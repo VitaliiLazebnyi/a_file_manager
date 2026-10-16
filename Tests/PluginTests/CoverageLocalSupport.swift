@@ -98,6 +98,6 @@ internal struct CoverageLocalSupport {
         // Eight questions are stuck: the next is not asked at all.
         #expect(resolver.resolve(link.path) == nil)
         gate.open()
-        #expect(Wait.until(seconds: 60) { resolver.resolve(link.path)?.isDirectory == true })
+        #expect(Wait.until { resolver.resolve(link.path)?.isDirectory == true })
     }
 }

@@ -40,7 +40,8 @@ import Testing
         // A link whose own name is not safe.
         #expect(FTPListParser.list("lrwxrwxrwx   1 owner    group          12 Jan 31  2024 ../l -> target") == nil)
         #expect(
-            FTPListParser.list("lrwxrwxrwx   1 owner    group          12 Jan 31  2024 l -> ../target")?.name == "l")
+            FTPListParser.list("lrwxrwxrwx   1 owner    group          12 Jan 31  2024 l -> ../target")?.name == "l"
+        )
 
         let dos = "01-31-24  03:04PM              1,234 "
         #expect(FTPListParser.list(dos + "..\\..\\evil.exe") == nil)
@@ -84,14 +85,17 @@ import Testing
     @Test func aPasswordIsNotRemembered() {
         #expect(
             ServerAddress.removingPassword(from: "smb://alice:s3cret@files.example.com/share")
-                == "smb://alice@files.example.com/share")
+                == "smb://alice@files.example.com/share"
+        )
         #expect(
             ServerAddress.removingPassword(from: "https://bob:p%40ss@dav.example.com:8443/a/b?x=1")
-                == "https://bob@dav.example.com:8443/a/b?x=1")
+                == "https://bob@dav.example.com:8443/a/b?x=1"
+        )
         #expect(ServerAddress.removingPassword(from: "afp://carol@host/vol") == "afp://carol@host/vol")
         #expect(
             ServerAddress.removingPassword(from: "nfs://host/export:with:colons@here")
-                == "nfs://host/export:with:colons@here")
+                == "nfs://host/export:with:colons@here"
+        )
         #expect(ServerAddress.removingPassword(from: "smb://") == "smb://")
         // Also without a scheme, and with a slash in the password.
         #expect(ServerAddress.removingPassword(from: "no scheme:pw@host") == "no scheme@host")
@@ -102,7 +106,10 @@ import Testing
 
     @Test func theStoredPasswordAnswersOnlyThisServersPrompt() {
         let profile = ConnectionProfile(
-            key: ServerKey(scheme: "sftp", host: "Files.Example.com"), user: "alice", password: "pw")
+            key: ServerKey(scheme: "sftp", host: "Files.Example.com"),
+            user: "alice",
+            password: "pw"
+        )
         let asks = { (question: String) in SFTPSession.asksForPassword(question, of: profile) }
         #expect(asks("alice@files.example.com's password: "))
         #expect(asks("(alice@files.example.com) Password: "))
@@ -213,8 +220,10 @@ import Testing
             #expect(fixture.fileSystem.item(at: target) == nil)
             #expect(fixture.fileSystem.item(at: target) == nil)
             try fixture.upload(
-                "/in/file\(index).dat", content,
-                attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000)))
+                "/in/file\(index).dat",
+                content,
+                attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000))
+            )
             let item = try #require(fixture.fileSystem.item(at: target))
             #expect(item.size == Int64(content.count) && item.modified == Date(timeIntervalSince1970: 1_600_000_000))
         }
@@ -374,9 +383,10 @@ import Testing
                 outcome.add("threw")
             }
             finished.signal()
-        }.start()
+        }
+        .start()
         // Until the server has the request, the read is under way but there is nothing to cut.
-        let waitUntil = Date().addingTimeInterval(120)
+        let waitUntil = Date().addingTimeInterval(Wait.ceiling)
         while !fixture.server.commands.contains(where: { $0.hasPrefix("RETR") }), Date() < waitUntil {
             Thread.sleep(forTimeInterval: 0.02)
         }
@@ -384,7 +394,7 @@ import Testing
         let started = Date()
         reader.close()
         // Long before the ten minutes the read would wait for the server by itself.
-        #expect(finished.wait(timeout: .now() + 120) == .success)
+        #expect(finished.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(Date().timeIntervalSince(started) < 120)
         #expect(outcome.all == ["threw"], "\(outcome.all)")
     }
@@ -401,7 +411,7 @@ import Testing
         let stream = NetStream(host: "localhost", port: fixture.server.port)
         stream.start()
         defer { stream.close() }
-        try stream.waitUntilReady(timeout: 10)
+        try stream.waitUntilReady(timeout: Wait.ceiling)
         #expect(stream.remoteAddress == "127.0.0.1")
     }
 
@@ -418,16 +428,16 @@ import Testing
         try fm.createSymbolicLink(atPath: fixture.box.url("srv/lslash").path, withDestinationPath: "realdir/")
 
         let probes = { fixture.server.commands.filter { $0.hasPrefix("CWD /l") }.count }
-        var items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true).filter(\.isSymlink).sorted {
-            $0.name < $1.name
-        }
+        var items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true)
+            .filter(\.isSymlink)
+            .sorted { $0.name < $1.name }
         #expect(items.map(\.name) == ["ldead", "ldir", "lfile", "lslash"])
         #expect(items.map(\.isDirectory) == [false, true, false, true])
         // The one whose target is spelled as a folder is not asked about; the others once each.
         #expect(probes() == 3)
-        items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true).filter(\.isSymlink).sorted {
-            $0.name < $1.name
-        }
+        items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true)
+            .filter(\.isSymlink)
+            .sorted { $0.name < $1.name }
         #expect(items.map(\.isDirectory) == [false, true, false, true])
         #expect(probes() == 3)
     }

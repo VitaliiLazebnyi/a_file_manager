@@ -409,7 +409,7 @@ final class FakeSFTPServer: @unchecked Sendable {
             environment: [:],
             writeTimeout: 1
         )
-        try channel.start(timeout: 10, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         defer { channel.close() }
         let started = Date()
         // A megabyte cannot be written into a pipe that nobody reads.

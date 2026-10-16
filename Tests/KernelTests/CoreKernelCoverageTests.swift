@@ -189,10 +189,9 @@ internal struct CoreKernelCoverageTests {
         }
         // The main thread does not turn for longer than the run loop is given.
         usleep(400_000)
-        var waited = 0
-        while answer.wait(seconds: 0) == nil, waited < 3_000 {
+        let end = Date(timeIntervalSinceNow: Wait.ceiling)
+        while answer.wait(seconds: 0) == nil, Date() < end {
             try? await Task.sleep(nanoseconds: 10_000_000)
-            waited += 1
         }
         // Whichever of the two blocks comes second finds nothing to do.
         try? await Task.sleep(nanoseconds: 300_000_000)

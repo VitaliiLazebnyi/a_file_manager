@@ -53,7 +53,7 @@ internal struct CoverageNetworkStreams {
         let stream = NetStream(host: "127.0.0.1", port: TestFTPServer.port(of: listener))
         stream.start()
         defer { stream.close() }
-        try stream.waitUntilReady(timeout: 30)
+        try stream.waitUntilReady(timeout: Wait.ceiling)
         let peer = try #require(accepted.wait())
         defer { close(peer) }
         // Nothing is read on the other side, so the buffers fill up and a piece is not taken in time.
@@ -79,8 +79,8 @@ internal struct CoverageNetworkStreams {
         let client = NetStream(host: "127.0.0.1", port: port)
         client.start()
         defer { client.close() }
-        let stream = try listener.accept(timeout: 30, cancellation: nil)
-        try stream.waitUntilReady(timeout: 30)
+        let stream = try listener.accept(timeout: Wait.ceiling, cancellation: nil)
+        try stream.waitUntilReady(timeout: Wait.ceiling)
         stream.close()
     }
 

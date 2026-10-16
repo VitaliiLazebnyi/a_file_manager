@@ -75,12 +75,12 @@ internal struct CoverageLocalVolumes {
         let free = local.volume(of: box.root)?.freeBytes
         // The old difference, and behind the scenes a new measurement: nothing important is free any more.
         #expect(free == 150)
-        #expect(Wait.until(seconds: 60) { local.spareLock.withLock { local.spareSpace[mount]?.isMeasuring == false } })
+        #expect(Wait.until { local.spareLock.withLock { local.spareSpace[mount]?.isMeasuring == false } })
         #expect(local.spareLock.withLock { local.spareSpace[mount]?.bytes } == nil)
         // And when the plain figure is gone too, the measurement is forgotten.
         answers.value = [(100, 0), (nil, 0)]
         local.spareLock.withLock { local.spareSpace[mount]?.measured = old }
         _ = local.volume(of: box.root)
-        #expect(Wait.until(seconds: 60) { local.spareLock.withLock { local.spareSpace[mount] == nil } })
+        #expect(Wait.until { local.spareLock.withLock { local.spareSpace[mount] == nil } })
     }
 }

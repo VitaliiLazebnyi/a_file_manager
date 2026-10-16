@@ -35,7 +35,7 @@ internal struct CoverageViewerPagerIndexTests {
         let flag = CancellationFlag()
         gate.submit(cancellation: flag) {
             started.signal()
-            _ = release.wait(timeout: .now() + 60)
+            _ = release.wait(timeout: .now() + Wait.ceiling)
         }
         Self.block(until: started)
         flag.cancel()

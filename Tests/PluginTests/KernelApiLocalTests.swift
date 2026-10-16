@@ -266,11 +266,8 @@ import Testing
         #expect(local.volume(of: box.root)?.freeBytes == plain + wrong)
         // …and put right behind the scenes, which is announced on the main thread.
         // (Waited for as a condition: the queues are busy while every test runs at once.)
-        var waited = 0
-        while !wasHeard(), waited < 120_000 {
-            try await Task.sleep(nanoseconds: 5_000_000)
-            waited += 5
-        }
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while !wasHeard(), Date() < patience { try await Task.sleep(nanoseconds: 5_000_000) }
         #expect(wasHeard())
         #expect(local.volume(of: box.root)?.freeBytes == plain + spare)
         #expect(known() == spare)

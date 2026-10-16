@@ -176,10 +176,10 @@ internal struct CoverageLocalMore {
         var probes = LocalProbes()
         probes.home = box.root
         let local = LocalFileSystem(probes: probes)
-        #expect(Wait.until(seconds: 60) { local.places().contains { $0.kind == .internalDisk } })
+        #expect(Wait.until { local.places().contains { $0.kind == .internalDisk } })
         try box.folder("Library/Mobile Documents/com~apple~CloudDocs")
         NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didMountNotification, object: nil)
-        #expect(Wait.until(seconds: 60) { local.places().contains { $0.name == "iCloud Drive" } })
+        #expect(Wait.until { local.places().contains { $0.name == "iCloud Drive" } })
     }
 
     /// The plugin registers the file system of the Mac.

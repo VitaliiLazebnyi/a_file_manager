@@ -1,6 +1,7 @@
 import AFMKernel
 import AppKit
 import Foundation
+import TestSupport
 import Testing
 
 @testable import ViewerPlugin
@@ -71,7 +72,8 @@ import Testing
                     Comment(
                         rawValue:
                             "seed \(seed), braces \(braces): \(String(decoding: units, as: UTF16.self).debugDescription)"
-                    ))
+                    )
+                )
                 compared += 1
             }
         }
@@ -85,7 +87,9 @@ import Testing
             #expect(HTMLText.plainText(units: units) == HTMLReference.plainText(units: units), "seed \(seed)")
             #expect(
                 HTMLText.plainText(units: units, linkBraces: false)
-                    == HTMLReference.plainText(units: units, linkBraces: false), "seed \(seed)")
+                    == HTMLReference.plainText(units: units, linkBraces: false),
+                "seed \(seed)"
+            )
         }
     }
 
@@ -106,9 +110,15 @@ import Testing
     private func picture(_ width: Int, _ height: Int) throws -> CGImage {
         let context = try #require(
             CGContext(
-                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        )
         // Red on the left half, blue on the right (the drawing has its origin at the bottom left).
         context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width / 2, height: height))
@@ -130,7 +140,7 @@ import Testing
     private func wait(until condition: () -> Bool) async -> Bool {
         // Generous: other tests that run on the main actor at the same time hold it for as long as they take, and
         // the wait costs nothing once the condition holds.
-        let deadline = Date().addingTimeInterval(300)
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !condition(), Date() < deadline { try? await Task.sleep(nanoseconds: 3_000_000) }
         return condition()
     }
@@ -155,7 +165,8 @@ import Testing
         // Showing it larger than it is, or at nearly its own size, needs no bitmap; nor does a huge one.
         #expect(
             cache.image(for: frame, width: 3_000, height: 1_500) == nil
-                && cache.image(for: frame, width: 1_990, height: 995) == nil)
+                && cache.image(for: frame, width: 1_990, height: 995) == nil
+        )
         let big = try picture(8_000, 6_000)
         #expect(cache.image(for: big, width: 7_000, height: 5_800) == nil)
         await settled(cache)

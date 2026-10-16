@@ -1,5 +1,6 @@
 import AFMKernel
 import Foundation
+import TestSupport
 import Testing
 
 @testable import NetworkPlugin
@@ -60,7 +61,7 @@ internal struct CoverageNetworkTransfers {
         defer { connection.close() }
         let stream = try connection.beginTransfer("RETR a", type: "I")
         var received = Data()
-        while let block = try stream.read(upToCount: 100, timeout: 10) {
+        while let block = try stream.read(upToCount: 100, timeout: Wait.ceiling) {
             received += block
         }
         #expect(received == Data("data".utf8))

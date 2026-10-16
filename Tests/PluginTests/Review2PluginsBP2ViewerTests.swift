@@ -244,7 +244,7 @@ import UniformTypeIdentifiers
         }
     }
 
-    private func wait(_ seconds: Double = 30, until condition: () -> Bool) -> Bool {
+    private func wait(_ seconds: Double = Wait.ceiling, until condition: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline { Thread.sleep(forTimeInterval: 0.002) }
         return condition()
@@ -676,12 +676,12 @@ import UniformTypeIdentifiers
         #expect(FileManager.default.fileExists(atPath: local.path))
         let done = DispatchSemaphore(value: 0)
         copies.removeAll(waiting: false, then: { done.signal() })
-        #expect(done.wait(timeout: .now() + 30) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(!FileManager.default.fileExists(atPath: local.path))
         // Nothing left: the answer comes at once, and once.
         let again = DispatchSemaphore(value: 0)
         copies.removeAll(waiting: false, then: { again.signal() })
-        #expect(again.wait(timeout: .now() + 30) == .success)
+        #expect(again.wait(timeout: .now() + Wait.ceiling) == .success)
     }
 
     // MARK: A FIFO that takes the place of a file
@@ -714,7 +714,7 @@ import UniformTypeIdentifiers
             done.signal()
         }
         thread.start()
-        let finished = done.wait(timeout: .now() + 30) == .success
+        let finished = done.wait(timeout: .now() + Wait.ceiling) == .success
         if !finished {
             // Let the stuck open go, so the thread ends.
             let fd = open(url.path, O_WRONLY | O_NONBLOCK)
@@ -740,7 +740,7 @@ import UniformTypeIdentifiers
             done.signal()
         }
         .start()
-        let finished = done.wait(timeout: .now() + 30) == .success
+        let finished = done.wait(timeout: .now() + Wait.ceiling) == .success
         if !finished {
             let fd = open(url.path, O_WRONLY | O_NONBLOCK)
             if fd >= 0 { close(fd) }
