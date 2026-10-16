@@ -20,6 +20,8 @@ internal final class CovFileOpsAnswers: FileJobDelegate, Sendable {
     internal let volumes = Shared<[ProtectionChoice]>([.skip])
     /// What was asked, one line per question.
     internal let asked = Shared<[String]>([])
+    /// Runs at every question, with its line, before it is answered.
+    internal let onQuestion = Shared<(@Sendable (String) -> Void)?>(nil)
     /// Runs at every failure, before it is answered.
     internal let onFailure = Shared<(@Sendable () -> Void)?>(nil)
     /// Runs with every report of progress.
@@ -65,6 +67,7 @@ internal final class CovFileOpsAnswers: FileJobDelegate, Sendable {
 
     private func next<Answer>(_ answers: Shared<[Answer]>, _ question: String) -> Answer {
         asked.modify { $0.append(question) }
+        onQuestion.value?(question)
         var answer: Answer?
         answers.modify { list in
             answer = list.count > 1 ? list.removeFirst() : list.first

@@ -33,7 +33,7 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
     internal let abilities = Shared<FileSystemCapabilities>([.write, .trash])
     /// What a look at a path answers instead of the memory file system.
     internal let seen = Shared<[String: FileItem]>([:])
-    /// How many reads of a file go well before the next one fails, by path.
+    /// How many reads of a file go well before the next one fails, by path, counted over every reader of it.
     internal let readsBeforeFailure = Shared<[String: Int]>([:])
     /// What moving to the Trash throws; nil moves the item into `/.Trash`.
     internal let trashError = Shared<(any Error)?>(nil)
@@ -85,10 +85,10 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
     /// The memory file system's reader, which fails where the test says.
     internal func read(_ url: URL) throws -> any FileReader {
         let reader = try base.read(url)
-        guard let allowed = readsBeforeFailure.value[url.path] else {
+        guard readsBeforeFailure.value[url.path] != nil else {
             return reader
         }
-        return CovFileOpsFailingReader(reader, allowed: allowed)
+        return CovFileOpsFailingReader(reader, path: url.path, budget: readsBeforeFailure)
     }
 
     /// The memory file system's continuation of a file.

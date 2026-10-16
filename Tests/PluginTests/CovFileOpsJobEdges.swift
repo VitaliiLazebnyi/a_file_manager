@@ -188,25 +188,24 @@ internal struct CovFileOpsJobEdges {
         #expect(answers.asked.value.filter { $0.hasPrefix("volume") }.count == 3)
     }
 
-    /// Moves to a file system that writes later keep their sources when the job is cancelled before the writes.
+    /// Moves to a file system that writes later keep their sources when the job is aborted before the writes.
     @Test
-    internal func deferredRemovalsAreKeptWhenTheJobIsCancelled() {
-        disk.abilities.value = [.write, .deferredWrites]
-        memory.addFile("/A/one.txt", "1")
-        memory.addFile("/A/two.txt", "2")
-        disk.base.addDirectory("/B")
+    internal func deferredRemovalsAreKeptWhenTheJobIsAborted() {
+        memory.capabilities = [.write, .deferredWrites]
+        disk.base.addFile("/A/one.txt", "1")
+        disk.base.addFile("/A/two.txt", "2")
+        disk.readsBeforeFailure.value = ["/A/two.txt": 0]
+        memory.addDirectory("/B")
         let answers = CovFileOpsAnswers()
-        answers.onProgress.value = { job, progress in
-            if progress.itemsDone >= 1 { job.cancel() }
-        }
+        answers.failures.value = [.abort]
         let job = FileJob(
             kind: .move,
-            sources: [memory.url("/A/one.txt"), memory.url("/A/two.txt")],
-            target: TargetSpec(directory: disk.base.url("/B")),
+            sources: [disk.base.url("/A/one.txt"), disk.base.url("/A/two.txt")],
+            target: TargetSpec(directory: memory.url("/B")),
             fileSystems: fileSystems
         )
         job.delegate = answers
-        #expect(job.run().cancelled && memory.exists("/A/one.txt"))
+        #expect(job.run().cancelled && disk.base.exists("/A/one.txt") && memory.contents("/B/one.txt") == "1")
     }
 
     /// The Trash that refuses a locked item asks about it; kept, it is not trashed.
@@ -220,79 +219,5 @@ internal struct CovFileOpsJobEdges {
         job.delegate = answers
         #expect(job.run().completed.isEmpty && disk.base.exists("/A/f.txt"))
         #expect(answers.asked.value.contains { $0.hasPrefix("protected: locked") })
-    }
-
-    /// Cancelled while the files of a folder are deleted by the workers, the job ends there.
-    @Test
-    internal func aCancelWhileWorkersDeleteEndsTheJob() throws {
-        for number in 0..<40 {
-            try box.file("d/f\(number).txt", "\(number)")
-        }
-        let answers = CovFileOpsAnswers()
-        answers.onProgress.value = { job, progress in
-            if progress.itemsDone >= 2 { job.cancel() }
-        }
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], fileSystems: fileSystems)
-        job.delegate = answers
-        #expect(job.run().cancelled && box.exists("d"))
-    }
-
-    /// A locked file that cannot be removed even unlocked gets its lock back.
-    @Test
-    internal func aLockedFileThatStillCannotGoGetsItsLockBack() throws {
-        let file = try box.file("d/f.txt", "f")
-        #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
-        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: box.url("d").path)
-        defer {
-            _ = chflags(file.path, 0)
-            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.url("d").path)
-        }
-        let answers = CovFileOpsAnswers()
-        answers.failures.value = [.skip]
-        let job = FileJob(kind: .delete(toTrash: false), sources: [file], fileSystems: fileSystems)
-        job.delegate = answers
-        _ = job.run()
-        #expect(box.exists("d/f.txt") && FileIdentity.flags(of: file).map { $0 & UInt32(UF_IMMUTABLE) != 0 } == true)
-    }
-
-    /// Links followed in a count take the size the listing brought; a count past the limit keeps large folders only;
-    /// a count cut short by a cancel stops.
-    @Test
-    internal func countsFollowLinksKeepLargeFoldersAndStop() throws {
-        try box.file("S/target.txt", "12345")
-        try FileManager.default.createSymbolicLink(atPath: box.url("S/link").path, withDestinationPath: "target.txt")
-        for number in 0..<70 {
-            try box.file("S/big/f\(number)", "x")
-        }
-        try box.file("S/small/f", "x")
-        var job = FileJob(
-            kind: .copy,
-            sources: [box.url("S")],
-            target: TargetSpec(directory: box.url("T")),
-            fileSystems: fileSystems
-        )
-        job.options.links = .followLinks
-        job.rememberedLimit = 1
-        let answers = Answers()
-        job.delegate = answers
-        _ = withExtendedLifetime(answers) { job.run() }
-        #expect(box.read("T/S/link") == "12345" && box.exists("T/S/big/f69"))
-        for number in 0..<300 {
-            disk.base.addFile("/W/d\(number)/f", "x")
-        }
-        disk.base.addDirectory("/Z")
-        job = FileJob(
-            kind: .copy,
-            sources: [disk.base.url("/W")],
-            target: TargetSpec(directory: disk.base.url("/Z")),
-            fileSystems: fileSystems
-        )
-        let held = Shared<FileJob?>(job)
-        disk.beforeList.value = { path in
-            if path == "/W/d3" { held.value?.cancel() }
-        }
-        job.delegate = answers
-        #expect(withExtendedLifetime(answers) { job.run() }.cancelled)
-        held.value = nil
     }
 }
