@@ -74,7 +74,7 @@ internal struct CovFileOpsCancelling {
         try box.file("dir/a.txt", "a")
         let bench = TestBench(
             plugins: [FileOperationsPlugin { nil }],
-            fileSystems: [CovFileOpsExclusiveDisk()],
+            fileSystems: [CovFileOpsExclusiveDisk(refusesReplacing: false)],
             left: box.url("dir"),
             right: box.root
         )

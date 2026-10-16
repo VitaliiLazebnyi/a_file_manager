@@ -31,6 +31,12 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
     internal let order = Shared<(@Sendable ([URL]) -> [URL])?>(nil)
     /// What the file system can do.
     internal let abilities = Shared<FileSystemCapabilities>([.write, .trash])
+    /// What a look at a path answers instead of the memory file system.
+    internal let seen = Shared<[String: FileItem]>([:])
+    /// How many reads of a file go well before the next one fails, by path.
+    internal let readsBeforeFailure = Shared<[String: Int]>([:])
+    /// What moving to the Trash throws; nil moves the item into `/.Trash`.
+    internal let trashError = Shared<(any Error)?>(nil)
 
     /// `scripted`.
     internal var scheme: String { base.scheme }
@@ -61,7 +67,7 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
             counts[path] = count + 1
         }
         beforeLook.value?(path, count)
-        return base.item(at: url)
+        return seen.value[path] ?? base.item(at: url)
     }
 
     /// The memory file system's answer.
@@ -69,9 +75,27 @@ internal final class CovFileOpsScriptedDisk: FileSystemProvider, Sendable {
         base.parent(of: directory)
     }
 
-    /// The memory file system's reader.
+    /// The memory file system's reader, which fails where the test says.
     internal func read(_ url: URL) throws -> any FileReader {
-        try base.read(url)
+        let reader = try base.read(url)
+        guard let allowed = readsBeforeFailure.value[url.path] else {
+            return reader
+        }
+        return CovFileOpsFailingReader(reader, allowed: allowed)
+    }
+
+    /// The memory file system's continuation of a file.
+    internal func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
+        try base.append(to: url, at: offset, cancellation: cancellation)
+    }
+
+    /// Moves the item into `/.Trash`, unless the test says what is thrown instead.
+    internal func trash(_ url: URL) throws {
+        if let error = trashError.value {
+            throw error
+        }
+        base.addDirectory("/.Trash")
+        try base.move(url, to: base.url("/.Trash/" + url.lastPathComponent), replacing: true)
     }
 
     /// The memory file system's writer.

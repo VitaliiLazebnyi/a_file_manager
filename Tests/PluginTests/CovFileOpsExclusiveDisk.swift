@@ -3,14 +3,21 @@ import Foundation
 import LocalFileSystemPlugin
 
 /// The disk as a volume sees it that cannot rename exclusively and looks at letter case only: a move that is not to
-/// replace is refused wherever the name is taken, also by the file itself under another case.
+/// replace is refused wherever the name is taken, also by the file itself under another case. With
+/// `refusesReplacing`, a move that is to replace is one between volumes.
 internal final class CovFileOpsExclusiveDisk: FileSystemProvider, Sendable {
     private let base = LocalFileSystem()
+    private let refusesReplacing: Bool
 
     /// `file`.
     internal var scheme: String { base.scheme }
     /// What the disk can do.
     internal var capabilities: FileSystemCapabilities { base.capabilities }
+
+    /// The disk; `refusesReplacing` makes every move that replaces one between volumes.
+    internal init(refusesReplacing: Bool) {
+        self.refusesReplacing = refusesReplacing
+    }
 
     /// The disk's answer.
     internal func capabilities(for url: URL) -> FileSystemCapabilities {
@@ -51,6 +58,9 @@ internal final class CovFileOpsExclusiveDisk: FileSystemProvider, Sendable {
     internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         if !replacing, FileManager.default.fileExists(atPath: destination.path) {
             throw FileSystemError.alreadyExists(destination.path)
+        }
+        if replacing, refusesReplacing {
+            throw FileSystemError.crossesVolumes
         }
         try base.move(source, to: destination, replacing: replacing)
     }

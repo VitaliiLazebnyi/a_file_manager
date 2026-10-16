@@ -2054,7 +2054,7 @@ public final class FileJob: @unchecked Sendable {
 
     /// What the system answers when a place has no Trash at all, as opposed to a failure of
     /// this one item (no permission, the item vanished), which is the user's to deal with.
-    private static func isNoTrash(_ error: any Error) -> Bool {
+    static func isNoTrash(_ error: any Error) -> Bool {
         if case .notSupported? = error as? FileSystemError { return true }
         let error = error as NSError
         if error.domain == NSCocoaErrorDomain, error.code == CocoaError.featureUnsupported.rawValue { return true }
@@ -2280,7 +2280,7 @@ public final class FileJob: @unchecked Sendable {
 
     /// "Operation not permitted": what the system answers for a locked item, as opposed to a
     /// folder one has no right to change.
-    private static func isRefusedAsLocked(_ error: any Error) -> Bool {
+    static func isRefusedAsLocked(_ error: any Error) -> Bool {
         let error = error as NSError
         if error.domain == NSPOSIXErrorDomain { return error.code == Int(EPERM) }
         return (error.userInfo[NSUnderlyingErrorKey] as? (any Error)).map(isRefusedAsLocked) ?? false
@@ -2314,36 +2314,34 @@ public final class FileJob: @unchecked Sendable {
     private func attempt(_ verb: OperationRecord.Verb, at url: URL, target: URL? = nil, _ step: () throws -> Bool)
         throws -> Bool
     {
-        while true {
-            do {
-                return try step()
-            } catch is Cancelled {
-                throw Cancelled()
-            } catch {
-                // What fails because the job is being stopped is not a question for the user.
+        do {
+            return try step()
+        } catch is Cancelled {
+            throw Cancelled()
+        } catch {
+            // What fails because the job is being stopped is not a question for the user.
+            if isStopping { throw Cancelled() }
+            counters.withLock {
+                failureCount += 1
+                if failures.count < 20 { failures.append("\(display(url)): \(error.localizedDescription)") }
+            }
+            record(verb, url, target, .failed(error.localizedDescription))
+            let choice: ErrorChoice = try decisions.withLock {
+                if skipAllErrors { return .skip }
+                // Another worker's question may have ended the job while this one waited its turn.
                 if isStopping { throw Cancelled() }
-                counters.withLock {
-                    failureCount += 1
-                    if failures.count < 20 { failures.append("\(display(url)): \(error.localizedDescription)") }
-                }
-                record(verb, url, target, .failed(error.localizedDescription))
-                let choice: ErrorChoice = try decisions.withLock {
-                    if skipAllErrors { return .skip }
-                    // Another worker's question may have ended the job while this one waited its turn.
-                    if isStopping { throw Cancelled() }
-                    let choice = try delegateOrStop().job(self, failedAt: url, error: error)
-                    if choice == .skipAll { skipAllErrors = true }
-                    if choice == .abort { halt() }
-                    return choice
-                }
-                switch choice {
-                case .skip, .skipAll:
-                    record(verb, url, target, .skipped)
-                    return false
+                let choice = try delegateOrStop().job(self, failedAt: url, error: error)
+                if choice == .skipAll { skipAllErrors = true }
+                if choice == .abort { halt() }
+                return choice
+            }
+            switch choice {
+            case .skip, .skipAll:
+                record(verb, url, target, .skipped)
+                return false
 
-                case .retry: continue
-                case .abort: throw Cancelled()
-                }
+            case .retry: return try attempt(verb, at: url, target: target, step)
+            case .abort: throw Cancelled()
             }
         }
     }
@@ -2491,11 +2489,6 @@ public final class FileJob: @unchecked Sendable {
     }
 
     // MARK: Counting
-
-    /// The item itself plus everything below it.
-    private func measure(_ url: URL) -> Measure {
-        (try? entry(at: url)).map(measure) ?? Measure(items: 1)
-    }
 
     /// What a source adds to the total. A folder that a move is going to rename as a whole is
     /// one item, and its contents are not walked: that would take as long as a copy's count.
@@ -2656,12 +2649,12 @@ enum FileIdentity {
     /// The volume of `url`, or of the nearest folder above it that exists.
     static func device(ofNearest url: URL) -> dev_t? {
         guard url.isFileURL else { return nil }
-        var path: String? = url.path
-        while let current = path {
-            if let info = status(current, followingLinks: true) { return info.st_dev }
-            path = parent(of: current)
+        var path = url.path
+        // The nearest folder that is there: the root always is.
+        while status(path, followingLinks: true) == nil, let above = parent(of: path) {
+            path = above
         }
-        return nil
+        return status(path, followingLinks: true)?.st_dev
     }
 
     /// True when both names are the same directory entry: the same file in the same folder,
