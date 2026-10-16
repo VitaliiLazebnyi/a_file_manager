@@ -549,8 +549,10 @@ public final class FileJob: @unchecked Sendable {
         final class Box: @unchecked Sendable { var result = JobResult() }
         let box = Box()
         let finished = DispatchSemaphore(value: 0)
-        let thread = Thread {
-            box.result = self.work()
+        // Unowned: the caller holds the job until `run()` returns, which is after the work. The
+        // thread lives on for a moment after it signals, and must not keep the job alive meanwhile.
+        let thread = Thread { [unowned self] in
+            box.result = work()
             finished.signal()
         }
         thread.name = "afm.fileoperations.job"
