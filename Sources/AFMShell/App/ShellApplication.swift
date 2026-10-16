@@ -116,8 +116,4 @@ public final class ShellApplication: NSObject, NSApplicationDelegate, NSMenuItem
         }
         return true
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

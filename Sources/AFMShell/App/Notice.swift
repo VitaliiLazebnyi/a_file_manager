@@ -10,6 +10,9 @@ internal enum Notice {
     internal static let duration: TimeInterval = 3
     /// The message on screen, until it has faded.
     internal private(set) static var shown: NSPanel?
+    /// Puts a message that belongs to no window on screen, in front of every program; the
+    /// system's way unless told otherwise.
+    internal static var orderInAlone: (NSPanel) -> Void = { $0.orderFrontRegardless() }
 
     /// Shows `message` over `window`, or at the bottom of the main screen without one.
     internal static func show(_ message: String, over window: NSWindow?) {
@@ -25,7 +28,7 @@ internal enum Notice {
         if let window {
             window.addChildWindow(panel, ordered: .above)
         } else {
-            panel.orderFrontRegardless()
+            orderInAlone(panel)
         }
         shown = panel
         NSAccessibility.post(

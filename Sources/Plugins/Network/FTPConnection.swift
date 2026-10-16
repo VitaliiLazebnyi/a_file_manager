@@ -259,8 +259,9 @@ final class FTPConnection: @unchecked Sendable {
     private(set) var commandMayHaveRun = false
     /// Guards the two stream references against `interrupt`, the one call from another thread.
     private let streamsLock = NSLock()
-    /// When the connection was last used; the pool reads it while it holds the connection.
-    var lastUsed = Date()
+    /// When the connection was last used, by `clock`; the pool reads it while it holds the connection.
+    private(set) var lastUsed: Date
+    private let clock: @Sendable () -> Date
     /// Called with every line sent and received, for the log.
     let log: (@Sendable (String) -> Void)?
 
@@ -271,7 +272,8 @@ final class FTPConnection: @unchecked Sendable {
         knownLinks: LinkMemory = LinkMemory(),
         knownNames: NameMemory = NameMemory(),
         onActivity: (@Sendable () -> Void)? = nil,
-        log: (@Sendable (String) -> Void)? = nil
+        log: (@Sendable (String) -> Void)? = nil,
+        clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.config = config
         self.trust = trust
@@ -279,6 +281,8 @@ final class FTPConnection: @unchecked Sendable {
         self.knownNames = knownNames
         self.onActivity = onActivity
         self.log = log
+        self.clock = clock
+        lastUsed = clock()
         encoding = config.encoding
     }
 
@@ -419,19 +423,17 @@ final class FTPConnection: @unchecked Sendable {
         let control = try stream()
         let deadline = Date().addingTimeInterval(timeout ?? config.timeout)
         do {
-            var read = 0
-            repeat {
+            for read in 1...FTPLimits.replyLinesRead + 1 {
                 let left = deadline.timeIntervalSinceNow
                 guard left > 0 else { throw NetworkError.timedOut("waiting for a reply") }
                 let line = encoding.decode(try control.readLine(timeout: left, cancellation: cancellation))
-                read += 1
                 // The log gets the start of a very long reply, not all of it.
                 if read <= FTPLimits.replyLines { log?(line) }
                 if let reply = replies.feed(line) {
                     onActivity?()
                     return reply
                 }
-            } while read <= FTPLimits.replyLinesRead
+            }
             throw NetworkError.unexpected("a reply of more than \(FTPLimits.replyLinesRead) lines")
         } catch {
             // A reply that did not arrive would be taken for the answer to the next command.
@@ -454,7 +456,7 @@ final class FTPConnection: @unchecked Sendable {
             throw FileSystemError.notSupported("A name with a line break")
         }
         log?(shown ?? command)
-        lastUsed = Date()
+        lastUsed = clock()
         commandMayHaveRun = false
         do {
             try control.write(
@@ -729,7 +731,7 @@ final class FTPConnection: @unchecked Sendable {
             }
             reply = try readReply(cancellation: cancellation)
         }
-        lastUsed = Date()
+        lastUsed = clock()
         guard reply.isSuccess else { throw refusal(reply) }
     }
 
@@ -763,7 +765,7 @@ final class FTPConnection: @unchecked Sendable {
                 return
             }
         }
-        lastUsed = Date()
+        lastUsed = clock()
     }
 
     // MARK: Listing

@@ -156,19 +156,20 @@ internal struct Review2ShellTests {
         let service = app.shell.jobService
         var states: [String] = []
         let told = service.onBusyChanged
-        service.onBusyChanged = {
-            states.append("busy \(service.isBusy)")
+        // The service keeps what it calls: held weakly, or the two would keep each other.
+        service.onBusyChanged = { [weak service] in
+            states.append("busy \(service?.isBusy == true)")
             told?()
         }
         service.run(
             title: "One",
             work: { _ in 1 },
-            completion: { _ in states.append("first done, busy \(service.isBusy)") }
+            completion: { [weak service] _ in states.append("first done, busy \(service?.isBusy == true)") }
         )
         service.run(
             title: "Two",
             work: { _ in 2 },
-            completion: { _ in states.append("second done, busy \(service.isBusy)") }
+            completion: { [weak service] _ in states.append("second done, busy \(service?.isBusy == true)") }
         )
         await program.settle(app)
         await PanelWait.until { states.count == 4 }
@@ -205,7 +206,7 @@ internal struct Review2ShellTests {
 
     /// The bars rest after a slow check: an event alone asks for no new check, a change does.
     @Test
-    internal func theBarsRestAfterASlowCheck() async throws {
+    internal func theBarsRestAfterASlowCheck() async {
         let app = await program.start()
         defer { app.stop() }
         let window = app.shell.mainWindow

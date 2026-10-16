@@ -151,6 +151,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         return total
     }
 
+    /// How many threads wait for a connection to run a command on, for tests.
+    var waitingCommands: Int { condition.withLock { commandWaiters } }
+
     /// A reader that was closed hands its connection to the background, which gives it back
     /// (`release`) once the server was told; `change` is +1 before and -1 after.
     fileprivate func noteReturning(_ change: Int) {
@@ -176,13 +179,13 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     // MARK: Opening connections
 
-    private func config(for profile: ConnectionProfile) -> FTPServerConfig {
+    private func config(for profile: ConnectionProfile, user: String) -> FTPServerConfig {
         let options = environment.options.values
         return FTPServerConfig(
             host: profile.key.host,
             port: profile.key.port,
             tls: profile.tls,
-            user: profile.user ?? "anonymous",
+            user: user,
             password: profile.password ?? "",
             passive: profile.passive ?? options.passiveByDefault,
             encoding: profile.encoding,
@@ -192,9 +195,12 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         )
     }
 
-    /// The user said no to a question; the connection is not made.
-    private struct Refusal: Error {
-        let error: any Error
+    /// Where the user name and password of a login come from.
+    private enum Login {
+        /// The user typed them.
+        case typed(Credentials)
+        /// Another thread's login was accepted with them meanwhile.
+        case another(user: String, password: String?, anonymous: Bool)
     }
 
     private func takeLoginLock(cancellation: CancellationFlag?) throws {
@@ -289,34 +295,37 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
         var refused = false
         var remember = false
-        /// Asks for the user name and password, unless another thread got them meanwhile.
-        func credentials(_ message: String) throws {
+        /// Asks for the user name and password, unless another thread got them meanwhile, and
+        /// returns the user name.
+        func credentials(_ message: String) throws -> String {
             let tried = (profile.user, profile.password)
             let hadLock = holdsLock
             let answer = try ask(holdsLock: &holdsLock, background: background, cancellation: cancellation) {
-                () -> Credentials?? in
+                () -> Login? in
                 if !hadLock {
                     // Waited for another thread's question: its answer, once a login accepted it, is used.
                     condition.lock()
                     let now = currentProfile
                     condition.unlock()
-                    if now.user != nil, (now.user, now.password) != tried { return .some(nil) }
+                    if let user = now.user, (now.user, now.password) != tried {
+                        return .another(user: user, password: now.password, anonymous: now.anonymous)
+                    }
                 }
-                return environment.askCredentials(profile, message).map { .some($0) }
+                return environment.askCredentials(profile, message).map(Login.typed)
             }
             guard let answer else {
                 refused = true
                 throw message.isEmpty ? NetworkError.cancelled : NetworkError.loginFailed(message)
             }
-            if let answer {
-                (profile.user, profile.password, profile.anonymous) = (answer.user, answer.password, false)
-                remember = answer.remember
-            } else {
-                condition.lock()
-                (profile.user, profile.password, profile.anonymous) = (
-                    currentProfile.user, currentProfile.password, currentProfile.anonymous
-                )
-                condition.unlock()
+            switch answer {
+            case .typed(let typed):
+                (profile.user, profile.password, profile.anonymous) = (typed.user, typed.password, false)
+                remember = typed.remember
+                return typed.user
+
+            case .another(let user, let password, let anonymous):
+                (profile.user, profile.password, profile.anonymous) = (user, password, anonymous)
+                return user
             }
         }
 
@@ -340,14 +349,15 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                 mayConnect = true
                 condition.unlock()
             }
-            if profile.user == nil {
-                if profile.anonymous {
-                    (profile.user, profile.password) = ("anonymous", environment.options.values.anonymousPassword)
-                } else {
-                    try credentials("")
-                }
-            } else if profile.password == nil, profile.user != "anonymous" {
-                try credentials("")
+            var user: String
+            if let known = profile.user {
+                user = known
+                if profile.password == nil, known != "anonymous" { user = try credentials("") }
+            } else if profile.anonymous {
+                (profile.user, profile.password) = ("anonymous", environment.options.values.anonymousPassword)
+                user = "anonymous"
+            } else {
+                user = try credentials("")
             }
             var attempts = 0
             var askedUnprotected = knowsUnprotected
@@ -376,12 +386,13 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                     condition.unlock()
                 }
                 let connection = FTPConnection(
-                    config: config(for: profile),
+                    config: config(for: profile, user: user),
                     trust: environment.trust,
                     knownLinks: links,
                     knownNames: names,
                     onActivity: { [weak self] in self?.noteProgress() },
-                    log: environment.log
+                    log: environment.log,
+                    clock: environment.clock
                 )
                 do {
                     try connection.connect(cancellation: cancellation ?? closing)
@@ -421,7 +432,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                     }
                 } catch NetworkError.loginFailed(let message) {
                     guard attempts < 4 else { throw NetworkError.loginFailed(message) }
-                    try credentials(message)
+                    user = try credentials(message)
                 }
             }
             return opened
@@ -508,12 +519,12 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
             // The slot is taken now, not when the connection is registered, so threads that
             // arrive together do not all see it free.
             if let transfer { adjust(transfer, by: 1) }
-            lastActivity = Date()
+            lastActivity = environment.clock()
             condition.unlock()
 
             if let connection = candidate {
                 // A connection that sat idle may have been dropped by the server or a router.
-                if Date().timeIntervalSince(connection.lastUsed) > Self.trustedIdleTime,
+                if environment.clock().timeIntervalSince(connection.lastUsed) > Self.trustedIdleTime,
                     !connection.isAlive(cancellation: cancellation ?? closing)
                 {
                     discard(connection, wasInUse: false, transfer: transfer)
@@ -655,19 +666,21 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         let timer = DispatchSource.makeTimerSource(queue: keepAliveQueue)
         let period = max(0.25, interval / 2)
         timer.schedule(deadline: .now() + period, repeating: period)
-        // The timer only says when; the test waits for the server, which a dispatch queue must not.
-        timer.setEventHandler { [weak self] in
-            guard let self else { return }
-            condition.lock()
-            let start = !isPinging && !isClosed
-            if start { isPinging = true }
-            condition.unlock()
-            if start {
-                Background.run(lane: self) { [weak self] in self?.keepIdleConnectionsAlive(interval: interval) }
-            }
-        }
+        timer.setEventHandler { [weak self] in self?.keepAliveBeat(interval: interval) }
         timer.resume()
         keepAlive = timer
+    }
+
+    /// The timer only says when: the test waits for the server, which a dispatch queue must not,
+    /// so it runs in the background, one round at a time.
+    private func keepAliveBeat(interval: TimeInterval) {
+        condition.lock()
+        let start = !isPinging && !isClosed
+        if start { isPinging = true }
+        condition.unlock()
+        if start {
+            Background.run(lane: self) { [weak self] in self?.keepIdleConnectionsAlive(interval: interval) }
+        }
     }
 
     /// Tests the idle connections that were not used for `interval`, one at a time: each is
@@ -677,7 +690,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         var kept = 0
         var tested = Set<ObjectIdentifier>()
         while true {
-            let now = Date()
+            let now = environment.clock()
             condition.lock()
             guard !isClosed,
                 let index = idle.firstIndex(where: {
@@ -797,10 +810,11 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
             guard let connection = try? acquire(transfer: nil, background: true, cancellation: closing).connection
             else {
-                // Nothing is free right now; the links wait.
+                // Nothing is free right now; the links wait. A session that was closed meanwhile
+                // ends the resolver at the top of the loop.
                 condition.lock()
                 pendingLinks = batch + pendingLinks
-                if !isClosed { condition.wait(until: Date().addingTimeInterval(0.5)) }
+                condition.wait(until: Date().addingTimeInterval(0.5))
                 condition.unlock()
                 continue
             }

@@ -351,8 +351,4 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
         }
         panel?.gridDidScroll()
     }
-
-    deinit {
-        // Nothing to release: the notification center forgets the list when it goes.
-    }
 }

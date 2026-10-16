@@ -42,7 +42,7 @@ internal final class CommandLineView: NSView, NSComboBoxDelegate {
     internal var hasFocus: Bool { field.currentEditor() != nil }
 
     /// Whether the list of the lines run before is open.
-    internal var isHistoryOpen: Bool { field.cell?.isAccessibilityExpanded() ?? false }
+    internal var isHistoryOpen: Bool { field.cell.map { $0.isAccessibilityExpanded() } == true }
 
     /// The command line of `kernel`, in the source panel of `panels`.
     internal init(kernel: Kernel, panels: PanelCoordinator) {
@@ -286,9 +286,5 @@ internal final class CommandLineView: NSView, NSComboBoxDelegate {
             return false
         }
         return true
-    }
-
-    deinit {
-        // Nothing to release.
     }
 }

@@ -61,8 +61,4 @@ internal final class SortHeaderView: NSView {
     private func frame(of index: Int) -> NSRect {
         NSRect(x: CGFloat(index) * Self.buttonWidth, y: 0, width: Self.buttonWidth, height: bounds.height)
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

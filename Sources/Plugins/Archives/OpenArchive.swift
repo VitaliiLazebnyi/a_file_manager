@@ -1805,7 +1805,10 @@ final class OpenArchive: @unchecked Sendable {
         var replaced: ArchiveEntry?
         if let existing = tree.entry(destination) {
             guard replacing else { throw FileSystemError.alreadyExists(destination) }
-            if existing.isDirectory, tree.hasChildren(destination) { throw FileSystemError.alreadyExists(destination) }
+            // As on the disk: a file takes the place of a file, and a folder that of an empty folder.
+            if existing.isDirectory != entry.isDirectory || tree.hasChildren(destination) {
+                throw FileSystemError.alreadyExists(destination)
+            }
             take(existing)
             replaced = existing
         }
@@ -2646,9 +2649,12 @@ private final class ZipMemberWriter: FileWriter, @unchecked Sendable {
         if final, pieces.isEmpty { pieces = [Data()] }
         let (level, last) = (self.level, pieces.count - 1)
         let packed = Parallel.map(Array(pieces.enumerated())) { index, piece in
-            (data: Deflater.piece(piece, level: level, final: final && index == last), crc: CRC32.of(piece))
+            Result {
+                (data: try Deflater.piece(piece, level: level, final: final && index == last), crc: CRC32.of(piece))
+            }
         }
-        for (piece, result) in zip(pieces, packed) {
+        for (piece, outcome) in zip(pieces, packed) {
+            let result = try outcome.get()
             try interruption.check()
             crc = CRC32.combine(crc, result.crc, secondLength: piece.count)
             try put(result.data)

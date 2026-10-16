@@ -84,8 +84,4 @@ internal final class FileTableView: NSTableView {
         }
         return panel?.commands.isEnabled(id) ?? false
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

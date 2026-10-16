@@ -14,6 +14,8 @@ internal final class ProgressDisplay {
     internal weak var service: ProgressJobService?
     /// The progress window while it is on screen.
     internal private(set) var panel: NSPanel?
+    /// What puts the window on the screen and takes it away; AppKit's, unless told otherwise.
+    internal var screen = ProgressScreen()
     /// The progress of the running job; nil between jobs.
     private var monitor: ProgressSheet?
     /// True while the window is a sheet, false while it is a window of its own.
@@ -78,9 +80,9 @@ internal final class ProgressDisplay {
             return
         }
         if panelIsSheet {
-            window?.endSheet(panel)
+            window.map { screen.endSheet(panel, $0) }
         } else {
-            panel.orderOut(nil)
+            screen.orderOut(panel)
         }
         // The content is used again by the next window.
         panel.contentView = NSView()
@@ -91,7 +93,7 @@ internal final class ProgressDisplay {
     ///
     /// Nothing is shown while the main window is not.
     internal func show() {
-        guard panel == nil, let monitor, let window, window.isVisible else {
+        guard panel == nil, let monitor, let window, screen.isShown(window) else {
             return
         }
         let inBackground = service?.runsInBackground ?? false
@@ -109,7 +111,7 @@ internal final class ProgressDisplay {
         panelIsSheet = !inBackground
         refresh()
         guard inBackground else {
-            window.beginSheet(shown)
+            screen.beginSheet(shown, window)
             return
         }
         shown.title = monitor.title
@@ -119,8 +121,7 @@ internal final class ProgressDisplay {
         // In the lower right corner of the main window, where it covers the least.
         let frame = window.frame
         shown.setFrameOrigin(NSPoint(x: frame.maxX - shown.frame.width - 24, y: frame.minY + 48))
-        shown.orderFront(nil)
-        window.makeKey()
+        screen.orderFront(shown, window)
     }
 
     /// The user chose the other form: a window that is on screen changes at once.

@@ -76,15 +76,19 @@ final class ZipPacker {
 
     private func drain() throws {
         let level = self.level
-        let packed = Parallel.map(pieces, serialBelow: 2) { piece -> (data: Data, crc: UInt32, stored: Bool) in
-            let crc = CRC32.of(piece.data)
-            if piece.stored || piece.data.isEmpty && piece.isFirst { return (piece.data, crc, true) }
-            let deflated = Deflater.piece(piece.data, level: level, final: piece.isLast)
-            // A small file that does not shrink is stored as it is.
-            if piece.isFirst, piece.isLast, deflated.count >= piece.data.count { return (piece.data, crc, true) }
-            return (deflated, crc, false)
+        let packed = Parallel.map(pieces, serialBelow: 2) {
+            piece -> Result<(data: Data, crc: UInt32, stored: Bool), any Error> in
+            Result {
+                let crc = CRC32.of(piece.data)
+                if piece.stored || piece.data.isEmpty && piece.isFirst { return (piece.data, crc, true) }
+                let deflated = try Deflater.piece(piece.data, level: level, final: piece.isLast)
+                // A small file that does not shrink is stored as it is.
+                if piece.isFirst, piece.isLast, deflated.count >= piece.data.count { return (piece.data, crc, true) }
+                return (deflated, crc, false)
+            }
         }
-        for (piece, result) in zip(pieces, packed) {
+        for (piece, outcome) in zip(pieces, packed) {
+            let result = try outcome.get()
             var member = members[piece.member - firstMember]
             if piece.isFirst {
                 member.record.method = result.stored ? ZipRecord.methodStored : ZipRecord.methodDeflate
@@ -531,6 +535,7 @@ final class Packer {
     {
         let file = try RandomAccessFile(archive)
         let contents = try ZipDirectory.read(file)
+        try Self.refuseOtherKinds(members, in: contents.records, innerFolder: innerFolder)
         let added = Set(members.map { ArchiveTree.join(innerFolder, $0.path) })
         var offsets: [UInt64] = []
         for record in contents.records {
@@ -572,6 +577,32 @@ final class Packer {
             throw error
         }
         return true
+    }
+
+    /// As in an archive on a server (`OpenArchive`): a member packed again takes the place of
+    /// one of its own kind only, a file that of a file and a folder that of a folder. A file
+    /// under the name of a folder of the archive (one listed or one its members lie in), or a
+    /// folder under the name of a file, leaves the archive as it is and fails.
+    private static func refuseOtherKinds(_ members: [Member], in records: [ZipRecord], innerFolder: String) throws {
+        // What each name is: what its record says, and a folder where other members lie in it.
+        var folders: [String: Bool] = [:]
+        for (name, isFolder) in records.compactMap({ record in
+            ArchiveTree.normalized(record.name).map { ($0, record.isDirectory) }
+        }) {
+            folders[name] = isFolder
+        }
+        for name in Array(folders.keys) {
+            var parent = ArchiveTree.parent(of: name)
+            while !parent.isEmpty {
+                folders[parent] = true
+                parent = ArchiveTree.parent(of: parent)
+            }
+        }
+        for member in members {
+            let path = ArchiveTree.join(innerFolder, member.path)
+            guard let isFolder = folders[path], isFolder != member.item.isRealDirectory else { continue }
+            throw isFolder ? FileSystemError.alreadyExists(path) : ArchiveError.notADirectory(path)
+        }
     }
 
     /// A new ZIP, or an existing one with the members added: what the old archive holds is

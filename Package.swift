@@ -98,7 +98,7 @@ private let kTestTargets: [Target] = [
     ),
     .testTarget(
         name: "ShellTests",
-        dependencies: ["AFMKernel", "AFMContracts", "AFMShell", "StandardPlugins", "TestSupport"],
+        dependencies: ["AFMKernel", "AFMContracts", "AFMShell", "ConfigurationPlugin", "StandardPlugins", "TestSupport"],
         swiftSettings: kTestSettings
     ),
     // The benchmarks of the hot paths with their limits; run by Scripts/benchmarks.sh, in release.

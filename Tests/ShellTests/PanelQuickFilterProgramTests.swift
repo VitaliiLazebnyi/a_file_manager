@@ -154,7 +154,7 @@ internal struct PanelQuickFilterProgramTests {
         #expect(bar.control(bar.field, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:))))
         #expect(app.left.quickFilterBar.isHidden && app.names(app.left).count == 3)
         app.commands.perform(.quickFilter, .nothing)
-        bar.closeButton.performClick(nil)
+        Controls.send(bar.closeButton)
         #expect(bar.isHidden)
     }
 

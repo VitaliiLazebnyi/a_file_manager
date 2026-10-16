@@ -8,7 +8,11 @@ import Testing
 
 /// One 512-byte TAR header built by hand, for headers the packer never writes.
 private func tarBlock(
-    name: String, type: UInt8 = 48, size: UInt64 = 0, link: String = "", magic: [UInt8] = Array("ustar\u{0}00".utf8),
+    name: String,
+    type: UInt8 = 48,
+    size: UInt64 = 0,
+    link: String = "",
+    magic: [UInt8] = Array("ustar\u{0}00".utf8),
     patch: (inout [UInt8]) -> Void = { _ in }
 ) -> Data {
     var block = [UInt8](repeating: 0, count: 512)
@@ -116,9 +120,11 @@ private func quarantine(of url: URL) -> String? {
         try box.file("in/one.txt", "one")
         try box.file("in/two.txt", String(repeating: "two ", count: 100_000))
         let result = runJob(
-            .move, [box.url("in/one.txt"), box.url("in/two.txt")],
+            .move,
+            [box.url("in/one.txt"), box.url("in/two.txt")],
             to: TargetSpec(directory: bench.inside(archive, "tree")),
-            fileSystems: bench.fileSystems)
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 2 && !box.exists("in/one.txt"))
         // Nothing was asked to write: the rename of each file did.
         #expect(try !bench.store.archive(at: archive).hasPendingChanges)
@@ -156,7 +162,8 @@ private func quarantine(of url: URL) -> String? {
         #expect(names.filter { $0.hasPrefix("tree/file") }.count == 18 && !names.contains { $0.hasSuffix(".tmp") })
         #expect(
             runTool("/usr/bin/unzip", ["-p", archive.path, "tree/file5.txt"]).output
-                == String(repeating: "file 5 ", count: 12_000))
+                == String(repeating: "file 5 ", count: 12_000)
+        )
         #expect(namesOnDisk(box.root).filter { $0.hasSuffix(".tmp") }.isEmpty)
     }
 
@@ -167,8 +174,12 @@ private func quarantine(of url: URL) -> String? {
         bench.environment.hasRoom = { _, _ in false }
         let answers = Answers()
         var result = runJob(
-            .move, [box.url("in/one.txt")], to: TargetSpec(directory: bench.inside(archive, "tree")), answers: answers,
-            fileSystems: bench.fileSystems)
+            .move,
+            [box.url("in/one.txt")],
+            to: TargetSpec(directory: bench.inside(archive, "tree")),
+            answers: answers,
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.isEmpty && answers.errors.count == 1 && box.read("in/one.txt") == "one")
         #expect(try !bench.names(bench.inside(archive, "tree")).contains("one.txt"))
         bench.environment.hasRoom = { _, _ in true }
@@ -185,8 +196,11 @@ private func quarantine(of url: URL) -> String? {
         try opened.move("tree/.part", to: "tree/final.txt", replacing: false)
         #expect(!opened.hasPendingChanges && listed(archive).contains("tree/final.txt") && isSound(archive))
         result = runJob(
-            .move, [box.url("in/one.txt")], to: TargetSpec(directory: bench.inside(archive, "tree")),
-            fileSystems: bench.fileSystems)
+            .move,
+            [box.url("in/one.txt")],
+            to: TargetSpec(directory: bench.inside(archive, "tree")),
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 1 && !box.exists("in/one.txt") && listed(archive).contains("tree/one.txt"))
     }
 
@@ -244,7 +258,8 @@ private func quarantine(of url: URL) -> String? {
         let failures = bench.store.flushAll()
         #expect(
             failures.count == 1
-                && failures.first?.error.localizedDescription.contains("changed by another program") == true)
+                && failures.first?.error.localizedDescription.contains("changed by another program") == true
+        )
         #expect(isSound(archive))
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/readme.txt.new"]).output == "theirs")
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/readme.txt (2).new"]).output == "ours")
@@ -331,9 +346,14 @@ private func quarantine(of url: URL) -> String? {
         // Times no calendar knows do not get far.
         #expect(
             TarHeader.date(.nan) == Date(timeIntervalSince1970: 0)
-                && TarHeader.date(.infinity).timeIntervalSince1970 < 3e11)
+                && TarHeader.date(.infinity).timeIntervalSince1970 < 3e11
+        )
         var record = ZipRecord.new(
-            name: "a", isDirectory: false, modified: Date(timeIntervalSince1970: .nan), permissions: 0o644)
+            name: "a",
+            isDirectory: false,
+            modified: Date(timeIntervalSince1970: .nan),
+            permissions: 0o644
+        )
         record.setModified(Date(timeIntervalSince1970: .infinity))
         #expect(record.extra.count == 9)
     }
@@ -345,7 +365,11 @@ private func quarantine(of url: URL) -> String? {
         let archive = try writeZip("claims.zip") { writer in
             for index in 0..<3 {
                 var record = ZipRecord.new(
-                    name: "claim\(index).bin", isDirectory: false, modified: Date(), permissions: 0o644)
+                    name: "claim\(index).bin",
+                    isDirectory: false,
+                    modified: Date(),
+                    permissions: 0o644
+                )
                 record.uncompressedSize = 1 << 62 + UInt64(index)
                 try writer.copyMember(record)
             }
@@ -384,7 +408,8 @@ private func quarantine(of url: URL) -> String? {
         let contents = try ZipDirectory.read(RandomAccessFile(archive))
         #expect(
             contents.records.map(\.uncompressedSize) == [0, 500, 0]
-                && contents.records.map(\.extra.count) == [0xFFFF, 0, 9])
+                && contents.records.map(\.extra.count) == [0xFFFF, 0, 9]
+        )
         // A name longer than a header can say is an error, not a crash.
         var long = ZipRecord()
         long.nameBytes = Data(repeating: 97, count: 70_000)
@@ -427,9 +452,13 @@ private func quarantine(of url: URL) -> String? {
         bench.environment.contentsChanged = { _ in changed.signal() }
         // Opened outside the store, and no reference kept beyond the writer's.
         var writer: (any FileWriter)? = try OpenArchive(
-            archiveURL: archive, localURL: archive, fetchedCopy: nil, remoteStamp: nil,
+            archiveURL: archive,
+            localURL: archive,
+            fetchedCopy: nil,
+            remoteStamp: nil,
             environment: bench.environment
-        ).write("tree/kept.txt")
+        )
+        .write("tree/kept.txt")
         try writer?.write(Data("kept".utf8))
         try writer?.close(attributes: FileAttributes())
         writer = nil
@@ -507,7 +536,9 @@ private func quarantine(of url: URL) -> String? {
         try write("appended", to: tree.appending(name: "added.txt"))
         try bench.zip.createDirectory(at: tree.appending(name: "folder"))
         try bench.zip.setAttributes(
-            FileAttributes(modified: stamp, permissions: 0o600), of: tree.appending(name: "readme.txt"))
+            FileAttributes(modified: stamp, permissions: 0o600),
+            of: tree.appending(name: "readme.txt")
+        )
         try bench.zip.move(tree.appending(name: "empty.txt"), to: tree.appending(name: "void.txt"), replacing: false)
         try bench.store.flush(archive)
 
@@ -521,12 +552,14 @@ private func quarantine(of url: URL) -> String? {
         let stampAt = try #require(now.range(of: Data([0x55, 0x54]), in: patched..<patched + 200))
         now.replaceSubrange(
             stampAt.lowerBound + 5..<stampAt.lowerBound + 9,
-            with: original[stampAt.lowerBound + 5..<stampAt.lowerBound + 9])
+            with: original[stampAt.lowerBound + 5..<stampAt.lowerBound + 9]
+        )
         #expect(now.prefix(Int(old.directoryOffset)) == original.prefix(Int(old.directoryOffset)))
         for (name, offset) in before where name != "tree/empty.txt" { #expect(after[name] == offset, "\(name)") }
         #expect(
             try #require(after["tree/added.txt"]) >= old.directoryOffset
-                && #require(after["tree/void.txt"]) >= old.directoryOffset)
+                && #require(after["tree/void.txt"]) >= old.directoryOffset
+        )
         #expect(after["tree/empty.txt"] == nil && after["tree/folder/"] != nil)
 
         // Every reader agrees with the result, the system's included.
@@ -538,7 +571,8 @@ private func quarantine(of url: URL) -> String? {
         #expect(attributes[.modificationDate] as? Date == stamp && attributes[.posixPermissions] as? Int == 0o600)
         #expect(
             box.read("unzipped/tree/added.txt") == "appended" && box.exists("unzipped/tree/void.txt")
-                && box.exists("unzipped/tree/folder"))
+                && box.exists("unzipped/tree/folder")
+        )
         bench.store.close()
         #expect(try bench.names(tree) == ["added.txt", "big.log", "folder", "hollow", "readme.txt", "sub", "void.txt"])
         #expect(try bench.item(tree.appending(name: "readme.txt")).modified == stamp)
@@ -560,7 +594,10 @@ private func quarantine(of url: URL) -> String? {
         var name = "big.log"
         for round in 0..<6 {
             try bench.zip.move(
-                tree.appending(name: name), to: tree.appending(name: "big\(round).log"), replacing: false)
+                tree.appending(name: name),
+                to: tree.appending(name: "big\(round).log"),
+                replacing: false
+            )
             name = "big\(round).log"
             try bench.store.flush(archive)
             #expect(isSound(archive))
@@ -642,7 +679,8 @@ private func quarantine(of url: URL) -> String? {
         try box.file("tree/readme.txt", "shorter")
         try bench.pack([box.url("tree/readme.txt")], to: archive, innerFolder: "tree") { $0.verifies = true }
         #expect(
-            isSound(archive) && runTool("/usr/bin/unzip", ["-p", archive.path, "tree/readme.txt"]).output == "shorter")
+            isSound(archive) && runTool("/usr/bin/unzip", ["-p", archive.path, "tree/readme.txt"]).output == "shorter"
+        )
         #expect(listed(archive).filter { $0 == "tree/readme.txt" }.count == 1)
     }
 
@@ -669,7 +707,8 @@ private func quarantine(of url: URL) -> String? {
         #expect(isSound(archive))
         try box.folder("long")
         #expect(
-            runTool("/usr/bin/unzip", ["-q", archive.path, "tree/long.txt", "-d", box.url("long").path]).status == 0)
+            runTool("/usr/bin/unzip", ["-q", archive.path, "tree/long.txt", "-d", box.url("long").path]).status == 0
+        )
         #expect(try Data(contentsOf: box.url("long/tree/long.txt")) == data)
         let entry = try #require(try bench.store.archive(at: archive).entry("tree/long.txt"))
         #expect(entry.size == Int64(data.count) && entry.packedSize < entry.size / 3)
@@ -790,7 +829,8 @@ private func quarantine(of url: URL) -> String? {
         try bench.pack([box.url("tree")], to: box.url("inner.tar")) { $0.format = .tar }
         try bench.pack([box.url("inner.tar")], to: box.url("outer.zip"))
         #expect(
-            mark.withCString { setxattr(box.url("outer.zip").path, "com.apple.quarantine", $0, strlen($0), 0, 0) } == 0)
+            mark.withCString { setxattr(box.url("outer.zip").path, "com.apple.quarantine", $0, strlen($0), 0, 0) } == 0
+        )
         let inner = bench.inside(box.url("outer.zip"), "inner.tar")
         let nested = try bench.unpack(inner, to: box.url("nested"))
         #expect(nested.problems.isEmpty && quarantine(of: box.url("nested/tree/readme.txt")) == mark)
@@ -808,14 +848,18 @@ private func quarantine(of url: URL) -> String? {
         for (name, scheme) in [("tools.zip", ArchiveURL.writableScheme), ("tools.tar", ArchiveURL.readOnlyScheme)] {
             #expect(
                 try bench.item(bench.inside(box.url(name), "tree/tool", scheme: scheme)).permissions == 0o755,
-                "\(name)")
+                "\(name)"
+            )
             #expect(
                 try bench.item(bench.inside(box.url(name), "tree/plain", scheme: scheme)).permissions == 0o640,
-                "\(name)")
+                "\(name)"
+            )
             _ = try bench.unpack(box.url(name), to: box.url("out-" + name))
             let mode =
-                try FileManager.default.attributesOfItem(atPath: box.url("out-\(name)/tree/tool").path)[
-                    .posixPermissions] as? Int
+                try
+                FileManager.default.attributesOfItem(atPath: box.url("out-\(name)/tree/tool").path)[
+                    .posixPermissions
+                ] as? Int
             #expect(mode == 0o755, "\(name)")
         }
         // Changing the ZIP does not take the bits from the archive itself.
@@ -826,7 +870,7 @@ private func quarantine(of url: URL) -> String? {
 
     @Test func aMemberThatUnpacksToMoreThanItSaysIsStopped() throws {
         let contents = Data(repeating: 0, count: 50 << 20)
-        let packed = Deflater.piece(contents, level: 6, final: true)
+        let packed = try Deflater.piece(contents, level: 6, final: true)
         let archive = box.url("bomb.zip")
         let output = try OutputFile(creating: archive)
         let writer = ZipWriter(output)
@@ -860,7 +904,8 @@ private func quarantine(of url: URL) -> String? {
         #expect(Set(tree.ordered.filter(\.isImplicit).map(\.path)) == ["a", "a/b", "a/b/c", "a/b/c/d", "a/b/c/d/e"])
         #expect(
             tree.children(of: "a/b")?.map(\.name).sorted() == ["c", "three.txt"]
-                && tree.children(of: "")?.map(\.name).sorted() == ["a", "x.txt"])
+                && tree.children(of: "")?.map(\.name).sorted() == ["a", "x.txt"]
+        )
         // The remembered order follows every change.
         tree.remove("a/b/c/two.txt")
         tree.insert(ArchiveEntry(path: "a/b/c/five.txt", isDirectory: false))
@@ -868,7 +913,8 @@ private func quarantine(of url: URL) -> String? {
         #expect(
             tree.ordered.filter { !$0.isDirectory }.map(\.path) == [
                 "a/b/c/one.txt", "a/b/three.txt", "x.txt", "a/b/c/d/e/four.txt", "a/z.txt", "a/b/c/five.txt"
-            ])
+            ]
+        )
         #expect(tree.ordered.first { $0.path == "x.txt" }?.size == 7)
         // A folder that was taken out is made up again with the next thing inside it.
         for path in ["a/b/c/d/e/four.txt", "a/b/c/d/e", "a/b/c/d"] { tree.remove(path) }
@@ -915,7 +961,8 @@ private func quarantine(of url: URL) -> String? {
             for link in ["early-link", "second-link", "late-link", "dir/real.txt"] {
                 #expect(
                     try bench.item(bench.inside(box.url(name), link, scheme: ArchiveURL.readOnlyScheme)).size == 9,
-                    "\(name) \(link)")
+                    "\(name) \(link)"
+                )
             }
             #expect(try bench.read(root.appending(name: "second-link")) == Data("the bytes".utf8))
             // Unpacked in one pass, every name gets the contents.
@@ -939,7 +986,8 @@ private func quarantine(of url: URL) -> String? {
         data.append(
             tarBlock(name: "posix.txt", size: 5) { block in
                 for (index, byte) in "some/long/prefix".utf8.enumerated() { block[345 + index] = byte }
-            })
+            }
+        )
         data.append(tarData("posix"))
         data.append(TarHeader.endOfArchive)
         try data.write(to: box.url("gnu.tar"))
@@ -948,8 +996,10 @@ private func quarantine(of url: URL) -> String? {
         #expect(try bench.read(root.appending(name: "gnu.txt")) == Data("gnu".utf8))
         #expect(
             try bench.read(
-                bench.inside(box.url("gnu.tar"), "some/long/prefix/posix.txt", scheme: ArchiveURL.readOnlyScheme))
-                == Data("posix".utf8))
+                bench.inside(box.url("gnu.tar"), "some/long/prefix/posix.txt", scheme: ArchiveURL.readOnlyScheme)
+            )
+                == Data("posix".utf8)
+        )
     }
 
     @Test func sparseFilesAreShownAndRefused() throws {
@@ -983,14 +1033,16 @@ private func quarantine(of url: URL) -> String? {
         #expect(try bench.item(inner("holes.img")).size == 1 << 20 && bench.item(inner("pax-holes")).size == 70_000)
         #expect(
             try bench.read(inner("after.txt")) == Data("after".utf8)
-                && bench.read(inner("last.txt")) == Data("last".utf8))
+                && bench.read(inner("last.txt")) == Data("last".utf8)
+        )
         for name in ["holes.img", "pax-holes"] {
             #expect(throws: ArchiveError.self) { try bench.read(inner(name)) }
         }
         let result = try bench.unpack(archive, to: box.url("out"))
         #expect(
             result.unpacked == 2 && result.problems.count == 2
-                && namesOnDisk(box.url("out")) == ["after.txt", "last.txt"])
+                && namesOnDisk(box.url("out")) == ["after.txt", "last.txt"]
+        )
     }
 
     // MARK: A11
@@ -1008,7 +1060,8 @@ private func quarantine(of url: URL) -> String? {
             // Nothing was written, and nothing was deleted.
             #expect(
                 !FileManager.default.fileExists(atPath: archive.path) && box.read("src/a/same.txt") == "first"
-                    && box.read("src/b/same.txt") == "second")
+                    && box.read("src/b/same.txt") == "second"
+            )
         }
         try FileManager.default.removeItem(at: box.url("src/b"))
         try bench.pack([box.url("src")], to: box.url("flat.zip")) { $0.storesPaths = false }
@@ -1028,11 +1081,16 @@ private func quarantine(of url: URL) -> String? {
         guard case .archive(let offset, let file) = record.source else { return }
         let start = try ZipDirectory.localHeader(of: record, at: offset, in: file).dataOffset
         let wrong = try #require(
-            (0..<100_000).lazy.map { "wrong\($0)" }.first { candidate in
-                (try? ZipDecryptStream(
-                    FileRangeStream(file, offset: start, length: 12), password: candidate,
-                    check: UInt8(record.dosTime >> 8), name: "")) != nil
-            })
+            (0..<100_000).lazy.map { "wrong\($0)" }
+                .first { candidate in
+                    (try? ZipDecryptStream(
+                        FileRangeStream(file, offset: start, length: 12),
+                        password: candidate,
+                        check: UInt8(record.dosTime >> 8),
+                        name: ""
+                    )) != nil
+                }
+        )
         bench.passwords.set([wrong, "right"])
         let member = bench.inside(archive, "readme.txt")
         // What it decrypts to is not compressed data: it is a wrong password like any other, asked

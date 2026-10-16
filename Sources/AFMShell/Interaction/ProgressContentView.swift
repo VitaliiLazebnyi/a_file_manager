@@ -148,8 +148,4 @@ internal final class ProgressContentView: NSView {
     private func countClicked() {
         onCountClicked?()
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

@@ -112,7 +112,7 @@ internal final class PanelReadingRun {
 
     /// Takes a piece into the tab.
     private func take(_ piece: PanelLoading.Piece) {
-        guard isCurrent else {
+        guard let panel, isCurrent else {
             return
         }
         let tab = request.tab
@@ -131,9 +131,9 @@ internal final class PanelReadingRun {
         nothingArrivedYet = false
         let isLong = piece.listing.items.count >= PanelViewController.backgroundSortThreshold
         if piece.isFirst {
-            showFirst(piece, isLong: isLong)
+            showFirst(piece, isLong: isLong, in: panel)
         } else if isLong || tab.listedItems.count >= PanelViewController.backgroundSortThreshold {
-            grow(with: piece)
+            grow(with: piece, in: panel)
         } else {
             tab.extend(to: piece.listing.items, sortedBy: piece.order)
             if piece.isLast {
@@ -170,10 +170,7 @@ internal final class PanelReadingRun {
 
     /// The first piece: the tab is in the folder from its first entries on, not only when the
     /// last has come.
-    private func showFirst(_ piece: PanelLoading.Piece, isLong: Bool) {
-        guard let panel else {
-            return
-        }
+    private func showFirst(_ piece: PanelLoading.Piece, isLong: Bool, in panel: PanelViewController) {
         let tab = request.tab
         panel.dropSnapshot(of: id)
         panel.dropQuickFilter(of: tab, unlessIn: piece.listing.directory)
@@ -194,24 +191,21 @@ internal final class PanelReadingRun {
             panel.announceLocation()
         }
         if isLong {
-            grow(with: piece)
+            grow(with: piece, in: panel)
         }
     }
 
     /// A long list grows in the background: filtering what has come, finding the marked
     /// entries and the cursor's again and counting the totals happen there, and what comes
     /// after this piece waits until the list has taken it.
-    private func grow(with piece: PanelLoading.Piece) {
-        guard let panel else {
-            return
-        }
+    private func grow(with piece: PanelLoading.Piece, in panel: PanelViewController) {
         isHolding = true
         let tab = request.tab
         let items = piece.listing.items
         let change = PanelListChange(
             of: tab,
             bringing: items,
-            while: { [weak self] in self?.isCurrent ?? false },
+            while: { [self] in isCurrent },
             by: { PanelModel.prepare($0, extendingTo: items, sortedBy: piece.order) }
         )
         panel.apply(change) { [self] outcome in

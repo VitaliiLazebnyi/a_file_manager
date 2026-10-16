@@ -48,7 +48,9 @@ internal struct CovSmallArchiveTestTests {
         try Self.damage(url)
         #expect(try bench.store.archive(at: url) === archive)
         let problems = ArchiveTester.test(archive, cancellation: CancellationFlag())
-        #expect(problems == [ArchiveError.damaged("the compressed data cannot be decoded").localizedDescription])
+        // What the changed byte becomes depends on the times in the TAR headers: the decoder stops at it, or hands
+        // on a header that is wrong. Either way the damage is reported, once.
+        #expect(problems.count == 1 && problems.first?.hasPrefix("The archive is damaged:") == true)
     }
 
     /// The members asked for are tested with the whole stream: a damage elsewhere in it is found.

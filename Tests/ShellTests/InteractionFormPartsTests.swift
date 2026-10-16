@@ -114,7 +114,7 @@ internal struct InteractionFormPartsTests {
         let list = dialog.lists[0]
         list.table.sendAction(list.table.doubleAction, to: list.table.target)
         #expect(accepted == 0)
-        list.onAccept?()
+        list.doubleClicked(row: 1)
         #expect(accepted == 1)
     }
 }

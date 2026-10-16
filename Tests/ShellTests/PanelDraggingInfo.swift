@@ -66,8 +66,4 @@ internal final class PanelDraggingInfo: NSObject, @preconcurrency NSDraggingInfo
     internal func resetSpringLoading() {
         // No spring loading.
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

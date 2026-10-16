@@ -26,6 +26,16 @@ internal final class MainWindowController: NSWindowController, NSMenuItemValidat
     internal let functionKeyBar: FunctionKeyBar
     /// True while a check of the bars is on its way.
     internal private(set) var isValidationPending = false
+    /// Puts the window on screen and in front, and into full-screen mode when the second
+    /// argument says so; the system's way unless told otherwise.
+    internal var present: (NSWindow, Bool) -> Void = { window, fullScreen in
+        window.makeKeyAndOrderFront(nil)
+        if fullScreen {
+            window.toggleFullScreen(nil)
+        }
+    }
+    /// The window this controller made, which it keeps for its whole life.
+    private let mainWindow: NSWindow
     /// The kernel whose commands the window's bars and menus run.
     private let kernel: Kernel
     /// The two panels the window shows.
@@ -65,7 +75,8 @@ internal final class MainWindowController: NSWindowController, NSMenuItemValidat
         commandLine = CommandLineView(kernel: kernel, panels: panels)
         functionKeyBar = FunctionKeyBar(kernel: kernel)
         split = PanelSplit(left: panels.leftPanel.view, right: panels.rightPanel.view, layout: layout)
-        super.init(window: Self.makeWindow())
+        mainWindow = Self.makeWindow()
+        super.init(window: mainWindow)
         arrangeParts()
         if let frame = layout.frame {
             window?.setFrame(from: frame)
@@ -174,11 +185,8 @@ internal final class MainWindowController: NSWindowController, NSMenuItemValidat
     }
 
     /// Shows the window; one that was left in full-screen mode comes back that way.
-    override internal func showWindow(_ sender: Any?) {
-        super.showWindow(sender)
-        if layout.isFullScreen, let window, !window.styleMask.contains(.fullScreen) {
-            window.toggleFullScreen(nil)
-        }
+    override internal func showWindow(_: Any?) {
+        present(mainWindow, layout.isFullScreen && !mainWindow.styleMask.contains(.fullScreen))
     }
 
     /// Runs the command of a menu item; the bars are checked after it.
@@ -224,16 +232,19 @@ internal final class MainWindowController: NSWindowController, NSMenuItemValidat
             self?.buttonBar.rebuild()
             self?.applyLayout()
         }
+        // The window keeps the subscription, so it hears of the panels for as long as it lives.
         let subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
-            guard let self else {
-                return
-            }
-            if event == .becameSource {
-                layout.sourceIsRight = panel === panels.rightPanel
-            }
-            scheduleValidation()
+            self?.panelDid(event, panel)
         }
         subscriptions.append(subscription)
+    }
+
+    /// A panel became the source, changed its folder or its selection: the bars follow.
+    private func panelDid(_ event: PanelEvent, _ panel: any PanelHandle) {
+        if event == .becameSource {
+            layout.sourceIsRight = panel === panels.rightPanel
+        }
+        scheduleValidation()
     }
 
     /// Listens to the program and the window becoming active, moving and changing size.
@@ -317,9 +328,5 @@ internal final class MainWindowController: NSWindowController, NSMenuItemValidat
         }
         // What another program did meanwhile (the pasteboard) may have changed what the buttons offer.
         scheduleValidation()
-    }
-
-    deinit {
-        // Nothing to release: notification observers that are objects are removed by the system.
     }
 }

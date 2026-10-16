@@ -106,7 +106,10 @@ internal final class PlacesStore {
             to: "places",
             { _ in provider.places() },
             then: { [weak self] answer in
-                self?.take(answer ?? [], from: index)
+                // Without a cancellation there always is an answer.
+                if let answer {
+                    self?.take(answer, from: index)
+                }
             }
         )
     }

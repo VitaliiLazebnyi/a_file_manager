@@ -123,8 +123,4 @@ internal final class PanelDragPayload: NSObject, NSPasteboardItemDataProvider, @
             receiver(result.locations)
         }
     }
-
-    deinit {
-        // Nothing to release.
-    }
 }

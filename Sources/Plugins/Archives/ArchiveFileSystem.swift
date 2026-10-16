@@ -93,11 +93,10 @@ final class ArchiveStore: @unchecked Sendable {
             return try archiveInTurn(at: url, key: key, cancellation: cancellation)
         }
         defer { slot.lock.unlock() }
-        if let archive = slot.archive {
-            if archive.isCurrent(cancellation: cancellation) { return archive }
-            // Its file was changed by someone else. It is let go for a fresh reading,
-            // unless a change has just begun in it: then it stays the archive.
-            guard archive.retireIfIdle() else { return archive }
+        // One whose file was changed by someone else is let go for a fresh reading, unless a
+        // change has begun in it since it was looked at: then it stays the archive.
+        if let archive = slot.archive, archive.isCurrent(cancellation: cancellation) || !archive.retireIfIdle() {
+            return archive
         }
         if let failure = slot.failure {
             let age = Date().timeIntervalSince(failure.time)

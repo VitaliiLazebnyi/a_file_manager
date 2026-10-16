@@ -118,8 +118,10 @@ internal struct AppSlowFolderTests {
         #expect(
             app.left.model.directory.path == "/" && app.left.model.cursorItem?.name == "late" && !app.left.showsActivity
         )
-        // The abandoned reading is ended, and the answer it might have given changes nothing.
-        #expect(await AppWait.until { late.listingsBegun == 2 && late.listingsEnded == 2 })
+        // The abandoned reading is ended, and the answer it might have given changes nothing. (On
+        // a busy machine the root may be read once more: a watch that was slow to set up has the
+        // folder read again, so the readings are counted, not their number guessed.)
+        #expect(await AppWait.until { late.listingsBegun >= 2 && late.listingsEnded == late.listingsBegun })
         late.open()
         #expect(app.left.model.directory.path == "/" && app.left.model.isComplete)
     }
@@ -139,8 +141,15 @@ internal struct AppSlowFolderTests {
         app.left.show(locked.url("/locked"))
         #expect(await AppWait.until { app.left.model.directory.path == "/locked" && app.left.model.isOpening })
         locked.open()
+        // The message comes from the run loop after the panel went back, whenever the machine gets
+        // to it: waited for, not given a time.
+        #expect(
+            await AppWait.until {
+                !fixture.user.log.isEmpty && app.left.model.directory.lastPathComponent == "A"
+                    && app.left.model.isComplete
+            }
+        )
         await app.settle()
-        await AppWait.until(seconds: 2) { !fixture.user.log.isEmpty }
         // Back in the folder it came from, with the cursor where it was, and the user is told.
         #expect(
             app.left.model.directory.lastPathComponent == "A" && app.names(app.left) == ["docs", "one.txt", "two.txt"]
