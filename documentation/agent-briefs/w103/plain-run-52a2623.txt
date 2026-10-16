@@ -1,0 +1,62 @@
+58 files below 100% (uncovered lines / functions / regions):
+  Sources/AFMShell/App/AlertInteraction.swift: 33 lines, 9 functions, 9 regions
+  Sources/AFMShell/App/Notice.swift: 1 lines, 1 functions, 1 regions
+  Sources/AFMShell/App/Shell.swift: 1 lines, 1 functions, 1 regions
+  Sources/AFMShell/App/ShellApplication.swift: 11 lines, 4 functions, 4 regions
+  Sources/AFMShell/App/ShellCommands.swift: 6 lines, 2 functions, 2 regions
+  Sources/AFMShell/Interaction/FormDialog.swift: 3 lines, 1 functions, 1 regions
+  Sources/AFMShell/Interaction/QuitProgress.swift: 24 lines, 1 functions, 3 regions
+  Sources/AFMShell/Panel/FileGridView+Drop.swift: 3 lines, 1 functions, 1 regions
+  Sources/AFMShell/Panel/FileTableView.swift: 10 lines, 5 regions
+  Sources/AFMShell/Panel/PanelPieceStream.swift: 4 lines, 1 regions
+  Sources/AFMShell/Panel/PanelReadingRun.swift: 5 lines, 2 regions
+  Sources/AFMShell/Panel/PanelRememberedVisit.swift: 40 lines, 3 functions, 9 regions
+  Sources/AFMShell/Panel/PanelViewController+Keys.swift: 4 lines, 3 regions
+  Sources/AFMShell/Panel/PanelViewController+Layout.swift: 7 lines, 1 functions, 2 regions
+  Sources/AFMShell/Panel/PanelViewController+PathBar.swift: 3 lines, 1 functions, 1 regions
+  Sources/AFMShell/Panel/PanelViewController+QuickFilter.swift: 14 lines, 1 functions, 8 regions
+  Sources/AFMShell/Panel/PanelViewController+Reading.swift: 4 lines, 2 regions
+  Sources/AFMShell/Panel/PanelViewController+Rename.swift: 4 lines, 1 functions, 3 regions
+  Sources/AFMShell/Panel/PanelViewController+Rereading.swift: 5 lines, 4 regions
+  Sources/AFMShell/Panel/PanelViewController+Table.swift: 2 lines, 1 regions
+  Sources/AFMShell/Panel/PanelViewController+Tabs.swift: 1 lines, 2 regions
+  Sources/AFMShell/Panel/PanelViewController+Volumes.swift: 4 lines, 1 functions, 1 regions
+  Sources/AFMShell/Panel/ReadAhead.swift: 12 lines, 1 functions, 10 regions
+  Sources/AFMShell/Window/BarCommandButton.swift: 2 lines, 1 regions
+  Sources/AFMShell/Window/CommandLineView.swift: 1 lines, 1 regions
+  Sources/AFMShell/Window/MainWindowController.swift: 3 regions
+  Sources/Plugins/Archives/ArchiveCommands.swift: 3 lines, 1 functions, 1 regions
+  Sources/Plugins/Archives/ArchivesPlugin.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/Archives/OpenArchive.swift: 2 lines, 1 regions
+  Sources/Plugins/CompareContent/CompareWindowEffects.swift: 11 lines, 6 functions, 8 regions
+  Sources/Plugins/Configuration/ConfigurationEffects.swift: 16 lines, 11 functions, 17 regions
+  Sources/Plugins/Configuration/ConfigurationPlugin.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/Configuration/ConfigurationViews.swift: 1 regions
+  Sources/Plugins/DirectorySync/SyncWindowController.swift: 4 lines, 1 functions, 3 regions
+  Sources/Plugins/DirectorySync/SyncWindowEffects.swift: 9 lines, 4 functions, 6 regions
+  Sources/Plugins/FileOperations/FileJob.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/FileOperations/FileOperationsPlugin.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/FileProperties/AppleScript.swift: 6 lines, 1 functions, 1 regions
+  Sources/Plugins/FindFiles/SearchForm.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/FindFiles/TextPattern.swift: 1 lines, 2 regions
+  Sources/Plugins/LocalFileSystem/LocalFileSystem.swift: 7 lines, 1 regions
+  Sources/Plugins/MacIntegration/SystemDesktop.swift: 25 lines, 5 functions, 9 regions
+  Sources/Plugins/MacIntegration/SystemPreviewPanel.swift: 17 lines, 5 functions, 9 regions
+  Sources/Plugins/MultiRename/MultiRenameWindowController.swift: 2 lines, 2 functions, 2 regions
+  Sources/Plugins/Network/FTPConnection.swift: 2 lines, 2 regions
+  Sources/Plugins/Network/NetStream.swift: 6 lines, 3 functions, 4 regions
+  Sources/Plugins/Network/NetworkPlugin.swift: 1 regions
+  Sources/Plugins/Network/SavedConnections.swift: 3 lines, 1 functions, 1 regions
+  Sources/Plugins/Places/DirectoryTreeWindowController.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/Places/HotlistEditorWindowController.swift: 8 lines, 1 functions, 2 regions
+  Sources/Plugins/Places/PlacesPlugin.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/SystemTools/ToolsDesktop.swift: 23 lines, 10 functions, 13 regions
+  Sources/Plugins/SystemTools/VolumeEjection.swift: 3 lines, 1 functions, 1 regions
+  Sources/Plugins/Viewer/Model/ByteSource.swift: 1 regions
+  Sources/Plugins/Viewer/Model/ViewerEncoding.swift: 1 regions
+  Sources/Plugins/Viewer/UI/SystemDialogs.swift: 29 lines, 7 functions, 13 regions
+  Sources/Plugins/Viewer/UI/SystemLinks.swift: 3 lines, 1 functions, 1 regions
+  Sources/Plugins/Viewer/UI/SystemMediaPlayback.swift: 37 lines, 19 functions, 21 regions
+lines       93921 /   94349   99.55%
+functions   15076 /   15191   99.24%
+regions     40741 /   40951   99.49%
