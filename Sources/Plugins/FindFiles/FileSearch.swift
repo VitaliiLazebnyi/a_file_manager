@@ -250,7 +250,19 @@ public final class FileSearch: @unchecked Sendable {
     struct Tuning {
         var budget = FileSearch.candidateBudget
         var partialListingAfter = FileSearch.defaultPartialListingAfter
+        /// How many threads list folders and test files: one walks in a fixed order.
+        var threads = FileSearch.threadCount
+        /// What tells that two locations are one folder: the device and file number of a local
+        /// one, nil for others (which are never taken for each other).
+        var identity: @Sendable (URL) -> FileIdentity? = { FileIdentity.of($0)?.identity }
     }
+
+    /// The threads of a search: all cores, and at least four for a slow disk or server.
+    static let threadCount = max(4, ProcessInfo.processInfo.activeProcessorCount)
+    /// See `Tuning`.
+    let threads: Int
+    /// See `Tuning`.
+    let folderIdentity: @Sendable (URL) -> FileIdentity?
 
     init(
         _ query: SearchQuery,
@@ -260,6 +272,7 @@ public final class FileSearch: @unchecked Sendable {
         tuning: Tuning
     ) {
         (budget, partialListingAfter) = (tuning.budget, tuning.partialListingAfter)
+        (threads, folderIdentity) = (tuning.threads, tuning.identity)
         self.query = query
         self.fileSystems = fileSystems
         self.now = now
@@ -507,7 +520,6 @@ public final class FileSearch: @unchecked Sendable {
         private var undelivered = 0
         private var needed: Node?
         private var stopped = false
-        private static let threadCount = max(4, ProcessInfo.processInfo.activeProcessorCount)
 
         init(_ search: FileSearch) {
             self.search = search
@@ -576,7 +588,7 @@ public final class FileSearch: @unchecked Sendable {
                 root.isDuplicateRoot = !claim(url, depth: root.depth)
                 root.isClaimed = true
             }
-            jobs.start(threads: Self.threadCount)
+            jobs.start(threads: search.threads)
             var first: [JobStack.Job] = []
             for root in roots {
                 if root.url == nil {
@@ -651,7 +663,7 @@ public final class FileSearch: @unchecked Sendable {
         /// road (a firmlink, an overlapping start directory) is left out, unless it is met
         /// nearer to a start directory, where a depth limit lets the search go deeper.
         private func claim(_ url: URL, depth: Int) -> Bool {
-            guard let identity = FileIdentity.of(url)?.identity else { return true }
+            guard let identity = search.folderIdentity(url) else { return true }
             visitedLock.lock()
             defer { visitedLock.unlock() }
             guard let before = visited[identity], search.query.maxDepth != nil else {
