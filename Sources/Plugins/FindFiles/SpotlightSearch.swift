@@ -136,7 +136,7 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     static let resultLimit = 1_000_000
 
     private let metadataQuery = NSMetadataQuery()
-    private let queue = OperationQueue()
+    private let queue: OperationQueue
     private let lock = NSLock()
     private var completion: (@MainActor @Sendable ([String], Bool) -> Void)?
     private var isStopped = false
@@ -145,9 +145,16 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     let limit: Int
 
     /// `string` is a question in Spotlight's language, as `SpotlightQuery.string` makes it (the
-    /// system stops the program at one it cannot read).
-    init(_ string: String, scopes: [URL], limit: Int = SpotlightSearch.resultLimit) {
+    /// system stops the program at one it cannot read). The answer is read on `queue` (tests hold
+    /// it, to choose what comes first).
+    init(
+        _ string: String,
+        scopes: [URL],
+        limit: Int = SpotlightSearch.resultLimit,
+        queue: OperationQueue = OperationQueue()
+    ) {
         let predicate = NSPredicate(fromMetadataQueryString: string)
+        self.queue = queue
         queue.maxConcurrentOperationCount = 1
         queue.qualityOfService = .userInitiated
         metadataQuery.predicate = predicate
