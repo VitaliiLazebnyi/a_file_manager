@@ -53,7 +53,13 @@ merge what is finished, and restart the rest with the same section of `wave-100.
 - Merged: **w102-sweep** (`9aef05a`): waits at `Wait.ceiling`, flaky tests fixed, race regions covered through seams;
   left: `MultiRenameWindowController:785` `?? []` (impossible optional, owner), `:50` sheet adapter (UI tests),
   `NetStream:317/326` framer callbacks never called, `FTPConnection:580` (no seam into `NWConnection`).
-- Running: **w100-fileops-tools** (still), **w102-shell**.
+- Merged: **w100-fileops-tools** (`52a2623`): FileOperations 1 / 1 / 1, SystemTools 26 / 11 / 14, CompareContent 11 / 6
+  / 8 left, all system adapters; printing over 4,096 files no longer ends the program.
+- **Whole suite with coverage at `52a2623`:** all passed (355 shell, 3,426 plugin, 336 kernel); lines 99.55% (428 left),
+  functions 99.24% (115), regions 99.49% (210); 58 files below 100%: system adapters (UI tests), the Panel regions
+  w102-shell is on, and regions the non-atomic counters lose or that tests skipping on a failed `hdiutil attach` miss.
+- Running: **w102-shell**; an atomic-counter measurement (scratchpad `atomic/run.sh`) to tell real gaps from lost
+  counts.
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts
