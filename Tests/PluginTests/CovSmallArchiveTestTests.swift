@@ -34,7 +34,9 @@ internal struct CovSmallArchiveTestTests {
     internal func aDamagedMiddleIsFound(copied: Bool) throws {
         let bench = try ArchiveBench()
         let box = bench.box
-        if !copied { bench.environment.hasRoom = { _, _ in false } }
+        // Whether there is room for the copy is the test's choice, not what the disk has free
+        // while other tests write.
+        bench.environment.hasRoom = { _, _ in copied }
         try box.file("tree/a.txt", String(repeating: "abcdefghij", count: 20_000))
         try box.file("tree/b.txt", "b")
         let url = box.url("tree.tar.gz")

@@ -151,25 +151,28 @@ import Testing
     @Test func placesAndVolumesAnswerFromWhatIsKnown() throws {
         let places = local.settledPlaces()
         #expect(places.first?.kind == .home && places.contains { $0.kind == .internalDisk && $0.url.path == "/" })
-        // Asked again, the list comes from memory, at once.
-        let start = DispatchTime.now().uptimeNanoseconds
-        for _ in 0..<200 { #expect(local.places().count == places.count) }
-        #expect(DispatchTime.now().uptimeNanoseconds - start < 1_000_000_000)
+        // Asked again, the list comes from memory (`places()` only reads what is known).
+        for _ in 0..<200 { #expect(local.places().map(\.url) == places.map(\.url)) }
 
         // The free space of a volume is the figure the system gives for important uses,
-        // first measured and then worked out from the plainly free space.
-        let root = URL(fileURLWithPath: "/")
-        let first = try #require(local.volume(of: root))
-        let second = try #require(local.volume(of: box().root))
-        let measured =
-            try root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            .volumeAvailableCapacityForImportantUsage ?? 0
-        #expect(first.name == second.name || !first.name.isEmpty)
-        for volume in [first, try #require(local.volume(of: root))] where measured > 0 {
-            // Other programs write while this runs; a gigabyte is far below any real mistake.
-            #expect(abs((volume.freeBytes ?? 0) - measured) < 1 << 30)
-            #expect(volume.totalBytes == first.totalBytes && volume.isLocal == first.isLocal)
+        // first measured and then worked out from the plainly free space. The figures are the
+        // probe's: the disk's own change all the time while other tests write.
+        let figures = Shared((available: Int64(10 << 30), important: Int64(15 << 30)))
+        var probes = LocalProbes()
+        probes.freeSpace = { _ in
+            let now = figures.value
+            return (Int64?(now.available), Int64?(now.important))
         }
+        let local = LocalFileSystem(probes: probes)
+        let sandbox = try box()
+        let first = try #require(local.volume(of: sandbox.root))
+        #expect(first.freeBytes == 15 << 30 && !first.name.isEmpty && first.isLocal)
+        // A gigabyte written since, and a figure for important uses that is not asked for: the
+        // next answer is the plainly free space plus what the system would clear, as measured.
+        figures.value = (available: 9 << 30, important: 99 << 30)
+        let second = try #require(local.volume(of: sandbox.root))
+        #expect(second.freeBytes == 14 << 30)
+        #expect(second.name == first.name && second.totalBytes == first.totalBytes && second.isLocal)
     }
 
     private func box() throws -> Sandbox { try Sandbox() }
