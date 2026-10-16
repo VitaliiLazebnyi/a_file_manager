@@ -346,8 +346,8 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// What was decided for a file whose turn has come.
+    /// Skipping is no plan: the planner answers nil.
     private enum Plan {
-        case skip
         case write(URL, replacing: Bool)
         /// The target is the source itself under another spelling of its name: a rename, and
         /// never anything that reads and writes the file.
@@ -355,9 +355,8 @@ public final class FileJob: @unchecked Sendable {
         case append(URL)
         case resume(URL)
 
-        var target: URL? {
+        var target: URL {
             switch self {
-            case .skip: return nil
             case .write(let url, _), .rename(let url), .append(let url), .resume(let url): return url
             }
         }
@@ -875,20 +874,20 @@ public final class FileJob: @unchecked Sendable {
             pool?.drain()
             try flushDeferred()
         }
-        var plan = Plan.skip
+        var plan: Plan?
         let planned = try attempt(isMove ? .move : .copy, at: item.url, target: destination) {
             plan = try self.plan(for: item, at: destination, ownOutput: collides || batch.isShared) {
                 batch.produced.contains(Self.claimHash($0))
             }
             return true
         }
-        guard planned, let target = plan.target else {
+        guard planned, let decided = plan else {
             add(Measure(items: 1, bytes: item.size))
             if planned { record(isMove ? .move : .copy, item.url, destination, .skipped) }
             batch.set(slot, .skipped)
             return
         }
-        let decided = plan
+        let target = decided.target
         batch.produced.insert(Self.claimHash(target))
         // Asked here, on the job thread, once per source folder; the workers only use the answer.
         let origin = originMark(of: item.url.deletingLastPathComponent(), copiedTo: target)
@@ -976,86 +975,86 @@ public final class FileJob: @unchecked Sendable {
     /// Applies the overwrite rules (07 › Name collisions) to one file. Job thread only.
     /// `ownOutput`: what is found at the target may be a file this very job wrote, from another
     /// source that maps to the same name. `isTaken` names targets that are spoken for.
-    private func plan(for item: FileItem, at wanted: URL, ownOutput: Bool, isTaken: (URL) -> Bool) throws -> Plan {
-        var destination = wanted
-        while true {
-            if destination.isSameLocation(as: item.url) { throw FileJobError.copyToItself }
-            guard let existing = try entry(at: destination) else { return .write(destination, replacing: false) }
-            // A file system that only shows the files of another answers with the real file.
-            // The real place is then what is compared and written: the other spelling of it
-            // would hide that source and target are one file.
-            if !existing.isDirectory, existing.url.scheme != destination.scheme {
-                destination = existing.url
-                continue
-            }
-            // The source under another spelling (letter case on a case-insensitive volume): no
-            // conflict. A move is a rename onto itself; a copy would be a copy onto itself.
-            if FileIdentity.sameEntry(existing.url, item.url) {
-                if isMove { return .rename(destination) }
-                throw FileJobError.copyToItself
-            }
-            // Another name of the very same file (a hard link): there is nothing to copy.
-            if FileIdentity.sameFile(existing.url, item.url) { throw FileJobError.copyToItself }
-            if existing.isRealDirectory { throw FileJobError.targetIsFolder(display(destination)) }
-            let folder = destination.deletingLastPathComponent()
-            switch try conflictChoice(existing, item, ownOutput: ownOutput) {
-            case .skip, .skipAll, .cancel:
-                return .skip
+    /// Nil: the file is skipped.
+    private func plan(for item: FileItem, at destination: URL, ownOutput: Bool, isTaken: (URL) -> Bool) throws -> Plan?
+    {
+        if destination.isSameLocation(as: item.url) { throw FileJobError.copyToItself }
+        guard let existing = try entry(at: destination) else { return .write(destination, replacing: false) }
+        // A file system that only shows the files of another answers with the real file.
+        // The real place is then what is compared and written: the other spelling of it
+        // would hide that source and target are one file.
+        if !existing.isDirectory, existing.url.scheme != destination.scheme {
+            return try plan(for: item, at: existing.url, ownOutput: ownOutput, isTaken: isTaken)
+        }
+        // The source under another spelling (letter case on a case-insensitive volume): no
+        // conflict. A move is a rename onto itself; a copy would be a copy onto itself.
+        if FileIdentity.sameEntry(existing.url, item.url) {
+            if isMove { return .rename(destination) }
+            throw FileJobError.copyToItself
+        }
+        // Another name of the very same file (a hard link): there is nothing to copy.
+        if FileIdentity.sameFile(existing.url, item.url) { throw FileJobError.copyToItself }
+        if existing.isRealDirectory { throw FileJobError.targetIsFolder(display(destination)) }
+        let folder = destination.deletingLastPathComponent()
+        switch try conflictChoice(existing, item, ownOutput: ownOutput) {
+        case .skip, .skipAll, .cancel:
+            return nil
 
-            case .rename(let name):
-                destination = folder.appending(name: name)
+        case .rename(let name):
+            return try plan(for: item, at: folder.appending(name: name), ownOutput: ownOutput, isTaken: isTaken)
 
-            case .autoRenameCopied:
-                let free = UniqueName.available(
-                    for: destination,
-                    in: fileSystems,
-                    cancellation: cancellation,
-                    isTaken: isTaken
+        case .autoRenameCopied:
+            let free = UniqueName.available(
+                for: destination,
+                in: fileSystems,
+                cancellation: cancellation,
+                isTaken: isTaken
+            )
+            // A name found while the job was being stopped is not known to be free.
+            try checkCancelled()
+            return .write(free, replacing: false)
+
+        case .renameExisting(let name):
+            try fileSystems.provider(for: destination)
+                .move(
+                    destination,
+                    to: folder.appending(name: name),
+                    replacing: false,
+                    cancellation: cancellation
                 )
-                // A name found while the job was being stopped is not known to be free.
-                try checkCancelled()
-                return .write(free, replacing: false)
+            record(.rename, destination, folder.appending(name: name), .done)
+            return try plan(for: item, at: destination, ownOutput: ownOutput, isTaken: isTaken)
 
-            case .renameExisting(let name):
-                try fileSystems.provider(for: destination)
-                    .move(
-                        destination,
-                        to: folder.appending(name: name),
-                        replacing: false,
-                        cancellation: cancellation
-                    )
-                record(.rename, destination, folder.appending(name: name), .done)
-
-            case .autoRenameExisting:
-                let free = UniqueName.available(
-                    for: destination,
-                    in: fileSystems,
-                    cancellation: cancellation,
-                    isTaken: isTaken
+        case .autoRenameExisting:
+            let free = UniqueName.available(
+                for: destination,
+                in: fileSystems,
+                cancellation: cancellation,
+                isTaken: isTaken
+            )
+            try checkCancelled()
+            try fileSystems.provider(for: destination)
+                .move(
+                    destination,
+                    to: free,
+                    replacing: false,
+                    cancellation: cancellation
                 )
-                try checkCancelled()
-                try fileSystems.provider(for: destination)
-                    .move(
-                        destination,
-                        to: free,
-                        replacing: false,
-                        cancellation: cancellation
-                    )
-                record(.rename, destination, free, .done)
+            record(.rename, destination, free, .done)
+            return try plan(for: item, at: destination, ownOutput: ownOutput, isTaken: isTaken)
 
-            case .append:
-                guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
-                return try mayTouch(existing, for: .overwrite) ? .append(destination) : .skip
+        case .append:
+            guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
+            return try mayTouch(existing, for: .overwrite) ? .append(destination) : nil
 
-            case .resume:
-                // A link has no length of its own and would pass for the start of anything.
-                guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
-                guard existing.size < item.size else { throw FileJobError.cannotResume(display(destination)) }
-                return .resume(destination)
+        case .resume:
+            // A link has no length of its own and would pass for the start of anything.
+            guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
+            guard existing.size < item.size else { throw FileJobError.cannotResume(display(destination)) }
+            return .resume(destination)
 
-            default:
-                return try mayTouch(existing, for: .overwrite) ? .write(destination, replacing: true) : .skip
-            }
+        default:
+            return try mayTouch(existing, for: .overwrite) ? .write(destination, replacing: true) : nil
         }
     }
 
@@ -1171,9 +1170,6 @@ public final class FileJob: @unchecked Sendable {
     private func execute(_ plan: Plan, _ item: FileItem, _ flight: Flight) throws -> Bool {
         let removesSource: Bool
         switch plan {
-        case .skip:
-            return false
-
         case .write(let destination, let replacing):
             removesSource = try put(item, at: destination, replacing: replacing, flight)
             record(isMove ? .move : .copy, item.url, destination, .done)

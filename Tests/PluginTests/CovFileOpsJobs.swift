@@ -64,6 +64,8 @@ internal struct CovFileOpsJobs {
             disk.base.addFile("/S/dir/\(name)", name)
         }
         let sources = ["a", "b", "c"].map { disk.base.url("/S/\($0)") }
+        memory.addDirectory("/T")
+        memory.addDirectory("/U")
         disk.order.value = { $0.reversed() }
         var result = runJob(
             .copy,
