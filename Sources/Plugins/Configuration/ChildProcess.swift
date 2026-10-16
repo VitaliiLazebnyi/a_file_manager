@@ -89,16 +89,44 @@ enum ChildProcess {
         }
     }
 
+    /// The calls of the system a child's start and end go through. Tests give failing ones: the
+    /// system fails them only when it runs out of memory, or when a signal comes at that moment.
+    internal struct SystemCalls: Sendable {
+        /// The system's own.
+        internal static let system = Self(
+            initActions: { posix_spawn_file_actions_init(&$0) },
+            initAttributes: { posix_spawnattr_init(&$0) },
+            wait: { pid, status, options in
+                let result = waitpid(pid, &status, options)
+                return (result, result == -1 ? errno : 0)
+            }
+        )
+
+        /// `posix_spawn_file_actions_init`: 0, or the number of the error.
+        internal var initActions: @Sendable (inout posix_spawn_file_actions_t?) -> Int32
+        /// `posix_spawnattr_init`: 0, or the number of the error.
+        internal var initAttributes: @Sendable (inout posix_spawnattr_t?) -> Int32
+        /// `waitpid` with its status and options: what it returns, and `errno` when that is -1.
+        internal var wait: @Sendable (pid_t, inout Int32, Int32) -> (result: pid_t, error: Int32)
+    }
+
     /// Starts `executable` in `directory`, with nothing to read and its output discarded.
     /// Returns the process number. Blocks for the time the start takes: not for the main thread.
-    static func spawn(executable: String, arguments: [String], environment: [String: String], directory: String)
-        -> Result<pid_t, Failure>
-    {
+    static func spawn(
+        executable: String,
+        arguments: [String],
+        environment: [String: String],
+        directory: String,
+        calls: SystemCalls = .system
+    ) -> Result<pid_t, Failure> {
         var actions: posix_spawn_file_actions_t?
         var attributes: posix_spawnattr_t?
-        guard posix_spawn_file_actions_init(&actions) == 0 else { return .failure(Failure(code: errno)) }
+        // The two return the number of the error; they do not set `errno`.
+        let actionsMade = calls.initActions(&actions)
+        guard actionsMade == 0 else { return .failure(Failure(code: actionsMade)) }
         defer { posix_spawn_file_actions_destroy(&actions) }
-        guard posix_spawnattr_init(&attributes) == 0 else { return .failure(Failure(code: errno)) }
+        let attributesMade = calls.initAttributes(&attributes)
+        guard attributesMade == 0 else { return .failure(Failure(code: attributesMade)) }
         defer { posix_spawnattr_destroy(&attributes) }
 
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
@@ -139,13 +167,15 @@ enum ChildProcess {
     final class Watch: @unchecked Sendable {
         private let pid: pid_t
         private let handler: @Sendable (Ending) -> Void
+        private let calls: SystemCalls
         private let source: any DispatchSourceProcess
         private let lock = NSLock()
         private var reported = false
 
-        init(pid: pid_t, handler: @escaping @Sendable (Ending) -> Void) {
+        init(pid: pid_t, calls: SystemCalls = .system, handler: @escaping @Sendable (Ending) -> Void) {
             self.pid = pid
             self.handler = handler
+            self.calls = calls
             source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .global(qos: .utility))
         }
 
@@ -156,15 +186,18 @@ enum ChildProcess {
             reap(waiting: false)
         }
 
-        private func reap(waiting: Bool) {
+        /// Collects the child and reports it, once: `waiting` when the system said it ended (it
+        /// may have been collected elsewhere then), else only when it has ended already.
+        func reap(waiting: Bool) {
             lock.lock()
             if reported {
                 lock.unlock()
                 return
             }
             var status: Int32 = 0
-            var result: pid_t
-            repeat { result = waitpid(pid, &status, waiting ? 0 : WNOHANG) } while result == -1 && errno == EINTR
+            var answer: (result: pid_t, error: Int32)
+            repeat { answer = calls.wait(pid, &status, waiting ? 0 : WNOHANG) } while answer == (-1, EINTR)
+            let result = answer.result
             guard result == pid || (result == -1 && waiting) else {
                 lock.unlock()
                 return
