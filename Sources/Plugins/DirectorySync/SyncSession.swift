@@ -105,6 +105,9 @@ final class SyncSession {
     var worksInBackgroundFrom = SyncSession.backgroundFrom
     /// The least time between two progress reports of a comparison, in seconds (tests: none).
     var progressInterval: TimeInterval = 0.1
+    /// Starts the work of a comparison, a list or a plan away from the main thread (tests keep
+    /// it, to run it when they choose).
+    var startWorker: (_ name: String, _ work: @escaping @Sendable () -> Void) -> Void = { SyncWorker.run($0, $1) }
     private var isPlanning = false
     /// Counts the calls of `adopt`: a long selection read in the background is dropped when another began.
     private var selectionEpoch = 0
@@ -215,7 +218,7 @@ final class SyncSession {
         // A thread of its own: listing a share that does not answer can block for as long as the server
         // takes to give up, and a few such comparisons must not use up the workers of the shared pool.
         let interval = progressInterval
-        SyncWorker.run("Synchronize directories: compare") { [weak self] in
+        startWorker("Synchronize directories: compare") { [weak self] in
             // What comes back for a comparison that was stopped or replaced meanwhile is dropped.
             let whileCurrent: @Sendable (@escaping @MainActor @Sendable (SyncSession) -> Void) -> Void = {
                 [weak self] work in
@@ -379,7 +382,7 @@ final class SyncSession {
         let (rows, show, sort, epoch) = (self.rows, self.show, self.sort, actionEpoch)
         if phase == .compared { status = "Preparing the list of \(rows.count) files…" }
         changed()
-        SyncWorker.run("Synchronize directories: list") { [weak self] in
+        startWorker("Synchronize directories: list") { [weak self] in
             let layout = Self.layout(rows: rows, show: show, sort: sort)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.layoutGeneration == generation else { return }
@@ -567,7 +570,7 @@ final class SyncSession {
         let (rows, entries, offset) = (self.rows, self.entries, compared.offsetHours)
         status = "Preparing the plan…"
         changed()
-        SyncWorker.run("Synchronize directories: plan") { [weak self] in
+        startWorker("Synchronize directories: plan") { [weak self] in
             var visible: [SyncRow] = []
             visible.reserveCapacity(entries.count)
             for case .row(let index) in entries where rows.indices.contains(index) { visible.append(rows[index]) }
