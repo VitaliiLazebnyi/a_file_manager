@@ -10,18 +10,28 @@ import Testing
 internal struct CoverageLocalWatcher {
     /// A folder the system cannot watch is tried again.
     @Test
-    internal func aFolderTheSystemCannotWatchIsTriedAgain() {
-        let before = DirectoryWatcher.Census.figures.refused
-        let watcher = DirectoryWatcher(queue: DispatchQueue(label: "coverage")) { _ in
+    internal func aFolderTheSystemCannotWatchIsTriedAgain() throws {
+        let box = try Sandbox()
+        let before = FSEvCensus.figures.refused
+        let tries = Shared(0)
+        // A system that makes no stream (and touches no descriptor).
+        let refusing = FSEvSystem(
+            makeStream: { _, _, _ in
+                tries.modify { $0 += 1 }
+                return nil
+            },
+            spareDescriptors: { 1_000 }
+        )
+        let watcher = DirectoryWatcher(queue: DispatchQueue(label: "coverage"), system: refusing) { _ in
             // Nothing is looked at.
         }
-        // A path longer than any path can be: the system makes no stream for it.
-        let impossible = URL(fileURLWithPath: "/" + String(repeating: "a", count: 5_000))
-        watcher.watch([impossible])
-        #expect(Wait.until(seconds: 60) { DirectoryWatcher.Census.figures.refused >= before + 1 })
+        watcher.watch([box.url("a")])
+        #expect(Wait.until(seconds: 60) { tries.value >= 1 })
         // Asked for again while a try is pending: refused again, and still tried once.
-        watcher.watch([impossible, URL(fileURLWithPath: "/" + String(repeating: "b", count: 5_000))])
-        #expect(Wait.until(seconds: 60) { DirectoryWatcher.Census.figures.refused >= before + 3 })
+        watcher.watch([box.url("a"), box.url("b")])
+        #expect(Wait.until(seconds: 60) { tries.value >= 3 })
+        #expect(FSEvCensus.figures.refused >= before + 3)
+        #expect(watcher.watchedFolders.isEmpty)
         watcher.stop()
     }
 
@@ -63,12 +73,12 @@ internal struct CoverageLocalWatcher {
     internal func theFiguresArePrintedAtTheEndWhenAskedFor() async throws {
         let result = try await #require(processExitsWith: .success, observing: [\.standardErrorContent]) {
             setenv("AFM_WATCHER_CENSUS", "1", 1)
-            DirectoryWatcher.Census.started()
-            DirectoryWatcher.Census.wasRefused()
+            FSEvCensus.started()
+            FSEvCensus.wasRefused()
             exit(0)
         }
-        let printed = String(decoding: result.standardErrorContent, as: UTF8.self)
-        #expect(printed.contains("AFM_WATCHER_CENSUS live=1 peak=1 refused=1"))
+        let printed = String(bytes: result.standardErrorContent, encoding: .utf8)
+        #expect(printed?.contains("AFM_WATCHER_CENSUS live=1 peak=1 refused=1") == true)
     }
 
     /// Streams beyond what the system gives one program are refused and tried again.
@@ -84,7 +94,7 @@ internal struct CoverageLocalWatcher {
                 }
             for watcher in watchers { watcher.watch([folder]) }
             // Refused, and refused again when tried again a moment later.
-            guard Wait.until(seconds: 120, { DirectoryWatcher.Census.figures.refused >= 2 * 20 }) else { exit(1) }
+            guard Wait.until(seconds: 120, { FSEvCensus.figures.refused >= 2 * 20 }) else { exit(1) }
             exit(0)
         }
     }
