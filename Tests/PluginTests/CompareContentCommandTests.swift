@@ -342,9 +342,15 @@ import Testing
 
 /// The window itself: opened when the background comparison has found differences, and drawn.
 @MainActor @Suite struct CompareContentWindow {
-    func spin(until done: () -> Bool) async {
-        let deadline = Date().addingTimeInterval(20)
-        while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 5_000_000) }
+    /// Lets the main thread run what the comparisons send it until `done` holds, up to `Wait.ceiling`: a comparison
+    /// under load may take long, and only a hang reaches the ceiling.
+    func spin(until done: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
+        while !done() {
+            guard Date() < deadline else { return false }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        return true
     }
 
     @Test func windowOpensForDifferentFilesOnly() async {
@@ -383,12 +389,12 @@ import Testing
 
         bench.left.moveCursor(toName: "same.txt")
         bench.commands.perform(.compareByContent)
-        await spin { plugin.sessions.isEmpty }
+        #expect(await spin { plugin.sessions.isEmpty })
         #expect(windows().isEmpty && bench.interaction.log == ["inform: Compare contents"])
 
         bench.left.moveCursor(toName: "a.txt")
         bench.commands.perform(.compareByContent)
-        await spin { !windows().isEmpty && plugin.sessions.first?.phase == .ready }
+        #expect(await spin { !windows().isEmpty && plugin.sessions.first?.phase == .ready })
         #expect(windows().count == 1 && plugin.sessions.count == 1 && plugin.sessions[0].blocks.count == 10)
         windows()[0].contentView?.layoutSubtreeIfNeeded()
         windows()[0].displayIfNeeded()
@@ -401,7 +407,7 @@ import Testing
         // Several windows may be open at once.
         bench.left.moveCursor(toName: "data.bin")
         bench.commands.perform(.compareByContent)
-        await spin { windows().count == 2 && plugin.sessions.last?.phase == .ready }
+        #expect(await spin { windows().count == 2 && plugin.sessions.last?.phase == .ready })
         #expect(windows().count == 2 && plugin.sessions.last?.isBinary == true && presenter.presented.count == 3)
         windows().forEach { $0.displayIfNeeded() }
         plugin.stop()
