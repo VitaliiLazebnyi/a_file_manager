@@ -45,8 +45,15 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   compressed TAR does not read to the checksum; many tests still wait 60 s instead of `Wait.ceiling`;
   `PluginCommandTests` builds `ViewerPlugin()` with windows shown; `TextPattern("\\x81")` throws under TSan; TSan run on
   the `ProcessStream` lock, the Archives quit port and the Viewer key monitor.
-- Owner questions open: the two TCC prompts on the VM desktop (microphone: from Viewer media tests, being fixed;
-  removable volumes: every test that mounts a disk image asks; recommended: Allow, keep the real-image tests).
+- Merged: **w100-network** (`64a286c`), **w100-shell** (`ff22b56`, AFMShell 203 / 29 / 80 left), **w101-archives**
+  (`3224e64`, Archives 100% but `openInApplication`), **w101-fsevents** (`2750aa9`, root cause in
+  `documentation/FSEvents-descriptor-zero.md`), the Compare window part of **w100-fileops-tools** (`9bd4b6a`); the
+  program raises its open-file limit at start (`99566b9`). Full suite at `2750aa9`: 349 shell, 3,328 plugin, 336 kernel,
+  all passed.
+- Running: **w100-fileops-tools** (still), **w102-shell**, **w102-sweep** (sections in `wave-100.md`).
+- Owner questions open: `NetStream.swift:242/444` impossible optionals (documented `!` as in decision 3?); the
+  `ArchiveFileSystem:100` race arm; the two TCC prompts on the VM desktop (microphone: from Viewer media tests, being
+  fixed; removable volumes: every test that mounts a disk image asks; recommended: Allow, keep the real-image tests).
 
 ### Done and pushed
 
