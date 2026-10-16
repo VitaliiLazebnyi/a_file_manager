@@ -428,18 +428,16 @@ import Testing
         try fm.createSymbolicLink(atPath: fixture.box.url("srv/lslash").path, withDestinationPath: "realdir/")
 
         let probes = { fixture.server.commands.filter { $0.hasPrefix("CWD /l") }.count }
-        var items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true).filter(\.isSymlink)
-            .sorted {
-                $0.name < $1.name
-            }
+        var items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true)
+            .filter(\.isSymlink)
+            .sorted { $0.name < $1.name }
         #expect(items.map(\.name) == ["ldead", "ldir", "lfile", "lslash"])
         #expect(items.map(\.isDirectory) == [false, true, false, true])
         // The one whose target is spelled as a folder is not asked about; the others once each.
         #expect(probes() == 3)
-        items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true).filter(\.isSymlink)
-            .sorted {
-                $0.name < $1.name
-            }
+        items = try fixture.fileSystem.list(fixture.url("/"), showHidden: true)
+            .filter(\.isSymlink)
+            .sorted { $0.name < $1.name }
         #expect(items.map(\.isDirectory) == [false, true, false, true])
         #expect(probes() == 3)
     }

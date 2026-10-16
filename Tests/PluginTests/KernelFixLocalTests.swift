@@ -163,14 +163,14 @@ import Testing
             let now = figures.value
             return (Int64?(now.available), Int64?(now.important))
         }
-        let local = LocalFileSystem(probes: probes)
+        let probed = LocalFileSystem(probes: probes)
         let sandbox = try box()
-        let first = try #require(local.volume(of: sandbox.root))
+        let first = try #require(probed.volume(of: sandbox.root))
         #expect(first.freeBytes == 15 << 30 && !first.name.isEmpty && first.isLocal)
         // A gigabyte written since, and a figure for important uses that is not asked for: the
         // next answer is the plainly free space plus what the system would clear, as measured.
         figures.value = (available: 9 << 30, important: 99 << 30)
-        let second = try #require(local.volume(of: sandbox.root))
+        let second = try #require(probed.volume(of: sandbox.root))
         #expect(second.freeBytes == 14 << 30)
         #expect(second.name == first.name && second.totalBytes == first.totalBytes && second.isLocal)
     }
