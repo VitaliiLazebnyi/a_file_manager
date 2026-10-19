@@ -132,12 +132,10 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             if returned.commonattr & wantName != 0 {
                 let reference = field.loadUnaligned(as: attrreference_t.self)
                 let bytes = (field + Int(reference.attr_dataoffset)).assumingMemoryBound(to: CChar.self)
-                if let name = String(validatingCString: bytes) {
-                    read.name = name
-                } else {
-                    read.name = String(cString: bytes)
-                    read.isNameRepaired = true
-                }
+                // A name that is not UTF-8 is shown repaired.
+                let name = String(validatingCString: bytes)
+                read.name = name ?? String(cString: bytes)
+                read.isNameRepaired = name == nil
                 field += MemoryLayout<attrreference_t>.size
             }
             if returned.commonattr & wantType != 0 {
@@ -213,7 +211,8 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
                 })
             else { return true }
             let count = Int32(read)
-            if count == 0 { return true }
+            // The end of the directory.
+            if count == 0 { break }
             if count < 0 {
                 if !deliveredAny, errno == ENOTSUP || errno == EINVAL { return false }
                 throw Self.posixError(errno, directory)
@@ -541,15 +540,17 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         let registration = cancellation.onCancel { call.interruption.interrupt() }
         defer { withExtendedLifetime(registration) {} }
         let mount = MountTable.shared.mount(containing: path)
-        if probes.isLocal?(path) ?? mount.isLocal { return try body(call) }
-        let volume = probes.isLocal == nil ? mount.path : volumeKey(path)
-        return try RemoteChanges.shared.run(
-            on: volume,
-            patience: probes.patienceAfterCancel,
-            cancellation: cancellation,
-            call,
-            body
-        )
+        guard probes.isLocal?(path) ?? mount.isLocal else {
+            let volume = probes.isLocal == nil ? mount.path : volumeKey(path)
+            return try RemoteChanges.shared.run(
+                on: volume,
+                patience: probes.patienceAfterCancel,
+                cancellation: cancellation,
+                call,
+                body
+            )
+        }
+        return try body(call)
     }
 
     public func createDirectory(at url: URL) throws {
@@ -1602,19 +1603,19 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             slot.lock.lock()
             let answered = slot.place
             slot.lock.unlock()
-            if let answered {
-                places.append(answered)
-            } else if let known = previous.first(where: { $0.url.path == volume.path }) {
-                places.append(known)
-            } else {
+            guard let answered else {
+                // Not answered in time: what was known of it, or its folder name.
                 places.append(
-                    Place(
-                        name: volume.lastPathComponent,
-                        url: volume,
-                        kind: volume.path == "/" ? .internalDisk : .externalDisk
-                    )
+                    previous.first { $0.url.path == volume.path }
+                        ?? Place(
+                            name: volume.lastPathComponent,
+                            url: volume,
+                            kind: volume.path == "/" ? .internalDisk : .externalDisk
+                        )
                 )
+                continue
             }
+            places.append(answered)
         }
         return places
     }
