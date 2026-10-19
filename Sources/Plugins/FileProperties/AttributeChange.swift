@@ -214,7 +214,10 @@ struct TimestampChange: Equatable {
             components.nanosecond = 0
         }
         components.calendar = calendar
-        return components.isValidDate ? calendar.date(from: components) : nil
+        guard components.isValidDate else {
+            return nil
+        }
+        return calendar.date(from: components)
     }
 
     /// A date as the fields of the dialog show it.

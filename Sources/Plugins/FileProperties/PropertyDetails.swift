@@ -65,7 +65,7 @@ enum PropertyColumns {
         columns.register(
             ContentColumn(id: "xattrCount", title: "Ext. Attributes", width: 60, alignsRight: true) { item in
                 let count = LocalInfo.extendedAttributeNames(item.url).count
-                return count > 0 ? String(count) : ""
+                return count == 0 ? "" : String(count)
             }
         )
         columns.register(
