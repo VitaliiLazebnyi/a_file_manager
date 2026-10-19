@@ -110,7 +110,9 @@ internal struct CovCompareLoading {
         for (isLocal, stretch) in [(false, 1_024), (true, 4)] {
             hooked.base.isLocal = isLocal
             let cancellation = CancellationFlag()
-            hooked.onNextRead { cancellation.cancel() }
+            // In the first read of every reader: side by side, the workers that open their readers late may find
+            // all the stretches taken, and the hook of a reader that never reads would never run.
+            hooked.onEveryRead { cancellation.cancel() }
             let answer = try CompareLoader.identical(
                 first,
                 second,
