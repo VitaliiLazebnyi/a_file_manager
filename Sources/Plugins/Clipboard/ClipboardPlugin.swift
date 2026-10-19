@@ -682,9 +682,12 @@ final class FileListReading: @unchecked Sendable {
             urls += found
             sliceCount += 1
         }
-        if !isDone {
+        // Both ways are rare against the loop above, so each is a case of its own.
+        switch isDone {
+        case false:
             DispatchQueue.main.async { self.step(cancellation, sliced: sliced) }
-        } else {
+
+        case true:
             // Changed while the last slice was read: what was read may be half of each.
             finish(pasteboard.changeCount == changeCount ? .read(lock.withLock { urls }) : .abandoned)
         }

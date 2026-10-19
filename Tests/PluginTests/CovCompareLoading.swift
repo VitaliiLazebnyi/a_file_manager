@@ -102,7 +102,10 @@ internal struct CovCompareLoading {
         let hooked = CoverageArchivesFSHookedMemory()
         let registry = FileSystemRegistry()
         registry.register(hooked)
-        let data = Data(repeating: 0x61, count: 64)
+        // Many more stretches than workers: the worker that opens the hooked file first surely reads it (with 16,
+        // the others could take them all before it does, and nothing would cancel the check).
+        let size = 1 << 20
+        let data = Data(repeating: 0x61, count: size)
         let (first, second) = (
             try CoverageArchivesFSHookedMemory.put(data, at: "/first", on: hooked.base),
             try CoverageArchivesFSHookedMemory.put(data, at: "/second", on: hooked.base)
@@ -114,7 +117,7 @@ internal struct CovCompareLoading {
             let answer = try CompareLoader.identical(
                 first,
                 second,
-                size: 64,
+                size: Int64(size),
                 fileSystems: registry,
                 cancellation: cancellation,
                 stretch: stretch
