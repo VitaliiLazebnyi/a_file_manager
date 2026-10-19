@@ -209,7 +209,10 @@ for gate in "${gates[@]}"; do
       ;;
     test)
       step "tests with coverage"
-      swift test --enable-code-coverage
+      mkdir -p .build
+      # A bundle that ends early (a crash, or a stopped main run loop: exit 0) must fail the gate too.
+      swift test --enable-code-coverage 2>&1 | tee .build/test-run.log
+      python3 Scripts/test-run-check.py .build/test-run.log
       python3 Scripts/coverage-gate.py
       ;;
     memory)
