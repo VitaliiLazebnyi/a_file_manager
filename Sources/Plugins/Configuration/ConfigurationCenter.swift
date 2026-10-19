@@ -397,23 +397,30 @@ final class ConfigurationCenter {
     ) {
         let keys = options.included(settingsKeys(), schema: settingsSchema())
         let archive = SettingsArchive.capture(from: kernel.settings, keys: keys)
+        // Weak: the file is written off the main thread, and the plugin may be gone when that is done.
         runner.offMain(
             { Result { try archive.write(to: url) } },
-            then: { [self] result in
-                switch result {
-                case .failure(let error): kernel.interaction.report(error, title: "The settings could not be exported")
-
-                case .success:
-                    if tellsWhatIsIncluded {
-                        kernel.interaction.inform(
-                            "The settings were exported",
-                            detail: options.description(count: archive.values.count),
-                            style: .information
-                        )
-                    }
-                }
+            then: { [weak self] result in
+                self?
+                    .exported(
+                        result,
+                        detail: tellsWhatIsIncluded ? options.description(count: archive.values.count) : nil
+                    )
             }
         )
+    }
+
+    /// Tells how an export went: a failure, or with `detail` what was exported.
+    private func exported(_ result: Result<Void, any Error>, detail: String?) {
+        switch result {
+        case .failure(let error):
+            kernel.interaction.report(error, title: "The settings could not be exported")
+
+        case .success:
+            if let detail {
+                kernel.interaction.inform("The settings were exported", detail: detail, style: .information)
+            }
+        }
     }
 
     /// Reads a settings file, checks it, shows what it would change and stores it when the
@@ -423,29 +430,38 @@ final class ConfigurationCenter {
     func importSettings(from url: URL) {
         let schema = settingsSchema()
         let knownKeys = settingsKeys()
+        // Weak: the file is read and checked off the main thread, and the plugin may be gone when
+        // that is done.
         runner.offMain(
             { Result { try CheckedSettings(SettingsArchive(data: CheckedSettings.read(url)), schema: schema) } },
-            then: { [self] result in
-                switch result {
-                case .failure(let error):
-                    kernel.interaction.report(error, title: "The settings could not be imported")
-
-                case .success(let checked):
-                    var current: [String: Data] = [:]
-                    for key in Set(knownKeys).union(checked.values.keys) {
-                        current[key] = kernel.settings.data(forKey: key)
-                    }
-                    runner.offMain(
-                        { [current] in
-                            SettingsImportPlan(checked, current: current, knownKeys: knownKeys, schema: schema)
-                        },
-                        then: { [self] plan in
-                            confirmAndApply(plan, fileName: url.lastPathComponent)
-                        }
-                    )
-                }
-            }
+            then: { [weak self] result in self?.checked(result, of: url, knownKeys: knownKeys, schema: schema) }
         )
+    }
+
+    /// Goes on with an import once its file is read: a failure is told, a checked file is
+    /// compared with what is stored, off the main thread again, and then offered.
+    private func checked(
+        _ result: Result<CheckedSettings, any Error>,
+        of url: URL,
+        knownKeys: [String],
+        schema: SettingsSchema
+    ) {
+        switch result {
+        case .failure(let error):
+            kernel.interaction.report(error, title: "The settings could not be imported")
+
+        case .success(let checked):
+            var current: [String: Data] = [:]
+            for key in Set(knownKeys).union(checked.values.keys) {
+                current[key] = kernel.settings.data(forKey: key)
+            }
+            runner.offMain(
+                { [current] in
+                    SettingsImportPlan(checked, current: current, knownKeys: knownKeys, schema: schema)
+                },
+                then: { [weak self] plan in self?.confirmAndApply(plan, fileName: url.lastPathComponent) }
+            )
+        }
     }
 
     private func confirmAndApply(_ plan: SettingsImportPlan, fileName: String) {

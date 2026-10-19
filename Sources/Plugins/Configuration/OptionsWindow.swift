@@ -229,14 +229,16 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
                     modifiers: modifiers
                 )
             else { return nil }
-            // The question about a key that is in use is asked after the key press is dealt with.
-            MainLoop.perform {
-                if self.editor.assign(shortcut, to: row.id, adding: adding, asking: self.center.kernel.interaction) {
-                    self.edited()
-                }
-            }
+            // The question about a key that is in use is asked after the key press is dealt with,
+            // when the window may have gone (weak).
+            MainLoop.perform { [weak self] in self?.assign(shortcut, to: row.id, adding: adding) }
             return nil
         }
+    }
+
+    /// Gives `shortcut` to the command `id`, asking about a key that is in use.
+    private func assign(_ shortcut: Shortcut, to id: CommandID, adding: Bool) {
+        if editor.assign(shortcut, to: id, adding: adding, asking: center.kernel.interaction) { edited() }
     }
 
     func commit() {
