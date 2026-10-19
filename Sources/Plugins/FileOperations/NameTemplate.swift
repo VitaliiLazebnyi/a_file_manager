@@ -180,11 +180,10 @@ public enum NameTemplate {
     private static func closingBracket(_ text: Substring) -> Substring.Index? {
         if text.hasPrefix("]]") { return text.index(after: text.startIndex) }
         var quoted = false
-        for index in text.indices {
+        return text.indices.first { index in
             if text[index] == "\"" { quoted.toggle() }
-            if text[index] == "]", !quoted { return index }
+            return text[index] == "]" && !quoted
         }
-        return nil
     }
 
     /// No name is longer than this, so no width of a counter or a range may be either.
