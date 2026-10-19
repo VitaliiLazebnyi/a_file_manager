@@ -23,7 +23,9 @@ enum RealLocation {
             guard !current.isFileURL, let provider = try? fileSystems.provider(for: current),
                 let real = provider.parent(of: current),
                 real.scheme != current.scheme, path(of: real) == path(of: current)
-            else { break }
+            else {
+                break
+            }
             current = fileSystems.realLocation(of: real)
         }
         return current

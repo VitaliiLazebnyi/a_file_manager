@@ -175,13 +175,14 @@ enum Volume {
             return true
         }
         // The system can make more room than it counts as free; it is asked before a write is refused.
-        if let more = (try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
-            .volumeAvailableCapacityForImportantUsage,
+        guard
+            let more = (try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+                .volumeAvailableCapacityForImportantUsage,
             more > 0
-        {
-            return UInt64(more) >= needed
+        else {
+            return false
         }
-        return false
+        return UInt64(more) >= needed
     }
 
     /// The volume a path lies on, as a number; nil when the path cannot be asked.

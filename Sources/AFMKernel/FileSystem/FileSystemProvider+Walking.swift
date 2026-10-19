@@ -31,8 +31,9 @@ extension FileSystemProvider {
             !cancellation.isCancelled
         else { return 0 }
         let files = items.reduce(Int64(0)) { $1.isRealDirectory ? $0 : $0.addingSaturated($1.size) }
+        // A measurement started after the flag was set ends at once; the answer is then 0 anyway.
         let folders = Parallel.map(items.filter(\.isRealDirectory)) { folder in
-            cancellation.isCancelled ? 0 : self.totalSize(of: folder.url, cancellation: cancellation)
+            self.totalSize(of: folder.url, cancellation: cancellation)
         }
         return cancellation.isCancelled ? 0 : folders.reduce(files) { $0.addingSaturated($1) }
     }

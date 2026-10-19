@@ -792,10 +792,13 @@ enum ZipDirectory {
         while index >= 0 {
             if tail[index] == 0x50, tail[index + 1] == 0x4B, tail[index + 2] == 0x05, tail[index + 3] == 0x06 {
                 let commentLength = Int(tail[index + 20]) | Int(tail[index + 21]) << 8
-                if index + 22 + commentLength <= tail.count {
-                    endIndex = index
-                    break
+                // A comment longer than what follows: the signature is part of a comment, the record is further back.
+                if index + 22 + commentLength > tail.count {
+                    index -= 1
+                    continue
                 }
+                endIndex = index
+                break
             }
             index -= 1
         }
