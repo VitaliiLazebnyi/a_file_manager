@@ -301,22 +301,12 @@ public final class MacIntegrationPlugin: Plugin {
             Command(Self.share, "Share…", runsDuringJobs: true),
             enabled: hasLocalOperands
         ) { [self] in
-            withLocalOperands(of: model(), { $0 }) { [self] urls in
-                // The sharing panel looks at every item; nobody shares a hundred thousand at once.
-                guard urls.count <= Self.shareLimit else {
-                    return kernel.interaction.inform(
-                        "Too many items to share",
-                        detail: "\(urls.count) items are selected. "
-                            + "At most \(Self.shareLimit) can be shared at a time.",
-                        style: .warning
-                    )
-                }
-                remember("share " + Self.described(urls))
-                desktop?.share(urls)
-            }
+            // Weak: with many items the list comes later, when the plugin may have gone; while it
+            // is there, so is the kernel.
+            withLocalOperands(of: model(), { $0 }, then: { [weak self] urls in self?.share(urls, in: kernel) })
         }
         commands.register(Command(Self.editTags, "Finder Tags…"), enabled: hasLocalOperands) { [self] in
-            withLocalOperands(of: model(), { $0 }) { [self] urls in editTags(of: urls, in: kernel) }
+            withLocalOperands(of: model(), { $0 }, then: { [weak self] urls in self?.editTags(of: urls, in: kernel) })
         }
         commands.register(
             Command(
@@ -466,6 +456,21 @@ public final class MacIntegrationPlugin: Plugin {
 
     /// Shows the tags of the first file and gives all files what the user makes of them. The
     /// disk is read and written as jobs, off the main thread.
+    /// Shows the system's sharing panel for `urls`, unless there are too many.
+    private func share(_ urls: [URL], in kernel: Kernel) {
+        // The sharing panel looks at every item; nobody shares a hundred thousand at once.
+        guard urls.count <= Self.shareLimit else {
+            kernel.interaction.inform(
+                "Too many items to share",
+                detail: "\(urls.count) items are selected. At most \(Self.shareLimit) can be shared at a time.",
+                style: .warning
+            )
+            return
+        }
+        remember("share " + Self.described(urls))
+        desktop?.share(urls)
+    }
+
     private func editTags(of urls: [URL], in kernel: Kernel) {
         guard let first = urls.first else { return }
         kernel.jobs.run(

@@ -347,10 +347,11 @@ final class MultiRenameSession {
                 return first < second
             }
         }
-        let apply: @MainActor @Sendable ([Int]) -> Void = { [self] order in
-            reorder(order)
-            dropGivenNames()
-            listChanged(keepingFolders: true)
+        // Weak: done in the background, the order may come when the session has gone.
+        let apply: @MainActor @Sendable ([Int]) -> Void = { [weak self] order in
+            self?.reorder(order)
+            self?.dropGivenNames()
+            self?.listChanged(keepingFolders: true)
         }
         sortRequest += 1
         guard previewsInBackground, entries.count >= Self.backgroundSortThreshold else {
@@ -425,15 +426,8 @@ final class MultiRenameSession {
             }
             return entries
         }
-        let finish: @MainActor @Sendable ([RenameEntry]) -> Void = { [self] updated in
-            entries = updated
-            givenNamesStorage = nil
-            // The subjects carry the old names.
-            listGeneration += 1
-            cache = cache.forChangedOrder()
-            if settings == .unchanged { listChanged(keepingFolders: true) } else { settings = .unchanged }
-            onChange?()
-        }
+        // Weak: done in the background, the rows may come when the session has gone.
+        let finish: @MainActor @Sendable ([RenameEntry]) -> Void = { [weak self] in self?.reordered($0) }
         guard previewsInBackground, oldEntries.count >= Self.backgroundSortThreshold else {
             finish(renamed())
             return
@@ -447,6 +441,17 @@ final class MultiRenameSession {
                 finish(updated)
             }
         }
+    }
+
+    /// Takes the rows in their new order.
+    private func reordered(_ updated: [RenameEntry]) {
+        entries = updated
+        givenNamesStorage = nil
+        // The subjects carry the old names.
+        listGeneration += 1
+        cache = cache.forChangedOrder()
+        if settings == .unchanged { listChanged(keepingFolders: true) } else { settings = .unchanged }
+        onChange?()
     }
 
     // MARK: Names from a list
@@ -482,11 +487,9 @@ final class MultiRenameSession {
                 return RenameNameList.names(in: RenameNameList.text(from: data))
             }
         }
-        let finish: @MainActor @Sendable (Result<[String], any Error>) -> Void = { [self] result in
-            switch result {
-            case .success(let names): applyGivenNames(names)
-            case .failure(let error): kernel.interaction.report(error, title: "The names cannot be loaded!")
-            }
+        // Weak: read in the background, the names may come when the session has gone.
+        let finish: @MainActor @Sendable (Result<[String], any Error>) -> Void = { [weak self] result in
+            self?.namesRead(result)
             completion?()
         }
         guard previewsInBackground else {
@@ -500,23 +503,22 @@ final class MultiRenameSession {
         }
     }
 
+    /// Takes the names read from a file, or tells why there are none.
+    private func namesRead(_ result: Result<[String], any Error>) {
+        switch result {
+        case .success(let names):
+            applyGivenNames(names)
+
+        case .failure(let error):
+            kernel.interaction.report(error, title: "The names cannot be loaded!")
+        }
+    }
+
     /// "Edit names": the new names as text, one per line, for the user to change.
     func editNames() {
         guard !isBusy else { return }
-        let ask: @MainActor @Sendable (String) -> Void = { [self] text in
-            let fields = [FormField.lines("names", "", text)]
-            guard
-                let answer = kernel.interaction.form(
-                    "Edit names",
-                    detail: "One name per line, in the order of the list.",
-                    fields: fields,
-                    buttons: ["OK"]
-                )
-            else {
-                return
-            }
-            loadNames(fromText: answer.text("names"))
-        }
+        // Weak: a long text is put together in the background, and the session may go meanwhile.
+        let ask: @MainActor @Sendable (String) -> Void = { [weak self] in self?.askNames($0) }
         // The text of a long list is put together in the background.
         guard previewsInBackground, entries.count >= Self.backgroundSortThreshold else {
             ask(targetNames.joined(separator: "\n"))
@@ -531,6 +533,22 @@ final class MultiRenameSession {
                     ask(text)
                 }
             }
+    }
+
+    /// Asks for the new names as text, one per line, starting from `text`.
+    private func askNames(_ text: String) {
+        let fields = [FormField.lines("names", "", text)]
+        guard
+            let answer = kernel.interaction.form(
+                "Edit names",
+                detail: "One name per line, in the order of the list.",
+                fields: fields,
+                buttons: ["OK"]
+            )
+        else {
+            return
+        }
+        loadNames(fromText: answer.text("names"))
     }
 
     /// Back to names made by the masks.
