@@ -20,7 +20,11 @@ public final class FindFilesPlugin: Plugin {
     /// run in, and look at what it was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
-    public init() {}
+    /// With `opensWindows` off, the windows are made but never put on screen (for tests of the
+    /// whole program).
+    public init(opensWindows: Bool = true) {
+        if !opensWindows { present = { _ in } }
+    }
 
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.

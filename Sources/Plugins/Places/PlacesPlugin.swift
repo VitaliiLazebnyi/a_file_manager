@@ -63,17 +63,21 @@ public final class PlacesPlugin: Plugin {
     /// Directory trees are cached in `treeCacheDirectory`; without one they go to the program's
     /// folder in Application Support, or stay in memory only when `keepsTreesOnDisk` is off.
     /// `favorites` are the standard places offered next to the user's hotlist; `now` is the
-    /// clock the history measures stays with. Tests replace all of these.
+    /// clock the history measures stays with. Tests replace all of these. With `opensWindows`
+    /// off, the Directory Tree window is made but never put on screen (for tests of the whole
+    /// program).
     public init(
         treeCacheDirectory: URL? = nil,
         keepsTreesOnDisk: Bool = true,
         favorites: [HotlistEntry] = MacFavorites.entries(),
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        opensWindows: Bool = true
     ) {
         self.treeCacheDirectory = treeCacheDirectory
         self.keepsTreesOnDisk = keepsTreesOnDisk
         self.favorites = favorites
         self.now = now
+        if !opensWindows { present = { _ in } }
     }
 
     public func start(in owner: Kernel) {

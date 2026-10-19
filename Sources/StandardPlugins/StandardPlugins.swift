@@ -31,7 +31,8 @@ public enum StandardPlugins {
     ///
     /// Main thread only.
     /// The order decides where entries appear inside a menu section; nothing else depends on it.
-    /// Tests pass a pasteboard of their own and keep other applications from being started.
+    /// Tests pass a pasteboard of their own and turn `launchesApplications` off: then no other
+    /// application is started, no tool window is put on screen, and no modal dialog is run.
     @MainActor
     @preconcurrency
     public static func make(pasteboard: NSPasteboard = .general, launchesApplications: Bool = true) -> [any Plugin] {
@@ -41,22 +42,22 @@ public enum StandardPlugins {
             NetworkPlugin(launchesApplications: launchesApplications),
             VirtualFoldersPlugin(),
             NavigationPlugin(),
-            PlacesPlugin(),
-            ViewerPlugin(),
+            PlacesPlugin(opensWindows: launchesApplications),
+            ViewerPlugin(showsWindows: launchesApplications),
             MacIntegrationPlugin(launchesApplications: launchesApplications),
             FileOperationsPlugin(),
             FilePropertiesPlugin(launchesApplications: launchesApplications),
-            MultiRenamePlugin(),
-            CompareContentPlugin(),
+            MultiRenamePlugin(opensWindows: launchesApplications),
+            CompareContentPlugin(opensWindows: launchesApplications),
             FileToolsPlugin(),
-            FindFilesPlugin(),
-            DirectorySyncPlugin(),
+            FindFilesPlugin(opensWindows: launchesApplications),
+            DirectorySyncPlugin(opensWindows: launchesApplications),
             SystemToolsPlugin(launchesApplications: launchesApplications),
             ClipboardPlugin(pasteboard: pasteboard),
             SelectionPlugin(),
             ViewOptionsPlugin(),
             FolderTabsPlugin(),
-            ConfigurationPlugin()
+            ConfigurationPlugin(launchesApplications: launchesApplications)
         ]
     }
 }
