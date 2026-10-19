@@ -105,6 +105,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     private var waitingLinked = 0
     /// Entries of `waiting` before this one are done with; they are dropped now and then.
     private var waitingHead = 0
+    /// Whether a later turn of linking is asked for already.
     private var isLinking = false
 
     /// Numbers the scans of each tree (by location key) and lets only the latest store its result.
@@ -474,7 +475,6 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     /// seconds at most; when more is waiting, the rest follows in a later turn, so that events
     /// and drawing come in between.
     private func linkWaiting() {
-        guard !isLinking else { return }
         guard let tree else {
             (waiting, waitingHead, waitingLinked) = ([], 0, 0)
             (reloadQueue, reloadQueued) = ([], [])
@@ -522,10 +522,13 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             if visible, scanner == nil { showCount() }
             return
         }
-        isLinking = true
-        DispatchQueue.main.async { [weak self] in
-            self?.isLinking = false
-            self?.linkWaiting()
+        // One later turn at a time is asked for; a call in between links what it can itself.
+        if !isLinking {
+            isLinking = true
+            DispatchQueue.main.async { [weak self] in
+                self?.isLinking = false
+                self?.linkWaiting()
+            }
         }
     }
 
