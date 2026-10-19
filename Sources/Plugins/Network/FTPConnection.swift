@@ -58,12 +58,16 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
     /// the name goes back to the server as the bytes it came as.
     func decodeTelling(_ data: Data) -> (text: String, encoding: String.Encoding) {
         if let encoding {
-            if let text = String(data: data, encoding: encoding) { return (text, encoding) }
+            guard let text = String(data: data, encoding: encoding) else {
+                return (String(decoding: data, as: UTF8.self), .utf8)
+            }
+            return (text, encoding)
+        }
+        guard let text = String(data: data, encoding: .utf8) else {
+            if let text = String(data: data, encoding: .windowsCP1252) { return (text, .windowsCP1252) }
             return (String(decoding: data, as: UTF8.self), .utf8)
         }
-        if let text = String(data: data, encoding: .utf8) { return (text, .utf8) }
-        if let text = String(data: data, encoding: .windowsCP1252) { return (text, .windowsCP1252) }
-        return (String(decoding: data, as: UTF8.self), .utf8)
+        return (text, .utf8)
     }
 
     /// The bytes of a command. Names are sent the way the Mac writes them when composed
@@ -132,8 +136,11 @@ final class NameMemory: @unchecked Sendable {
     /// writes names composed and in `sending`.
     static func needsRemembering(_ name: String, readAs encoding: String.Encoding, sending: String.Encoding) -> Bool {
         if encoding != sending { return true }
-        if name.utf8.allSatisfy({ $0 < 0x80 }) { return false }
-        return !name.precomposedStringWithCanonicalMapping.utf8.elementsEqual(name.utf8)
+        // A name in ASCII is the same composed or not.
+        if name.utf8.contains(where: { $0 >= 0x80 }) {
+            return !name.precomposedStringWithCanonicalMapping.utf8.elementsEqual(name.utf8)
+        }
+        return false
     }
 }
 
@@ -423,18 +430,21 @@ final class FTPConnection: @unchecked Sendable {
         let control = try stream()
         let deadline = Date().addingTimeInterval(timeout ?? config.timeout)
         do {
+            var reply: FTPReply?
             for read in 1...FTPLimits.replyLinesRead + 1 {
                 let left = deadline.timeIntervalSinceNow
                 guard left > 0 else { throw NetworkError.timedOut("waiting for a reply") }
                 let line = encoding.decode(try control.readLine(timeout: left, cancellation: cancellation))
                 // The log gets the start of a very long reply, not all of it.
                 if read <= FTPLimits.replyLines { log?(line) }
-                if let reply = replies.feed(line) {
-                    onActivity?()
-                    return reply
-                }
+                reply = replies.feed(line)
+                if reply != nil { break }
             }
-            throw NetworkError.unexpected("a reply of more than \(FTPLimits.replyLinesRead) lines")
+            guard let reply else {
+                throw NetworkError.unexpected("a reply of more than \(FTPLimits.replyLinesRead) lines")
+            }
+            onActivity?()
+            return reply
         } catch {
             // A reply that did not arrive would be taken for the answer to the next command.
             isBroken = true
@@ -905,7 +915,10 @@ final class FTPConnection: @unchecked Sendable {
         } else if isUsable {
             isDirectory = (try? changeDirectory(full, cancellation: cancellation)) != nil
         }
-        return isUsable ? isDirectory : nil
+        guard isUsable else {
+            return nil
+        }
+        return isDirectory
     }
 
     private static let resolvedLinks = 32
