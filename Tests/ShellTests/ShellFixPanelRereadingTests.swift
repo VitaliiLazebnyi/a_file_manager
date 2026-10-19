@@ -134,4 +134,19 @@ internal struct ShellFixPanelRereadingTests {
         await ShellFixTurns.timer(after: 0.05)
         #expect(gone == nil)
     }
+
+    /// A rename that was to start after a click, when the cursor has moved on by then: nothing
+    /// starts.
+    @Test
+    internal func aRenameWhoseCursorMovedOnDoesNotStart() async throws {
+        await fixture.show("/b")
+        fixture.memory.addFile("/b/z.txt")
+        await fixture.show("/b")
+        let row = try #require(model.row(ofName: "y.txt"))
+        model.moveCursor(to: row)
+        panel.scheduleRename(row: row, after: 0.05)
+        model.moveCursor(to: try #require(model.row(ofName: "z.txt")))
+        await ShellFixTurns.timer(after: 0.05)
+        #expect(!panel.isRenaming && panel.pendingRename == nil)
+    }
 }
