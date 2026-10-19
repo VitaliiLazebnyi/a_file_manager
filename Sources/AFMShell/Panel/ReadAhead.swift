@@ -84,17 +84,40 @@ internal final class ReadAhead {
     internal private(set) var pauses: [String: TimeInterval] = [:]
     private let fileSystems: FileSystemRegistry
     private let cache: ListingCache
+    /// The time, of the system's uptime unless told otherwise; read on any thread.
+    private let clock: @Sendable () -> TimeInterval
+    /// The most folders that are left alone at a time (`pauseLimit` unless told otherwise).
+    private let mostPauses: Int
     /// What the cursor rests on now, if it may be read ahead.
     private var resting: Target?
     /// Counts the rests, so a timer that was overtaken knows it.
     private var rest = 0
 
-    private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+    private var now: TimeInterval { clock() }
 
-    /// Reads with `fileSystems` into `cache`.
-    internal init(fileSystems: FileSystemRegistry, cache: ListingCache) {
+    /// Reads with `fileSystems` into `cache`, by the time `clock` tells, leaving at most
+    /// `mostPauses` folders alone at a time.
+    internal init(
+        fileSystems: FileSystemRegistry,
+        cache: ListingCache,
+        clock: @escaping @Sendable () -> TimeInterval,
+        mostPauses: Int
+    ) {
         self.fileSystems = fileSystems
         self.cache = cache
+        self.clock = clock
+        self.mostPauses = mostPauses
+    }
+
+    /// Reads with `fileSystems` into `cache`, by the system's uptime, leaving at most `pauseLimit`
+    /// folders alone at a time.
+    internal convenience init(fileSystems: FileSystemRegistry, cache: ListingCache) {
+        self.init(
+            fileSystems: fileSystems,
+            cache: cache,
+            clock: { ProcessInfo.processInfo.systemUptime },
+            mostPauses: Self.pauseLimit
+        )
     }
 
     /// Reads for `reading`, on its background thread; nil for a reading that was cancelled or
@@ -112,9 +135,7 @@ internal final class ReadAhead {
                 ) { reading.progress($0, limit: limit) }
                 .map { .success($0) }
         } catch {
-            // A file system may end a reading that was told to stop with an error: that is
-            // no failure of the folder.
-            return reading.cancellation.isCancelled ? nil : .failure(error)
+            return .failure(error)
         }
     }
 
@@ -241,9 +262,9 @@ internal final class ReadAhead {
     /// Leaves a folder alone for a while.
     private func pause(_ location: URL, for time: TimeInterval) {
         let moment = now
-        if pauses.count >= Self.pauseLimit {
+        if pauses.count >= mostPauses {
             pauses = pauses.filter { $0.value > moment }
-            if pauses.count >= Self.pauseLimit {
+            if pauses.count >= mostPauses {
                 pauses = [:]
             }
         }
@@ -252,7 +273,7 @@ internal final class ReadAhead {
 
     /// Reads `target` in the background.
     private func start(_ target: Target) {
-        let started = ReadAheadReading(target: target)
+        let started = ReadAheadReading(target: target, clock: clock)
         reading = started
         let source = PanelLoading.Source(
             location: target.location,
@@ -276,6 +297,12 @@ internal final class ReadAhead {
             self.reading = nil
         }
         let target = reading.target
+        // A file system may end a reading that was told to stop with an error: that is no
+        // failure of the folder, and nobody hears of it.
+        var outcome = outcome
+        if case .failure = outcome, reading.cancellation.isCancelled {
+            outcome = nil
+        }
         switch outcome {
         case .failure:
             pause(target.location, for: Self.pauseAfterError)

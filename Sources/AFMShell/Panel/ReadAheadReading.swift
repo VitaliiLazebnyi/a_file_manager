@@ -18,11 +18,14 @@ internal final class ReadAheadReading: @unchecked Sendable {
     /// When the reading was told to stop (in the system's uptime).
     @MainActor internal var cancelledAt: TimeInterval?
 
+    /// The time, of the system's uptime unless told otherwise; read on any thread.
+    private let clock: @Sendable () -> TimeInterval
+
     // Shared with the reading thread, behind the lock.
     private let lock = NSLock()
     private var joined = false
     private var givenUp = false
-    private var lastProgress = ProcessInfo.processInfo.systemUptime
+    private var lastProgress: TimeInterval
     private var thread: pthread_t?
     private var boost: pthread_override_t?
 
@@ -32,16 +35,18 @@ internal final class ReadAheadReading: @unchecked Sendable {
     /// The folder turned out to be larger than the cache takes, and nobody waited for it.
     internal var wasGivenUp: Bool { lock.withLock { givenUp } }
 
-    /// A reading of `target`, not started yet.
-    internal init(target: ReadAhead.Target) {
+    /// A reading of `target`, not started yet, which tells the time by `clock`.
+    internal init(target: ReadAhead.Target, clock: @escaping @Sendable () -> TimeInterval) {
         self.target = target
+        self.clock = clock
+        lastProgress = clock()
     }
 
     /// Reading thread, when it starts.
     internal func began() {
         lock.withLock {
             thread = pthread_self()
-            lastProgress = ProcessInfo.processInfo.systemUptime
+            lastProgress = clock()
             if joined {
                 raise()
             }
@@ -64,7 +69,7 @@ internal final class ReadAheadReading: @unchecked Sendable {
     /// will be remembered) and no panel waits for it.
     internal func progress(_ count: Int, limit: Int) -> Bool {
         lock.withLock {
-            lastProgress = ProcessInfo.processInfo.systemUptime
+            lastProgress = clock()
             if count > limit, !joined {
                 givenUp = true
             }
@@ -94,7 +99,7 @@ internal final class ReadAheadReading: @unchecked Sendable {
 
     /// Whether nothing has arrived for `time`.
     internal func isSilent(for time: TimeInterval) -> Bool {
-        lock.withLock { ProcessInfo.processInfo.systemUptime - lastProgress > time }
+        lock.withLock { clock() - lastProgress > time }
     }
 
     /// Raises the reading thread to the user's priority.

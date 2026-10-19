@@ -149,12 +149,12 @@ internal struct PanelReadAheadTests {
     @Test
     internal func aReadingIsRaisedWhenJoinedAndCannotBeJoinedOnceGivenUp() {
         let target = ReadAhead.Target(location: URL(fileURLWithPath: "/x"), showHidden: false, order: ListOrder())
-        let joined = ReadAheadReading(target: target)
+        let joined = ReadAheadReading(target: target) { ProcessInfo.processInfo.systemUptime }
         #expect(joined.join() && joined.isJoined)
         joined.began()
         #expect(joined.progress(10, limit: 5))
         joined.finished()
-        let large = ReadAheadReading(target: target)
+        let large = ReadAheadReading(target: target) { ProcessInfo.processInfo.systemUptime }
         #expect(!large.progress(10, limit: 5) && large.wasGivenUp && !large.join())
     }
 
