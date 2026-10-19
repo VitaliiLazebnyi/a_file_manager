@@ -78,7 +78,9 @@ internal struct CoverageLocalPlaces {
     internal func aVolumeThatDoesNotAnswerIsListedByItsFolderName() throws {
         let box = try Sandbox()
         guard let image = CoverageCoreDiskImage(in: box, name: "AFMSilent", browsable: true) else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         let gate = CoverageCoreGate()
         defer { gate.open() }
@@ -99,7 +101,9 @@ internal struct CoverageLocalPlaces {
     internal func aVolumeThatGoesWhileItIsAskedIsListedByItsFolderName() throws {
         let box = try Sandbox()
         guard let image = CoverageCoreDiskImage(in: box, name: "AFMGone", browsable: true) else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         var probes = LocalProbes()
         probes.willAsk = { path in if path == image.systemPath { image.detach() } }
@@ -113,7 +117,9 @@ internal struct CoverageLocalPlaces {
     internal func readingsThatTakeTooLongAreGivenUpAndNoMoreThanTwoAreLeft() throws {
         let box = try Sandbox()
         guard let image = CoverageCoreDiskImage(in: box, name: "AFMLate", browsable: true) else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         let (root, late) = (CoverageCoreGate(), CoverageCoreGate())
         let blocksImage = Shared(false)

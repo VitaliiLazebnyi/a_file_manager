@@ -22,7 +22,9 @@ internal struct CoverageLocalOtherVolume {
     internal func aCopyToAnotherVolumeReportsItsProgress() throws {
         let box = try Sandbox()
         guard let image = CoverageCoreDiskImage(in: box, name: "AFMCopy") else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         let source = try Self.file(box, "big.bin", size: 3_000_000)
         var reported: [Int64] = []
@@ -40,7 +42,9 @@ internal struct CoverageLocalOtherVolume {
     internal func aStoppedCopyToAnotherVolumeLeavesNothing() throws {
         let box = try Sandbox()
         guard let image = CoverageCoreDiskImage(in: box, name: "AFMStop") else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         let source = try Self.file(box, "big.bin", size: 3_000_000)
         let target = image.mountPoint.appendingPathComponent("big.bin")
@@ -62,7 +66,9 @@ internal struct CoverageLocalOtherVolume {
     internal func aCopyThatDoesNotFitEndsWithTheErrorAndLeavesNothing() throws {
         let box = try Sandbox()
         guard let image = CoverageCoreDiskImage(in: box, name: "AFMFull", megabytes: 4) else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         let source = try Self.file(box, "big.bin", size: 6_000_000)
         let target = image.mountPoint.appendingPathComponent("big.bin")
@@ -77,7 +83,9 @@ internal struct CoverageLocalOtherVolume {
     internal func aCopyCancelledWhileItsExtendedAttributesAreCopiedLeavesNothing() throws {
         let box = try Sandbox()
         guard let image = CoverageCoreDiskImage(in: box, name: "AFMAttributes", megabytes: 64) else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         let source = try box.file("attributes.txt", "attributes")
         for index in 0..<2 {
@@ -104,7 +112,9 @@ internal struct CoverageLocalOtherVolume {
     internal func aLockedCopyOnAnotherVolumeKeepsTheDateOfCreationAndStaysTheOwnOne() throws {
         let box = try Sandbox()
         guard let image = CoverageCoreDiskImage(in: box, name: "AFMLock") else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         let source = try box.file("locked.txt", "locked")
         var times = [timespec(tv_sec: 1_000_000, tv_nsec: 0)]

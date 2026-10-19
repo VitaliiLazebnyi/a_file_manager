@@ -183,7 +183,9 @@ internal struct CoverageArchivesAppendTests {
     @Test(arguments: [true, false])
     internal func onAVolumeThatCannotCloneTheArchiveIsWrittenAnew(probeTells: Bool) throws {
         guard let image = CoverageArchivesDiskImage(in: box, at: "hfs") else {
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         let source = try CoverageArchives.zip("source.zip", in: box, ["a.txt": "a", "b.txt": "b"], options: [])
         let url = image.mountPoint.appendingPathComponent("archive.zip")
