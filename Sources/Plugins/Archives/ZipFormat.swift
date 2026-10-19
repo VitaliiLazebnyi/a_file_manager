@@ -58,7 +58,7 @@ struct ZipRecord {
     }
 
     /// How many bytes the name has.
-    var nameLength: Int { nameRaw.isEmpty ? nameText.utf8.count : nameRaw.count }
+    var nameLength: Int { !nameRaw.isEmpty ? nameRaw.count : nameText.utf8.count }
     /// How many bytes the extra fields have.
     var extraLength: Int { extraStore.count }
     private var lastNameByte: UInt8? { nameRaw.isEmpty ? nameText.utf8.last : nameRaw.last }
@@ -178,11 +178,11 @@ struct ZipRecord {
 
     var modified: Date {
         // The Unix time of the "extended timestamp" field is exact and has no time zone.
-        if let field = Self.field(0x5455, in: extra), field.count >= 5, field[field.startIndex] & 1 != 0 {
-            var reader = ByteReader(Data(field.dropFirst()))
-            return Date(timeIntervalSince1970: TimeInterval(Int32(bitPattern: reader.u32())))
+        guard let field = Self.field(0x5455, in: extra), field.count >= 5, field[field.startIndex] & 1 != 0 else {
+            return DOSTime.date(time: dosTime, date: dosDate)
         }
-        return DOSTime.date(time: dosTime, date: dosDate)
+        var reader = ByteReader(Data(field.dropFirst()))
+        return Date(timeIntervalSince1970: TimeInterval(Int32(bitPattern: reader.u32())))
     }
 
     /// True when the password check byte of this member was taken from its DOS time: it is

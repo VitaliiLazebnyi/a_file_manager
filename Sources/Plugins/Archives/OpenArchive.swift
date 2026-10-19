@@ -338,13 +338,13 @@ internal final class FlushGate: @unchecked Sendable {
         let lent = lend()
         defer { Self.end(lent) }
         while holder != nil {
-            if let cancellation {
-                _ = condition.wait(until: Date(timeIntervalSinceNow: 0.05))
-                if holder != nil, cancellation.isCancelled {
-                    throw ArchiveError.cancelled
-                }
-            } else {
+            guard let cancellation else {
                 condition.wait()
+                continue
+            }
+            _ = condition.wait(until: Date(timeIntervalSinceNow: 0.05))
+            if holder != nil, cancellation.isCancelled {
+                throw ArchiveError.cancelled
             }
         }
         take(long: long)
@@ -1359,32 +1359,36 @@ final class OpenArchive: @unchecked Sendable {
             }
             return nil
         }
+        // Asks the user, three times at most; called under `passwordGate`, one thread at a time.
+        func asked() throws -> (any ByteStream, String) {
+            for attempt in 0..<3 {
+                guard let given = environment.askPassword(name, attempt > 0) else {
+                    noteRefusal()
+                    throw ArchiveError.passwordNeeded(name)
+                }
+                do {
+                    let stream = try make(given)
+                    locked {
+                        passwords.removeAll { $0 == given }
+                        passwords.insert(given, at: 0)
+                        if passwords.count > 8 { passwords.removeLast() }
+                        (refusedInScope, refusedUntil) = (false, .distantPast)
+                    }
+                    return (stream, given)
+                } catch ArchiveError.wrongPassword {
+                    // Asked again, three times at most.
+                }
+            }
+            noteRefusal()
+            throw ArchiveError.wrongPassword(name)
+        }
         if let opened = try tryKnown() { return opened }
         // Asked without the directory's lock: the question is put on the main thread.
         passwordGate.lock()
         defer { passwordGate.unlock() }
         if let opened = try tryKnown() { return opened }
         if locked({ isRefusedLocked }) { throw ArchiveError.passwordNeeded(name) }
-        for attempt in 0..<3 {
-            guard let given = environment.askPassword(name, attempt > 0) else {
-                noteRefusal()
-                throw ArchiveError.passwordNeeded(name)
-            }
-            do {
-                let stream = try make(given)
-                locked {
-                    passwords.removeAll { $0 == given }
-                    passwords.insert(given, at: 0)
-                    if passwords.count > 8 { passwords.removeLast() }
-                    (refusedInScope, refusedUntil) = (false, .distantPast)
-                }
-                return (stream, given)
-            } catch ArchiveError.wrongPassword {
-                // Asked again, three times at most.
-            }
-        }
-        noteRefusal()
-        throw ArchiveError.wrongPassword(name)
+        return try asked()
     }
 
     /// Sets the password to try first, for callers that already know it; nil forgets them all.
