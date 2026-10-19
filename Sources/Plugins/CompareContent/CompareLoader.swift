@@ -273,9 +273,10 @@ public enum CompareLoader {
                 lock.unlock()
             }
         }
-        if let failure, !cancellation.isCancelled { throw failure }
-        if differs { return false }
-        return cancellation.isCancelled ? nil : true
+        // A cancelled check has no answer, also when the reads it cut short came back different.
+        if cancellation.isCancelled { return nil }
+        if let failure { throw failure }
+        return !differs
     }
 
     /// Reads until `count` bytes are there or the file ends; readers may hand out less at a time.
