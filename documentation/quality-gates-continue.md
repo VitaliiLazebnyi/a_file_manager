@@ -58,8 +58,15 @@ merge what is finished, and restart the rest with the same section of `wave-100.
 - **Whole suite with coverage at `52a2623`:** all passed (355 shell, 3,426 plugin, 336 kernel); lines 99.55% (428 left),
   functions 99.24% (115), regions 99.49% (210); 58 files below 100%: system adapters (UI tests), the Panel regions
   w102-shell is on, and regions the non-atomic counters lose or that tests skipping on a failed `hdiutil attach` miss.
-- Running: **w102-shell**; an atomic-counter measurement (scratchpad `atomic/run.sh`) to tell real gaps from lost
-  counts.
+- Atomic-counter run of `52a2623` (`documentation/agent-briefs/w103/`): the same totals; the gaps outside the adapters
+  differ between runs because some tests reach them only now and then (wave 103).
+- Merged: **w102-shell** (`b089625`): AFMShell 34 regions left (adapters, key-window checks). Found: test processes
+  ending early with status 0 (a stopped main run loop) or SIGSEGV, unreported by `swift test`.
+- `45dea79`: `StandardPlugins.make(launchesApplications: false)` passes it on (no real modal loop or tool window in the
+  program tests). `a58cca3`: `Scripts/test-run-check.py` makes the test gate fail when a bundle did not run all its
+  `@Test` functions.
+- Running: **w103-determinism**, **w104-crashes** (SIGSEGV in PluginTests, an unowned reference read after free, early
+  exits, tests failing only in full runs).
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts
