@@ -18,7 +18,7 @@ import Testing
         return context
     }()
 
-    func finishes(within seconds: Double = 60, _ work: @escaping @Sendable () -> Void) -> Bool {
+    func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -166,7 +166,10 @@ import Testing
 
     @Test func precomposingANameIsARename() {
         let decomposed = "e\u{301}.txt"
-        let item = FileItem(url: URL(string: "mem:///d/" + decomposed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)!, name: decomposed)
+        let item = FileItem(
+            url: URL(string: "mem:///d/" + decomposed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)!,
+            name: decomposed
+        )
         var settings = RenameSettings()
         settings.nameMask = "[u][N]"
         let preview = RenameComputation.preview(
@@ -332,7 +335,8 @@ import Testing
         for mask in ["[N]1", "[N]2", "[N]3", "[N]4"] { session.settings.nameMask = mask }
         // Nothing was computed for the first three.
         #expect(session.isComputing)
-        for _ in 0..<5_000 where session.isComputing { try? await Task.sleep(nanoseconds: 2_000_000) }
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while session.isComputing, Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
         #expect(
             !session.isComputing && session.rows.map(\.newName) == ["a4.txt", "b4.txt", "c4.txt"] && changes - base <= 2
         )
@@ -351,7 +355,8 @@ import Testing
         let session = session(clipboard: { nil }, changes: nil, background: true)
         session.sort(by: .name, ascending: false)
         session.sort(by: .name, ascending: true)
-        for _ in 0..<5_000 where session.isComputing { try? await Task.sleep(nanoseconds: 2_000_000) }
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while session.isComputing, Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
         try? await Task.sleep(nanoseconds: 100_000_000)
         #expect(session.rows.first?.entry.name == "f0000.txt" && session.rows.last?.entry.name == "f2499.txt")
     }
@@ -424,7 +429,8 @@ import Testing
         #expect(next.undoCount == 1)
         var loaded = false
         next.loadUndo { loaded = true }
-        for _ in 0..<5_000 where !loaded { try? await Task.sleep(nanoseconds: 2_000_000) }
+        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
+        while !loaded, Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
         #expect(loaded && next.lastUndo?.count == 1)
     }
 

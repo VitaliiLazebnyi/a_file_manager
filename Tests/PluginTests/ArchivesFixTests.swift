@@ -463,7 +463,7 @@ private func quarantine(of url: URL) -> String? {
         try writer?.close(attributes: FileAttributes())
         writer = nil
         // (A generous wait: the timer runs at low priority, behind whatever else the machine does.)
-        #expect(changed.wait(timeout: .now() + 60) == .success)
+        #expect(changed.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(listed(archive).contains("tree/kept.txt") && isSound(archive))
     }
 

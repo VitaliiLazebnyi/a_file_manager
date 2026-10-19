@@ -21,7 +21,7 @@ import Testing
     }
 
     /// Runs `work` on another thread and fails instead of hanging if it does not end.
-    func finishes(within seconds: Double = 30, _ work: @escaping @Sendable () -> Void) -> Bool {
+    func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()

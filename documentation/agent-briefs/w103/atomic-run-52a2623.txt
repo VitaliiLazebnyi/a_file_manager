@@ -1,0 +1,60 @@
+Sources/AFMKernel/Panels/Sorter.swift {'regions': 1}
+Sources/AFMShell/App/AlertInteraction.swift {'lines': 33, 'functions': 9, 'regions': 9}
+Sources/AFMShell/App/Notice.swift {'lines': 1, 'functions': 1, 'regions': 1}
+Sources/AFMShell/App/Shell.swift {'lines': 1, 'functions': 1, 'regions': 1}
+Sources/AFMShell/App/ShellApplication.swift {'lines': 11, 'functions': 4, 'regions': 4}
+Sources/AFMShell/App/ShellCommands.swift {'lines': 6, 'functions': 2, 'regions': 2}
+Sources/AFMShell/Interaction/FormDialog.swift {'lines': 3, 'functions': 1, 'regions': 1}
+Sources/AFMShell/Interaction/QuitProgress.swift {'lines': 24, 'functions': 1, 'regions': 3}
+Sources/AFMShell/Panel/FileGridView+Drop.swift {'lines': 3, 'functions': 1, 'regions': 1}
+Sources/AFMShell/Panel/FileTableView.swift {'lines': 10, 'regions': 5}
+Sources/AFMShell/Panel/PanelPieceStream.swift {'lines': 4, 'regions': 1}
+Sources/AFMShell/Panel/PanelReadingRun.swift {'lines': 5, 'regions': 2}
+Sources/AFMShell/Panel/PanelRememberedVisit.swift {'lines': 40, 'functions': 3, 'regions': 9}
+Sources/AFMShell/Panel/PanelViewController+Keys.swift {'lines': 4, 'regions': 3}
+Sources/AFMShell/Panel/PanelViewController+Layout.swift {'lines': 7, 'functions': 1, 'regions': 2}
+Sources/AFMShell/Panel/PanelViewController+PathBar.swift {'lines': 3, 'functions': 1, 'regions': 1}
+Sources/AFMShell/Panel/PanelViewController+QuickFilter.swift {'lines': 14, 'functions': 1, 'regions': 8}
+Sources/AFMShell/Panel/PanelViewController+Reading.swift {'lines': 4, 'regions': 2}
+Sources/AFMShell/Panel/PanelViewController+Rename.swift {'lines': 4, 'functions': 1, 'regions': 3}
+Sources/AFMShell/Panel/PanelViewController+Rereading.swift {'lines': 5, 'regions': 4}
+Sources/AFMShell/Panel/PanelViewController+Table.swift {'lines': 2, 'regions': 1}
+Sources/AFMShell/Panel/PanelViewController+Tabs.swift {'lines': 2, 'regions': 3}
+Sources/AFMShell/Panel/PanelViewController+Volumes.swift {'lines': 4, 'functions': 1, 'regions': 1}
+Sources/AFMShell/Panel/ReadAhead.swift {'lines': 10, 'functions': 1, 'regions': 8}
+Sources/AFMShell/Window/BarCommandButton.swift {'lines': 2, 'regions': 1}
+Sources/AFMShell/Window/CommandLineView.swift {'lines': 1, 'regions': 1}
+Sources/AFMShell/Window/MainWindowController.swift {'regions': 3}
+Sources/Plugins/Archives/ArchiveCommands.swift {'lines': 3, 'functions': 1, 'regions': 1}
+Sources/Plugins/Archives/ArchivesPlugin.swift {'lines': 1, 'functions': 1, 'regions': 1}
+Sources/Plugins/CompareContent/CompareWindowEffects.swift {'lines': 11, 'functions': 6, 'regions': 8}
+Sources/Plugins/Configuration/ConfigurationEffects.swift {'lines': 16, 'functions': 11, 'regions': 17}
+Sources/Plugins/Configuration/ConfigurationPlugin.swift {'lines': 1, 'functions': 1, 'regions': 1}
+Sources/Plugins/Configuration/ConfigurationViews.swift {'regions': 1}
+Sources/Plugins/DirectorySync/SyncWindowController.swift {'lines': 4, 'functions': 1, 'regions': 3}
+Sources/Plugins/DirectorySync/SyncWindowEffects.swift {'lines': 9, 'functions': 4, 'regions': 6}
+Sources/Plugins/FileOperations/FileOperationsPlugin.swift {'lines': 1, 'functions': 1, 'regions': 1}
+Sources/Plugins/FileProperties/AppleScript.swift {'lines': 6, 'functions': 1, 'regions': 1}
+Sources/Plugins/FindFiles/FileIdentity.swift {'lines': 1, 'regions': 1}
+Sources/Plugins/FindFiles/SearchForm.swift {'lines': 1, 'functions': 1, 'regions': 1}
+Sources/Plugins/MacIntegration/SystemDesktop.swift {'lines': 25, 'functions': 5, 'regions': 9}
+Sources/Plugins/MacIntegration/SystemPreviewPanel.swift {'lines': 17, 'functions': 5, 'regions': 9}
+Sources/Plugins/MultiRename/MultiRenameWindowController.swift {'lines': 2, 'functions': 2, 'regions': 2}
+Sources/Plugins/Network/FTPConnection.swift {'lines': 1, 'regions': 1}
+Sources/Plugins/Network/NetStream.swift {'lines': 6, 'functions': 3, 'regions': 4}
+Sources/Plugins/Network/NetworkPlugin.swift {'regions': 1}
+Sources/Plugins/Network/SavedConnections.swift {'lines': 3, 'functions': 1, 'regions': 1}
+Sources/Plugins/Places/DirectoryTreeWindowController.swift {'lines': 1, 'functions': 1, 'regions': 1}
+Sources/Plugins/Places/HotlistEditorWindowController.swift {'lines': 8, 'functions': 1, 'regions': 2}
+Sources/Plugins/Places/PlacesPlugin.swift {'lines': 1, 'functions': 1, 'regions': 1}
+Sources/Plugins/Selection/SelectionType.swift {'regions': 1}
+Sources/Plugins/SystemTools/ToolsDesktop.swift {'lines': 23, 'functions': 10, 'regions': 13}
+Sources/Plugins/SystemTools/VolumeEjection.swift {'lines': 3, 'functions': 1, 'regions': 1}
+Sources/Plugins/Viewer/Model/ByteSource.swift {'regions': 1}
+Sources/Plugins/Viewer/Model/ViewerEncoding.swift {'lines': 5, 'regions': 4}
+Sources/Plugins/Viewer/UI/SystemDialogs.swift {'lines': 29, 'functions': 7, 'regions': 13}
+Sources/Plugins/Viewer/UI/SystemLinks.swift {'lines': 3, 'functions': 1, 'regions': 1}
+Sources/Plugins/Viewer/UI/SystemMediaPlayback.swift {'lines': 37, 'functions': 19, 'regions': 21}
+lines 93928/94349 99.55%
+functions 15077/15191 99.25%
+regions 40742/40951 99.49%

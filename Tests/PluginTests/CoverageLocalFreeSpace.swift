@@ -39,7 +39,7 @@ internal struct CoverageLocalFreeSpace {
             local.spareLock.withLock { local.spareSpace[mount] = (0, lost, true, volume) }
             #expect(local.volume(of: box.root) != nil)
             #expect(
-                Wait.until(seconds: 60) {
+                Wait.until {
                     local.spareLock.withLock {
                         local.spareSpace[mount].map { !$0.isMeasuring && $0.measured != lost } ?? true
                     }

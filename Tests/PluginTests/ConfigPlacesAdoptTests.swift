@@ -12,7 +12,7 @@ import Testing
 @testable import VirtualFoldersPlugin
 
 /// Waits for `condition` without a fixed sleep: it polls, with a generous limit.
-private func waitFor(_ limit: TimeInterval = 60, _ condition: () -> Bool) -> Bool {
+private func waitFor(_ limit: TimeInterval = Wait.ceiling, _ condition: () -> Bool) -> Bool {
     let deadline = Date().addingTimeInterval(limit)
     while !condition(), Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
     return condition()
@@ -96,7 +96,7 @@ private final class MountedImage {
         }
         #expect(waitFor { memory.listRequests(for: "/S") > 0 })
         flag.cancel()
-        let ended = finished.wait(timeout: .now() + 60) == .success
+        let ended = finished.wait(timeout: .now() + Wait.ceiling) == .success
         memory.releaseStalls()
         #expect(ended)
         // A walk that was given up is no branch: the same walk without a flag reads it all.
@@ -130,7 +130,10 @@ private final class MountedImage {
         try writer.close(attributes: FileAttributes())
         #expect(memory.contents("/F/new.txt") == "abc")
         let appender = try virtual.append(
-            to: VirtualLocation.branch(of: memory.url("/F/new.txt")).url, at: 1, cancellation: flag)
+            to: VirtualLocation.branch(of: memory.url("/F/new.txt")).url,
+            at: 1,
+            cancellation: flag
+        )
         try appender.write(Data("Z".utf8))
         try appender.close(attributes: FileAttributes())
         #expect(memory.contents("/F/new.txt") == "aZ")
@@ -144,7 +147,8 @@ private final class MountedImage {
         // Both ends are translated; the real file system gets real locations.
         try virtual.copyMetadata(
             from: VirtualLocation.branch(of: memory.url("/F/dir")).url,
-            to: VirtualLocation.branch(of: memory.url("/G/copy")).url)
+            to: VirtualLocation.branch(of: memory.url("/G/copy")).url
+        )
         #expect(memory.metadataCopies.map(\.to) == ["/G/copy"] && memory.metadataCopies.first?.from.scheme == "mem")
         let list = virtual.register(files: [memory.url("/F/one.txt")], title: "Found", origin: nil)
         #expect(throws: FileSystemError.self) {
@@ -153,7 +157,8 @@ private final class MountedImage {
 
         #expect(
             virtual.item(at: VirtualLocation.branch(of: memory.url("/F/one.txt")).url, cancellation: flag)?.name
-                == "one.txt")
+                == "one.txt"
+        )
         flag.cancel()
         #expect(virtual.item(at: VirtualLocation.branch(of: memory.url("/F/one.txt")).url, cancellation: flag) == nil)
         #expect(virtual.totalSize(of: branch, cancellation: CancellationFlag()) == 7)
@@ -165,7 +170,8 @@ private final class MountedImage {
         memory.addFile("/X/c/other.txt", "3")
         let picked = virtual.registerPicked(
             [memory.url("/X/a/same.txt"), memory.url("/X/b/same.txt"), memory.url("/X/c/other.txt")],
-            in: memory.url("/X"))
+            in: memory.url("/X")
+        )
         let items = try virtual.list(picked, showHidden: true)
         #expect(Set(items.map { Array($0.name.utf8) }).count == 3)
         #expect(items.filter { $0.name.hasSuffix("same.txt") }.count == 2 && items.contains { $0.name == "other.txt" })
@@ -180,7 +186,8 @@ private final class MountedImage {
         let items = try virtual.list(picked, showHidden: true)
         #expect(
             items.count == 2 && Set(items.map(\.name)).count == 2
-                && Set(items.map(\.url.path)) == ["/Y/p/dir/in.txt", "/Y/q/dir/in.txt"])
+                && Set(items.map(\.url.path)) == ["/Y/p/dir/in.txt", "/Y/q/dir/in.txt"]
+        )
     }
 
     @Test func operationsOnAPickedViewActOnTheRealFiles() throws {
@@ -245,7 +252,7 @@ private final class MountedImage {
             }
             done.signal()
         }
-        #expect(done.wait(timeout: .now() + 60) == .success)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(offMain && levels.allSatisfy { $0.nodes.map(\.name) == $0.children })
 
         let linked = DirectoryTree(rootURL: box.root)
@@ -258,7 +265,8 @@ private final class MountedImage {
             let (new, expected) = (try #require(linked.node(at: path)), try #require(old.node(at: path)))
             #expect(
                 new.isScanned == expected.isScanned && new.depth == expected.depth
-                    && linked.url(of: new) == old.url(of: expected))
+                    && linked.url(of: new) == old.url(of: expected)
+            )
             #expect(new.parent === linked.node(at: (path as NSString).deletingLastPathComponent))
         }
         let cached = DirectoryTree(rootURL: box.root, paths: linked.paths)
@@ -283,9 +291,11 @@ private final class MountedImage {
         whole.setChildren(names, ofPath: "")
         #expect(
             tree.paths == whole.paths
-                && zip(tree.root.children, whole.root.children).allSatisfy {
-                    $0.name == $1.name && $0.indexInParent == $1.indexInParent
-                })
+                && zip(tree.root.children, whole.root.children)
+                    .allSatisfy {
+                        $0.name == $1.name && $0.indexInParent == $1.indexInParent
+                    }
+        )
         // A folder that was read by someone else in between is left alone.
         let other = DirectoryTree(rootURL: URL(fileURLWithPath: "/V"))
         other.attach(nodes, ofPath: "", from: 0, limit: 10)
@@ -308,7 +318,9 @@ private final class MountedImage {
             try Test.cancel("a disk image cannot be attached here (hdiutil)")
         }
         try FileManager.default.createDirectory(
-            at: image.mountPoint.appendingPathComponent("inside"), withIntermediateDirectories: true)
+            at: image.mountPoint.appendingPathComponent("inside"),
+            withIntermediateDirectories: true
+        )
         let scanner = TreeScanner(root: box.root, provider: LocalFileSystem())
         #expect(scanner.run { _ in })
         #expect(scanner.paths.contains("mounted") && !scanner.paths.contains("mounted/inside"))
@@ -331,13 +343,22 @@ private final class MountedImage {
         memory.addFile("/A/" + decomposed)
         memory.addDirectory("/B")
         let plugin = ConfigurationPlugin(
-            launchesApplications: false, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+            launchesApplications: false,
+            background: nil,
+            listFolder: box.url("lists"),
+            settingsKeys: { [] }
+        )
         let bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem(), memory],
-            left: memory.url("/A"), right: memory.url("/B"))
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
+            fileSystems: [LocalFileSystem(), memory],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
         bench.left.model.setSelected(true, names: [decomposed])
-        plugin.center!.save(
-            UserCommand(name: "em_marked", title: "", action: CommandAction(command: "echo", parameters: "%S")))
+        plugin.center!
+            .save(
+                UserCommand(name: "em_marked", title: "", action: CommandAction(command: "echo", parameters: "%S"))
+            )
         bench.commands.perform("em_marked")
         let line = Array((plugin.launched.first ?? "").utf8)
         func contains(_ text: String) -> Bool {
@@ -351,26 +372,36 @@ private final class MountedImage {
         _ = try? box.folder("A")
         _ = try? box.folder("B")
         let plugin = ConfigurationPlugin(
-            launchesApplications: true, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+            launchesApplications: true,
+            background: nil,
+            listFolder: box.url("lists"),
+            settingsKeys: { [] }
+        )
         let bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"))
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B")
+        )
         let center = plugin.center!
         let marker = box.url("marker").path
         var draft = center.startMenuDraft()
         draft.insert(
             StartMenuDraft.Row(
-                entry: StartMenuEntry(title: "Build", action: CommandAction(command: "sleep 0.3; touch '\(marker)'"))),
-            after: nil)
+                entry: StartMenuEntry(title: "Build", action: CommandAction(command: "sleep 0.3; touch '\(marker)'"))
+            ),
+            after: nil
+        )
         center.commit(draft)
         var existed: Bool?
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) {
             existed = FileManager.default.fileExists(atPath: marker)
         }
         center.save(
-            UserCommand(name: "em_chain", title: "", action: CommandAction(command: "cm_UserMenu1, cm_ConfigProbe")))
+            UserCommand(name: "em_chain", title: "", action: CommandAction(command: "cm_UserMenu1, cm_ConfigProbe"))
+        )
         bench.commands.perform("em_chain")
-        let deadline = Date().addingTimeInterval(60)
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while existed == nil, Date() < deadline { try? await Task.sleep(nanoseconds: 50_000_000) }
         #expect(existed == true)
     }

@@ -22,16 +22,16 @@ enum RealLocation {
         for _ in 0..<4 {
             guard !current.isFileURL, let provider = try? fileSystems.provider(for: current),
                 let real = provider.parent(of: current),
-                (real.scheme ?? "file") != (current.scheme ?? "file"), path(of: real) == path(of: current)
+                real.scheme != current.scheme, path(of: real) == path(of: current)
             else { break }
             current = fileSystems.realLocation(of: real)
         }
         return current
     }
 
+    /// The path of a location, `..` and `.` resolved (a URL's path has no slash at its end).
     private static func path(of url: URL) -> String {
-        let path = url.standardized.path
-        return path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+        url.standardized.path
     }
 
     /// True when files can be addressed below `directory` by writing its displayed path with
@@ -43,8 +43,10 @@ enum RealLocation {
         // Read from somewhere else: a path that only means something relative to where one
         // stands is not the name of this place.
         let probe = fileSystems.location(
-            from: (typed.hasSuffix("/") ? typed : typed + "/") + "x", relativeTo: URL(fileURLWithPath: "/"))
-        return (probe.scheme ?? "file") == (directory.scheme ?? "file")
+            from: (typed.hasSuffix("/") ? typed : typed + "/") + "x",
+            relativeTo: URL(fileURLWithPath: "/")
+        )
+        return probe.scheme == directory.scheme
     }
 }
 
@@ -114,22 +116,34 @@ extension FileIdentity {
     static func timestampGrain(of url: URL) -> TimeInterval {
         // A server or an archive: FTP lists minutes, ZIP stores even seconds.
         guard url.isFileURL else { return 2 }
-        var path: String? = url.path
+        var folder = url
         var info = statfs()
-        while let current = path {
-            if statfs(current, &info) == 0 { break }
-            path = current == "/" || current.isEmpty ? nil : (current as NSString).deletingLastPathComponent
+        // The nearest folder that is there: the root always is.
+        while statfs(folder.path, &info) != 0, folder.path != "/" {
+            folder.deleteLastPathComponent()
         }
-        guard path != nil else { return 2 }
         let type = withUnsafeBytes(of: &info.f_fstypename) { raw in
             String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
         }
+        return timestampGrain(ofType: type, isLocal: info.f_flags & UInt32(MNT_LOCAL) != 0)
+    }
+
+    /// The same for a volume of the file system type `type` (`apfs`, `hfs`, `msdos` …), local or not.
+    static func timestampGrain(ofType type: String, isLocal: Bool) -> TimeInterval {
         // A share keeps what its server keeps, which nobody can tell from here.
-        guard info.f_flags & UInt32(MNT_LOCAL) != 0 else { return 2 }
+        guard isLocal else {
+            return 2
+        }
         switch type {
-        case "apfs": return 0
-        case "hfs": return 1
-        default: return 2  // FAT and exFAT keep even seconds; whatever else there is gets the same caution
+        case "apfs":
+            return 0
+
+        case "hfs":
+            return 1
+
+        default:
+            // FAT and exFAT keep even seconds; whatever else there is gets the same caution.
+            return 2
         }
     }
 }

@@ -41,7 +41,7 @@ internal struct FSEvDescriptorZeroTests {
             let long = URL(fileURLWithPath: "/" + String(repeating: "a", count: 1_100))
             watcher.watch([long, folder])
             // The folder that fits is watched; the other one is not asked for.
-            guard Wait.until(seconds: 120, { watcher.watchedFolders == [folder] }) else { exit(3) }
+            guard Wait.until(seconds: Wait.ceiling, { watcher.watchedFolders == [folder] }) else { exit(3) }
             watcher.stop()
             exit(fsevZero() == before && FSEvCensus.figures.refused == refused ? 0 : 1)
         }
@@ -67,7 +67,7 @@ internal struct FSEvDescriptorZeroTests {
         }
         defer { watcher.stop() }
         watcher.watch(folders)
-        #expect(Wait.until(seconds: 120) { watcher.watchedFolders == Set(folders) })
+        #expect(Wait.until { watcher.watchedFolders == Set(folders) })
         #expect(made.value.count == 3)
         #expect(Set(made.value.map { URL(fileURLWithPath: $0).lastPathComponent }) == ["a", "b", "c"])
         var count = 0
@@ -101,7 +101,7 @@ internal struct FSEvDescriptorZeroTests {
         }
         defer { watcher.stop() }
         watcher.watch(folders)
-        #expect(Wait.until(seconds: 60) { tries.value >= 2 })
+        #expect(Wait.until { tries.value >= 2 })
         #expect(watcher.watchedFolders.isEmpty)
     }
 
@@ -128,12 +128,12 @@ internal struct FSEvDescriptorZeroTests {
         defer { watcher.stop() }
         watcher.watch([folder])
         // The reserve alone is left: the folder's stream would eat into it.
-        #expect(Wait.until(seconds: 60) { asked.value >= 1 })
+        #expect(Wait.until { asked.value >= 1 })
         #expect(made.value == 0)
         #expect(watcher.watchedFolders.isEmpty)
         // Once there are enough, the next try makes it.
         spare.value = FSEvDescriptors.reserve + 1_000
-        #expect(Wait.until(seconds: 120) { watcher.watchedFolders == [folder] })
+        #expect(Wait.until { watcher.watchedFolders == [folder] })
         #expect(made.value == 1)
     }
 
@@ -158,11 +158,11 @@ internal struct FSEvDescriptorZeroTests {
                 // Nothing is looked at.
             }
             watcher.watch([folder])
-            guard Wait.until(seconds: 120, { FSEvCensus.figures.refused > refused }) else { exit(3) }
+            guard Wait.until(seconds: Wait.ceiling, { FSEvCensus.figures.refused > refused }) else { exit(3) }
             guard watcher.watchedFolders.isEmpty, fsevZero() == before else { exit(4) }
             limit.rlim_cur = roomy
             setrlimit(RLIMIT_NOFILE, &limit)
-            guard Wait.until(seconds: 120, { watcher.watchedFolders == [folder] }) else { exit(5) }
+            guard Wait.until(seconds: Wait.ceiling, { watcher.watchedFolders == [folder] }) else { exit(5) }
             watcher.stop()
             exit(fsevZero() == before ? 0 : 1)
         }
@@ -187,7 +187,7 @@ internal struct FSEvDescriptorZeroTests {
                 // Nothing is looked at.
             }
             watcher.watch([URL(fileURLWithPath: NSTemporaryDirectory())])
-            guard Wait.until(seconds: 120, { tries.value >= 1 }) else { exit(3) }
+            guard Wait.until(seconds: Wait.ceiling, { tries.value >= 1 }) else { exit(3) }
             watcher.stop()
             // Asked on the watcher's queue: the try is over by then.
             _ = watcher.watchedFolders

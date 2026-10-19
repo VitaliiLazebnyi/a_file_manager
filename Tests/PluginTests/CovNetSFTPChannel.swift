@@ -56,7 +56,7 @@ internal struct CovNetSFTPChannel {
             writeTimeout: 60
         )
         defer { channel.close() }
-        try channel.start(timeout: 30, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         #expect(Wait.until { channel.errorMessage == "/afm/elsewhere" })
     }
 
@@ -65,7 +65,7 @@ internal struct CovNetSFTPChannel {
     internal func ofALongErrorOutputTheLastLinesAreKept(scene: CovNetRawSFTP.Scene) throws {
         let channel = try CovNetRawSFTP.channel(scene, in: box)
         defer { channel.close() }
-        try channel.start(timeout: 30, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         let said = { channel.errorMessage.hasSuffix("the last word") }
         #expect(Wait.until(said))
         let lines = channel.errorMessage.split(separator: "\n")
@@ -76,7 +76,7 @@ internal struct CovNetSFTPChannel {
     @Test
     internal func aChannelNobodyHoldsGoes() throws {
         var channel: SFTPChannel? = try CovNetRawSFTP.channel(.lingering, in: box)
-        try channel?.start(timeout: 30, cancellation: nil) { true }
+        try channel?.start(timeout: Wait.ceiling, cancellation: nil) { true }
         weak let gone = channel
         channel = nil
         #expect(gone == nil)
@@ -100,7 +100,7 @@ internal struct CovNetSFTPChannel {
     internal func aRequestWithASetFlagIsNotSent() throws {
         let channel = try CovNetRawSFTP.channel(.home, in: box)
         defer { channel.close() }
-        try channel.start(timeout: 30, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         let flag = CancellationFlag()
         flag.cancel()
         let error = #expect(throws: NetworkError.self) {
@@ -114,7 +114,7 @@ internal struct CovNetSFTPChannel {
     @Test
     internal func aClosedChannelTakesNoRequests() throws {
         let channel = try CovNetRawSFTP.channel(.home, in: box)
-        try channel.start(timeout: 30, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         channel.close()
         channel.sendWithoutAnswer(.close) { $0.bytes(Data([1])) }
         let sent = #expect(throws: NetworkError.self) { _ = try channel.send(.realpath) { $0.string(".") } }
@@ -129,7 +129,7 @@ internal struct CovNetSFTPChannel {
     internal func closingEndsAWriterThatIsStuck() throws {
         let channel = try CovNetRawSFTP.channel(.stuck, in: box)
         defer { channel.close() }
-        try channel.start(timeout: 30, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         let writing = AdoptOutcome { _ = try channel.send(.write) { $0.bytes(Data(count: 1_000_000)) } }
         // The server read the start of the packet and stopped: the writer is in the middle of it.
         #expect(Wait.until { channel.errorMessage == "stuck" })
@@ -147,7 +147,7 @@ internal struct CovNetSFTPChannel {
     internal func aWriterThatWaitsTooLongForItsTurnGivesTheChannelUp() throws {
         let channel = try CovNetRawSFTP.channel(.trickle, in: box, environment: [:], writeTimeout: 3)
         defer { channel.close() }
-        try channel.start(timeout: 30, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         // Some 25 seconds for the server, which takes it in slowly but steadily.
         let writing = AdoptOutcome { _ = try channel.send(.write) { $0.bytes(Data(count: 5_000_000)) } }
         // The packet is on its way: the writer has the pipe.

@@ -16,7 +16,7 @@ import Testing
     }
 
     /// Runs `work` on another thread and fails instead of hanging if it does not end.
-    func finishes(within seconds: Double = 60, _ work: @escaping @Sendable () -> Void) -> Bool {
+    func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -102,7 +102,7 @@ import Testing
             }
             thread.stackSize = 512 << 10
             thread.start()
-            #expect(done.wait(timeout: .now() + 60) == .success && found)
+            #expect(done.wait(timeout: .now() + Wait.ceiling) == .success && found)
         }
     }
 
@@ -135,7 +135,7 @@ import Testing
         let columns = ColumnRegistry()
         columns.register(
             ContentColumn(id: "gate", title: "Gate") { item in
-                if item.name >= "f64" { _ = release.wait(timeout: .now() + 30) }
+                if item.name >= "f64" { _ = release.wait(timeout: .now() + Wait.ceiling) }
                 return "open"
             }
         )
@@ -158,7 +158,7 @@ import Testing
         }
         thread.start()
         // The first hit arrives while the last files are still held back.
-        let early = first.wait(timeout: .now() + 30) == .success
+        let early = first.wait(timeout: .now() + Wait.ceiling) == .success
         for _ in 0..<8 { release.signal() }
         #expect(early)
         #expect(finishes(within: 600) { while lock.withLock({ hits }) < 70 { Thread.sleep(forTimeInterval: 0.01) } })
@@ -172,7 +172,7 @@ import Testing
         let columns = ColumnRegistry()
         columns.register(
             ContentColumn(id: "gate", title: "Gate") { item in
-                if item.url.path == "/wide/d000/f0.txt" { _ = release.wait(timeout: .now() + 60) }
+                if item.url.path == "/wide/d000/f0.txt" { _ = release.wait(timeout: .now() + Wait.ceiling) }
                 return "open"
             }
         )
@@ -193,7 +193,7 @@ import Testing
         #expect(listed < 100)
         release.signal()
         // The 2,000 files and the 200 folders.
-        #expect(done.wait(timeout: .now() + 60) == .success && count == 2_200)
+        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success && count == 2_200)
     }
 
     @Test func cancellingAContentSearchWhileItRunsIsSafe() {

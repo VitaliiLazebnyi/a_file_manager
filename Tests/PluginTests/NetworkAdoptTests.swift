@@ -32,7 +32,7 @@ final class AdoptOutcome: @unchecked Sendable {
     /// True when the call ended within `seconds`. The default is long on purpose: these tests
     /// run beside many others, and what they show is that a call ends at all where the fault
     /// would be a wait of ten minutes or for ever, not how fast it ends.
-    func ended(within seconds: TimeInterval = 120) -> Bool { done.wait(timeout: .now() + seconds) == .success }
+    func ended(within seconds: TimeInterval = Wait.ceiling) -> Bool { done.wait(timeout: .now() + seconds) == .success }
     /// What the call threw; nil while it runs and when it succeeded.
     var thrown: (any Error)? { lock.withLock { error } }
     var failed: Bool {
@@ -42,7 +42,7 @@ final class AdoptOutcome: @unchecked Sendable {
     }
 }
 
-func adoptWait(_ seconds: TimeInterval = 120, until condition: () -> Bool) -> Bool {
+func adoptWait(_ seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) -> Bool {
     let end = Date().addingTimeInterval(seconds)
     while !condition(), Date() < end { Thread.sleep(forTimeInterval: 0.02) }
     return condition()
@@ -284,7 +284,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
             let links = (try? fixture.fileSystem.list(fixture.url("/"), showHidden: false))?.filter(\.isSymlink) ?? []
             return links.count == 40 && links.allSatisfy(\.isDirectory)
         }
-        #expect(adoptWait(20, until: allResolved))
+        #expect(adoptWait(until: allResolved))
     }
 
     @Test func aLinkResolvedInTheBackgroundIsAFolderInWhatTheFileSystemRemembers() throws {
@@ -305,7 +305,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         // The server has been asked about every link once the background work is through. That
         // work gives up after a while (20 s); on a machine so busy that it did, there is nothing to check.
         func asked() -> Int { Set(fixture.server.commands.filter { $0.hasPrefix("CWD /link") }).count }
-        guard adoptWait(40, until: { asked() == 40 }) else {
+        guard adoptWait(until: { asked() == 40 }) else {
             try Test.cancel("the background work did not get through in time")
         }
         // A moment later the remembered entries say so, too. After the lifetime of a remembered
@@ -439,7 +439,7 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
             environment: [:],
             writeTimeout: 600
         )
-        try channel.start(timeout: 10, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         defer { channel.close() }
         let flag = CancellationFlag()
         // Nobody reads the pipe: the packet gets stuck half way and the writer must not wait the full minute.

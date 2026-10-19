@@ -34,16 +34,19 @@ import Testing
         let archive = URL(fileURLWithPath: "/Users/me/my photos.zip")
         let root = ArchiveURL.make(scheme: "zip", archive: archive)
         #expect(
-            root.scheme == "zip" && root.path == "/Users/me/my photos.zip" && root.lastPathComponent == "my photos.zip")
+            root.scheme == "zip" && root.path == "/Users/me/my photos.zip" && root.lastPathComponent == "my photos.zip"
+        )
         let inner = root.appending(name: "2026").appending(name: "ü #1?.jpg")
         #expect(ArchiveURL.parse(inner) == .inside(ArchiveLocation(archive: archive, innerPath: "2026/ü #1?.jpg")))
         #expect(ArchiveURL.parse(root) == .inside(ArchiveLocation(archive: archive, innerPath: "")))
         #expect(
             ArchiveURL.parse(inner.deletingLastPathComponent())
-                == .inside(ArchiveLocation(archive: archive, innerPath: "2026")))
+                == .inside(ArchiveLocation(archive: archive, innerPath: "2026"))
+        )
         #expect(inner.isInside(root) && inner.standardized == inner)
         #expect(
-            ArchiveURL.make(scheme: "zip", archive: archive, innerPath: "2026/ü #1?.jpg").isSameLocation(as: inner))
+            ArchiveURL.make(scheme: "zip", archive: archive, innerPath: "2026/ü #1?.jpg").isSameLocation(as: inner)
+        )
 
         // A path that does not run through the archive is a place on the archive's own file system.
         var components = try #require(URLComponents(url: root, resolvingAgainstBaseURL: false))
@@ -58,15 +61,18 @@ import Testing
         let onServer = ArchiveURL.make(scheme: "archive", archive: remote, innerPath: "x/y")
         #expect(ArchiveURL.parse(onServer) == .inside(ArchiveLocation(archive: remote, innerPath: "x/y")))
         let nested = ArchiveURL.make(
-            scheme: "zip", archive: inner.deletingLastPathComponent().appending(name: "inner.zip"),
-            innerPath: "deep/file")
+            scheme: "zip",
+            archive: inner.deletingLastPathComponent().appending(name: "inner.zip"),
+            innerPath: "deep/file"
+        )
         guard case .inside(let location)? = ArchiveURL.parse(nested) else {
             Issue.record("not inside")
             return
         }
         #expect(
             location.innerPath == "deep/file"
-                && location.archive.isSameLocation(as: root.appending(name: "2026").appending(name: "inner.zip")))
+                && location.archive.isSameLocation(as: root.appending(name: "2026").appending(name: "inner.zip"))
+        )
         #expect(ArchiveURL.location(of: location.archive)?.archive == archive)
         #expect(nested.path == "/Users/me/my photos.zip/2026/inner.zip/deep/file")
     }
@@ -86,12 +92,16 @@ import Testing
         // The panel loader finds the surroundings the same way, and a member's location leads
         // to its folder with the cursor on it.
         let loaded = try PanelLoader.load(
-            bench.inside(archive, "tree/sub/random.bin"), showHidden: false, fileSystems: bench.fileSystems)
+            bench.inside(archive, "tree/sub/random.bin"),
+            showHidden: false,
+            fileSystems: bench.fileSystems
+        )
         #expect(loaded.listing.directory == bench.inside(archive, "tree/sub") && loaded.focus == "random.bin")
         #expect(loaded.listing.items.map(\.name).sorted() == ["deep", "random.bin"])
         let model = PanelModel(directory: box.root)
         model.show(
-            try PanelLoader.load(bench.inside(archive), showHidden: false, fileSystems: bench.fileSystems).listing)
+            try PanelLoader.load(bench.inside(archive), showHidden: false, fileSystems: bench.fileSystems).listing
+        )
         #expect(
             model.parentTarget?.location.isSameLocation(as: box.root) == true && model.parentTarget?.focus == "tree.zip"
         )
@@ -142,11 +152,17 @@ import Testing
         #expect(throws: FileSystemError.self) { try write("x", to: tree.appending(name: "readme.txt")) }
         // Rename a file and a folder with everything in it.
         try bench.zip.move(
-            tree.appending(name: "readme.txt"), to: tree.appending(name: "LIESMICH.txt"), replacing: false)
+            tree.appending(name: "readme.txt"),
+            to: tree.appending(name: "LIESMICH.txt"),
+            replacing: false
+        )
         try bench.zip.move(tree.appending(name: "sub"), to: tree.appending(name: "unter"), replacing: false)
         #expect(throws: FileSystemError.self) {
             try bench.zip.move(
-                tree.appending(name: "big.log"), to: tree.appending(name: "empty.txt"), replacing: false)
+                tree.appending(name: "big.log"),
+                to: tree.appending(name: "empty.txt"),
+                replacing: false
+            )
         }
         try bench.zip.move(tree.appending(name: "big.log"), to: tree.appending(name: "empty.txt"), replacing: true)
         // A copy inside the archive shares the compressed data.
@@ -156,7 +172,9 @@ import Testing
         try bench.zip.remove(tree.appending(name: "hollow"))
         #expect(throws: (any Error).self) { try bench.zip.remove(tree.appending(name: "unter")) }
         try bench.zip.setAttributes(
-            FileAttributes(modified: stamp, permissions: 0o700), of: tree.appending(name: "copy.txt"))
+            FileAttributes(modified: stamp, permissions: 0o700),
+            of: tree.appending(name: "copy.txt")
+        )
 
         // Everything is visible at once, before the archive file is touched.
         #expect(FileSignature.of(archive.path) == before && bench.store.flushAll().isEmpty == true)
@@ -174,8 +192,10 @@ import Testing
             #expect(try bench.item(tree.appending(name: "copy.txt")).permissions == 0o700)
             #expect(
                 try bench.read(
-                    tree.appending(name: "unter").appending(name: "deep").appending(name: "übung – ñ 日本.txt"))
-                    == Data("unicode name".utf8))
+                    tree.appending(name: "unter").appending(name: "deep").appending(name: "übung – ñ 日本.txt")
+                )
+                    == Data("unicode name".utf8)
+            )
             // The second round reads the archive afresh, as after a restart.
             bench.store.close()
         }
@@ -190,7 +210,8 @@ import Testing
             unzipped.keys.sorted() == [
                 "LIESMICH.txt", "copy.txt", "empty.txt", "new/fresh.txt", "new/nested", "new/nothing", "unter/.hidden",
                 "unter/deep/übung – ñ 日本.txt"
-            ])
+            ]
+        )
         #expect(unzipped["new/fresh.txt"] == Data("fresh contents".utf8))
         let attributes = try FileManager.default.attributesOfItem(atPath: box.url("unzipped/tree/new/fresh.txt").path)
         #expect(attributes[.modificationDate] as? Date == stamp && attributes[.posixPermissions] as? Int == 0o600)
@@ -253,13 +274,17 @@ import Testing
         // added to the archive as it is now.
         try write("pending", to: bench.inside(archive, "other/pending.txt"))
         try bench.zip.move(
-            bench.inside(archive, "other/solo.txt"), to: bench.inside(archive, "other/renamed.txt"), replacing: false)
+            bench.inside(archive, "other/solo.txt"),
+            to: bench.inside(archive, "other/renamed.txt"),
+            replacing: false
+        )
         Thread.sleep(forTimeInterval: 0.02)
         #expect(runTool("/usr/bin/zip", ["-q", "tree.zip", "tree/empty.txt"], in: box.root).status == 0)
         let failures = bench.store.flushAll()
         #expect(
             failures.count == 1
-                && failures.first?.error.localizedDescription.contains("changed by another program") == true)
+                && failures.first?.error.localizedDescription.contains("changed by another program") == true
+        )
         #expect(try bench.names(bench.inside(archive)) == ["other", "tree"])
         #expect(try bench.names(bench.inside(archive, "other")) == ["pending.txt", "solo.txt"])
         #expect(runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0)
@@ -282,7 +307,7 @@ import Testing
         #expect(changed.wait(timeout: .now() + 0.5) == .timedOut && FileSignature.of(archive.path) == before)
         try writer.close(attributes: FileAttributes())
         // (A generous wait: the timer runs at low priority, behind whatever else the machine does.)
-        #expect(changed.wait(timeout: .now() + 60) == .success)
+        #expect(changed.wait(timeout: .now() + Wait.ceiling) == .success)
         #expect(FileSignature.of(archive.path) != before)
         let listed = runTool("/usr/bin/unzip", ["-Z1", archive.path]).output
         #expect(listed.contains("tree/slow.txt") && !listed.contains("empty.txt"))
@@ -304,14 +329,17 @@ import Testing
         #expect(
             try bench.names(innerZip.appending(name: "tree")) == [
                 "big.log", "empty.txt", "hollow", "readme.txt", "sub"
-            ])
+            ]
+        )
         #expect(
             try bench.read(innerTar.appending(name: "tree").appending(name: "big.log"))
-                == Data(contentsOf: tree.appendingPathComponent("big.log")))
+                == Data(contentsOf: tree.appendingPathComponent("big.log"))
+        )
         #expect(bench.zip.parent(of: innerZip)?.isSameLocation(as: outer) == true)
         #expect(
             bench.fileSystems.displayPath(innerZip.appending(name: "tree")) == box.url("outer.zip").path
-                + "/inner.zip/tree")
+                + "/inner.zip/tree"
+        )
         #expect(bench.zip.root(of: innerZip.appending(name: "tree")).isSameLocation(as: box.root))
 
         // A change deep inside travels outwards: the inner archive is rewritten, then the outer.
@@ -324,7 +352,8 @@ import Testing
         #expect(listed.contains("tree/added.txt") && !listed.contains("big.log") && listed.contains("tree/readme.txt"))
         #expect(runTool("/usr/bin/unzip", ["-tq", box.url("x/inner.zip").path]).status == 0)
         #expect(
-            try bench.read(innerZip.appending(name: "tree").appending(name: "added.txt")) == Data("added inside".utf8))
+            try bench.read(innerZip.appending(name: "tree").appending(name: "added.txt")) == Data("added inside".utf8)
+        )
     }
 
     @Test func anArchiveOnAnotherFileSystem() throws {
@@ -358,7 +387,8 @@ import Testing
             try bench.zip.remove(root.appending(name: "tree").appending(name: "empty.txt"))
         }
         #expect(
-            ArchiveFileSystem.scheme(forArchive: onServer, fileSystems: bench.fileSystems) == ArchiveURL.readOnlyScheme)
+            ArchiveFileSystem.scheme(forArchive: onServer, fileSystems: bench.fileSystems) == ArchiveURL.readOnlyScheme
+        )
     }
 
     // MARK: The copy job
@@ -369,9 +399,11 @@ import Testing
         // Out: a folder with everything in it, onto the disk.
         try box.folder("out")
         var result = runJob(
-            .copy, [tree.appending(name: "sub"), tree.appending(name: "readme.txt")],
+            .copy,
+            [tree.appending(name: "sub"), tree.appending(name: "readme.txt")],
             to: TargetSpec(directory: box.url("out")),
-            fileSystems: bench.fileSystems)
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 2 && !result.cancelled)
         #expect(snapshot(box.url("out/sub")) == snapshot(box.url("tree/sub")))
         #expect(try Data(contentsOf: box.url("out/readme.txt")) == Data(contentsOf: box.url("tree/readme.txt")))
@@ -385,9 +417,12 @@ import Testing
         try box.file("in/readme.txt", "replaced")
         let answers = Answers()
         result = runJob(
-            .copy, [box.url("in/alpha.txt"), box.url("in/more"), box.url("in/readme.txt")],
+            .copy,
+            [box.url("in/alpha.txt"), box.url("in/more"), box.url("in/readme.txt")],
             to: TargetSpec(directory: tree),
-            answers: answers, fileSystems: bench.fileSystems)
+            answers: answers,
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 3 && answers.conflicts == ["readme.txt"] && answers.errors.isEmpty)
         // One rewrite of the archive for the whole job, however many files it brought.
         #expect(bench.store.flushAll().isEmpty)
@@ -398,33 +433,46 @@ import Testing
 
         // Move inside the archive is a rename; delete walks the tree.
         result = runJob(
-            .move, [tree.appending(name: "more")], to: TargetSpec(directory: tree.appending(name: "hollow")),
-            fileSystems: bench.fileSystems)
+            .move,
+            [tree.appending(name: "more")],
+            to: TargetSpec(directory: tree.appending(name: "hollow")),
+            fileSystems: bench.fileSystems
+        )
         #expect(
             try result.completed.count == 1
-                && bench.names(tree.appending(name: "hollow").appending(name: "more")) == ["beta.txt"])
+                && bench.names(tree.appending(name: "hollow").appending(name: "more")) == ["beta.txt"]
+        )
         result = runJob(
-            .delete(toTrash: false), [tree.appending(name: "hollow"), tree.appending(name: "big.log")],
-            fileSystems: bench.fileSystems)
+            .delete(toTrash: false),
+            [tree.appending(name: "hollow"), tree.appending(name: "big.log")],
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 2)
         // From one archive into another.
         try bench.pack([box.url("in/alpha.txt")], to: box.url("second.zip"))
         result = runJob(
-            .copy, [tree.appending(name: "sub")], to: TargetSpec(directory: bench.inside(box.url("second.zip"))),
-            fileSystems: bench.fileSystems)
+            .copy,
+            [tree.appending(name: "sub")],
+            to: TargetSpec(directory: bench.inside(box.url("second.zip"))),
+            fileSystems: bench.fileSystems
+        )
         #expect(result.completed.count == 1 && bench.store.flushAll().isEmpty)
-        let listed = runTool("/usr/bin/unzip", ["-Z1", box.url("second.zip").path]).output.split(separator: "\n").map(
-            String.init
-        ).sorted()
+        let listed = runTool("/usr/bin/unzip", ["-Z1", box.url("second.zip").path]).output.split(separator: "\n")
+            .map(
+                String.init
+            )
+            .sorted()
         // (The system's unzip garbles the Unicode name when it lists; the name itself is checked above.)
         #expect(
             listed.count == 6
-                && Set(listed).isSuperset(of: ["alpha.txt", "sub/", "sub/.hidden", "sub/deep/", "sub/random.bin"]))
+                && Set(listed).isSuperset(of: ["alpha.txt", "sub/", "sub/.hidden", "sub/deep/", "sub/random.bin"])
+        )
         #expect(try bench.names(bench.inside(box.url("second.zip"), "sub/deep")) == ["übung – ñ 日本.txt"])
         #expect(try bench.names(tree) == ["alpha.txt", "empty.txt", "readme.txt", "sub"])
         #expect(
             runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0
-                && runTool("/usr/bin/unzip", ["-tq", box.url("second.zip").path]).status == 0)
+                && runTool("/usr/bin/unzip", ["-tq", box.url("second.zip").path]).status == 0
+        )
     }
 
     // MARK: Many threads
@@ -454,8 +502,10 @@ import Testing
                 case 3:
                     try bench.zip.createDirectory(at: tree.appending(name: "made\(index)"))
                     try bench.zip.move(
-                        tree.appending(name: "made\(index)"), to: tree.appending(name: "moved\(index)"),
-                        replacing: false)
+                        tree.appending(name: "made\(index)"),
+                        to: tree.appending(name: "moved\(index)"),
+                        replacing: false
+                    )
 
                 case 4:
                     if try bench.read(inTar.appending(name: "big.log")) != expected { failures.add(1) }
@@ -483,7 +533,11 @@ import Testing
         var options = PackOptions()
         options.format = .compressedTar(.gzip)
         let packer = Packer(
-            fileSystems: bench.fileSystems, store: bench.store, monitor: bench.monitor, options: options)
+            fileSystems: bench.fileSystems,
+            store: bench.store,
+            monitor: bench.monitor,
+            options: options
+        )
         let result = packer.run([try bench.item(tree)], archive: box.url("out/cancelled.tgz"))
         #expect(result.cancelled && result.archives.isEmpty && result.failure == nil)
         #expect(namesOnDisk(box.url("out")).isEmpty)

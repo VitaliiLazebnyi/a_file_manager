@@ -70,9 +70,7 @@ internal struct PanelsLoaderTests {
             batches += 1
             return false
         }
-        let end = Date(timeIntervalSinceNow: 6)
-        while !broken.wasToldToStop, Date() < end { Thread.sleep(forTimeInterval: 0.01) }
-        #expect(batches == 1 && broken.wasToldToStop)
+        #expect(batches == 1 && Wait.until { broken.wasToldToStop })
     }
 
     /// A reading that was cancelled before it began is no listing.

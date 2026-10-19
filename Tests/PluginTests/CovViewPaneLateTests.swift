@@ -81,6 +81,25 @@ internal struct CovViewPaneLateTests {
         #expect(pane.failure == ViewerError.fileChanged.localizedDescription && pane.mode == .html)
     }
 
+    /// An HTML file that became shorter says nothing of it when another mode was chosen before
+    /// the answer came back.
+    @Test
+    internal func aShorterHTMLFileOfAModeLeftMeanwhileSaysNothing() async throws {
+        let bench = try CoverageViewerPaneBench()
+        defer { bench.close() }
+        bench.setup.bench.kernel.settings.set(false, forKey: "viewer.htmlAsText")
+        Self.serve(CoverageViewerHeldSource("<p>Short page</p>"), bench, size: 400)
+        let pane = try #require(await bench.open(try Self.url("page.html")))
+        #expect(pane.mode != .html)
+        pane.setMode(.html)
+        // The read has failed and its answer waits for the main thread, which chooses another
+        // mode first.
+        Self.drain(pane)
+        pane.setMode(.text)
+        await CoverageViewerPagerBench.settleAlone()
+        #expect(pane.mode == .text && pane.failure == nil)
+    }
+
     /// An HTML file whose tags are still being removed when another mode is chosen is not shown
     /// as a page afterwards.
     @Test

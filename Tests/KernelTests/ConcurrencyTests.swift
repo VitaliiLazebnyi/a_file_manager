@@ -28,7 +28,7 @@ internal struct ConcurrencyTests {
             var id: UInt64 = 0
             pthread_threadid_np(nil, &id)
             threads.modify { $0.insert(id) }
-            return isSingleCore || Wait.until(seconds: 30) { threads.value.count > 1 }
+            return isSingleCore || Wait.until { threads.value.count > 1 }
         }
         #expect(threads.value.count > 1 || isSingleCore)
     }

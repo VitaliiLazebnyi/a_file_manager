@@ -49,7 +49,7 @@ import Testing
         // The writes behind the refused one were on their way and were carried out. What is left
         // on the server is cut back to the first byte that was not confirmed: a true start of the file.
         let stored = suite.box.url("srv/up.bin")
-        #expect(adoptWait(300) { ((try? Data(contentsOf: stored))?.count ?? -1) == 65_536 })
+        #expect(adoptWait { ((try? Data(contentsOf: stored))?.count ?? -1) == 65_536 })
         #expect(try Data(contentsOf: stored) == content.prefix(65_536))
     }
 
@@ -109,16 +109,17 @@ import Testing
         let session = SFTPSession(
             profile: ConnectionProfile(key: ServerKey(scheme: "sftp", host: "silent.invalid")),
             environment: environment,
-            transport: SFTPTransport(executable: "/bin/sleep", arguments: ["600"]))
+            transport: SFTPTransport(executable: "/bin/sleep", arguments: ["600"])
+        )
         let login = AdoptOutcome { _ = try session.connect(cancellation: nil) }
-        #expect(adoptWait(30) { session.isConnecting })
+        #expect(adoptWait { session.isConnecting })
         // A second caller without a flag waits behind the login.
         let waiting = AdoptOutcome { try session.makeDirectory("/x", cancellation: nil) }
         let started = Date()
         session.disconnect()
         #expect(Date().timeIntervalSince(started) < 60, "closing returns at once")
-        #expect(login.ended(within: 30) && login.failed)
-        #expect(waiting.ended(within: 30) && waiting.failed)
+        #expect(login.ended() && login.failed)
+        #expect(waiting.ended() && waiting.failed)
         #expect(!session.isConnected && !session.isConnecting)
         // Nothing is stored in a session that was closed.
         #expect(throws: NetworkError.self) { _ = try session.entry(at: "/") }
@@ -145,11 +146,12 @@ import Testing
             os.read(0, 1 << 16)
             os.write(1, struct.pack(">I", 0x7fffffff) + b"x" * 1000)
             time.sleep(600)
-            """)
+            """
+        )
         let channel = SFTPChannel(executable: FakeSFTPServer.python, arguments: [script.path], environment: [:])
-        try channel.start(timeout: 30, cancellation: nil) { true }
+        try channel.start(timeout: Wait.ceiling, cancellation: nil) { true }
         #expect(throws: NetworkError.self) { _ = try channel.request(.realpath, timeout: 30) { $0.string(".") } }
-        #expect(adoptWait(30) { channel.isClosed })
+        #expect(adoptWait { channel.isClosed })
         #expect(SFTPChannel.largestPacket <= 1 << 20)
     }
 
@@ -163,7 +165,7 @@ import Testing
             let writing = AdoptOutcome { for _ in 0..<40 { try writer.write(NetworkFixSFTP.pattern(200_000)) } }
             Thread.sleep(forTimeInterval: 0.05)
             writer.interrupt()
-            #expect(writing.ended(within: 60))
+            #expect(writing.ended())
             try? writer.close(attributes: FileAttributes())
         }
         // The channel is the same one, and still carries the others.
@@ -199,7 +201,8 @@ import Testing
         #expect(
             try FileManager.default.contentsOfDirectory(atPath: suite.box.url("srv").path).sorted() == [
                 "keep.txt", "locked"
-            ])
+            ]
+        )
         // A source that is not there.
         #expect(throws: (any Error).self) {
             try suite.fileSystem.move(suite.url("/none"), to: suite.url("/keep.txt"), replacing: true)
@@ -224,8 +227,10 @@ struct Review2NetworkSFTPSystemServer {
         center = ConnectionCenter(environment: environment)
         center.makeSession = { profile, environment in
             SFTPSession(
-                profile: profile, environment: environment,
-                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"]))
+                profile: profile,
+                environment: environment,
+                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"])
+            )
         }
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
@@ -247,7 +252,8 @@ struct Review2NetworkSFTPSystemServer {
         try fileSystem.move(url("new.txt"), to: url("keep.txt"), replacing: true)
         #expect(box.read("keep.txt") == "new" && !box.exists("new.txt"))
         #expect(
-            try FileManager.default.contentsOfDirectory(atPath: box.root.path).sorted() == ["fresh.txt", "keep.txt"])
+            try FileManager.default.contentsOfDirectory(atPath: box.root.path).sorted() == ["fresh.txt", "keep.txt"]
+        )
         // A source that does not exist loses nothing.
         #expect(throws: (any Error).self) {
             try fileSystem.move(url("none.txt"), to: url("keep.txt"), replacing: true)
@@ -260,13 +266,15 @@ struct Review2NetworkSFTPSystemServer {
         let writer = try fileSystem.write(url("up.bin"))
         try writer.write(content)
         try writer.close(
-            attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000), permissions: 0o640))
+            attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000), permissions: 0o640)
+        )
         #expect(try Data(contentsOf: box.url("up.bin")) == content)
         #expect(fileSystem.item(at: url("up.bin"))?.size == 300_000)
         // A name stored decomposed is found again under the name the listing showed.
         try box.file("u\u{308}ber.txt", "content")
         let listed = try #require(
-            try fileSystem.list(url(""), showHidden: true).first { $0.name.hasSuffix("ber.txt") })
+            try fileSystem.list(url(""), showHidden: true).first { $0.name.hasSuffix("ber.txt") }
+        )
         let reader = try fileSystem.read(listed.url)
         #expect(try reader.read(upToCount: 100) == Data("content".utf8))
         reader.close()
@@ -307,7 +315,8 @@ struct Review2NetworkSFTPSystemServer {
             fi
             exec \(systemSFTPServer) -e
 
-            """)
+            """
+        )
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
         return SFTPTransport(executable: script.path, asksQuestions: true)
     }
@@ -321,8 +330,10 @@ struct Review2NetworkSFTPSystemServer {
         let key = ServerKey(scheme: "sftp", host: "files.example")
         let profile = ConnectionProfile(key: key, savedID: UUID(), user: "anna", password: "stale")
         let session = SFTPSession(
-            profile: profile, environment: environment,
-            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
+            profile: profile,
+            environment: environment,
+            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right")
+        )
         defer { session.disconnect() }
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var questions: [String] = []
@@ -344,8 +355,10 @@ struct Review2NetworkSFTPSystemServer {
         // A stored password that is right asks nothing.
         questions = []
         let good = SFTPSession(
-            profile: ConnectionProfile(key: key, user: "anna", password: "right"), environment: environment,
-            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
+            profile: ConnectionProfile(key: key, user: "anna", password: "right"),
+            environment: environment,
+            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right")
+        )
         defer { good.disconnect() }
         _ = try good.connect(cancellation: nil)
         #expect(questions.isEmpty && remembered == ["right"])
@@ -353,8 +366,10 @@ struct Review2NetworkSFTPSystemServer {
         // The user gives up: remembered as a refusal, nothing stored.
         environment.declineMemory = 600
         let refused = SFTPSession(
-            profile: profile, environment: environment,
-            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right"))
+            profile: profile,
+            environment: environment,
+            transport: try fakeShell(box, prompt: "anna@files.example's password: ", password: "right")
+        )
         defer { refused.disconnect() }
         #expect(throws: NetworkError.self) { _ = try refused.connect(cancellation: nil) }
         #expect(questions.count == 1 && remembered == ["right"])
@@ -368,7 +383,10 @@ struct Review2NetworkSFTPSystemServer {
         let environment = SessionEnvironment()
         environment.declineMemory = 0
         let profile = ConnectionProfile(
-            key: ServerKey(scheme: "sftp", host: "files.example"), user: "anna", password: "stored")
+            key: ServerKey(scheme: "sftp", host: "files.example"),
+            user: "anna",
+            password: "stored"
+        )
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var shown: [String] = []
         environment.askSecret = { _, question, _ in
@@ -383,8 +401,10 @@ struct Review2NetworkSFTPSystemServer {
             "(anna@files.example) Enter passphrase for key '/Users/a/.ssh/id': "
         ] {
             let session = SFTPSession(
-                profile: profile, environment: environment,
-                transport: try fakeShell(box, prompt: prompt, password: "typed"))
+                profile: profile,
+                environment: environment,
+                transport: try fakeShell(box, prompt: prompt, password: "typed")
+            )
             _ = try session.connect(cancellation: nil)
             session.disconnect()
         }
@@ -394,8 +414,10 @@ struct Review2NetworkSFTPSystemServer {
         #expect(shown[2].contains("The server files.example asks") && shown[2].contains("comes from the server"))
         // Asked by this server for this login, the stored one is given without a question.
         let own = SFTPSession(
-            profile: profile, environment: environment,
-            transport: try fakeShell(box, prompt: "(anna@files.example) Password: ", password: "stored"))
+            profile: profile,
+            environment: environment,
+            transport: try fakeShell(box, prompt: "(anna@files.example) Password: ", password: "stored")
+        )
         _ = try own.connect(cancellation: nil)
         own.disconnect()
         #expect(shown.count == 3)
@@ -427,8 +449,10 @@ struct Review2NetworkSFTPSystemServer {
         environment.askSecret = { _, _, isSecret in isSecret ? passphrase.value : "yes" }
         func session() -> SFTPSession {
             SFTPSession(
-                profile: ConnectionProfile(key: key, user: NSUserName()), environment: environment,
-                transport: SFTPTransport(executable: "/usr/bin/ssh", arguments: arguments, asksQuestions: true))
+                profile: ConnectionProfile(key: key, user: NSUserName()),
+                environment: environment,
+                transport: SFTPTransport(executable: "/usr/bin/ssh", arguments: arguments, asksQuestions: true)
+            )
         }
         // A login that fails: the message is ssh's own, not the server's banner.
         let failing = session()
@@ -438,7 +462,8 @@ struct Review2NetworkSFTPSystemServer {
         } catch {
             #expect(!error.localizedDescription.contains("BANNER-TEXT"), "\(error.localizedDescription)")
             #expect(
-                error.localizedDescription.lowercased().contains("permission denied"), "\(error.localizedDescription)"
+                error.localizedDescription.lowercased().contains("permission denied"),
+                "\(error.localizedDescription)"
             )
         }
         failing.disconnect()

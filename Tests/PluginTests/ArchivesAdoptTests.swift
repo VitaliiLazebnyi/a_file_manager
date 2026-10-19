@@ -28,16 +28,16 @@ private final class EndlessDeflate: ByteStream, @unchecked Sendable {
 /// to stop comes from outside the thread that is stuck, and not from a queue that may stall.
 private func signal(when condition: @escaping @Sendable () -> Bool, _ body: @escaping @Sendable () -> Void) {
     let thread = Thread {
-        let deadline = Date().addingTimeInterval(60)
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !condition(), Date() < deadline { Thread.sleep(forTimeInterval: 0.001) }
         body()
     }
     thread.start()
 }
 
-/// Waits for `condition`, up to a minute.
+/// Waits for `condition`, up to `Wait.ceiling`.
 private func wait(for condition: () -> Bool) -> Bool {
-    let deadline = Date().addingTimeInterval(60)
+    let deadline = Date().addingTimeInterval(Wait.ceiling)
     while !condition(), Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
     return condition()
 }

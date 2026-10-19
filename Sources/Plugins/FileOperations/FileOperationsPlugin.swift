@@ -25,8 +25,18 @@ extension CommandID {
 public final class FileOperationsPlugin: Plugin {
     public let name = "File operations"
     private var operations: FileOperations?
+    /// The text of the clipboard, for `[X]` in new names.
+    private let clipboard: @Sendable () -> String?
 
-    public init() {}
+    /// The plugin, reading the system's clipboard.
+    public convenience init() {
+        self.init { NSPasteboard.general.string(forType: .string) }
+    }
+
+    /// The plugin reading the clipboard through `clipboard`; tests bring a text of their own.
+    init(clipboard: @escaping @Sendable () -> String?) {
+        self.clipboard = clipboard
+    }
 
     /// The operation log is written in bursts; this is where the last one goes out. The
     /// program is quitting and this is the main thread: a log on a volume that has stopped
@@ -50,7 +60,7 @@ public final class FileOperationsPlugin: Plugin {
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
-        let operations = FileOperations(kernel)
+        let operations = FileOperations(kernel, clipboard: clipboard)
         self.operations = operations
         kernel.fileSystems.addVolumeCloser { [weak operations] volume, _ in operations?.closeLog(on: volume) }
         // Some handlers run other commands; the registry keeps them, so they hold it unowned.
@@ -268,8 +278,13 @@ final class FileOperations: FileTransferService {
         if file.isSameLocation(as: volume) || file.isInside(volume) { log.flush() }
     }
 
-    init(_ kernel: Kernel) {
+    /// The text of the clipboard, for `[X]`; read on a job's thread, only when a name asks for it (another program
+    /// may hand its text over slowly).
+    private let clipboard: @Sendable () -> String?
+
+    init(_ kernel: Kernel, clipboard: @escaping @Sendable () -> String?) {
         self.kernel = kernel
+        self.clipboard = clipboard
     }
 
     private var source: any PanelHandle { kernel.panels.source }
@@ -300,9 +315,14 @@ final class FileOperations: FileTransferService {
     private func recorder() -> (@Sendable (OperationRecord) -> Void)? {
         let configuration = OperationSettings.logConfiguration(from: kernel.settings)
         guard configuration.isEnabled else { return nil }
-        if log?.configuration != configuration { log = OperationLog(configuration) }
-        guard let log else { return nil }
-        return { log.write($0) }
+        let current: OperationLog
+        if let log, log.configuration == configuration {
+            current = log
+        } else {
+            current = OperationLog(configuration)
+            log = current
+        }
+        return { current.write($0) }
     }
 
     /// Which records the log is going to keep, so that a job makes no others.
@@ -381,13 +401,9 @@ final class FileOperations: FileTransferService {
         /// The operands. For any thread.
         func items() -> [FileItem] { snapshot.items() }
 
-        /// The operands one after another, without the list of them being made, until
+        /// The marked operands one after another, without the list of them being made, until
         /// `body` answers false: for a loop that asks about each and may be left early.
         func forEach(_ body: (FileItem) -> Bool) {
-            guard snapshot.markedCount > 0 else {
-                if let first { _ = body(first) }
-                return
-            }
             for index in snapshot.shownItems.indices where snapshot.isMarked(at: index) {
                 if !body(snapshot.shownItems[index]) { return }
             }
@@ -431,10 +447,10 @@ final class FileOperations: FileTransferService {
     /// Where relative targets of an operation in `directory` count from: the real folder
     /// behind a branch view; for a list of files from anywhere, which has no folder of its
     /// own, the folder of the first item.
-    private func base(of directory: URL, first: FileItem?) -> URL {
+    private func base(of directory: URL, first: FileItem) -> URL {
         let real = RealLocation.resolve(directory, in: fileSystems)
         if RealLocation.takesNames(real, in: fileSystems) { return real }
-        return first.map { $0.url.deletingLastPathComponent() } ?? real
+        return first.url.deletingLastPathComponent()
     }
 
     /// The panel's names of the items a job processed. In a branch or list view a name is a
@@ -469,13 +485,33 @@ final class FileOperations: FileTransferService {
     ) {
         // What the command works on is fixed now; the panels may show something else by the
         // time the job ends.
+        withOperands { picked, first in
+            transfer(kind, picked, first: first, sameFolder: sameFolder, dialog: dialog, switches: text)
+        }
+    }
+
+    /// The operands of a command and the first of them. The commands are offered only where there are operands.
+    private func withOperands(_ body: (Picked, FileItem) -> Void) {
+        let picked = Picked(source.model)
+        if let first = picked.first {
+            body(picked, first)
+        }
+    }
+
+    private func transfer(
+        _ kind: TransferKind,
+        _ picked: Picked,
+        first: FileItem,
+        sameFolder: Bool,
+        dialog: Dialog,
+        switches text: String?
+    ) {
         let model = source.model
-        let (picked, panelDirectory) = (Picked(model), model.directory)
-        guard picked.count > 0 else { return }
+        let panelDirectory = model.directory
         // A branch view shows the files of a real folder under a location of its own. Targets
         // are read and written in terms of the real one, or a second spelling of one place
         // would come into the job.
-        let sourceDirectory = base(of: panelDirectory, first: picked.first)
+        let sourceDirectory = base(of: panelDirectory, first: first)
         let targetPanelDirectory = RealLocation.resolve(target.model.directory, in: fileSystems)
         let verb = kind == .copy ? "Copy" : "Rename/Move"
         let switches = CommandSwitches.parse(text ?? "")
@@ -649,9 +685,12 @@ final class FileOperations: FileTransferService {
     /// deletes directly. The configuration can turn the two around (spec 07 › Recycle bin or
     /// direct deletion).
     func delete(shifted: Bool) {
+        withOperands { picked, _ in delete(picked, shifted: shifted) }
+    }
+
+    private func delete(_ picked: Picked, shifted: Bool) {
         let model = source.model
-        let (picked, directory) = (Picked(model), model.directory)
-        guard picked.count > 0 else { return }
+        let directory = model.directory
         // What the folder says for all it shows: a view of several folders answers with what
         // every one of them can do, so the items are not asked about one by one.
         let hasTrash = fileSystems.capabilities(for: directory).contains(.trash)
@@ -823,9 +862,12 @@ final class FileOperations: FileTransferService {
     /// Shift+F6 with several items: a wildcard mask for all, or a new name for each in turn
     /// (spec 07 › Shift+F6 with several items). Name conflicts get the Overwrite dialog.
     func renameSelection() {
+        withOperands { picked, first in renameSelection(picked, first: first) }
+    }
+
+    private func renameSelection(_ picked: Picked, first firstItem: FileItem) {
         let model = source.model
-        let (picked, directory) = (Picked(model), model.directory)
-        guard picked.count > 0, let firstItem = picked.first else { return }
+        let directory = model.directory
         guard
             let answer = ui.form(
                 "Rename",
@@ -887,10 +929,12 @@ final class FileOperations: FileTransferService {
                     fileSystems: fileSystems,
                     cancellation: cancellation
                 )
-                job.newNames = Dictionary(
-                    names.map { ($0.0.locationKey, $0.1) },
-                    uniquingKeysWith: { first, _ in first }
-                )
+                // Every item once; were one named twice, its first name would hold.
+                var newNames: [String: String] = [:]
+                for (url, name) in names.reversed() {
+                    newNames[url.locationKey] = name
+                }
+                job.newNames = newNames
                 job.options = options
                 return .success(job)
             },
@@ -922,12 +966,6 @@ final class FileOperations: FileTransferService {
         return context
     }
 
-    /// The text of the clipboard for `[X]`, read only when the name asks for it, and on the
-    /// job's thread: another program may hand its text over slowly.
-    nonisolated private static func clipboardText(for typed: String) -> String? {
-        typed.contains("[X") ? NSPasteboard.general.string(forType: .string) : nil
-    }
-
     /// F7 and Shift+F7 (spec 07 › New folder). `names` given: no dialog; it is the text of the
     /// dialog or the command's switches (`N="a|b"`).
     func makeDirectory(in panel: any PanelHandle, names given: String?) {
@@ -951,7 +989,7 @@ final class FileOperations: FileTransferService {
         }
         guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         let context = nameContext(for: panel, typed: typed, openedAt: openedAt)
-        let fileSystems = self.fileSystems
+        let (fileSystems, clipboard) = (self.fileSystems, self.clipboard)
         let record = recorder()
         kernel.jobs.run(
             title: "New folder:",
@@ -964,7 +1002,7 @@ final class FileOperations: FileTransferService {
                 }
                 var created: URL?
                 var failures: [(String, any Error)] = []
-                context.clipboard = Self.clipboardText(for: typed)
+                context.clipboard = typed.contains("[X") ? clipboard() : nil
                 context.exists = { exists(fileSystems.location(from: $0, relativeTo: directory)) }
                 let names: [String]
                 do {
@@ -1032,7 +1070,7 @@ final class FileOperations: FileTransferService {
             .trimmingCharacters(in: .whitespaces), !typed.isEmpty
         else { return }
         let context = nameContext(for: source, typed: typed, openedAt: openedAt)
-        let fileSystems = self.fileSystems
+        let (fileSystems, clipboard) = (self.fileSystems, self.clipboard)
         let record = recorder()
         kernel.jobs.run(
             title: "New file:",
@@ -1042,7 +1080,7 @@ final class FileOperations: FileTransferService {
                 @Sendable func exists(_ url: URL) -> Bool {
                     (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) != nil
                 }
-                context.clipboard = Self.clipboardText(for: typed)
+                context.clipboard = typed.contains("[X") ? clipboard() : nil
                 context.exists = { exists(fileSystems.location(from: $0, relativeTo: directory)) }
                 var urls: [URL] = []
                 do {

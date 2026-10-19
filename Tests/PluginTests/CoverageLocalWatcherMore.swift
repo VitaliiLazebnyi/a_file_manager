@@ -45,7 +45,7 @@ internal struct CoverageLocalWatcherMore {
         defer { watcher.stop() }
         let folders = [box.url("a"), box.url("gone")]
         watcher.watch(folders)
-        #expect(Wait.until(seconds: 60) { watcher.watchedFolders == Set(folders) })
+        #expect(Wait.until { watcher.watchedFolders == Set(folders) })
         // Asked for again: all are known, nothing is resolved or made anew.
         watcher.watch(folders)
         #expect(watcher.watchedFolders == Set(folders))

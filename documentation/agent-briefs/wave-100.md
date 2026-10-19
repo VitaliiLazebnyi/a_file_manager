@@ -144,3 +144,25 @@ Base: `quality-gates` at `99566b9` or later. Same reading and shared rules as wa
   `NetStream:590`, `RemoteFileSystem`). For each: a deterministic test through a seam, or a simplification that removes
   the arm; report what is left and why.
 - Not: FileOperations, SystemTools, CompareContent (w100-fileops-tools is still on them), AFMShell (w102-shell).
+
+# Wave 103: coverage that does not depend on the run (2026-10-16)
+
+## w103-determinism (prefix `Determ`)
+
+Two whole-suite coverage runs of `52a2623` (`documentation/agent-briefs/w103/`: a plain one and one with atomic
+counters, script `atomic-run.sh`) left different regions uncovered outside the system adapters: covered in one, not the
+other, e.g. `OpenArchive:1386` (wrong password), `LocalFileSystem:1610` (browsable volume places, from a disk image test
+that skips when `hdiutil attach` fails), `TextPattern:445`, `FileJob`, `Sorter`, `SelectionType`, `FileIdentity`,
+`ViewerEncoding` (5 lines), `ByteSource:145`, `ConfigurationViews:192`, `NetworkPlugin:120`, `FTPConnection:437`. A test
+that reaches a region only sometimes (timing, a skip, load) makes the gate fail at random.
+
+- For every region uncovered in either run, outside `Sources/AFMShell/**` (w102-shell is there) and outside the system
+  adapters (the `.system` sides of the effects seams, `System*.swift`, `ToolsDesktop.system`, `AppleScript.run`,
+  `openInApplication`, the `present` defaults, `SavedConnections`' Keychain store, `HotlistEditorWindowController.run`,
+  `VolumeEjection`'s real unmount): find the test that should reach it, and make it reach it on every run (deterministic
+  order through a seam, no skip: a test that cannot make its disk image fails instead of skipping, or the case goes
+  through a fake volume), or a new deterministic test. Run the whole suite with coverage at least three times (plain, as
+  the gate does) and once with atomic counters; the regions outside the adapters must be covered in all of them.
+- Report the adapters left (they are for the UI tests) and anything else with file:line and why.
+- Owner questions you must not decide: `NetStream:242/444`, `MultiRenameWindowController:785` (impossible optionals),
+  `ArchiveFileSystem:100`.

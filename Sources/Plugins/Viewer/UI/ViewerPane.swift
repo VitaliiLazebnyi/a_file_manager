@@ -90,6 +90,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
     private var presentCancellation = CancellationFlag()
     var cancellation = CancellationFlag()
     let workQueue = DispatchQueue(label: "viewer.work", qos: .userInitiated, attributes: .concurrent)
+    /// How a file whose reads are slow (a server) is kept once read: in blocks of this size, this
+    /// many of them in memory. A file that fits (64 MB) is kept whole, a bigger one on disk.
+    var slowFileBlocks = (size: 256 << 10, count: 256)
     private let temporaryCopies: TemporaryCopies
     /// The text of an HTML file with its tags removed, kept while the file is shown.
     private var strippedHTML: (links: [String], source: any ByteSource)?
@@ -292,6 +295,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         let fileSystems = kernel.fileSystems
         let media = settings.additionalMediaTypes
         let vetoed = settings.noMediaTypes
+        let blocks = slowFileBlocks
         updateChrome()
         workQueue.async { [weak self] in
             // Moved on before this got a thread (the cursor ran over many files): nothing to read.
@@ -323,17 +327,17 @@ final class ViewerPane: NSView, NSMenuDelegate {
                         let isLocal =
                             opened is DataByteSource
                             || (provider.volume(of: url, cancellation: flag)?.isLocal ?? false)
-                        // Where a read is slow (a server), a file up to 64 MB is kept whole once it has
-                        // been read, and a bigger one on disk, so laying the text out again does not
-                        // fetch it again.
+                        // Where a read is slow (a server), a file that fits in the blocks is kept whole
+                        // once it has been read, and a bigger one on disk, so laying the text out again
+                        // does not fetch it again.
                         let source =
                             isLocal
                             ? CachedByteSource(opened)
                             : CachedByteSource(
                                 opened,
-                                blockSize: 256 << 10,
-                                capacity: 256,
-                                wholeFileLimit: 64 << 20,
+                                blockSize: blocks.size,
+                                capacity: blocks.count,
+                                wholeFileLimit: Int64(blocks.size) * Int64(blocks.count),
                                 spillsToDisk: true
                             )
                         let sample = try source.read(at: 0, count: ViewerDetection.sampleSize, cancellation: flag)

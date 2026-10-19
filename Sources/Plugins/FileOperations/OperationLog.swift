@@ -27,8 +27,10 @@ public final class OperationLog: @unchecked Sendable {
     /// What the Log file page of the configuration holds.
     public struct Configuration: Equatable, Sendable {
         public var isEnabled = false
-        public var file = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(
-            "Library/Logs/A File Manager/operations.log")
+        public var file = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent(
+                "Library/Logs/A File Manager/operations.log"
+            )
         public var logsTransfers = true
         public var logsDeletes = true
         public var logsFolders = true
@@ -216,10 +218,15 @@ public final class OperationLog: @unchecked Sendable {
             let bytes = line.utf8.count
             // What this burst has collected for the file counts as in it: after a rotation
             // within the burst the new file grows by `chunk`, and is rotated again when due.
-            if rotationIsDue(adding: bytes, size: state.size + chunk.count, modified: state.modified, at: time) {
+            if let written = rotationDue(
+                adding: bytes,
+                size: state.size + chunk.count,
+                modified: state.modified,
+                at: time
+            ) {
                 writeChunk(&chunk)
                 closeHandle()
-                rotate(at: state.modified ?? time)
+                rotate(at: written)
                 state = (0, nil)
             }
             chunk.append(contentsOf: line.utf8)
@@ -231,12 +238,23 @@ public final class OperationLog: @unchecked Sendable {
     /// The size of the file and the time it was last written; 0 and nil when there is none.
     /// A handle that no longer points to the file at that place is dropped.
     private func fileState() -> (size: Int, modified: Date?) {
-        guard let attributes = try? fm.attributesOfItem(atPath: configuration.file.path) else {
+        var info = stat()
+        guard stat(configuration.file.path, &info) == 0 else {
             closeHandle()
             return (0, nil)
         }
-        if handle != nil, (attributes[.systemFileNumber] as? UInt64) != handleFile { closeHandle() }
-        return ((attributes[.size] as? Int) ?? 0, attributes[.modificationDate] as? Date)
+        if handle != nil, UInt64(info.st_ino) != handleFile {
+            closeHandle()
+        }
+        return (Int(info.st_size), Self.modified(info))
+    }
+
+    /// When a file was last changed, as its `stat` says.
+    private static func modified(_ info: stat) -> Date {
+        Date(
+            timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec) + TimeInterval(info.st_mtimespec.tv_nsec)
+                / 1e9
+        )
     }
 
     private func writeChunk(_ chunk: inout Data) {
@@ -263,17 +281,24 @@ public final class OperationLog: @unchecked Sendable {
         try? handle?.write(contentsOf: chunk)
     }
 
-    private func rotationIsDue(adding bytes: Int, size: Int, modified: Date?, at time: Date) -> Bool {
+    /// When the file to be rotated was last written, if adding `bytes` at `time` makes a rotation due. A file
+    /// with something in it (`size`) has been written (`modified`).
+    private func rotationDue(adding bytes: Int, size: Int, modified: Date?, at time: Date) -> Date? {
         switch configuration.rotation {
         case .never:
-            return false
+            return nil
 
         case .daily:
-            guard let modified else { return false }
-            return day.string(from: modified) != day.string(from: time)
+            guard let modified, day.string(from: modified) != day.string(from: time) else {
+                return nil
+            }
+            return modified
 
         case .size(let limit):
-            return size > 0 && size + bytes > limit
+            guard let modified, size > 0, size + bytes > limit else {
+                return nil
+            }
+            return modified
         }
     }
 
@@ -283,14 +308,13 @@ public final class OperationLog: @unchecked Sendable {
         guard fm.fileExists(atPath: file.path) else { return }
         let (base, ext) = (file.deletingPathExtension().lastPathComponent, file.pathExtension)
         func copy(_ tag: String) -> URL {
-            file.deletingLastPathComponent().appendingPathComponent(
-                ext.isEmpty ? "\(base).\(tag)" : "\(base).\(tag).\(ext)")
+            file.deletingLastPathComponent()
+                .appendingPathComponent(
+                    ext.isEmpty ? "\(base).\(tag)" : "\(base).\(tag).\(ext)"
+                )
         }
-        switch configuration.rotation {
-        case .never:
-            return
-
-        case .daily:
+        // Only a rotation that is due comes here: daily, or by size.
+        if case .daily = configuration.rotation {
             var target = copy(day.string(from: written))
             var counter = 2
             while fm.fileExists(atPath: target.path) {
@@ -298,8 +322,7 @@ public final class OperationLog: @unchecked Sendable {
                 counter += 1
             }
             try? fm.moveItem(at: file, to: target)
-
-        case .size:
+        } else {
             var counter = 1
             while fm.fileExists(atPath: copy(String(counter)).path) { counter += 1 }
             try? fm.moveItem(at: file, to: copy(String(counter)))
@@ -307,19 +330,17 @@ public final class OperationLog: @unchecked Sendable {
         guard configuration.keepCount > 0 else { return }
         // The oldest copies beyond the limit go. Only files named the way this log names its
         // copies: a neighbour such as `operations.backup.log` is somebody else's.
-        let siblings =
-            (try? fm.contentsOfDirectory(
-                at: file.deletingLastPathComponent(), includingPropertiesForKeys: [.contentModificationDateKey]))
-            ?? []
-        let copies = siblings.filter { Self.isRotatedCopy($0.lastPathComponent, of: file.lastPathComponent) }
-            .map {
-                (
-                    $0,
-                    (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-                        ?? .distantPast
-                )
+        let folder = file.deletingLastPathComponent()
+        let copies = ((try? fm.contentsOfDirectory(atPath: folder.path)) ?? [])
+            .compactMap { name -> (url: URL, modified: Date)? in
+                let url = folder.appendingPathComponent(name)
+                var info = stat()
+                guard Self.isRotatedCopy(name, of: file.lastPathComponent), lstat(url.path, &info) == 0 else {
+                    return nil
+                }
+                return (url, Self.modified(info))
             }
-            .sorted { $0.1 > $1.1 }
+            .sorted { $0.modified > $1.modified }
         for (url, _) in copies.dropFirst(configuration.keepCount) { try? fm.removeItem(at: url) }
     }
 

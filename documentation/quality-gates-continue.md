@@ -50,10 +50,24 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   `documentation/FSEvents-descriptor-zero.md`), the Compare window part of **w100-fileops-tools** (`9bd4b6a`); the
   program raises its open-file limit at start (`99566b9`). Full suite at `2750aa9`: 349 shell, 3,328 plugin, 336 kernel,
   all passed.
-- Running: **w100-fileops-tools** (still), **w102-shell**, **w102-sweep** (sections in `wave-100.md`).
-- Owner questions open: `NetStream.swift:242/444` impossible optionals (documented `!` as in decision 3?); the
-  `ArchiveFileSystem:100` race arm; the two TCC prompts on the VM desktop (microphone: from Viewer media tests, being
-  fixed; removable volumes: every test that mounts a disk image asks; recommended: Allow, keep the real-image tests).
+- Merged: **w102-sweep** (`9aef05a`): waits at `Wait.ceiling`, flaky tests fixed, race regions covered through seams;
+  left: `MultiRenameWindowController:785` `?? []` (impossible optional, owner), `:50` sheet adapter (UI tests),
+  `NetStream:317/326` framer callbacks never called, `FTPConnection:580` (no seam into `NWConnection`).
+- Merged: **w100-fileops-tools** (`52a2623`): FileOperations 1 / 1 / 1, SystemTools 26 / 11 / 14, CompareContent 11 / 6
+  / 8 left, all system adapters; printing over 4,096 files no longer ends the program.
+- **Whole suite with coverage at `52a2623`:** all passed (355 shell, 3,426 plugin, 336 kernel); lines 99.55% (428 left),
+  functions 99.24% (115), regions 99.49% (210); 58 files below 100%: system adapters (UI tests), the Panel regions
+  w102-shell is on, and regions the non-atomic counters lose or that tests skipping on a failed `hdiutil attach` miss.
+- Running: **w102-shell**; an atomic-counter measurement (scratchpad `atomic/run.sh`) to tell real gaps from lost
+  counts.
+- Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
+  profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
+  `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts
+  are stable. Owner question whether the gate's coverage run takes that flag.
+- Owner questions open: atomic counters for the coverage run (above); `NetStream.swift:242/444` impossible optionals
+  (documented `!` as in decision 3?); the `ArchiveFileSystem:100` race arm; the two TCC prompts on the VM desktop
+  (microphone: from Viewer media tests, being fixed; removable volumes: every test that mounts a disk image asks;
+  recommended: Allow, keep the real-image tests).
 
 ### Done and pushed
 

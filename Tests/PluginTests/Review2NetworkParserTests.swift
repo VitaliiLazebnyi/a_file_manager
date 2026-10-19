@@ -47,7 +47,8 @@ private func reproducer(_ name: String) throws -> Data {
         var entry = try #require(list("-rw-r--r--   1 owner    group        1234 Jan 31  2024 a file  with spaces.txt"))
         #expect(
             entry.name == "a file  with spaces.txt" && entry.size == 1_234 && entry.modified == day(2_024, 1, 31)
-                && entry.permissions == 0o644)
+                && entry.permissions == 0o644
+        )
         // The time instead of the year means the last months; a date ahead of today is last year's.
         #expect(list("-rw-r--r-- 1 o g 7 Mar  5 12:30 r.txt")?.modified == day(2_024, 3, 5, 12, 30))
         #expect(list("-rw-r--r-- 1 o g 7 Dec 24 08:00 r.txt")?.modified == day(2_023, 12, 24, 8, 0))
@@ -124,10 +125,12 @@ private func reproducer(_ name: String) throws -> Data {
         var edge = LineSplitter()
         #expect(
             edge.feed(Data(repeating: 0x61, count: FTPLimits.lineLength) + Data("\r\n".utf8)).first?.count
-                == FTPLimits.lineLength)
+                == FTPLimits.lineLength
+        )
         #expect(
             edge.feed(Data(repeating: 0x61, count: FTPLimits.lineLength + 2) + Data("\n".utf8)).isEmpty
-                && edge.dropped == 1)
+                && edge.dropped == 1
+        )
     }
 
     @Test func aReplyIsKeptOnlyUpToItsLargestSize() {
@@ -163,9 +166,11 @@ private func reproducer(_ name: String) throws -> Data {
         #expect(RemotePath.parent(of: "/a/\u{301}b") == "/a")
         #expect(
             RemotePath.normalized("/a/./b/../c//d/") == "/a/c/d" && RemotePath.normalized("") == "/"
-                && RemotePath.normalized("../..") == "/")
+                && RemotePath.normalized("../..") == "/"
+        )
         #expect(
-            RemotePath.parent(of: "/") == nil && RemotePath.parent(of: "/a") == "/" && RemotePath.name(of: "/") == "")
+            RemotePath.parent(of: "/") == nil && RemotePath.parent(of: "/a") == "/" && RemotePath.name(of: "/") == ""
+        )
         // Whatever the text, the result reads as an absolute path with whole names.
         for text in [
             mark, "/" + mark, "x/" + mark + "..", "\u{600}/..", "a\u{600}/b", "/\u{200D}/..", "\u{1F1E9}/\u{1F1EA}",
@@ -173,14 +178,16 @@ private func reproducer(_ name: String) throws -> Data {
         ] {
             #expect(
                 isClean(RemotePath.normalized(text)),
-                "\(text.debugDescription) -> \(RemotePath.normalized(text).debugDescription)")
+                "\(text.debugDescription) -> \(RemotePath.normalized(text).debugDescription)"
+            )
             #expect(isClean(RemotePath.join(text, text)))
         }
         // A name that would melt into the slash next to it is told, and is no name for an entry of a listing.
         #expect(!RemotePath.hasSeparableNames("/a/" + mark) && RemotePath.hasSeparableNames("/a/é/e\u{301}"))
         #expect(
             !RemoteEntry.isSafeName(mark + "x") && !RemoteEntry.isSafeName("x\u{600}")
-                && RemoteEntry.isSafeName("e\u{301}"))
+                && RemoteEntry.isSafeName("e\u{301}")
+        )
         #expect(FTPListParser.mlsd("type=file;size=1; " + mark + "x") == nil)
         #expect(FTPListParser.mlsd("type=file;size=1;" + " " + "ok")?.name == "ok")
     }
@@ -226,8 +233,11 @@ private func reproducer(_ name: String) throws -> Data {
     }
 
     @Test func aSavedConnectionWithAPortThatIsNoneDoesNotTrap() throws {
-        let saved = try JSONDecoder().decode(
-            [SavedConnection].self, from: try reproducer("saved-connection-port-trap.json"))
+        let saved = try JSONDecoder()
+            .decode(
+                [SavedConnection].self,
+                from: try reproducer("saved-connection-port-trap.json")
+            )
         let connection = try #require(saved.first)
         #expect(connection.port == nil && connection.key.port == 21)
         _ = connection.key.url()
@@ -241,14 +251,18 @@ private func reproducer(_ name: String) throws -> Data {
             #expect(key.port == 22 && key.url(path: "/x").absoluteString == "sftp://h.example/x")
         }
         // Members that are missing or of the wrong kind take their usual values; the rest is kept.
-        let partial = try JSONDecoder().decode(
-            SavedConnection.self,
-            from: Data(
-                #"{"id":"00000000-0000-0000-0000-000000000001","host":"h","port":2121,"kind":99,"passive":"yes","user":"u"}"#
-                    .utf8))
+        let partial = try JSONDecoder()
+            .decode(
+                SavedConnection.self,
+                from: Data(
+                    #"{"id":"00000000-0000-0000-0000-000000000001","host":"h","port":2121,"kind":99,"passive":"yes","user":"u"}"#
+                        .utf8
+                )
+            )
         #expect(
             partial.host == "h" && partial.port == 2_121 && partial.kind == .ftp && partial.passive
-                && partial.user == "u")
+                && partial.user == "u"
+        )
         #expect(throws: (any Error).self) { try JSONDecoder().decode(SavedConnection.self, from: Data("{}".utf8)) }
         // What is written is read back the same.
         var full = SavedConnection()
@@ -288,16 +302,19 @@ private func reproducer(_ name: String) throws -> Data {
         for breaker in ["\n", "\r", "\u{2028}", "\u{2029}", "\u{85}", "\u{B}", "\u{C}", "\0"] {
             #expect(
                 !DownloadList.canHold(source: "ftp://h/pub/payload" + breaker + "sleep:1", target: nil),
-                "\(breaker.debugDescription)")
+                "\(breaker.debugDescription)"
+            )
             #expect(!DownloadList.canHold(source: "ftp://h/a", target: "/t/a" + breaker + "move:/x -> ftp://evil/x"))
         }
         // The separator in a source would make its tail the target; a line that reads as a command is none.
         #expect(!DownloadList.canHold(source: "ftp://h/pub/x -> /Users/me/Library/LaunchAgents/x.plist", target: nil))
         #expect(
             !DownloadList.canHold(source: "move:/a", target: "/b")
-                && !DownloadList.canHold(source: "sleep:5", target: nil))
+                && !DownloadList.canHold(source: "sleep:5", target: nil)
+        )
         #expect(
-            !DownloadList.canHold(source: " ftp://h/a", target: nil) && !DownloadList.canHold(source: "", target: nil))
+            !DownloadList.canHold(source: " ftp://h/a", target: nil) && !DownloadList.canHold(source: "", target: nil)
+        )
     }
 
     @Test func aListSaysWhatEachLineIs() {
@@ -310,7 +327,8 @@ private func reproducer(_ name: String) throws -> Data {
                 .move(source: "~/.ssh/id", target: "ftp://evil/k"), .pause(DownloadList.longestPause), .pause(0),
                 .pause(0),
                 .unsupported("put:")
-            ])
+            ]
+        )
         // No more lines than a list a person made.
         let many = String(repeating: "ftp://h/a\n", count: DownloadList.mostLines + 50)
         #expect(DownloadList.parse(many).count == DownloadList.mostLines)
@@ -332,19 +350,23 @@ private func reproducer(_ name: String) throws -> Data {
 @Suite struct Review2NetworkSecrets {
     @Test func aQuestionOfTheSecureShellIsToldByItsShape() {
         #expect(
-            SSHQuestion("alice@files.example.com's password: ") == .password(user: "alice", host: "files.example.com"))
+            SSHQuestion("alice@files.example.com's password: ") == .password(user: "alice", host: "files.example.com")
+        )
         // A user name may hold an `@`; the host is what follows the last one.
         #expect(
             SSHQuestion("alice@corp.example@files.example.com's password:")
-                == .password(user: "alice@corp.example", host: "files.example.com"))
+                == .password(user: "alice@corp.example", host: "files.example.com")
+        )
         #expect(
             SSHQuestion("(bob@jump.example.net) Verification code: ")
-                == .server(user: "bob", host: "jump.example.net", text: "Verification code:"))
+                == .server(user: "bob", host: "jump.example.net", text: "Verification code:")
+        )
         #expect(SSHQuestion("Enter passphrase for key '/Users/a/.ssh/id_ed25519': ") == .passphrase)
         #expect(
             SSHQuestion(
                 "The authenticity of host 'h (1.2.3.4)' can't be established.\nED25519 key fingerprint is SHA256:x.\nAre you sure you want to continue connecting (yes/no/[fingerprint])? "
-            ) == .hostKey)
+            ) == .hostKey
+        )
         #expect(SSHQuestion("Password:") == .other)
         // What a server writes cannot pass for a question of this Mac or for a confirmation.
         let forged = "(alice@files.example.com) Enter passphrase for key '/Users/a/.ssh/id_ed25519': "
@@ -360,7 +382,10 @@ private func reproducer(_ name: String) throws -> Data {
 
     @Test func theStoredPasswordGoesToThisLoginOnly() {
         let profile = ConnectionProfile(
-            key: ServerKey(scheme: "sftp", host: "files.example.com"), user: "alice@corp.example", password: "pw")
+            key: ServerKey(scheme: "sftp", host: "files.example.com"),
+            user: "alice@corp.example",
+            password: "pw"
+        )
         #expect(SFTPSession.asksForPassword("alice@corp.example@files.example.com's password: ", of: profile))
         #expect(SFTPSession.asksForPassword("(alice@corp.example@files.example.com) Password: ", of: profile))
         #expect(!SFTPSession.asksForPassword("alice@corp.example's password: ", of: profile))
@@ -373,7 +398,9 @@ private func reproducer(_ name: String) throws -> Data {
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (20, 0)
         let arguments = SFTPSession.sshArguments(
-            for: ConnectionProfile(key: ServerKey(scheme: "sftp", host: "h"), user: "u"), options: values)
+            for: ConnectionProfile(key: ServerKey(scheme: "sftp", host: "h"), user: "u"),
+            options: values
+        )
         for option in [
             "RemoteCommand=none", "PermitLocalCommand=no", "ControlMaster=no", "ControlPath=none", "LogLevel=ERROR",
             "ServerAliveCountMax=3"
@@ -402,7 +429,7 @@ private func reproducer(_ name: String) throws -> Data {
             process.standardOutput = output
             try process.run()
             var question: AskpassHelper.Question?
-            let end = Date().addingTimeInterval(30)
+            let end = Date().addingTimeInterval(Wait.ceiling)
             while question == nil, Date() < end {
                 question = helper.pendingQuestion()
                 if question == nil { Thread.sleep(forTimeInterval: 0.02) }
@@ -418,7 +445,8 @@ private func reproducer(_ name: String) throws -> Data {
         let first = try ask("alice@h's password: ", kind: nil, answer: "the new secret")
         #expect(
             first.output == "the new secret\n" && first.question.kind == .entry
-                && first.question.text == "alice@h's password: ")
+                && first.question.text == "alice@h's password: "
+        )
         // A question of several lines arrives whole.
         let second = try ask("line one\nline two? ", kind: nil, answer: "yes")
         #expect(second.question.text == "line one\nline two? " && second.output == "yes\n")
@@ -442,7 +470,8 @@ private func reproducer(_ name: String) throws -> Data {
         center.agentName = "Some; Program"
         let fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
         let mark = try #require(
-            fileSystem.quarantine(of: ServerKey(scheme: "sftp", host: "h").url(path: "/tool.command")))
+            fileSystem.quarantine(of: ServerKey(scheme: "sftp", host: "h").url(path: "/tool.command"))
+        )
         let fields = String(decoding: mark, as: UTF8.self).split(separator: ";", omittingEmptySubsequences: false)
         #expect(fields.count == 4 && fields[0] == "0083" && fields[2] == "Some  Program" && fields[3].isEmpty)
         let stamp = try #require(Int(fields[1], radix: 16))
@@ -451,7 +480,9 @@ private func reproducer(_ name: String) throws -> Data {
         #expect(
             String(
                 decoding: RemoteFileSystem.quarantineMark(agent: "A", at: Date(timeIntervalSince1970: 255)),
-                as: UTF8.self) == "0083;ff;A;")
+                as: UTF8.self
+            ) == "0083;ff;A;"
+        )
     }
 
     @Test func aNameGoesBackToTheServerAsItCame() throws {
@@ -463,27 +494,32 @@ private func reproducer(_ name: String) throws -> Data {
         names.remember(read.text, encoding: read.encoding)
         #expect(
             try NameEncoding.automatic.encode("RETR /pub/Grüße", names: names) == Data("RETR /pub/".utf8)
-                + Data([0x47, 0x72, 0xFC, 0xDF, 0x65]))
+                + Data([0x47, 0x72, 0xFC, 0xDF, 0x65])
+        )
         // Decomposed on the server: not composed on the way back. A name of the Mac's is composed as before.
         #expect(
             NameMemory.needsRemembering("u\u{308}", readAs: .utf8, sending: .utf8)
-                && !NameMemory.needsRemembering("ü", readAs: .utf8, sending: .utf8))
+                && !NameMemory.needsRemembering("ü", readAs: .utf8, sending: .utf8)
+        )
         names.remember("u\u{308}.txt", encoding: .utf8)
         #expect(try NameEncoding.utf8.encode("DELE /u\u{308}.txt", names: names) == Data("DELE /u\u{308}.txt".utf8))
         #expect(try NameEncoding.utf8.encode("DELE /o\u{308}.txt", names: names) == Data("DELE /ö.txt".utf8))
         #expect(
             try NameEncoding.utf8.encode("SITE CHMOD 644 /dir/u\u{308}.txt", names: names)
-                == Data("SITE CHMOD 644 /dir/u\u{308}.txt".utf8))
+                == Data("SITE CHMOD 644 /dir/u\u{308}.txt".utf8)
+        )
         // A character the server's encoding does not have is an error, not a question mark.
         #expect(throws: FileSystemError.self) { try NameEncoding.windowsLatin1.encode("STOR /日本.txt") }
         #expect(
-            try NameEncoding.windowsLatin1.encode("STOR /Grüße") == Data("STOR /Gr".utf8) + Data([0xFC, 0xDF, 0x65]))
+            try NameEncoding.windowsLatin1.encode("STOR /Grüße") == Data("STOR /Gr".utf8) + Data([0xFC, 0xDF, 0x65])
+        )
         // The same for the secure shell's packets.
         var packet = SFTPEncoder()
         packet.names = names
         packet.string("/pub/Grüße/o\u{308}")
         #expect(
-            packet.data.dropFirst(4) == Data("/pub/".utf8) + Data([0x47, 0x72, 0xFC, 0xDF, 0x65]) + Data("/ö".utf8))
+            packet.data.dropFirst(4) == Data("/pub/".utf8) + Data([0x47, 0x72, 0xFC, 0xDF, 0x65]) + Data("/ö".utf8)
+        )
         var decoder = SFTPDecoder(Data([0, 0, 0, 2, 0xFC, 0x41]))
         let name = try decoder.name()
         #expect(name.text == "üA" && name.encoding == .isoLatin1)

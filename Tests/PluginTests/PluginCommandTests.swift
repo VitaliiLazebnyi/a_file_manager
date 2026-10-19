@@ -3,7 +3,6 @@ import AFMKernel
 import AppKit
 import ClipboardPlugin
 import FileOperationsPlugin
-import FindFilesPlugin
 import FolderTabsPlugin
 import LocalFileSystemPlugin
 import MacIntegrationPlugin
@@ -12,12 +11,16 @@ import SelectionPlugin
 import TestSupport
 import Testing
 import ViewOptionsPlugin
-import ViewerPlugin
+
+@testable import FindFilesPlugin
+@testable import ViewerPlugin
 
 /// Every plugin driven through its commands, against a kernel with fake panels and a job
-/// service that runs at once. No window is involved.
+/// service that runs at once. No window is put on screen: what the viewer and Find Files would
+/// show goes to `presenter` (none of these commands opens a window of theirs).
 @MainActor @Suite struct PluginCommands {
     let memory = MemoryFileSystem()
+    private let presenter = StabilityPresenter()
     let mac = MacIntegrationPlugin(launchesApplications: false)
     private let scratch = ScratchPasteboard()
     var pasteboard: NSPasteboard { scratch.pasteboard }
@@ -33,9 +36,13 @@ import ViewerPlugin
         memory.addFile("/A/two.txt", "2")
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/B/one.txt", "old")
+        let viewer = ViewerPlugin()
+        viewer.present = presenter.present
+        let find = FindFilesPlugin()
+        find.present = presenter.present
         bench = TestBench(
             plugins: [
-                NavigationPlugin(), ViewerPlugin(), mac, FileOperationsPlugin(), FindFilesPlugin(),
+                NavigationPlugin(), viewer, mac, FileOperationsPlugin(), find,
                 ClipboardPlugin(pasteboard: scratch.pasteboard), SelectionPlugin(), ViewOptionsPlugin(),
                 FolderTabsPlugin()
             ],

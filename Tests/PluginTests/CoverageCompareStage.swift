@@ -18,7 +18,9 @@ internal final class CoverageCompareStage {
         /// Where the window is put instead of on the desktop: tests keep it off screen.
         internal let presenter = StabilityPresenter()
         /// How often the window beeped.
-        internal var beeps = 0
+        internal var beeps: Int { beepCount.value }
+        /// The same, kept apart, for a test that lets go of the window and its recorder.
+        internal let beepCount = Shared(0)
         /// How often the font panel was asked for.
         internal var fontPanels = 0
         /// The answers of the file panel, in order; without one the user cancels.
@@ -29,8 +31,9 @@ internal final class CoverageCompareStage {
         /// The effects that record into this.
         internal var effects: CompareWindowEffects {
             CompareWindowEffects(
-                present: { [presenter] in presenter.present($0) },
-                beep: { [weak self] in self?.beeps += 1 },
+                // Weakly: the presenter holds the window's controller, which holds these effects.
+                present: { [weak presenter] in presenter?.present($0) },
+                beep: { [beepCount] in beepCount.modify { $0 += 1 } },
                 chooseFile: { [weak self] _, done in
                     done(self?.chosen.isEmpty == false ? self?.chosen.removeFirst() : nil)
                 },
@@ -44,14 +47,15 @@ internal final class CoverageCompareStage {
         }
     }
 
+    /// What the window did outside itself. Declared first, so that it goes first: its presenter holds the window's
+    /// controller, which must go before the kernel it belongs to.
+    internal let recorder = Recorder()
     /// The files.
     internal let memory = MemoryFileSystem()
     /// The kernel with fake panels and jobs that run at once.
     internal let bench: TestBench
     /// The session the window draws.
     internal let session: CompareSession
-    /// What the window did outside itself.
-    internal let recorder = Recorder()
     /// The window's controller; nil once closed.
     internal private(set) var controller: CompareWindowController?
     /// Whether the window told that it closed.

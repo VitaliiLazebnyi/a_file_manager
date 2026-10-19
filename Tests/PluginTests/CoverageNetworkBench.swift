@@ -65,6 +65,9 @@ internal final class CoverageNetworkBench {
         try box.folder("other")
         server = try TestFTPServer(root: box.url("srv"))
         settings.set("0", forKey: "network.keepAliveSeconds")
+        // The longest the plugin waits for an answer: the test server answers at once, but on a
+        // machine busy with other tests its thread may be long in getting to it.
+        settings.set("600", forKey: "network.timeoutSeconds")
         plugin = NetworkPlugin(
             launchesApplications: false,
             passwords: passwords,

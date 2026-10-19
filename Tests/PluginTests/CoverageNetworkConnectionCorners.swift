@@ -1,5 +1,6 @@
 import AFMKernel
 import Foundation
+import TestSupport
 import Testing
 
 @testable import NetworkPlugin
@@ -55,7 +56,7 @@ internal struct CoverageNetworkConnectionCorners {
         let connection = try server.connected()
         defer { connection.close() }
         let stream = try connection.beginTransfer("RETR a", type: "I")
-        while try stream.read(upToCount: 10, timeout: 10) != nil {
+        while try stream.read(upToCount: 10, timeout: Wait.ceiling) != nil {
             // Read to the end.
         }
         let error = #expect(throws: NetworkError.self) { try connection.finishTransfer() }

@@ -212,9 +212,15 @@ private final class FakeOverlayHost: PanelOverlayHost {
 
     @Test func aTextIsLaidOutOnceWhenItsWindowKeepsItsSize() async throws {
         let controller = try await openLister(on: "long.txt")
+        // The window's layout is finished first: on a busy machine the text may be shown before
+        // a layout pass the window still owes, which then wraps it once more for the final width.
+        controller.window?.layoutIfNeeded()
         #expect(await rowsShown(controller))
         let document = try #require(controller.pane.pager.document)
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        // The same size again changes nothing, and neither does the end of a resize (what the
+        // pane does once a size has stopped changing).
+        if let size = controller.window?.contentView?.frame.size { controller.window?.setContentSize(size) }
+        controller.pane.layOutAfterResize(whileResizing: false)
         #expect(controller.pane.pager.document === document)
         // A narrower window wraps the text anew, a moment after the change.
         let columns = controller.pane.pager.columnsThatFit

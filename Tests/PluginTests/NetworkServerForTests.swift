@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 
 /// A small FTP server for the tests: it listens on 127.0.0.1 on a port the system picks and
 /// serves a folder of the test's sandbox. One thread per control connection, plain BSD
@@ -320,11 +321,11 @@ final class TestFTPServer: @unchecked Sendable {
     }
 
     /// Waits for the data connection: until it comes, until the client says something else on
-    /// the control connection or hangs up (it gave the transfer up), until the server stops, a
-    /// minute at most. No short limit: a client on a machine that is busy with other tests may
-    /// take seconds to get to its `connect`.
+    /// the control connection or hangs up (it gave the transfer up), until the server stops,
+    /// `Wait.ceiling` at most. No short limit: a client on a machine that is busy with other tests
+    /// may take seconds to get to its `connect`.
     fileprivate func acceptOne(_ listener: Int32, control: Int32) -> Int32? {
-        let deadline = Date().addingTimeInterval(60)
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !isStopped, Date() < deadline {
             var descriptors = [
                 pollfd(fd: listener, events: Int16(POLLIN), revents: 0),
@@ -513,7 +514,8 @@ private final class Session {
             reply(
                 verb == "PASV"
                     ? "227 Entering Passive Mode (127,0,0,1,\(port / 256),\(port % 256))"
-                    : "229 Entering Extended Passive Mode (|||\(port)|)")
+                    : "229 Entering Extended Passive Mode (|||\(port)|)"
+            )
 
         case "PORT":
             let numbers = argument.split(separator: ",").compactMap { Int($0) }
@@ -556,9 +558,10 @@ private final class Session {
                     Thread.sleep(forTimeInterval: min(0.05, max(0, end.timeIntervalSinceNow)))
                 }
             }
-            let names = ((try? fm.contentsOfDirectory(atPath: url.path)) ?? []).sorted().filter {
-                showHidden || !$0.hasPrefix(".")
-            }
+            let names = ((try? fm.contentsOfDirectory(atPath: url.path)) ?? []).sorted()
+                .filter {
+                    showHidden || !$0.hasPrefix(".")
+                }
             let lines =
                 names.map {
                     line(for: url.appendingPathComponent($0), name: $0, mlsd: verb == "MLSD", dos: options.dosListing)
@@ -694,7 +697,8 @@ private final class Session {
             }
             reply(
                 (try? fm.createDirectory(at: url, withIntermediateDirectories: false)) != nil
-                    ? "257 \"\(virtual(url))\" created" : "550 Cannot create")
+                    ? "257 \"\(virtual(url))\" created" : "550 Cannot create"
+            )
 
         case "RNFR":
             guard let url = local(argument), fm.fileExists(atPath: url.path) else {
@@ -802,9 +806,10 @@ private final class Session {
             return
                 "\(Self.dosFormat.string(from: date))  \(isFolder ? "     <DIR>         " : String(format: "%19lld", bytes)) \(name)"
         }
-        let letters = (0..<9).map { index -> Character in
-            mode & (1 << (8 - index)) != 0 ? Array("rwxrwxrwx")[index] : "-"
-        }
+        let letters = (0..<9)
+            .map { index -> Character in
+                mode & (1 << (8 - index)) != 0 ? Array("rwxrwxrwx")[index] : "-"
+            }
         if let target = try? fm.destinationOfSymbolicLink(atPath: url.path) {
             let isOld = date < Date().addingTimeInterval(-180 * 86_400)
             let when = (isOld ? Self.oldFormat : Self.recentFormat).string(from: date)

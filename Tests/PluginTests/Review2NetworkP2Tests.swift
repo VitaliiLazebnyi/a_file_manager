@@ -43,14 +43,14 @@ private final class Record<Value>: @unchecked Sendable {
         let done = DispatchSemaphore(value: 0)
         for _ in 0..<5 { Background.run(lane: free) { done.signal() } }
         for _ in 0..<5 { #expect(done.wait(timeout: .now() + 300) == .success) }
-        #expect(Background.waitUntilIdle(lane: free, timeout: 300))
+        #expect(Background.waitUntilIdle(lane: free, timeout: Wait.ceiling))
         // Of the stuck lane only so many run, and the wait for it says it is not done.
         #expect(started.all.count <= Background.mostPerLane)
         #expect(!Background.waitUntilIdle(lane: stuck, timeout: 0.2))
         #expect(Background.threadCount <= Background.mostThreads)
         // Let go, every piece runs, in the order it was queued within what ran together.
         for _ in 0..<pieces { release.signal() }
-        #expect(Background.waitUntilIdle(lane: stuck, timeout: 300))
+        #expect(Background.waitUntilIdle(lane: stuck, timeout: Wait.ceiling))
         #expect(started.all.sorted() == Array(0..<pieces))
     }
 
@@ -69,7 +69,7 @@ private final class Record<Value>: @unchecked Sendable {
             var reader: (any FileReader)? = try stalled.fileSystem.read(stalled.url("/f.bin"))
             let pending = reader
             abandoned.append(AdoptOutcome { _ = try pending?.read(upToCount: 10) })
-            #expect(adoptWait(120) { stalled.server.commands.filter { $0.hasPrefix("RETR") }.count == abandoned.count })
+            #expect(adoptWait { stalled.server.commands.filter { $0.hasPrefix("RETR") }.count == abandoned.count })
             reader?.interrupt()
             reader = nil
         }
@@ -80,12 +80,12 @@ private final class Record<Value>: @unchecked Sendable {
             let reader = try fixture.fileSystem.read(fixture.url("/big.bin"))
             #expect(try reader.read(upToCount: 100)?.count == 100)
             reader.close()
-            #expect(fixture.settle(timeout: 120), "the connection of a healthy server waited behind a dead one")
+            #expect(fixture.settle(), "the connection of a healthy server waited behind a dead one")
         }
         #expect(try fixture.names("/") == ["big.bin"])
         stalled.center.disconnectAll()
         stalled.server.stop()
-        for outcome in abandoned { #expect(outcome.ended(within: 120)) }
+        for outcome in abandoned { #expect(outcome.ended()) }
     }
 }
 
@@ -107,7 +107,7 @@ private final class Record<Value>: @unchecked Sendable {
             return Credentials(user: "anna", password: "pw")
         }
         let first = AdoptOutcome { _ = try fixture.names("/") }
-        #expect(asked.wait(timeout: .now() + 120) == .success)
+        #expect(asked.wait(timeout: .now() + Wait.ceiling) == .success)
         return (fixture, answer, first)
     }
 
@@ -141,11 +141,11 @@ private final class Record<Value>: @unchecked Sendable {
         for (name, flag, outcome) in waits {
             #expect(!outcome.ended(within: 0.3), "\(name) did not wait")
             flag.cancel()
-            #expect(outcome.ended(within: 120) && outcome.failed, "\(name) did not end when it was cancelled")
+            #expect(outcome.ended() && outcome.failed, "\(name) did not end when it was cancelled")
         }
         // Nothing was changed, and the session is as good as before.
         answer.signal()
-        #expect(first.ended(within: 120) && !first.failed)
+        #expect(first.ended() && !first.failed)
         #expect(try fixture.names("/") == ["a.txt", "d"])
         #expect(
             !fixture.server.commands.contains {
@@ -217,7 +217,7 @@ private final class Record<Value>: @unchecked Sendable {
             let outcome = AdoptOutcome { try call(flag) }
             #expect(!outcome.ended(within: 0.3), "\(name) did not wait")
             flag.cancel()
-            #expect(outcome.ended(within: 120) && outcome.failed, "\(name) did not end when it was cancelled")
+            #expect(outcome.ended() && outcome.failed, "\(name) did not end when it was cancelled")
         }
     }
 
@@ -233,7 +233,7 @@ private final class Record<Value>: @unchecked Sendable {
         let outcome = AdoptOutcome { try fresh.remove(suite.url("/hang"), cancellation: flag) }
         #expect(!outcome.ended(within: 0.5))
         flag.cancel()
-        #expect(outcome.ended(within: 120) && outcome.failed)
+        #expect(outcome.ended() && outcome.failed)
         #expect(suite.box.exists("srv/hang"))
         suite.center.disconnectAll()
     }
@@ -332,12 +332,12 @@ private final class Record<Value>: @unchecked Sendable {
             return Credentials(user: "anna", password: "pw")
         }
         let login = AdoptOutcome { _ = try fixture.names("/") }
-        #expect(asked.wait(timeout: .now() + 120) == .success)
+        #expect(asked.wait(timeout: .now() + Wait.ceiling) == .success)
         let session = try fixture.center.session(for: fixture.key)
         fixture.center.noteChosen(fixture.key)
         #expect(try fixture.center.session(for: fixture.key) === session)
         answer.signal()
-        #expect(login.ended(within: 120) && !login.failed)
+        #expect(login.ended() && !login.failed)
     }
 }
 
@@ -484,10 +484,10 @@ private final class Record<Value>: @unchecked Sendable {
         let outcome = AdoptOutcome {
             _ = try mounter.mount(URL(string: "smb://anna:secret@dead.invalid/share")!, cancellation: flag)
         }
-        #expect(adoptWait(120) { answers.all.count == 1 })
+        #expect(adoptWait { answers.all.count == 1 })
         #expect(!outcome.ended(within: 0.3), "the mount did not wait for the system")
         flag.cancel()
-        #expect(outcome.ended(within: 120) && outcome.failed)
+        #expect(outcome.ended() && outcome.failed)
         #expect(cancelled.all == [0x5EED])
         // The system's answer that comes after all goes nowhere, and harms nothing.
         answers.all.first?(0, ["/Volumes/share"] as CFArray)
@@ -568,7 +568,7 @@ private final class Record<Value>: @unchecked Sendable {
         let first = NetStream(host: "127.0.0.1", port: server.port, security: .tls(slow))
         first.start()
         defer { first.close() }
-        #expect(entered.wait(timeout: .now() + 120) == .success)
+        #expect(entered.wait(timeout: .now() + Wait.ceiling) == .success)
 
         // Its own stream still serves its waits: a time limit and a flag both end them while
         // the check sits there. (They would not if the check ran on the stream's queue.)
@@ -577,7 +577,7 @@ private final class Record<Value>: @unchecked Sendable {
         let waiting = AdoptOutcome { try first.waitUntilReady(timeout: 600, cancellation: flag) }
         #expect(!waiting.ended(within: 0.3))
         flag.cancel()
-        #expect(waiting.ended(within: 120) && waiting.failed)
+        #expect(waiting.ended() && waiting.failed)
 
         // Other connections are checked meanwhile, several at once: each comes to its verdict
         // (the certificate is self-signed, so each is refused and remembered for the question).
@@ -593,7 +593,7 @@ private final class Record<Value>: @unchecked Sendable {
 
         // Let go, the first check ends like the others.
         release.signal()
-        #expect(adoptWait(120) { slow.rejected != nil })
+        #expect(adoptWait { slow.rejected != nil })
     }
 }
 
@@ -635,9 +635,9 @@ private final class Record<Value>: @unchecked Sendable {
         let stream = NetStream(host: "127.0.0.1", port: server.port)
         stream.start()
         defer { stream.close() }
-        try stream.waitUntilReady(timeout: 120)
-        func line() throws -> String { String(decoding: try stream.readLine(timeout: 120), as: UTF8.self) }
-        func say(_ text: String) throws { try stream.write(Data((text + "\r\n").utf8), timeout: 120) }
+        try stream.waitUntilReady(timeout: Wait.ceiling)
+        func line() throws -> String { String(decoding: try stream.readLine(timeout: Wait.ceiling), as: UTF8.self) }
+        func say(_ text: String) throws { try stream.write(Data((text + "\r\n").utf8), timeout: Wait.ceiling) }
         #expect(try line().hasPrefix("220"))
         try say("USER anonymous")
         #expect(try line().hasPrefix("230"))

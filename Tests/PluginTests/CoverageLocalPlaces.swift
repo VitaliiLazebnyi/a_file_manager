@@ -16,10 +16,10 @@ internal struct CoverageLocalPlaces {
         probes.home = box.root
         probes.placesPatience = 0.2
         let local = LocalFileSystem(probes: probes)
-        #expect(Wait.until(seconds: 60) { local.places().contains { $0.kind == .internalDisk } })
+        #expect(Wait.until { local.places().contains { $0.kind == .internalDisk } })
         // The moment the reading had is over: it was not given up, as it had ended.
         let over = Date(timeIntervalSinceNow: 0.4)
-        #expect(Wait.until(seconds: 60) { Date() > over })
+        #expect(Wait.until { Date() > over })
         #expect(local.abandonedReadings == 0)
     }
 
@@ -35,8 +35,8 @@ internal struct CoverageLocalPlaces {
         probes.home = box.url("without")
         let without = LocalFileSystem(probes: probes)
         #expect(with.places().first?.url == box.url("with"))
-        #expect(Wait.until(seconds: 60) { with.places().contains { $0.name == "iCloud Drive" } })
-        #expect(Wait.until(seconds: 60) { without.places().contains { $0.kind == .internalDisk } })
+        #expect(Wait.until { with.places().contains { $0.name == "iCloud Drive" } })
+        #expect(Wait.until { without.places().contains { $0.kind == .internalDisk } })
         #expect(!without.places().contains { $0.name == "iCloud Drive" })
     }
 
@@ -143,12 +143,12 @@ internal struct CoverageLocalPlaces {
         blocksImage.value = true
         local.refreshPlaces()
         #expect(asked.wait() == true)
-        #expect(Wait.until(seconds: 60) { local.abandonedReadings == 2 })
+        #expect(Wait.until { local.abandonedReadings == 2 })
         // Two readings are stuck: no third is begun.
         local.refreshPlaces()
         #expect(local.abandonedReadings == 2)
         root.open()
         late.open()
-        #expect(Wait.until(seconds: 60) { local.abandonedReadings == 0 })
+        #expect(Wait.until { local.abandonedReadings == 0 })
     }
 }
