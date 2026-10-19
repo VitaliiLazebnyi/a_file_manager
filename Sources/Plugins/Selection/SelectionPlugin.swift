@@ -9,6 +9,9 @@ public final class SelectionPlugin: Plugin {
     private let pasteboard: NSPasteboard
     private let background: Bool
     private var selections: Selections?
+    /// Where the work that can take long is done: on a thread of the kernel's own. Set before
+    /// the plugin starts; tests hold the work back, to change a list while it is under way.
+    internal var runsWork: @Sendable (@escaping @Sendable () -> Void) -> Void = { BlockingCalls.run($0) }
 
     /// Tests pass a pasteboard of their own, so they leave the user's clipboard alone. With
     /// `background` false everything is worked out on the calling thread and has taken effect
@@ -23,7 +26,7 @@ public final class SelectionPlugin: Plugin {
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
-        let selections = Selections(kernel, pasteboard: pasteboard, background: background)
+        let selections = Selections(kernel, pasteboard: pasteboard, background: background, runsWork: runsWork)
         self.selections = selections
         let commands = kernel.commands
         let model = { kernel.panels.source.model }
@@ -325,6 +328,8 @@ final class Selections {
     private var restrictions: [ObjectIdentifier: Restriction] = [:]
     private var subscription: AnyObject?
     private let background: Bool
+    /// Runs the work of `compute` off the main thread.
+    private let runsWork: @Sendable (@escaping @Sendable () -> Void) -> Void
     /// The computation under way; a newer command ends it.
     private var running: CancellationFlag?
     /// Lists longer than this are worked on off the main thread.
@@ -332,10 +337,18 @@ final class Selections {
     /// How many names are applied to the model in one piece of main-thread work.
     static let applyPiece = 20_000
 
-    init(_ kernel: Kernel, pasteboard: NSPasteboard, background: Bool = true) {
+    /// The behaviour for `kernel`'s panels, with the clipboard `pasteboard`; with `background`,
+    /// what can take long is handed to `runsWork`, which works it out elsewhere.
+    internal init(
+        _ kernel: Kernel,
+        pasteboard: NSPasteboard,
+        background: Bool,
+        runsWork: @escaping @Sendable (@escaping @Sendable () -> Void) -> Void
+    ) {
         self.kernel = kernel
         self.pasteboard = pasteboard
         self.background = background
+        self.runsWork = runsWork
         store = SelectionStore(settings: kernel.settings)
         // A comparison view belongs to the directory it was made in: it ends when the panel
         // goes elsewhere (spec 09 › Ending the comparison view).
@@ -390,6 +403,8 @@ final class Selections {
         running?.cancel()
         running = flag
         let directories = models.map(\.directory)
+        // Taken now: the result may come after the kernel has gone (a closed window, the end of a test).
+        let commands = kernel.commands
         func attempt(_ number: Int) {
             let frozen = models.map(Frozen.init)
             guard heavy, background else {
@@ -402,7 +417,7 @@ final class Selections {
             let onMain = Handover((apply: apply, again: attempt))
             // (Some of this work asks a file system: on a thread of the kernel's own.)
             // `onMain` keeps this object (its `again` is a method of it) until the result is in.
-            BlockingCalls.run {
+            runsWork {
                 let result = autoreleasepool { work(frozen, flag) }
                 // A result can ask the user something (a mask that took too long): from the run loop.
                 performOnMainLoop {
@@ -414,7 +429,7 @@ final class Selections {
                     if onMain.value.apply(frozen, result) { return finish() }
                     guard number < Self.attempts else {
                         finish()
-                        return self.kernel.commands.onRejected()
+                        return commands.onRejected()
                     }
                     onMain.value.again(number + 1)
                 }
@@ -434,16 +449,18 @@ final class Selections {
         timedOut mask: SelectionMask? = nil,
         matching matches: @escaping @Sendable (FileItem) -> Bool
     ) {
-        // A regular expression can take long on any list.
+        // A regular expression can take long on any list. (The result may come after the kernel
+        // has gone: what tells the user is taken now.)
+        let interaction = ui
         compute(
             heavy: model.items.count > Self.longList || mask?.isRegex == true,
             models: [model],
             { frozen, _ in
                 PanelModel.rows(of: frozen[0].basis, where: matches)
             },
-            apply: { [weak self] frozen, rows in
+            apply: { frozen, rows in
                 if let mask, mask.timedOut {
-                    self?.ui.inform("The regular expression takes too long.", detail: mask.text, style: .warning)
+                    interaction.inform("The regular expression takes too long.", detail: mask.text, style: .warning)
                     return true
                 }
                 return frozen[0].model.setSelection(rows, change)
@@ -912,11 +929,16 @@ final class Selections {
                 // A cancelled job ends quietly, whatever its reading came to.
                 return monitor.cancellation.isCancelled ? .success(nil) : result
             },
-            completion: { [weak self] result in
+            completion: { [weak self, interaction = ui] result in
                 switch result {
-                case .failure(let error): self?.ui.report(error, title: "The selection cannot be loaded!")
-                case .success(let names?): self?.select(names, in: model, directory: directory)
-                case .success(nil): break
+                case .failure(let error):
+                    interaction.report(error, title: "The selection cannot be loaded!")
+
+                case .success(let names?):
+                    self?.select(names, in: model, directory: directory)
+
+                case .success(nil):
+                    break
                 }
             }
         )
