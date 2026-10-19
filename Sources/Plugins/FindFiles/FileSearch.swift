@@ -669,9 +669,12 @@ public final class FileSearch: @unchecked Sendable {
             guard let before = visited[identity], search.query.maxDepth != nil else {
                 return visited.updateValue(depth, forKey: identity) == nil
             }
-            guard depth < before else { return false }
-            visited[identity] = depth
-            return true
+            // Met nearer to a start directory: searched again, deeper.
+            if depth < before {
+                visited[identity] = depth
+                return true
+            }
+            return false
         }
 
         private func finishJob(of node: Node) {

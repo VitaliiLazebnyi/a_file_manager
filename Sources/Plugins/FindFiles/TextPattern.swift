@@ -431,10 +431,10 @@ public struct TextPattern: Sendable {
                         needles.contains { $0.occurs(in: hay, skip: isStart ? 0 : $0.unit, isLast: isLast) }
                     }
                     if found { return true }
-                    if isLast { return false }
                     carryStartsFile = carryStartsFile && buffer.count <= overlap
                     carry = Data(buffer.suffix(overlap))
-                    current = next
+                    // After the last block the loop ends, as it does at once for an empty file.
+                    current = isLast ? nil : next
                     return nil
                 }
                 if let outcome { return outcome }
