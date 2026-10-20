@@ -223,7 +223,9 @@ private final class MountedImage {
         try box.file("plain/a.txt")
         guard let image = MountedImage(in: box, at: "mounted") else {
             // Shown as skipped, not as passed: nothing was checked.
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         try Data("m".utf8).write(to: image.mountPoint.appendingPathComponent("inside.txt"))
         #expect(BranchWalker.isMountPoint(image.mountPoint.path) && !BranchWalker.isMountPoint(box.url("plain").path))
@@ -315,7 +317,9 @@ private final class MountedImage {
         try box.folder("plain/sub")
         guard let image = MountedImage(in: box, at: "mounted") else {
             // Shown as skipped, not as passed: nothing was checked.
-            try Test.cancel("a disk image cannot be attached here (hdiutil)")
+            // Fails rather than skips: a skip would leave what the test covers to chance.
+            Issue.record("a disk image cannot be attached here (hdiutil)")
+            return
         }
         try FileManager.default.createDirectory(
             at: image.mountPoint.appendingPathComponent("inside"),

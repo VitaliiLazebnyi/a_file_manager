@@ -308,9 +308,12 @@ private final class EntryCache: @unchecked Sendable {
     /// The listing of a directory unless it is too old. Called with the lock held.
     private func fresh(_ key: String) -> Directory? {
         guard let known = directories[key] else { return nil }
-        if now().timeIntervalSince(known.read) < Self.lifetime { return known }
-        directories[key] = nil
-        return nil
+        // Too old: forgotten.
+        if now().timeIntervalSince(known.read) >= Self.lifetime {
+            directories[key] = nil
+            return nil
+        }
+        return known
     }
 
     private func note(_ key: String, name: String?, entry: RemoteEntry?) {

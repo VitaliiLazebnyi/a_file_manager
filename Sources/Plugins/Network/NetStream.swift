@@ -490,15 +490,26 @@ final class NetStream: @unchecked Sendable {
         try wait(timeout: timeout, cancellation: cancellation, for: "connecting") { self.isReady ? () : nil }
     }
 
-    /// The address of this end of the connection, for the PORT command.
+    /// Whether `close` was called; the network layer lets go of the connection later, on its queue.
+    private var wasClosed: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return isClosed
+    }
+
+    /// The address of this end of the connection, for the PORT command; nil once the stream is closed.
     var localAddress: String? {
-        guard case .hostPort(let host, _)? = connection.currentPath?.localEndpoint else { return nil }
+        guard !wasClosed, case .hostPort(let host, _)? = connection.currentPath?.localEndpoint else { return nil }
         let text = "\(host)"
         return text.split(separator: "%").first.map(String.init)
     }
 
-    /// The address of the other end, as the network layer reached it; nil when only a name is known.
+    /// The address of the other end, as the network layer reached it; nil when only a name is known, and
+    /// once the stream is closed.
     var remoteAddress: String? {
+        guard !wasClosed else {
+            return nil
+        }
         switch connection.currentPath?.remoteEndpoint {
         case .hostPort(.ipv4(let address), _)?: return "\(address)"
         case .hostPort(.ipv6(let address), _)?: return "\(address)"

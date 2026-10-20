@@ -65,8 +65,13 @@ merge what is finished, and restart the rest with the same section of `wave-100.
 - `45dea79`: `StandardPlugins.make(launchesApplications: false)` passes it on (no real modal loop or tool window in the
   program tests). `a58cca3`: `Scripts/test-run-check.py` makes the test gate fail when a bundle did not run all its
   `@Test` functions.
-- Running: **w103-determinism**, **w104-crashes** (SIGSEGV in PluginTests, an unowned reference read after free, early
-  exits, tests failing only in full runs).
+- Merged: **w103-determinism** (`93f1338`): rare arms moved where they have their own counters, impossible arms gone,
+  timing replaced by deterministic tests; finding: the plain counters both lose counts (ran, read 0) and wrap below zero
+  (never ran, read covered), so only atomic counters measure 100% (owner question). Left: timing-only arms that need
+  seams (`FTPSession:229/506`, `TextRows:615`, `ViewerPane:660`, `FTPConnection:773`, `LocalSupport:66`), and the
+  adapters (list in its report, `documentation/agent-briefs/w103/`).
+- Running: **w104-crashes** (SIGSEGV in PluginTests, an unowned reference read after free, early exits, tests failing
+  only in full runs).
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts

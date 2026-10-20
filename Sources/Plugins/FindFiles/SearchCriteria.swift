@@ -353,6 +353,7 @@ struct PreparedFieldRules {
                     rule.matches($0.value(item), expression: expressions[index], trip: trip, cancelled: cancelled)
                 } ?? false
         }
-        return rules.matchAll ? rules.rules.indices.allSatisfy(holds) : rules.rules.indices.contains(where: holds)
+        // Any rule (the rarer choice), or all of them.
+        return !rules.matchAll ? rules.rules.indices.contains(where: holds) : rules.rules.indices.allSatisfy(holds)
     }
 }

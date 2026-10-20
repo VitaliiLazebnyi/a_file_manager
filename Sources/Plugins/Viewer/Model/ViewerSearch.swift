@@ -601,33 +601,39 @@ enum ViewerSearch {
             func characterBefore(_ end: Int) -> Bool {
                 guard end > 0 else { return false }
                 let byte = start[end - 1]
-                if byte < 0x80 { return isWordUnit(UInt16(byte)) }
-                if let table { return isWordUnit(table.single[Int(byte)]) }
-                var begin = end - 1
-                while begin > 0, end - begin < 4, start[begin] & 0xC0 == 0x80 { begin -= 1 }
-                var text = DecodedText()
-                text.tracksOffsets = false
-                _ = ViewerEncoding.utf8.decode(
-                    UnsafeBufferPointer(start: start + begin, count: end - begin),
-                    final: true,
-                    into: &text
-                )
-                // Bytes decoded to the end give at least one unit.
-                return isWordUnit(text.units[text.units.count - 1])
+                // Beyond ASCII: by the table of the code page, or decoded as UTF-8.
+                if byte >= 0x80 {
+                    if let table { return isWordUnit(table.single[Int(byte)]) }
+                    var begin = end - 1
+                    while begin > 0, end - begin < 4, start[begin] & 0xC0 == 0x80 { begin -= 1 }
+                    var text = DecodedText()
+                    text.tracksOffsets = false
+                    _ = ViewerEncoding.utf8.decode(
+                        UnsafeBufferPointer(start: start + begin, count: end - begin),
+                        final: true,
+                        into: &text
+                    )
+                    // Bytes decoded to the end give at least one unit.
+                    return isWordUnit(text.units[text.units.count - 1])
+                }
+                return isWordUnit(UInt16(byte))
             }
             func characterAfter(_ begin: Int) -> Bool {
                 guard begin < count else { return false }
                 let byte = start[begin]
-                if byte < 0x80 { return isWordUnit(UInt16(byte)) }
-                if let table { return isWordUnit(table.single[Int(byte)]) }
-                var text = DecodedText()
-                text.tracksOffsets = false
-                _ = ViewerEncoding.utf8.decode(
-                    UnsafeBufferPointer(start: start + begin, count: min(4, count - begin)),
-                    final: true,
-                    into: &text
-                )
-                return isWordUnit(text.units[0])
+                // Beyond ASCII: by the table of the code page, or decoded as UTF-8.
+                if byte >= 0x80 {
+                    if let table { return isWordUnit(table.single[Int(byte)]) }
+                    var text = DecodedText()
+                    text.tracksOffsets = false
+                    _ = ViewerEncoding.utf8.decode(
+                        UnsafeBufferPointer(start: start + begin, count: min(4, count - begin)),
+                        final: true,
+                        into: &text
+                    )
+                    return isWordUnit(text.units[0])
+                }
+                return isWordUnit(UInt16(byte))
             }
             let first = wanted[0]
             let alternative: UInt8 = folded && first >= 0x61 && first <= 0x7A ? first & ~0x20 : first

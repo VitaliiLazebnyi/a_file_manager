@@ -102,7 +102,10 @@ struct ViewerEncoding: Hashable {
     fileprivate var coreFoundationEncoding: CFStringEncoding? {
         guard codePage > 0, codePage <= Int(UInt32.max) else { return nil }
         let encoding = CFStringConvertWindowsCodepageToEncoding(UInt32(codePage))
-        return encoding != kCFStringEncodingInvalidId && CFStringIsEncodingAvailable(encoding) ? encoding : nil
+        guard encoding != kCFStringEncodingInvalidId, CFStringIsEncodingAvailable(encoding) else {
+            return nil
+        }
+        return encoding
     }
 
     /// Whether the system converts this code page, and the viewer can decode it: a code page of
@@ -182,9 +185,11 @@ final class CodeTable: Sendable {
     static func table(for encoding: ViewerEncoding) -> CodeTable {
         lock.lock()
         defer { lock.unlock() }
-        if let table = tables[encoding.codePage] { return table }
-        let table = CodeTable(encoding)
-        tables[encoding.codePage] = table
+        guard let table = tables[encoding.codePage] else {
+            let table = CodeTable(encoding)
+            tables[encoding.codePage] = table
+            return table
+        }
         return table
     }
 
@@ -276,23 +281,35 @@ final class CodeTable: Sendable {
             guard single[Int(byte)] == Self.leadByte else { return 1 }
             // A lead byte before something that cannot be a trail byte (a line end, a digit) is a stray byte.
             guard index + 1 < count else { return 0 }
-            return bytes[index + 1] >= 0x40 ? 2 : 1
+            guard bytes[index + 1] >= 0x40 else {
+                return 1
+            }
+            return 2
 
         case .eucJP:
             switch byte {
             case 0x8E:
                 guard index + 1 < count else { return 0 }
-                return (0xA1...0xDF).contains(bytes[index + 1]) ? 2 : 1
+                guard (0xA1...0xDF).contains(bytes[index + 1]) else {
+                    return 1
+                }
+                return 2
 
             case 0x8F:
                 guard index + 1 < count else { return 0 }
                 guard (0xA1...0xFE).contains(bytes[index + 1]) else { return 1 }
                 guard index + 2 < count else { return 0 }
-                return (0xA1...0xFE).contains(bytes[index + 2]) ? 3 : 1
+                guard (0xA1...0xFE).contains(bytes[index + 2]) else {
+                    return 1
+                }
+                return 3
 
             case 0xA1...0xFE:
                 guard index + 1 < count else { return 0 }
-                return (0xA1...0xFE).contains(bytes[index + 1]) ? 2 : 1
+                guard (0xA1...0xFE).contains(bytes[index + 1]) else {
+                    return 1
+                }
+                return 2
 
             default:
                 return 1
@@ -307,7 +324,10 @@ final class CodeTable: Sendable {
             guard index + 2 < count else { return 0 }
             guard (0x81...0xFE).contains(bytes[index + 2]) else { return 1 }
             guard index + 3 < count else { return 0 }
-            return (0x30...0x39).contains(bytes[index + 3]) ? 4 : 1
+            guard (0x30...0x39).contains(bytes[index + 3]) else {
+                return 1
+            }
+            return 4
         }
     }
 
@@ -392,12 +412,12 @@ extension ViewerEncoding {
                         let trail = Int(bytes[index + 1])
                         // A lead byte before something that cannot be a trail byte (a line end,
                         // a digit) is a stray byte; the next byte keeps its own meaning.
-                        if trail >= 0x40 {
-                            text.append(double[byte << 8 | trail], index)
-                            index += 2
-                        } else {
+                        if trail < 0x40 {
                             text.append(CodeTable.replacement, index)
                             index += 1
+                        } else {
+                            text.append(double[byte << 8 | trail], index)
+                            index += 2
                         }
                     } else if final {
                         text.append(CodeTable.replacement, index)
@@ -451,19 +471,16 @@ extension ViewerEncoding {
                 let second = Int(bytes[index + 1]) - 0x30
                 let third = Int(bytes[index + 2]) - 0x81
                 let fourth = Int(bytes[index + 3]) - 0x30
+                // Beyond the Basic Multilingual Plane the numbering is straight: 0x90308130 is U+10000.
+                let scalar = 0x10000 + (((first - (0x90 - 0x81)) * 10 + second) * 126 + third) * 10 + fourth
                 if first < 4 {
                     text.append(table.quad[(first * 10 + second) * 1_260 + third * 10 + fourth], index)
-                } else if first >= 0x90 - 0x81 {
-                    // Beyond the Basic Multilingual Plane the numbering is straight: 0x90308130 is U+10000.
-                    let scalar = 0x10000 + (((first - (0x90 - 0x81)) * 10 + second) * 126 + third) * 10 + fourth
-                    if scalar <= 0x10FFFF {
-                        text.append(UInt16(0xD800 + ((scalar - 0x10000) >> 10)), index)
-                        text.append(UInt16(0xDC00 + ((scalar - 0x10000) & 0x3FF)), index)
-                    } else {
-                        text.append(CodeTable.replacement, index)
-                    }
-                } else {
+                } else if first < 0x90 - 0x81 || scalar > 0x10FFFF {
+                    // Between the two ranges, and past the last character, nothing is assigned.
                     text.append(CodeTable.replacement, index)
+                } else {
+                    text.append(UInt16(0xD800 + ((scalar - 0x10000) >> 10)), index)
+                    text.append(UInt16(0xDC00 + ((scalar - 0x10000) & 0x3FF)), index)
                 }
             }
             index += length
@@ -554,19 +571,21 @@ extension ViewerEncoding {
             }
             let value = unit(index)
             if (0xD800...0xDBFF).contains(value) {
-                if index + 3 < count {
-                    let low = unit(index + 2)
-                    if (0xDC00...0xDFFF).contains(low) {
-                        text.append(value, index)
-                        text.append(low, index)
-                        index += 4
-                        continue
-                    }
-                } else if !final {
-                    break
+                // A high surrogate cut off at the end is left for the next call, unless this is the end.
+                if index + 3 >= count, !final { break }
+                let low = index + 3 >= count ? 0 : unit(index + 2)
+                if !(0xDC00...0xDFFF).contains(low) {
+                    // A high surrogate without its low one.
+                    text.append(CodeTable.replacement, index)
+                    index += 2
+                    continue
                 }
-                text.append(CodeTable.replacement, index)
-            } else if (0xDC00...0xDFFF).contains(value) {
+                text.append(value, index)
+                text.append(low, index)
+                index += 4
+                continue
+            }
+            if (0xDC00...0xDFFF).contains(value) {
                 text.append(CodeTable.replacement, index)
             } else {
                 text.append(value, index)
