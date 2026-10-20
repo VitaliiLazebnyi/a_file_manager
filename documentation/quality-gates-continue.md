@@ -84,7 +84,14 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   (389 / 3,447 / 337); lines 99.92%, functions 99.88%, regions 99.91%; 20 files below 100%
   (`documentation/agent-briefs/w103/gate-c91244e.txt`). The local-network prompt came from the print panel looking for
   printers. Accessibility gaps outside the audit: the rename box, the Brief and Thumbnail views.
-- Running: **w107-last** (the last 20 files).
+- Merged: **w107-last** (`2cebda6`): 8 files below 100% left (lines 99.98%, functions 99.96%, regions 99.97%, 54 UI
+  tests): `AppleScript.run` (Finder automation prompt), `NetStream`, `MultiRenameWindowController:785` (owner),
+  `Place.swift` (counter wrap-around: atomic counters), `FileGridView+Drop` (XCUITest cannot drag there; CGEvents need
+  the Accessibility permission), `SystemDesktop:45`, `SystemPreviewPanel:20`, `SystemDialogs:31` (millisecond windows,
+  real cases kept). `UITests/run.sh` attaches a disk image of its own (`AFM_VOLUME`).
+- Gate at `2cebda6`: the UI tests passed; the unit tests stopped the gate on the flaky
+  `AppShellLifetimeTests.aUsedProgramGoesAsWell` (parts not freed in 311 s; about one full run in three).
+- Running: **w108-lifetime** (what holds the program's parts in that test).
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts
