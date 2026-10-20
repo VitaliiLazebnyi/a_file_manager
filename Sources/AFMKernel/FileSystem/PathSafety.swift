@@ -78,7 +78,8 @@ public enum PathSafety: Sendable {
             }
         }
         let joined = Array(names.joined(separator: [0x2F]))
-        return (path.first == 0x2F ? [0x2F] + joined : joined, false)
+        // A relative path stays relative.
+        return (path.first != 0x2F ? joined : [0x2F] + joined, false)
     }
 
     /// The path of a local file (which starts at the root) with every link on the way

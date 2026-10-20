@@ -114,15 +114,14 @@ enum ArchiveURL {
 
     /// Scheme and authority, e.g. `file://` or `ftp://user@server:21`.
     private static func authority(of url: URL) -> String {
-        if var components = URLComponents(url: url, resolvingAgainstBaseURL: true) {
-            components.path = ""
-            components.query = nil
-            components.fragment = nil
-            if let text = components.string, text.contains("://") {
-                return text
-            }
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+        components?.path = ""
+        components?.query = nil
+        components?.fragment = nil
+        guard let text = components?.string, text.contains("://") else {
+            return (url.scheme ?? "file") + "://"
         }
-        return (url.scheme ?? "file") + "://"
+        return text
     }
 
     private static func outerURL(prefix: String, path: String) -> URL? {

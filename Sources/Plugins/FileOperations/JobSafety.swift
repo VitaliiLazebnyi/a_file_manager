@@ -18,13 +18,21 @@ enum RealLocation {
     /// does not is still seen through by what its `parent(of:)` answers.
     static func resolve(_ url: URL, in fileSystems: FileSystemRegistry) -> URL {
         var current = fileSystems.realLocation(of: url)
+        // The place a location of a file system that shows another one's files stands for; nil for any other.
+        func seenThrough(_ location: URL) -> URL? {
+            if !location.isFileURL, let provider = try? fileSystems.provider(for: location),
+                let real = provider.parent(of: location),
+                real.scheme != location.scheme, path(of: real) == path(of: location)
+            {
+                return real
+            }
+            return nil
+        }
         // A view of a view is as deep as it gets; the bound keeps a confused provider from looping.
-        for _ in 0..<4 {
-            guard !current.isFileURL, let provider = try? fileSystems.provider(for: current),
-                let real = provider.parent(of: current),
-                real.scheme != current.scheme, path(of: real) == path(of: current)
-            else { break }
+        var steps = 0
+        while steps < 4, let real = seenThrough(current) {
             current = fileSystems.realLocation(of: real)
+            steps += 1
         }
         return current
     }

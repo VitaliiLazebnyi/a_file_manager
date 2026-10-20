@@ -2192,9 +2192,10 @@ public final class FileJob: @unchecked Sendable {
                 do {
                     if try !self.deleteLeaf(leaf, tree: tree) { tally.lock.withLock { tally.kept = true } }
                 } catch {
-                    // Abort or Cancel in a question a worker asked: the whole job ends.
-                    self.halt()
+                    // Abort or Cancel in a question a worker asked: the whole job ends. The error is
+                    // kept before the others are stopped, so it is not the stop they meet that is told.
                     tally.lock.withLock { tally.failure = tally.failure ?? error }
+                    self.halt()
                 }
             }
         }
@@ -2205,8 +2206,8 @@ public final class FileJob: @unchecked Sendable {
                 keptAsked = true
             }
         } catch {
-            halt()
             tally.lock.withLock { tally.failure = tally.failure ?? error }
+            halt()
         }
         group.wait()
         return try tally.lock.withLock {

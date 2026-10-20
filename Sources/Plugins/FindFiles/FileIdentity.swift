@@ -82,11 +82,11 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
         var data = Data(count: max(count, 0))
         let got = data.withUnsafeMutableBytes { buffer -> Int in
             guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
-            while true {
-                let result = systemRead(descriptor, base, buffer.count)
-                if result < 0, errno == EINTR { continue }
-                return result
-            }
+            var result: Int
+            repeat {
+                result = systemRead(descriptor, base, buffer.count)
+            } while result < 0 && errno == EINTR
+            return result
         }
         if got < 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         if got == 0 { return nil }

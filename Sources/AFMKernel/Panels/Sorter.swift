@@ -124,8 +124,9 @@ public enum Sorter: Sendable {
             return .orderedSame
         }
         var result = collator.withKey(of: lhs) { first in collator.withKey(of: rhs) { SortKeys.bytewise(first, $0) } }
+        // Names that are not the same bytes always differ in their bytes.
         if result == 0 { result = SortKeys.bytewise(lhs, rhs) }
-        return result < 0 ? .orderedAscending : (result > 0 ? .orderedDescending : .orderedSame)
+        return result < 0 ? .orderedAscending : .orderedDescending
     }
 
     /// The comparison that defines the order, for two items without records: negative when

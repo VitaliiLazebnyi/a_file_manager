@@ -93,7 +93,10 @@ extension ByteSource {
     func read(_ range: Range<Int64>, cancellation: CancellationFlag?) throws -> Data {
         let lower = max(0, min(range.lowerBound, length))
         let upper = max(lower, min(range.upperBound, length))
-        return upper > lower ? try read(at: lower, count: Int(upper - lower), interruptedBy: cancellation) : Data()
+        guard upper > lower else {
+            return Data()
+        }
+        return try read(at: lower, count: Int(upper - lower), interruptedBy: cancellation)
     }
 }
 
@@ -132,7 +135,7 @@ final class DataByteSource: ByteSource {
 
     init(_ data: Data) {
         // A slice keeps the indices of what it was cut from; a copy starts at zero.
-        self.data = data.startIndex == 0 ? data : Data(data)
+        self.data = data.startIndex != 0 ? Data(data) : data
     }
 
     var length: Int64 { Int64(data.count) }
@@ -514,7 +517,9 @@ final class CachedByteSource: ByteSource, @unchecked Sendable {
     private func readInPool(at offset: Int64, count: Int, flag: CancellationFlag?) throws -> Data {
         let lower = max(0, min(offset, length))
         let upper = min(length, lower + Int64(max(0, count)))
-        guard upper > lower else { return Data() }
+        guard upper > lower else {
+            return Data()
+        }
         try flag?.throwIfCancelled()
         // Four blocks or more is a scan, not a look at what is shown.
         if upper - lower >= Int64(blockSize) * 4 {

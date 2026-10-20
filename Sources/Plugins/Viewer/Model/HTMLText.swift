@@ -448,7 +448,7 @@ enum HTMLText {
                     let name = (0..<key.length).map { UInt8(truncatingIfNeeded: key.first >> UInt64($0 * 8)) }
                     if let end = findClosing(name, from: index) {
                         let after = find(0x3E, from: end)
-                        index = after < count ? after + 1 : count
+                        index = after >= count ? count : after + 1
                     } else {
                         index = count
                     }
