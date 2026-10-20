@@ -166,3 +166,27 @@ that reaches a region only sometimes (timing, a skip, load) makes the gate fail 
 - Report the adapters left (they are for the UI tests) and anything else with file:line and why.
 - Owner questions you must not decide: `NetStream:242/444`, `MultiRenameWindowController:785` (impossible optionals),
   `ArchiveFileSystem:100`.
+
+# Wave 105: the main-thread stall and the last timing arms (2026-10-20)
+
+## w105-stall (prefix `Stall`)
+
+Base `quality-gates` at `f8fa15e` or later.
+
+- **The stall.** About once in ten full `swift test --parallel` runs something holds the main thread of the PluginTests
+  process for about `Wait.ceiling` (300 s), and some 20 tests waiting on it give up together
+  (`ViewerAdoptPane.aBigTextOfASlowFileSystem…`, `CoveragePlacesTreeWindowTests.aStoredTreeOpensWithoutReading`,
+  `CoverageSelectionBackground.aListThatKeepsChangingIsGivenUp` among them). w104-crashes' report (in the hand-over of
+  this wave, see `quality-gates-continue.md`) names suspects: the real Quick Look calls in
+  `theSystemPanelIsFedWhileInControl`, the unhandled keys the Viewer keyboard tests send through `NSApp.sendEvent` (they
+  also beep), and `CovViewPaneKeyboardTests.aPaneThatGoesWithItsWindowIsFreed`; `findingText` ran about 420 s in all
+  three bad logs. Its sampler (`/private/tmp/claude-501/sp/w104/watch.py`) and signal catcher are there to reuse. Find
+  what blocks the main thread, fix it (in the test, or the code if the code can block the main thread), and show 10 full
+  runs without the stall (`Scripts/test-run-check.py` on each, and no test over 120 s).
+- **Timing arms that need a seam** (from w103-determinism): `FTPSession:229/506` (the background link resolver meets "no
+  connection free" or a login question only by timing), `TextRows:615` (segments published out of order),
+  `ViewerPane:660` (mode changed while the HTML tags are stripped), `FTPConnection:773` (more replies within 0.05 s),
+  `LocalSupport:66` (the resend limit of 50). For each, a deterministic test through a seam, or a simplification that
+  removes the arm.
+- Tests that still skip when background work is slow: `NetworkAdoptTests:309`, `Review2NetworkFTPTests:562`: make them
+  deterministic instead.

@@ -70,8 +70,11 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   (never ran, read covered), so only atomic counters measure 100% (owner question). Left: timing-only arms that need
   seams (`FTPSession:229/506`, `TextRows:615`, `ViewerPane:660`, `FTPConnection:773`, `LocalSupport:66`), and the
   adapters (list in its report, `documentation/agent-briefs/w103/`).
-- Running: **w104-crashes** (SIGSEGV in PluginTests, an unowned reference read after free, early exits, tests failing
-  only in full runs).
+- Merged: **w104-crashes** (`f8fa15e`): the PluginTests SIGSEGV (locale notifications posted from 16 threads to the
+  default center reached other tests' date pickers off the main thread); unowned references fixed; window watches name
+  their windows; a wrong old-style ZIP password that decrypts to valid data is asked for again. Two full runs: every
+  test ran and passed (337 / 3,438 / 388). Open: a main-thread stall of ~300 s about once in ten runs.
+- Running: **w105-stall** (the stall, the last timing arms).
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts
