@@ -1,11 +1,25 @@
 import XCTest
 
-/// The Lister's ways out to the system: the open and save panels, full screen and the window's
-/// zoom. Every panel is cancelled; nothing is saved.
+/// The Lister's ways out to the system: the open and save panels, page setup and printing,
+/// full screen and the window's zoom. Every panel is cancelled: nothing is saved or printed.
 @MainActor
 internal final class UIViewerTests: XCTestCase {
     /// The program of the running test, once started.
     private var running: AppSession?
+
+    /// A PDF of one page with a black box on it.
+    private static func onePagePDF() throws -> Data {
+        let data = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 300, height: 200)
+        let consumer = try XCTUnwrap(CGDataConsumer(data: data as CFMutableData))
+        let context = try XCTUnwrap(CGContext(consumer: consumer, mediaBox: &box, nil))
+        context.beginPDFPage(nil)
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(CGRect(x: 20, y: 20, width: 100, height: 40))
+        context.endPDFPage()
+        context.closePDF()
+        return data as Data
+    }
 
     /// A test stops at its first failure: what follows depends on what failed.
     override internal func setUp() async throws {
@@ -51,9 +65,6 @@ internal final class UIViewerTests: XCTestCase {
 
     /// Open… and Save as… show the system's panels; each is cancelled, and the Lister still
     /// shows the file.
-    ///
-    /// Page Setup… and Print… are not tried: the system's print panel and page layout look for
-    /// printers on the local network, which asks the user for that permission.
     internal func testTheFileMenuShowsTheSystemsPanels() throws {
         let session = try AppSession(leftFiles: ["alpha.txt": "first line\nsecond line\n"])
         running = session
@@ -65,6 +76,46 @@ internal final class UIViewerTests: XCTestCase {
         UIDesktop(session).cancelPanel("the save panel")
 
         Check.that(lister.title.hasSuffix("alpha.txt]"), "the Lister still shows alpha.txt, not \(lister.title)")
+        lister.typeKey("q", modifierFlags: [])
+        Wait.until(lister, \.exists, is: false)
+    }
+
+    /// Page Setup… shows the system's page layout and Print… its print sheet; with text marked,
+    /// the Lister asks first whether to print the marked text alone. Each is cancelled.
+    ///
+    /// The print panel and the page layout look for printers on the local network: the first
+    /// time, macOS asks the user whether the program may (the owner has answered on this Mac).
+    internal func testPageSetupAndPrintShowTheSystemsPanels() throws {
+        let session = try AppSession(leftFiles: ["alpha.txt": "first line\nsecond line\n"])
+        running = session
+        let lister = try openLister(session, downs: 1, named: "alpha")
+        let desktop = UIDesktop(session)
+
+        choose("Page Setup…", of: "File", in: lister)
+        desktop.cancelPanel("the page layout")
+        choose("Print…", of: "File", in: lister)
+        desktop.cancelPanel("the print sheet")
+
+        choose("Select all", of: "Edit", in: lister)
+        choose("Print…", of: "File", in: lister)
+        let selection = session.app.dialogs.buttons["Selection"]
+        Wait.forElement(selection)
+        session.app.dialogs.buttons["Whole file"].click()
+        Wait.until(selection, \.exists, is: false)
+        desktop.cancelPanel("the print sheet of the whole file")
+
+        lister.typeKey("q", modifierFlags: [])
+        Wait.until(lister, \.exists, is: false)
+    }
+
+    /// A PDF prints through its own view: the system's print panel, cancelled.
+    internal func testAPDFPrintsThroughThePrintPanel() throws {
+        let session = try AppSession(leftFiles: [:])
+        try Self.onePagePDF().write(to: session.left.appendingPathComponent("page.pdf"))
+        running = session
+        let lister = try openLister(session, downs: 1, named: "page")
+        choose("Print…", of: "File", in: lister)
+        UIDesktop(session).cancelPanel("the PDF's print panel")
         lister.typeKey("q", modifierFlags: [])
         Wait.until(lister, \.exists, is: false)
     }
