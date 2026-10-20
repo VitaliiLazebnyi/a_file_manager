@@ -253,8 +253,9 @@ public final class SessionEnvironment: @unchecked Sendable {
         get { hook(\.log) }
         set { setHook(\.log, newValue) }
     }
-    /// The time by which connections age: how long one sat idle, and how long nothing was done
-    /// with a server. The system's clock unless a test sets another.
+    /// The time by which connections age: how long one sat idle, how long nothing was done with
+    /// a server, and when the links of a listing are no longer asked about in the background.
+    /// The system's clock unless a test sets another.
     public var clock: @Sendable () -> Date {
         get { hook(\.clock) }
         set { setHook(\.clock, newValue) }

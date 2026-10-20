@@ -288,7 +288,9 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(asked.all.count == 2)
     }
 
-    @Test func theTopOfAServerIsKnownFromTheAddressAlone() {
+    /// Off the main thread: the climb through 3,000 levels takes seconds of a debug build, which other tests waited
+    /// for when it ran there.
+    @Test nonisolated func theTopOfAServerIsKnownFromTheAddressAlone() {
         let center = ConnectionCenter(environment: SessionEnvironment())
         let fs = RemoteFileSystem(scheme: "sftp", center: center)
         let key = ServerKey(scheme: "sftp", host: "files.example.com", port: 2_222)
@@ -495,14 +497,14 @@ private final class Record<Value>: @unchecked Sendable {
 
     @Test func aMountIsAnsweredAndAFailureNamesNoPassword() throws {
         var calls = SystemVolumeMounter.Calls.mounting(request: 0) { _, answer in
-            DispatchQueue.global().async { answer(0, ["/Volumes/share"] as CFArray) }
+            OtherThread.start { answer(0, ["/Volumes/share"] as CFArray) }
             return 0
         }
         let mounter = SystemVolumeMounter(calls: calls, unmountTime: 600)
         #expect(try mounter.mount(URL(string: "smb://host.invalid/share")!).map(\.path) == ["/Volumes/share"])
         // A mount that names no mount point.
         calls = .mounting(request: 0) { _, answer in
-            DispatchQueue.global().async { answer(0, nil) }
+            OtherThread.start { answer(0, nil) }
             return 0
         }
         #expect(
@@ -510,7 +512,7 @@ private final class Record<Value>: @unchecked Sendable {
         )
 
         calls = .mounting(request: 0) { _, answer in
-            DispatchQueue.global().async { answer(ECONNREFUSED, [] as CFArray) }
+            OtherThread.start { answer(ECONNREFUSED, [] as CFArray) }
             return 0
         }
         let refused = SystemVolumeMounter(calls: calls, unmountTime: 600)
@@ -541,9 +543,9 @@ private final class Record<Value>: @unchecked Sendable {
         answers.all.first?(nil)
 
         // An answer in time: success, or the system's error.
-        calls.unmount = { _, answer in DispatchQueue.global().async { answer(nil) } }
+        calls.unmount = { _, answer in OtherThread.start { answer(nil) } }
         try SystemVolumeMounter(calls: calls, unmountTime: 600).unmount(URL(fileURLWithPath: "/Volumes/x"))
-        calls.unmount = { _, answer in DispatchQueue.global().async { answer(POSIXError(.EBUSY)) } }
+        calls.unmount = { _, answer in OtherThread.start { answer(POSIXError(.EBUSY)) } }
         #expect(throws: POSIXError.self) {
             try SystemVolumeMounter(calls: calls, unmountTime: 600).unmount(URL(fileURLWithPath: "/Volumes/x"))
         }

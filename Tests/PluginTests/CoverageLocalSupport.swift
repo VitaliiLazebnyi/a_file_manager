@@ -46,23 +46,29 @@ internal struct CoverageLocalSupport {
         #expect(interruption.isInterrupted)
     }
 
-    /// The signal is sent fifty times at most.
+    /// The signal is sent fifty times at most: a call that stays deaf to it is left alone after that.
     @Test
     internal func theSignalIsSentFiftyTimesAtMost() {
-        let interruption = Interruption()
-        let inside = Signal<Bool>()
-        let done = Signal<Int>()
-        Thread.detachNewThread {
+        let resent = CovNetCount()
+        // Sent again at once, and counted, instead of a tenth of a second later.
+        let interruption = Interruption { _, work in
+            resent.add()
+            work()
+        }
+        let (inside, leave, done) = (Signal<Bool>(), Signal<Bool>(), Signal<Int>())
+        OtherThread.start {
             let result = try? interruption.run {
                 inside.set(true)
-                let end = Date(timeIntervalSinceNow: 5.4)
-                while Date() < end { usleep(20_000) }
+                // Deaf to the signal: it only wakes this wait, which goes on.
+                _ = leave.wait()
                 return 1
             }
             done.set(result ?? -1)
         }
         #expect(inside.wait() == true)
         interruption.interrupt()
+        #expect(resent.value == 50)
+        leave.set(true)
         #expect(done.wait() == 1)
     }
 

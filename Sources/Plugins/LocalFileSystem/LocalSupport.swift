@@ -10,9 +10,8 @@ import Foundation
 /// inside one call; a signal that comes a moment too early is sent again until the call is
 /// over. **Thread-safe**; `interrupt()` returns at once. All state is guarded by `lock`.
 final class Interruption: @unchecked Sendable {
-    private let lock = NSLock()
-    private var thread: pthread_t?
-    private var interrupted = false
+    /// Runs `work` once `delay` seconds have passed, on another thread.
+    internal typealias Schedule = @Sendable (_ delay: TimeInterval, _ work: @escaping @Sendable () -> Void) -> Void
 
     /// A handler that does nothing, installed without `SA_RESTART`: the call it interrupts
     /// returns `EINTR` instead of carrying on. (Installing a handler for a valid signal does not fail.)
@@ -24,10 +23,26 @@ final class Interruption: @unchecked Sendable {
         sigaction(SIGURG, &action, nil)
     }()
 
+    private let lock = NSLock()
+    private var thread: pthread_t?
+    private var interrupted = false
+    /// Where the signal is sent again: the local file system's clock.
+    private let schedule: Schedule
+
     var isInterrupted: Bool {
         lock.lock()
         defer { lock.unlock() }
         return interrupted
+    }
+
+    /// An interruption that sends its signal again on the local file system's clock.
+    internal convenience init() {
+        self.init { delay, work in LocalClock.queue.asyncAfter(deadline: .now() + delay, execute: work) }
+    }
+
+    /// An interruption that sends its signal again where `schedule` says (tests count the times).
+    internal init(schedule: @escaping Schedule) {
+        self.schedule = schedule
     }
 
     /// The calling thread is about to make a call that may wait. False when `interrupt` was
@@ -64,7 +79,7 @@ final class Interruption: @unchecked Sendable {
     /// The call may not have been entered yet when the first signal arrived.
     private func resend(attempt: Int) {
         guard attempt <= 50 else { return }
-        LocalClock.queue.asyncAfter(deadline: .now() + 0.1) { [self] in
+        schedule(0.1) { [self] in
             lock.lock()
             let target = thread
             if let target { pthread_kill(target, SIGURG) }

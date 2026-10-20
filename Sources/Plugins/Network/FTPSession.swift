@@ -91,7 +91,10 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// The links (full paths) still to be asked about in the background, newest listing first.
     private var pendingLinks: [String] = []
     private var isResolving = false
+    /// By the environment's clock, as the ages of the connections.
     private var linkDeadline = Date()
+    /// How often the resolver found no connection it may use and put its links back.
+    private var linksPutBack = 0
 
     /// Open files may use this many connections more than `parallelConnections`, per direction.
     private static let extraTransferConnections = 1
@@ -153,6 +156,10 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     /// How many threads wait for a connection to run a command on, for tests.
     var waitingCommands: Int { condition.withLock { commandWaiters } }
+
+    /// How often the link resolver found no connection it may use (none free, or one that would ask the user
+    /// something to log in) and put its links back, for tests.
+    internal var linkRoundsPutBack: Int { condition.withLock { linksPutBack } }
 
     /// A reader that was closed hands its connection to the background, which gives it back
     /// (`release`) once the server was told; `change` is +1 before and -1 after.
@@ -782,7 +789,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         pendingLinks = Array(
             (paths + pendingLinks).filter { seen.insert($0).inserted }.prefix(Self.backgroundLinks)
         )
-        linkDeadline = Date().addingTimeInterval(Self.backgroundLinkTime)
+        linkDeadline = environment.clock().addingTimeInterval(Self.backgroundLinkTime)
         let start = !isResolving && !isClosed
         if start { isResolving = true }
         condition.unlock()
@@ -795,10 +802,10 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     private func resolveLinks() {
         while true {
             condition.lock()
-            while commandWaiters > 0, !isClosed, !pendingLinks.isEmpty, Date() < linkDeadline {
+            while commandWaiters > 0, !isClosed, !pendingLinks.isEmpty, environment.clock() < linkDeadline {
                 condition.wait(until: Date().addingTimeInterval(0.2))
             }
-            guard !isClosed, !pendingLinks.isEmpty, Date() < linkDeadline else {
+            guard !isClosed, !pendingLinks.isEmpty, environment.clock() < linkDeadline else {
                 pendingLinks = []
                 isResolving = false
                 condition.unlock()
@@ -814,6 +821,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
                 // ends the resolver at the top of the loop.
                 condition.lock()
                 pendingLinks = batch + pendingLinks
+                linksPutBack += 1
                 condition.wait(until: Date().addingTimeInterval(0.5))
                 condition.unlock()
                 continue

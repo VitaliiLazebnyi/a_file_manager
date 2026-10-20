@@ -30,6 +30,14 @@ internal struct CoverageViewerPaneKeyTests {
         pane.handleKey(try #require(bench.key(characters, code: code, flags: flags)))
     }
 
+    /// Lets the main queue run what a key handed to it (one turn: in a full run every turn waits behind the other
+    /// tests, and five of them after each of fourteen keys made this the slowest test of the bundle).
+    private static func afterWhatTheKeyHandedOn() async {
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            DispatchQueue.main.async { done.resume() }
+        }
+    }
+
     /// The cursor keys, alone and with Shift, Control, Option and Command, move through the text.
     @Test
     internal func theCursorKeysMoveThroughTheText() async throws {
@@ -47,7 +55,7 @@ internal struct CoverageViewerPaneKeyTests {
         ]
         for (code, flags, characters) in steps {
             #expect(try Self.press(pane, bench, code, flags, characters: characters))
-            await CoverageViewerPagerBench.settleAlone()
+            await Self.afterWhatTheKeyHandedOn()
         }
         #expect(await bench.wait { pager.selection != nil })
         #expect(try Self.press(pane, bench, Code.down, [.command]))

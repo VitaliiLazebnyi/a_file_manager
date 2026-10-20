@@ -45,13 +45,25 @@ import Testing
         let group = DispatchGroup()
         // The first write stops in the FIFO, holding the cache's write lock, until it is read.
         let big = bulky(4)
-        DispatchQueue.global().async(group: group) { cache.store(big, for: root) }
+        group.enter()
+        OtherThread.start {
+            cache.store(big, for: root)
+            group.leave()
+        }
         let reader = open(fifo, O_RDONLY)
         #expect(reader >= 0)
         // Two stores of another tree come while it waits: the first is overtaken by the second.
-        DispatchQueue.global().async(group: group) { cache.store(["first"], for: other) }
+        group.enter()
+        OtherThread.start {
+            cache.store(["first"], for: other)
+            group.leave()
+        }
         #expect(Wait.until { cache.paths(for: other) == ["first"] })
-        DispatchQueue.global().async(group: group) { cache.store(["second"], for: other) }
+        group.enter()
+        OtherThread.start {
+            cache.store(["second"], for: other)
+            group.leave()
+        }
         #expect(Wait.until { cache.paths(for: other) == ["second"] })
         let written = drain(reader)
         group.wait()
@@ -114,11 +126,10 @@ import Testing
             try? FileManager.default.createDirectory(at: box.url("cache"), withIntermediateDirectories: true)
             #expect(mkfifo(fifo, 0o600) == 0)
             let done = DispatchSemaphore(value: 0)
-            DispatchQueue.global()
-                .async {
-                    cache.store(paths, unscanned: unscanned, for: root)
-                    done.signal()
-                }
+            OtherThread.start {
+                cache.store(paths, unscanned: unscanned, for: root)
+                done.signal()
+            }
             // The reader goes away without reading: the writer is refused.
             let reader = open(fifo, O_RDONLY)
             close(reader)

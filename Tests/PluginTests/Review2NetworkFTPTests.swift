@@ -538,6 +538,9 @@ private final class Notes: @unchecked Sendable {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options) { $0.parallelConnections = 1 }
+        // Time stands still for the session: the background work does not give up on the links (it would after 20 s).
+        let now = Date()
+        fixture.environment.clock = { now }
         for folder in ["one", "two", "three"] {
             try fixture.box.folder("srv/\(folder)/d")
             for index in 0..<40 {
@@ -558,9 +561,7 @@ private final class Notes: @unchecked Sendable {
             return links.count == 40 && links.allSatisfy(\.isDirectory)
         }
         // The last folder, the one the user is in, comes first.
-        guard adoptWait(until: { resolved("three") }) else {
-            try Test.cancel("the background work did not get through in time")
-        }
+        #expect(adoptWait(until: { resolved("three") }))
         #expect(fixture.server.mostConnectionsAtOnce == 1)
         let session = try fixture.center.session(for: fixture.key)
         fixture.center.disconnect(fixture.key)

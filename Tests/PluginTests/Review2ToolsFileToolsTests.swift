@@ -22,18 +22,22 @@ import Testing
     }
 
     func run(
-        asking answer: ExistingFileChoice = .overwrite, cancel: CancellationFlag = CancellationFlag(),
+        asking answer: ExistingFileChoice = .overwrite,
+        cancel: CancellationFlag = CancellationFlag(),
         cancelOnAsk: Int? = nil
     ) -> ToolRun {
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var asked = 0
         return ToolRun(
-            fileSystems: registry, cancellation: cancel, report: { _ in },
+            fileSystems: registry,
+            cancellation: cancel,
+            report: { _ in },
             askExisting: { _ in
                 asked += 1
                 if asked == cancelOnAsk { cancel.cancel() }
                 return answer
-            })
+            }
+        )
     }
 
     func names(_ folder: String) -> [String] {
@@ -82,11 +86,12 @@ import Testing
         try box.file("#notes.txt", "one")
         try box.file(";x.txt", "two")
         try box.file("ok.txt", "three")
-        let entries = try ["#notes.txt", ";x.txt", "ok.txt"].map { name -> (name: String, digest: [UInt8]) in
-            let hasher = CRC32Hasher()
-            hasher.update(try Data(contentsOf: box.url(name)))
-            return (name, hasher.finish())
-        }
+        let entries = try ["#notes.txt", ";x.txt", "ok.txt"]
+            .map { name -> (name: String, digest: [UInt8]) in
+                let hasher = CRC32Hasher()
+                hasher.update(try Data(contentsOf: box.url(name)))
+                return (name, hasher.finish())
+            }
         let data = ChecksumFile.contents(entries, method: .crc32, unixFormat: true, byteOrderMark: false)
         try data.write(to: box.url("set.sfv"))
         #expect(try ChecksumRun.verify(checksumFiles: [item("set.sfv")], run: run()).count(.ok) == 3)
@@ -110,13 +115,15 @@ import Testing
         // An SFV file cannot hold such a name, and says so instead of writing a broken file.
         #expect(throws: ToolError.self) {
             try ChecksumRun.create(
-                for: [item(name)], target: box.url("out.sfv"),
+                for: [item(name)],
+                target: box.url("out.sfv"),
                 options: {
                     var o = ChecksumRun.CreateOptions()
                     o.method = .crc32
                     return o
                 }(),
-                run: run())
+                run: run()
+            )
         }
         #expect(!box.exists("out.sfv"))
     }
@@ -164,7 +171,12 @@ import Testing
         try box.folder("enc")
         try box.folder("dec")
         let written = try Encoder.encode(
-            item("data.bin"), into: box.url("enc"), method: .mime, linesPerFile: 20, run: run())
+            item("data.bin"),
+            into: box.url("enc"),
+            method: .mime,
+            linesPerFile: 20,
+            run: run()
+        )
         #expect(written.count > 1)
         let outcome = try Decoder.decodeChecked(registry.item(at: written[0])!, into: box.url("dec"), run: run())
         #expect(outcome.problems.isEmpty)
@@ -219,7 +231,8 @@ import Testing
         hasher.update(Data(content))
         let header = Array("=ybegin line=128 size=\(content.count) name=f.bin\r\n".utf8)
         let footer = Array(
-            "\r\n=yend size=\(size ?? content.count) crc32=\(String(format: "%08x", crc ?? hasher.checksum))\r\n".utf8)
+            "\r\n=yend size=\(size ?? content.count) crc32=\(String(format: "%08x", crc ?? hasher.checksum))\r\n".utf8
+        )
         return header + body + footer
     }
 
@@ -248,7 +261,8 @@ import Testing
         let outcome = try Decoder.decodeChecked(item("evil.uue"), into: box.url("target/inner"), run: run())
         #expect(
             outcome.files.count == 1
-                && outcome.files[0].deletingLastPathComponent().path == box.url("target/inner").path)
+                && outcome.files[0].deletingLastPathComponent().path == box.url("target/inner").path
+        )
         #expect(names("target") == ["inner"])
 
         // The same for the name a .crc file gives to the combined file.
@@ -267,11 +281,16 @@ import Testing
         let cancel = CancellationFlag()
         #expect(throws: ToolError.cancelled) {
             try Splitter.split(
-                item("data.bin"), into: box.url("out"), partSize: 1_000, run: run(cancel: cancel, cancelOnAsk: 2))
+                item("data.bin"),
+                into: box.url("out"),
+                partSize: 1_000,
+                run: run(cancel: cancel, cancelOnAsk: 2)
+            )
         }
         #expect(
             box.read("out/data.001") == "old one" && box.read("out/data.002") == "old two"
-                && box.read("out/data.crc") == "old crc")
+                && box.read("out/data.crc") == "old crc"
+        )
         #expect(names("out") == ["data.001", "data.002", "data.crc"])
         // Without the cancel they are replaced, all together.
         _ = try Splitter.split(item("data.bin"), into: box.url("out"), partSize: 1_000, run: run())
@@ -287,7 +306,11 @@ import Testing
         let cancel = CancellationFlag()
         #expect(throws: ToolError.cancelled) {
             try Encoder.encode(
-                item("data.bin"), into: box.url("out"), method: .mime, run: run(cancel: cancel, cancelOnAsk: 1))
+                item("data.bin"),
+                into: box.url("out"),
+                method: .mime,
+                run: run(cancel: cancel, cancelOnAsk: 1)
+            )
         }
         #expect(box.read("out/data.b64") == "old" && names("out") == ["data.b64"])
     }
@@ -322,7 +345,8 @@ import Testing
         #expect(ToolRun.isSameFile(box.url("alias/X.crc"), box.url("real/X.crc")))
         #expect(
             ToolRun.isSameFile(box.url("real/x.CRC"), box.url("real/X.crc"))
-                == (FileManager.default.fileExists(atPath: box.url("real/x.CRC").path)))
+                == (FileManager.default.fileExists(atPath: box.url("real/x.CRC").path))
+        )
         #expect(!ToolRun.isSameFile(box.url("real/other"), box.url("real/X.crc")))
         // Splitting a part of its own series in place is refused through a link as well.
         try box.file("real/data.001", "abc")
@@ -336,7 +360,12 @@ import Testing
         try Data(repeating: 3, count: 500).write(to: box.url("data.bin"))
         try box.folder("out")
         let written = try Encoder.encode(
-            item("data.bin"), into: box.url("out"), method: .uue, linesPerFile: 999_999_999_999_999_999, run: run())
+            item("data.bin"),
+            into: box.url("out"),
+            method: .uue,
+            linesPerFile: 999_999_999_999_999_999,
+            run: run()
+        )
         #expect(written.count == 1)
     }
 
@@ -352,7 +381,8 @@ import Testing
                     entered.signal()
                     held.wait()
                 }
-            })
+            }
+        )
         let first = Thread { run.advance(10, force: true) }
         first.start()
         entered.wait()
@@ -360,9 +390,10 @@ import Testing
         let group = DispatchGroup()
         for _ in 0..<3 {
             group.enter()
-            DispatchQueue.global().async {
-                Thread.sleep(forTimeInterval: 0.08)
-                run.advance(1)
+            // Each one's report is due (forced): a report that is not due does not wait for the turn, and whether
+            // one is due by the clock depended on how far apart the system started the threads.
+            OtherThread.start {
+                run.advance(1, force: true)
                 _ = finished.add()
                 group.leave()
             }

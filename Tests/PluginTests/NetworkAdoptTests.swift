@@ -298,23 +298,21 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
                 withDestinationURL: fixture.box.url("srv/d")
             )
         }
+        // Time stands still for the session and for what the file system remembers: the background work does not
+        // give up on the links (it would after 20 s), and the remembered listing does not age (it would after 10 s).
+        let now = Date()
+        fixture.environment.clock = { now }
+        let fileSystem = RemoteFileSystem(scheme: "ftp", center: fixture.center) { now }
         // The listing is remembered by the file system, with some links not resolved yet.
-        let stored = Date()
-        let listed = try fixture.fileSystem.list(fixture.url("/"), showHidden: false).filter(\.isSymlink)
+        let listed = try fileSystem.list(fixture.url("/"), showHidden: false).filter(\.isSymlink)
         #expect(listed.count == 40 && listed.filter(\.isDirectory).count < 40)
-        // The server has been asked about every link once the background work is through. That
-        // work gives up after a while (20 s); on a machine so busy that it did, there is nothing to check.
+        // The server is asked about every link in the background, and the remembered entries say so, too.
         func asked() -> Int { Set(fixture.server.commands.filter { $0.hasPrefix("CWD /link") }).count }
-        guard adoptWait(until: { asked() == 40 }) else {
-            try Test.cancel("the background work did not get through in time")
-        }
-        // A moment later the remembered entries say so, too. After the lifetime of a remembered
-        // listing the file system asks the server again, which would prove nothing about them.
+        #expect(adoptWait(until: { asked() == 40 }))
         func allFolders() -> Bool {
-            (0..<40).allSatisfy { fixture.fileSystem.item(at: fixture.url("/link\($0)"))?.isDirectory == true }
+            (0..<40).allSatisfy { fileSystem.item(at: fixture.url("/link\($0)"))?.isDirectory == true }
         }
-        let patched = adoptWait(max(0, 8 - Date().timeIntervalSince(stored)), until: allFolders)
-        if Date().timeIntervalSince(stored) < 9 { #expect(patched) }
+        #expect(adoptWait(until: allFolders))
     }
 
     @Test func aServerThatWantsTheTLSSessionReusedGetsAnUnderstandableError() {

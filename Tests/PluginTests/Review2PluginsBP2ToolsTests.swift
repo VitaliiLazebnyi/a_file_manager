@@ -25,7 +25,7 @@ import Testing
         try #require(registry.item(at: box.url(path)))
     }
 
-    func run() -> ToolRun {
+    nonisolated func run() -> ToolRun {
         ToolRun(
             fileSystems: registry,
             cancellation: CancellationFlag(),
@@ -90,7 +90,8 @@ import Testing
         #expect(one.finish() == two.finish())
     }
 
-    @Test func manyFilesAreHashedToTheSameDigestsAsOneByOne() throws {
+    /// Off the main thread: making and hashing 40 files takes seconds, which other tests waited for when it ran there.
+    @Test nonisolated func manyFilesAreHashedToTheSameDigestsAsOneByOne() throws {
         // More files than cores, and a few larger than the blocks BLAKE3 spreads.
         var files: [(url: URL, methods: [ChecksumMethod])] = []
         var expected: [[[UInt8]]] = []
