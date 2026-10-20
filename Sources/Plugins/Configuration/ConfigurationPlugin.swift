@@ -62,8 +62,13 @@ public final class ConfigurationPlugin: Plugin {
     /// The keys of the values the program itself stored in the macOS preferences. Only the
     /// real settings store is listed this way; any other store has no list of its keys.
     static func storedKeys(of settings: any SettingsStore) -> [String] {
+        storedKeys(of: settings, domain: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName)
+    }
+
+    /// The same, with the preferences kept in `domain` (the program's own is named by its
+    /// bundle identifier); nothing is listed before anything was stored there.
+    internal static func storedKeys(of settings: any SettingsStore, domain: String) -> [String] {
         guard settings is UserDefaultsSettings else { return [] }
-        let domain = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
         return storedKeys(in: UserDefaults.standard.persistentDomain(forName: domain) ?? [:])
     }
 

@@ -19,9 +19,9 @@ internal struct ConfigurationEffects {
         runModal: { _ = NSApp.runModal(for: $0) },
         stopModal: { NSApp.stopModal() },
         chooseSettingsFile: { saving, productName in Self.filePanel(saving: saving, productName) },
-        showAbout: { NSApp?.orderFrontStandardAboutPanel(nil) },
-        mainMenu: { NSApp?.mainMenu },
-        windows: { NSApp?.windows ?? [] },
+        showAbout: { NSApp.orderFrontStandardAboutPanel(nil) },
+        mainMenu: { NSApp.mainMenu },
+        windows: { NSApp.windows },
         pasteboard: .general,
         monitorKeys: { NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: $0) },
         removeKeyMonitor: { NSEvent.removeMonitor($0) }
