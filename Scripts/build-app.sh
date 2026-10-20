@@ -22,7 +22,10 @@ entitlements="Resources/AFileManager.entitlements"
 configuration="${AFM_CONFIGURATION:-release}"
 flags=(-c "$configuration" --scratch-path "$scratch")
 if [ "${AFM_COVERAGE:-0}" = "1" ]; then
-    flags+=(-Xswiftc -profile-generate -Xswiftc -profile-coverage-mapping)
+    # Atomic counters, as in the unit tests' coverage run (Scripts/check.sh test): the program counts
+    # on several threads.
+    flags+=(-Xswiftc -profile-generate -Xswiftc -profile-coverage-mapping
+        -Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all)
 fi
 
 plutil -lint Resources/Info.plist "$entitlements" >/dev/null

@@ -782,7 +782,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         row: Int,
         dropOperation _: NSTableView.DropOperation
     ) -> Bool {
-        let rows = (info.draggingPasteboard.pasteboardItems ?? [])
+        // The rows come from this table's own drag, whose pasteboard always holds its items.
+        // swiftlint:disable:next force_unwrapping
+        let rows = info.draggingPasteboard.pasteboardItems!
             .compactMap {
                 $0.string(forType: Self.rowType).flatMap(Int.init)
             }

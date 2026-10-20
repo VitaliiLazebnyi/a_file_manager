@@ -29,7 +29,9 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: local.a-file-manager.uitests.runner
+        # Not ".runner": the container of that one was taken over by a runner signed with a
+        # certificate once (2026-10-21), and the program may no longer read the test folders in it.
+        PRODUCT_BUNDLE_IDENTIFIER: local.a-file-manager.uitests.tests
 schemes:
   AFileManagerUITests:
     build:

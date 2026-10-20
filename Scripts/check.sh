@@ -211,7 +211,10 @@ for gate in "${gates[@]}"; do
       step "tests with coverage"
       mkdir -p .build
       # A bundle that ends early (a crash, or a stopped main run loop: exit 0) must fail the gate too.
-      swift test --enable-code-coverage 2>&1 | tee .build/test-run.log
+      # Atomic counters (owner's decision, 2026-10-21): Swift Testing runs a bundle's tests on several
+      # threads, and plain counters both lose counts and wrap below zero, so a region that ran can read 0.
+      swift test --enable-code-coverage -Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all \
+        2>&1 | tee .build/test-run.log
       python3 Scripts/test-run-check.py .build/test-run.log
       python3 Scripts/coverage-gate.py
       ;;

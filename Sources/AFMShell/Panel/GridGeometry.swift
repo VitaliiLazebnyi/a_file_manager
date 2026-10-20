@@ -113,8 +113,10 @@ internal struct GridGeometry: Equatable {
         let (start, end) =
             flow == .columns
             ? (rect.minX / cell.width, rect.maxX / cell.width) : (rect.minY / cell.height, rect.maxY / cell.height)
-        let first = min(max(Int(start.rounded(.down)), 0), lines)
-        let last = min(max(Int(end.rounded(.up)), first), lines)
+        // Kept in range before it is a whole number: the visible rectangle of a view in no window
+        // reaches to the ends of the floating-point numbers, far past what an Int holds.
+        let first = Int(min(max(start.rounded(.down), 0), CGFloat(lines)))
+        let last = Int(min(max(end.rounded(.up), CGFloat(first)), CGFloat(lines)))
         return min(first * perLine, cellCount)..<min(last * perLine, cellCount)
     }
 

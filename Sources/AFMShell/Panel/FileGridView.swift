@@ -34,7 +34,8 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
         }
     }
 
-    private var flow = GridGeometry.Flow.columns
+    /// The order the cells are laid out in: Brief or Thumbnails.
+    internal private(set) var flow = GridGeometry.Flow.columns
     /// The width of the widest of the longest names, measured when the list was last taken from
     /// the model; nil until measured.
     private var widestName: CGFloat?
@@ -42,6 +43,10 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
     private var pressed: (point: NSPoint, row: Int)?
     /// The click under way is a second click on the cursor item (`isRenameClick`).
     private var renameOnRelease = false
+    /// What the accessibility elements of the cells show; nil when they are to be made again.
+    internal var accessibleCells: AccessibleCells?
+    /// The accessibility elements of the cells on screen, by row.
+    internal var cellElements: [Int: NSAccessibilityElement] = [:]
 
     /// Drawn from the top down.
     override internal var isFlipped: Bool { true }
@@ -61,6 +66,7 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
     internal func reload(flow: GridGeometry.Flow) {
         self.flow = flow
         widestName = nil
+        accessibleCells = nil
         layOut()
         needsDisplay = true
     }
@@ -139,18 +145,6 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
         geometry.index(at: point) ?? -1
     }
 
-    /// Where the name of a row is drawn, for the in-place name editor.
-    internal func nameFrame(ofRow row: Int) -> NSRect {
-        let frame = geometry.frame(of: row)
-        switch flow {
-        case .columns:
-            return NSRect(x: frame.minX + 22, y: frame.minY, width: frame.width - 24, height: frame.height)
-
-        case .rows:
-            return NSRect(x: frame.minX + 2, y: frame.maxY - 36, width: frame.width - 4, height: 20)
-        }
-    }
-
     // MARK: Drawing
 
     /// The cells in `dirtyRect`: the cursor bar, the icon or picture and the name, and the frame
@@ -159,6 +153,7 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
         guard let panel, let model else {
             return
         }
+        updateAccessibilityCells(of: model)
         if dropRow == -1 {
             CursorBar.drawDropFrame(in: visibleRect)
         }
@@ -219,6 +214,24 @@ internal final class FileGridView: NSView, NSUserInterfaceValidations {
     /// Cmd+A arrives as the standard editing action: the panel's Select All command.
     override internal func selectAll(_: Any?) {
         panel?.perform(.selectAll)
+    }
+
+    // MARK: Accessibility
+
+    /// The cell under a point of the screen (VoiceOver, the UI tests); the list itself on empty
+    /// space, and while it is in no window.
+    ///
+    /// AppKit asks on the main thread, though the method is not marked so; the answer stays on
+    /// it (`Handover` only carries it out of the isolated block).
+    override internal func accessibilityHitTest(_ point: NSPoint) -> Any? {
+        MainActor.assumeIsolated {
+            guard let window else {
+                return Handover<Any>(self)
+            }
+            let row = row(at: convert(window.convertPoint(fromScreen: point), from: nil))
+            return Handover<Any>(cellElements[row] ?? self)
+        }
+        .value
     }
 
     // MARK: Mouse

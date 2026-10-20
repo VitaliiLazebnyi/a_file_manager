@@ -24,7 +24,8 @@ internal struct PanelTabsTests {
     }
 
     /// A closed tab takes with it what was under way for it: whoever waited for its reading hears
-    /// of it, its timers stop, its calculations, filterings and questions are cancelled.
+    /// of it, its timers stop, its calculations, filterings and questions are cancelled, and a
+    /// change it had still to read is forgotten.
     @Test
     internal func whatBelongsToAClosedTabGoesWithIt() async {
         let app = await start()
@@ -41,10 +42,11 @@ internal struct PanelTabsTests {
         panel.sizeCalculations[id] = size
         panel.filterJobs[id] = 7
         panel.volumeAsking[id] = volume
+        panel.dirty[id] = [closing.directory.locationKey]
         #expect(panel.tabs.closeTab(at: 0))
         #expect(heard.sorted() == ["timer stopped", "told"] && size.isCancelled && volume.isCancelled)
         #expect(panel.sizeCalculations[id] == nil && panel.filterJobs[id] == nil && panel.volumeAsking[id] == nil)
-        #expect(panel.rereadTimers[id] == nil && panel.waitingCompletions[id] == nil)
+        #expect(panel.rereadTimers[id] == nil && panel.waitingCompletions[id] == nil && panel.dirty[id] == nil)
     }
 
     /// Tabs and lists that change before the panel is on screen are drawn when it is.

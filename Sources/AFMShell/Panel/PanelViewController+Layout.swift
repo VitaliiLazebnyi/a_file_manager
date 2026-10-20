@@ -97,6 +97,10 @@ extension PanelViewController {
         let gridScroll = NSScrollView()
         gridView.panel = self
         gridView.registerForDraggedTypes(PanelDrop.acceptedTypes)
+        // A list, like the table of the Full view; its cells are its children
+        // (`FileGridView.updateAccessibilityCells`).
+        gridView.setAccessibilityElement(true)
+        gridView.setAccessibilityRole(.list)
         gridView.setAccessibilityLabel("File list")
         gridScroll.documentView = gridView
         gridScroll.hasVerticalScroller = true

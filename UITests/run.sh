@@ -26,9 +26,12 @@ forget_settings() {
 }
 
 # Built like the unit tests are for `swift test --enable-code-coverage` (debug, the same
-# compiler flags), so the counts can be merged with theirs.
+# compiler flags), so the counts can be merged with theirs. The program is signed with an
+# identity that stays from build to build (UITests/identity.sh), so the permission to control
+# Finder, given once, stays too (the runner stays ad hoc: see UITests/project.yml).
+identity=$(UITests/identity.sh)
 AFM_BUILD_DIR="$out/build" AFM_APP_DIR="$out/app" AFM_CONFIGURATION=debug AFM_COVERAGE=1 \
-    AFM_BUNDLE_ID="$bundle_id" Scripts/build-app.sh
+    AFM_BUNDLE_ID="$bundle_id" CODESIGN_IDENTITY="$identity" Scripts/build-app.sh
 xcodegen generate --quiet --spec UITests/project.yml
 
 rm -rf "$out/codecov" "$out/results.xcresult"

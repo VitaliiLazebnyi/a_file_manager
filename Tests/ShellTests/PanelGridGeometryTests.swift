@@ -29,6 +29,8 @@ internal struct PanelGridGeometryTests {
         #expect(grid.index(at: CGPoint(x: 450, y: 45)) == 22 && grid.index(at: CGPoint(x: -1, y: 5)) == nil)
         #expect(grid.indexes(in: CGRect(x: 120, y: 0, width: 100, height: 105)) == 5..<15)
         #expect(grid.indexes(in: CGRect(x: 420, y: 0, width: 500, height: 105)) == 20..<23)
+        // The visible rectangle of a view in no window: every cell.
+        #expect(grid.indexes(in: .infinite) == 0..<23)
         #expect(grid.pageSize == 9)
     }
 

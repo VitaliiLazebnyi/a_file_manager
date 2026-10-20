@@ -237,12 +237,13 @@ final class TLSSettings: @unchecked Sendable {
         SecTrustSetPolicies(trust, SecPolicyCreateSSL(true, host as CFString))
         var error: CFError?
         if SecTrustEvaluateWithError(trust, &error) { return true }
-        // A failed evaluation always says why, and a chain starts with the server's own
-        // certificate; were either missing, the chain is refused without a question.
-        guard let error, let leaf = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])?.first else {
-            return false
-        }
-        let info = CertificateInfo(leaf: leaf, problem: CFErrorCopyDescription(error) as String)
+        // A failed evaluation always says why (`SecTrustEvaluateWithError` sets the error whenever
+        // it returns false), and the chain of an evaluated trust is never empty: it starts with
+        // the server's own certificate, the one the trust was made with.
+        // swiftlint:disable:next force_unwrapping
+        let leaf = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])!.first!
+        // swiftlint:disable:next force_unwrapping
+        let info = CertificateInfo(leaf: leaf, problem: CFErrorCopyDescription(error!) as String)
         if self.trust.isAccepted(info.fingerprint, for: host) { return true }
         rejected = info
         return false
@@ -441,7 +442,9 @@ final class NetStream: @unchecked Sendable {
             framer[FTPAuthTLSFramer.reportKey] = report
             parameters.defaultProtocolStack.applicationProtocols.insert(framer, at: 0)
         }
-        let endpointPort = NWEndpoint.Port(rawValue: UInt16(clamping: port)) ?? .any
+        // Every 16-bit number is a port (0 is "any"), so a port always comes out.
+        // swiftlint:disable:next force_unwrapping
+        let endpointPort = NWEndpoint.Port(rawValue: UInt16(clamping: port))!
         connection = NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: parameters)
     }
 
