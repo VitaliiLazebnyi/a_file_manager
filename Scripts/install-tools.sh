@@ -18,7 +18,7 @@ arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta 
 [[ -x "$HOME/.afm-tools/bin/muter" ]] || "$(dirname "$0")/build-muter.sh"
 
 command -v prettier >/dev/null || npm install --global --silent prettier@3
-command -v jscpd >/dev/null || npm install --global --silent jscpd@4
+command -v jscpd >/dev/null || npm install --global --silent jscpd@5
 # Homebrew's "lizard" is a compressor; the complexity analyser comes from PyPI.
 if ! { command -v lizard >/dev/null && lizard --version 2>/dev/null | grep -qE '^1\.'; }; then
   pipx install --force lizard
