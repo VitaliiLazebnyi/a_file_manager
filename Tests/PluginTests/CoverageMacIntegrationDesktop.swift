@@ -130,22 +130,10 @@ internal struct CoverageMacIntegrationDesktop {
         #expect(panel.calls.suffix(2) == ["show", "close"])
     }
 
-    /// Lets the main run loop run until `condition` holds; false after `Wait.ceiling`.
-    private func spin(until condition: () -> Bool) -> Bool {
-        let end = Date(timeIntervalSinceNow: Wait.ceiling)
-        while !condition() {
-            guard Date() < end else {
-                return false
-            }
-            RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
-        }
-        return true
-    }
-
     /// A very long marked list is followed from the background; an answer that comes when the
     /// panel has been closed meanwhile is dropped.
     @Test
-    internal func longMarkedListsAreFollowedFromTheBackground() throws {
+    internal func longMarkedListsAreFollowedFromTheBackground() async throws {
         for index in 0...MacIntegrationPlugin.backgroundListThreshold { try box.file("A/many/f\(index).txt") }
         left.show(box.url("A/many"))
         left.moveCursor(toName: "f0.txt")
@@ -153,13 +141,13 @@ internal struct CoverageMacIntegrationDesktop {
         commands.perform(MacIntegrationPlugin.quickLook)
         left.model.selectAll()
         bench.kernel.panelEvents.post(.selectionChanged, from: left)
-        #expect(spin { panel.calls == ["show", "reload"] })
+        #expect(await RunLoopWait.until { panel.calls == ["show", "reload"] })
         left.model.setSelected(false, names: ["f0.txt"])
         bench.kernel.panelEvents.post(.selectionChanged, from: left)
         panel.close()
         // The answer asks whether the panel is still open, finds it closed and is dropped.
         let asked = panel.visibilityQuestions
-        #expect(spin { panel.visibilityQuestions > asked })
+        #expect(await RunLoopWait.until { panel.visibilityQuestions > asked })
         #expect(panel.calls == ["show", "reload", "close"])
     }
 

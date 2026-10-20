@@ -41,20 +41,6 @@ internal struct CoverageSelectionBackground {
         )
     }
 
-    /// Lets the main thread run what was handed to it, one pass of its run loop at a time,
-    /// doing `between` before each pass, until `condition` holds; false after `Wait.ceiling`.
-    private func pass(until condition: () -> Bool, between: (() -> Void)? = nil) -> Bool {
-        let end = Date(timeIntervalSinceNow: Wait.ceiling)
-        while !condition() {
-            guard Date() < end else {
-                return false
-            }
-            between?()
-            RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.001))
-        }
-        return true
-    }
-
     /// A clipboard too long to be read here is matched in the background.
     @Test
     internal func aLongClipboardIsMatchedInTheBackground() async {
@@ -73,11 +59,11 @@ internal struct CoverageSelectionBackground {
 
     /// A list that changes while Mark Newer works on it is worked on again.
     @Test
-    internal func markNewerStartsAgainWhenAListChanged() {
+    internal func markNewerStartsAgainWhenAListChanged() async {
         commands.perform(Ids.markNewerHideSame)
         memory.addFile("/A/later.txt", "later")
         left.reload()
-        #expect(pass { commands.isChecked(Ids.markNewerHideSame) })
+        #expect(await RunLoopWait.until { commands.isChecked(Ids.markNewerHideSame) })
         #expect(left.model.selection == ["later.txt", "new.txt"] && left.names == ["later.txt", "new.txt"])
     }
 
@@ -85,7 +71,7 @@ internal struct CoverageSelectionBackground {
     /// (The work is held back, and each round changes the list before the work is done: its
     /// result is always for a list the panel no longer shows.)
     @Test
-    internal func aListThatKeepsChangingIsGivenUp() {
+    internal func aListThatKeepsChangingIsGivenUp() async {
         let held = Shared<[@Sendable () -> Void]>([])
         let plugin = SelectionPlugin(pasteboard: scratch.pasteboard)
         plugin.runsWork = { work in held.modify { $0.append(work) } }
@@ -109,7 +95,7 @@ internal struct CoverageSelectionBackground {
             memory.addFile("/A/more\(rounds).txt")
             holding.left.reload()
             work.forEach { $0() }
-            #expect(pass { !held.value.isEmpty || rejected > 0 })
+            #expect(await RunLoopWait.until { !held.value.isEmpty || rejected > 0 })
         }
         #expect(rejected == 1 && rounds == Selections.attempts && held.value.isEmpty)
         #expect(holding.left.model.selection.isEmpty)
@@ -117,17 +103,17 @@ internal struct CoverageSelectionBackground {
 
     /// Mark Newer at the roots names the comparison after the roots.
     @Test
-    internal func markNewerAtTheRoots() {
+    internal func markNewerAtTheRoots() async {
         left.show(memory.url("/"))
         bench.right.show(memory.url("/"))
         commands.perform(Ids.markNewerHideSame)
-        #expect(pass { commands.isChecked(Ids.markNewerHideSame) })
+        #expect(await RunLoopWait.until { commands.isChecked(Ids.markNewerHideSame) })
         #expect(left.model.filter?.title == "Comparison: mem:/*.*")
     }
 
     /// Local folders are asked whether they tell the cases apart.
     @Test
-    internal func localFoldersAreAskedAboutCase() throws {
+    internal func localFoldersAreAskedAboutCase() async throws {
         let box = try Sandbox()
         let time = Date(timeIntervalSince1970: 1_000_000)
         try box.file("L/Photo.JPG", "x", modified: time)
@@ -139,7 +125,7 @@ internal struct CoverageSelectionBackground {
         let folds =
             (try? box.url("L").resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey]))?
             .volumeSupportsCaseSensitiveNames == false
-        #expect(pass { left.model.selection.contains("only.txt") })
+        #expect(await RunLoopWait.until { left.model.selection.contains("only.txt") })
         // On a volume that folds case the two are one file, the same on both sides.
         #expect(left.model.selection.contains("Photo.JPG") != folds)
         #expect(bench.right.model.selection.contains("photo.jpg") != folds)
