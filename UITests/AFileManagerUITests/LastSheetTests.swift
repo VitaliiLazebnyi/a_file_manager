@@ -120,6 +120,27 @@ internal final class LastSheetTests: XCTestCase {
         }
     }
 
+    /// A double click on a command in the modal chooser of Add Command… chooses it: the
+    /// button-bar editor lists it. Cancel keeps the button bar as it was.
+    internal func testADoubleClickOnACommandChoosesIt() throws {
+        let (session, _) = try start()
+        let desktop = UIDesktop(session)
+        desktop.menu("Configuration", "Button Bar…")
+        let options = desktop.window(titled: "Options")
+        Wait.forElement(options)
+        options.buttons["Add Command…"].click()
+        let chooser = desktop.window(titled: "Choose Command")
+        Wait.forElement(chooser)
+        chooser.searchFields.firstMatch.typeText("cm_SysInfo")
+        let rows = chooser.tables.firstMatch.tableRows
+        Wait.until("only System Information is listed") { rows.count == 1 }
+        rows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).doubleClick()
+        Wait.until(chooser, \.exists, is: false)
+        Wait.forElement(options.tables.staticTexts["cm_SysInfo"])
+        options.buttons["Cancel"].click()
+        Wait.until(options, \.exists, is: false)
+    }
+
     /// Set Shortcut… with no command chosen only beeps: it waits for no key.
     internal func testSetShortcutWithoutACommandWaitsForNoKey() throws {
         let (session, _) = try start()
