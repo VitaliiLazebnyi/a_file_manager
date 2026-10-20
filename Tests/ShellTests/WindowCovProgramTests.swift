@@ -142,6 +142,9 @@ internal struct WindowCovProgramTests {
         line.showHistory()
         line.showHistory()
         #expect(line.hasFocus)
+        // The combo box opens its list a moment later, in an event loop of its own: not here,
+        // where that loop would end the test process's own.
+        line.field.cell.map(NSObject.cancelPreviousPerformRequests(withTarget:))
         // Remembering switched off meanwhile: the list is emptied and does not open.
         fixture.settings.set(false, forKey: CommandLineHistory.recordKey)
         line.showHistory()
