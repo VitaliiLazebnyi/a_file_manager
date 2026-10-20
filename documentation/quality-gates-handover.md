@@ -193,18 +193,22 @@ reported every `Sources` finding a second time). The fuzz and stress drivers the
   App Sandbox: the tests can write only in their container and cannot remove preferences themselves.
 - **Waits:** condition-based only (`Wait`), at most 30 s; no fixed pauses.
 - **Permissions** (owner's decision, 2026-10-21): the program may control Finder (Automation; `Finder Info` runs
-  `AppleScript.run`), and the helper **AFM UI Mouse** (`UITests/MouseHelper`, built by `run.sh`) may post mouse events
-  (Accessibility) for the drag from the thumbnail grid, which XCUITest's own drag gestures do not reach (its clicks
-  do). Both are signed with a self-signed certificate "AFM UI Tests" in a keychain of its own
-  (`UITests/identity.sh`, `~/Library/Keychains/afm-uitests.keychain-db`), so a permission given once stays from build
-  to build (an ad-hoc signature changes with every build, and macOS ties a permission to the signature). The test
-  runner stays ad hoc: a runner signed with a certificate gets a protected container, from which the program may no
-  longer read the test folders (`SystemPolicyAppDataDetailed` denied). That happened once to the runner's container
+  `AppleScript.run`), and the helper **AFM UI Mouse** may post mouse and key events (Accessibility). Both are signed
+  with a self-signed certificate "AFM UI Tests" in a keychain of its own (`UITests/identity.sh`,
+  `~/Library/Keychains/afm-uitests.keychain-db`), so a permission given once stays from build to build (an ad-hoc
+  signature changes with every build, and macOS ties a permission to the signature). The test runner stays ad hoc: a
+  runner signed with a certificate gets a protected container, from which the program may no longer read the test
+  folders (`SystemPolicyAppDataDetailed` denied). That happened once to the runner's container
   `local.a-file-manager.uitests.runner`; the runner has been `local.a-file-manager.uitests.tests` since.
-- **Coverage:** the program writes `.build/uitest/codecov/ui-*.profraw` (`LLVM_PROFILE_FILE`), merged into
-  `ui.profdata`. The counts merge with those of `swift test --enable-code-coverage` (same compiler flags, same function
-  hashes; checked: no mismatch warnings, +142 lines). `Scripts/coverage-gate.py` merges `ui.profdata` with the other
-  profiles and passes the program's binary as one more `-object` when a UI run left them.
+- **Checks outside XCUITest** (`UITests/MouseHelper`, run by `run.sh` after the whole suite): in the VM, XCUITest's
+  drag gestures never arrive (its clicks do), and while it drives the desktop it holds back events from anyone else,
+  including the events a process posts to another. So AFM UI Mouse starts the program itself (same settings as
+  `AppSession`, counts into `codecov/`) and posts real events: `drag` drags from the thumbnails of a full folder onto
+  the other panel and waits for the file; `finder-info` presses a key bound to Finder Info for the run and waits for
+  Finder's new window, then closes it. It is started with `open`, so the permission asked is its own.
+- **Finder Info** walks to the item by name through Finder's own references (`FilePropertiesPlugin.finderPath`): on
+  macOS 27 Finder resolves no file path it is handed (`POSIX file`, alias or file URL: "Can't get alias", -1728),
+  while `item "x" of folder "y" of startup disk` works. Found 2026-10-21 by the UI tests.
 - **Brief and Thumbnails views:** the grid is an accessibility list whose children are the cells on screen, named as
   the list writes them, the cursor's selected (`FileGridView+Accessibility.swift`).
 - **Audit findings (open):** the file lists have no accessibility label; the empty cells of the `[..]` row are static

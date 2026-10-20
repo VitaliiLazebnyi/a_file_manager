@@ -40,7 +40,7 @@ xcodegen generate --quiet --spec UITests/project.yml
 mouse="$out/mouse/AFM UI Mouse.app"
 rm -rf "$mouse"
 mkdir -p "$mouse/Contents/MacOS"
-swiftc -O -framework AppKit -o "$mouse/Contents/MacOS/AFM UI Mouse" UITests/MouseHelper/main.swift
+swiftc -O -framework AppKit -o "$mouse/Contents/MacOS/AFM UI Mouse" UITests/MouseHelper/*.swift
 cat >"$mouse/Contents/Info.plist" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -93,6 +93,32 @@ TEST_RUNNER_AFM_APP="$out/app/A File Manager.app" TEST_RUNNER_AFM_PROFILE_DIR="$
     xcodebuild test -quiet -project UITests/AFileManagerUITests.xcodeproj -scheme AFileManagerUITests \
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "$out/derived" \
     -resultBundlePath "$out/results.xcresult" "$@" || status=$?
+
+# The checks XCUITest cannot make (UITests/MouseHelper), with real mouse and key events: the
+# drag from the thumbnails, on a left folder with enough files to fill them and an empty right
+# one; Finder Info. Only with the whole suite.
+if [[ $# -eq 0 ]]; then
+    desktop="$scratch/desktop"
+    mkdir -p "$desktop/left" "$desktop/right"
+    for index in $(seq 1 300); do : >"$desktop/left/file$index.txt"; done
+    : >"$out/desktop.log"
+    forget_settings
+    open -W -n --stdout "$out/desktop.log" --stderr "$out/desktop.log" "$mouse" --args \
+        drag "$out/app/A File Manager.app" "$out/codecov" "$desktop/left" "$desktop/right"
+    # Finder Info, on a file in a visible folder outside every container (Finder is asked for it).
+    finder="$PWD/build/uitest-finder"
+    rm -rf "$finder"
+    mkdir -p "$finder"
+    printf 'Finder shows this file.\n' >"$finder/finder-info.txt"
+    forget_settings
+    open -W -n --stdout "$out/desktop.log" --stderr "$out/desktop.log" "$mouse" --args \
+        finder-info "$out/app/A File Manager.app" "$out/codecov" "$finder"
+    rm -rf "$finder"
+    cat "$out/desktop.log"
+    grep -q "a file arrived" "$out/desktop.log" || status=1
+    grep -q "Finder showed the Info window" "$out/desktop.log" || status=1
+    if grep -q "stayed open" "$out/desktop.log"; then status=1; fi
+fi
 finish
 
 # The counts of every run of the program, failed tests included.

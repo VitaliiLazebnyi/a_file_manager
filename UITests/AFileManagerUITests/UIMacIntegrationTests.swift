@@ -76,9 +76,9 @@ internal final class UIMacIntegrationTests: XCTestCase {
     /// Finder Info asks Finder, through AppleScript, for the Info window of the item under the
     /// cursor; the test closes it.
     ///
-    /// The item is the Utilities folder in /Applications: in the UI tests Finder's scripting finds
-    /// no item under /Users (nor in the runner's container), whatever its folder. The program needs the
-    /// permission to control Finder (Privacy & Security › Automation); the first run asks.
+    /// The item is the Utilities folder in /Applications, outside the runner's container, whose
+    /// items Finder does not show. The program needs the permission to control Finder (Privacy &
+    /// Security › Automation); the first run asks.
     internal func testFinderInfoShowsFindersInfoWindowOfTheItem() throws {
         let session = try AppSession(leftFiles: [:])
         running = session

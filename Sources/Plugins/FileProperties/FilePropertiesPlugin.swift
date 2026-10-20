@@ -179,13 +179,28 @@ public final class FilePropertiesPlugin: Plugin {
     }
 
     /// The `osascript` arguments that open Finder's Info window of each item.
-    static func finderInfoArguments(_ urls: [URL]) -> [String] {
+    ///
+    /// Finder is handed no path: on some systems it resolves no file path it is given, as an alias
+    /// or a file URL ("Can't get alias", -1728), while its own references always work. So the
+    /// script walks to each item by name, from the disk it is on (`finderPath`).
+    internal static func finderInfoArguments(_ urls: [URL]) -> [String] {
         let script = [
-            "on run paths", "tell application \"Finder\"", "repeat with itemPath in paths",
-            "open information window of ((POSIX file (contents of itemPath)) as alias)", "end repeat", "activate",
-            "end tell", "end run"
+            "on run paths", "set AppleScript's text item delimiters to \":\"", "tell application \"Finder\"",
+            "repeat with itemPath in paths", "set names to rest of text items of (contents of itemPath)",
+            "set found to startup disk",
+            "if (count of names) > 1 and item 1 of names is \"Volumes\" then",
+            "set found to disk (item 2 of names)", "set names to rest of rest of names", "end if",
+            "repeat with itemName in names",
+            "if contents of itemName is not \"\" then set found to item (contents of itemName) of found",
+            "end repeat", "open information window of found", "end repeat", "activate", "end tell", "end run"
         ]
-        return script.flatMap { ["-e", $0] } + urls.map(\.path)
+        return script.flatMap { ["-e", $0] } + urls.map(finderPath)
+    }
+
+    /// An item's path as Finder names it: each name after a `:`, a `:` in a name written `/` (as
+    /// Finder shows it), so the separator is never part of a name; the startup disk is `:`.
+    internal static func finderPath(of url: URL) -> String {
+        ":" + url.pathComponents.dropFirst().map { $0.replacingOccurrences(of: ":", with: "/") }.joined(separator: ":")
     }
 }
 
