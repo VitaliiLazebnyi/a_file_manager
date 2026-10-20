@@ -52,9 +52,10 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
 
     private func buildContent(in window: NSWindow) {
         filter.placeholderString = "Filter"
+        // Return in the filter is the delegate's (`control(_:textView:doCommandBy:)`): the field
+        // sends no action of its own, since a search field sends it while the user types, which
+        // ran the first command of a list that was still being narrowed down.
         filter.delegate = self
-        filter.target = self
-        filter.action = #selector(filterAccepted)
         categories.target = self
         categories.action = #selector(categoryChanged)
         table.onSelect = { [weak self] in self?.updateButtons() }
@@ -144,7 +145,15 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
 
     func controlTextDidChange(_: Notification) { reload() }
     @objc private func categoryChanged() { reload() }
-    @objc private func filterAccepted() { accept() }
+
+    /// Return in the filter runs (or picks) the selected command; other keys edit the filter.
+    internal func control(_: NSControl, textView _: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard selector == #selector(NSResponder.insertNewline(_:)) else {
+            return false
+        }
+        accept()
+        return true
+    }
 
     // MARK: Actions
 

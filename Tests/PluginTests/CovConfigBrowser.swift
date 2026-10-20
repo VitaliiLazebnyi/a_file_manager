@@ -68,7 +68,7 @@ internal struct CovConfigBrowser {
 
     /// Opened on its own the dialog runs the chosen command and closes; with nothing chosen it beeps.
     @Test
-    internal func onItsOwnItRunsTheChosenCommand() throws {
+    internal func onItsOwnItRunsTheChosenCommand() {
         defer { finish() }
         browser.show()
         #expect(stage.presented.last === browser)
@@ -77,10 +77,29 @@ internal struct CovConfigBrowser {
         press("Run")
         #expect(ran.names == ["cov_beta"])
         type("nothing is called like this")
-        let field = try #require(filter)
-        field.sendAction(field.action, to: field.target)
+        #expect(returnInFilter())
         #expect(stage.beeps == 1)
         press("Cancel")
+    }
+
+    /// Return in the filter as its field editor tells the delegate.
+    private func returnInFilter(_ selector: Selector = #selector(NSResponder.insertNewline(_:))) -> Bool {
+        browser.control(filter ?? NSSearchField(), textView: NSTextView(), doCommandBy: selector)
+    }
+
+    /// Typing a filter only narrows the list: the field sends no action (a search field sends
+    /// its action while the user types, and that ran the first command of the half-narrowed
+    /// list); Return runs the selected command, other keys stay the field's.
+    @Test
+    internal func typingAFilterRunsNothingUntilReturn() throws {
+        defer { finish() }
+        browser.show()
+        let field = try #require(filter)
+        #expect(field.action == nil && field.target == nil)
+        type("cov_")
+        #expect(browser.rows.map(\.id) == ["cov_alpha", "cov_beta"] && ran.names.isEmpty)
+        #expect(!returnInFilter(#selector(NSResponder.moveDown(_:))) && ran.names.isEmpty)
+        #expect(returnInFilter() && ran.names == ["cov_alpha"])
     }
 
     /// The category pop-up limits the list; the user commands are one category, however they came.
