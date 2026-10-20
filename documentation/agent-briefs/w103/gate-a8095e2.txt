@@ -1,0 +1,11 @@
+9 files below 100% (uncovered lines / functions / regions):
+  Sources/AFMShell/Panel/FileGridView+Drop.swift: 3 lines, 1 functions, 1 regions
+  Sources/Plugins/FileProperties/AppleScript.swift: 6 lines, 1 functions, 1 regions
+  Sources/Plugins/FileTools/ChecksumFiles.swift: 2 lines, 2 regions
+  Sources/Plugins/LocalFileSystem/LocalFileSystem.swift: 1 regions
+  Sources/Plugins/MacIntegration/SystemDesktop.swift: 1 lines, 1 regions
+  Sources/Plugins/MacIntegration/SystemPreviewPanel.swift: 2 lines, 1 regions
+  Sources/Plugins/MultiRename/MultiRenameWindowController.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/Network/NetStream.swift: 6 lines, 3 functions, 4 regions
+  Sources/Plugins/Viewer/UI/SystemDialogs.swift: 2 lines, 1 regions
+lines       94536 /   94559   99.98%

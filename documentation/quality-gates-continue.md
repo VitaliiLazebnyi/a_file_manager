@@ -91,7 +91,19 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   real cases kept). `UITests/run.sh` attaches a disk image of its own (`AFM_VOLUME`).
 - Gate at `2cebda6`: the UI tests passed; the unit tests stopped the gate on the flaky
   `AppShellLifetimeTests.aUsedProgramGoesAsWell` (parts not freed in 311 s; about one full run in three).
-- Running: **w108-lifetime** (what holds the program's parts in that test).
+- Merged: **w108-lifetime** (`9e6fb67`): the lifetime tests' parts sat in an autorelease page nothing empties (the run
+  loop releases a block it ran outside any pool; a control dying there autoreleases every live window); a test main-loop
+  pool (`Tests/TestSupport/LifetimeMainLoopPools.swift`) empties it; the command-line edge test cancels the combo box's
+  pending popup, whose event loop ended ShellTests with status 0. `a8095e2`: plugins use `NSApplication.shared` (NSApp
+  traps before the application object exists); `LastTabsTests` without the cache.
+- **Gate at `a8095e2`** (`UITests/run.sh`, then `Scripts/check.sh test`): every test ran and passed (391 / 3,447 / 337,
+  54 UI tests); lines 99.98%, functions 99.96%, regions 99.97%; 9 files below 100%
+  (`documentation/agent-briefs/w103/gate-a8095e2.txt`): the owner's questions and counts that come and go with the
+  non-atomic counters (`ChecksumFiles`, `LocalFileSystem` this run; `Place` the run before).
+- **Waiting for the owner** (nothing else is left): atomic counters for the coverage run; a documented `!` for
+  `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation prompt); the drop on the
+  thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`, `SystemPreviewPanel:20`, `SystemDialogs:31`
+  (millisecond windows: accept, or restructure). Then: lint step 6 and the mutation runs.
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts
