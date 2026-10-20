@@ -288,7 +288,9 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(asked.all.count == 2)
     }
 
-    @Test func theTopOfAServerIsKnownFromTheAddressAlone() {
+    /// Off the main thread: the climb through 3,000 levels takes seconds of a debug build, which other tests waited
+    /// for when it ran there.
+    @Test nonisolated func theTopOfAServerIsKnownFromTheAddressAlone() {
         let center = ConnectionCenter(environment: SessionEnvironment())
         let fs = RemoteFileSystem(scheme: "sftp", center: center)
         let key = ServerKey(scheme: "sftp", host: "files.example.com", port: 2_222)
