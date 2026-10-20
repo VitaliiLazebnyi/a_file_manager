@@ -84,10 +84,15 @@ internal final class AppSession {
     /// The tabs of a panel as the program keeps them (`PanelTabs.State`), in the property-list
     /// form the argument domain reads: `<hex bytes>` is data.
     private static func tabs(at folder: URL) throws -> String {
+        try setting(tabState(at: folder))
+    }
+
+    /// One tab in `folder`, as the program keeps a panel's tabs (`PanelTabs.State`).
+    private static func tabState(at folder: URL) -> [String: Any] {
         let tab: [String: Any] = [
             "location": folder.absoluteString, "sortKey": 0, "descending": false, "showHidden": false
         ]
-        return try setting(["tabs": [tab], "active": 0])
+        return ["tabs": [tab], "active": 0]
     }
 
     /// A setting as the program keeps it (JSON), in the property-list form the argument domain
@@ -109,6 +114,11 @@ internal final class AppSession {
         }
     }
 
+    /// Starts the program with the left panel in `folder` instead of the session's `left`.
+    internal func startLeft(in folder: URL) throws {
+        try pin("left.tabs", to: Self.tabState(at: folder))
+    }
+
     /// Starts the program and returns its main window, once it is there (nil if it never came).
     internal func launch() -> XCUIElement? {
         app.launch()
@@ -117,8 +127,11 @@ internal final class AppSession {
             return nil
         }
         // Where the mouse rests decides what pops up by itself (a tooltip, the window button's
-        // menu, which takes the keys); it goes where nothing does, the empty part of the right list.
-        window.tables.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).hover()
+        // menu, which takes the keys); it goes where nothing does, the empty part of the right list
+        // (the last one: a panel in the Brief or Thumbnails view has no table).
+        let lists = window.tables
+        Wait.forElement(lists.firstMatch)
+        lists.element(boundBy: lists.count - 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).hover()
         return window
     }
 

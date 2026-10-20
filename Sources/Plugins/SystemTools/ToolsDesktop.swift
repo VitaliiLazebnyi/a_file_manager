@@ -32,7 +32,8 @@ internal struct ToolsDesktop: Sendable {
             NSPasteboard.general.setString(text, forType: .string)
         },
         quit: { NSApp.terminate(nil) },
-        minimize: { (NSApp.mainWindow ?? NSApp.windows.first(where: \.isVisible))?.miniaturize(nil) }
+        // The command comes through the main window's responder chain: there is a main window.
+        minimize: { NSApp.mainWindow?.miniaturize(nil) }
     )
 
     /// Nothing outside the program: only harmless lines run, by the plain system shell with the PATH and the
@@ -101,7 +102,7 @@ internal struct ToolsDesktop: Sendable {
     internal var copy: @MainActor @Sendable (String) -> Void
     /// Quits the program (main thread).
     internal var quit: @MainActor @Sendable () -> Void
-    /// Minimizes the program's front window (main thread).
+    /// Minimizes the program's main window, the one the command came from (main thread).
     internal var minimize: @MainActor @Sendable () -> Void
 
     /// The print dialog, as a sheet of `window` or on its own.

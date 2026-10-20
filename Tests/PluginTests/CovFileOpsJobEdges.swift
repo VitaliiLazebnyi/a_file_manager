@@ -204,6 +204,8 @@ internal struct CovFileOpsJobEdges {
             target: TargetSpec(directory: memory.url("/B")),
             fileSystems: fileSystems
         )
+        // One file after the other: side by side, two.txt may fail (and abort) before one.txt is written.
+        job.options.copiesSmallFilesInParallel = false
         job.delegate = answers
         #expect(job.run().cancelled && disk.base.exists("/A/one.txt") && memory.contents("/B/one.txt") == "1")
     }

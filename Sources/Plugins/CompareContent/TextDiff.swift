@@ -154,8 +154,9 @@ public struct TextDiff: Equatable, Sendable {
         cancellation: CancellationFlag?,
         hashes: @Sendable ([TextLine]) -> [UInt64]
     ) -> Self {
-        let keys = Parallel.map([left, right]) { hashes($0) }
-        let (leftKeys, rightKeys) = (keys[0], keys[1])
+        // One side after the other: a long side is spread over all cores by itself, and a
+        // short one costs little.
+        let (leftKeys, rightKeys) = (hashes(left), hashes(right))
         var rows: [DiffRow] = []
         rows.reserveCapacity(max(left.count, right.count))
 
