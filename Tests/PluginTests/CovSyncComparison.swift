@@ -82,7 +82,7 @@ internal struct CovSyncComparison {
 
     /// A file that cannot be read while the comparison is cancelled is no error: the pair stays open.
     @Test
-    internal func aReadStoppedByTheCancelIsNoError() async {
+    internal func aReadStoppedByTheCancelIsNoError() throws {
         memory.addFile("/L/a.txt", "same size")
         memory.addFile("/R/a.txt", "same size")
         memory.stallsReads = true
@@ -90,10 +90,12 @@ internal struct CovSyncComparison {
         options.byContent = true
         let comparison = SyncComparison(options: options, fileSystems: fileSystems)
         let (left, right) = (memory.url("/L"), memory.url("/R"))
-        let running = Task.detached { comparison.run(left: left, right: right) }
+        // On a thread of its own: the test waits for it without needing a thread of the pool it holds.
+        let running = Signal<SyncResult>()
+        OtherThread.start { running.set(comparison.run(left: left, right: right)) }
         #expect(Wait.until { memory.stalledTransfers > 0 })
         comparison.cancellation.cancel()
-        let result = await running.value
+        let result = try #require(running.wait())
         #expect(result.errors.isEmpty && result.rows.first?.state == .pending)
     }
 }
