@@ -219,8 +219,7 @@ internal enum FileListColumn: String {
     /// file may be asked for its own icon).
     ///
     /// Only what differs from what the cell shows is set, so filling a cell that is up to date
-    /// costs a few comparisons and no drawing. An empty cell (as most of the `[..]` row's are) is
-    /// no element of its own to the accessibility interface: it says nothing.
+    /// costs a few comparisons and no drawing.
     internal func fill(_ cell: NSTableCellView, with look: RowLook) {
         let item = look.item
         if let field = cell.textField {
@@ -230,9 +229,6 @@ internal enum FileListColumn: String {
             }
             if field.textColor != look.color {
                 field.textColor = look.color
-            }
-            if field.isAccessibilityElement() == text.isEmpty {
-                field.setAccessibilityElement(!text.isEmpty)
             }
         }
         guard self == .name, let imageView = cell.imageView else {
@@ -259,11 +255,17 @@ internal enum FileListColumn: String {
         cell.identifier = identifier
         let label = NSTextField(labelWithString: "")
         label.lineBreakMode = self == .name ? .byTruncatingMiddle : .byTruncatingTail
+        // The permissions are mostly dashes, strokes too thin at the regular weight to stand out
+        // enough from the row behind them (the accessibility audit's contrast check).
         label.font =
             self == .name || self == .ext
-            ? .systemFont(ofSize: 12) : .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+            ? .systemFont(ofSize: 12)
+            : .monospacedDigitSystemFont(ofSize: 12, weight: self == .attr ? .medium : .regular)
         label.alignment = self == .size ? .right : .left
-        label.setAccessibilityLabel(title)
+        // To the accessibility interface the label's cell is a static text called by the column,
+        // with what it shows as its value (nothing, in most of the `[..]` row's columns): the
+        // label itself is no element, it would have no role.
+        label.cell?.setAccessibilityLabel(title)
         var leading: CGFloat = 0
         if self == .name {
             let icon = NSImageView(frame: NSRect(x: 2, y: (size.height - 16) / 2, width: 16, height: 16))

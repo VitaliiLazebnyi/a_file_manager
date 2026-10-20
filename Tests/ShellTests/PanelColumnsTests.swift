@@ -32,6 +32,13 @@ internal struct PanelColumnsTests {
         return cell?.textField?.stringValue
     }
 
+    /// What the accessibility interface sees of the cell of `column` in `row` of the left panel.
+    private func element(_ app: PanelProgram.Running, _ column: Int, _ row: Int) -> NSCell? {
+        let table = app.left.tableView
+        let cell = app.left.tableView(table, viewFor: table.tableColumns[column], row: row) as? NSTableCellView
+        return cell?.textField?.cell
+    }
+
     /// A row asks for its value and does not wait for it; the value arrives from the background;
     /// the header's menu shows and hides the columns; columns and widths come back with the next
     /// start, for this panel only; the Custom Columns dialog sets the same list.
@@ -50,6 +57,12 @@ internal struct PanelColumnsTests {
         #expect(text(app, 5, 2)?.isEmpty == true && text(app, 5, 0)?.isEmpty == true)
         #expect(await PanelWait.until { app.left.columnValues.working.isEmpty && !app.left.columnValues.hasWaiting })
         #expect(await PanelWait.until { text(app, 5, 2) == "ONE.TXT" })
+        // A plugin's cell is a static text called by its column, not by the one it was made for.
+        let value = element(app, 5, 2)
+        #expect(value?.accessibilityLabel() == "Upper" && value?.accessibilityRole() == .staticText)
+        #expect(
+            value?.accessibilityValue() as? String == "ONE.TXT" && element(app, 5, 0)?.accessibilityLabel() == "Upper"
+        )
         #expect(text(app, 5, 0)?.isEmpty == true && (1...3).contains(probe.callCount) && probe.callsOnMain == 0)
         #expect(text(app, 0, 2) == "one" && text(app, 2, 2) == "3")
         // The header's menu offers the views and the columns.
