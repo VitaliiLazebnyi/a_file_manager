@@ -243,6 +243,26 @@ internal final class PathBarView: NSView {
         menuProvider?()
     }
 
+    /// The bar draws its text itself; to the accessibility interface it is a text of its own.
+    override internal func isAccessibilityElement() -> Bool {
+        true
+    }
+
+    /// A text.
+    override internal func accessibilityRole() -> NSAccessibility.Role? {
+        .staticText
+    }
+
+    /// What the text is.
+    override internal func accessibilityLabel() -> String? {
+        "Current folder"
+    }
+
+    /// The path and the display mask, as shown.
+    override internal func accessibilityValue() -> Any? {
+        text
+    }
+
     /// The segment drawn at `point`, if any.
     private func segment(at point: NSPoint) -> Int? {
         let offset = point.x - textOrigin

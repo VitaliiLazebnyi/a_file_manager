@@ -74,6 +74,16 @@ internal struct PanelPathBarTests {
         #expect(PathBarView.segments(of: "/a", ancestors: ancestors(["/a", "/a"])).count == 1)
     }
 
+    /// The bar draws its text itself, so it tells the accessibility interface the text: a static
+    /// text called Current folder, with the path as it is shown.
+    @Test
+    internal func theBarIsATextToTheAccessibilityInterface() {
+        let bar = PathBarView(frame: NSRect(x: 0, y: 0, width: 400, height: 22))
+        bar.update(text: "/Users/me/*.*", segments: [])
+        #expect(bar.isAccessibilityElement() && bar.accessibilityRole() == .staticText)
+        #expect(bar.accessibilityLabel() == "Current folder" && bar.accessibilityValue() as? String == "/Users/me/*.*")
+    }
+
     /// A click on a part above the folder shown goes there; elsewhere it is a click on the bar.
     @Test
     internal func aClickOnAPartOfThePathGoesThere() {

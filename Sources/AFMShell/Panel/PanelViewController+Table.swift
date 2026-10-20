@@ -134,11 +134,9 @@ extension PanelViewController {
         if field.stringValue != text {
             field.stringValue = text
         }
-        if field.accessibilityLabel() != column.title {
-            field.setAccessibilityLabel(column.title)
-        }
-        if field.isAccessibilityElement() == text.isEmpty {
-            field.setAccessibilityElement(!text.isEmpty)
+        // The cells of all plugin columns are alike: the cell says which column it is in now.
+        if field.cell?.accessibilityLabel() != column.title {
+            field.cell?.setAccessibilityLabel(column.title)
         }
     }
 }

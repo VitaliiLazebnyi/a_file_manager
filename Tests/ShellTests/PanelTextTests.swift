@@ -79,20 +79,28 @@ internal struct PanelTextTests {
         #expect(GridCellPainter.caption(for: item("docs", kind: .directory, size: 0)) == "[docs]")
     }
 
-    /// The cells of the list are called by their column; an empty cell is no element of its
-    /// own, so the interface does not offer a text that says nothing.
+    /// The cells of the list are static texts called by their column, with what they show as
+    /// their value (an empty one says so); the label itself is no element: it would have no role.
     @Test
     internal func theCellsTellTheAccessibilityInterfaceWhatTheyShow() throws {
         let file = item("a.txt", kind: [], size: 7)
         for column in FileListColumn.fullView {
             let cell = column.makeCell()
             let field = try #require(cell.textField)
-            #expect(field.accessibilityLabel() == column.title)
+            let element = try #require(field.cell)
+            #expect(element.accessibilityLabel() == column.title && element.accessibilityRole() == .staticText)
             column.fill(cell, with: RowLook(item: nil, color: .labelColor, ownIcons: false))
-            #expect(field.isAccessibilityElement() == !column.text(for: nil).isEmpty, "\(column) of [..]")
+            #expect(element.accessibilityValue() as? String == column.text(for: nil), "\(column) of [..]")
             column.fill(cell, with: RowLook(item: file, color: .labelColor, ownIcons: false))
-            #expect(field.isAccessibilityElement() == !column.text(for: file).isEmpty, "\(column) of a file")
+            #expect(element.accessibilityValue() as? String == column.text(for: file), "\(column) of a file")
+            #expect(element.isAccessibilityElement() && !field.isAccessibilityElement(), "\(column)")
         }
+        // The dashes of the permissions are drawn heavier than the digits of the other columns.
+        let attr = FileListColumn.attr.makeCell().textField?.font
+        #expect(attr == .monospacedDigitSystemFont(ofSize: 12, weight: .medium))
+        #expect(
+            FileListColumn.date.makeCell().textField?.font == .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        )
         let name = FileListColumn.name.makeCell()
         name.textField?.textColor = .labelColor
         FileListColumn.name.fill(

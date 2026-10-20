@@ -28,8 +28,17 @@ internal final class AccessibilityTests: XCTestCase {
         running = session
         let window = try XCTUnwrap(session.launch(), "no main window")
         Wait.forElement(window.tables.element(boundBy: 0).row(named: "beta"))
-        // The message names the element, which the audit's own message does not.
+        // The audit looks at the screen: a tooltip would cover the lists (the mouse is where
+        // nothing has one, `AppSession.launch`).
+        Wait.until("no tooltip is shown") { !session.app.helpTags.firstMatch.exists }
         try session.app.performAccessibilityAudit { issue in
+            // The Touch Bar element is AppKit's, not the program's: the program makes no touch
+            // bar, the Mac has none, and the element is empty, with nothing the program could
+            // describe (a touch bar has no accessibility label). Only that one finding is let go.
+            if issue.element?.elementType == .touchBar, issue.auditType == .sufficientElementDescription {
+                return true
+            }
+            // The message names the element, which the audit's own message does not.
             let element = issue.element.map { "\($0.elementType) \"\($0.identifier)\" \"\($0.label)\" \($0.frame)" }
             XCTFail("\(issue.compactDescription): \(element ?? "no element"). \(issue.detailedDescription)")
             return true
