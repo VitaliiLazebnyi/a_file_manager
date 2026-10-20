@@ -39,24 +39,23 @@ forget_settings
 # ejecting a drive): the test runner is sandboxed and cannot attach one itself. It is not shown
 # in Finder or on the desktop; it is detached and deleted at the end, whether the tests ejected
 # it or not.
-volume_name="AFM UI Volume"
-image_dir=$(mktemp -d "${TMPDIR:-/tmp}/afm-uitest-volume.XXXXXX")
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/afm-uitest.XXXXXX")
 device=""
 # Called once the tests are done, and on the way out should the script stop before.
 finish() {
     # Only while the disk is still this image's: one the tests ejected may have another by now.
     local images
     images=$(hdiutil info)
-    if [[ -n "$device" && "$images" == *"$(basename "$image_dir")/volume.dmg"* ]]; then
+    if [[ -n "$device" && "$images" == *"$(basename "$scratch")/volume.dmg"* ]]; then
         diskutil eject "$device" >/dev/null || true
     fi
     device=""
-    rm -rf "$image_dir"
+    rm -rf "$scratch"
     forget_settings
 }
 trap finish EXIT
-hdiutil create -quiet -size 16m -fs HFS+ -volname "$volume_name" "$image_dir/volume.dmg"
-attached=$(diskutil image attach --nobrowse "$image_dir/volume.dmg")
+hdiutil create -quiet -size 16m -fs HFS+ -volname "AFM UI Volume" "$scratch/volume.dmg"
+attached=$(diskutil image attach --nobrowse "$scratch/volume.dmg")
 # The first line names the disk, the last one the volume and where it is mounted.
 device=$(head -1 <<<"$attached" | cut -f1 | tr -d '[:space:]')
 volume=$(tail -1 <<<"$attached" | cut -f3)
