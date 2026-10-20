@@ -181,7 +181,9 @@ import Testing
         let box = try Sandbox()
         try box.folder("watched")
         for round in 0..<20 {
-            let watcher = await MainActor.run { local.watch([box.url("watched")]) { _ in } }
+            // Made here, not on the main thread: the watch returns at once from any thread, and twenty turns of a
+            // main thread that every other test wants took this test two minutes of a full run.
+            let watcher = local.watch([box.url("watched")]) { _ in }
             try box.file("watched/\(round).txt")
             try await Task.sleep(nanoseconds: UInt64(round % 4) * 150_000_000)
             withExtendedLifetime(watcher) {}
