@@ -255,7 +255,8 @@ public final class NavigationPlugin: Plugin {
                 work: { _ -> Place? in
                     Self.neighbourPlace(of: current, in: providers.flatMap { $0.places() }, delta: delta)
                 },
-                completion: { place in
+                // The registry is kept until the answer is in: the kernel may have gone by then.
+                completion: { [commands] place in
                     guard let place else { return commands.onRejected() }
                     panel.show(place.url)
                 }

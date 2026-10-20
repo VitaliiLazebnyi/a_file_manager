@@ -246,7 +246,7 @@ final class SystemTools {
             kernel: kernel,
             access: desktop.volumes,
             home: { FileManager.default.homeDirectoryForCurrentUser },
-            note: { [unowned self] in note($0) }
+            note: { [weak self] in self?.note($0) }
         )
     }
 
@@ -435,24 +435,30 @@ final class SystemTools {
         let name = settings.text(SystemToolsPlugin.terminalKey, default: "Terminal")
         let identified = desktop.applicationWithIdentifier
         // (Looking an application up asks the disk: on a thread of the kernel's own.)
-        BlockingCalls.run {
+        BlockingCalls.run { [weak self] in
             let application = Self.application(
                 named: name.trimmingCharacters(in: .whitespaces),
                 identified: identified
             )
-            DispatchQueue.main.async { [self] in
-                guard let application else {
-                    return ui.inform(
-                        "The terminal application \(DisplayText.oneLine(name, limit: 120)) was not found.",
-                        detail: "Choose another one in the configuration.",
-                        style: .warning
-                    )
-                }
-                note("terminal: \(DisplayText.oneLine(directory.path))")
-                // A terminal that is handed a folder opens a window there.
-                desktop.open([directory], application)
-            }
+            // Weak: the plugin may have gone by the time the disk has answered.
+            DispatchQueue.main.async { [weak self] in self?.open(directory, inTerminal: application, named: name) }
         }
+    }
+
+    /// Opens `directory` in the terminal `application` that was looked up, or says that the one
+    /// called `name` was not found.
+    private func open(_ directory: URL, inTerminal application: URL?, named name: String) {
+        guard let application else {
+            ui.inform(
+                "The terminal application \(DisplayText.oneLine(name, limit: 120)) was not found.",
+                detail: "Choose another one in the configuration.",
+                style: .warning
+            )
+            return
+        }
+        note("terminal: \(DisplayText.oneLine(directory.path))")
+        // A terminal that is handed a folder opens a window there.
+        desktop.open([directory], application)
     }
 
     // MARK: System information

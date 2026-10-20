@@ -45,12 +45,23 @@ final class NetworkCommands {
     /// safe on any thread, and without the mark the compiler cannot check them.
     func connectQuestions() {
         // The questions are kept by the environment, which the kernel keeps through the plugin:
-        // they must keep neither.
-        unowned let (kernel, environment) = (self.kernel, center.environment)
+        // they must keep neither. A connection may still ask when the kernel has gone (a test
+        // that ended): weak, and the question is refused then.
+        weak let owner = kernel
+        unowned let environment = center.environment
+        let settings = kernel.settings
+        // `question` asked on the main thread; `refused` once the kernel has gone.
+        @Sendable
+        func ask<Answer: Sendable>(
+            _ refused: Answer,
+            _ question: @escaping @MainActor @Sendable (any UserInteraction) -> Answer
+        ) -> Answer {
+            owner?.askUser(question) ?? refused
+        }
         let store = self.store
         let vault = store.vault
         environment.askCredentials = { profile, message in
-            kernel.askUser { @Sendable ui -> Credentials? in
+            ask(nil) { @Sendable asked -> Credentials? in
                 // The title names the connection, so password managers can fill the dialog in.
                 var fields: [FormField] = [
                     .text("user", "User name:", profile.user ?? ""), .password("password", "Password:")
@@ -61,7 +72,7 @@ final class NetworkCommands {
                 let detail =
                     message.isEmpty
                     ? "User name and password for \(profile.key.description)" : "The server answered: \(message)"
-                guard let answer = ui.form(profile.title, detail: detail, fields: fields, buttons: ["OK"]),
+                guard let answer = asked.form(profile.title, detail: detail, fields: fields, buttons: ["OK"]),
                     !answer.text("user").isEmpty
                 else { return nil }
                 // Stored only once the server has accepted it (`rememberPassword`).
@@ -89,7 +100,7 @@ final class NetworkCommands {
             }
         }
         environment.askToConnect = { profile in
-            kernel.askUser { @Sendable ui -> Bool in
+            ask(false) { @Sendable asked -> Bool in
                 let how =
                     profile.key.scheme == "sftp"
                     ? "A secure shell login as \(profile.user ?? NSUserName()) would be made, with the keys and the configuration of your account."
@@ -101,7 +112,7 @@ final class NetworkCommands {
                     \(how)
                     """
                 // Return is Cancel: nobody asked for this connection.
-                return ui.choose(
+                return asked.choose(
                     "Connect to \(profile.key.description)?",
                     detail: detail,
                     buttons: ["Connect", "Cancel"],
@@ -112,10 +123,10 @@ final class NetworkCommands {
         }
         environment.askToSendPasswordUnprotected = { profile in
             let host = profile.key.host
-            if kernel.settings.value([String].self, forKey: NetworkSettings.unprotectedHosts)?.contains(host) == true {
+            if settings.value([String].self, forKey: NetworkSettings.unprotectedHosts)?.contains(host) == true {
                 return true
             }
-            return kernel.askUser { @Sendable ui -> Bool in
+            return ask(false) { @Sendable asked -> Bool in
                 let detail = """
                     \(profile.key.description) is a plain FTP connection. The password travels unencrypted, \
                     and anyone on the way can read it, and the files.
@@ -123,7 +134,7 @@ final class NetworkCommands {
                     If the server offers it, use FTP over TLS or SFTP instead.
                     """
                 guard
-                    let answer = ui.form(
+                    let answer = asked.form(
                         "Send the password unencrypted?",
                         detail: detail,
                         fields: [.checkbox("always", "Do not ask again for this server", false)],
@@ -131,8 +142,8 @@ final class NetworkCommands {
                     )
                 else { return false }
                 if answer.flag("always") {
-                    let known = kernel.settings.value([String].self, forKey: NetworkSettings.unprotectedHosts) ?? []
-                    kernel.settings.set(
+                    let known = settings.value([String].self, forKey: NetworkSettings.unprotectedHosts) ?? []
+                    settings.set(
                         Array((known.filter { $0 != host } + [host]).suffix(200)),
                         forKey: NetworkSettings.unprotectedHosts
                     )
@@ -141,7 +152,7 @@ final class NetworkCommands {
             }
         }
         environment.askToTrust = { profile, certificate in
-            kernel.askUser { @Sendable ui -> Bool in
+            ask(false) { @Sendable asked -> Bool in
                 let detail = """
                     The certificate was not signed by a trusted party!
                     Continue anyway?
@@ -152,7 +163,7 @@ final class NetworkCommands {
                     \(certificate.problem)
                     """
                 guard
-                    let answer = ui.form(
+                    let answer = asked.form(
                         "SSL",
                         detail: detail,
                         fields: [.checkbox("always", "Always trust this server", false)],
@@ -169,7 +180,7 @@ final class NetworkCommands {
         environment.askToTrustChanged = { profile, certificate, known in
             // Whether the old certificate was accepted for good is read here, on the connecting thread.
             let wasStored = vault.hasTrusted(for: profile.key.host)
-            return kernel.askUser { @Sendable ui -> Bool in
+            return ask(false) { @Sendable asked -> Bool in
                 let detail = """
                     WARNING: THE CERTIFICATE OF THIS SERVER HAS CHANGED.
 
@@ -197,7 +208,7 @@ final class NetworkCommands {
                 ]
                 // Only the ticked box is consent; the button alone, or Return, is not.
                 guard
-                    let answer = ui.form(
+                    let answer = asked.form(
                         "The server's certificate has changed!",
                         detail: detail,
                         fields: fields,
@@ -211,11 +222,11 @@ final class NetworkCommands {
             }
         }
         environment.askSecret = { profile, question, isSecret in
-            kernel.askUser { @Sendable ui -> String? in
+            ask(nil) { @Sendable asked -> String? in
                 if !isSecret {
                     // The secure shell asks to confirm a host key it has not seen.
                     // Return is No: a key is accepted on purpose.
-                    return ui.choose(
+                    return asked.choose(
                         profile.title,
                         detail: question,
                         buttons: ["Yes", "No"],
@@ -224,7 +235,7 @@ final class NetworkCommands {
                     )
                         == 0 ? "yes" : "no"
                 }
-                return ui.form(profile.title, detail: question, fields: [.password("secret", "")], buttons: ["OK"])?
+                return asked.form(profile.title, detail: question, fields: [.password("secret", "")], buttons: ["OK"])?
                     .text("secret")
             }
         }

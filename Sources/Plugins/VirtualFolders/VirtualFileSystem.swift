@@ -97,8 +97,10 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     static let entriesPerBatch = 256
 
     public let scheme = VirtualLocation.scheme
-    /// Unowned: the registry holds this file system.
-    private unowned let fileSystems: FileSystemRegistry
+    /// Weak: the registry holds this file system, whose work (a list prepared in the background,
+    /// a listing, a watcher) can still run after the registry has gone; it then finds no file
+    /// systems.
+    private weak let registry: FileSystemRegistry?
     private let lock = NSLock()
     private var lists: [Int: FileList] = [:]
     /// Ids are numbered from a random start, so the location of a list from an earlier run of
@@ -115,8 +117,11 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     private var walked: [String: [URL]] = [:]
 
     public init(fileSystems: FileSystemRegistry) {
-        self.fileSystems = fileSystems
+        registry = fileSystems
     }
+
+    /// The registry, or an empty one once it has gone.
+    private var fileSystems: FileSystemRegistry { registry ?? FileSystemRegistry() }
 
     private func synchronized<T>(_ body: () throws -> T) rethrows -> T {
         lock.lock()

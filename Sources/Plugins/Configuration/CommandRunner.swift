@@ -404,10 +404,12 @@ final class CommandRunner {
                 generation: call.generation
             )
         )
-        let begin = { [self] in
-            perform(ArraySlice(steps), chain, then: completion)
+        // Weak: the list is written off the main thread, and the plugin may be gone when that is done.
+        let grace = listGrace
+        let begin = { [weak self] in
+            self?.perform(ArraySlice(steps), chain, then: completion)
             // Commands of the program have read the list by now; a started process removes it itself.
-            if !isExternal { removeListFile(listURL, after: listGrace) }
+            if !isExternal { self?.removeListFile(listURL, after: grace) }
         }
         guard let list = expanded.listFile else {
             begin()
@@ -426,12 +428,11 @@ final class CommandRunner {
                     try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: list.url.path)
                 }
             },
-            then: { [self] result in
+            then: { [weak self] result in
                 if case .failure(let error) = result {
-                    return kernel.interaction.report(
-                        error,
-                        title: "The list of files for “\(title)” could not be written"
-                    )
+                    self?.kernel.interaction
+                        .report(error, title: "The list of files for “\(title)” could not be written")
+                    return
                 }
                 begin()
             }

@@ -82,25 +82,37 @@ internal struct CoverageSelectionBackground {
     }
 
     /// A list that keeps changing faster than the work is done is given up after a few tries.
-    /// (Each round changes the list before the main thread takes the next result: the list is
-    /// long, so the work on it is not done before.)
+    /// (The work is held back, and each round changes the list before the work is done: its
+    /// result is always for a list the panel no longer shows.)
     @Test
     internal func aListThatKeepsChangingIsGivenUp() {
-        for index in 0...Selections.longList { memory.addFile("/A/f\(index).bin") }
-        left.reload()
-        var rejected = 0
-        commands.onRejected = { rejected += 1 }
-        commands.perform(.selectGroup, .text("*.txt"))
-        var round = 0
-        let given = pass(
-            until: { rejected > 0 },
-            between: {
-                round += 1
-                memory.addFile("/A/more\(round).txt")
-                left.reload()
-            }
+        let held = Shared<[@Sendable () -> Void]>([])
+        let plugin = SelectionPlugin(pasteboard: scratch.pasteboard)
+        plugin.runsWork = { work in held.modify { $0.append(work) } }
+        let holding = TestBench(
+            plugins: [plugin],
+            fileSystems: [memory],
+            left: memory.url("/A"),
+            right: memory.url("/B")
         )
-        #expect(given && rejected == 1 && left.model.selection.isEmpty)
+        for index in 0...Selections.longList { memory.addFile("/A/f\(index).bin") }
+        holding.left.reload()
+        var rejected = 0
+        holding.commands.onRejected = { rejected += 1 }
+        holding.commands.perform(.selectGroup, .text("*.txt"))
+        var rounds = 0
+        while rejected == 0, rounds < Selections.attempts {
+            let work = held.value
+            held.value = []
+            #expect(work.count == 1)
+            rounds += 1
+            memory.addFile("/A/more\(rounds).txt")
+            holding.left.reload()
+            work.forEach { $0() }
+            #expect(pass { !held.value.isEmpty || rejected > 0 })
+        }
+        #expect(rejected == 1 && rounds == Selections.attempts && held.value.isEmpty)
+        #expect(holding.left.model.selection.isEmpty)
     }
 
     /// Mark Newer at the roots names the comparison after the roots.

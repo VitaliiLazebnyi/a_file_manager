@@ -35,9 +35,12 @@ final class CompareSession {
         case empty, working, ready
     }
 
-    /// Unowned: the kernel owns the plugin, and through it this.
+    /// Unowned: the kernel owns the plugin, and through it this. Read only on the way of a
+    /// request (a command, a click); what comes back later uses the parts taken when it began,
+    /// for the kernel may have gone by then (a window closed, the end of a test).
     unowned let kernel: Kernel
     private let settings: any SettingsStore
+    private let fileSystems: FileSystemRegistry
 
     var leftURL: URL?
     var rightURL: URL?
@@ -93,6 +96,7 @@ final class CompareSession {
     init(kernel: Kernel) {
         self.kernel = kernel
         settings = kernel.settings.scoped(to: CompareSettingsKey.scope)
+        fileSystems = kernel.fileSystems
         options = DiffOptions(
             ignoreCase: settings.flag(CompareSettingsKey.ignoreCase, default: true),
             ignoreRepeatedSpaces: settings.flag(CompareSettingsKey.ignoreSpaces, default: true),
@@ -102,7 +106,6 @@ final class CompareSession {
         bytesPerLine = CompareSettingsKey.bytesPerLineChoices[max(0, min(3, choice))]
     }
 
-    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
     var hasUnsavedChanges: Bool { modified.left || modified.right }
     var canUndo: Bool { !undoStack.isEmpty }
 
@@ -156,6 +159,7 @@ final class CompareSession {
         let (fileSystems, forceBinary, options, bytesPerLine, limits) = (
             self.fileSystems, self.forceBinary, self.options, self.bytesPerLine, self.limits
         )
+        let interaction = kernel.interaction
         background(
             { cancellation in
                 CompareLoader.load(
@@ -196,9 +200,9 @@ final class CompareSession {
                 updateStatus()
                 if let message = result.message {
                     status = message
-                    kernel.interaction.inform("Compare contents", detail: message, style: .warning)
+                    interaction.inform("Compare contents", detail: message, style: .warning)
                 } else if result.isIdentical {
-                    kernel.interaction.inform(
+                    interaction.inform(
                         "Compare contents",
                         detail: "The two files have the same content!",
                         style: .information
@@ -677,6 +681,7 @@ final class CompareSession {
         }
         let fileSystems = self.fileSystems
         let generation = editGeneration
+        let (interaction, panels) = (kernel.interaction, kernel.panels)
         kernel.jobs.run(
             title: "Save",
             work: { [files] monitor -> [Saved] in
@@ -706,7 +711,7 @@ final class CompareSession {
             completion: { [self] results in
                 for saved in results {
                     if let error = saved.error {
-                        kernel.interaction.report(error, title: "\(displayPath(saved.side)) could not be saved.")
+                        interaction.report(error, title: "\(displayPath(saved.side)) could not be saved.")
                     } else {
                         // What was written is now the file on disk, whatever was edited since (a link
                         // is saved where it leads, so this is never the link).
@@ -721,7 +726,7 @@ final class CompareSession {
                         }
                     }
                 }
-                kernel.panels.refresh(files.map { $0.url.deletingLastPathComponent() })
+                panels.refresh(files.map { $0.url.deletingLastPathComponent() })
                 updateStatus()
                 onChange()
                 completion(results.allSatisfy { $0.error == nil } && !hasUnsavedChanges)

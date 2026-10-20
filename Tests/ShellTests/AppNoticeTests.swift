@@ -19,7 +19,8 @@ internal struct AppNoticeTests {
     internal func aNoticeIsReplacedByANewerOneAndGoesByItself() async {
         // Nothing is left open. (`shown` is not asked: a window that was never on screen reports
         // itself unoccluded when it is ordered out, or here when the test says it became key.)
-        let windows = StabilityWindows()
+        // Only the notices: other suites' windows are theirs to close.
+        let windows = StabilityWindows { ["Copied 3 files.", "Moved."].contains($0.accessibilityLabel() ?? "") }
         defer {
             #expect(windows.open.isEmpty, "\(windows.openTitles)")
             windows.closeAll()

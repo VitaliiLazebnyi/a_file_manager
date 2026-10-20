@@ -1,8 +1,8 @@
 public import AFMKernel
 public import Foundation
 
-/// A memory file system (scheme `hooked`) that runs a hook, once, where a file is looked at
-/// or read, and counts how often files were opened for reading: for what happens to the code
+/// A memory file system (scheme `hooked`) that runs a hook, once (or for every file opened),
+/// where a file is looked at or read, and counts how often files were opened for reading: for what happens to the code
 /// that reads it while it looks or reads.
 ///
 /// Unchecked: the hooks and the count are guarded by `lock`; `base` is safe from any thread.
@@ -52,6 +52,8 @@ public final class CoverageArchivesFSHookedMemory: FileSystemProvider, @unchecke
     private let lock = NSLock()
     private var itemHook: (@Sendable () -> Void)?
     private var readHook: (@Sendable () -> Void)?
+    /// Whether `readHook` stays for the files opened after the next one.
+    private var keepsReadHook = false
     private var openings = 0
 
     /// `hooked`.
@@ -91,7 +93,14 @@ public final class CoverageArchivesFSHookedMemory: FileSystemProvider, @unchecke
     /// read and before it is handed over.
     @preconcurrency
     public func onNextRead(_ hook: @escaping @Sendable () -> Void) {
-        lock.withLock { readHook = hook }
+        lock.withLock { (readHook, keepsReadHook) = (hook, false) }
+    }
+
+    /// Runs `hook` in the first read of every file that is opened from now on, after the block
+    /// was read and before it is handed over.
+    @preconcurrency
+    public func onEveryRead(_ hook: @escaping @Sendable () -> Void) {
+        lock.withLock { (readHook, keepsReadHook) = (hook, true) }
     }
 
     /// The memory file system's answer.
@@ -123,7 +132,7 @@ public final class CoverageArchivesFSHookedMemory: FileSystemProvider, @unchecke
     public func read(_ url: URL) throws -> any FileReader {
         let hook = lock.withLock {
             openings += 1
-            defer { readHook = nil }
+            defer { if !keepsReadHook { readHook = nil } }
             return readHook
         }
         return Reader(try base.read(url), hook: hook)

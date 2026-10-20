@@ -28,8 +28,10 @@ public final class StabilityWindows {
     /// The titles of `open`, for a message.
     public var openTitles: [String] { open.map(\.title) }
 
-    /// Starts watching the windows `isWatched` says yes to; all of them by default.
-    public init(_ isWatched: @escaping (NSWindow) -> Bool = { _ in true }) {
+    /// Starts watching the windows `isWatched` says yes to: those of the test's subject only.
+    /// (Watching all of them, a test counted the windows of the tests running beside it as its
+    /// own, failed, and closed them under their tests.)
+    public init(_ isWatched: @escaping (NSWindow) -> Bool) {
         self.isWatched = isWatched
         earlier = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
         let center = NotificationCenter.default

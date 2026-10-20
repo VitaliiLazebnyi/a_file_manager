@@ -44,6 +44,35 @@ public final class Kernel {
         }
     }
 
+    /// The shell's job service, whose completions come only while the kernel is there: once it
+    /// has gone (the program or a test ended while a job ran), the plugins that would hear of a
+    /// job went with it, and what they hold of it is no longer there to be read.
+    private final class LivingJobs: JobService {
+        private let service: any JobService
+        private weak var kernel: Kernel?
+
+        var isBusy: Bool { service.isBusy }
+
+        init(_ service: any JobService, of kernel: Kernel) {
+            self.service = service
+            self.kernel = kernel
+        }
+
+        func run<Result: Sendable>(
+            title: String,
+            work: @escaping @Sendable (any JobMonitor) -> Result,
+            completion: @escaping @MainActor (Result) -> Void
+        ) {
+            service.run(title: title, work: work) { [weak kernel] result in
+                if kernel != nil { completion(result) }
+            }
+        }
+
+        deinit {
+            // Nothing to release.
+        }
+    }
+
     private static let log = Log.logger("Kernel")
     private static let signposter = Log.signposter("Kernel")
 
@@ -110,8 +139,9 @@ public final class Kernel {
     ///
     /// Available to command handlers, not while a plugin starts.
     public var panels: any PanelSet { attachedShell.panels }
-    /// Runs long work with a progress window.
-    public var jobs: any JobService { attachedShell.jobs }
+    /// Runs long work with a progress window. A job's completion is not called once the kernel
+    /// has gone.
+    public var jobs: any JobService { LivingJobs(attachedShell.jobs, of: self) }
 
     private var attachedShell: any ShellServices {
         guard let shell else {

@@ -1076,21 +1076,34 @@ private func quarantine(of url: URL) -> String? {
             $0.encryption = .legacy
         }
         bench.store.close()
-        // One wrong password in 256 gets past the first twelve bytes.
+        // One wrong password in 256 gets past the first twelve bytes. Taken is one whose data does not start like
+        // compressed data, which is nearly all of them (the encryption header is random: the few that start like it
+        // differ from run to run).
         let record = try #require(ZipDirectory.read(RandomAccessFile(archive)).records.first)
         guard case .archive(let offset, let file) = record.source else { return }
         let start = try ZipDirectory.localHeader(of: record, at: offset, in: file).dataOffset
-        let wrong = try #require(
-            (0..<100_000).lazy.map { "wrong\($0)" }
-                .first { candidate in
-                    (try? ZipDecryptStream(
-                        FileRangeStream(file, offset: start, length: 12),
-                        password: candidate,
-                        check: UInt8(record.dosTime >> 8),
-                        name: ""
-                    )) != nil
-                }
-        )
+        // Whether `password` passes the check byte and what it decrypts to is not compressed data.
+        func isNoCompressedData(_ password: String) -> Bool {
+            guard
+                let decrypted = try? ZipDecryptStream(
+                    FileRangeStream(file, offset: start, length: record.compressedSize),
+                    password: password,
+                    check: UInt8(record.dosTime >> 8),
+                    name: ""
+                )
+            else { return false }
+            let probe = InflateStream(decrypted, wrapping: .raw)
+            defer { probe.close() }
+            do {
+                _ = try probe.read(upToCount: 1 << 12)
+                return false
+            } catch ArchiveError.damaged {
+                return true
+            } catch {
+                return false
+            }
+        }
+        let wrong = try #require((0..<100_000).lazy.map { "wrong\($0)" }.first(where: isNoCompressedData))
         bench.passwords.set([wrong, "right"])
         let member = bench.inside(archive, "readme.txt")
         // What it decrypts to is not compressed data: it is a wrong password like any other, asked

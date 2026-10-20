@@ -30,6 +30,20 @@ struct ViewerItem {
 /// number; what was overtaken by a newer load is dropped. Each load has a cancellation flag
 /// that stops the work of the one before.
 final class ViewerPane: NSView, NSMenuDelegate {
+    /// A monitor of the application's key presses that is removed when it goes: whoever
+    /// holds it can be sure the monitor never outlives it.
+    private final class KeyMonitor {
+        private let token: Any?
+
+        init(_ handler: @escaping (NSEvent) -> NSEvent?) {
+            token = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: handler)
+        }
+
+        deinit {
+            _ = token.map(NSEvent.removeMonitor)
+        }
+    }
+
     let kernel: Kernel
     let settings: ListerSettings
     /// True in the quick-view pane: Esc and Q do not close anything, and keys are taken only
@@ -125,9 +139,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
     private let statusLabel = NSTextField(labelWithString: "")
     private let progressBar = NSProgressIndicator()
     private let cancelButton = NSButton(title: "Cancel", target: nil, action: nil)
-    /// Set while the pane is in a window. A pane leaves its window (`viewDidMoveToWindow`) before
-    /// it can go: the window holds it, and takes it out of itself when it goes.
-    private var keyMonitor: Any?
+    /// Set while the pane is in a window; it goes with the pane at the latest.
+    private var keyMonitor: KeyMonitor?
     static let menuTitles = ["File", "Edit", "Options", "Encoding"]
 
     init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, isEmbedded: Bool) {
@@ -252,7 +265,6 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         guard window != nil else { return }
         // A Quick Look view closed when the pane left its window is made anew in this one.
@@ -262,20 +274,23 @@ final class ViewerPane: NSView, NSMenuDelegate {
         // inside the main window, only while the pane has the keyboard (spec 10 › Embedded
         // Lister: "these keep their Lister meaning").
         // A key the pane handled is taken from the application (nil); the monitor is removed
-        // when the pane leaves its window, which it does before it goes, so it never outlives it.
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [unowned self] event in
-            monitored(event)
-        }
+        // when the pane leaves its window, and with the pane when it goes.
+        keyMonitor = KeyMonitor { [weak self] event in self?.takes(event) == true ? nil : event }
     }
 
     /// What the key monitor does with a key of the application: a key of this pane's window
     /// that the pane handles is taken (nil), any other is passed on.
     func monitored(_ event: NSEvent) -> NSEvent? {
+        takes(event) ? nil : event
+    }
+
+    /// Whether the pane handles `event`, a key of the application: only one of its window.
+    private func takes(_ event: NSEvent) -> Bool {
         guard let window, event.window === window, window.attachedSheet == nil,
             !isEmbedded || hasKeyboard,
             !(window.firstResponder is NSText) || richText === window.firstResponder
-        else { return event }
-        return handleKey(event) ? nil : event
+        else { return false }
+        return handleKey(event)
     }
 
     // MARK: Loading
