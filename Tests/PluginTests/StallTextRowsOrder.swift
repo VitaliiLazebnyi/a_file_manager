@@ -54,16 +54,14 @@ internal struct StallTextRowsOrder {
             progress: progress
         )
         let index = TextRowIndex(start: 0, reusing: nil) { count, work in
-            withoutActuallyEscaping(work) { work in
-                let done = (0..<count).map { _ in Signal<Bool>() }
-                for number in 0..<count {
-                    OtherThread.start {
-                        work(number)
-                        done[number].set(true)
-                    }
+            let done = (0..<count).map { _ in Signal<Bool>() }
+            for number in 0..<count {
+                OtherThread.start {
+                    work(number)
+                    done[number].set(true)
                 }
-                for signal in done { _ = signal.wait() }
             }
+            for signal in done { _ = signal.wait() }
         }
         index.build(
             source: source,

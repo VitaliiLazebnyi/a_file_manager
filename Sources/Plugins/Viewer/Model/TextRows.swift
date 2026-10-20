@@ -228,7 +228,7 @@ struct RowSplitter {
 /// the state is guarded by `lock`, and `overview` has a lock of its own.
 final class TextRowIndex: @unchecked Sendable {
     /// Runs the pieces of work of a parallel build, numbered from 0 to the count, and returns when all are done.
-    internal typealias Spread = @Sendable (_ count: Int, _ work: @Sendable (Int) -> Void) -> Void
+    internal typealias Spread = @Sendable (_ count: Int, _ work: @escaping @Sendable (Int) -> Void) -> Void
 
     static let stride = 64
     /// Checkpoints are at least this many bytes apart on average: a file of nothing but line
