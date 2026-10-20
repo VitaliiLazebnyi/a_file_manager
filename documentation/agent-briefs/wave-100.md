@@ -218,3 +218,34 @@ and mouse; the VM's sound is muted). Read the hand-over's section "UI tests, acc
   than answering a permission prompt.
 - After the UI tests: run `Scripts/check.sh test` (unit tests, test-run check, coverage gate with the UI counts merged)
   and report the files still below 100% and why.
+
+# Wave 107: the last 20 files (2026-10-20)
+
+## w107-last (prefix `Last`)
+
+Base `quality-gates` at `c91244e` or later. `Scripts/check.sh test` there, with the UI counts of `UITests/run.sh`
+merged: every test ran and passed; lines 99.92%, functions 99.88%, regions 99.91%; the 20 files below 100% are in
+`documentation/agent-briefs/w103/gate-c91244e.txt`. w106-uitests' report (in `quality-gates-continue.md`) says why each
+is left. Close every one you can without an owner decision:
+
+- **A mounted volume for the UI tests**: the runner is sandboxed and cannot use `hdiutil`, but `UITests/run.sh` is not:
+  let it make and attach a small disk image before `xcodebuild`, hand its path to the tests (`TEST_RUNNER_<name>`), and
+  detach it at the end (also on failure, `trap`). Then cover `VolumeEjection:48–50`, `ToolsDesktop` `renameVolume`,
+  `AlertInteraction:149–151` and `Notice:15` (the eject notice) in UI tests.
+- **`QuitProgress`**: a UI test that quits while a plugin still writes (pack a large archive, or a slow copy), and sees
+  the progress, through the program's real behaviour (no test hooks in the program).
+- **The OK arms of the sheet panels** (`CompareWindowEffects:35`, `SyncWindowEffects:28`, `SystemDialogs:18` Save as),
+  `SyncWindowController:382`, the beep in `ConfigurationEffects:18`: UI tests.
+- **`SystemLinks:7–9`**: a UI test that follows an http link to a page on 127.0.0.1 served by the test (or a `file:` URL
+  if the adapter allows), and quits the browser it started.
+- **Arms only reachable without a window or before any action** (`ToolsDesktop:35/111`, `SystemDialogs:31`,
+  `SystemDesktop:45`, `SystemPreviewPanel:16/20`, `ConfigurationEffects:24` `NSApp == nil`, `ConfigurationPlugin:67` no
+  persistent domain): simplify so the impossible case does not exist (types that carry the window, a non-optional
+  `NSApp`), or reach it deterministically.
+- **`FileGridView+Drop:9–11`**: the drop on the thumbnail grid. XCUITest's drag did not land in four variants; try a
+  `CGEvent` mouse sequence from the UI test, or report why not.
+- **Counts that come and go** (`TextDiff:91`, `PanelViewController+Tabs:150`, `ConfigurationViews:172`,
+  `SystemMediaPlayback:38`): make the test that reaches each deterministic.
+- Leave for the owner: `AppleScript.run` (the Finder automation prompt), `NetStream:243/317/326/444`,
+  `MultiRenameWindowController:785`.
+- Finish with `UITests/run.sh` and `Scripts/check.sh test`; report the files still below 100% and why.

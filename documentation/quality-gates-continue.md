@@ -79,7 +79,12 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   passed (388 / 3,444 / 337); lines 99.67%, functions 99.28%, regions 99.61%; 43 files below 100%, nearly all system
   adapters. UI test baseline: 3 passed, the accessibility audit failed (file-list cells without a role, the type-81
   element without a description).
-- Running: **w106-uitests** (the audit, UI tests for every adapter, then the gate with the UI counts).
+- Merged: **w106-uitests** (`c91244e`): the accessibility audit passes; Choose Command no longer runs a command while
+  the filter is typed; 44 UI tests. `Scripts/check.sh test` with the UI counts at `c91244e`: every test ran and passed
+  (389 / 3,447 / 337); lines 99.92%, functions 99.88%, regions 99.91%; 20 files below 100%
+  (`documentation/agent-briefs/w103/gate-c91244e.txt`). The local-network prompt came from the print panel looking for
+  printers. Accessibility gaps outside the audit: the rename box, the Brief and Thumbnail views.
+- Running: **w107-last** (the last 20 files).
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts

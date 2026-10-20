@@ -1,0 +1,22 @@
+20 files below 100% (uncovered lines / functions / regions):
+  Sources/AFMShell/App/AlertInteraction.swift: 4 lines, 2 functions, 2 regions
+  Sources/AFMShell/App/Notice.swift: 1 lines, 1 functions, 1 regions
+  Sources/AFMShell/Interaction/QuitProgress.swift: 24 lines, 1 functions, 3 regions
+  Sources/AFMShell/Panel/FileGridView+Drop.swift: 3 lines, 1 functions, 1 regions
+  Sources/Plugins/CompareContent/CompareWindowEffects.swift: 1 regions
+  Sources/Plugins/Configuration/ConfigurationEffects.swift: 2 lines, 2 functions, 3 regions
+  Sources/Plugins/Configuration/ConfigurationPlugin.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/Configuration/ConfigurationViews.swift: 1 regions
+  Sources/Plugins/DirectorySync/SyncWindowController.swift: 2 lines, 1 functions, 2 regions
+  Sources/Plugins/DirectorySync/SyncWindowEffects.swift: 1 regions
+  Sources/Plugins/FileProperties/AppleScript.swift: 6 lines, 1 functions, 1 regions
+  Sources/Plugins/MacIntegration/SystemDesktop.swift: 1 lines, 1 regions
+  Sources/Plugins/MacIntegration/SystemPreviewPanel.swift: 3 lines, 2 regions
+  Sources/Plugins/MultiRename/MultiRenameWindowController.swift: 1 lines, 1 functions, 1 regions
+  Sources/Plugins/Network/NetStream.swift: 6 lines, 3 functions, 4 regions
+  Sources/Plugins/SystemTools/ToolsDesktop.swift: 9 lines, 3 functions, 5 regions
+  Sources/Plugins/SystemTools/VolumeEjection.swift: 3 lines, 1 functions, 1 regions
+  Sources/Plugins/Viewer/UI/SystemDialogs.swift: 2 lines, 2 regions
+  Sources/Plugins/Viewer/UI/SystemLinks.swift: 3 lines, 1 functions, 1 regions
+  Sources/Plugins/Viewer/UI/SystemMediaPlayback.swift: 1 regions
+lines       94491 /   94562   99.92%
