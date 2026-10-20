@@ -7,6 +7,26 @@ internal final class UIViewerTests: XCTestCase {
     /// The program of the running test, once started.
     private var running: AppSession?
 
+    /// `seconds` of silence as a WAV file: 8,000 samples a second, 16 bits, one channel.
+    private static func silence(seconds: Int) -> Data {
+        let samples = 8_000 * seconds
+        var data = Data()
+        func put(_ text: String) { data.append(contentsOf: Array(text.utf8)) }
+        func put(_ value: UInt32) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+        func put(_ value: UInt16) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+        put("RIFF")
+        put(UInt32(36 + samples * 2))
+        put("WAVEfmt ")
+        put(UInt32(16))
+        for value: UInt16 in [1, 1] { put(value) }
+        for value: UInt32 in [8_000, 16_000] { put(value) }
+        for value: UInt16 in [2, 16] { put(value) }
+        put("data")
+        put(UInt32(samples * 2))
+        data.append(Data(count: samples * 2))
+        return data
+    }
+
     /// A PDF of one page with a black box on it.
     private static func onePagePDF() throws -> Data {
         let data = NSMutableData()
@@ -88,6 +108,42 @@ internal final class UIViewerTests: XCTestCase {
         choose("Open…", of: "File", in: lister)
         UIDesktop(session).choose(session.left.appendingPathComponent("beta.txt").path, in: "the open panel")
         Wait.until("the Lister shows beta.txt") { lister.title.hasSuffix("beta.txt]") }
+        lister.typeKey("q", modifierFlags: [])
+        Wait.until(lister, \.exists, is: false)
+    }
+
+    /// A sound plays in the Lister's player as soon as it is shown; Space pauses it and plays it
+    /// again, the arrows change the volume and move in it, M mutes it, E steps on, and moving
+    /// past its end ends it. F2 loads it anew. (The Mac's sound is off while the tests run.)
+    internal func testASoundPlaysInThePlayerAndItsKeysWork() throws {
+        let session = try AppSession(leftFiles: [:])
+        try Self.silence(seconds: 20).write(to: session.left.appendingPathComponent("quiet.wav"))
+        running = session
+        let lister = try openLister(session, downs: 1, named: "quiet")
+        let playing = lister.checkBoxes["play/pause"]
+        let volume = lister.sliders["volume"]
+        Wait.forElement(playing)
+        Wait.until("the sound plays") { playing.value as? Int == 1 }
+        lister.typeKey(.space, modifierFlags: [])
+        Wait.until("the sound is paused") { playing.value as? Int == 0 }
+        lister.typeKey(.space, modifierFlags: [])
+        Wait.until("the sound plays again") { playing.value as? Int == 1 }
+        let loud = try XCTUnwrap(volume.value as? Double)
+        lister.typeKey(.downArrow, modifierFlags: .shift)
+        Wait.until("the volume is lower") { (volume.value as? Double).map { $0 < loud } == true }
+        lister.typeKey(.upArrow, modifierFlags: .shift)
+        Wait.until("the volume is back") { (volume.value as? Double).map { abs($0 - loud) < 0.001 } == true }
+        lister.typeKey("m", modifierFlags: [])
+        lister.typeKey("m", modifierFlags: [])
+        lister.typeKey(.leftArrow, modifierFlags: .shift)
+        lister.typeKey("e", modifierFlags: [])
+        Wait.until("a step pauses the sound") { playing.value as? Int == 0 }
+        lister.typeKey(.space, modifierFlags: [])
+        lister.typeKey(.rightArrow, modifierFlags: .shift)
+        lister.typeKey(.rightArrow, modifierFlags: .shift)
+        Wait.until("the sound has played to its end") { playing.value as? Int == 0 }
+        lister.typeKey(.F2, modifierFlags: [])
+        Wait.until("the sound plays from the start") { playing.value as? Int == 1 }
         lister.typeKey("q", modifierFlags: [])
         Wait.until(lister, \.exists, is: false)
     }
