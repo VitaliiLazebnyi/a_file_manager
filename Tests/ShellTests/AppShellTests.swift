@@ -64,7 +64,8 @@ internal struct AppShellTests {
     @Test
     internal func theMainWindowComesOnScreenAndUnknownCommandsAreRefused() async {
         // Nothing comes on the screen, and nothing is left open.
-        let windows = StabilityWindows()
+        // Only the program's main window: other suites' windows are theirs to close.
+        let windows = StabilityWindows { $0.windowController is MainWindowController }
         defer {
             #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
             windows.closeAll()

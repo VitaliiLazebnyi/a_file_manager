@@ -74,7 +74,8 @@ internal struct InteractionProgressWindowTests {
     @Test
     internal func theWindowsButtonsActOnTheJob() async throws {
         // Nothing comes on the screen, and nothing is left open.
-        let windows = StabilityWindows()
+        // Only the progress windows: other suites' windows are theirs to close.
+        let windows = StabilityWindows { $0.contentView is ProgressContentView }
         defer {
             #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
             windows.closeAll()
@@ -115,7 +116,8 @@ internal struct InteractionProgressWindowTests {
     @Test
     internal func theWindowCarriesOnWithTheNextJob() async {
         // Nothing comes on the screen, and nothing is left open.
-        let windows = StabilityWindows()
+        // Only the progress windows: other suites' windows are theirs to close.
+        let windows = StabilityWindows { $0.contentView is ProgressContentView }
         defer {
             #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
             windows.closeAll()
@@ -150,7 +152,8 @@ internal struct InteractionProgressWindowTests {
     internal func theWindowWaitsForTheMainWindow() async {
         // Nothing is left open. (`shown` is not asked: a window that was never on screen reports
         // itself unoccluded when it is ordered out, or here when the test says it became key.)
-        let windows = StabilityWindows()
+        // Only the progress windows: other suites' windows are theirs to close.
+        let windows = StabilityWindows { $0.contentView is ProgressContentView }
         defer {
             #expect(windows.open.isEmpty, "\(windows.openTitles)")
             windows.closeAll()
@@ -181,7 +184,8 @@ internal struct InteractionProgressWindowTests {
     @Test
     internal func aDisplayWithoutAQueueAndBetweenJobs() throws {
         // Nothing comes on the screen, and nothing is left open.
-        let windows = StabilityWindows()
+        // Only the progress windows: other suites' windows are theirs to close.
+        let windows = StabilityWindows { $0.contentView is ProgressContentView }
         defer {
             #expect(windows.shown.isEmpty && windows.open.isEmpty, "\(windows.shown) \(windows.openTitles)")
             windows.closeAll()
