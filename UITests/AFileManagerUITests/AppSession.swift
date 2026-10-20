@@ -101,7 +101,13 @@ internal final class AppSession {
     internal func launch() -> XCUIElement? {
         app.launch()
         let window = app.windows[Self.windowTitle]
-        return window.waitForExistence(timeout: Self.patience) ? window : nil
+        guard window.waitForExistence(timeout: Self.patience) else {
+            return nil
+        }
+        // Where the mouse rests decides what pops up by itself (a tooltip, the window button's
+        // menu, which takes the keys); it goes where nothing does, the empty part of the right list.
+        window.tables.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).hover()
+        return window
     }
 
     /// Quits the program and removes the session's folder; says whether the program quit.

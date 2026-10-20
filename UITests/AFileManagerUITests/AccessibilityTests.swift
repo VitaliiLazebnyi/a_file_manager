@@ -28,9 +28,8 @@ internal final class AccessibilityTests: XCTestCase {
         running = session
         let window = try XCTUnwrap(session.launch(), "no main window")
         Wait.forElement(window.tables.element(boundBy: 0).row(named: "beta"))
-        // The audit looks at the screen: a tooltip of whatever the mouse rests on would cover the
-        // lists. The mouse goes where nothing has one, the empty part of the right list.
-        window.tables.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).hover()
+        // The audit looks at the screen: a tooltip would cover the lists (the mouse is where
+        // nothing has one, `AppSession.launch`).
         Wait.until("no tooltip is shown") { !session.app.helpTags.firstMatch.exists }
         try session.app.performAccessibilityAudit { issue in
             // The Touch Bar element is AppKit's, not the program's: the program makes no touch

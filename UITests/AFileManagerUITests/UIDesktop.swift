@@ -42,9 +42,13 @@ internal struct UIDesktop {
         item.click()
     }
 
-    /// The program's window whose title starts with `prefix`.
+    /// The program's window whose title starts with `prefix`; a window shown as a modal dialog
+    /// is a dialog to the accessibility interface.
     internal func window(titled prefix: String) -> XCUIElement {
-        app.windows.matching(NSPredicate(format: "title BEGINSWITH %@", prefix)).firstMatch
+        let kinds = [XCUIElement.ElementType.window, .dialog].map(\.rawValue)
+        return app.descendants(matching: .any)
+            .matching(NSPredicate(format: "elementType IN %@ AND title BEGINSWITH %@", kinds, prefix))
+            .firstMatch
     }
 
     /// Waits until a panel or a sheet is on screen, presses Esc and waits until it has gone.
