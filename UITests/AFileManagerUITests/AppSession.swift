@@ -97,6 +97,18 @@ internal final class AppSession {
         return "<" + json.map { String(format: "%02x", $0) }.joined() + ">"
     }
 
+    /// Starts the program with `value` for the setting `key`, in place of what the session gives
+    /// it otherwise.
+    internal func pin(_ key: String, to value: Any) throws {
+        let flag = "-" + key
+        let setting = try Self.setting(value)
+        if let index = app.launchArguments.firstIndex(of: flag) {
+            app.launchArguments[index + 1] = setting
+        } else {
+            app.launchArguments += [flag, setting]
+        }
+    }
+
     /// Starts the program and returns its main window, once it is there (nil if it never came).
     internal func launch() -> XCUIElement? {
         app.launch()
