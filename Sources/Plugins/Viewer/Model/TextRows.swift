@@ -227,6 +227,9 @@ struct RowSplitter {
 /// (`Segment.widest`), and reads only the others. All members are safe to use from any thread:
 /// the state is guarded by `lock`, and `overview` has a lock of its own.
 final class TextRowIndex: @unchecked Sendable {
+    /// Runs the pieces of work of a parallel build, numbered from 0 to the count, and returns when all are done.
+    internal typealias Spread = @Sendable (_ count: Int, _ work: @Sendable (Int) -> Void) -> Void
+
     static let stride = 64
     /// Checkpoints are at least this many bytes apart on average: a file of nothing but line
     /// ends would need one per 64 bytes otherwise.
@@ -415,11 +418,22 @@ final class TextRowIndex: @unchecked Sendable {
 
     private let overview: Overview
 
+    /// How a parallel build runs its segments: on all cores at once.
+    private let spread: Spread
+
     /// `reusing` is the index of the same bytes in another layout, if there is one.
-    init(start: Int64 = 0, reusing previous: TextRowIndex? = nil) {
+    internal convenience init(start: Int64 = 0, reusing previous: TextRowIndex? = nil) {
+        self.init(start: start, reusing: previous) { count, work in
+            DispatchQueue.concurrentPerform(iterations: count, execute: work)
+        }
+    }
+
+    /// An index whose parallel builds run their segments through `spread` (tests run each on a thread of its own).
+    internal init(start: Int64, reusing previous: TextRowIndex?, spread: @escaping Spread) {
         coveredEnd = start
         overview = Overview(covered: start)
         self.previous = previous
+        self.spread = spread
     }
 
     private func synchronized<T>(_ body: () -> T) -> T {
@@ -552,7 +566,7 @@ final class TextRowIndex: @unchecked Sendable {
             }
         }
         if parallel, bounds.count > 1 {
-            DispatchQueue.concurrentPerform(iterations: bounds.count) { work($0) }
+            spread(bounds.count) { work($0) }
         } else {
             var lineStart: Int64?
             for number in bounds.indices {
@@ -608,11 +622,11 @@ final class TextRowIndex: @unchecked Sendable {
         }
     }
 
-    /// Shows what the segment that comes next has found so far, in place of its earlier state.
-    /// Returns whether anything was published.
+    /// Shows what the segment that comes next has found so far, in place of its earlier state (`scan` hands on
+    /// only a state that has rows). Returns whether anything was published.
     private func publishPartial(_ number: Int, _ segment: Segment, coveredEnd covered: Int64) -> Bool {
         synchronized {
-            guard number == nextToPublish, segment.rowCount > 0 else { return false }
+            guard number == nextToPublish else { return false }
             dropPartial()
             var next = segment
             next.firstRow = rows
