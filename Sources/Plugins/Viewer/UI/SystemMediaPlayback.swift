@@ -32,10 +32,9 @@ internal final class SystemMediaPlayback: MediaPlayback {
     /// The player's place.
     internal var currentSeconds: Double { avPlayer.currentTime().seconds }
 
-    /// Gives the player the file, and tells `ended` when it played to its end.
+    /// Gives the player its file, and tells `ended` when it played to its end; once.
     internal func load(_ url: URL, ended: @escaping @MainActor () -> Void) {
         let item = AVPlayerItem(url: url)
-        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         // Delivered on the main queue.
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,

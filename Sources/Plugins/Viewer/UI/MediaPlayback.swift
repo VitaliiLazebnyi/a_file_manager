@@ -20,8 +20,8 @@ internal protocol MediaPlayback: AnyObject {
     /// Where the loaded file is, in seconds.
     var currentSeconds: Double { get }
 
-    /// Loads the file at `url` in place of the one before; `ended` is called when it has played
-    /// to its end.
+    /// Loads the file at `url`; `ended` is called when it has played to its end. A player is
+    /// loaded once: the Lister makes one for each file it plays (`MediaView`).
     func load(_ url: URL, ended: @escaping @MainActor () -> Void)
     /// Lets go of the loaded file.
     func unload()
