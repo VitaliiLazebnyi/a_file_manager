@@ -127,8 +127,11 @@ internal final class AppSession {
             return nil
         }
         // Where the mouse rests decides what pops up by itself (a tooltip, the window button's
-        // menu, which takes the keys); it goes where nothing does, the empty part of the right list.
-        window.tables.element(boundBy: 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).hover()
+        // menu, which takes the keys); it goes where nothing does, the empty part of the right list
+        // (the last one: a panel in the Brief or Thumbnails view has no table).
+        let lists = window.tables
+        Wait.forElement(lists.firstMatch)
+        lists.element(boundBy: lists.count - 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).hover()
         return window
     }
 

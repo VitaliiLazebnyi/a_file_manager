@@ -5,6 +5,9 @@ import XCTest
 /// and deletes the image afterwards should a test leave it attached.
 @MainActor
 internal final class LastVolumeTests: XCTestCase {
+    /// How many files the folder has that the panel goes back to: reading them takes a moment.
+    private static let longFolderCount = 100_000
+
     /// The program of the running test, once started.
     private var running: AppSession?
 
@@ -30,8 +33,22 @@ internal final class LastVolumeTests: XCTestCase {
             .firstMatch
     }
 
+    /// Changes the folder of the left panel with `cd` on the command line and waits until the
+    /// path bar shows it.
+    private func change(to folder: String, in window: XCUIElement) {
+        let line = window.comboBoxes["Command line"]
+        line.click()
+        line.typeText("cd \"\(folder)\"\n")
+        Wait.forElement(pathBar(of: window, endingWith: folder))
+    }
+
     /// Rename Volume… asks for the new name and the drive takes it; the panel follows it. Eject
-    /// Volume then takes the panel off the drive, ejects it, and a notice says it can be removed.
+    /// Volume then takes the panel back to the folder it came from (a long one, which takes a
+    /// moment to read), ejects the drive, and a notice says it can be removed. The user
+    /// minimized the window meanwhile: the notice shows at the bottom of the screen on its own.
+    ///
+    /// The left panel shows the Brief view, which offers its long list to the accessibility
+    /// interface as one element: XCUITest would take too long to go through a table of it.
     internal func testADriveIsRenamedAndEjected() throws {
         let volume = try XCTUnwrap(
             ProcessInfo.processInfo.environment["AFM_VOLUME"],
@@ -39,9 +56,13 @@ internal final class LastVolumeTests: XCTestCase {
         )
         let session = try AppSession(leftFiles: [:])
         running = session
-        try session.startLeft(in: URL(fileURLWithPath: volume, isDirectory: true))
+        try session.pin("left.view", to: ["mode": 1, "extraColumns": [], "columnWidths": [:]] as [String: Any])
+        for index in 0..<Self.longFolderCount {
+            FileManager.default.createFile(atPath: session.left.appendingPathComponent("f\(index)").path, contents: nil)
+        }
         let window = try XCTUnwrap(session.launch(), "no main window")
-        Wait.forElement(pathBar(of: window, endingWith: volume))
+        Wait.forElement(pathBar(of: window, endingWith: session.left.path))
+        change(to: volume, in: window)
         let desktop = UIDesktop(session)
 
         desktop.menu("Commands", "More", "Rename Volume…")
@@ -52,23 +73,23 @@ internal final class LastVolumeTests: XCTestCase {
         name.typeKey("a", modifierFlags: .command)
         name.typeText("AFM UI Renamed\n")
         Wait.until(question, \.exists, is: false)
-        // The drive is mounted under its new name now: the panel climbs to where the drives are,
-        // which lists it so.
-        let list = window.tables.element(boundBy: 0)
-        let drive = list.row(named: "[AFM UI Renamed]")
-        Wait.forElement(drive)
-        drive.doubleClick()
-        let renamed = pathBar(of: window, endingWith: "/AFM UI Renamed")
-        Wait.forElement(renamed)
+        // The drive is mounted under its new name now: the panel climbs to where the drives are.
+        Wait.forElement(pathBar(of: window, endingWith: "/Volumes"))
 
+        // From the long folder onto the drive, so that the eject goes back there.
+        change(to: session.left.path, in: window)
+        let renamed = "/Volumes/AFM UI Renamed"
+        change(to: renamed, in: window)
         desktop.menu("Commands", "More", "Eject Volume")
-        // The panel had been nowhere else: it goes to the home folder.
-        Wait.until(renamed, \.exists, is: false)
+        session.app.typeKey("m", modifierFlags: .command)
         let notice = session.app.staticTexts
             .matching(NSPredicate(format: "value == %@", "“AFM UI Renamed” can now be removed safely."))
             .firstMatch
         Wait.forElement(notice)
         Wait.until(notice, \.exists, is: false)
+        desktop.menu("Window", "A File Manager 0.1")
+        Wait.until("the main window is back") { window.isHittable }
+        Wait.forElement(pathBar(of: window, endingWith: session.left.path))
     }
 
     deinit {
