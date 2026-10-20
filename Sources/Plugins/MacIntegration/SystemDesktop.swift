@@ -13,6 +13,12 @@ internal final class SystemDesktop: MacDesktop, @unchecked Sendable {
     /// The system's shared Quick Look panel.
     @MainActor internal var preview: any PreviewPanel { SystemPreviewPanel() }
 
+    /// The application's main window.
+    @MainActor internal var mainWindow: NSWindow? { NSApplication.shared.mainWindow }
+
+    /// The content of the application's key window.
+    @MainActor internal var keyWindowContent: NSView? { NSApplication.shared.keyWindow?.contentView }
+
     /// Opens the files with the application.
     internal func open(_ urls: [URL], with application: URL) {
         NSWorkspace.shared.open(urls, withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
@@ -38,12 +44,9 @@ internal final class SystemDesktop: MacDesktop, @unchecked Sendable {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    /// Shows the sharing panel at the middle of the key window.
+    /// Shows the sharing panel at the middle of `view`.
     @MainActor
-    internal func share(_ urls: [URL]) {
-        guard let view = NSApp?.keyWindow?.contentView else {
-            return
-        }
+    internal func share(_ urls: [URL], at view: NSView) {
         let shown = NSSharingServicePicker(items: urls)
         picker = shown
         let middle = NSRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)

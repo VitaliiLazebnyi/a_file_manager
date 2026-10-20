@@ -885,13 +885,16 @@ extension ViewerPane {
     /// File › Print (spec 10 › Printing from Lister): text prints as the current mode shows
     /// it, the selection when there is one and the user wants it; images, PDF and pages print
     /// as themselves.
+    ///
+    /// The print panel is a sheet of the window the user printed from, taken now: a text is
+    /// prepared first, and the pane may have left that window by the time it is ready. A pane in
+    /// no window has nothing to print from.
     func printContent() {
-        let info = printInfo()
-        // Weakly: the block that prepares a text holds this, and must not be the pane's last
-        // owner on its thread (a view goes away on the main thread).
-        let run: @MainActor @Sendable (NSPrintOperation) -> Void = { [weak self] operation in
-            self?.dialogs.run(operation, for: self?.window)
+        guard let window else {
+            return
         }
+        let info = printInfo()
+        let run = { [dialogs] (operation: NSPrintOperation) in dialogs.run(operation, sheetOf: window) }
         if let frame = imageView?.currentFrame {
             let area = info.imageablePageBounds.size
             let size = NSSize(width: frame.width, height: frame.height)
@@ -903,9 +906,8 @@ extension ViewerPane {
             view.image = NSImage(cgImage: frame, size: size)
             view.imageScaling = .scaleAxesIndependently
             run(NSPrintOperation(view: view, printInfo: info))
-        } else if let pdfView, let window {
+        } else if let pdfView {
             dialogs.print(pdfView, with: info)
-            _ = window
         } else if let webView {
             run(webView.printOperation(with: info))
         } else if let richText {
@@ -930,7 +932,9 @@ extension ViewerPane {
             activity = ("Preparing to print…", nil, cancel)
             // Made on the main thread and used there only, by the block that comes back.
             let held = Handover((font: font, info: info))
-            workQueue.async { [weak self, range] in
+            // Weakly: the block must not be the last owner of the window or the pane on its thread
+            // (a view goes away on the main thread).
+            workQueue.async { [weak self, weak window, range] in
                 let text = Self.printableText(
                     of: document,
                     in: range,
@@ -939,7 +943,7 @@ extension ViewerPane {
                 )
                 DispatchQueue.main.async {
                     self?
-                        .textPrepared(text, generation: generation, cancel: cancel) {
+                        .textPrepared(text, generation: generation, cancel: cancel, sheetOf: window) {
                             NSPrintOperation(
                                 view: TextPrintView(lines: text.lines, font: held.value.font, pageSize: page),
                                 printInfo: held.value.info
@@ -950,22 +954,26 @@ extension ViewerPane {
         }
     }
 
-    /// Prints the text that was prepared (`operation` makes the print operation), telling the
-    /// user when it was cut short; nothing when the file changed or printing was stopped.
+    /// Prints the text that was prepared (`operation` makes the print operation) with its panel
+    /// as a sheet of `window`, telling the user when it was cut short; nothing when the file
+    /// changed, printing was stopped or the window has gone.
     private func textPrepared(
         _ text: PrintableText,
         generation: Int,
         cancel: CancellationFlag,
+        sheetOf window: NSWindow?,
         operation: () -> NSPrintOperation
     ) {
         if activity?.cancel === cancel { activity = nil }
-        guard loadGeneration == generation, !cancel.isCancelled else { return }
+        guard loadGeneration == generation, !cancel.isCancelled, let window else {
+            return
+        }
         if text.truncated {
             kernel.interaction.inform(
                 "The text is longer than the \(Self.printPageLimit) pages that are printed at most: only its first \(Self.printPageLimit) pages (\(text.lines.count) lines) are printed."
             )
         }
-        dialogs.run(operation(), for: window)
+        dialogs.run(operation(), sheetOf: window)
     }
 
     /// The rows of `range` as the document's layout shows them, at most `maxRows` of them (`truncated`

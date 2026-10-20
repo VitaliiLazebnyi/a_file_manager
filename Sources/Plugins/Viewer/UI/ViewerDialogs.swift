@@ -12,8 +12,8 @@ internal protocol ViewerDialogs {
     func saveTarget(proposing name: String) -> URL?
     /// The page setup panel for `info`; whether the user confirmed it.
     func pageLayout(_ info: NSPrintInfo) -> Bool
-    /// Runs `operation`: with its panel as a sheet of `window`, or on its own without one.
-    func run(_ operation: NSPrintOperation, for window: NSWindow?)
+    /// Runs `operation` with its panel as a sheet of `window`.
+    func run(_ operation: NSPrintOperation, sheetOf window: NSWindow)
     /// Prints the document of `view` with `info`.
     func print(_ view: PDFView, with info: NSPrintInfo)
     /// Takes `window` to full screen, or back.

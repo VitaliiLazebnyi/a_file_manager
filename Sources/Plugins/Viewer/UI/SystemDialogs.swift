@@ -23,13 +23,9 @@ internal struct SystemDialogs: ViewerDialogs {
         NSPageLayout().runModal(with: info) == NSApplication.ModalResponse.OK.rawValue
     }
 
-    /// The print panel, as a sheet when there is a window.
-    internal func run(_ operation: NSPrintOperation, for window: NSWindow?) {
-        if let window {
-            operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
-        } else {
-            operation.run()
-        }
+    /// The print panel, as a sheet of the window.
+    internal func run(_ operation: NSPrintOperation, sheetOf window: NSWindow) {
+        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
     }
 
     /// The print panel of the PDF view.

@@ -85,7 +85,7 @@ internal struct CoverageViewerPaneMenuTests {
         #expect(await bench.textShown(pane))
         #expect(CoverageViewerMenus.run("Print", in: "File", of: pane))
         #expect(await bench.wait { bench.dialogs.operations.count == 1 })
-        #expect(bench.dialogs.operations.first?.hadWindow == true)
+        #expect(bench.dialogs.operations.first?.window === pane.window)
         // Edit goes to the editor with the file.
         var edited: [URL] = []
         bench.setup.commands.register(Command(.edit, "Edit")) { argument in

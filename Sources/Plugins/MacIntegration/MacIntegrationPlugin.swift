@@ -283,6 +283,10 @@ public final class MacIntegrationPlugin: Plugin {
             enabled: hasLocalOperands,
             checked: { [self] in quickLook.isVisible }
         ) { [self] in
+            // The panel looks for its feeder in the responder chain of the window the command came
+            // from: joined now, while that window is the main one. A long list is gone through
+            // first, and by then the program may be in the background, without a main window.
+            quickLook.join(desktop?.mainWindow)
             withLocalOperands(of: model(), { $0 }) { [self] urls in
                 remember("quicklook " + Self.described(urls))
                 followed = nil
@@ -468,7 +472,12 @@ public final class MacIntegrationPlugin: Plugin {
             return
         }
         remember("share " + Self.described(urls))
-        desktop?.share(urls)
+        // At the middle of the window that has the keyboard; none has it when the program went to
+        // the background while a long list was gone through, and then nothing is shown.
+        guard let desktop, let view = desktop.keyWindowContent else {
+            return
+        }
+        desktop.share(urls, at: view)
     }
 
     private func editTags(of urls: [URL], in kernel: Kernel) {

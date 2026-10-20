@@ -13,15 +13,11 @@ internal final class SystemPreviewPanel: PreviewPanel {
         QLPreviewPanel.sharedPreviewPanelExists() && shared.isVisible
     }
 
-    /// Shows the shared panel, fed through the main window's responder chain or directly.
-    internal func show(for controller: QuickLookController) {
-        let panel = shared
-        // Fed directly when there is no window whose responder chain could hold the feeder.
-        if !controller.join(NSApplication.shared.mainWindow) {
-            (panel.dataSource, panel.delegate) = (controller, controller)
-        }
-        panel.makeKeyAndOrderFront(nil)
-        panel.reloadData()
+    /// Shows the shared panel. It finds its feeder in the responder chain of the main window,
+    /// which the feeder joined when the command started.
+    internal func show(for _: QuickLookController) {
+        shared.makeKeyAndOrderFront(nil)
+        shared.reloadData()
     }
 
     /// Has the shared panel ask its feeder again.
