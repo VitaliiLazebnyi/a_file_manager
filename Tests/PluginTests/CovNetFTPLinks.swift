@@ -141,8 +141,8 @@ internal struct CovNetFTPLinks {
             return true
         }
         #expect(listed == 48)
-        // The background's own login is refused, and nobody is asked.
-        #expect(Wait.until { logins.value >= 3 })
+        // The background's own login is refused: it asks nobody and puts its links back for later.
+        #expect(Wait.until { logins.value >= 3 && session.linkRoundsPutBack > 0 })
         #expect(questions.value == 0)
         session.disconnect()
     }
