@@ -190,3 +190,31 @@ Base `quality-gates` at `f8fa15e` or later.
   removes the arm.
 - Tests that still skip when background work is slow: `NetworkAdoptTests:309`, `Review2NetworkFTPTests:562`: make them
   deterministic instead.
+
+# Wave 106: the UI tests (2026-10-20)
+
+## w106-uitests (prefix `UI`)
+
+Base `quality-gates` at `839c9a8` or later. The only agent: you run `UITests/run.sh` (it takes over the VM's keyboard
+and mouse; the VM's sound is muted). Read the hand-over's section "UI tests, accessibility audit, snapshot tests" first.
+
+- **Accessibility audit** (`AccessibilityTests.testTheMainWindowPassesTheAccessibilityAudit` fails at `839c9a8`): the
+  cells of the file lists (Name, Ext, Size, Date, Attr) are elements of type 1 with "Unknown role" — give them a real
+  role (a text cell / static text with a value) in `Sources/AFMShell/Panel/**`; the element of type 81 (XCUITest's
+  TouchBar type) at (80, 30, 685, 30) "has no description" — find what it is and describe it, or show it is XCUITest's
+  own and exclude only that audit type with a comment saying why. Unit tests of the accessibility values where possible.
+- **Coverage of the system adapters**: the coverage gate merges the program's counts from the UI tests
+  (`.build/uitest/codecov/ui.profdata`, `Scripts/coverage-gate.py`). Write UI tests (`UITests/AFileManagerUITests/`,
+  files starting `UI`) that drive the program through each adapter the unit tests cannot reach: the shell's alerts
+  (`AlertInteraction`, `FormDialog.run`), the quit progress (`QuitProgress`), `ShellApplication`'s launch and terminate
+  replies, the table and grid clicks and drags (`FileTableView.mouseDown`, `FileGridView.systemDrag`), the path bar's
+  copy, the volume list, the Viewer's `SystemDialogs`, `SystemLinks`, `SystemMediaPlayback`, MacIntegration's
+  `SystemDesktop` and `SystemPreviewPanel`, SystemTools' `ToolsDesktop.system` and the real unmount, Configuration's,
+  Compare's and Synchronize's `.system` effects, `AppleScript.run`, Archives' `openInApplication`, Places' hotlist
+  editor `run` and the tree's beep, the Keychain stores of Network, the system clipboard of File Operations, Find Files'
+  open panel, Multi-Rename's sheet. Each test checks what the user sees, and leaves the desktop as it found it (close
+  what it opened, quit what it started, delete what it made, eject what it mounted). Where an adapter would show
+  something that needs the owner's permission (the microphone for media, removable volumes), say so in the report rather
+  than answering a permission prompt.
+- After the UI tests: run `Scripts/check.sh test` (unit tests, test-run check, coverage gate with the UI counts merged)
+  and report the files still below 100% and why.
