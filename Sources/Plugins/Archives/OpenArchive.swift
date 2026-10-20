@@ -1305,9 +1305,18 @@ final class OpenArchive: @unchecked Sendable {
                         wrapping: .raw
                     )
                     defer { probe.close() }
+                    // As much as the member holds, up to 4 KB and a byte, so that a shorter
+                    // one is seen to end where it should: what a wrong password decrypts to is
+                    // now and then a short stream of compressed data (it was then a CRC error,
+                    // and the password was not asked for again).
+                    let probed = (1 << 12) + 1
+                    let start: Data
                     do {
-                        _ = try probe.read(upToCount: 1 << 12)
+                        start = try probe.readFully(probed)
                     } catch ArchiveError.damaged {
+                        throw ArchiveError.wrongPassword(name)
+                    }
+                    guard UInt64(start.count) == min(record.uncompressedSize, UInt64(probed)) else {
                         throw ArchiveError.wrongPassword(name)
                     }
                 }
