@@ -84,10 +84,15 @@ internal final class AppSession {
     /// The tabs of a panel as the program keeps them (`PanelTabs.State`), in the property-list
     /// form the argument domain reads: `<hex bytes>` is data.
     private static func tabs(at folder: URL) throws -> String {
+        try setting(tabState(at: folder))
+    }
+
+    /// One tab in `folder`, as the program keeps a panel's tabs (`PanelTabs.State`).
+    private static func tabState(at folder: URL) -> [String: Any] {
         let tab: [String: Any] = [
             "location": folder.absoluteString, "sortKey": 0, "descending": false, "showHidden": false
         ]
-        return try setting(["tabs": [tab], "active": 0])
+        return ["tabs": [tab], "active": 0]
     }
 
     /// A setting as the program keeps it (JSON), in the property-list form the argument domain
@@ -107,6 +112,11 @@ internal final class AppSession {
         } else {
             app.launchArguments += [flag, setting]
         }
+    }
+
+    /// Starts the program with the left panel in `folder` instead of the session's `left`.
+    internal func startLeft(in folder: URL) throws {
+        try pin("left.tabs", to: Self.tabState(at: folder))
     }
 
     /// Starts the program and returns its main window, once it is there (nil if it never came).

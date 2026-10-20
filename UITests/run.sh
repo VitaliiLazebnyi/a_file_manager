@@ -34,13 +34,42 @@ xcodegen generate --quiet --spec UITests/project.yml
 rm -rf "$out/codecov" "$out/results.xcresult"
 mkdir -p "$out/codecov"
 forget_settings
-trap forget_settings EXIT
+
+# A small disk image of its own, attached for the tests of the volume commands (renaming and
+# ejecting a drive): the test runner is sandboxed and cannot attach one itself. It is not shown
+# in Finder or on the desktop; it is detached and deleted at the end, whether the tests ejected
+# it or not.
+volume_name="AFM UI Volume"
+image_dir=$(mktemp -d "${TMPDIR:-/tmp}/afm-uitest-volume.XXXXXX")
+device=""
+# Called once the tests are done, and on the way out should the script stop before.
+finish() {
+    # Only while the disk is still this image's: one the tests ejected may have another by now.
+    local images
+    images=$(hdiutil info)
+    if [[ -n "$device" && "$images" == *"$(basename "$image_dir")/volume.dmg"* ]]; then
+        diskutil eject "$device" >/dev/null || true
+    fi
+    device=""
+    rm -rf "$image_dir"
+    forget_settings
+}
+trap finish EXIT
+hdiutil create -quiet -size 16m -fs HFS+ -volname "$volume_name" "$image_dir/volume.dmg"
+attached=$(diskutil image attach --nobrowse "$image_dir/volume.dmg")
+# The first line names the disk, the last one the volume and where it is mounted.
+device=$(head -1 <<<"$attached" | cut -f1 | tr -d '[:space:]')
+volume=$(tail -1 <<<"$attached" | cut -f3)
+[[ -d "$volume" ]] || { echo "the disk image was not mounted: $attached" >&2; exit 2; }
+
 status=0
 # xcodebuild hands TEST_RUNNER_<name> to the tests as <name>.
 TEST_RUNNER_AFM_APP="$out/app/A File Manager.app" TEST_RUNNER_AFM_PROFILE_DIR="$out/codecov" \
+    TEST_RUNNER_AFM_VOLUME="$volume" \
     xcodebuild test -quiet -project UITests/AFileManagerUITests.xcodeproj -scheme AFileManagerUITests \
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "$out/derived" \
     -resultBundlePath "$out/results.xcresult" "$@" || status=$?
+finish
 
 # The counts of every run of the program, failed tests included.
 profiles=("$out"/codecov/ui-*.profraw)
