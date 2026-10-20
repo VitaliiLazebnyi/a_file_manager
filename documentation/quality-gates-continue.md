@@ -74,7 +74,12 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   default center reached other tests' date pickers off the main thread); unowned references fixed; window watches name
   their windows; a wrong old-style ZIP password that decrypts to valid data is asked for again. Two full runs: every
   test ran and passed (337 / 3,438 / 388). Open: a main-thread stall of ~300 s about once in ten runs.
-- Running: **w105-stall** (the stall, the last timing arms).
+- Merged: **w105-stall** (`a42de8d`): the stall was a test turning the main run loop itself; no synchronous spin loops
+  left in the tests; the timing arms tested deterministically. `Scripts/check.sh test` at `a42de8d`: every test ran and
+  passed (388 / 3,444 / 337); lines 99.67%, functions 99.28%, regions 99.61%; 43 files below 100%, nearly all system
+  adapters. UI test baseline: 3 passed, the accessibility audit failed (file-list cells without a role, the type-81
+  element without a description).
+- Running: **w106-uitests** (the audit, UI tests for every adapter, then the gate with the UI counts).
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts
