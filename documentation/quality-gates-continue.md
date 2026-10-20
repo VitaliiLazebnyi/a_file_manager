@@ -100,10 +100,16 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   54 UI tests); lines 99.98%, functions 99.96%, regions 99.97%; 9 files below 100%
   (`documentation/agent-briefs/w103/gate-a8095e2.txt`): the owner's questions and counts that come and go with the
   non-atomic counters (`ChecksumFiles`, `LocalFileSystem` this run; `Place` the run before).
-- **Waiting for the owner** (nothing else is left): atomic counters for the coverage run; a documented `!` for
-  `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation prompt); the drop on the
-  thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`, `SystemPreviewPanel:20`, `SystemDialogs:31`
-  (millisecond windows: accept, or restructure). Then: lint step 6 and the mutation runs.
+- Merged: **w109-timing-arms** (`8678a90`): share and Quick Look take their window when the command starts, the Lister
+  prints as a sheet of the window it was asked from; the three millisecond arms are tested. Gate: every test ran and
+  passed (391 / 3,452 / 337, 54 UI tests); lines 99.98%, functions 99.96%, regions 99.98%; 5 files below 100%:
+  `FileGridView+Drop`, `AppleScript`, `MultiRenameWindowController:785`, `NetStream`, and `ZipFormat:175–176` (lost
+  counts of the non-atomic counters).
+- **Waiting for the owner** (nothing else is left; the millisecond arms are done): atomic counters for the coverage run;
+  a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
+  prompt); the drop on the thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`,
+  `SystemPreviewPanel:20`, `SystemDialogs:31` (millisecond windows: accept, or restructure). Then: lint step 6 and the
+  mutation runs.
 - Coverage measurement (fileops-tools finding): Swift Testing runs tests on several threads in one process and the
   profile counters are not atomic, so regions counted as expressions of other counters (a `catch` arm, a `guard`'s
   `else`) come out 0 now and then. Built with `-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all` the counts
