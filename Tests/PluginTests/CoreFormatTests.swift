@@ -19,12 +19,15 @@ internal struct CoreFormatTests {
     @Test
     internal func datesFollowTheTimeZoneAndLetGoOfTheirObservers() {
         weak var gone: Format.Dates?
+        // A center of its own: posted to the program's, the change would reach every observer of
+        // the process on this thread, the date fields of other tests' windows among them.
+        let center = NotificationCenter()
         do {
-            let dates = Format.Dates()
+            let dates = Format.Dates(center: center)
             gone = dates
             let moment = Date(timeIntervalSince1970: 1_000_000_000)
             let before = dates.string(from: moment)
-            NotificationCenter.default.post(name: .NSSystemTimeZoneDidChange, object: nil)
+            center.post(name: .NSSystemTimeZoneDidChange, object: nil)
             #expect(dates.string(from: moment) == before)
         }
         #expect(gone == nil)

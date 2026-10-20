@@ -12,19 +12,27 @@ public enum Format: Sendable {
     /// it is thrown away and the next date makes a new one: a formatter keeps the pattern it
     /// worked out for the region it was made in.
     ///
-    /// Unchecked: `formatter` is guarded by `lock`; `observers` is set in `init` only.
+    /// Unchecked: `formatter` is guarded by `lock`; `center` and `observers` are set in `init` only.
     internal final class Dates: @unchecked Sendable {
         private let lock = NSLock()
         private var formatter: DateFormatter?
+        private let center: NotificationCenter
         private var observers: [any NSObjectProtocol] = []
 
         /// A formatter made with the first date, and made again after the region or time zone changed.
-        internal init() {
+        internal convenience init() {
+            self.init(center: .default)
+        }
+
+        /// The same, told of the changes by `center` (tests use one of their own: a change posted
+        /// to the program's center reaches every observer of the process, on the posting thread).
+        internal init(center: NotificationCenter) {
+            self.center = center
             // The first is what Foundation posts as `NSLocale.currentLocaleDidChangeNotification`.
             let localeChanged = Notification.Name("kCFLocaleCurrentLocaleDidChangeNotification")
             observers = [localeChanged, .NSSystemTimeZoneDidChange]
                 .map { name in
-                    NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
+                    center.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
                         self?.forget()
                     }
                 }
@@ -54,7 +62,7 @@ public enum Format: Sendable {
         }
 
         deinit {
-            for observer in observers { NotificationCenter.default.removeObserver(observer) }
+            for observer in observers { center.removeObserver(observer) }
         }
     }
 
