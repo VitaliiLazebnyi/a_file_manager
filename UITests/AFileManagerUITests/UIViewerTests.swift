@@ -80,6 +80,18 @@ internal final class UIViewerTests: XCTestCase {
         Wait.until(lister, \.exists, is: false)
     }
 
+    /// A file chosen in the open panel of Open… is what the Lister shows then.
+    internal func testAFileChosenInTheOpenPanelIsShown() throws {
+        let session = try AppSession(leftFiles: ["alpha.txt": "first\n", "beta.txt": "second\n"])
+        running = session
+        let lister = try openLister(session, downs: 1, named: "alpha")
+        choose("Open…", of: "File", in: lister)
+        UIDesktop(session).choose(session.left.appendingPathComponent("beta.txt").path, in: "the open panel")
+        Wait.until("the Lister shows beta.txt") { lister.title.hasSuffix("beta.txt]") }
+        lister.typeKey("q", modifierFlags: [])
+        Wait.until(lister, \.exists, is: false)
+    }
+
     /// Page Setup… shows the system's page layout and Print… its print sheet; with text marked,
     /// the Lister asks first whether to print the marked text alone. Each is cancelled.
     ///

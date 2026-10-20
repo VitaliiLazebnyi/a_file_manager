@@ -110,6 +110,22 @@ internal final class UIMacIntegrationTests: XCTestCase {
         Wait.forElement(other.app.windows["alpha.txt"])
     }
 
+    /// An application chosen in the open panel of Other… opens the file.
+    internal func testAnApplicationChosenInThePanelOpensTheFile() throws {
+        let other = UIOtherApplication(UIOtherApplication.textEdit)
+        textEdit = other
+        let (session, _) = try start()
+        let desktop = UIDesktop(session)
+        desktop.menu("Files", item: "Open With…", number: 1)
+        let choice = session.app.dialogs.firstMatch
+        Wait.forElement(choice)
+        choice.staticTexts["Other…"].click()
+        choice.buttons["Open"].click()
+        desktop.choose("/System/Applications/TextEdit.app", in: "the open panel for an application")
+        other.waitUntilRunning()
+        Wait.forElement(other.app.windows["alpha.txt"])
+    }
+
     /// Share… shows the system's sharing picker, which Esc closes.
     internal func testShareShowsTheSharingPicker() throws {
         let (session, _) = try start()

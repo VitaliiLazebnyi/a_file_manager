@@ -51,6 +51,19 @@ internal struct UIDesktop {
             .firstMatch
     }
 
+    /// Waits until an open panel is on screen, chooses `path` in it (Go to Folder, then Open)
+    /// and waits until it has gone.
+    ///
+    /// `what` names the panel in a failure.
+    internal func choose(_ path: String, in what: String) {
+        let desktop = self
+        Wait.until("\(what) is shown") { desktop.panels > 0 }
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        app.typeText(path + "\n")
+        app.typeKey(.return, modifierFlags: [])
+        Wait.until("\(what) has gone") { desktop.panels == 0 }
+    }
+
     /// Waits until a panel or a sheet is on screen, presses Esc and waits until it has gone.
     ///
     /// `what` names it in a failure.
