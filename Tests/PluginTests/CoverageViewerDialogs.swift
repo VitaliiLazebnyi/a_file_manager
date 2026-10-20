@@ -15,8 +15,8 @@ internal final class CoverageViewerDialogs: ViewerDialogs {
     internal var layoutAnswer = false
     /// The names the save panel proposed.
     internal private(set) var proposedNames: [String] = []
-    /// The print operations that were run, with whether they had a window.
-    internal private(set) var operations: [(operation: NSPrintOperation, hadWindow: Bool)] = []
+    /// The print operations that were run, with the window each was a sheet of.
+    internal private(set) var operations: [(operation: NSPrintOperation, window: NSWindow)] = []
     /// The PDF views that were printed.
     internal private(set) var printedPDFs: [PDFView] = []
     /// What was asked of the window: "full screen", "zoom".
@@ -35,8 +35,8 @@ internal final class CoverageViewerDialogs: ViewerDialogs {
     internal func pageLayout(_: NSPrintInfo) -> Bool { layoutAnswer }
 
     /// Keeps the operation.
-    internal func run(_ operation: NSPrintOperation, for window: NSWindow?) {
-        operations.append((operation, window != nil))
+    internal func run(_ operation: NSPrintOperation, sheetOf window: NSWindow) {
+        operations.append((operation, window))
     }
 
     /// Keeps the view.
