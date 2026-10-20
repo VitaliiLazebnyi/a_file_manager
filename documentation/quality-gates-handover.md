@@ -9,7 +9,11 @@ from the host Mac into the test VM. Branch: `quality-gates`.
   automatic scanner.
 - Everything runs locally in a Parallels VM (macOS 27), not on the host.
 - Decisions taken:
-  - **Coverage:** 100% of lines and functions, everything covered (`Scripts/coverage-gate.py`).
+  - **Coverage:** 100% of lines, functions and regions, everything covered (`Scripts/coverage-gate.py`). The gate's
+    coverage run counts atomically (`-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all`, owner's decision
+    2026-10-21): Swift Testing runs a bundle's tests on several threads, and plain counters lose counts and wrap below
+    zero, so a region that ran could read 0 and one that never ran could read covered. The UI test build counts the
+    same way (`Scripts/build-app.sh`, `AFM_COVERAGE=1`).
   - **Docs:** every non-private declaration documented (SwiftLint `missing_docs` for open, public, package and
     internal), plus DocC without warnings.
   - **Rollout:** fix everything first, then switch the gates on (CI, pre-commit hook).
@@ -94,9 +98,11 @@ Every SwiftLint rule with findings was tried: real violations rewritten the way 
 declares one only when it has code to run, because an empty `deinit` there is never counted as run, even when the object
 is freed, and coverage could not reach 100%.
 
-Force unwraps (owner's decision, 2026-10-16): `force_unwrapping` stays on; exactly the Foundation optionals that no
-input can make nil (`VirtualLocation.url`'s `components.url`, `ZipFormat`'s `DOSTime` date) may use `!`, each with
-`// swiftlint:disable:next force_unwrapping` and a comment that says why it cannot fail.
+Force unwraps (owner's decision, 2026-10-16, extended 2026-10-21): `force_unwrapping` stays on; exactly the system
+optionals that no input can make nil may use `!`, each with `// swiftlint:disable:next force_unwrapping` and a comment
+that says why it cannot fail: `VirtualLocation.url`'s `components.url`, `ZipFormat`'s `DOSTime` date, the error and
+the leaf certificate of a failed trust evaluation and the port in `NetStream`, the pasteboard items of the rename
+list's own drag in `MultiRenameWindowController`.
 
 **Configured so SwiftLint and swift-format agree** (`.swiftlint.yml`, `.swift-format`):
 
@@ -186,10 +192,21 @@ reported every `Sources` finding a second time). The fuzz and stress drivers the
   passes them on the command line (`-left.tabs <data>`, the argument domain). Xcode always runs the test runner in an
   App Sandbox: the tests can write only in their container and cannot remove preferences themselves.
 - **Waits:** condition-based only (`Wait`), at most 30 s; no fixed pauses.
+- **Permissions** (owner's decision, 2026-10-21): the program may control Finder (Automation; `Finder Info` runs
+  `AppleScript.run`), and the helper **AFM UI Mouse** (`UITests/MouseHelper`, built by `run.sh`) may post mouse events
+  (Accessibility) for the drag from the thumbnail grid, which XCUITest's own drag gestures do not reach (its clicks
+  do). Both are signed with a self-signed certificate "AFM UI Tests" in a keychain of its own
+  (`UITests/identity.sh`, `~/Library/Keychains/afm-uitests.keychain-db`), so a permission given once stays from build
+  to build (an ad-hoc signature changes with every build, and macOS ties a permission to the signature). The test
+  runner stays ad hoc: a runner signed with a certificate gets a protected container, from which the program may no
+  longer read the test folders (`SystemPolicyAppDataDetailed` denied). That happened once to the runner's container
+  `local.a-file-manager.uitests.runner`; the runner has been `local.a-file-manager.uitests.tests` since.
 - **Coverage:** the program writes `.build/uitest/codecov/ui-*.profraw` (`LLVM_PROFILE_FILE`), merged into
   `ui.profdata`. The counts merge with those of `swift test --enable-code-coverage` (same compiler flags, same function
   hashes; checked: no mismatch warnings, +142 lines). `Scripts/coverage-gate.py` merges `ui.profdata` with the other
   profiles and passes the program's binary as one more `-object` when a UI run left them.
+- **Brief and Thumbnails views:** the grid is an accessibility list whose children are the cells on screen, named as
+  the list writes them, the cursor's selected (`FileGridView+Accessibility.swift`).
 - **Audit findings (open):** the file lists have no accessibility label; the empty cells of the `[..]` row are static
   texts without a value; the Attr column, partly outside the visible panel, fails the contrast check; one element in the
   menu bar area (type 81) has no description. The audit test fails until they are fixed in `AFMShell`.

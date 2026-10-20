@@ -34,6 +34,28 @@ AFM_BUILD_DIR="$out/build" AFM_APP_DIR="$out/app" AFM_CONFIGURATION=debug AFM_CO
     AFM_BUNDLE_ID="$bundle_id" CODESIGN_IDENTITY="$identity" Scripts/build-app.sh
 xcodegen generate --quiet --spec UITests/project.yml
 
+# The helper that makes the checks XCUITest cannot (UITests/MouseHelper: a drag from the
+# thumbnails), with the system's own mouse events, after the UI tests. Signed with the same
+# identity, so its permission to post events (Accessibility), given once, stays.
+mouse="$out/mouse/AFM UI Mouse.app"
+rm -rf "$mouse"
+mkdir -p "$mouse/Contents/MacOS"
+swiftc -O -framework AppKit -o "$mouse/Contents/MacOS/AFM UI Mouse" UITests/MouseHelper/main.swift
+cat >"$mouse/Contents/Info.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>local.a-file-manager.uitests.mouse</string>
+    <key>CFBundleName</key><string>AFM UI Mouse</string>
+    <key>CFBundleExecutable</key><string>AFM UI Mouse</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>LSBackgroundOnly</key><true/>
+</dict>
+</plist>
+EOF
+codesign --force --options runtime --timestamp=none --sign "$identity" "$mouse"
+
 rm -rf "$out/codecov" "$out/results.xcresult"
 mkdir -p "$out/codecov"
 forget_settings

@@ -73,6 +73,33 @@ internal final class UIMacIntegrationTests: XCTestCase {
         session.app.activate()
     }
 
+    /// Finder Info asks Finder, through AppleScript, for the Info window of the item under the
+    /// cursor; the test closes it.
+    ///
+    /// The item is the Utilities folder in /Applications: in the UI tests Finder's scripting finds
+    /// no item under /Users (nor in the runner's container), whatever its folder. The program needs the
+    /// permission to control Finder (Privacy & Security › Automation); the first run asks.
+    internal func testFinderInfoShowsFindersInfoWindowOfTheItem() throws {
+        let session = try AppSession(leftFiles: [:])
+        running = session
+        try session.startLeft(in: URL(fileURLWithPath: "/Applications", isDirectory: true))
+        let window = try XCTUnwrap(session.launch(), "no main window")
+        let utilities = window.tables.element(boundBy: 0).row(named: "[Utilities]")
+        Wait.forElement(utilities)
+        utilities.click()
+        Wait.until(utilities, \.isSelected, is: true)
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        let info = finder.windows
+            .matching(NSPredicate(format: "title == 'Utilities Info'"))
+            .firstMatch
+        Check.that(!info.exists, "no Info window of Utilities before")
+        UIDesktop(session).menu("Files", "Finder Info")
+        Wait.forElement(info)
+        info.buttons["_XCUI:CloseWindow"].click()
+        Wait.until(info, \.exists, is: false)
+        session.app.activate()
+    }
+
     /// Open with Default Application hands the file to TextEdit, which opens it.
     internal func testTheDefaultApplicationOpensTheFile() throws {
         let other = UIOtherApplication(UIOtherApplication.textEdit)
