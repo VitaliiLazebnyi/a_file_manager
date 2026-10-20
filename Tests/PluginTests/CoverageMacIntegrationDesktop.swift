@@ -43,6 +43,18 @@ internal struct CoverageMacIntegrationDesktop {
         bench = TestBench(plugins: [mac], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"))
     }
 
+    /// A window that is never put on screen.
+    private static func window() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [],
+            backing: .buffered,
+            defer: true
+        )
+        window.isReleasedWhenClosed = false
+        return window
+    }
+
     /// The path of a file in `A`.
     private func path(_ name: String) -> String { box.url("A/" + name).path }
 
@@ -94,6 +106,40 @@ internal struct CoverageMacIntegrationDesktop {
         left.model.setSelected(true, names: ["notes.txt"])
         commands.perform(MacIntegrationPlugin.share)
         #expect(requests == ["share " + path("notes.txt")])
+    }
+
+    /// Without a window that has the keyboard (the program went to the background while a long
+    /// list was gone through) the sharing panel is not shown; the log still says what was asked.
+    @Test
+    internal func withoutAKeyWindowNothingIsShared() {
+        desktop.keyWindowContent = nil
+        left.model.setSelected(true, names: ["notes.txt"])
+        commands.perform(MacIntegrationPlugin.share)
+        #expect(requests.isEmpty && mac.log == ["share " + path("notes.txt")])
+    }
+
+    /// The Quick Look feeder joins the responder chain of the main window when the command starts:
+    /// a long marked list is gone through first, and the window is no longer the main one by the
+    /// time the panel is shown.
+    @Test
+    internal func quickLookJoinsTheWindowTheCommandCameFrom() async throws {
+        for index in 0...MacIntegrationPlugin.backgroundListThreshold { try box.file("A/many/f\(index).txt") }
+        left.show(box.url("A/many"))
+        left.model.selectAll()
+        let window = Self.window()
+        defer { window.close() }
+        let before = window.nextResponder
+        desktop.mainWindow = window
+        commands.perform(MacIntegrationPlugin.quickLook)
+        // The list is still being gone through: the main window goes.
+        desktop.mainWindow = nil
+        let panel = desktop.panel
+        #expect(panel.calls.isEmpty)
+        #expect(await RunLoopWait.until { panel.calls == ["show"] })
+        let feeder = try #require(panel.feeder)
+        #expect(window.nextResponder === feeder && feeder.nextResponder === before)
+        #expect(feeder.numberOfPreviewItems(in: nil) == MacIntegrationPlugin.backgroundListThreshold + 1)
+        mac.stop()
     }
 
     /// Quick Look: shown with the files, closed again; while open it follows the cursor and the
@@ -156,19 +202,21 @@ internal struct CoverageMacIntegrationDesktop {
     @Test
     internal func theFeederPassesKeysOn() throws {
         let feeder = QuickLookController()
-        #expect(!feeder.join(nil) && feeder.acceptsPreviewPanelControl(nil))
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
-            styleMask: [],
-            backing: .buffered,
-            defer: true
-        )
-        window.isReleasedWhenClosed = false
-        defer { window.close() }
+        feeder.join(nil)
+        #expect(feeder.nextResponder == nil && feeder.acceptsPreviewPanelControl(nil))
+        let (window, other) = (Self.window(), Self.window())
+        defer {
+            window.close()
+            other.close()
+        }
         let keys = CoverageMacKeys(frame: window.contentLayoutRect)
         window.contentView = keys
         window.makeFirstResponder(keys)
-        #expect(feeder.join(window) && feeder.join(nil) && window.nextResponder === feeder)
+        feeder.join(window)
+        feeder.join(nil)
+        feeder.join(other)
+        // Joined once: the first window keeps it.
+        #expect(window.nextResponder === feeder && other.nextResponder !== feeder)
         let event = try #require(
             NSEvent.keyEvent(
                 with: .keyDown,

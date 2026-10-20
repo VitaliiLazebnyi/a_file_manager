@@ -28,15 +28,14 @@ final class QuickLookController: NSResponder, @preconcurrency QLPreviewPanelData
         panel?.show(for: self)
     }
 
-    /// Puts this object behind `window` in the responder chain, once; false when there is no
-    /// window to join and the panel is to be fed directly.
-    func join(_ window: NSWindow?) -> Bool {
+    /// Puts this object behind `window` in the responder chain, where the panel looks for whoever
+    /// feeds it; once, and not without a window.
+    internal func join(_ window: NSWindow?) {
         if host == nil, let window {
             nextResponder = window.nextResponder
             window.nextResponder = self
             host = window
         }
-        return host != nil
     }
 
     /// Follows the cursor: the open panel shows other files.

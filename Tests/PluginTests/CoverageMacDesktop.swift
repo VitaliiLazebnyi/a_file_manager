@@ -1,12 +1,12 @@
-import Foundation
+import AppKit
 import TestSupport
 
 @testable import MacIntegrationPlugin
 
 /// A desktop that notes what it is asked, from any thread, and starts nothing.
 ///
-/// Unchecked `Sendable`: the records are `Shared` values; `preview` and `chosen` are used on the
-/// main thread only.
+/// Unchecked `Sendable`: the records are `Shared` values; `preview`, `chosen` and the windows are
+/// used on the main thread only.
 internal final class CoverageMacDesktop: MacDesktop, @unchecked Sendable {
     /// What was asked, one line each: `open-with <app> <paths>`, `open <path>`, `reveal <paths>`,
     /// `choose <title>`, `share <paths>`.
@@ -15,6 +15,10 @@ internal final class CoverageMacDesktop: MacDesktop, @unchecked Sendable {
     @MainActor internal let panel = CoverageMacPreview()
     /// What the user picks when asked for an application.
     @MainActor internal var chosen: URL?
+    /// The program's main window, as this desktop says; none unless the test gives one.
+    @MainActor internal var mainWindow: NSWindow?
+    /// What the window with the keyboard shows; a view of its own unless the test takes it away.
+    @MainActor internal var keyWindowContent: NSView? = NSView()
 
     /// The Quick Look panel of this desktop.
     @MainActor internal var preview: any PreviewPanel { panel }
@@ -49,7 +53,7 @@ internal final class CoverageMacDesktop: MacDesktop, @unchecked Sendable {
 
     /// Notes the request.
     @MainActor
-    internal func share(_ urls: [URL]) {
+    internal func share(_ urls: [URL], at _: NSView) {
         note("share " + urls.map(\.path).joined(separator: " "))
     }
 
