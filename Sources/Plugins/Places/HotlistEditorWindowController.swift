@@ -45,7 +45,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         let controller = HotlistEditorWindowController(hotlist, kernel: kernel, currentDirectory: currentDirectory)
         let window = controller.dialog
         window.center()
-        NSApp.runModal(for: window)
+        NSApplication.shared.runModal(for: window)
         window.orderOut(nil)
         return controller.result
     }
@@ -337,6 +337,6 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     func windowWillClose(_: Notification) {
         // Only the loop this window runs in is ended: a stop without one would end whatever
         // loop the main thread runs.
-        if NSApp.modalWindow === window { NSApp.stopModal() }
+        if NSApplication.shared.modalWindow === window { NSApplication.shared.stopModal() }
     }
 }

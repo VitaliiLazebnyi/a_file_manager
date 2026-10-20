@@ -693,7 +693,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     /// Keys in the quick-search field: Ctrl+Enter and Ctrl+arrows step through the matches, and
     /// plain arrows move the cursor in the tree.
     func control(_: NSControl, textView _: NSTextView, doCommandBy _: Selector) -> Bool {
-        handleFieldKey(NSApp.currentEvent)
+        handleFieldKey(NSApplication.shared.currentEvent)
     }
 
     /// The key press behind a command of the quick-search field, if it was one.

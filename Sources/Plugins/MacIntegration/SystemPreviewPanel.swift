@@ -17,7 +17,7 @@ internal final class SystemPreviewPanel: PreviewPanel {
     internal func show(for controller: QuickLookController) {
         let panel = shared
         // Fed directly when there is no window whose responder chain could hold the feeder.
-        if !controller.join(NSApp.mainWindow) {
+        if !controller.join(NSApplication.shared.mainWindow) {
             (panel.dataSource, panel.delegate) = (controller, controller)
         }
         panel.makeKeyAndOrderFront(nil)

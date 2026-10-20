@@ -16,12 +16,12 @@ internal struct ConfigurationEffects {
     internal static let system = Self(
         present: { $0.showWindow(nil) },
         beep: { NSSound.beep() },
-        runModal: { _ = NSApp.runModal(for: $0) },
-        stopModal: { NSApp.stopModal() },
+        runModal: { _ = NSApplication.shared.runModal(for: $0) },
+        stopModal: { NSApplication.shared.stopModal() },
         chooseSettingsFile: { saving, productName in Self.filePanel(saving: saving, productName) },
-        showAbout: { NSApp.orderFrontStandardAboutPanel(nil) },
-        mainMenu: { NSApp.mainMenu },
-        windows: { NSApp.windows },
+        showAbout: { NSApplication.shared.orderFrontStandardAboutPanel(nil) },
+        mainMenu: { NSApplication.shared.mainMenu },
+        windows: { NSApplication.shared.windows },
         pasteboard: .general,
         monitorKeys: { NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: $0) },
         removeKeyMonitor: { NSEvent.removeMonitor($0) }

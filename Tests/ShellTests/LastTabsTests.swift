@@ -15,6 +15,9 @@ internal struct LastTabsTests {
     /// The program's folders: `A` with `docs`, `one.txt`, `two.txt`; `B` with `fresh.txt`.
     internal init() throws {
         program = try PanelProgram(rightFile: "fresh.txt", contents: "fresh")
+        // Without the listing cache, the new tab's folder is never shown before it is read: under
+        // load the cache would keep `B` (it took long to read) and show it, cursor and all, at once.
+        program.settings.set(false, forKey: ListingCache.settingsKey)
     }
 
     /// The shown tab is closed while the next one has not been read: no cursor is shown, not

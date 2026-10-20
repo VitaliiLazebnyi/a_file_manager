@@ -26,14 +26,14 @@ internal struct ToolsDesktop: Sendable {
         printer: URL(fileURLWithPath: "/usr/bin/lpr"),
         start: { NSWorkspace.shared.openApplication(at: $0, configuration: NSWorkspace.OpenConfiguration()) },
         open: { NSWorkspace.shared.open($0, withApplicationAt: $1, configuration: NSWorkspace.OpenConfiguration()) },
-        print: { Self.run($0, sheetOf: NSApp.mainWindow) },
+        print: { Self.run($0, sheetOf: NSApplication.shared.mainWindow) },
         copy: { text in
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
         },
-        quit: { NSApp.terminate(nil) },
+        quit: { NSApplication.shared.terminate(nil) },
         // The command comes through the main window's responder chain: there is a main window.
-        minimize: { NSApp.mainWindow?.miniaturize(nil) }
+        minimize: { NSApplication.shared.mainWindow?.miniaturize(nil) }
     )
 
     /// Nothing outside the program: only harmless lines run, by the plain system shell with the PATH and the
