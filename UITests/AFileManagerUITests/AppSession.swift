@@ -66,6 +66,15 @@ internal final class AppSession {
             // No windows brought back from an earlier run.
             "-ApplePersistenceIgnoreState", "YES"
         ]
+        // The tests share the program's preferences while they run: what one test changes and
+        // the program remembers (the source panel, a view, the divider) does not reach the next.
+        let fullView = ["mode": 0, "extraColumns": [], "columnWidths": [:]] as [String: Any]
+        for (key, value) in [
+            ("window.sourcePanel", "left" as Any), ("window.divider", 500), ("window.panelsStacked", false),
+            ("window.fullScreen", false), ("left.view", fullView), ("right.view", fullView)
+        ] {
+            app.launchArguments += ["-" + key, try Self.setting(value)]
+        }
         if let profiles = environment["AFM_PROFILE_DIR"] {
             // %p: one file for each run of the program.
             app.launchEnvironment["LLVM_PROFILE_FILE"] = profiles + "/ui-%p.profraw"
@@ -78,7 +87,13 @@ internal final class AppSession {
         let tab: [String: Any] = [
             "location": folder.absoluteString, "sortKey": 0, "descending": false, "showHidden": false
         ]
-        let json = try JSONSerialization.data(withJSONObject: ["tabs": [tab], "active": 0])
+        return try setting(["tabs": [tab], "active": 0])
+    }
+
+    /// A setting as the program keeps it (JSON), in the property-list form the argument domain
+    /// reads: `<hex bytes>` is data.
+    private static func setting(_ value: Any) throws -> String {
+        let json = try JSONSerialization.data(withJSONObject: value, options: .fragmentsAllowed)
         return "<" + json.map { String(format: "%02x", $0) }.joined() + ">"
     }
 
