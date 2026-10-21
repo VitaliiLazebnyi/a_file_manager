@@ -1,4 +1,4 @@
-// swift-tools-version:6.2
+// swift-tools-version:6.4
 import PackageDescription
 
 // The stress harnesses, built against the project's own sources: `Sources` and `TestSupport` in

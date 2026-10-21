@@ -49,7 +49,7 @@ from the host Mac into the test VM. Branch: `quality-gates`.
 5. SwiftLint automatic fixes, one rule at a time, each build-checked; all 2,161 tests pass.
 6. Gate scripts: `Scripts/check.sh` (all gates), `coverage-gate.py`, `leak-check.sh`, `mutation.sh`, `vm-check.sh`,
    `install-tools.sh`; workflows `quality.yml` and `codeql.yml`; `.githooks/pre-commit` (not switched on yet).
-7. `Package.swift` for Swift 6: tools 6.2, Swift 6 language mode, warnings as errors, upcoming features
+7. `Package.swift` for Swift 6: tools 6.4, Swift 6 language mode, warnings as errors, upcoming features
    `ExistentialAny`, `MemberImportVisibility`, `InternalImportsByDefault`, and the DocC plugin.
 8. **Swift 6 migration (done 2026-10-14).** Swift 6 language mode, every warning an error, `ExistentialAny`,
    `MemberImportVisibility`, `InternalImportsByDefault`; zero diagnostics in sources and tests. The isolation model:
