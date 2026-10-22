@@ -24,10 +24,10 @@ private final class ProbingFileSystem: FileSystemProvider {
     let reading = DispatchSemaphore(value: 0)
     let writing = DispatchSemaphore(value: 0)
 
-    init(_ memory: MemoryFileSystem) { self.memory = memory }
-
     var scheme: String { memory.scheme }
     var capabilities: FileSystemCapabilities { memory.capabilities }
+
+    init(_ memory: MemoryFileSystem) { self.memory = memory }
     func capabilities(for url: URL) -> FileSystemCapabilities { memory.capabilities(for: url) }
     func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try memory.list(directory, showHidden: showHidden)
@@ -117,15 +117,15 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
 internal struct ToolsAdoptSelection {
     internal let memory = MemoryFileSystem()
 
+    private let scratch = ScratchPasteboard()
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+
     internal init() {
         memory.addFile("/A/" + composed, "12345")
         memory.addFile("/A/" + decomposed, "1")
         memory.addFile("/A/plain.md", "x")
         memory.addDirectory("/B")
     }
-
-    private let scratch = ScratchPasteboard()
-    internal var pasteboard: NSPasteboard { scratch.pasteboard }
 
     internal func makeBench() -> TestBench {
         TestBench(
@@ -709,17 +709,6 @@ internal struct ToolsAdoptCompare {
 
 @Suite
 internal struct ToolsAdoptFileTools {
-    private func random(_ count: Int, seed: UInt64) -> Data {
-        var state = seed
-        return Data(
-            (0..<count)
-                .map { _ in
-                    state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-                    return UInt8(truncatingIfNeeded: state >> 33)
-                }
-        )
-    }
-
     /// The first form of the two six-bit codecs, kept as the reference of the pointer loops.
     private enum Reference {
         static let xx = Array("+-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".utf8)
@@ -782,6 +771,17 @@ internal struct ToolsAdoptFileTools {
             }
             return Array(bytes.prefix(count))
         }
+    }
+
+    private func random(_ count: Int, seed: UInt64) -> Data {
+        var state = seed
+        return Data(
+            (0..<count)
+                .map { _ in
+                    state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+                    return UInt8(truncatingIfNeeded: state >> 33)
+                }
+        )
     }
 
     @Test

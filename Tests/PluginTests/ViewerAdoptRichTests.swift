@@ -10,16 +10,6 @@ import Testing
 /// drawn from.
 @Suite
 internal struct ViewerAdoptHTML {
-    private func random(_ seed: UInt64) -> (Int) -> Int {
-        var state = seed &* 0x9E37_79B9_7F4A_7C15 | 1
-        return { bound in
-            state ^= state << 13
-            state ^= state >> 7
-            state ^= state << 17
-            return Int(truncatingIfNeeded: state >> 11) % max(1, bound)
-        }
-    }
-
     private let pieces: [String] = [
         "text ", "More  words\n", "tab\there ", "\u{A0}", "\u{2003}", "\u{85}", " ", "  \n  ", "\r\n", "x", "é", "日本語 ",
         "😀", "caf\u{E9} ",
@@ -44,6 +34,16 @@ internal struct ViewerAdoptHTML {
         "x > y", "<<p>>", "<a b c>", "<verylongtagnamethatgoesonforever>",
         "<h1 attr=\"v\"", "<div class='a>b'>"
     ]
+
+    private func random(_ seed: UInt64) -> (Int) -> Int {
+        var state = seed &* 0x9E37_79B9_7F4A_7C15 | 1
+        return { bound in
+            state ^= state << 13
+            state ^= state >> 7
+            state ^= state << 17
+            return Int(truncatingIfNeeded: state >> 11) % max(1, bound)
+        }
+    }
 
     private func generate(_ next: (Int) -> Int, count: Int) -> [UInt16] {
         var units: [UInt16] = []

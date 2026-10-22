@@ -63,6 +63,16 @@ internal final class TemporaryCopies: @unchecked Sendable {
     /// What must stay free on the disk after a copy.
     internal static let freeSpaceMargin: Int64 = 256 << 20
 
+    // MARK: Leftovers
+
+    private static let prefix = "afm-viewer-"
+
+    /// Once per launch, in the background: removes the folders of processes that are gone (a crash
+    /// does not run `deinit`), and those of earlier versions that are over a day old.
+    internal static let sweepOnce: Void = {
+        BlockingCalls.run { sweep(in: FileManager.default.temporaryDirectory) }
+    }()
+
     private let lock = NSLock()
     private var root: URL?
     private var copies: [String: Copy] = [:]
@@ -76,6 +86,9 @@ internal final class TemporaryCopies: @unchecked Sendable {
     /// Taken while the folder of all copies is made: one thread makes it.
     private let rootLock = NSLock()
 
+    /// What is being deleted in the background.
+    private let group = DispatchGroup()
+
     internal convenience init(directory: URL = FileManager.default.temporaryDirectory) {
         self.init(directory: directory, disk: .system)
     }
@@ -85,6 +98,44 @@ internal final class TemporaryCopies: @unchecked Sendable {
         self.directory = directory
         self.disk = disk
         _ = Self.sweepOnce
+    }
+
+    /// A file name for a copy: one path component, whatever the name of the file was (it may
+    /// be anything a server sent, decoded: `..`, `a/b`, a very long name).
+    internal static func safeName(_ name: String) -> String {
+        var cleaned = String(
+            String.UnicodeScalarView(
+                name.unicodeScalars.map { scalar in
+                    scalar == "/" || scalar == ":" || scalar == "\\" || scalar.value < 0x20 || scalar.value == 0x7F
+                        ? "_" : scalar
+                }
+            )
+        )
+        cleaned = cleaned.trimmingCharacters(in: .whitespaces)
+        if cleaned.isEmpty || cleaned.allSatisfy({ $0 == "." }) {
+            return "file"
+        }
+        // A name is at most 255 bytes: keep the end, which holds the extension that picks the player.
+        while cleaned.utf8.count > 200 { cleaned.remove(at: cleaned.index(after: cleaned.startIndex)) }
+        return cleaned.first == "." ? "_" + cleaned : cleaned
+    }
+
+    internal static func sweep(in directory: URL, now: Date = Date()) {
+        let manager = FileManager.default
+        guard let names = try? manager.contentsOfDirectory(atPath: directory.path) else {
+            return
+        }
+        for name in names where name.hasPrefix(prefix) {
+            let folder = directory.appendingPathComponent(name, isDirectory: true)
+            let rest = name.dropFirst(prefix.count)
+            if rest.hasPrefix("p"), let pid = Int32(rest.dropFirst().prefix { $0 != "-" }) {
+                if pid != getpid(), kill(pid, 0) != 0, errno == ESRCH { try? manager.removeItem(at: folder) }
+            } else if let modified = (try? manager.attributesOfItem(atPath: folder.path))?[.modificationDate] as? Date,
+                now.timeIntervalSince(modified) > 86_400
+            {
+                try? manager.removeItem(at: folder)
+            }
+        }
     }
 
     /// The file itself when it is on the local disk, else a copy of it read through its
@@ -205,26 +256,6 @@ internal final class TemporaryCopies: @unchecked Sendable {
         return .success(target)
     }
 
-    /// A file name for a copy: one path component, whatever the name of the file was (it may
-    /// be anything a server sent, decoded: `..`, `a/b`, a very long name).
-    internal static func safeName(_ name: String) -> String {
-        var cleaned = String(
-            String.UnicodeScalarView(
-                name.unicodeScalars.map { scalar in
-                    scalar == "/" || scalar == ":" || scalar == "\\" || scalar.value < 0x20 || scalar.value == 0x7F
-                        ? "_" : scalar
-                }
-            )
-        )
-        cleaned = cleaned.trimmingCharacters(in: .whitespaces)
-        if cleaned.isEmpty || cleaned.allSatisfy({ $0 == "." }) {
-            return "file"
-        }
-        // A name is at most 255 bytes: keep the end, which holds the extension that picks the player.
-        while cleaned.utf8.count > 200 { cleaned.remove(at: cleaned.index(after: cleaned.startIndex)) }
-        return cleaned.first == "." ? "_" + cleaned : cleaned
-    }
-
     private func begin(_ owner: ObjectIdentifier) -> (epoch: Int, release: Int) {
         lock.lock()
         defer { lock.unlock() }
@@ -287,9 +318,6 @@ internal final class TemporaryCopies: @unchecked Sendable {
             group.leave()
         }
     }
-
-    /// What is being deleted in the background.
-    private let group = DispatchGroup()
 
     /// Returns once the copies that were let go of have been deleted (for tests).
     internal func waitForCleanup() {
@@ -360,34 +388,6 @@ internal final class TemporaryCopies: @unchecked Sendable {
     }
 
     deinit { removeAll() }
-
-    // MARK: Leftovers
-
-    private static let prefix = "afm-viewer-"
-
-    /// Once per launch, in the background: removes the folders of processes that are gone (a crash
-    /// does not run `deinit`), and those of earlier versions that are over a day old.
-    internal static let sweepOnce: Void = {
-        BlockingCalls.run { sweep(in: FileManager.default.temporaryDirectory) }
-    }()
-
-    internal static func sweep(in directory: URL, now: Date = Date()) {
-        let manager = FileManager.default
-        guard let names = try? manager.contentsOfDirectory(atPath: directory.path) else {
-            return
-        }
-        for name in names where name.hasPrefix(prefix) {
-            let folder = directory.appendingPathComponent(name, isDirectory: true)
-            let rest = name.dropFirst(prefix.count)
-            if rest.hasPrefix("p"), let pid = Int32(rest.dropFirst().prefix { $0 != "-" }) {
-                if pid != getpid(), kill(pid, 0) != 0, errno == ESRCH { try? manager.removeItem(at: folder) }
-            } else if let modified = (try? manager.attributesOfItem(atPath: folder.path))?[.modificationDate] as? Date,
-                now.timeIntervalSince(modified) > 86_400
-            {
-                try? manager.removeItem(at: folder)
-            }
-        }
-    }
 }
 
 /// The media player mode (spec 10 › Media player mode), on AVKit.
@@ -402,6 +402,8 @@ internal final class MediaView: NSView {
     internal var onEnd: () -> Void = {}
     /// Called with "track – artist" when the file's tags name them.
     internal var onTitle: ((String) -> Void)?
+
+    internal var volume: Float { playback.volume }
 
     internal init(frame: NSRect, playback: any MediaPlayback) {
         self.playback = playback
@@ -444,8 +446,6 @@ internal final class MediaView: NSView {
         playback.unload()
     }
 
-    internal var volume: Float { playback.volume }
-
     internal func togglePlaying() {
         if playback.isPlaying { playback.pause() } else { playback.play() }
     }
@@ -483,13 +483,19 @@ internal final class MediaView: NSView {
 /// http-equiv="refresh">` and a script-less redirect are navigations too, and would load a page of
 /// the web into the viewer), and a link that was clicked is handed to `onLink`. Main thread only.
 internal final class WebContentView: NSView, WKNavigationDelegate {
+    /// What a navigation is allowed to do: the first one (the page, from a string), a jump to a
+    /// place in the page (`#name`), and nothing else.
+    internal enum Decision: Equatable {
+        case allow, cancel, followLink
+    }
+    /// Forbids every load but inline styles and images that are part of the page itself.
+    internal static let policy =
+        "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:\">"
+
     private let webView: WKWebView
     internal var onLink: (URL) -> Void = { _ in }
     /// Whether the load of the page itself is still to come.
     private var expectsPage = false
-    /// Forbids every load but inline styles and images that are part of the page itself.
-    internal static let policy =
-        "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:\">"
 
     override internal init(frame: NSRect) {
         let configuration = WKWebViewConfiguration()
@@ -504,17 +510,6 @@ internal final class WebContentView: NSView, WKNavigationDelegate {
 
     /// Made in code only: an archive gives none.
     internal required init?(coder _: NSCoder) { nil }
-
-    internal func show(html: String) {
-        expectsPage = true
-        webView.loadHTMLString(Self.policy + html, baseURL: nil)
-    }
-
-    /// What a navigation is allowed to do: the first one (the page, from a string), a jump to a
-    /// place in the page (`#name`), and nothing else.
-    internal enum Decision: Equatable {
-        case allow, cancel, followLink
-    }
 
     nonisolated internal static func decide(isMainFrame: Bool, isLinkClick: Bool, url: URL?, expectsPage: Bool)
         -> Decision
@@ -538,6 +533,11 @@ internal final class WebContentView: NSView, WKNavigationDelegate {
             return .allow
         }
         return .cancel
+    }
+
+    internal func show(html: String) {
+        expectsPage = true
+        webView.loadHTMLString(Self.policy + html, baseURL: nil)
     }
 
     internal func webView(

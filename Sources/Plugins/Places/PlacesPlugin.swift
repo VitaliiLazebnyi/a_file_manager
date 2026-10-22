@@ -26,8 +26,6 @@ extension CommandID {
 /// the main thread and works on locations only; the one thing that reads file systems, the
 /// tree, does so on background threads (`TreeScanner`, `TreeCache`).
 public final class PlacesPlugin: Plugin {
-    public let name = "Places"
-
     internal enum Keys {
         internal static let hotlist = "hotlist"
         internal static let favorites = "places.hotlist.favorites"
@@ -37,6 +35,13 @@ public final class PlacesPlugin: Plugin {
         internal static let showFrequent = "places.history.showFrequent"
         internal static let frequentShown = "places.history.frequentShown"
     }
+
+    private enum HotlistLevel {
+        case user(Hotlist.Path)
+        case favorites
+    }
+
+    public let name = "Places"
 
     /// Set when the plugin starts; safe to use from any thread.
     internal private(set) var treeCache = TreeCache(directory: nil)
@@ -268,11 +273,6 @@ public final class PlacesPlugin: Plugin {
             return false
         }
         return kernel.fileSystems.location(from: path, relativeTo: directory).isSameLocation(as: directory)
-    }
-
-    private enum HotlistLevel {
-        case user(Hotlist.Path)
-        case favorites
     }
 
     /// Ctrl+D: the hotlist as a pick list, one level at a time.

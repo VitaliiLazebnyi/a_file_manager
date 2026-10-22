@@ -38,6 +38,8 @@ internal struct SelectionMask {
         /// The mask ended with a separator: it means folders, not files.
         let foldersOnly: Bool
 
+        var usesPath: Bool { isAnchored || !folders.isEmpty }
+
         /// Nil for a mask that names nothing in a list (a lone `\`, the base directory itself).
         init?(_ text: String) {
             let text = text.replacingOccurrences(of: "\\", with: "/").lowercased()
@@ -50,35 +52,6 @@ internal struct SelectionMask {
             nameBytes = last.utf8.allSatisfy { $0 < 0x80 && $0 != 0x0D } ? Array(last.utf8) : nil
             isAnchored = text.hasPrefix("/") || text.hasPrefix("./")
             foldersOnly = text.hasSuffix("/")
-        }
-
-        var usesPath: Bool { isAnchored || !folders.isEmpty }
-
-        /// For a name of plain ASCII bytes and a mask with no folder part; nil when `nameBytes` is.
-        func matches(bytes name: UnsafeBufferPointer<UInt8>, isFolder: Bool) -> Bool? {
-            guard let nameBytes, !usesPath else {
-                return nil
-            }
-            if foldersOnly, !isFolder {
-                return false
-            }
-            return Wildcard.matches(ascii: nameBytes, name)
-        }
-
-        /// `chain` is the folders leading to the entry, in lower case.
-        func matches(_ name: [Character], isFolder: Bool, chain: [[Character]]) -> Bool {
-            if foldersOnly, !isFolder {
-                return false
-            }
-            guard Wildcard.matches(self.name, name) else {
-                return false
-            }
-            guard usesPath else {
-                return true
-            }
-            // Without a leading separator the chain may start below any subdirectory.
-            let patterns = isAnchored ? folders : [Array("**")] + folders
-            return Self.chain(patterns, matches: chain)
         }
 
         /// Whether the folder patterns fit the folders from the first to the last; `**` stands
@@ -111,6 +84,33 @@ internal struct SelectionMask {
             while p < patterns.count, patterns[p] == anyLevels { p += 1 }
             return p == patterns.count
         }
+
+        /// For a name of plain ASCII bytes and a mask with no folder part; nil when `nameBytes` is.
+        func matches(bytes name: UnsafeBufferPointer<UInt8>, isFolder: Bool) -> Bool? {
+            guard let nameBytes, !usesPath else {
+                return nil
+            }
+            if foldersOnly, !isFolder {
+                return false
+            }
+            return Wildcard.matches(ascii: nameBytes, name)
+        }
+
+        /// `chain` is the folders leading to the entry, in lower case.
+        func matches(_ name: [Character], isFolder: Bool, chain: [[Character]]) -> Bool {
+            if foldersOnly, !isFolder {
+                return false
+            }
+            guard Wildcard.matches(self.name, name) else {
+                return false
+            }
+            guard usesPath else {
+                return true
+            }
+            // Without a leading separator the chain may start below any subdirectory.
+            let patterns = isAnchored ? folders : [Array("**")] + folders
+            return Self.chain(patterns, matches: chain)
+        }
     }
 
     internal let text: String
@@ -124,21 +124,6 @@ internal struct SelectionMask {
     private var related: String?
     /// False for a regular expression that cannot be read; such a mask matches nothing.
     internal private(set) var isValid = true
-
-    internal init(_ text: String) {
-        let text = text.trimmingCharacters(in: .whitespaces)
-        self.text = text
-        if text.hasPrefix("<") {
-            expression = try? NSRegularExpression(pattern: String(text.dropFirst()), options: [.caseInsensitive])
-            isValid = expression != nil
-            return
-        }
-        let (primary, related) = Self.split(text, at: ">")
-        self.related = related.map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
-        let (included, excluded) = Self.split(primary, at: "|")
-        includes = Self.tokens(included).compactMap(Token.init)
-        excludes = Self.tokens(excluded ?? "").compactMap(Token.init)
-    }
 
     /// Whether the folders leading to an entry matter; when not, callers need not work them out.
     internal var needsDirectories: Bool {
@@ -155,6 +140,52 @@ internal struct SelectionMask {
     /// Whether a regular expression of the mask ran out of time on some name: those were taken
     /// as not matching, and the mask's answer is not to be trusted.
     internal var timedOut: Bool { trip.hasTimedOut }
+
+    internal init(_ text: String) {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        self.text = text
+        if text.hasPrefix("<") {
+            expression = try? NSRegularExpression(pattern: String(text.dropFirst()), options: [.caseInsensitive])
+            isValid = expression != nil
+            return
+        }
+        let (primary, related) = Self.split(text, at: ">")
+        self.related = related.map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
+        let (included, excluded) = Self.split(primary, at: "|")
+        includes = Self.tokens(included).compactMap(Token.init)
+        excludes = Self.tokens(excluded ?? "").compactMap(Token.init)
+    }
+
+    /// Splits at the first `separator` outside double quotes.
+    private static func split(_ text: String, at separator: Character) -> (String, String?) {
+        var quoted = false
+        for index in text.indices {
+            if text[index] == "\"" { quoted.toggle() }
+            if text[index] == separator, !quoted {
+                return (String(text[..<index]), String(text[text.index(after: index)...]))
+            }
+        }
+        return (text, nil)
+    }
+
+    /// The masks of one part, separated by spaces or semicolons; double quotes keep spaces.
+    private static func tokens(_ text: String) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+        var quoted = false
+        for character in text {
+            if character == "\"" {
+                quoted.toggle()
+            } else if !quoted, character == " " || character == ";" {
+                if !current.isEmpty { tokens.append(current) }
+                current = ""
+            } else {
+                current.append(character)
+            }
+        }
+        if !current.isEmpty { tokens.append(current) }
+        return tokens
+    }
 
     /// Whether the entry matches the mask itself; related files (`A>B`) are found by `selected`.
     /// `cancelled` ends a regular expression that is still working.
@@ -224,37 +255,6 @@ internal struct SelectionMask {
             }
         }
         return result
-    }
-
-    /// Splits at the first `separator` outside double quotes.
-    private static func split(_ text: String, at separator: Character) -> (String, String?) {
-        var quoted = false
-        for index in text.indices {
-            if text[index] == "\"" { quoted.toggle() }
-            if text[index] == separator, !quoted {
-                return (String(text[..<index]), String(text[text.index(after: index)...]))
-            }
-        }
-        return (text, nil)
-    }
-
-    /// The masks of one part, separated by spaces or semicolons; double quotes keep spaces.
-    private static func tokens(_ text: String) -> [String] {
-        var tokens: [String] = []
-        var current = ""
-        var quoted = false
-        for character in text {
-            if character == "\"" {
-                quoted.toggle()
-            } else if !quoted, character == " " || character == ";" {
-                if !current.isEmpty { tokens.append(current) }
-                current = ""
-            } else {
-                current.append(character)
-            }
-        }
-        if !current.isEmpty { tokens.append(current) }
-        return tokens
     }
 }
 

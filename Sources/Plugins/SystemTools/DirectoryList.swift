@@ -232,6 +232,8 @@ internal final class PagePrintView: NSView {
     private let attributes: [NSAttributedString.Key: Any]
     private let lineHeight: CGFloat
 
+    override internal var isFlipped: Bool { true }
+
     /// `longestLine` is the length of the longest line, when the caller has measured it
     /// already (off the main thread, for a long list).
     ///
@@ -263,8 +265,6 @@ internal final class PagePrintView: NSView {
     }
 
     internal required init?(coder _: NSCoder) { nil }
-
-    override internal var isFlipped: Bool { true }
 
     override internal func knowsPageRange(_ range: NSRangePointer) -> Bool {
         range.pointee = NSRange(location: 1, length: max(pages.count, 1))

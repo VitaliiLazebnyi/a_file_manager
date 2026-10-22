@@ -74,6 +74,11 @@ internal struct ArchiveAdoption {
     internal let bench: ArchiveBench
     internal var box: Sandbox { bench.box }
 
+    /// What the temporary folder of the archives holds.
+    internal var scratchFiles: [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: bench.environment.scratch.url.path)) ?? [])
+    }
+
     internal init() throws {
         bench = try ArchiveBench()
     }
@@ -96,11 +101,6 @@ internal struct ArchiveAdoption {
 
     internal func isSound(_ archive: URL) -> Bool {
         runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0
-    }
-
-    /// What the temporary folder of the archives holds.
-    internal var scratchFiles: [String] {
-        ((try? FileManager.default.contentsOfDirectory(atPath: bench.environment.scratch.url.path)) ?? [])
     }
 
     // MARK: Per location

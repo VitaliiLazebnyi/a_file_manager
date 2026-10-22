@@ -22,15 +22,6 @@ import Foundation
 /// Unchecked: the table is guarded by `lock`, what a slot holds by the slot's own lock (see
 /// Threading above).
 internal final class ArchiveStore: @unchecked Sendable {
-    internal let environment: ArchiveEnvironment
-    private let lock = NSLock()
-    private var slots: [String: Slot] = [:]
-    /// The archives of the slots, for readers that must not wait on a slot.
-    private var opened: [String: OpenArchive] = [:]
-    private var clock = 0
-    /// Archives without pending changes beyond this number are let go, least recently used first.
-    private let capacity = 12
-
     private final class Slot {
         let lock = NSLock()
         var archive: OpenArchive?
@@ -43,8 +34,51 @@ internal final class ArchiveStore: @unchecked Sendable {
     /// How long the reason a file could not be opened is repeated without looking again.
     internal static let failureMemory: TimeInterval = 30
 
+    internal let environment: ArchiveEnvironment
+    private let lock = NSLock()
+    private var slots: [String: Slot] = [:]
+    /// The archives of the slots, for readers that must not wait on a slot.
+    private var opened: [String: OpenArchive] = [:]
+    private var clock = 0
+    /// Archives without pending changes beyond this number are let go, least recently used first.
+    private let capacity = 12
+
+    /// The archives that are open, from the table alone.
+    private var openArchives: [OpenArchive] {
+        lock.lock()
+        defer { lock.unlock() }
+        return Array(opened.values)
+    }
+
+    /// True when changes wait to be written into some archive.
+    internal var hasPendingChanges: Bool {
+        openArchives.contains(where: \.hasPendingChanges)
+    }
+
     internal init(environment: ArchiveEnvironment) {
         self.environment = environment
+    }
+
+    private static func isAboutTheFile(_ error: any Error) -> Bool {
+        switch error {
+        case ArchiveError.notAnArchive, ArchiveError.damaged, ArchiveError.unsupported:
+            return true
+
+        default:
+            return false
+        }
+    }
+
+    /// Whether an archive is the file at `url`, lies in that folder, or inside such an archive.
+    private static func archive(_ archive: OpenArchive, liesIn url: URL) -> Bool {
+        // The file an archive inside archives finally lies in.
+        var file = archive.archiveURL
+        for _ in 0..<64 {
+            guard case .inside(let location)? = ArchiveURL.parse(file) else { break }
+            file = location.archive
+        }
+        file = ArchiveURL.resolved(file)
+        return file.isSameLocation(as: url) || PathSafety.isContained(file, in: url)
     }
 
     /// The open archive for the file at `url`, opening or re-reading it when needed.
@@ -131,16 +165,6 @@ internal final class ArchiveStore: @unchecked Sendable {
                 slot.failure = (error, url.isFileURL ? FileSignature.of(url.path) : nil, Date())
             }
             throw error
-        }
-    }
-
-    private static func isAboutTheFile(_ error: any Error) -> Bool {
-        switch error {
-        case ArchiveError.notAnArchive, ArchiveError.damaged, ArchiveError.unsupported:
-            return true
-
-        default:
-            return false
         }
     }
 
@@ -275,18 +299,6 @@ internal final class ArchiveStore: @unchecked Sendable {
         }
     }
 
-    /// The archives that are open, from the table alone.
-    private var openArchives: [OpenArchive] {
-        lock.lock()
-        defer { lock.unlock() }
-        return Array(opened.values)
-    }
-
-    /// True when changes wait to be written into some archive.
-    internal var hasPendingChanges: Bool {
-        openArchives.contains(where: \.hasPendingChanges)
-    }
-
     /// Writes the pending changes of every archive; returns what could not be written.
     ///
     /// Writing an archive that lies inside another archive (or on a server whose file system
@@ -350,18 +362,6 @@ internal final class ArchiveStore: @unchecked Sendable {
             for archive in waiting { try archive.commit(cancellation: cancellation) }
             (waiting, rounds) = (pending(), rounds + 1)
         }
-    }
-
-    /// Whether an archive is the file at `url`, lies in that folder, or inside such an archive.
-    private static func archive(_ archive: OpenArchive, liesIn url: URL) -> Bool {
-        // The file an archive inside archives finally lies in.
-        var file = archive.archiveURL
-        for _ in 0..<64 {
-            guard case .inside(let location)? = ArchiveURL.parse(file) else { break }
-            file = location.archive
-        }
-        file = ArchiveURL.resolved(file)
-        return file.isSameLocation(as: url) || PathSafety.isContained(file, in: url)
     }
 
     /// Lets go of the archives that lie on `volume` (before it is ejected): their files are
@@ -435,6 +435,18 @@ internal final class ArchiveStore: @unchecked Sendable {
 /// a disk of this machine, and decides from the text alone where it lies on a server.
 /// Everything else may wait for a disk or a server and belongs to a background thread.
 internal final class ArchiveFileSystem: FileSystemProvider {
+    private enum Target {
+        case inside(OpenArchive, path: String, location: ArchiveLocation)
+        /// A place on the file system the archive lies on.
+        case outside(any FileSystemProvider, URL)
+    }
+
+    /// The endings of files that are ZIP archives under another name.
+    internal static let zipExtensions: Set<String> = [
+        "zip", "jar", "war", "ear", "apk", "ipa", "epub", "cbz", "xpi", "whl", "docx", "xlsx", "pptx",
+        "odt", "ods", "odp"
+    ]
+
     internal let scheme: String
     internal let capabilities: FileSystemCapabilities
     private let store: ArchiveStore
@@ -442,6 +454,8 @@ internal final class ArchiveFileSystem: FileSystemProvider {
     /// What lies at a path of this machine, without asking a volume that may not answer
     /// (`Volume.kind(ofLocalPath:)`).
     private let pathKind: @Sendable (String) -> Volume.PathKind
+
+    private var fileSystems: FileSystemRegistry? { store.environment.fileSystems() }
 
     internal convenience init(scheme: String, store: ArchiveStore) {
         self.init(scheme: scheme, store: store) { Volume.kind(ofLocalPath: $0) }
@@ -455,13 +469,17 @@ internal final class ArchiveFileSystem: FileSystemProvider {
         capabilities = scheme == ArchiveURL.writableScheme ? [.write, .deferredWrites] : []
     }
 
-    private enum Target {
-        case inside(OpenArchive, path: String, location: ArchiveLocation)
-        /// A place on the file system the archive lies on.
-        case outside(any FileSystemProvider, URL)
+    /// Which of the two schemes an archive file is shown under: the writable one for ZIP
+    /// files on a file system that can itself be written to.
+    internal static func scheme(forArchive url: URL, fileSystems: FileSystemRegistry?, isZip: Bool? = nil) -> String {
+        let zip = isZip ?? zipExtensions.contains(url.pathExtension.lowercased())
+        let writable = fileSystems?.capabilities(for: url).contains(.write) ?? false
+        return zip && writable ? ArchiveURL.writableScheme : ArchiveURL.readOnlyScheme
     }
 
-    private var fileSystems: FileSystemRegistry? { store.environment.fileSystems() }
+    private static func check(_ cancellation: CancellationFlag?) throws {
+        if cancellation?.isCancelled == true { throw ArchiveError.cancelled }
+    }
 
     private func outerProvider(for url: URL) throws -> any FileSystemProvider {
         guard let fileSystems else { throw FileSystemError.noProvider(url) }
@@ -501,20 +519,6 @@ internal final class ArchiveFileSystem: FileSystemProvider {
             throw FileSystemError.noProvider(url)
         }
     }
-
-    /// Which of the two schemes an archive file is shown under: the writable one for ZIP
-    /// files on a file system that can itself be written to.
-    internal static func scheme(forArchive url: URL, fileSystems: FileSystemRegistry?, isZip: Bool? = nil) -> String {
-        let zip = isZip ?? zipExtensions.contains(url.pathExtension.lowercased())
-        let writable = fileSystems?.capabilities(for: url).contains(.write) ?? false
-        return zip && writable ? ArchiveURL.writableScheme : ArchiveURL.readOnlyScheme
-    }
-
-    /// The endings of files that are ZIP archives under another name.
-    internal static let zipExtensions: Set<String> = [
-        "zip", "jar", "war", "ear", "apk", "ipa", "epub", "cbz", "xpi", "whl", "docx", "xlsx", "pptx",
-        "odt", "ods", "odp"
-    ]
 
     // MARK: Reading
 
@@ -714,10 +718,6 @@ internal final class ArchiveFileSystem: FileSystemProvider {
                 try archive.makeDirectory(path)
             }
         }
-    }
-
-    private static func check(_ cancellation: CancellationFlag?) throws {
-        if cancellation?.isCancelled == true { throw ArchiveError.cancelled }
     }
 
     internal func write(_ url: URL) throws -> any FileWriter {

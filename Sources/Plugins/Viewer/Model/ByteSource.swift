@@ -145,12 +145,12 @@ internal final class LinkedCancellation: @unchecked Sendable {
 internal final class DataByteSource: ByteSource {
     private let data: Data
 
+    internal var length: Int64 { Int64(data.count) }
+
     internal init(_ data: Data) {
         // A slice keeps the indices of what it was cut from; a copy starts at zero.
         self.data = data.startIndex != 0 ? Data(data) : data
     }
-
-    internal var length: Int64 { Int64(data.count) }
 
     internal func read(at offset: Int64, count: Int) -> Data {
         let lower = Int(max(0, min(offset, length)))
@@ -167,6 +167,11 @@ internal final class DataByteSource: ByteSource {
 ///
 /// `idle` and `closes` are guarded by `lock`; everything else is immutable.
 internal final class ProviderByteSource: ByteSource, @unchecked Sendable {
+    /// The most that is read to find the size of a file the file system cannot give.
+    internal static let measuringLimit: Int64 = 1 << 40
+
+    private static let measuredKeepLimit: Int64 = 16 << 20
+
     internal let url: URL
     internal let length: Int64
     private let provider: any FileSystemProvider
@@ -244,10 +249,9 @@ internal final class ProviderByteSource: ByteSource, @unchecked Sendable {
             ? DataByteSource(kept) : ProviderByteSource(url: url, provider: provider, length: total)
     }
 
-    /// The most that is read to find the size of a file the file system cannot give.
-    internal static let measuringLimit: Int64 = 1 << 40
-
-    private static let measuredKeepLimit: Int64 = 16 << 20
+    private static func reading(_ reader: any FileReader, _ flag: CancellationFlag?, _ body: () throws -> Void) throws {
+        if let flag { try flag.whileReading(reader, body) } else { try body() }
+    }
 
     internal func read(at offset: Int64, count: Int) throws -> Data {
         try read(at: offset, count: count, flag: nil)
@@ -285,10 +289,6 @@ internal final class ProviderByteSource: ByteSource, @unchecked Sendable {
             if flag?.isCancelled == true { reader.close() } else { checkIn(reader, epoch: epoch) }
             return data
         }
-    }
-
-    private static func reading(_ reader: any FileReader, _ flag: CancellationFlag?, _ body: () throws -> Void) throws {
-        if let flag { try flag.whileReading(reader, body) } else { try body() }
     }
 
     /// A reader and the number of `close`s there were when it was taken.
@@ -353,6 +353,19 @@ internal final class DiskBlockCache: @unchecked Sendable {
     private var held: Int64 = 0
     private var failed = false
 
+    /// Bytes this cache holds.
+    internal var storedBytes: Int64 {
+        lock.lock()
+        defer { lock.unlock() }
+        return held
+    }
+
+    internal var isOpen: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return descriptor >= 0
+    }
+
     internal convenience init(blockSize: Int, length: Int64, limit: Int64 = 1 << 30) {
         self.init(blockSize: blockSize, length: length, limit: limit, budget: .shared, openFile: Self.openUnnamedFile)
     }
@@ -385,19 +398,6 @@ internal final class DiskBlockCache: @unchecked Sendable {
         let opened = open(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
         if opened >= 0 { unlink(path) }
         return opened
-    }
-
-    /// Bytes this cache holds.
-    internal var storedBytes: Int64 {
-        lock.lock()
-        defer { lock.unlock() }
-        return held
-    }
-
-    internal var isOpen: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return descriptor >= 0
     }
 
     private func size(of block: Int64) -> Int { Int(min(Int64(blockSize), length - block * Int64(blockSize))) }
@@ -505,6 +505,13 @@ internal final class CachedByteSource: ByteSource, @unchecked Sendable {
     /// Block numbers, least recently used first.
     private var order: [Int64] = []
 
+    internal var length: Int64 { base.length }
+
+    /// Bytes of the file kept on disk now (zero without `spillsToDisk`).
+    internal var diskBytes: Int64 { spill?.storedBytes ?? 0 }
+    /// Whether the file on disk is open now.
+    internal var diskCacheIsOpen: Bool { spill?.isOpen ?? false }
+
     internal init(
         _ base: any ByteSource,
         blockSize: Int = 128 * 1_024,
@@ -523,13 +530,6 @@ internal final class CachedByteSource: ByteSource, @unchecked Sendable {
             spillsToDisk && !keepsWholeFile && base.length > 0
             ? DiskBlockCache(blockSize: blockSize, length: base.length, limit: diskLimit) : nil
     }
-
-    internal var length: Int64 { base.length }
-
-    /// Bytes of the file kept on disk now (zero without `spillsToDisk`).
-    internal var diskBytes: Int64 { spill?.storedBytes ?? 0 }
-    /// Whether the file on disk is open now.
-    internal var diskCacheIsOpen: Bool { spill?.isOpen ?? false }
 
     internal func read(at offset: Int64, count: Int) throws -> Data {
         try read(at: offset, count: count, flag: nil)

@@ -9,6 +9,43 @@ import Testing
 /// unreadable while they are indexed, and rows that are never cut in front of a mark.
 @Suite
 internal struct Review2ViewerRows {
+    // MARK: Files that change
+
+    /// A source of `length` bytes that has become shorter: it gives only the first `available`.
+    private final class Shrunk: ByteSource {
+        let length: Int64
+        let available: Int
+        init(length: Int64, available: Int) {
+            self.length = length
+            self.available = available
+        }
+
+        func read(at offset: Int64, count: Int) -> Data {
+            guard offset < Int64(available) else {
+                return Data()
+            }
+            return Data(repeating: UInt8(ascii: "a"), count: min(count, available - Int(offset)))
+        }
+    }
+
+    /// A source that cannot be read at some places.
+    private final class Gappy: ByteSource {
+        let data: Data
+        let unreadable: Range<Int64>
+        var length: Int64 { Int64(data.count) }
+        init(_ data: Data, unreadable: Range<Int64>) {
+            self.data = data
+            self.unreadable = unreadable
+        }
+
+        func read(at offset: Int64, count: Int) throws -> Data {
+            if unreadable.contains(offset) { throw CocoaError(.fileReadUnknown) }
+            let lower = Int(min(offset, length))
+            let upper = min(data.count, lower + count)
+            return data.subdata(in: lower..<upper)
+        }
+    }
+
     private func document(
         _ data: Data,
         columns: Int,
@@ -144,25 +181,6 @@ internal struct Review2ViewerRows {
         }
     }
 
-    // MARK: Files that change
-
-    /// A source of `length` bytes that has become shorter: it gives only the first `available`.
-    private final class Shrunk: ByteSource {
-        let length: Int64
-        let available: Int
-        init(length: Int64, available: Int) {
-            self.length = length
-            self.available = available
-        }
-
-        func read(at offset: Int64, count: Int) -> Data {
-            guard offset < Int64(available) else {
-                return Data()
-            }
-            return Data(repeating: UInt8(ascii: "a"), count: min(count, available - Int(offset)))
-        }
-    }
-
     @Test
     internal func aFileThatBecameShorterIsReportedNotShownAsComplete() {
         let source = Shrunk(length: 100_000, available: 30_000)
@@ -209,24 +227,6 @@ internal struct Review2ViewerRows {
         let hex = TextDocument(source: Shrunk(length: 5_000, available: 100), encoding: .ansi, layout: .hex)
         _ = try hex.rows(from: 0, count: 100)
         #expect(hex.readError as? ViewerError == .fileChanged)
-    }
-
-    /// A source that cannot be read at some places.
-    private final class Gappy: ByteSource {
-        let data: Data
-        let unreadable: Range<Int64>
-        var length: Int64 { Int64(data.count) }
-        init(_ data: Data, unreadable: Range<Int64>) {
-            self.data = data
-            self.unreadable = unreadable
-        }
-
-        func read(at offset: Int64, count: Int) throws -> Data {
-            if unreadable.contains(offset) { throw CocoaError(.fileReadUnknown) }
-            let lower = Int(min(offset, length))
-            let upper = min(data.count, lower + count)
-            return data.subdata(in: lower..<upper)
-        }
     }
 
     @Test

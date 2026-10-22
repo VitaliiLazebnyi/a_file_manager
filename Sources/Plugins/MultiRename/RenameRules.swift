@@ -35,6 +35,11 @@ internal struct TitleCaseRule: Equatable {
 internal enum LetterCase: Int, Codable, CaseIterable {
     case unchanged, lower, upper, firstUpper, words, titleWords
 
+    /// The characters after which a new word starts, besides white space.
+    ///
+    /// A dot is not among them, so an extension stays in lower case.
+    private static let wordBreaks: Set<Character> = ["/", "\\", "-", "_", "(", "[", "{", ",", ";", "+", "&"]
+
     internal var title: String {
         switch self {
         case .unchanged:
@@ -57,10 +62,21 @@ internal enum LetterCase: Int, Codable, CaseIterable {
         }
     }
 
-    /// The characters after which a new word starts, besides white space.
-    ///
-    /// A dot is not among them, so an extension stays in lower case.
-    private static let wordBreaks: Set<Character> = ["/", "\\", "-", "_", "(", "[", "{", ",", ";", "+", "&"]
+    private static func capitalizingWords(_ text: String) -> String {
+        var result = ""
+        result.reserveCapacity(text.utf8.count)
+        var startsWord = true
+        for character in text {
+            if character.isLetter || character.isNumber {
+                result += startsWord ? character.uppercased() : character.lowercased()
+                startsWord = false
+            } else {
+                result.append(character)
+                if character.isWhitespace || wordBreaks.contains(character) { startsWord = true }
+            }
+        }
+        return result
+    }
 
     internal func apply(to text: String, rule: TitleCaseRule = .standard) -> String {
         switch self {
@@ -96,27 +112,14 @@ internal enum LetterCase: Int, Codable, CaseIterable {
             return words.joined(separator: " ")
         }
     }
-
-    private static func capitalizingWords(_ text: String) -> String {
-        var result = ""
-        result.reserveCapacity(text.utf8.count)
-        var startsWord = true
-        for character in text {
-            if character.isLetter || character.isNumber {
-                result += startsWord ? character.uppercased() : character.lowercased()
-                startsWord = false
-            } else {
-                result.append(character)
-                if character.isWhitespace || wordBreaks.contains(character) { startsWord = true }
-            }
-        }
-        return result
-    }
 }
 
 /// Everything the fields of the tool hold: what "Save settings" stores under a name
 /// (spec 09 › Saved settings and persistence).
 internal struct RenameSettings: Codable, Equatable {
+    /// The settings of `<default>`: no change.
+    internal static let unchanged = Self()
+
     internal var nameMask = "[N]"
     internal var extensionMask = "[E]"
     internal var search = ""
@@ -132,9 +135,6 @@ internal struct RenameSettings: Codable, Equatable {
     internal var substitute = false
     internal var letterCase = LetterCase.unchanged
     internal var counter = CounterDefinition()
-
-    /// The settings of `<default>`: no change.
-    internal static let unchanged = Self()
 }
 
 /// Search & Replace of the Multi-Rename Tool (spec 18 › Search & Replace in the Multi-Rename
@@ -216,88 +216,6 @@ internal struct SearchReplace {
                     )
                 }
         }
-    }
-
-    /// The name after the replacements; a name the regular expression takes too long for is
-    /// left as it is (use `replacing` to know).
-    internal func apply(to text: String) -> String {
-        replacing(in: text, cancelled: { false }) ?? text
-    }
-
-    /// The name after the replacements, or nil when the regular expression ran out of time or
-    /// the work was cancelled: the preview then shows `<Error!>`.
-    internal func replacing(in text: String, cancelled: () -> Bool) -> String? {
-        var text = text
-        for pair in pairs {
-            let source = text as NSString
-            let whole = NSRange(location: 0, length: source.length)
-            switch pair.finder {
-            case .regex(let expression):
-                guard
-                    let matches = RenameRegex.matches(
-                        expression,
-                        in: text,
-                        firstOnly: firstOnly || substitute,
-                        guardian: guardian,
-                        cancelled: cancelled
-                    )
-                else {
-                    return nil
-                }
-                if substitute {
-                    if let match = matches.first { text = expand(pair.replacement, match, source) }
-                    continue
-                }
-                guard !matches.isEmpty else { continue }
-                var result = ""
-                var position = 0
-                for match in matches {
-                    result += source.substring(
-                        with: NSRange(location: position, length: match.range.location - position)
-                    )
-                    result += expand(pair.replacement, match, source)
-                    position = match.range.location + match.range.length
-                }
-                text = result + source.substring(from: position)
-
-            case .wildcard(let matcher):
-                // Bounded like a regular expression: a long search in a long name is the name times the search.
-                guard
-                    let ranges = matcher.matches(
-                        in: text,
-                        firstOnly: firstOnly,
-                        guardian: guardian,
-                        cancelled: cancelled
-                    )
-                else { return nil }
-                guard !ranges.isEmpty, case .text(let replacement)? = pair.replacement.first else { continue }
-                var result = ""
-                var position = 0
-                for range in ranges {
-                    result += source.substring(with: NSRange(location: position, length: range.location - position))
-                    result += replacement
-                    position = range.location + range.length
-                }
-                text = result + source.substring(from: min(position, whole.length))
-            }
-        }
-        return text
-    }
-
-    private func expand(_ parts: [Part], _ match: NSTextCheckingResult, _ source: NSString) -> String {
-        parts.map { part -> String in
-            switch part {
-            case .text(let text):
-                return text
-
-            case .group(let number, let letterCase):
-                guard number < match.numberOfRanges, match.range(at: number).location != NSNotFound else {
-                    return ""
-                }
-                return letterCase.apply(to: source.substring(with: match.range(at: number)))
-            }
-        }
-        .joined()
     }
 
     /// The regular expression that means what the plain search means: `*` stands for any run
@@ -392,6 +310,88 @@ internal struct SearchReplace {
         if !literal.isEmpty { parts.append(.text(literal)) }
         return parts
     }
+
+    /// The name after the replacements; a name the regular expression takes too long for is
+    /// left as it is (use `replacing` to know).
+    internal func apply(to text: String) -> String {
+        replacing(in: text, cancelled: { false }) ?? text
+    }
+
+    /// The name after the replacements, or nil when the regular expression ran out of time or
+    /// the work was cancelled: the preview then shows `<Error!>`.
+    internal func replacing(in text: String, cancelled: () -> Bool) -> String? {
+        var text = text
+        for pair in pairs {
+            let source = text as NSString
+            let whole = NSRange(location: 0, length: source.length)
+            switch pair.finder {
+            case .regex(let expression):
+                guard
+                    let matches = RenameRegex.matches(
+                        expression,
+                        in: text,
+                        firstOnly: firstOnly || substitute,
+                        guardian: guardian,
+                        cancelled: cancelled
+                    )
+                else {
+                    return nil
+                }
+                if substitute {
+                    if let match = matches.first { text = expand(pair.replacement, match, source) }
+                    continue
+                }
+                guard !matches.isEmpty else { continue }
+                var result = ""
+                var position = 0
+                for match in matches {
+                    result += source.substring(
+                        with: NSRange(location: position, length: match.range.location - position)
+                    )
+                    result += expand(pair.replacement, match, source)
+                    position = match.range.location + match.range.length
+                }
+                text = result + source.substring(from: position)
+
+            case .wildcard(let matcher):
+                // Bounded like a regular expression: a long search in a long name is the name times the search.
+                guard
+                    let ranges = matcher.matches(
+                        in: text,
+                        firstOnly: firstOnly,
+                        guardian: guardian,
+                        cancelled: cancelled
+                    )
+                else { return nil }
+                guard !ranges.isEmpty, case .text(let replacement)? = pair.replacement.first else { continue }
+                var result = ""
+                var position = 0
+                for range in ranges {
+                    result += source.substring(with: NSRange(location: position, length: range.location - position))
+                    result += replacement
+                    position = range.location + range.length
+                }
+                text = result + source.substring(from: min(position, whole.length))
+            }
+        }
+        return text
+    }
+
+    private func expand(_ parts: [Part], _ match: NSTextCheckingResult, _ source: NSString) -> String {
+        parts.map { part -> String in
+            switch part {
+            case .text(let text):
+                return text
+
+            case .group(let number, let letterCase):
+                guard number < match.numberOfRanges, match.range(at: number).location != NSNotFound else {
+                    return ""
+                }
+                return letterCase.apply(to: source.substring(with: match.range(at: number)))
+            }
+        }
+        .joined()
+    }
 }
 
 /// The whole rename pipeline for one set of settings (spec 09 › Rename pipeline): masks, then
@@ -412,6 +412,11 @@ internal struct RenameEngine {
     private let cancelled: @Sendable () -> Bool
     /// What is wrong with the settings as a whole, if anything: then no item gets a name.
     internal let problem: any Error?
+
+    /// Set once names were computed: a regular expression that took too long for some of them.
+    internal var tooSlow: any Error? {
+        searchReplace?.timedOut == true ? SearchReplace.Problem.tooSlow(settings.search) : nil
+    }
 
     internal init(
         _ settings: RenameSettings,
@@ -435,9 +440,42 @@ internal struct RenameEngine {
         }
     }
 
-    /// Set once names were computed: a regular expression that took too long for some of them.
-    internal var tooSlow: any Error? {
-        searchReplace?.timedOut == true ? SearchReplace.Problem.tooSlow(settings.search) : nil
+    /// Control characters become spaces and slashes at the end are dropped.
+    internal static func tidied(_ name: String) -> String {
+        var name = String(
+            name.map { character in
+                character.unicodeScalars.contains { $0.value < 32 || $0.value == 127 } ? " " : character
+            }
+        )
+        while name.hasSuffix("/") { name.removeLast() }
+        return name
+    }
+
+    /// Why a name cannot be given to a file; nil when it can.
+    ///
+    /// A slash inside the name is fine: it moves the item into that folder.
+    internal static func invalidity(of name: String) -> String? {
+        if name.isEmpty {
+            return "The name is empty."
+        }
+        // Cut at the `/` byte, not at the character: a combining mark after a slash makes one
+        // character with it, and the file system reads the slash all the same.
+        let components = name.utf8.split(separator: 0x2F, omittingEmptySubsequences: false)
+            .dropFirst(
+                name.utf8.first == 0x2F ? 1 : 0
+            )
+        for component in components {
+            if component.isEmpty {
+                return "A folder name is empty."
+            }
+            if component.elementsEqual(".".utf8) || component.elementsEqual("..".utf8) {
+                return "\(String(decoding: component, as: UTF8.self)) is not a name."
+            }
+            if component.count > 255 {
+                return "The name is too long."
+            }
+        }
+        return nil
     }
 
     /// The new name of the item at `index` of the list.
@@ -487,43 +525,5 @@ internal struct RenameEngine {
         }
         full = settings.letterCase.apply(to: full, rule: context.titleRule)
         return Self.tidied(full)
-    }
-
-    /// Control characters become spaces and slashes at the end are dropped.
-    internal static func tidied(_ name: String) -> String {
-        var name = String(
-            name.map { character in
-                character.unicodeScalars.contains { $0.value < 32 || $0.value == 127 } ? " " : character
-            }
-        )
-        while name.hasSuffix("/") { name.removeLast() }
-        return name
-    }
-
-    /// Why a name cannot be given to a file; nil when it can.
-    ///
-    /// A slash inside the name is fine: it moves the item into that folder.
-    internal static func invalidity(of name: String) -> String? {
-        if name.isEmpty {
-            return "The name is empty."
-        }
-        // Cut at the `/` byte, not at the character: a combining mark after a slash makes one
-        // character with it, and the file system reads the slash all the same.
-        let components = name.utf8.split(separator: 0x2F, omittingEmptySubsequences: false)
-            .dropFirst(
-                name.utf8.first == 0x2F ? 1 : 0
-            )
-        for component in components {
-            if component.isEmpty {
-                return "A folder name is empty."
-            }
-            if component.elementsEqual(".".utf8) || component.elementsEqual("..".utf8) {
-                return "\(String(decoding: component, as: UTF8.self)) is not a name."
-            }
-            if component.count > 255 {
-                return "The name is too long."
-            }
-        }
-        return nil
     }
 }

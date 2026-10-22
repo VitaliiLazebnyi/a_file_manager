@@ -14,6 +14,38 @@ import UniformTypeIdentifiers
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 internal final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
+    /// Unchecked: used by one thread at a time, as the protocol allows.
+    private final class Reader: FileReader, @unchecked Sendable {
+        let owner: Review2HookProvider
+        let data: Data?
+        var position = 0
+        init(_ owner: Review2HookProvider, data: Data?) {
+            self.owner = owner
+            self.data = data
+        }
+
+        func read(upToCount count: Int) -> Data? {
+            guard let data else {
+                return Data(repeating: 0x41, count: count)
+            }
+            guard position < data.count else {
+                return nil
+            }
+            let block = data.subdata(in: position..<min(data.count, position + count))
+            position += block.count
+            return block
+        }
+
+        func seek(to offset: UInt64) { position = Int(offset) }
+
+        func close() {
+            owner.onClose()
+            owner.lock.lock()
+            owner.closed += 1
+            owner.lock.unlock()
+        }
+    }
+
     internal let scheme = "hook"
     internal let capabilities: FileSystemCapabilities = []
     internal var sizes: [String: Int64] = [:]
@@ -45,38 +77,6 @@ internal final class Review2HookProvider: FileSystemProvider, @unchecked Sendabl
             kind: .init(isSpecial: special.contains(url.path)),
             stat: .init(size: sizes[url.path] ?? Int64(contents[url.path]?.count ?? 0))
         )
-    }
-
-    /// Unchecked: used by one thread at a time, as the protocol allows.
-    private final class Reader: FileReader, @unchecked Sendable {
-        let owner: Review2HookProvider
-        let data: Data?
-        var position = 0
-        init(_ owner: Review2HookProvider, data: Data?) {
-            self.owner = owner
-            self.data = data
-        }
-
-        func read(upToCount count: Int) -> Data? {
-            guard let data else {
-                return Data(repeating: 0x41, count: count)
-            }
-            guard position < data.count else {
-                return nil
-            }
-            let block = data.subdata(in: position..<min(data.count, position + count))
-            position += block.count
-            return block
-        }
-
-        func seek(to offset: UInt64) { position = Int(offset) }
-
-        func close() {
-            owner.onClose()
-            owner.lock.lock()
-            owner.closed += 1
-            owner.lock.unlock()
-        }
     }
 
     internal func read(_ url: URL) -> any FileReader {

@@ -84,61 +84,6 @@ internal final class TLSServer {
         FileManager.default.isExecutableFile(atPath: python) && FileManager.default.isExecutableFile(atPath: openssl)
     }
 
-    internal let port: Int
-    private let process = Process()
-
-    /// `refusesProtection`: the server answers PROT with an error, as one that cannot encrypt its data connections.
-    /// `requiresReuse`: every data connection is refused for not resuming the control connection's TLS session.
-    /// `resumesSessions`: false gives no session tickets, so every connection makes a whole handshake and has its
-    /// certificate checked.
-    internal init(
-        mode: TLSMode,
-        box: Sandbox,
-        refusesProtection: Bool = false,
-        requiresReuse: Bool = false,
-        resumesSessions: Bool = true
-    ) throws {
-        let (certificate, key, script) = (box.url("cert.pem"), box.url("key.pem"), box.url("ftps.py"))
-        let make = Process()
-        make.executableURL = URL(fileURLWithPath: Self.openssl)
-        make.arguments = [
-            "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key.path, "-out", certificate.path, "-days",
-            "2",
-            "-subj", "/CN=localhost/O=afm test"
-        ]
-        (make.standardOutput, make.standardError) = (FileHandle.nullDevice, FileHandle.nullDevice)
-        try make.run()
-        make.waitUntilExit()
-        try Self.script.write(to: script, atomically: true, encoding: .utf8)
-
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: Self.python)
-        process.arguments =
-            [script.path, mode == .implicit ? "implicit" : "explicit", certificate.path, key.path, box.url("srv").path]
-            + (refusesProtection ? ["refuse-prot"] : []) + (requiresReuse ? ["require-reuse"] : [])
-            + (resumesSessions ? [] : ["no-tickets"])
-        process.standardOutput = output
-        let errors = box.url("tls-errors.log")
-        FileManager.default.createFile(atPath: errors.path, contents: nil)
-        process.standardError = try FileHandle(forWritingTo: errors)
-        try process.run()
-        // The first line the script prints is its port.
-        var line = Data()
-        while !line.contains(0x0A), let byte = try output.fileHandleForReading.read(upToCount: 1), !byte.isEmpty {
-            line.append(byte)
-        }
-        guard let number = Int(String(decoding: line, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
-        else {
-            process.terminate()
-            throw POSIXError(.ECONNREFUSED)
-        }
-        port = number
-    }
-
-    internal func stop() {
-        process.terminate()
-    }
-
     internal static let script = """
         import os, socket, ssl, sys, threading
         mode, cert, key, root = sys.argv[1:5]
@@ -249,4 +194,59 @@ internal final class TLSServer {
             client, _ = listener.accept()
             threading.Thread(target=serve, args=(client,), daemon=True).start()
         """
+
+    internal let port: Int
+    private let process = Process()
+
+    /// `refusesProtection`: the server answers PROT with an error, as one that cannot encrypt its data connections.
+    /// `requiresReuse`: every data connection is refused for not resuming the control connection's TLS session.
+    /// `resumesSessions`: false gives no session tickets, so every connection makes a whole handshake and has its
+    /// certificate checked.
+    internal init(
+        mode: TLSMode,
+        box: Sandbox,
+        refusesProtection: Bool = false,
+        requiresReuse: Bool = false,
+        resumesSessions: Bool = true
+    ) throws {
+        let (certificate, key, script) = (box.url("cert.pem"), box.url("key.pem"), box.url("ftps.py"))
+        let make = Process()
+        make.executableURL = URL(fileURLWithPath: Self.openssl)
+        make.arguments = [
+            "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key.path, "-out", certificate.path, "-days",
+            "2",
+            "-subj", "/CN=localhost/O=afm test"
+        ]
+        (make.standardOutput, make.standardError) = (FileHandle.nullDevice, FileHandle.nullDevice)
+        try make.run()
+        make.waitUntilExit()
+        try Self.script.write(to: script, atomically: true, encoding: .utf8)
+
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: Self.python)
+        process.arguments =
+            [script.path, mode == .implicit ? "implicit" : "explicit", certificate.path, key.path, box.url("srv").path]
+            + (refusesProtection ? ["refuse-prot"] : []) + (requiresReuse ? ["require-reuse"] : [])
+            + (resumesSessions ? [] : ["no-tickets"])
+        process.standardOutput = output
+        let errors = box.url("tls-errors.log")
+        FileManager.default.createFile(atPath: errors.path, contents: nil)
+        process.standardError = try FileHandle(forWritingTo: errors)
+        try process.run()
+        // The first line the script prints is its port.
+        var line = Data()
+        while !line.contains(0x0A), let byte = try output.fileHandleForReading.read(upToCount: 1), !byte.isEmpty {
+            line.append(byte)
+        }
+        guard let number = Int(String(decoding: line, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
+        else {
+            process.terminate()
+            throw POSIXError(.ECONNREFUSED)
+        }
+        port = number
+    }
+
+    internal func stop() {
+        process.terminate()
+    }
 }

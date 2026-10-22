@@ -32,6 +32,9 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
     private var isPicking = false
     private var picked: CommandRow?
 
+    private var selected: CommandRow? { table.selectedRow.flatMap { rows.dropFirst($0).first } }
+    private var selectedUserCommand: UserCommand? { selected.flatMap { center.userCommand(named: $0.id.rawValue) } }
+
     internal init(center: ConfigurationCenter) {
         self.center = center
         let window = Window(
@@ -143,9 +146,6 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
         )
         updateButtons()
     }
-
-    private var selected: CommandRow? { table.selectedRow.flatMap { rows.dropFirst($0).first } }
-    private var selectedUserCommand: UserCommand? { selected.flatMap { center.userCommand(named: $0.id.rawValue) } }
 
     private func updateButtons() {
         primaryButton.isEnabled = selected != nil

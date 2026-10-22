@@ -243,26 +243,11 @@ internal enum ImageDecoder {
 /// enlarged one is no smaller to keep), and none above `pixelLimit` pixels. Main thread only.
 @MainActor
 internal final class ScaledFrameCache {
-    /// A scaled bitmap has at most this many pixels (160 MB).
-    internal static let pixelLimit = 40_000_000
-
     private struct Key: Equatable {
         var frame: ObjectIdentifier
         var width: Int
         var height: Int
     }
-
-    private var key: Key?
-    private var ready: CGImage?
-    /// Counts the starts of a bitmap, so the result of an earlier one is dropped.
-    private var generation = 0 { didSet { latest.value = generation } }
-    /// The count, readable on the queue: a bitmap that was asked for and then replaced is not made.
-    private let latest = Latest()
-    /// One bitmap is made at a time, on a queue of its own (a zoom asks for dozens of sizes in a
-    /// second; at most one resample of up to 160 MB runs, and the ones that are overtaken do not).
-    internal let queue = DispatchQueue(label: "viewer.scale", qos: .userInitiated)
-    /// How long a size must stay before its bitmap is made.
-    internal static let settle = 0.1
 
     /// Guarded by `lock`.
     private final class Latest: @unchecked Sendable {
@@ -282,10 +267,44 @@ internal final class ScaledFrameCache {
             }
         }
     }
+
+    /// A scaled bitmap has at most this many pixels (160 MB).
+    internal static let pixelLimit = 40_000_000
+    /// How long a size must stay before its bitmap is made.
+    internal static let settle = 0.1
+
+    private var key: Key?
+    private var ready: CGImage?
+    /// Counts the starts of a bitmap, so the result of an earlier one is dropped.
+    private var generation = 0 { didSet { latest.value = generation } }
+    /// The count, readable on the queue: a bitmap that was asked for and then replaced is not made.
+    private let latest = Latest()
+    /// One bitmap is made at a time, on a queue of its own (a zoom asks for dozens of sizes in a
+    /// second; at most one resample of up to 160 MB runs, and the ones that are overtaken do not).
+    internal let queue = DispatchQueue(label: "viewer.scale", qos: .userInitiated)
     /// How many bitmaps were made (for tests).
     internal private(set) var made = 0
     /// Called when a bitmap is ready for the key last asked for.
     internal var onReady: () -> Void = {}
+
+    /// `frame` resampled to `width` × `height` pixels with the best interpolation.
+    nonisolated internal static func scale(_ frame: CGImage, width: Int, height: Int) -> CGImage? {
+        let space = frame.colorSpace.flatMap { $0.model == .rgb ? $0 : nil } ?? CGColorSpace(name: CGColorSpace.sRGB)
+        guard let space,
+            let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else { return nil }
+        context.interpolationQuality = .high
+        context.draw(frame, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
 
     /// The bitmap of `frame` at `width` × `height` pixels when it is there; else nil, and it is
     /// made in the background when `building` and the frame is shown smaller than it is.
@@ -327,25 +346,6 @@ internal final class ScaledFrameCache {
         key = nil
         ready = nil
         generation += 1
-    }
-
-    /// `frame` resampled to `width` × `height` pixels with the best interpolation.
-    nonisolated internal static func scale(_ frame: CGImage, width: Int, height: Int) -> CGImage? {
-        let space = frame.colorSpace.flatMap { $0.model == .rgb ? $0 : nil } ?? CGColorSpace(name: CGColorSpace.sRGB)
-        guard let space,
-            let context = CGContext(
-                data: nil,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: 0,
-                space: space,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            )
-        else { return nil }
-        context.interpolationQuality = .high
-        context.draw(frame, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return context.makeImage()
     }
 }
 
@@ -412,6 +412,47 @@ internal final class ImageCanvasView: NSScrollView {
     /// Called when the zoom factor changed.
     internal var onZoomChange: () -> Void = {}
 
+    /// The image as it is shown now, for printing.
+    internal var currentFrame: CGImage? { image?.frames[frameIndex].image }
+    internal var imageSize: CGSize { image?.pixelSize ?? .zero }
+    internal var isDownsampled: Bool { image?.isDownsampled ?? false }
+    /// The number of frames of an animation that were left out for want of memory.
+    internal var framesDropped: Int { image?.framesDropped ?? 0 }
+    internal var frameCount: Int { image?.frames.count ?? 0 }
+
+    /// The size of the turned image at 100 %, in points: one pixel of the image on one pixel
+    /// of the screen.
+    private var turnedSize: CGSize {
+        guard let size = image?.size else {
+            return .zero
+        }
+        let scale = Self.pixelsPerPoint(window: window, screen: NSScreen.main)
+        return quarterTurns % 2 != 0
+            ? CGSize(width: size.height / scale, height: size.width / scale)
+            : CGSize(width: size.width / scale, height: size.height / scale)
+    }
+
+    /// The factor the image is drawn with; 1 is actual size.
+    internal var zoom: CGFloat {
+        if let manualZoom {
+            return manualZoom
+        }
+        let size = turnedSize
+        let area = contentSize
+        guard size.width > 0, size.height > 0, fit != .none else {
+            return 1
+        }
+        let fitting = min(area.width / size.width, area.height / size.height)
+        return fit == .window ? fitting : min(1, fitting)
+    }
+
+    /// How many bitmaps of the image at the size it is shown at were made (for tests).
+    internal var scaledBitmapsMade: Int { canvas.scaled.made }
+
+    /// The queue the scaled bitmap is made on: a test holds it still while it asks for sizes, so how long
+    /// that takes on a busy machine decides nothing.
+    internal var scalingQueue: DispatchQueue { canvas.scaled.queue }
+
     override internal init(frame: NSRect) {
         super.init(frame: frame)
         hasVerticalScroller = true
@@ -426,7 +467,10 @@ internal final class ImageCanvasView: NSScrollView {
     /// Made in code only: an archive gives none.
     internal required init?(coder _: NSCoder) { nil }
 
-    deinit { timer?.invalidate() }
+    /// The pixels of the screen per point: those of the window, else of the main screen, else 1.
+    internal static func pixelsPerPoint(window: NSWindow?, screen: NSScreen?) -> CGFloat {
+        window?.backingScaleFactor ?? screen?.backingScaleFactor ?? 1
+    }
 
     internal func show(_ image: DecodedImage) {
         timer?.invalidate()
@@ -439,14 +483,6 @@ internal final class ImageCanvasView: NSScrollView {
         arrange()
         scheduleNextFrame()
     }
-
-    /// The image as it is shown now, for printing.
-    internal var currentFrame: CGImage? { image?.frames[frameIndex].image }
-    internal var imageSize: CGSize { image?.pixelSize ?? .zero }
-    internal var isDownsampled: Bool { image?.isDownsampled ?? false }
-    /// The number of frames of an animation that were left out for want of memory.
-    internal var framesDropped: Int { image?.framesDropped ?? 0 }
-    internal var frameCount: Int { image?.frames.count ?? 0 }
 
     /// Takes the complete animation in place of its first frame, which was shown early; zoom and
     /// turns stay.
@@ -463,37 +499,6 @@ internal final class ImageCanvasView: NSScrollView {
         canvas.needsDisplay = true
         onZoomChange()
         scheduleNextFrame()
-    }
-
-    /// The size of the turned image at 100 %, in points: one pixel of the image on one pixel
-    /// of the screen.
-    private var turnedSize: CGSize {
-        guard let size = image?.size else {
-            return .zero
-        }
-        let scale = Self.pixelsPerPoint(window: window, screen: NSScreen.main)
-        return quarterTurns % 2 != 0
-            ? CGSize(width: size.height / scale, height: size.width / scale)
-            : CGSize(width: size.width / scale, height: size.height / scale)
-    }
-
-    /// The pixels of the screen per point: those of the window, else of the main screen, else 1.
-    internal static func pixelsPerPoint(window: NSWindow?, screen: NSScreen?) -> CGFloat {
-        window?.backingScaleFactor ?? screen?.backingScaleFactor ?? 1
-    }
-
-    /// The factor the image is drawn with; 1 is actual size.
-    internal var zoom: CGFloat {
-        if let manualZoom {
-            return manualZoom
-        }
-        let size = turnedSize
-        let area = contentSize
-        guard size.width > 0, size.height > 0, fit != .none else {
-            return 1
-        }
-        let fitting = min(area.width / size.width, area.height / size.height)
-        return fit == .window ? fitting : min(1, fitting)
     }
 
     internal func setZoom(_ factor: CGFloat) {
@@ -533,13 +538,6 @@ internal final class ImageCanvasView: NSScrollView {
         super.viewDidEndLiveResize()
         canvas.needsDisplay = true
     }
-
-    /// How many bitmaps of the image at the size it is shown at were made (for tests).
-    internal var scaledBitmapsMade: Int { canvas.scaled.made }
-
-    /// The queue the scaled bitmap is made on: a test holds it still while it asks for sizes, so how long
-    /// that takes on a busy machine decides nothing.
-    internal var scalingQueue: DispatchQueue { canvas.scaled.queue }
 
     private func arrange() {
         guard image != nil else {
@@ -597,4 +595,6 @@ internal final class ImageCanvasView: NSScrollView {
     override internal func magnify(with event: NSEvent) {
         setZoom(zoom * (1 + event.magnification))
     }
+
+    deinit { timer?.invalidate() }
 }

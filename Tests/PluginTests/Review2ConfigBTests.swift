@@ -23,7 +23,6 @@ private func drainMainQueue() async {
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Sendable {
     let scheme: String
-    init(scheme: String = "r2watch") { self.scheme = scheme }
     let capabilities: FileSystemCapabilities = []
     private let lock = NSLock()
     private var watches: [([URL], @Sendable ([URL]) -> Void)] = []
@@ -32,6 +31,7 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         defer { lock.unlock() }
         return watches.reduce(0) { $0 + $1.0.count }
     }
+    init(scheme: String = "r2watch") { self.scheme = scheme }
 
     func url(_ path: String) -> URL { URL(string: scheme + "://" + path)! }
     func fire() {
@@ -632,12 +632,12 @@ internal struct Review2ConfigBNavigation {
 private final class Mutex<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
-    init(_ value: Value) { stored = value }
     var value: Value {
         lock.lock()
         defer { lock.unlock() }
         return stored
     }
+    init(_ value: Value) { stored = value }
     func mutate(_ change: (inout Value) -> Void) {
         lock.lock()
         change(&stored)

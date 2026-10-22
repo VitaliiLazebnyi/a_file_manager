@@ -29,11 +29,11 @@ internal final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
     private var trashed: [URL] = []
     /// What `trash` throws; nil trashes for real.
     internal var trashError: (any Error)?
+    internal var removed: [URL] { lock.withLock { removedURLs } }
+    internal var trashedItems: [URL] { lock.withLock { trashed } }
 
     internal func addHostile(names: [String], in directory: String) { lock.withLock { hostile[directory] = names } }
     internal func failNextRemovals(_ count: Int) { lock.withLock { failures = count } }
-    internal var removed: [URL] { lock.withLock { removedURLs } }
-    internal var trashedItems: [URL] { lock.withLock { trashed } }
 
     internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         var items = try base.list(directory, showHidden: showHidden)

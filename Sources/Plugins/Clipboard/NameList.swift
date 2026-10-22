@@ -25,8 +25,23 @@ internal struct NameList {
         internal let value: @Sendable (FileItem) -> String
     }
 
+    /// The columns every panel has, after the name: size in raw bytes or `<DIR>`, date as in
+    /// the panel, permissions (spec 07 › Names to the clipboard).
+    internal static let standardColumns = [
+        Column(title: "Size") { item in
+            item.isFolder ? (item.computedSize.map { String($0) } ?? "<DIR>") : String(item.size)
+        },
+        Column(title: "Date") { Format.date($0.modified) },
+        Column(title: "Attr") { Format.permissions($0.permissions) }
+    ]
+
     /// How a file system writes a location; answers at once (`FileSystemRegistry.displayPath`).
     internal let displayPath: @Sendable (URL) -> String
+
+    /// A value on one line: tabs and line breaks inside it would break the table.
+    private static func field(_ text: String) -> String {
+        String(text.map { $0 == "\t" || $0.isNewline ? " " : $0 })
+    }
 
     internal func entry(_ item: FileItem, _ style: Style) -> String {
         let text: String
@@ -52,16 +67,6 @@ internal struct NameList {
         items.map { displayPath($0.url.deletingLastPathComponent()) }.joined(separator: "\n")
     }
 
-    /// The columns every panel has, after the name: size in raw bytes or `<DIR>`, date as in
-    /// the panel, permissions (spec 07 › Names to the clipboard).
-    internal static let standardColumns = [
-        Column(title: "Size") { item in
-            item.isFolder ? (item.computedSize.map { String($0) } ?? "<DIR>") : String(item.size)
-        },
-        Column(title: "Date") { Format.date($0.modified) },
-        Column(title: "Attr") { Format.permissions($0.permissions) }
-    ]
-
     /// All shown columns, tab-separated. `extra` are the plugin columns the panel shows; their
     /// values may block, so the rows are worked out on all cores and this belongs on a job's
     /// thread. `mask` picks columns by bit (1 = name, 2 = the first column after it, 4 = the
@@ -82,11 +87,6 @@ internal struct NameList {
         }
         if headers { lines.insert(picked.map(\.title).joined(separator: "\t"), at: 0) }
         return lines.joined(separator: "\n")
-    }
-
-    /// A value on one line: tabs and line breaks inside it would break the table.
-    private static func field(_ text: String) -> String {
-        String(text.map { $0 == "\t" || $0.isNewline ? " " : $0 })
     }
 }
 

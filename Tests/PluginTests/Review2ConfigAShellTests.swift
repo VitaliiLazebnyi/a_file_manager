@@ -12,6 +12,12 @@ import Testing
 /// Every payload only tries to `touch` a marker file in the test's own folder.
 @Suite
 internal struct Review2ConfigAShell {
+    internal struct Outcome {
+        /// The arguments of each case, as the shell made them.
+        internal var arguments: [[String]]
+        internal var created: [String]
+    }
+
     internal static let shells = ["/bin/zsh", "/bin/sh"]
 
     /// Names that ran commands before, and their relatives.
@@ -28,6 +34,27 @@ internal struct Review2ConfigAShell {
         "report\u{3000}", " lead and trail ", "!bang", "~", "*", "#c", "x=1", "a&b|c>d<e", "tab\there",
         "${IFS}touch${IFS}M17", "$0", "%N%Q",
         "\u{1B}[31mred", "a\rb"
+    ]
+
+    /// Every template in which a placeholder may stand, with what the shell must make of it.
+    internal static let templates: [(template: String, expected: @Sendable (String, String) -> [String])] = [
+        ("%N", { _, guarded in [guarded] }),
+        ("x%Ny", { name, _ in ["x" + name + "y"] }),
+        ("--out=%N", { name, _ in ["--out=" + name] }),
+        ("\"%N\"", { _, guarded in [guarded] }),
+        ("\"pre %N post\"", { name, _ in ["pre " + name + " post"] }),
+        ("'%N'", { _, guarded in [guarded] }),
+        ("'pre %N post'", { name, _ in ["pre " + name + " post"] }),
+        ("%P%N", { name, _ in ["/tmp/A dir/" + name] }),
+        ("\"%P%N\" %N", { name, guarded in ["/tmp/A dir/" + name, guarded] }),
+        ("\"$(printf '%%s' %N)\"", { _, guarded in [guarded] }),
+        ("\"$(printf '%%s' \"%N\")\"", { _, guarded in [guarded] }),
+        ("$(printf 'ok') %N", { _, guarded in ["ok", guarded] }),
+        ("a # it's a comment\nprintf '%%s\\0' %N", { _, guarded in ["a", guarded] }),
+        ("%S", { _, guarded in [guarded, "b c"] }),
+        ("\"new-%S-old\"", { name, _ in ["new-" + name + "-old", "new-b c-old"] }),
+        ("%|EVIL|", { _, _ in ["e'v\"\u{301}il $x `touch M18`;touch M19"] }),
+        ("'%|EVIL|' \"%|EVIL|\"", { _, _ in Array(repeating: "e'v\"\u{301}il $x `touch M18`;touch M19", count: 2) })
     ]
 
     internal let box: Sandbox
@@ -49,12 +76,6 @@ internal struct Review2ConfigAShell {
 
     internal func expand(_ template: String, name: String?, selection: [String] = []) -> ExpandedParameters {
         ParameterExpander(context: context(name: name, selection: selection)).expand(template)
-    }
-
-    internal struct Outcome {
-        /// The arguments of each case, as the shell made them.
-        internal var arguments: [[String]]
-        internal var created: [String]
     }
 
     /// Runs `printf` with the pieces of every case as its arguments, all cases in one script,
@@ -97,27 +118,6 @@ internal struct Review2ConfigAShell {
     }
 
     internal func protected(_ name: String) -> String { name.unicodeScalars.first == "-" ? "./" + name : name }
-
-    /// Every template in which a placeholder may stand, with what the shell must make of it.
-    internal static let templates: [(template: String, expected: @Sendable (String, String) -> [String])] = [
-        ("%N", { _, guarded in [guarded] }),
-        ("x%Ny", { name, _ in ["x" + name + "y"] }),
-        ("--out=%N", { name, _ in ["--out=" + name] }),
-        ("\"%N\"", { _, guarded in [guarded] }),
-        ("\"pre %N post\"", { name, _ in ["pre " + name + " post"] }),
-        ("'%N'", { _, guarded in [guarded] }),
-        ("'pre %N post'", { name, _ in ["pre " + name + " post"] }),
-        ("%P%N", { name, _ in ["/tmp/A dir/" + name] }),
-        ("\"%P%N\" %N", { name, guarded in ["/tmp/A dir/" + name, guarded] }),
-        ("\"$(printf '%%s' %N)\"", { _, guarded in [guarded] }),
-        ("\"$(printf '%%s' \"%N\")\"", { _, guarded in [guarded] }),
-        ("$(printf 'ok') %N", { _, guarded in ["ok", guarded] }),
-        ("a # it's a comment\nprintf '%%s\\0' %N", { _, guarded in ["a", guarded] }),
-        ("%S", { _, guarded in [guarded, "b c"] }),
-        ("\"new-%S-old\"", { name, _ in ["new-" + name + "-old", "new-b c-old"] }),
-        ("%|EVIL|", { _, _ in ["e'v\"\u{301}il $x `touch M18`;touch M19"] }),
-        ("'%|EVIL|' \"%|EVIL|\"", { _, _ in Array(repeating: "e'v\"\u{301}il $x `touch M18`;touch M19", count: 2) })
-    ]
 
     @Test
     internal func aNameIsOneArgumentAndNothingOfItRunsInAnyPlaceAndShell() throws {

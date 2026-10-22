@@ -223,6 +223,8 @@ extension Sequence where Element == UInt8 {
 internal final class CRC32Hasher: StreamHasher, @unchecked Sendable {
     internal private(set) var value: UInt = zlib.crc32(0, nil, 0)
 
+    internal var checksum: UInt32 { UInt32(truncatingIfNeeded: value) }
+
     internal func update(_ data: Data) {
         data.withUnsafeBytes { buffer in
             guard !buffer.isEmpty, var pointer = buffer.bindMemory(to: Bytef.self).baseAddress else {
@@ -238,8 +240,6 @@ internal final class CRC32Hasher: StreamHasher, @unchecked Sendable {
             }
         }
     }
-
-    internal var checksum: UInt32 { UInt32(truncatingIfNeeded: value) }
 
     internal func finish() -> [UInt8] {
         withUnsafeBytes(of: checksum.bigEndian, Array.init)
@@ -290,25 +290,6 @@ internal final class SHA224Hasher: StreamHasher, @unchecked Sendable {
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
 internal final class SHA3Hasher: StreamHasher, @unchecked Sendable {
-    private let state = UnsafeMutablePointer<UInt64>.allocate(capacity: 25)
-    private let rate: Int
-    private let digestLength: Int
-    /// Input that does not fill a block of `rate` bytes yet.
-    private let pending: UnsafeMutableRawPointer
-    private var pendingCount = 0
-
-    internal init(digestLength: Int) {
-        self.digestLength = digestLength
-        rate = 200 - 2 * digestLength
-        state.initialize(repeating: 0, count: 25)
-        pending = .allocate(byteCount: 200, alignment: 8)
-    }
-
-    deinit {
-        state.deallocate()
-        pending.deallocate()
-    }
-
     /// Filled once, when first used, and only read afterwards.
     nonisolated(unsafe) private static let roundConstants: UnsafeMutablePointer<UInt64> = {
         let constants: [UInt64] = [
@@ -326,12 +307,18 @@ internal final class SHA3Hasher: StreamHasher, @unchecked Sendable {
         return pointer
     }()
 
-    /// XORs one block of `rate` bytes into the state and permutes it.
-    private func absorb(_ block: UnsafeRawPointer) {
-        for index in 0..<(rate / 8) {
-            state[index] ^= UInt64(littleEndian: block.loadUnaligned(fromByteOffset: index * 8, as: UInt64.self))
-        }
-        Self.permute(state)
+    private let state = UnsafeMutablePointer<UInt64>.allocate(capacity: 25)
+    private let rate: Int
+    private let digestLength: Int
+    /// Input that does not fill a block of `rate` bytes yet.
+    private let pending: UnsafeMutableRawPointer
+    private var pendingCount = 0
+
+    internal init(digestLength: Int) {
+        self.digestLength = digestLength
+        rate = 200 - 2 * digestLength
+        state.initialize(repeating: 0, count: 25)
+        pending = .allocate(byteCount: 200, alignment: 8)
     }
 
     @inline(__always)
@@ -445,6 +432,14 @@ internal final class SHA3Hasher: StreamHasher, @unchecked Sendable {
         }
     }
 
+    /// XORs one block of `rate` bytes into the state and permutes it.
+    private func absorb(_ block: UnsafeRawPointer) {
+        for index in 0..<(rate / 8) {
+            state[index] ^= UInt64(littleEndian: block.loadUnaligned(fromByteOffset: index * 8, as: UInt64.self))
+        }
+        Self.permute(state)
+    }
+
     internal func update(_ data: Data) {
         data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
             guard !input.isEmpty, let base = input.baseAddress else {
@@ -486,6 +481,11 @@ internal final class SHA3Hasher: StreamHasher, @unchecked Sendable {
         absorb(pending)
         return Array(UnsafeRawBufferPointer(start: state, count: digestLength))
     }
+
+    deinit {
+        state.deallocate()
+        pending.deallocate()
+    }
 }
 
 /// BLAKE3, after the reference implementation of its authors: 1024-byte chunks hashed in
@@ -497,6 +497,12 @@ internal final class SHA3Hasher: StreamHasher, @unchecked Sendable {
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
 internal final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
+    /// A pointer handed to the threads of `subtree`; they work on separate parts of it.
+    private struct UncheckedPointer<Pointee>: @unchecked Sendable {
+        let pointer: Pointee
+        init(_ pointer: Pointee) { self.pointer = pointer }
+    }
+
     private static let chunkStart: UInt32 = 1, chunkEnd: UInt32 = 2, parent: UInt32 = 4, root: UInt32 = 8
     private static let chunkSize = 1_024
 
@@ -528,6 +534,18 @@ internal final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
 
     /// Inputs of at least this many chunks are split over the cores.
     private static let parallelChunks = 16
+
+    // MARK: The hasher
+
+    /// The last (possibly full) chunk of the input so far.
+    ///
+    /// A full chunk is closed only when more input follows: the last one is the root's.
+    private let buffer = UnsafeMutableRawPointer.allocate(byteCount: BLAKE3Hasher.chunkSize, alignment: 8)
+    private var bufferLength = 0
+    private var chunkCounter: UInt64 = 0
+    /// The chaining values of finished subtrees (8 words each), the largest first.
+    private let stack = UnsafeMutablePointer<UInt32>.allocate(capacity: 64 * 8)
+    private var stackCount = 0
 
     // MARK: The compression function
 
@@ -708,29 +726,6 @@ internal final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
         for index in 0..<8 { out[index] = values[index] }
     }
 
-    /// A pointer handed to the threads of `subtree`; they work on separate parts of it.
-    private struct UncheckedPointer<Pointee>: @unchecked Sendable {
-        let pointer: Pointee
-        init(_ pointer: Pointee) { self.pointer = pointer }
-    }
-
-    // MARK: The hasher
-
-    /// The last (possibly full) chunk of the input so far.
-    ///
-    /// A full chunk is closed only when more input follows: the last one is the root's.
-    private let buffer = UnsafeMutableRawPointer.allocate(byteCount: BLAKE3Hasher.chunkSize, alignment: 8)
-    private var bufferLength = 0
-    private var chunkCounter: UInt64 = 0
-    /// The chaining values of finished subtrees (8 words each), the largest first.
-    private let stack = UnsafeMutablePointer<UInt32>.allocate(capacity: 64 * 8)
-    private var stackCount = 0
-
-    deinit {
-        buffer.deallocate()
-        stack.deallocate()
-    }
-
     /// A finished subtree of `2^level` chunks joins the tree: for every pair of equal subtrees
     /// that is complete now (one per trailing zero bit of the chunk count) a parent takes their place.
     private func add(_ value: UnsafeMutablePointer<UInt32>, level: Int) {
@@ -819,5 +814,10 @@ internal final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
             for index in 0..<8 { words[index] = value[index] }
         }
         return words.prefix(8).flatMap { word in (0..<4).map { UInt8(truncatingIfNeeded: word >> (8 * UInt32($0))) } }
+    }
+
+    deinit {
+        buffer.deallocate()
+        stack.deallocate()
     }
 }

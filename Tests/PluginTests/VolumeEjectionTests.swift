@@ -16,15 +16,15 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
     private var refusals: [EjectRefusal?]
     private var ejectCount = 0
 
-    init(_ volume: URL, refusals: [EjectRefusal?] = []) {
-        self.volume = volume
-        self.refusals = refusals
-    }
-
     var ejects: Int {
         lock.lock()
         defer { lock.unlock() }
         return ejectCount
+    }
+
+    init(_ volume: URL, refusals: [EjectRefusal?] = []) {
+        self.volume = volume
+        self.refusals = refusals
     }
 
     func facts(of directory: URL) -> VolumeFacts {

@@ -12,6 +12,22 @@ import UniformTypeIdentifiers
 /// the folders, the dates inside pictures and the result log, where things go wrong.
 @Suite
 internal struct CoverageRenameRun {
+    /// Counts the questions asked of a closure.
+    ///
+    /// Unchecked: the count is guarded by `lock`.
+    private final class Asked: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+
+        /// Counts one more question and returns the count.
+        func next() -> Int {
+            lock.withLock {
+                count += 1
+                return count
+            }
+        }
+    }
+
     internal let fileSystem = CoverageRenameFileSystem()
     internal let registry = FileSystemRegistry()
     internal let box: Sandbox
@@ -419,21 +435,5 @@ internal struct CoverageRenameRun {
         #expect(
             text == "\"\(registry.displayPath(url("/a/x.txt")))\" -> \"\(registry.displayPath(url("/b/y.txt")))\"\n"
         )
-    }
-
-    /// Counts the questions asked of a closure.
-    ///
-    /// Unchecked: the count is guarded by `lock`.
-    private final class Asked: @unchecked Sendable {
-        private let lock = NSLock()
-        private var count = 0
-
-        /// Counts one more question and returns the count.
-        func next() -> Int {
-            lock.withLock {
-                count += 1
-                return count
-            }
-        }
     }
 }

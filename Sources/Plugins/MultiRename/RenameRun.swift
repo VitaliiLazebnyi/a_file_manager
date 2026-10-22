@@ -7,6 +7,10 @@ internal struct RenameEntry {
     internal var item: FileItem
     internal var name: String
 
+    internal var diskName: String { Self.diskName(of: item) }
+
+    internal var directory: URL { item.url.deletingLastPathComponent() }
+
     internal init(_ item: FileItem) {
         self.item = item
         name = Self.diskName(of: item)
@@ -20,10 +24,6 @@ internal struct RenameEntry {
     internal static func diskName(of item: FileItem) -> String {
         item.name.utf8.contains(0x2F) ? item.url.lastPathComponent : item.name
     }
-
-    internal var diskName: String { Self.diskName(of: item) }
-
-    internal var directory: URL { item.url.deletingLastPathComponent() }
 }
 
 /// The new names of a list and how each of them stands.
@@ -382,6 +382,18 @@ internal struct RenameSurvey {
         self.cancellation = cancellation
     }
 
+    /// What a local volume says about letter case in names; nil for anything else or when it does not say.
+    internal static func volumeFoldsCase(_ folder: URL) -> Bool? {
+        guard folder.isFileURL else {
+            return nil
+        }
+        // The nearest folder that exists answers for one that does not exist yet (the top always exists).
+        var current = folder
+        while !FileManager.default.fileExists(atPath: current.path) { current.deleteLastPathComponent() }
+        let values = try? current.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
+        return values?.volumeSupportsCaseSensitiveNames.map { !$0 }
+    }
+
     /// The keys of every entry of the given folders (by `locationKey`).
     ///
     /// A folder that does not exist yet has none.
@@ -460,18 +472,6 @@ internal struct RenameSurvey {
         return folded.isEmpty
             ? RenamePlanner()
             : folded.count == allFolders.count ? RenamePlanner(foldsCase: true) : RenamePlanner(foldedFolders: folded)
-    }
-
-    /// What a local volume says about letter case in names; nil for anything else or when it does not say.
-    internal static func volumeFoldsCase(_ folder: URL) -> Bool? {
-        guard folder.isFileURL else {
-            return nil
-        }
-        // The nearest folder that exists answers for one that does not exist yet (the top always exists).
-        var current = folder
-        while !FileManager.default.fileExists(atPath: current.path) { current.deleteLastPathComponent() }
-        let values = try? current.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
-        return values?.volumeSupportsCaseSensitiveNames.map { !$0 }
     }
 
     /// Whether the file system of the items takes names that differ only in letter case for

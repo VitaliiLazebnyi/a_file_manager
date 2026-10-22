@@ -36,16 +36,6 @@ internal final class QuietMonitor: JobMonitor, @unchecked Sendable {
 /// Unchecked: its parts are file systems and stores, which are safe from any thread; the
 /// environment is set up before use.
 internal final class ArchiveBench: @unchecked Sendable {
-    internal let box: Sandbox
-    internal let environment = ArchiveEnvironment()
-    internal let store: ArchiveStore
-    internal let fileSystems = FileSystemRegistry()
-    internal let memory = MemoryFileSystem()
-    internal let zip: ArchiveFileSystem
-    internal let readOnly: ArchiveFileSystem
-    internal let monitor = QuietMonitor()
-    internal let passwords = Passwords()
-
     /// The answers to password questions, and how often one was asked.
     ///
     /// Unchecked: the state is guarded by `lock`.
@@ -54,16 +44,16 @@ internal final class ArchiveBench: @unchecked Sendable {
         private var answers: [String?] = []
         private var count = 0
 
-        internal func set(_ answers: [String?]) {
-            lock.lock()
-            self.answers = answers
-            lock.unlock()
-        }
-
         internal var asked: Int {
             lock.lock()
             defer { lock.unlock() }
             return count
+        }
+
+        internal func set(_ answers: [String?]) {
+            lock.lock()
+            self.answers = answers
+            lock.unlock()
         }
 
         internal func next() -> String? {
@@ -73,6 +63,16 @@ internal final class ArchiveBench: @unchecked Sendable {
             return answers.isEmpty ? nil : answers.removeFirst()
         }
     }
+
+    internal let box: Sandbox
+    internal let environment = ArchiveEnvironment()
+    internal let store: ArchiveStore
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
+    internal let zip: ArchiveFileSystem
+    internal let readOnly: ArchiveFileSystem
+    internal let monitor = QuietMonitor()
+    internal let passwords = Passwords()
 
     internal init() throws {
         box = try Sandbox()
@@ -84,8 +84,6 @@ internal final class ArchiveBench: @unchecked Sendable {
         environment.fileSystems = { [weak fileSystems] in fileSystems }
         environment.askPassword = { [passwords] _, _ in passwords.next() }
     }
-
-    deinit { store.close() }
 
     /// A small tree with text, binary data, an empty file, an empty folder and odd names.
     @discardableResult
@@ -162,6 +160,8 @@ internal final class ArchiveBench: @unchecked Sendable {
     internal func names(_ url: URL, showHidden: Bool = true) throws -> [String] {
         try fileSystems.provider(for: url).list(url, showHidden: showHidden).map(\.name).sorted()
     }
+
+    deinit { store.close() }
 }
 
 /// Runs a program of the system and returns its exit status and output.

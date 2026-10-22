@@ -113,6 +113,16 @@ internal struct ShellContext {
     /// Where a value written now would stand; nil where none can.
     internal var place: Place? { try? check().get() }
 
+    private static func isSimpleParameterCharacter(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar {
+        case "a"..."z", "A"..."Z", "0"..."9", "_", "@", "*", "#", "?", "!", "$":
+            return true
+
+        default:
+            return false
+        }
+    }
+
     private func check() -> Result<Place, Refusal> {
         if let poisoned {
             return .failure(poisoned)
@@ -222,16 +232,6 @@ internal struct ShellContext {
         // Back in the word that held the quote or the substitution.
         tokenStart = false
         keyword = nil
-    }
-
-    private static func isSimpleParameterCharacter(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar {
-        case "a"..."z", "A"..."Z", "0"..."9", "_", "@", "*", "#", "?", "!", "$":
-            return true
-
-        default:
-            return false
-        }
     }
 
     internal mutating func feed(_ scalar: Unicode.Scalar) {

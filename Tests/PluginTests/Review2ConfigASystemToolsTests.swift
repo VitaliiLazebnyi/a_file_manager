@@ -21,6 +21,8 @@ internal struct Review2ConfigASystemTools {
     internal var commands: CommandRegistry { bench.commands }
     internal var ui: ScriptedInteraction { bench.interaction }
 
+    internal var history: [String]? { settings.value([String].self, forKey: "systemTools.history") }
+
     internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt", "1")
@@ -34,8 +36,6 @@ internal struct Review2ConfigASystemTools {
             settings: settings
         )
     }
-
-    internal var history: [String]? { settings.value([String].self, forKey: "systemTools.history") }
 
     @Test
     internal func aLineTypedWithABlankInFrontIsNotRemembered() {

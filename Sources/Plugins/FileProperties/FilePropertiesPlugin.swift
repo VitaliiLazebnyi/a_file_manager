@@ -16,20 +16,20 @@ extension CommandID {
 /// File comments, Properties, Calculate occupied space, Create shortcut), and the columns
 /// that show such facts in the file list.
 public final class FilePropertiesPlugin: Plugin {
-    public let name = "FileProperties"
-    /// Runs AppleScript with these `osascript` arguments; nil starts nothing (tests).
-    private let runScript: (@Sendable ([String]) -> Void)?
-    /// The items Finder's Info window was asked for, whether or not Finder was really told; the
-    /// most recent ones only, for tests to look at.
-    public private(set) var finderInfoRequests: [URL] = []
-    private static let finderInfoRequestLimit = 64
-
     internal enum Settings {
         internal static let linkKind = "fileProperties.linkKind"
         internal static let relativeLinks = "fileProperties.relativeLinks"
         internal static let selectMeasured = "fileProperties.selectMeasuredFolders"
         internal static let hideCommentFile = "fileProperties.hideCommentFile"
     }
+    private static let finderInfoRequestLimit = 64
+
+    public let name = "FileProperties"
+    /// Runs AppleScript with these `osascript` arguments; nil starts nothing (tests).
+    private let runScript: (@Sendable ([String]) -> Void)?
+    /// The items Finder's Info window was asked for, whether or not Finder was really told; the
+    /// most recent ones only, for tests to look at.
+    public private(set) var finderInfoRequests: [URL] = []
 
     /// Tests turn `launchesApplications` off, so they do not start other applications.
     public convenience init(launchesApplications: Bool = true) {
@@ -39,6 +39,31 @@ public final class FilePropertiesPlugin: Plugin {
     /// A plugin that hands its AppleScript to `runScript`.
     internal init(runScript: (@Sendable ([String]) -> Void)?) {
         self.runScript = runScript
+    }
+
+    /// The `osascript` arguments that open Finder's Info window of each item.
+    ///
+    /// Finder is handed no path: on some systems it resolves no file path it is given, as an alias
+    /// or a file URL ("Can't get alias", -1728), while its own references always work. So the
+    /// script walks to each item by name, from the disk it is on (`finderPath`).
+    internal static func finderInfoArguments(_ urls: [URL]) -> [String] {
+        let script = [
+            "on run paths", "set AppleScript's text item delimiters to \":\"", "tell application \"Finder\"",
+            "repeat with itemPath in paths", "set names to rest of text items of (contents of itemPath)",
+            "set found to startup disk",
+            "if (count of names) > 1 and item 1 of names is \"Volumes\" then",
+            "set found to disk (item 2 of names)", "set names to rest of rest of names", "end if",
+            "repeat with itemName in names",
+            "if contents of itemName is not \"\" then set found to item (contents of itemName) of found",
+            "end repeat", "open information window of found", "end repeat", "activate", "end tell", "end run"
+        ]
+        return script.flatMap { ["-e", $0] } + urls.map(finderPath)
+    }
+
+    /// An item's path as Finder names it: each name after a `:`, a `:` in a name written `/` (as
+    /// Finder shows it), so the separator is never part of a name; the startup disk is `:`.
+    internal static func finderPath(of url: URL) -> String {
+        ":" + url.pathComponents.dropFirst().map { $0.replacingOccurrences(of: ":", with: "/") }.joined(separator: ":")
     }
 
     public func start(in owner: Kernel) {
@@ -179,31 +204,6 @@ public final class FilePropertiesPlugin: Plugin {
         // Starting a program waits for the system: on a thread for work that waits.
         BlockingCalls.run { runScript(arguments) }
     }
-
-    /// The `osascript` arguments that open Finder's Info window of each item.
-    ///
-    /// Finder is handed no path: on some systems it resolves no file path it is given, as an alias
-    /// or a file URL ("Can't get alias", -1728), while its own references always work. So the
-    /// script walks to each item by name, from the disk it is on (`finderPath`).
-    internal static func finderInfoArguments(_ urls: [URL]) -> [String] {
-        let script = [
-            "on run paths", "set AppleScript's text item delimiters to \":\"", "tell application \"Finder\"",
-            "repeat with itemPath in paths", "set names to rest of text items of (contents of itemPath)",
-            "set found to startup disk",
-            "if (count of names) > 1 and item 1 of names is \"Volumes\" then",
-            "set found to disk (item 2 of names)", "set names to rest of rest of names", "end if",
-            "repeat with itemName in names",
-            "if contents of itemName is not \"\" then set found to item (contents of itemName) of found",
-            "end repeat", "open information window of found", "end repeat", "activate", "end tell", "end run"
-        ]
-        return script.flatMap { ["-e", $0] } + urls.map(finderPath)
-    }
-
-    /// An item's path as Finder names it: each name after a `:`, a `:` in a name written `/` (as
-    /// Finder shows it), so the separator is never part of a name; the startup disk is `:`.
-    internal static func finderPath(of url: URL) -> String {
-        ":" + url.pathComponents.dropFirst().map { $0.replacingOccurrences(of: ":", with: "/") }.joined(separator: ":")
-    }
 }
 
 /// The behaviour behind the commands.
@@ -219,15 +219,15 @@ internal final class PropertyActions {
     private let comments: CommentStore
     internal let showFinderInfo: ([URL]) -> Void
 
+    private var source: any PanelHandle { kernel.panels.source }
+    private var ui: any UserInteraction { kernel.interaction }
+    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
+
     internal init(_ kernel: Kernel, comments: CommentStore, showFinderInfo: @escaping ([URL]) -> Void) {
         self.kernel = kernel
         self.comments = comments
         self.showFinderInfo = showFinderInfo
     }
-
-    private var source: any PanelHandle { kernel.panels.source }
-    private var ui: any UserInteraction { kernel.interaction }
-    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
     /// The folders whose listings an operation on `items` may have changed.
     ///
@@ -246,6 +246,25 @@ internal final class PropertyActions {
         let count = total ?? failures.count
         let shown = failures.prefix(limit)
         return shown.joined(separator: "\n") + (count > shown.count ? "\n… and \(count - shown.count) more" : "")
+    }
+
+    /// Shows calculated folder sizes in a panel.
+    ///
+    /// They were written into a copy of the list on the job's thread (`prepared`), which the model
+    /// takes in one step; if its list is no longer the one the copy was made of, the sizes are set
+    /// by name instead. Main thread.
+    internal static func show(
+        _ sizes: [(name: String, size: Int64)],
+        prepared: PanelModel.Prepared?,
+        in model: PanelModel
+    ) {
+        guard !sizes.isEmpty else {
+            return
+        }
+        if let prepared, model.apply(prepared) != .stale {
+            return
+        }
+        model.setComputedSizes(sizes)
     }
 
     // MARK: Change attributes
@@ -538,25 +557,6 @@ internal final class PropertyActions {
         )
     }
 
-    /// Shows calculated folder sizes in a panel.
-    ///
-    /// They were written into a copy of the list on the job's thread (`prepared`), which the model
-    /// takes in one step; if its list is no longer the one the copy was made of, the sizes are set
-    /// by name instead. Main thread.
-    internal static func show(
-        _ sizes: [(name: String, size: Int64)],
-        prepared: PanelModel.Prepared?,
-        in model: PanelModel
-    ) {
-        guard !sizes.isEmpty else {
-            return
-        }
-        if let prepared, model.apply(prepared) != .stale {
-            return
-        }
-        model.setComputedSizes(sizes)
-    }
-
     // MARK: Comments
 
     /// Edits the comment of the item under the cursor; on `[..]`, of the folder the panel
@@ -791,11 +791,6 @@ internal struct AttributeDraft {
         else { return nil }
         return prefilled
     }
-
-    /// What the field shows is meant after all (the user said so).
-    internal mutating func confirmPermissions() {
-        prefilledPermissions = nil
-    }
     /// 0 unchanged, 1 set, 2 clear.
     internal var hidden = 0
     internal var locked = 0
@@ -814,6 +809,11 @@ internal struct AttributeDraft {
         permissions = PropertyText.octal(items[0].permissions)
         prefilledPermissions = permissions
         (date, time) = TimestampChange.fieldTexts(for: items[0].modified)
+    }
+
+    /// What the field shows is meant after all (the user said so).
+    internal mutating func confirmPermissions() {
+        prefilledPermissions = nil
     }
 
     /// Takes the permissions and the date of another file (Load from file under cursor); what

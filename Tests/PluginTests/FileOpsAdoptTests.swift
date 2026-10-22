@@ -18,27 +18,6 @@ import Testing
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 internal final class ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
-    internal let base: MemoryFileSystem
-    internal var scheme: String { base.scheme }
-    internal var capabilities: FileSystemCapabilities { base.capabilities }
-    /// Called when a read, a write, a listing or a commit is entered (before it may wait).
-    internal var onRead: (() -> Void)?
-    internal var onWrite: (() -> Void)?
-    internal var onList: (() -> Void)?
-    internal var onCommit: (() -> Void)?
-    /// Called when a move begins.
-    internal var onMove: (() -> Void)?
-    /// Claimed on top of what the base can do, as a server without a session claims `.append`
-    /// that its connection then cannot keep.
-    internal var claims: FileSystemCapabilities = []
-    private let lock = NSLock()
-    private var calls: [String: Int] = [:]
-
-    internal init(_ base: MemoryFileSystem) { self.base = base }
-
-    private func count(_ name: String) { lock.withLock { calls[name, default: 0] += 1 } }
-    internal func count(of name: String) -> Int { lock.withLock { calls[name] ?? 0 } }
-
     private final class Reader: FileReader {
         let inner: any FileReader, owner: ProbeFileSystem
         init(_ inner: any FileReader, _ owner: ProbeFileSystem) { (self.inner, self.owner) = (inner, owner) }
@@ -61,6 +40,27 @@ internal final class ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
         func close(attributes: FileAttributes) throws { try inner.close(attributes: attributes) }
         func interrupt() { inner.interrupt() }
     }
+
+    internal let base: MemoryFileSystem
+    internal var scheme: String { base.scheme }
+    internal var capabilities: FileSystemCapabilities { base.capabilities }
+    /// Called when a read, a write, a listing or a commit is entered (before it may wait).
+    internal var onRead: (() -> Void)?
+    internal var onWrite: (() -> Void)?
+    internal var onList: (() -> Void)?
+    internal var onCommit: (() -> Void)?
+    /// Called when a move begins.
+    internal var onMove: (() -> Void)?
+    /// Claimed on top of what the base can do, as a server without a session claims `.append`
+    /// that its connection then cannot keep.
+    internal var claims: FileSystemCapabilities = []
+    private let lock = NSLock()
+    private var calls: [String: Int] = [:]
+
+    internal init(_ base: MemoryFileSystem) { self.base = base }
+
+    private func count(_ name: String) { lock.withLock { calls[name, default: 0] += 1 } }
+    internal func count(of name: String) -> Int { lock.withLock { calls[name] ?? 0 } }
 
     internal func capabilities(for url: URL) -> FileSystemCapabilities { base.capabilities(for: url).union(claims) }
     internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
@@ -151,8 +151,8 @@ private func cancel(_ job: FileJob, when gate: DispatchSemaphore) {
 private final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
-    init(_ value: Value) { stored = value }
     var value: Value { lock.withLock { stored } }
+    init(_ value: Value) { stored = value }
     func modify(_ change: (inout Value) -> Void) { lock.withLock { change(&stored) } }
 }
 

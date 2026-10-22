@@ -14,18 +14,6 @@ internal final class RenameStore {
         case replacement = "history.replacement"
     }
 
-    internal static let scope = "multirename"
-    internal static let historyLimit = 20
-    /// The runs kept for Undo are saved up to this many renamed files in all, newest first; a
-    /// run that alone is longer is kept in memory for this session only and is not saved (a
-    /// hundred thousand names are tens of megabytes of settings, which the program would read
-    /// at every start).
-    internal static let persistedItemLimit = 50_000
-    /// The full keys of the preferences, as the configuration page stores them.
-    internal static let undoLimitKey = scope + ".undoHistoryLength"
-    internal static let startupSettingsKey = scope + ".loadSettings"
-    internal static let lowercaseWordsKey = scope + ".lowercaseWords"
-
     /// What the stores made on one settings object share.
     ///
     /// The lists are read from the settings once and then live here, so asking for them costs
@@ -47,33 +35,27 @@ internal final class RenameStore {
         }
     }
 
+    internal static let scope = "multirename"
+    internal static let historyLimit = 20
+    /// The runs kept for Undo are saved up to this many renamed files in all, newest first; a
+    /// run that alone is longer is kept in memory for this session only and is not saved (a
+    /// hundred thousand names are tens of megabytes of settings, which the program would read
+    /// at every start).
+    internal static let persistedItemLimit = 50_000
+    /// The full keys of the preferences, as the configuration page stores them.
+    internal static let undoLimitKey = scope + ".undoHistoryLength"
+    internal static let startupSettingsKey = scope + ".loadSettings"
+    internal static let lowercaseWordsKey = scope + ".lowercaseWords"
+
     private static var memories: [ObjectIdentifier: Memory] = [:]
     private static let memoriesLock = NSLock()
     /// Runs with more renamed files than this are saved in the background.
     private static let backgroundWriteThreshold = 2_000
     private static let writer = DispatchQueue(label: "multirename.store", qos: .utility)
 
-    private static func memory(for settings: any SettingsStore) -> Memory {
-        memoriesLock.lock()
-        defer { memoriesLock.unlock() }
-        memories = memories.filter { $0.value.settings != nil }
-        if let known = memories[ObjectIdentifier(settings)], known.settings === settings {
-            return known
-        }
-        let created = Memory(settings)
-        memories[ObjectIdentifier(settings)] = created
-        return created
-    }
-
     private let all: any SettingsStore
     private let own: any SettingsStore
     private let memory: Memory
-
-    internal init(settings: any SettingsStore) {
-        all = settings
-        own = settings.scoped(to: Self.scope)
-        memory = Self.memory(for: settings)
-    }
 
     // MARK: Preferences
 
@@ -115,39 +97,6 @@ internal final class RenameStore {
     /// need not rebuild them while it stays the same.
     internal var revision: Int { memory.revision }
 
-    // MARK: Histories
-
-    internal func history(_ history: History) -> [String] {
-        if let known = memory.histories[history] {
-            return known
-        }
-        let loaded = own.value([String].self, forKey: history.rawValue) ?? []
-        memory.histories[history] = loaded
-        return loaded
-    }
-
-    private func setHistory(_ entries: [String], _ history: History) {
-        memory.histories[history] = entries
-        memory.revision += 1
-        own.set(entries, forKey: history.rawValue)
-    }
-
-    /// Puts a text at the top of a history.
-    ///
-    /// Leading and trailing spaces are kept: they matter in Search & Replace.
-    internal func remember(_ text: String, in history: History) {
-        guard !text.isEmpty else {
-            return
-        }
-        var entries = self.history(history).filter { $0 != text }
-        entries.insert(text, at: 0)
-        setHistory(Array(entries.prefix(Self.historyLimit)), history)
-    }
-
-    internal func forget(_ text: String, in history: History) {
-        setHistory(self.history(history).filter { $0 != text }, history)
-    }
-
     // MARK: Undo
 
     /// The runs that can be undone, the latest last.
@@ -184,6 +133,57 @@ internal final class RenameStore {
     }
 
     internal var lastUndo: [RenamedItem]? { undoHistory.last }
+
+    internal init(settings: any SettingsStore) {
+        all = settings
+        own = settings.scoped(to: Self.scope)
+        memory = Self.memory(for: settings)
+    }
+
+    private static func memory(for settings: any SettingsStore) -> Memory {
+        memoriesLock.lock()
+        defer { memoriesLock.unlock() }
+        memories = memories.filter { $0.value.settings != nil }
+        if let known = memories[ObjectIdentifier(settings)], known.settings === settings {
+            return known
+        }
+        let created = Memory(settings)
+        memories[ObjectIdentifier(settings)] = created
+        return created
+    }
+
+    // MARK: Histories
+
+    internal func history(_ history: History) -> [String] {
+        if let known = memory.histories[history] {
+            return known
+        }
+        let loaded = own.value([String].self, forKey: history.rawValue) ?? []
+        memory.histories[history] = loaded
+        return loaded
+    }
+
+    private func setHistory(_ entries: [String], _ history: History) {
+        memory.histories[history] = entries
+        memory.revision += 1
+        own.set(entries, forKey: history.rawValue)
+    }
+
+    /// Puts a text at the top of a history.
+    ///
+    /// Leading and trailing spaces are kept: they matter in Search & Replace.
+    internal func remember(_ text: String, in history: History) {
+        guard !text.isEmpty else {
+            return
+        }
+        var entries = self.history(history).filter { $0 != text }
+        entries.insert(text, at: 0)
+        setHistory(Array(entries.prefix(Self.historyLimit)), history)
+    }
+
+    internal func forget(_ text: String, in history: History) {
+        setHistory(self.history(history).filter { $0 != text }, history)
+    }
 
     /// Brings the undo history into memory, decoding it off the main thread; `completion` runs
     /// on the main thread.

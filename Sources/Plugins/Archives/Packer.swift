@@ -194,6 +194,12 @@ internal final class Packer {
         internal let path: String
     }
 
+    private static let processMask: mode_t = {
+        let mask = umask(0)
+        umask(mask)
+        return mask
+    }()
+
     private let fileSystems: FileSystemRegistry
     private let store: ArchiveStore
     private let monitor: any JobMonitor
@@ -215,6 +221,52 @@ internal final class Packer {
         self.store = store
         self.monitor = monitor
         self.options = options
+    }
+
+    /// The name of the archive made for one operand: a folder or file gives `name.zip`; the
+    /// single-file compressors keep the whole name (`a.txt` → `a.txt.gz`), spec 08 › Target string.
+    internal static func archiveName(for source: FileItem, format: ArchiveFormat) -> String {
+        if case .compressedFile = format {
+            return source.name + "." + format.defaultExtension
+        }
+        return (source.isFolder || source.baseName.isEmpty ? source.name : source.baseName) + "."
+            + format.defaultExtension
+    }
+
+    /// The rights a new archive gets: the user's own, and those of group and others only as
+    /// far as every file packed into it grants them.
+    ///
+    /// An archive of private files is not readable by everyone on the machine.
+    internal static func mode(for members: [Member]) -> mode_t {
+        let shared = members.filter { !$0.item.isDirectory }.reduce(UInt16(0o044)) { $0 & $1.item.permissions }
+        return mode_t(0o600 | shared) & ~processMask
+    }
+
+    /// As in an archive on a server (`OpenArchive`): a member packed again takes the place of
+    /// one of its own kind only, a file that of a file and a folder that of a folder.
+    ///
+    /// A file under the name of a folder of the archive (one listed or one its members lie in), or
+    /// a folder under the name of a file, leaves the archive as it is and fails.
+    private static func refuseOtherKinds(_ members: [Member], in records: [ZipRecord], innerFolder: String) throws {
+        // What each name is: what its record says, and a folder where other members lie in it.
+        var folders: [String: Bool] = [:]
+        for (name, isFolder) in records.compactMap({ record in
+            ArchiveTree.normalized(record.name).map { ($0, record.isDirectory) }
+        }) {
+            folders[name] = isFolder
+        }
+        for name in Array(folders.keys) {
+            var parent = ArchiveTree.parent(of: name)
+            while !parent.isEmpty {
+                folders[parent] = true
+                parent = ArchiveTree.parent(of: parent)
+            }
+        }
+        for member in members {
+            let path = ArchiveTree.join(innerFolder, member.path)
+            guard let isFolder = folders[path], isFolder != member.item.isRealDirectory else { continue }
+            throw isFolder ? FileSystemError.alreadyExists(path) : ArchiveError.notADirectory(path)
+        }
     }
 
     /// Packs `sources` into the archive at `archive` (below `innerFolder` when it is an
@@ -261,16 +313,6 @@ internal final class Packer {
             result.failure = error
         }
         return result
-    }
-
-    /// The name of the archive made for one operand: a folder or file gives `name.zip`; the
-    /// single-file compressors keep the whole name (`a.txt` → `a.txt.gz`), spec 08 › Target string.
-    internal static func archiveName(for source: FileItem, format: ArchiveFormat) -> String {
-        if case .compressedFile = format {
-            return source.name + "." + format.defaultExtension
-        }
-        return (source.isFolder || source.baseName.isEmpty ? source.name : source.baseName) + "."
-            + format.defaultExtension
     }
 
     private func checkCancelled() throws {
@@ -467,21 +509,6 @@ internal final class Packer {
         }
     }
 
-    /// The rights a new archive gets: the user's own, and those of group and others only as
-    /// far as every file packed into it grants them.
-    ///
-    /// An archive of private files is not readable by everyone on the machine.
-    internal static func mode(for members: [Member]) -> mode_t {
-        let shared = members.filter { !$0.item.isDirectory }.reduce(UInt16(0o044)) { $0 & $1.item.permissions }
-        return mode_t(0o600 | shared) & ~processMask
-    }
-
-    private static let processMask: mode_t = {
-        let mask = umask(0)
-        umask(mask)
-        return mask
-    }()
-
     /// Writes the archive under a temporary name and puts it in place when it is complete, so
     /// that a failed or cancelled pack leaves no half archive and never damages an existing one.
     ///
@@ -608,33 +635,6 @@ internal final class Packer {
             throw error
         }
         return true
-    }
-
-    /// As in an archive on a server (`OpenArchive`): a member packed again takes the place of
-    /// one of its own kind only, a file that of a file and a folder that of a folder.
-    ///
-    /// A file under the name of a folder of the archive (one listed or one its members lie in), or
-    /// a folder under the name of a file, leaves the archive as it is and fails.
-    private static func refuseOtherKinds(_ members: [Member], in records: [ZipRecord], innerFolder: String) throws {
-        // What each name is: what its record says, and a folder where other members lie in it.
-        var folders: [String: Bool] = [:]
-        for (name, isFolder) in records.compactMap({ record in
-            ArchiveTree.normalized(record.name).map { ($0, record.isDirectory) }
-        }) {
-            folders[name] = isFolder
-        }
-        for name in Array(folders.keys) {
-            var parent = ArchiveTree.parent(of: name)
-            while !parent.isEmpty {
-                folders[parent] = true
-                parent = ArchiveTree.parent(of: parent)
-            }
-        }
-        for member in members {
-            let path = ArchiveTree.join(innerFolder, member.path)
-            guard let isFolder = folders[path], isFolder != member.item.isRealDirectory else { continue }
-            throw isFolder ? FileSystemError.alreadyExists(path) : ArchiveError.notADirectory(path)
-        }
     }
 
     /// A new ZIP, or an existing one with the members added: what the old archive holds is

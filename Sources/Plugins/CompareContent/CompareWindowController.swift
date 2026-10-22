@@ -11,6 +11,28 @@ import AppKit
 internal final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
     NSTableViewDelegate
 {
+    private final class PaneTableView: NSTableView {
+        var onKey: ((NSEvent) -> Bool)?
+
+        override func keyDown(with event: NSEvent) {
+            if onKey?(event) != true { super.keyDown(with: event) }
+        }
+    }
+
+    /// Draws the background that tells what kind of line a row is.
+    private final class DiffRowView: NSTableRowView {
+        var fill: NSColor? { didSet { needsDisplay = true } }
+
+        override func drawBackground(in dirtyRect: NSRect) {
+            super.drawBackground(in: dirtyRect)
+            guard let fill else {
+                return
+            }
+            fill.setFill()
+            bounds.intersection(dirtyRect).fill(using: .sourceOver)
+        }
+    }
+
     private let session: CompareSession
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
@@ -44,26 +66,30 @@ internal final class CompareWindowController: NSWindowController, NSWindowDelega
     private var resyncMarks: (left: Int?, right: Int?) = (nil, nil)
     private var base = FileManager.default.homeDirectoryForCurrentUser
 
-    private final class PaneTableView: NSTableView {
-        var onKey: ((NSEvent) -> Bool)?
+    // MARK: Moving around
 
-        override func keyDown(with event: NSEvent) {
-            if onKey?(event) != true { super.keyDown(with: event) }
-        }
+    private var currentRow: Int {
+        leftTable.selectedRow >= 0 ? leftTable.selectedRow : max(0, leftTable.rows(in: leftTable.visibleRect).location)
     }
 
-    /// Draws the background that tells what kind of line a row is.
-    private final class DiffRowView: NSTableRowView {
-        var fill: NSColor? { didSet { needsDisplay = true } }
+    /// The pane the keyboard is in.
+    private var focusedSide: CompareSide {
+        window?.firstResponder === rightTable ? .right : .left
+    }
 
-        override func drawBackground(in dirtyRect: NSRect) {
-            super.drawBackground(in: dirtyRect)
-            guard let fill else {
-                return
-            }
-            fill.setFill()
-            bounds.intersection(dirtyRect).fill(using: .sourceOver)
+    // MARK: Editing
+
+    /// The rows "Copy" works on: the selected rows when several are, else the difference the
+    /// cursor is in, else the cursor's row.
+    private var rowsToCopy: Range<Int>? {
+        let selection = leftTable.selectedRowIndexes
+        guard let first = selection.first, let last = selection.last else {
+            return nil
         }
+        if selection.count > 1 {
+            return first..<(last + 1)
+        }
+        return session.block(containing: first) ?? first..<(first + 1)
     }
 
     internal init(
@@ -392,17 +418,6 @@ internal final class CompareWindowController: NSWindowController, NSWindowDelega
         }
     }
 
-    // MARK: Moving around
-
-    private var currentRow: Int {
-        leftTable.selectedRow >= 0 ? leftTable.selectedRow : max(0, leftTable.rows(in: leftTable.visibleRect).location)
-    }
-
-    /// The pane the keyboard is in.
-    private var focusedSide: CompareSide {
-        window?.firstResponder === rightTable ? .right : .left
-    }
-
     /// Selects a row in both panes and shows it near the top.
     ///
     /// (Rows come from the session's current rows: a search that the rows have changed under is
@@ -475,21 +490,6 @@ internal final class CompareWindowController: NSWindowController, NSWindowDelega
         let other = changed === leftTable ? rightTable : leftTable
         other.selectRowIndexes(changed.selectedRowIndexes, byExtendingSelection: false)
         isMirroring = false
-    }
-
-    // MARK: Editing
-
-    /// The rows "Copy" works on: the selected rows when several are, else the difference the
-    /// cursor is in, else the cursor's row.
-    private var rowsToCopy: Range<Int>? {
-        let selection = leftTable.selectedRowIndexes
-        guard let first = selection.first, let last = selection.last else {
-            return nil
-        }
-        if selection.count > 1 {
-            return first..<(last + 1)
-        }
-        return session.block(containing: first) ?? first..<(first + 1)
     }
 
     @objc

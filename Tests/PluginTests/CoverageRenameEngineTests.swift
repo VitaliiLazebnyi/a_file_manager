@@ -8,6 +8,25 @@ import Testing
 /// are typed wrong, numbers at their limits, expressions that take too long.
 @Suite
 internal struct CoverageRenameEngine {
+    /// Counts the calls of a closure.
+    ///
+    /// Unchecked: the count is guarded by `lock`.
+    private final class CallCounter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+
+        /// How often `next` was called.
+        var value: Int { lock.withLock { count } }
+
+        /// Counts one more call and returns the count.
+        func next() -> Int {
+            lock.withLock {
+                count += 1
+                return count
+            }
+        }
+    }
+
     /// 2025-12-01 15:05:09 UTC: an afternoon.
     internal static let afternoon = Date(timeIntervalSince1970: 1_764_601_509)
 
@@ -260,24 +279,5 @@ internal struct CoverageRenameEngine {
             cancelled: { asked.next() > 1 }
         )
         #expect(steps.isEmpty && asked.value >= 2)
-    }
-
-    /// Counts the calls of a closure.
-    ///
-    /// Unchecked: the count is guarded by `lock`.
-    private final class CallCounter: @unchecked Sendable {
-        private let lock = NSLock()
-        private var count = 0
-
-        /// How often `next` was called.
-        var value: Int { lock.withLock { count } }
-
-        /// Counts one more call and returns the count.
-        func next() -> Int {
-            lock.withLock {
-                count += 1
-                return count
-            }
-        }
     }
 }

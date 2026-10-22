@@ -329,6 +329,84 @@ internal final class Selections {
         let title: String
     }
 
+    // MARK: Changing a selection
+
+    /// A list as work on it was started, with what tells whether it is still the list the
+    /// result belongs to.
+    ///
+    /// Taken on the main thread (nothing is copied).
+    private struct Frozen {
+        let model: PanelModel
+        let basis: PanelModel.Basis
+        /// Guards indexes of `basis.items`.
+        let shownVersion: Int
+        let operands: PanelModel.Operands
+
+        var items: [FileItem] { basis.items }
+
+        @MainActor
+        init(_ model: PanelModel) {
+            self.model = model
+            basis = model.basis
+            shownVersion = model.shownVersion
+            operands = model.operandsSnapshot()
+        }
+    }
+
+    // MARK: Selection files
+
+    private enum FileOutcome {
+        case done, cancelled
+        case failed(any Error)
+    }
+
+    /// The entries a text of names stands for: the ones whose name is written exactly like a
+    /// line, and, for a line no entry is written like, the ones that read the same.
+    internal struct ListedNames {
+        private var exact = Set<NameBytes>()
+        private var alike = Set<String>()
+
+        internal var isEmpty: Bool { exact.isEmpty && alike.isEmpty }
+
+        internal init(_ text: String, among items: [FileItem]) {
+            let known = Set(items.map(\.name))
+            let written = Set(items.map { NameBytes($0.name) })
+            for name in SelectionFile.listed(in: text, among: known) {
+                if written.contains(NameBytes(name)) { exact.insert(NameBytes(name)) } else { alike.insert(name) }
+            }
+        }
+
+        internal func contains(_ item: FileItem) -> Bool {
+            exact.contains(NameBytes(item.name)) || (!alike.isEmpty && alike.contains(item.name))
+        }
+    }
+
+    /// Who asks the volumes; stands for the plugin in `BlockingCalls`.
+    private final class VolumeQuestions: Sendable {}
+    /// Lists longer than this are worked on off the main thread.
+    internal static let longList = 20_000
+    /// How many names are applied to the model in one piece of main-thread work.
+    internal static let applyPiece = 20_000
+
+    /// How often a result that the list outgrew is worked out again before it is given up.
+    internal static let attempts = 8
+
+    // MARK: Groups
+
+    internal static let maskHelp =
+        "Specify file type, e.g. *.txt, or RegEx with leading '<', like <(a|b). "
+        + "Masks after | are left out: *.*|*.bak. >name uses a saved selection type."
+
+    /// Selection files are small; a file that is not one is not read to its end.
+    nonisolated private static let readLimit = 32 << 20
+
+    /// The most text taken from the clipboard as a list of names.
+    private static let clipboardLimit = 64 << 20
+
+    /// The owner of the questions to the volumes: a stalled volume holds at most as many
+    /// threads as one owner may have.
+    nonisolated private static let volumeQuestions = VolumeQuestions()
+
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let pasteboard: NSPasteboard
@@ -341,10 +419,13 @@ internal final class Selections {
     private let runsWork: @Sendable (@escaping @Sendable () -> Void) -> Void
     /// The computation under way; a newer command ends it.
     private var running: CancellationFlag?
-    /// Lists longer than this are worked on off the main thread.
-    internal static let longList = 20_000
-    /// How many names are applied to the model in one piece of main-thread work.
-    internal static let applyPiece = 20_000
+
+    private var source: PanelModel { kernel.panels.source.model }
+    private var ui: any UserInteraction { kernel.interaction }
+
+    /// What Num +, Ctrl+Num + and Num * affect, and the choice their Shift variants make.
+    internal var configured: SelectionScope { store.marksFolders ? .both : .files }
+    internal var other: SelectionScope { store.marksFolders ? .files : .both }
 
     /// The behaviour for the panels of `kernel`, with the clipboard `pasteboard`; with `background`,
     /// what can take long is handed to `runsWork`, which works it out elsewhere.
@@ -366,39 +447,41 @@ internal final class Selections {
         }
     }
 
-    private var source: PanelModel { kernel.panels.source.model }
-    private var ui: any UserInteraction { kernel.interaction }
+    private static func take(_ indices: [Int], _ change: PanelModel.SelectionChange, in frozen: Frozen) -> Bool {
+        let model = frozen.model
+        switch change {
+        case .replace:
+            if indices.isEmpty, model.selectionCount == 0 {
+                return model.shownVersion == frozen.shownVersion
+            }
+            return model.setSelection(indices: indices, shownVersion: frozen.shownVersion)
 
-    /// What Num +, Ctrl+Num + and Num * affect, and the choice their Shift variants make.
-    internal var configured: SelectionScope { store.marksFolders ? .both : .files }
-    internal var other: SelectionScope { store.marksFolders ? .files : .both }
+        case .add:
+            return model.setSelected(true, indices: indices, shownVersion: frozen.shownVersion)
 
-    // MARK: Changing a selection
-
-    /// A list as work on it was started, with what tells whether it is still the list the
-    /// result belongs to.
-    ///
-    /// Taken on the main thread (nothing is copied).
-    private struct Frozen {
-        let model: PanelModel
-        let basis: PanelModel.Basis
-        /// Guards indexes of `basis.items`.
-        let shownVersion: Int
-        let operands: PanelModel.Operands
-
-        @MainActor
-        init(_ model: PanelModel) {
-            self.model = model
-            basis = model.basis
-            shownVersion = model.shownVersion
-            operands = model.operandsSnapshot()
+        case .remove:
+            return model.setSelected(false, indices: indices, shownVersion: frozen.shownVersion)
         }
-
-        var items: [FileItem] { basis.items }
     }
 
-    /// How often a result that the list outgrew is worked out again before it is given up.
-    internal static let attempts = 8
+    /// Whether both folders are on local volumes that treat `A.txt` and `a.txt` as one name.
+    ///
+    /// Asks the volumes on a thread of the kernel's, which is given up when `cancellation` is set
+    /// (a stalled mount holds that thread, not this one); not for the main thread.
+    nonisolated private static func foldsCase(_ folders: URL..., cancellation: CancellationFlag) -> Bool {
+        folders.allSatisfy { folder in
+            guard folder.isFileURL else {
+                return false
+            }
+            let key = "case " + folder.path
+            let answer = BlockingCalls.answer(from: volumeQuestions, to: key, cancellation: cancellation) { _ in
+                (try? folder.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey]))?
+                    .volumeSupportsCaseSensitiveNames == false
+            }
+            // Given up (a newer command): taken as a volume that tells the cases apart.
+            return answer == true
+        }
+    }
 
     /// Works `work` out and then `apply`s its result on the main thread.
     ///
@@ -505,29 +588,6 @@ internal final class Selections {
             }
         )
     }
-
-    private static func take(_ indices: [Int], _ change: PanelModel.SelectionChange, in frozen: Frozen) -> Bool {
-        let model = frozen.model
-        switch change {
-        case .replace:
-            if indices.isEmpty, model.selectionCount == 0 {
-                return model.shownVersion == frozen.shownVersion
-            }
-            return model.setSelection(indices: indices, shownVersion: frozen.shownVersion)
-
-        case .add:
-            return model.setSelected(true, indices: indices, shownVersion: frozen.shownVersion)
-
-        case .remove:
-            return model.setSelected(false, indices: indices, shownVersion: frozen.shownVersion)
-        }
-    }
-
-    // MARK: Groups
-
-    internal static let maskHelp =
-        "Specify file type, e.g. *.txt, or RegEx with leading '<', like <(a|b). "
-        + "Masks after | are left out: *.*|*.bak. >name uses a saved selection type."
 
     /// Select group / Unselect group (spec 03 › Select and unselect group): asks for a mask,
     /// or takes it from `.text` (the `SELECTFILES` way).
@@ -825,13 +885,6 @@ internal final class Selections {
         model.moveCursor(to: count > 0 ? last + 1 : last - 1)
     }
 
-    // MARK: Selection files
-
-    private enum FileOutcome {
-        case done, cancelled
-        case failed(any Error)
-    }
-
     /// The file a command names in its argument, or the one the user types; plain names are
     /// files of the source panel's folder.
     private func file(from argument: CommandArgument, prompt: String, proposal: String, detail: String, directory: URL)
@@ -942,9 +995,6 @@ internal final class Selections {
         )
     }
 
-    /// Selection files are small; a file that is not one is not read to its end.
-    nonisolated private static let readLimit = 32 << 20
-
     /// Load Selection From File: selects exactly the listed names that the panel shows.
     ///
     /// The file is read and its names picked out in the job, which ends when it is cancelled; the
@@ -1022,30 +1072,6 @@ internal final class Selections {
             }
     }
 
-    /// The most text taken from the clipboard as a list of names.
-    private static let clipboardLimit = 64 << 20
-
-    /// The entries a text of names stands for: the ones whose name is written exactly like a
-    /// line, and, for a line no entry is written like, the ones that read the same.
-    internal struct ListedNames {
-        private var exact = Set<NameBytes>()
-        private var alike = Set<String>()
-
-        internal init(_ text: String, among items: [FileItem]) {
-            let known = Set(items.map(\.name))
-            let written = Set(items.map { NameBytes($0.name) })
-            for name in SelectionFile.listed(in: text, among: known) {
-                if written.contains(NameBytes(name)) { exact.insert(NameBytes(name)) } else { alike.insert(name) }
-            }
-        }
-
-        internal var isEmpty: Bool { exact.isEmpty && alike.isEmpty }
-
-        internal func contains(_ item: FileItem) -> Bool {
-            exact.contains(NameBytes(item.name)) || (!alike.isEmpty && alike.contains(item.name))
-        }
-    }
-
     private func select(_ names: ListedNames, in model: PanelModel, directory: URL) {
         // The panel may have gone elsewhere while the names were found.
         guard model.directory.isSameLocation(as: directory) else {
@@ -1091,32 +1117,6 @@ internal final class Selections {
             }
         )
     }
-
-    /// Whether both folders are on local volumes that treat `A.txt` and `a.txt` as one name.
-    ///
-    /// Asks the volumes on a thread of the kernel's, which is given up when `cancellation` is set
-    /// (a stalled mount holds that thread, not this one); not for the main thread.
-    nonisolated private static func foldsCase(_ folders: URL..., cancellation: CancellationFlag) -> Bool {
-        folders.allSatisfy { folder in
-            guard folder.isFileURL else {
-                return false
-            }
-            let key = "case " + folder.path
-            let answer = BlockingCalls.answer(from: volumeQuestions, to: key, cancellation: cancellation) { _ in
-                (try? folder.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey]))?
-                    .volumeSupportsCaseSensitiveNames == false
-            }
-            // Given up (a newer command): taken as a volume that tells the cases apart.
-            return answer == true
-        }
-    }
-
-    /// The owner of the questions to the volumes: a stalled volume holds at most as many
-    /// threads as one owner may have.
-    nonisolated private static let volumeQuestions = VolumeQuestions()
-
-    /// Who asks the volumes; stands for the plugin in `BlockingCalls`.
-    private final class VolumeQuestions: Sendable {}
 
     /// Mark Newer, Hide Same Files: marks like Compare Directories and leaves what is the
     /// same on both sides out of both lists, until the command is chosen again or the panel

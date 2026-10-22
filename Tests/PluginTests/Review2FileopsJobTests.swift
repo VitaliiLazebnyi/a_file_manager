@@ -16,20 +16,9 @@ import VirtualFoldersPlugin
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 internal final class FlakyFileSystem: FileSystemProvider, @unchecked Sendable {
-    internal let base = MemoryFileSystem(scheme: "flaky")
-    internal var scheme: String { base.scheme }
-    internal var capabilities: FileSystemCapabilities { [.write] }
-    private let lock = NSLock()
-    private var failures = 0
-    /// Called once, after the first block of the next read.
-    internal var afterFirstBlock: (() -> Void)?
-
     internal struct Broken: LocalizedError {
         internal var errorDescription: String? { "the connection broke" }
     }
-
-    /// The next `count` readers fail after their first block.
-    internal func failNextReads(_ count: Int) { lock.withLock { failures = count } }
 
     /// Unchecked: used by one thread at a time, as the protocol allows.
     private final class Reader: FileReader, @unchecked Sendable {
@@ -52,6 +41,17 @@ internal final class FlakyFileSystem: FileSystemProvider, @unchecked Sendable {
         func seek(to offset: UInt64) throws { try inner.seek(to: offset) }
         func close() { inner.close() }
     }
+
+    internal let base = MemoryFileSystem(scheme: "flaky")
+    internal var scheme: String { base.scheme }
+    internal var capabilities: FileSystemCapabilities { [.write] }
+    private let lock = NSLock()
+    private var failures = 0
+    /// Called once, after the first block of the next read.
+    internal var afterFirstBlock: (() -> Void)?
+
+    /// The next `count` readers fail after their first block.
+    internal func failNextReads(_ count: Int) { lock.withLock { failures = count } }
 
     internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try base.list(directory, showHidden: showHidden)

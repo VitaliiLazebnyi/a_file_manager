@@ -72,16 +72,16 @@ private final class Collected<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [Value] = []
 
-    func add(_ value: Value) {
-        lock.lock()
-        values.append(value)
-        lock.unlock()
-    }
-
     var all: [Value] {
         lock.lock()
         defer { lock.unlock() }
         return values
+    }
+
+    func add(_ value: Value) {
+        lock.lock()
+        values.append(value)
+        lock.unlock()
     }
 }
 

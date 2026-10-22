@@ -19,6 +19,10 @@ public struct Age: Codable, Equatable, Sendable {
         public var title: String { ["minute(s)", "hour(s)", "day(s)", "week(s)", "month(s)", "year(s)"][rawValue] }
     }
 
+    /// The most of any unit that is calculated with: a count typed or loaded beyond this (a
+    /// saved search can hold any number) is held to it instead of overflowing.
+    public static let largestCount = 1_000_000
+
     public var count: Int
     public var unit: Unit
 
@@ -26,10 +30,6 @@ public struct Age: Codable, Equatable, Sendable {
         self.count = count
         self.unit = unit
     }
-
-    /// The most of any unit that is calculated with: a count typed or loaded beyond this (a
-    /// saved search can hold any number) is held to it instead of overflowing.
-    public static let largestCount = 1_000_000
 
     /// The moment that lies this far before `now`.
     ///
@@ -84,6 +84,23 @@ public struct SizeRule: Codable, Equatable, Sendable {
     public var value: Double
     public var unit: Unit
 
+    /// The figure in bytes; an absurd value (a huge number, not a number) is held to what a
+    /// size can be, not trapped on.
+    public var bytes: Int64 {
+        let exact = (value * unit.factor).rounded()
+        guard !exact.isNaN else {
+            return 0
+        }
+        return exact >= 9.2e18 ? Int64.max : exact <= -9.2e18 ? Int64.min : Int64(exact)
+    }
+
+    /// The first size above the figure that still shows as it (`= 2 kbytes` ends at 3,072).
+    public var upperBytes: Int64 {
+        let step = unit == .bytes ? 1 : Int64(unit.factor)
+        let (end, overflow) = bytes.addingReportingOverflow(step)
+        return overflow ? Int64.max : end
+    }
+
     public init(_ comparison: Comparison, _ value: Double, _ unit: Unit = .bytes) {
         self.comparison = comparison
         self.value = value
@@ -104,23 +121,6 @@ public struct SizeRule: Codable, Equatable, Sendable {
         case .equal:
             return unit == .bytes ? size == bytes : (bytes..<upperBytes).contains(size)
         }
-    }
-
-    /// The figure in bytes; an absurd value (a huge number, not a number) is held to what a
-    /// size can be, not trapped on.
-    public var bytes: Int64 {
-        let exact = (value * unit.factor).rounded()
-        guard !exact.isNaN else {
-            return 0
-        }
-        return exact >= 9.2e18 ? Int64.max : exact <= -9.2e18 ? Int64.min : Int64(exact)
-    }
-
-    /// The first size above the figure that still shows as it (`= 2 kbytes` ends at 3,072).
-    public var upperBytes: Int64 {
-        let step = unit == .bytes ? 1 : Int64(unit.factor)
-        let (end, overflow) = bytes.addingReportingOverflow(step)
-        return overflow ? Int64.max : end
     }
 }
 
@@ -146,6 +146,11 @@ public struct FileCriteria: Codable, Equatable, Sendable {
     /// A folder shown as a file, such as an application.
     public var package = TriState.any
 
+    public var isEmpty: Bool { self == Self() }
+    public var hasAttributes: Bool {
+        [hidden, directory, symbolicLink, readOnly, executable, package].contains { $0 != .any }
+    }
+
     public init(
         dateFrom: Date? = nil,
         dateTo: Date? = nil,
@@ -160,15 +165,10 @@ public struct FileCriteria: Codable, Equatable, Sendable {
         self.size = size
     }
 
-    public var isEmpty: Bool { self == Self() }
-
     /// The criteria with the moments worked out once, for testing many files. `nil` when no
     /// criterion is set.
     public func prepared(now: Date, calendar: Calendar = .current) -> PreparedCriteria? {
         isEmpty ? nil : PreparedCriteria(self, now: now, calendar: calendar)
-    }
-    public var hasAttributes: Bool {
-        [hidden, directory, symbolicLink, readOnly, executable, package].contains { $0 != .any }
     }
 
     /// `now` is the moment the search started, so every file is measured against the same.
@@ -267,22 +267,26 @@ public struct FieldRule: Codable, Equatable, Sendable {
     public var comparison: Operator
     public var value: String
 
+    /// Whether the rule's operator reads its value as a regular expression.
+    public var usesRegex: Bool { comparison == .regex || comparison == .notRegex }
+
+    /// False for a regex rule whose value is no regular expression: it can never be judged.
+    public var isUsable: Bool { !usesRegex || compiledExpression() != nil }
+
     public init(_ field: String, _ comparison: Operator, _ value: String) {
         self.field = field
         self.comparison = comparison
         self.value = value
     }
 
-    /// Whether the rule's operator reads its value as a regular expression.
-    public var usesRegex: Bool { comparison == .regex || comparison == .notRegex }
+    internal static func number(_ text: String) -> Double? {
+        Double(text.filter { $0 != "," && $0 != " " && $0 != "\u{a0}" })
+    }
 
     /// The value as a regular expression; nil when the operator is no regex one or the value is not one.
     internal func compiledExpression() -> NSRegularExpression? {
         usesRegex ? try? NSRegularExpression(pattern: value, options: .caseInsensitive) : nil
     }
-
-    /// False for a regex rule whose value is no regular expression: it can never be judged.
-    public var isUsable: Bool { !usesRegex || compiledExpression() != nil }
 
     /// Tests a field's text.
     ///
@@ -361,10 +365,6 @@ public struct FieldRule: Codable, Equatable, Sendable {
             }
         }
     }
-
-    internal static func number(_ text: String) -> Double? {
-        Double(text.filter { $0 != "," && $0 != " " && $0 != "\u{a0}" })
-    }
 }
 
 /// The rule list of the Plugins tab (spec 09 › Plugins tab).
@@ -375,17 +375,17 @@ public struct FieldRules: Codable, Equatable, Sendable {
     public var matchAll: Bool
     public var rules: [FieldRule]
 
-    public init(isEnabled: Bool = false, matchAll: Bool = true, rules: [FieldRule] = []) {
-        self.isEnabled = isEnabled
-        self.matchAll = matchAll
-        self.rules = rules
-    }
-
     public var isActive: Bool { isEnabled && !rules.isEmpty }
 
     /// The first rule that cannot be used because its regular expression is none; the search is
     /// not started with such a list.
     public var unusableRule: FieldRule? { isActive ? rules.first { !$0.isUsable } : nil }
+
+    public init(isEnabled: Bool = false, matchAll: Bool = true, rules: [FieldRule] = []) {
+        self.isEnabled = isEnabled
+        self.matchAll = matchAll
+        self.rules = rules
+    }
 
     /// A rule whose field no longer exists (its plugin is gone) never matches.
     public func matches(_ item: FileItem, fields: [String: SearchField]) -> Bool {

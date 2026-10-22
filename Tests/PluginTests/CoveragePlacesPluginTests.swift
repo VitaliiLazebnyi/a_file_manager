@@ -16,6 +16,10 @@ internal struct CoveragePlacesPlugin {
     internal let settings = MemorySettings()
     internal let plugin = PlacesPlugin(keepsTreesOnDisk: false, favorites: [.item("Desktop", command: "cd mem:/C")])
 
+    internal var hotlist: Hotlist {
+        settings.scoped(to: "places").value(Hotlist.self, forKey: PlacesPlugin.Keys.hotlist) ?? Hotlist()
+    }
+
     internal init() {
         memory.addFile("/A/one.txt")
         memory.addFile("/B/two.txt")
@@ -38,10 +42,6 @@ internal struct CoveragePlacesPlugin {
 
     internal func store(_ list: Hotlist) {
         settings.scoped(to: "places").set(list, forKey: PlacesPlugin.Keys.hotlist)
-    }
-
-    internal var hotlist: Hotlist {
-        settings.scoped(to: "places").value(Hotlist.self, forKey: PlacesPlugin.Keys.hotlist) ?? Hotlist()
     }
 
     internal func informs(_ bench: TestBench) -> [String] { bench.interaction.log.filter { $0.hasPrefix("inform:") } }

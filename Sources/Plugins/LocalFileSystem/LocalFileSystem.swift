@@ -12,84 +12,6 @@ public import Foundation
 /// `lockedLock`, `placesLock`, `volumeLock`, `spareLock`); `mountObservers` is set in `init`
 /// and read in `deinit`; the default file manager may be used from any thread.
 public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
-    public let scheme = "file"
-    public let capabilities: FileSystemCapabilities = [.write, .trash, .append]
-    private let fm = FileManager.default
-    /// Nil everywhere unless a test stands in for the system (`LocalProbes`).
-    internal let probes: LocalProbes
-
-    public convenience init() {
-        self.init(probes: LocalProbes())
-    }
-
-    /// Tests stand in for the system with `probes`.
-    internal init(probes: LocalProbes) {
-        self.probes = probes
-        knownPlaces = Self.fixedPlaces(home: probes.home ?? FileManager.default.homeDirectoryForCurrentUser)
-        // Disks that come and go change the list of places; it is read again behind the scenes.
-        let workspace = NSWorkspace.shared.notificationCenter
-        let names = [
-            NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification,
-            NSWorkspace.didRenameVolumeNotification
-        ]
-        mountObservers = names.map { name in
-            workspace.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in self?.refreshPlaces() }
-        }
-        _ = Self.defaultFileMode
-        refreshPlaces()
-    }
-
-    deinit {
-        mountObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
-    }
-
-    // MARK: Reading
-
-    public func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
-        try list(directory, showHidden: showHidden, cancellation: CancellationFlag())
-    }
-
-    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
-        var items: [FileItem] = []
-        try list(directory, showHidden: showHidden, cancellation: cancellation) { batch in
-            items += batch
-            return true
-        }
-        return items
-    }
-
-    public func list(_ directory: URL, showHidden: Bool, receive: ([FileItem]) -> Bool) throws {
-        try list(directory, showHidden: showHidden, cancellation: CancellationFlag(), receive: receive)
-    }
-
-    /// Names and attributes are fetched together, a buffer at a time, so a folder on a network
-    /// share costs a few requests instead of one per file, and its entries can be shown while
-    /// the rest is still coming from the server.
-    ///
-    /// The flag is looked at before every buffer: a listing that was cancelled ends quietly with
-    /// what it has delivered.
-    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
-        throws
-    {
-        if try listInBulk(directory, showHidden: showHidden, cancellation: cancellation, receive: receive) {
-            return
-        }
-        // A volume without bulk reads: every entry is examined on its own, on all cores.
-        let names = try fm.contentsOfDirectory(atPath: directory.path)
-        let pieceSize = 4_000
-        for start in stride(from: 0, to: names.count, by: pieceSize) {
-            if cancellation.isCancelled {
-                return
-            }
-            let piece = Array(names[start..<min(start + pieceSize, names.count)])
-            let items = Parallel.map(piece, serialBelow: 512) { name in self.item(at: directory.appending(name: name)) }
-                .compactMap { item in item.flatMap { $0.isHidden && !showHidden ? nil : $0 } }
-            if !receive(items) {
-                return
-            }
-        }
-    }
-
     /// What a bulk read tells about one entry, before it becomes an item.
     internal struct Entry {
         /// The attributes asked for: name, kind and date of change.
@@ -174,6 +96,584 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
                 read.size = field.loadUnaligned(as: Int64.self)
             }
             return (read, length)
+        }
+    }
+
+    /// Reads through the descriptor with `read(2)`, into a block that is the caller's own: no
+    /// object of the system's is made per read, so nothing piles up on a long-lived thread.
+    ///
+    /// Unchecked: used by one thread at a time, as `FileReader` allows; `interrupt` touches
+    /// only `interruption`, which is safe from any thread.
+    private final class Reader: FileReader, @unchecked Sendable {
+        private var descriptor: Int32
+        private let url: URL
+        private let probes: LocalProbes
+        private let interruption = Interruption()
+
+        init(_ descriptor: Int32, url: URL, probes: LocalProbes) {
+            (self.descriptor, self.url, self.probes) = (descriptor, url, probes)
+        }
+
+        func read(upToCount count: Int) throws -> Data? {
+            guard descriptor >= 0 else { throw LocalFileSystem.posixError(EBADF, url) }
+            guard count > 0 else {
+                return nil
+            }
+            var data = Data(count: count)
+            var code: Int32 = 0
+            let descriptor = self.descriptor
+            let got = try data.withUnsafeMutableBytes { buffer in
+                try interruption.run { () -> Int in
+                    let got = probes.system("read", url.path) { Darwin.read(descriptor, buffer.baseAddress, count) }
+                    if got < 0 { code = errno }
+                    return got
+                }
+            }
+            guard got >= 0 else { throw LocalFileSystem.posixError(code, url) }
+            guard got > 0 else {
+                return nil
+            }
+            if got < count { data.removeSubrange(got...) }
+            return data
+        }
+
+        func seek(to offset: UInt64) throws {
+            guard descriptor >= 0 else { throw LocalFileSystem.posixError(EBADF, url) }
+            guard let position = off_t(exactly: offset) else { throw LocalFileSystem.posixError(EINVAL, url) }
+            // Setting the position of a regular file (all a reader reads) does not fail.
+            lseek(descriptor, position, SEEK_SET)
+        }
+
+        func close() {
+            guard descriptor >= 0 else {
+                return
+            }
+            Darwin.close(descriptor)
+            descriptor = -1
+        }
+
+        func interrupt() { interruption.interrupt() }
+
+        deinit { close() }
+    }
+
+    /// Writes through the descriptor it was made with, and gives the file its date and its
+    /// rights through the same descriptor before closing it: nothing that happens to the name
+    /// meanwhile (a link put in its place) can redirect that.
+    ///
+    /// Unchecked: used by one thread at a time, as `FileWriter` allows; `interrupt` touches
+    /// only `interruption`, which is safe from any thread.
+    private final class Writer: FileWriter, @unchecked Sendable {
+        private var descriptor: Int32
+        private let url: URL
+        /// What a new file is given when the caller names no rights; nil for a file that was
+        /// there before (its rights stay as they are).
+        private let defaultPermissions: mode_t?
+        private let probes: LocalProbes
+        private let interruption = Interruption()
+
+        init(_ descriptor: Int32, url: URL, defaultPermissions: mode_t?, probes: LocalProbes) {
+            (self.descriptor, self.url, self.defaultPermissions, self.probes) = (
+                descriptor, url, defaultPermissions, probes
+            )
+        }
+
+        func write(_ data: Data) throws {
+            guard descriptor >= 0 else { throw LocalFileSystem.posixError(EBADF, url) }
+            let descriptor = self.descriptor
+            try data.withUnsafeBytes { buffer in
+                var done = 0
+                while done < buffer.count {
+                    var code: Int32 = 0
+                    let wrote = try interruption.run { () -> Int in
+                        let wrote = probes.system("write", url.path) {
+                            Darwin.write(descriptor, buffer.baseAddress! + done, buffer.count - done)
+                        }
+                        if wrote < 0 { code = errno }
+                        return wrote
+                    }
+                    guard wrote >= 0 else { throw LocalFileSystem.posixError(code, url) }
+                    done += wrote
+                }
+            }
+        }
+
+        func close(attributes: FileAttributes) throws {
+            guard descriptor >= 0 else {
+                return
+            }
+            var failure: any Error?
+            if let modified = attributes.modified {
+                let seconds = modified.timeIntervalSince1970.rounded(.down)
+                let nanoseconds = ((modified.timeIntervalSince1970 - seconds) * 1e9).rounded(.down)
+                // The time of access stays as it is.
+                var times = [
+                    timespec(tv_sec: 0, tv_nsec: Int((1 << 30) - 2)),
+                    timespec(tv_sec: Int(seconds), tv_nsec: Int(nanoseconds))
+                ]
+                if probes.system("futimens", url.path, { futimens(descriptor, &times) }) != 0 {
+                    failure = LocalFileSystem.posixError(errno, url)
+                }
+            }
+            if let mode = attributes.permissions.map({ mode_t($0) & 0o7777 }) ?? defaultPermissions {
+                if probes.system("fchmod", url.path, { fchmod(descriptor, mode) }) != 0, failure == nil {
+                    failure = LocalFileSystem.posixError(errno, url)
+                }
+            }
+            let result = probes.system("close", url.path) { Darwin.close(descriptor) }
+            descriptor = -1
+            if result != 0, failure == nil { failure = LocalFileSystem.posixError(errno, url) }
+            if let failure { throw failure }
+        }
+
+        func interrupt() { interruption.interrupt() }
+
+        deinit {
+            if descriptor >= 0 { Darwin.close(descriptor) }
+        }
+    }
+
+    /// Hands the progress of a copy to the caller's closure for as long as the caller is
+    /// there: a copy that was left behind finds nobody to report to, and stops.
+    ///
+    /// Unchecked: `report` is guarded by `lock`. The caller's closure is called on another
+    /// thread only while the caller waits for the copy, and never once `detach` has returned.
+    internal final class CopyReport: @unchecked Sendable {
+        private let lock = NSLock()
+        private var report: ((Int64) -> Bool)?
+
+        /// Reports to `report` until `detach`.
+        internal init(_ report: @escaping (Int64) -> Bool) { self.report = report }
+
+        /// False when the copy is to stop.
+        internal func callAsFunction(_ copied: Int64) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return report?(copied) ?? false
+        }
+
+        /// The caller is leaving; returns once a report under way is over.
+        internal func detach() {
+            lock.lock()
+            report = nil
+            lock.unlock()
+        }
+    }
+
+    /// One question to a volume that is under way, and everybody who waits for its answer.
+    ///
+    /// Unchecked: `info` and `isOver` are guarded by `condition`, `wasAnsweredFromMemory` by
+    /// the file system's `volumeLock`.
+    private final class VolumeQuestion: @unchecked Sendable {
+        enum Outcome {
+            case answered(VolumeInfo?)
+            case cancelled
+            case late
+        }
+
+        let asked = DispatchTime.now().uptimeNanoseconds
+        /// Somebody was answered from memory because this took too long.
+        ///
+        /// Guarded by the file system's `volumeLock`.
+        var wasAnsweredFromMemory = false
+        private let condition = NSCondition()
+        private var info: VolumeInfo?
+        private var isOver = false
+
+        func finish(_ info: VolumeInfo?) {
+            condition.lock()
+            (self.info, isOver) = (info, true)
+            condition.broadcast()
+            condition.unlock()
+        }
+
+        func wait(until deadline: UInt64, _ cancellation: CancellationFlag?) -> Outcome {
+            let registration = cancellation?
+                .onCancel { [condition] in
+                    condition.lock()
+                    condition.broadcast()
+                    condition.unlock()
+                }
+            defer { withExtendedLifetime(registration) {} }
+            condition.lock()
+            defer { condition.unlock() }
+            while cancellation?.isCancelled != true, !isOver {
+                let now = DispatchTime.now().uptimeNanoseconds
+                guard now < deadline else {
+                    return .late
+                }
+                _ = condition.wait(until: Date(timeIntervalSinceNow: TimeInterval(deadline - now) / 1_000_000_000))
+            }
+            // A caller that has cancelled is not given the answer, even one that came in time.
+            return cancellation?.isCancelled == true ? .cancelled : .answered(info)
+        }
+    }
+
+    /// The rights a new file gets when none are given: what `open` would have made with 0666,
+    /// less the umask, which is read once (it can only be read by setting it).
+    private static let defaultFileMode: mode_t = {
+        let mask = umask(0o022)
+        umask(mask)
+        return 0o644 & ~mask
+    }()
+
+    /// The flags that keep a file from being renamed or deleted: "Locked" in the Finder.
+    private static let lockFlags = UInt32(UF_IMMUTABLE | UF_APPEND)
+    /// A temporary that was never finished is forgotten after this long.
+    private static let lockedCopyLifetime: UInt64 = 6 * 3_600 * 1_000_000_000
+    private static let lockedCopyLimit = 4_096
+
+    private static let quarantineName = "com.apple.quarantine"
+
+    /// Posted on the main thread when the list of places was read again and is not what
+    /// `places()` last answered.
+    ///
+    /// The object is the file system.
+    public static let placesDidChange = Notification.Name("AFMPlacesDidChange")
+    /// How old a measurement may be before the next question has it taken again.
+    internal static let spareSpaceAge: UInt64 = 3_000_000_000
+    /// A measurement that has taken this long is taken for lost (the disk does not answer).
+    internal static let spareSpaceLoss: UInt64 = 30_000_000_000
+
+    public let scheme = "file"
+    public let capabilities: FileSystemCapabilities = [.write, .trash, .append]
+    private let fm = FileManager.default
+    /// Nil everywhere unless a test stands in for the system (`LocalProbes`).
+    internal let probes: LocalProbes
+
+    /// Guards `packageExtensions`.
+    internal let packageLock = NSLock()
+    /// Lowercase extension → whether folders with it are packages, and when that was learned.
+    ///
+    /// Guarded by `packageLock`.
+    internal var packageExtensions: [String: (isPackage: Bool, learned: UInt64)] = [:]
+    /// Guards `lockedCopies`.
+    internal let lockedLock = NSLock()
+    /// Path → file of the locked copies `copy` has made under a temporary name and nobody has
+    /// renamed or removed yet, and when.
+    ///
+    /// These are the only ones this file system takes the lock off for the moment of a rename or
+    /// removal: the caller is about to give them their real names. A copy that kept its name is the
+    /// user's file like the one it was copied from, and stays as locked as that. Guarded by
+    /// `lockedLock`.
+    internal var lockedCopies: [String: (device: dev_t, inode: ino_t, made: UInt64)] = [:]
+
+    private var mountObservers: [any NSObjectProtocol] = []
+    /// Guards everything below.
+    private let placesLock = NSLock()
+    private var knownPlaces: [Place]
+    /// When the places were last read (0: not yet), and whether they are being read now or
+    /// have to be read once more after that.
+    private var placesRead: UInt64 = 0
+    private var isReadingPlaces = false
+    private var placesChangedMeanwhile = false
+    /// Which reading is the current one: a reading that has taken too long (a mount that does
+    /// not answer) is given up, and whatever it finds later is not used.
+    ///
+    /// The reading goes on in its thread until the system lets it go; no new one is started while
+    /// two are stuck.
+    private var placesGeneration = 0
+    private var abandonedReads = 0
+
+    /// Readings of the places that were given up and have not come back.
+    internal var abandonedReadings: Int { placesLock.withLock { abandonedReads } }
+
+    /// Volumes whose questions have not been answered yet: asked about once, not again and
+    /// again, while a share that does not answer holds a thread.
+    private let volumesAsking = Locked(Set<String>())
+
+    private let volumeLock = NSLock()
+    /// The question to each mount point that has not come back, and the last answer for each.
+    private var volumeQuestions: [String: VolumeQuestion] = [:]
+    private var lastVolumes: [String: VolumeInfo] = [:]
+
+    internal let spareLock = NSLock()
+    /// Mount point → what the system would free on demand there (the free space it reports
+    /// for important uses, less the space that is plainly free), when that was measured, and
+    /// of which volume (a different one mounted at the same place starts afresh).
+    ///
+    /// Nil where the system has no such figure. Guarded by `spareLock`.
+    internal var spareSpace: [String: (bytes: Int64?, measured: UInt64, isMeasuring: Bool, volume: fsid_t)] = [:]
+
+    public convenience init() {
+        self.init(probes: LocalProbes())
+    }
+
+    /// Tests stand in for the system with `probes`.
+    internal init(probes: LocalProbes) {
+        self.probes = probes
+        knownPlaces = Self.fixedPlaces(home: probes.home ?? FileManager.default.homeDirectoryForCurrentUser)
+        // Disks that come and go change the list of places; it is read again behind the scenes.
+        let workspace = NSWorkspace.shared.notificationCenter
+        let names = [
+            NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification,
+            NSWorkspace.didRenameVolumeNotification
+        ]
+        mountObservers = names.map { name in
+            workspace.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in self?.refreshPlaces() }
+        }
+        _ = Self.defaultFileMode
+        refreshPlaces()
+    }
+
+    /// The Finder's bundle bit of a folder; nil when it cannot be read.
+    private static func hasBundleBit(_ path: String) -> Bool? {
+        var request = attrlist()
+        request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
+        request.commonattr = attrgroup_t(ATTR_CMN_FNDRINFO)
+        // The answer: its length, then the 32 bytes of Finder information. For a folder the
+        // flags are the two bytes after the window rectangle, high byte first.
+        var reply = [UInt8](repeating: 0, count: 36)
+        guard getattrlist(path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else {
+            return nil
+        }
+        let flags = UInt16(reply[12]) << 8 | UInt16(reply[13])
+        return flags & 0x2000 != 0
+    }
+
+    /// The name an item has in its folder, byte for byte as it is stored (a volume that ignores
+    /// case or the form of accents answers to other spellings too; this is the one it keeps).
+    internal static func storedName(of url: URL) -> [UInt8]? {
+        var request = attrlist()
+        request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
+        request.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | attrgroup_t(ATTR_CMN_NAME)
+        var reply = [UInt8](
+            repeating: 0,
+            count: 4 + MemoryLayout<attribute_set_t>.size + MemoryLayout<attrreference_t>.size + Int(NAME_MAX) * 4 + 8
+        )
+        guard getattrlist(url.path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else {
+            return nil
+        }
+        return reply.withUnsafeBytes { raw in
+            let at = 4 + MemoryLayout<attribute_set_t>.size
+            let reference = raw.loadUnaligned(fromByteOffset: at, as: attrreference_t.self)
+            // Kept inside the reply whatever the system says; its last bytes are always zero.
+            let start = min(max(at + Int(reference.attr_dataoffset), 0), raw.count - 1)
+            let bytes = raw.baseAddress!.advanced(by: start).assumingMemoryBound(to: CChar.self)
+            return Array(
+                UnsafeBufferPointer(
+                    start: UnsafeRawPointer(bytes).assumingMemoryBound(to: UInt8.self),
+                    count: strlen(bytes)
+                )
+            )
+        }
+    }
+
+    /// Whether `url` is named like the temporary files the callers of `copy` use for a file
+    /// that is not complete yet: a dot, and `.tmp` or the `afm-` of the program's own.
+    internal static func isTemporaryName(_ url: URL) -> Bool {
+        let name = url.lastPathComponent
+        return name.hasPrefix(".") && (name.hasSuffix(".tmp") || name.contains(".afm-"))
+    }
+
+    internal static func posixError(_ code: Int32, _ url: URL) -> any Error {
+        NSError(
+            domain: NSPOSIXErrorDomain,
+            code: Int(code),
+            userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path]
+        )
+    }
+
+    /// The places that are known without asking a disk.
+    private static func fixedPlaces(home: URL) -> [Place] {
+        [Place(name: "Home", url: home, kind: .home)]
+            + ["Desktop", "Documents", "Downloads"]
+            .map {
+                Place(name: $0, url: home.appending(name: $0), kind: .folder)
+            }
+            + [
+                Place(
+                    name: "Applications",
+                    url: URL(fileURLWithPath: "/Applications", isDirectory: true),
+                    kind: .folder
+                )
+            ]
+    }
+
+    /// Reads the places from the system.
+    ///
+    /// Each volume is asked about on its own thread and waited for for a moment only, so that one
+    /// that does not answer (a share that went away) shows with what was known of it, or its folder
+    /// name, and holds up none of the others.
+    internal static func readPlaces(previous: [Place], _ probes: LocalProbes, asking volumesAsking: Locked<Set<String>>)
+        -> [Place]
+    {
+        let fm = FileManager.default
+        let home = probes.home ?? fm.homeDirectoryForCurrentUser
+        var places = [Place(name: "Home", url: home, kind: .home)]
+        places += ["Desktop", "Documents", "Downloads"]
+            .map {
+                Place(name: $0, url: home.appending(name: $0), kind: .folder)
+            }
+        let cloud = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
+        if fm.fileExists(atPath: cloud.path) { places.append(Place(name: "iCloud Drive", url: cloud, kind: .folder)) }
+        places.append(
+            Place(name: "Applications", url: URL(fileURLWithPath: "/Applications", isDirectory: true), kind: .folder)
+        )
+        let keys: [URLResourceKey] = [
+            .volumeNameKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsRemovableKey, .volumeIsEjectableKey,
+            .volumeIsRootFileSystemKey
+        ]
+        // (The system always answers with a list; none would be no volumes.)
+        let volumes = [fm.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes])]
+            .compactMap(\.self).joined()
+        /// All state is guarded by `lock`.
+        final class Slot: @unchecked Sendable {
+            let lock = NSLock()
+            var place: Place?
+        }
+        let slots = volumes.map { _ in Slot() }
+        let group = DispatchGroup()
+        for (volume, slot) in zip(volumes, slots) {
+            let key = volume.path
+            guard volumesAsking.withValue({ $0.insert(key).inserted }) else { continue }
+            group.enter()
+            BlockingCalls.run {
+                probes.willAsk?(volume.path)
+                let values = try? volume.resourceValues(forKeys: Set(keys))
+                let place = Place(
+                    name: values?.volumeName ?? volume.lastPathComponent,
+                    url: volume,
+                    kind: Self.volumeKind(
+                        path: volume.path,
+                        isInternal: values?.volumeIsInternal,
+                        isLocal: values?.volumeIsLocal,
+                        isRemovable: values?.volumeIsRemovable,
+                        isEjectable: values?.volumeIsEjectable
+                    ),
+                    canBeEjected: Place.VolumeTraits(path: volume.path, values: values).mayBeEjected
+                )
+                slot.lock.lock()
+                slot.place = place
+                slot.lock.unlock()
+                volumesAsking.withValue { $0.remove(key) }
+                group.leave()
+            }
+        }
+        _ = group.wait(timeout: .now() + probes.volumePatience)
+        for (volume, slot) in zip(volumes, slots) {
+            slot.lock.lock()
+            let answered = slot.place
+            slot.lock.unlock()
+            guard let answered else {
+                // Not answered in time: what was known of it, or its folder name.
+                places.append(
+                    previous.first { $0.url.path == volume.path }
+                        ?? Place(
+                            name: volume.lastPathComponent,
+                            url: volume,
+                            kind: volume.path == "/" ? .internalDisk : .externalDisk
+                        )
+                )
+                continue
+            }
+            places.append(answered)
+        }
+        return places
+    }
+
+    /// Internal: the start-up disk, and a local disk the system calls internal that cannot be
+    /// taken out.
+    ///
+    /// A volume the system knows nothing about counts as external.
+    internal static func volumeKind(
+        path: String,
+        isInternal: Bool?,
+        isLocal: Bool?,
+        isRemovable: Bool?,
+        isEjectable: Bool?
+    )
+        -> Place.Kind
+    {
+        if path == "/" {
+            return .internalDisk
+        }
+        let fixed = isLocal == true && isInternal == true && isRemovable != true && isEjectable != true
+        return fixed ? .internalDisk : .externalDisk
+    }
+
+    /// What an entry of a bulk read in the folder at `path` counts for: a folder to measure (its
+    /// path), or a file of a size.
+    ///
+    /// Nil for what is neither (a link, a pipe) and for an entry that cannot be asked about.
+    internal static func measured(_ entry: Entry, in path: String) -> (folder: String?, size: Int64)? {
+        guard !entry.name.isEmpty else {
+            return nil
+        }
+        let child = path.hasSuffix("/") ? path + entry.name : path + "/" + entry.name
+        var (type, size) = (entry.type, entry.size)
+        if entry.failed {
+            // The entry is asked by itself, as the listing does.
+            var st = stat()
+            guard lstat(child, &st) == 0 else {
+                return nil
+            }
+            type =
+                (st.st_mode & S_IFMT) == S_IFDIR
+                ? VDIR.rawValue : ((st.st_mode & S_IFMT) == S_IFREG ? VREG.rawValue : 0)
+            size = Int64(st.st_size)
+        }
+        guard type == VDIR.rawValue || type == VREG.rawValue else {
+            return nil
+        }
+        return type == VDIR.rawValue ? (child, 0) : (nil, size)
+    }
+
+    // MARK: System calls
+
+    /// Opens a folder to be read. `O_CLOEXEC`, and an `EINTR` nobody asked for is tried again.
+    internal static func openDirectory(_ path: String) -> Int32 {
+        var descriptor: Int32
+        repeat {
+            descriptor = Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        } while descriptor < 0 && errno == EINTR
+        return descriptor
+    }
+
+    // MARK: Reading
+
+    public func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+        try list(directory, showHidden: showHidden, cancellation: CancellationFlag())
+    }
+
+    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
+        var items: [FileItem] = []
+        try list(directory, showHidden: showHidden, cancellation: cancellation) { batch in
+            items += batch
+            return true
+        }
+        return items
+    }
+
+    public func list(_ directory: URL, showHidden: Bool, receive: ([FileItem]) -> Bool) throws {
+        try list(directory, showHidden: showHidden, cancellation: CancellationFlag(), receive: receive)
+    }
+
+    /// Names and attributes are fetched together, a buffer at a time, so a folder on a network
+    /// share costs a few requests instead of one per file, and its entries can be shown while
+    /// the rest is still coming from the server.
+    ///
+    /// The flag is looked at before every buffer: a listing that was cancelled ends quietly with
+    /// what it has delivered.
+    public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
+        throws
+    {
+        if try listInBulk(directory, showHidden: showHidden, cancellation: cancellation, receive: receive) {
+            return
+        }
+        // A volume without bulk reads: every entry is examined on its own, on all cores.
+        let names = try fm.contentsOfDirectory(atPath: directory.path)
+        let pieceSize = 4_000
+        for start in stride(from: 0, to: names.count, by: pieceSize) {
+            if cancellation.isCancelled {
+                return
+            }
+            let piece = Array(names[start..<min(start + pieceSize, names.count)])
+            let items = Parallel.map(piece, serialBelow: 512) { name in self.item(at: directory.appending(name: name)) }
+                .compactMap { item in item.flatMap { $0.isHidden && !showHidden ? nil : $0 } }
+            if !receive(items) {
+                return
+            }
         }
     }
 
@@ -361,28 +861,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         return answer
     }
 
-    /// Guards `packageExtensions`.
-    internal let packageLock = NSLock()
-    /// Lowercase extension → whether folders with it are packages, and when that was learned.
-    ///
-    /// Guarded by `packageLock`.
-    internal var packageExtensions: [String: (isPackage: Bool, learned: UInt64)] = [:]
-
-    /// The Finder's bundle bit of a folder; nil when it cannot be read.
-    private static func hasBundleBit(_ path: String) -> Bool? {
-        var request = attrlist()
-        request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
-        request.commonattr = attrgroup_t(ATTR_CMN_FNDRINFO)
-        // The answer: its length, then the 32 bytes of Finder information. For a folder the
-        // flags are the two bytes after the window rectangle, high byte first.
-        var reply = [UInt8](repeating: 0, count: 36)
-        guard getattrlist(path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else {
-            return nil
-        }
-        let flags = UInt16(reply[12]) << 8 | UInt16(reply[13])
-        return flags & 0x2000 != 0
-    }
-
     /// The entry as `lstat` sees it: a link has no size of its own, and what it leads to is
     /// said besides (`isDirectory`, `isSpecial`, and for a link to a file `linkTargetSize`).
     /// `device` is the volume the entry is on; for a folder another volume is mounted on,
@@ -510,64 +988,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         return Reader(descriptor, url: url, probes: probes)
     }
 
-    /// Reads through the descriptor with `read(2)`, into a block that is the caller's own: no
-    /// object of the system's is made per read, so nothing piles up on a long-lived thread.
-    ///
-    /// Unchecked: used by one thread at a time, as `FileReader` allows; `interrupt` touches
-    /// only `interruption`, which is safe from any thread.
-    private final class Reader: FileReader, @unchecked Sendable {
-        private var descriptor: Int32
-        private let url: URL
-        private let probes: LocalProbes
-        private let interruption = Interruption()
-
-        init(_ descriptor: Int32, url: URL, probes: LocalProbes) {
-            (self.descriptor, self.url, self.probes) = (descriptor, url, probes)
-        }
-
-        deinit { close() }
-
-        func read(upToCount count: Int) throws -> Data? {
-            guard descriptor >= 0 else { throw LocalFileSystem.posixError(EBADF, url) }
-            guard count > 0 else {
-                return nil
-            }
-            var data = Data(count: count)
-            var code: Int32 = 0
-            let descriptor = self.descriptor
-            let got = try data.withUnsafeMutableBytes { buffer in
-                try interruption.run { () -> Int in
-                    let got = probes.system("read", url.path) { Darwin.read(descriptor, buffer.baseAddress, count) }
-                    if got < 0 { code = errno }
-                    return got
-                }
-            }
-            guard got >= 0 else { throw LocalFileSystem.posixError(code, url) }
-            guard got > 0 else {
-                return nil
-            }
-            if got < count { data.removeSubrange(got...) }
-            return data
-        }
-
-        func seek(to offset: UInt64) throws {
-            guard descriptor >= 0 else { throw LocalFileSystem.posixError(EBADF, url) }
-            guard let position = off_t(exactly: offset) else { throw LocalFileSystem.posixError(EINVAL, url) }
-            // Setting the position of a regular file (all a reader reads) does not fail.
-            lseek(descriptor, position, SEEK_SET)
-        }
-
-        func close() {
-            guard descriptor >= 0 else {
-                return
-            }
-            Darwin.close(descriptor)
-            descriptor = -1
-        }
-
-        func interrupt() { interruption.interrupt() }
-    }
-
     // MARK: Changing
 
     /// The calls that change something, for a caller with a flag.
@@ -687,14 +1107,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         return Writer(descriptor, url: url, defaultPermissions: Self.defaultFileMode, probes: probes)
     }
 
-    /// The rights a new file gets when none are given: what `open` would have made with 0666,
-    /// less the umask, which is read once (it can only be read by setting it).
-    private static let defaultFileMode: mode_t = {
-        let mask = umask(0o022)
-        umask(mask)
-        return 0o644 & ~mask
-    }()
-
     /// The file is cut and the position set through the descriptor it was opened with, so
     /// nothing can come between.
     ///
@@ -743,82 +1155,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         // regular file does not fail.)
         lseek(descriptor, off_t(offset ?? Int64(st.st_size)), SEEK_SET)
         return Writer(descriptor, url: url, defaultPermissions: nil, probes: probes)
-    }
-
-    /// Writes through the descriptor it was made with, and gives the file its date and its
-    /// rights through the same descriptor before closing it: nothing that happens to the name
-    /// meanwhile (a link put in its place) can redirect that.
-    ///
-    /// Unchecked: used by one thread at a time, as `FileWriter` allows; `interrupt` touches
-    /// only `interruption`, which is safe from any thread.
-    private final class Writer: FileWriter, @unchecked Sendable {
-        private var descriptor: Int32
-        private let url: URL
-        /// What a new file is given when the caller names no rights; nil for a file that was
-        /// there before (its rights stay as they are).
-        private let defaultPermissions: mode_t?
-        private let probes: LocalProbes
-        private let interruption = Interruption()
-
-        init(_ descriptor: Int32, url: URL, defaultPermissions: mode_t?, probes: LocalProbes) {
-            (self.descriptor, self.url, self.defaultPermissions, self.probes) = (
-                descriptor, url, defaultPermissions, probes
-            )
-        }
-
-        deinit {
-            if descriptor >= 0 { Darwin.close(descriptor) }
-        }
-
-        func write(_ data: Data) throws {
-            guard descriptor >= 0 else { throw LocalFileSystem.posixError(EBADF, url) }
-            let descriptor = self.descriptor
-            try data.withUnsafeBytes { buffer in
-                var done = 0
-                while done < buffer.count {
-                    var code: Int32 = 0
-                    let wrote = try interruption.run { () -> Int in
-                        let wrote = probes.system("write", url.path) {
-                            Darwin.write(descriptor, buffer.baseAddress! + done, buffer.count - done)
-                        }
-                        if wrote < 0 { code = errno }
-                        return wrote
-                    }
-                    guard wrote >= 0 else { throw LocalFileSystem.posixError(code, url) }
-                    done += wrote
-                }
-            }
-        }
-
-        func close(attributes: FileAttributes) throws {
-            guard descriptor >= 0 else {
-                return
-            }
-            var failure: any Error?
-            if let modified = attributes.modified {
-                let seconds = modified.timeIntervalSince1970.rounded(.down)
-                let nanoseconds = ((modified.timeIntervalSince1970 - seconds) * 1e9).rounded(.down)
-                // The time of access stays as it is.
-                var times = [
-                    timespec(tv_sec: 0, tv_nsec: Int((1 << 30) - 2)),
-                    timespec(tv_sec: Int(seconds), tv_nsec: Int(nanoseconds))
-                ]
-                if probes.system("futimens", url.path, { futimens(descriptor, &times) }) != 0 {
-                    failure = LocalFileSystem.posixError(errno, url)
-                }
-            }
-            if let mode = attributes.permissions.map({ mode_t($0) & 0o7777 }) ?? defaultPermissions {
-                if probes.system("fchmod", url.path, { fchmod(descriptor, mode) }) != 0, failure == nil {
-                    failure = LocalFileSystem.posixError(errno, url)
-                }
-            }
-            let result = probes.system("close", url.path) { Darwin.close(descriptor) }
-            descriptor = -1
-            if result != 0, failure == nil { failure = LocalFileSystem.posixError(errno, url) }
-            if let failure { throw failure }
-        }
-
-        func interrupt() { interruption.interrupt() }
     }
 
     /// One file, one link or one empty directory; never a tree.
@@ -1007,57 +1343,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         }
     }
 
-    /// The name an item has in its folder, byte for byte as it is stored (a volume that ignores
-    /// case or the form of accents answers to other spellings too; this is the one it keeps).
-    internal static func storedName(of url: URL) -> [UInt8]? {
-        var request = attrlist()
-        request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
-        request.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | attrgroup_t(ATTR_CMN_NAME)
-        var reply = [UInt8](
-            repeating: 0,
-            count: 4 + MemoryLayout<attribute_set_t>.size + MemoryLayout<attrreference_t>.size + Int(NAME_MAX) * 4 + 8
-        )
-        guard getattrlist(url.path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else {
-            return nil
-        }
-        return reply.withUnsafeBytes { raw in
-            let at = 4 + MemoryLayout<attribute_set_t>.size
-            let reference = raw.loadUnaligned(fromByteOffset: at, as: attrreference_t.self)
-            // Kept inside the reply whatever the system says; its last bytes are always zero.
-            let start = min(max(at + Int(reference.attr_dataoffset), 0), raw.count - 1)
-            let bytes = raw.baseAddress!.advanced(by: start).assumingMemoryBound(to: CChar.self)
-            return Array(
-                UnsafeBufferPointer(
-                    start: UnsafeRawPointer(bytes).assumingMemoryBound(to: UInt8.self),
-                    count: strlen(bytes)
-                )
-            )
-        }
-    }
-
-    /// The flags that keep a file from being renamed or deleted: "Locked" in the Finder.
-    private static let lockFlags = UInt32(UF_IMMUTABLE | UF_APPEND)
-    /// Guards `lockedCopies`.
-    internal let lockedLock = NSLock()
-    /// Path → file of the locked copies `copy` has made under a temporary name and nobody has
-    /// renamed or removed yet, and when.
-    ///
-    /// These are the only ones this file system takes the lock off for the moment of a rename or
-    /// removal: the caller is about to give them their real names. A copy that kept its name is the
-    /// user's file like the one it was copied from, and stays as locked as that. Guarded by
-    /// `lockedLock`.
-    internal var lockedCopies: [String: (device: dev_t, inode: ino_t, made: UInt64)] = [:]
-    /// A temporary that was never finished is forgotten after this long.
-    private static let lockedCopyLifetime: UInt64 = 6 * 3_600 * 1_000_000_000
-    private static let lockedCopyLimit = 4_096
-
-    /// Whether `url` is named like the temporary files the callers of `copy` use for a file
-    /// that is not complete yet: a dot, and `.tmp` or the `afm-` of the program's own.
-    internal static func isTemporaryName(_ url: URL) -> Bool {
-        let name = url.lastPathComponent
-        return name.hasPrefix(".") && (name.hasSuffix(".tmp") || name.contains(".afm-"))
-    }
-
     private func rememberLockedCopy(_ url: URL, _ st: stat) {
         guard Self.isTemporaryName(url) else {
             return
@@ -1147,33 +1432,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             let report = CopyReport(progress)
             defer { report.detach() }
             try change(at: destination, cancellation) { try self.copyItem(source, to: destination, $0, report) }
-        }
-    }
-
-    /// Hands the progress of a copy to the caller's closure for as long as the caller is
-    /// there: a copy that was left behind finds nobody to report to, and stops.
-    ///
-    /// Unchecked: `report` is guarded by `lock`. The caller's closure is called on another
-    /// thread only while the caller waits for the copy, and never once `detach` has returned.
-    internal final class CopyReport: @unchecked Sendable {
-        private let lock = NSLock()
-        private var report: ((Int64) -> Bool)?
-
-        /// Reports to `report` until `detach`.
-        internal init(_ report: @escaping (Int64) -> Bool) { self.report = report }
-
-        /// False when the copy is to stop.
-        internal func callAsFunction(_ copied: Int64) -> Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            return report?(copied) ?? false
-        }
-
-        /// The caller is leaving; returns once a report under way is over.
-        internal func detach() {
-            lock.lock()
-            report = nil
-            lock.unlock()
         }
     }
 
@@ -1434,8 +1692,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         if let failure { throw failure }
     }
 
-    private static let quarantineName = "com.apple.quarantine"
-
     /// The mark of the item itself: what was downloaded says so wherever it is copied to.
     public func quarantine(of url: URL) -> Data? {
         let path = url.path
@@ -1485,14 +1741,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         } == 0
     }
 
-    internal static func posixError(_ code: Int32, _ url: URL) -> any Error {
-        NSError(
-            domain: NSPOSIXErrorDomain,
-            code: Int(code),
-            userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(code)) + ": " + url.path]
-        )
-    }
-
     // MARK: Surroundings
 
     public func displayPath(_ url: URL) -> String {
@@ -1520,32 +1768,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         if isOld { refreshPlaces() }
         return places
     }
-
-    /// Posted on the main thread when the list of places was read again and is not what
-    /// `places()` last answered.
-    ///
-    /// The object is the file system.
-    public static let placesDidChange = Notification.Name("AFMPlacesDidChange")
-
-    private var mountObservers: [any NSObjectProtocol] = []
-    /// Guards everything below.
-    private let placesLock = NSLock()
-    private var knownPlaces: [Place]
-    /// When the places were last read (0: not yet), and whether they are being read now or
-    /// have to be read once more after that.
-    private var placesRead: UInt64 = 0
-    private var isReadingPlaces = false
-    private var placesChangedMeanwhile = false
-    /// Which reading is the current one: a reading that has taken too long (a mount that does
-    /// not answer) is given up, and whatever it finds later is not used.
-    ///
-    /// The reading goes on in its thread until the system lets it go; no new one is started while
-    /// two are stuck.
-    private var placesGeneration = 0
-    private var abandonedReads = 0
-
-    /// Readings of the places that were given up and have not come back.
-    internal var abandonedReadings: Int { placesLock.withLock { abandonedReads } }
 
     /// Reads the places again in the background, unless a reading is under way (it is then
     /// read once more after it) or two readings are stuck.
@@ -1619,128 +1841,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         placesChangedMeanwhile = false
         placesLock.unlock()
         if again { refreshPlaces() }
-    }
-
-    /// The places that are known without asking a disk.
-    private static func fixedPlaces(home: URL) -> [Place] {
-        [Place(name: "Home", url: home, kind: .home)]
-            + ["Desktop", "Documents", "Downloads"]
-            .map {
-                Place(name: $0, url: home.appending(name: $0), kind: .folder)
-            }
-            + [
-                Place(
-                    name: "Applications",
-                    url: URL(fileURLWithPath: "/Applications", isDirectory: true),
-                    kind: .folder
-                )
-            ]
-    }
-
-    /// Volumes whose questions have not been answered yet: asked about once, not again and
-    /// again, while a share that does not answer holds a thread.
-    private let volumesAsking = Locked(Set<String>())
-
-    /// Reads the places from the system.
-    ///
-    /// Each volume is asked about on its own thread and waited for for a moment only, so that one
-    /// that does not answer (a share that went away) shows with what was known of it, or its folder
-    /// name, and holds up none of the others.
-    internal static func readPlaces(previous: [Place], _ probes: LocalProbes, asking volumesAsking: Locked<Set<String>>)
-        -> [Place]
-    {
-        let fm = FileManager.default
-        let home = probes.home ?? fm.homeDirectoryForCurrentUser
-        var places = [Place(name: "Home", url: home, kind: .home)]
-        places += ["Desktop", "Documents", "Downloads"]
-            .map {
-                Place(name: $0, url: home.appending(name: $0), kind: .folder)
-            }
-        let cloud = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
-        if fm.fileExists(atPath: cloud.path) { places.append(Place(name: "iCloud Drive", url: cloud, kind: .folder)) }
-        places.append(
-            Place(name: "Applications", url: URL(fileURLWithPath: "/Applications", isDirectory: true), kind: .folder)
-        )
-        let keys: [URLResourceKey] = [
-            .volumeNameKey, .volumeIsInternalKey, .volumeIsLocalKey, .volumeIsRemovableKey, .volumeIsEjectableKey,
-            .volumeIsRootFileSystemKey
-        ]
-        // (The system always answers with a list; none would be no volumes.)
-        let volumes = [fm.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes])]
-            .compactMap(\.self).joined()
-        /// All state is guarded by `lock`.
-        final class Slot: @unchecked Sendable {
-            let lock = NSLock()
-            var place: Place?
-        }
-        let slots = volumes.map { _ in Slot() }
-        let group = DispatchGroup()
-        for (volume, slot) in zip(volumes, slots) {
-            let key = volume.path
-            guard volumesAsking.withValue({ $0.insert(key).inserted }) else { continue }
-            group.enter()
-            BlockingCalls.run {
-                probes.willAsk?(volume.path)
-                let values = try? volume.resourceValues(forKeys: Set(keys))
-                let place = Place(
-                    name: values?.volumeName ?? volume.lastPathComponent,
-                    url: volume,
-                    kind: Self.volumeKind(
-                        path: volume.path,
-                        isInternal: values?.volumeIsInternal,
-                        isLocal: values?.volumeIsLocal,
-                        isRemovable: values?.volumeIsRemovable,
-                        isEjectable: values?.volumeIsEjectable
-                    ),
-                    canBeEjected: Place.VolumeTraits(path: volume.path, values: values).mayBeEjected
-                )
-                slot.lock.lock()
-                slot.place = place
-                slot.lock.unlock()
-                volumesAsking.withValue { $0.remove(key) }
-                group.leave()
-            }
-        }
-        _ = group.wait(timeout: .now() + probes.volumePatience)
-        for (volume, slot) in zip(volumes, slots) {
-            slot.lock.lock()
-            let answered = slot.place
-            slot.lock.unlock()
-            guard let answered else {
-                // Not answered in time: what was known of it, or its folder name.
-                places.append(
-                    previous.first { $0.url.path == volume.path }
-                        ?? Place(
-                            name: volume.lastPathComponent,
-                            url: volume,
-                            kind: volume.path == "/" ? .internalDisk : .externalDisk
-                        )
-                )
-                continue
-            }
-            places.append(answered)
-        }
-        return places
-    }
-
-    /// Internal: the start-up disk, and a local disk the system calls internal that cannot be
-    /// taken out.
-    ///
-    /// A volume the system knows nothing about counts as external.
-    internal static func volumeKind(
-        path: String,
-        isInternal: Bool?,
-        isLocal: Bool?,
-        isRemovable: Bool?,
-        isEjectable: Bool?
-    )
-        -> Place.Kind
-    {
-        if path == "/" {
-            return .internalDisk
-        }
-        let fixed = isLocal == true && isInternal == true && isRemovable != true && isEjectable != true
-        return fixed ? .internalDisk : .externalDisk
     }
 
     /// The volume a location is on.
@@ -1842,55 +1942,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         }
     }
 
-    /// One question to a volume that is under way, and everybody who waits for its answer.
-    ///
-    /// Unchecked: `info` and `isOver` are guarded by `condition`, `wasAnsweredFromMemory` by
-    /// the file system's `volumeLock`.
-    private final class VolumeQuestion: @unchecked Sendable {
-        enum Outcome {
-            case answered(VolumeInfo?)
-            case cancelled
-            case late
-        }
-
-        let asked = DispatchTime.now().uptimeNanoseconds
-        /// Somebody was answered from memory because this took too long.
-        ///
-        /// Guarded by the file system's `volumeLock`.
-        var wasAnsweredFromMemory = false
-        private let condition = NSCondition()
-        private var info: VolumeInfo?
-        private var isOver = false
-
-        func finish(_ info: VolumeInfo?) {
-            condition.lock()
-            (self.info, isOver) = (info, true)
-            condition.broadcast()
-            condition.unlock()
-        }
-
-        func wait(until deadline: UInt64, _ cancellation: CancellationFlag?) -> Outcome {
-            let registration = cancellation?
-                .onCancel { [condition] in
-                    condition.lock()
-                    condition.broadcast()
-                    condition.unlock()
-                }
-            defer { withExtendedLifetime(registration) {} }
-            condition.lock()
-            defer { condition.unlock() }
-            while cancellation?.isCancelled != true, !isOver {
-                let now = DispatchTime.now().uptimeNanoseconds
-                guard now < deadline else {
-                    return .late
-                }
-                _ = condition.wait(until: Date(timeIntervalSinceNow: TimeInterval(deadline - now) / 1_000_000_000))
-            }
-            // A caller that has cancelled is not given the answer, even one that came in time.
-            return cancellation?.isCancelled == true ? .cancelled : .answered(info)
-        }
-    }
-
     /// The volume a path is on when a test stands in for the system: the test's own volume
     /// (the nearest folder above that it says is not local), else the real mount.
     private func volumeKey(_ path: String) -> String {
@@ -1902,11 +1953,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         return remote ?? MountTable.shared.mount(containing: path).path
     }
-
-    private let volumeLock = NSLock()
-    /// The question to each mount point that has not come back, and the last answer for each.
-    private var volumeQuestions: [String: VolumeQuestion] = [:]
-    private var lastVolumes: [String: VolumeInfo] = [:]
 
     /// Asks the system, which may wait for as long as the volume likes (on a thread of its
     /// own: see `volume(of:)`).
@@ -1944,18 +1990,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             isLocal: values.volumeIsLocal != false
         )
     }
-
-    internal let spareLock = NSLock()
-    /// Mount point → what the system would free on demand there (the free space it reports
-    /// for important uses, less the space that is plainly free), when that was measured, and
-    /// of which volume (a different one mounted at the same place starts afresh).
-    ///
-    /// Nil where the system has no such figure. Guarded by `spareLock`.
-    internal var spareSpace: [String: (bytes: Int64?, measured: UInt64, isMeasuring: Bool, volume: fsid_t)] = [:]
-    /// How old a measurement may be before the next question has it taken again.
-    internal static let spareSpaceAge: UInt64 = 3_000_000_000
-    /// A measurement that has taken this long is taken for lost (the disk does not answer).
-    internal static let spareSpaceLoss: UInt64 = 30_000_000_000
 
     /// The free space as the Finder states it, which counts what the system can clear away.
     ///
@@ -2115,33 +2149,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         return (files, folders)
     }
 
-    /// What an entry of a bulk read in the folder at `path` counts for: a folder to measure (its
-    /// path), or a file of a size.
-    ///
-    /// Nil for what is neither (a link, a pipe) and for an entry that cannot be asked about.
-    internal static func measured(_ entry: Entry, in path: String) -> (folder: String?, size: Int64)? {
-        guard !entry.name.isEmpty else {
-            return nil
-        }
-        let child = path.hasSuffix("/") ? path + entry.name : path + "/" + entry.name
-        var (type, size) = (entry.type, entry.size)
-        if entry.failed {
-            // The entry is asked by itself, as the listing does.
-            var st = stat()
-            guard lstat(child, &st) == 0 else {
-                return nil
-            }
-            type =
-                (st.st_mode & S_IFMT) == S_IFDIR
-                ? VDIR.rawValue : ((st.st_mode & S_IFMT) == S_IFREG ? VREG.rawValue : 0)
-            size = Int64(st.st_size)
-        }
-        guard type == VDIR.rawValue || type == VREG.rawValue else {
-            return nil
-        }
-        return type == VDIR.rawValue ? (child, 0) : (nil, size)
-    }
-
     /// Nil when the volume has no bulk reads; the tree is then measured by listing it.
     private func totalSize(ofPath path: String, _ cancellation: CancellationFlag) -> Int64? {
         guard !cancellation.isCancelled else {
@@ -2165,17 +2172,6 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             .reduce(level.files) { $0.addingSaturated($1) }
     }
 
-    // MARK: System calls
-
-    /// Opens a folder to be read. `O_CLOEXEC`, and an `EINTR` nobody asked for is tried again.
-    internal static func openDirectory(_ path: String) -> Int32 {
-        var descriptor: Int32
-        repeat {
-            descriptor = Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-        } while descriptor < 0 && errno == EINTR
-        return descriptor
-    }
-
     /// `getattrlistbulk` of the folder at `path`, tried again after an `EINTR` nobody asked for.
     internal func readBulk(
         _ descriptor: Int32,
@@ -2189,5 +2185,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             count = probes.system("getattrlistbulk", path) { getattrlistbulk(descriptor, request, buffer, capacity, 0) }
         } while count < 0 && errno == EINTR
         return count
+    }
+
+    deinit {
+        mountObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
     }
 }

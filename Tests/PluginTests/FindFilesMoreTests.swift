@@ -884,11 +884,6 @@ internal final class FindFilesWindow {
         )
     }
 
-    /// The window goes with the test: drawn later, its list would ask a kernel that is gone.
-    isolated deinit {
-        autoreleasepool { plugin.stop() }
-    }
-
     /// Fills the form like a user, runs the search and waits for its end.
     internal func search(_ change: (inout SearchSettings) -> Void) async {
         let window = window
@@ -1045,5 +1040,10 @@ internal final class FindFilesWindow {
         await search { $0.searchFor = "one" }
         window.newSearch()
         #expect(window.lines.isEmpty && window.form.settings.searchFor == "one")
+    }
+
+    /// The window goes with the test: drawn later, its list would ask a kernel that is gone.
+    isolated deinit {
+        autoreleasepool { plugin.stop() }
     }
 }

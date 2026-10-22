@@ -32,45 +32,6 @@ internal struct SelectionType: Codable, Equatable {
     internal var hidden = Tri.any
     internal var links = Tri.any
 
-    /// The conditions beyond the mask.
-    internal func accepts(_ item: FileItem, now: Date = Date()) -> Bool {
-        switch kind {
-        case .any:
-            break
-
-        case .files:
-            if item.isFolder {
-                return false
-            }
-
-        case .folders:
-            if !item.isFolder {
-                return false
-            }
-        }
-        if minSize != nil || maxSize != nil {
-            guard !item.isFolder else {
-                return false
-            }
-            if let minSize, item.size < minSize {
-                return false
-            }
-            if let maxSize, item.size > maxSize {
-                return false
-            }
-        }
-        if let modifiedFrom, item.modified < modifiedFrom {
-            return false
-        }
-        if let modifiedTo, item.modified > modifiedTo {
-            return false
-        }
-        if let notOlderThanDays, item.modified < now.addingTimeInterval(-Double(notOlderThanDays) * 86_400) {
-            return false
-        }
-        return hidden.accepts(item.isHidden) && links.accepts(item.isSymlink)
-    }
-
     // MARK: Text forms of the dialog
 
     /// `1500`, `10k`, `1.5 M`, `2g`; nil for anything else.
@@ -130,6 +91,45 @@ internal struct SelectionType: Codable, Equatable {
     internal static func text(ofDate date: Date?) -> String {
         date.map(formatter("yyyy-MM-dd HH:mm").string(from:)) ?? ""
     }
+
+    /// The conditions beyond the mask.
+    internal func accepts(_ item: FileItem, now: Date = Date()) -> Bool {
+        switch kind {
+        case .any:
+            break
+
+        case .files:
+            if item.isFolder {
+                return false
+            }
+
+        case .folders:
+            if !item.isFolder {
+                return false
+            }
+        }
+        if minSize != nil || maxSize != nil {
+            guard !item.isFolder else {
+                return false
+            }
+            if let minSize, item.size < minSize {
+                return false
+            }
+            if let maxSize, item.size > maxSize {
+                return false
+            }
+        }
+        if let modifiedFrom, item.modified < modifiedFrom {
+            return false
+        }
+        if let modifiedTo, item.modified > modifiedTo {
+            return false
+        }
+        if let notOlderThanDays, item.modified < now.addingTimeInterval(-Double(notOlderThanDays) * 86_400) {
+            return false
+        }
+        return hidden.accepts(item.isHidden) && links.accepts(item.isSymlink)
+    }
 }
 
 /// A mask or a selection type, ready to be asked which entries of a list it selects.
@@ -138,6 +138,10 @@ internal struct SelectionType: Codable, Equatable {
 internal struct SelectionRule {
     internal let mask: SelectionMask
     internal let type: SelectionType?
+
+    /// Whether the rule looks at other entries than the one it judges (`A>B` takes the files
+    /// that belong to the matching ones): such a rule has to be run over the whole list.
+    internal var isPairwise: Bool { mask.pairsRelatedFiles }
 
     internal init(mask text: String) {
         mask = SelectionMask(text)
@@ -169,10 +173,6 @@ internal struct SelectionRule {
     internal func matching(among items: [FileItem], base: URL, now: Date = Date(), cancelled: () -> Bool) -> [String] {
         matchingIndices(among: items, base: base, now: now, cancelled: cancelled).map { items[$0].name }
     }
-
-    /// Whether the rule looks at other entries than the one it judges (`A>B` takes the files
-    /// that belong to the matching ones): such a rule has to be run over the whole list.
-    internal var isPairwise: Bool { mask.pairsRelatedFiles }
 
     /// The same as places in `items`, of the entries `scope` lets through.
     internal func matchingIndices(
@@ -234,11 +234,6 @@ internal final class SelectionStore {
     private let settings: any SettingsStore
     private let scoped: any SettingsStore
 
-    internal init(settings: any SettingsStore) {
-        self.settings = settings
-        scoped = settings.scoped(to: Self.scope)
-    }
-
     /// Whether Num +, Ctrl+Num + and Num * also affect folders (`MarkDirectories`).
     internal var marksFolders: Bool { settings.flag(Self.marksFoldersKey, default: true) }
     /// Whether comparing treats times exactly one hour apart as equal (`1hourdif`).
@@ -246,6 +241,16 @@ internal final class SelectionStore {
 
     /// The masks used so far, the newest first.
     internal var history: [String] { scoped.value([String].self, forKey: "maskHistory") ?? [] }
+
+    /// The saved types; one that does not read is left out, the others stay.
+    internal var types: [SelectionType] {
+        (scoped.value([Readable<SelectionType>].self, forKey: "types") ?? []).compactMap(\.value)
+    }
+
+    internal init(settings: any SettingsStore) {
+        self.settings = settings
+        scoped = settings.scoped(to: Self.scope)
+    }
 
     internal func remember(_ mask: String) {
         var masks = history.filter { $0 != mask }
@@ -255,11 +260,6 @@ internal final class SelectionStore {
 
     internal func forget(mask: String) {
         scoped.set(history.filter { $0 != mask }, forKey: "maskHistory")
-    }
-
-    /// The saved types; one that does not read is left out, the others stay.
-    internal var types: [SelectionType] {
-        (scoped.value([Readable<SelectionType>].self, forKey: "types") ?? []).compactMap(\.value)
     }
 
     internal func type(named name: String) -> SelectionType? {

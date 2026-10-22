@@ -125,6 +125,11 @@ public struct DiffRow: Equatable, Sendable {
 /// Pure and UI-free; computing it is the slow part of the comparison and belongs on a background
 /// thread.
 public struct TextDiff: Equatable, Sendable {
+    // MARK: Inside a line
+
+    /// The within-line comparison covers this many characters (spec 09 › Comparison rules).
+    public static let inlineLimit = 4_096
+
     public let rows: [DiffRow]
     /// The differences as ranges of rows; a run of differing rows is one difference
     /// (spec 09 › Window, Next / Previous difference).
@@ -241,25 +246,6 @@ public struct TextDiff: Equatable, Sendable {
         return blocks
     }
 
-    /// The lines of the right text put together from the rows: the right file again, which is
-    /// what makes a set of rows a correct diff.
-    public func rebuiltRight<Line>(left _: [Line], right: [Line]) -> [Line] {
-        rows.compactMap { row in
-            switch row.kind {
-            case .equal, .changed, .added:
-                return row.right.map { right[$0] }
-
-            case .removed:
-                return nil
-            }
-        }
-    }
-
-    // MARK: Inside a line
-
-    /// The within-line comparison covers this many characters (spec 09 › Comparison rules).
-    public static let inlineLimit = 4_096
-
     /// The parts of two differing lines that differ, as ranges of UTF-16 units.
     ///
     /// After a difference the comparison only picks up again where at least `minimumMatch`
@@ -359,6 +345,20 @@ public struct TextDiff: Equatable, Sendable {
             }
         }
         return result
+    }
+
+    /// The lines of the right text put together from the rows: the right file again, which is
+    /// what makes a set of rows a correct diff.
+    public func rebuiltRight<Line>(left _: [Line], right: [Line]) -> [Line] {
+        rows.compactMap { row in
+            switch row.kind {
+            case .equal, .changed, .added:
+                return row.right.map { right[$0] }
+
+            case .removed:
+                return nil
+            }
+        }
     }
 }
 

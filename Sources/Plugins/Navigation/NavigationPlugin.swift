@@ -24,6 +24,46 @@ extension CommandID {
 ///
 /// Every move asks the panel to show a location; the panel reads it in the background.
 public final class NavigationPlugin: Plugin {
+    /// What the commands and menus need of the clipboard.
+    ///
+    /// Its text is copied (all of it, if it is a long one) only when a command needs it, and once
+    /// for each change count; the menus ask only for the kinds of its contents, which costs no
+    /// copy: a yes is kept for as long as the change count stays, a no is asked again each time,
+    /// since a program that fills the clipboard may add the text after the count was changed. Main
+    /// thread only (`NSPasteboard` is not safe to use from two threads at once).
+    @MainActor
+    private final class ClipboardText {
+        private let pasteboard: NSPasteboard
+        private var textCount: Int?
+        private var pathRead: (count: Int, path: String?)?
+
+        var hasText: Bool {
+            let count = pasteboard.changeCount
+            if textCount == count {
+                return true
+            }
+            guard pasteboard.availableType(from: [.string]) != nil else {
+                return false
+            }
+            textCount = count
+            return true
+        }
+
+        /// The path the clipboard's text starts with; the text is read once for each change.
+        var path: String? {
+            let count = pasteboard.changeCount
+            if let pathRead, pathRead.count == count {
+                return pathRead.path
+            }
+            let path = pasteboard.string(forType: .string).flatMap(NavigationPlugin.path(fromClipboard:))
+            // An empty answer is asked again: the text may not have been put there yet.
+            if path != nil { pathRead = (count, path) }
+            return path
+        }
+
+        init(_ pasteboard: NSPasteboard) { self.pasteboard = pasteboard }
+    }
+
     public let name = "Navigation"
     private let pasteboard: NSPasteboard
     private let home: URL
@@ -73,46 +113,6 @@ public final class NavigationPlugin: Plugin {
             ) ?? ""
         let path = line.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         return path.isEmpty ? nil : path
-    }
-
-    /// What the commands and menus need of the clipboard.
-    ///
-    /// Its text is copied (all of it, if it is a long one) only when a command needs it, and once
-    /// for each change count; the menus ask only for the kinds of its contents, which costs no
-    /// copy: a yes is kept for as long as the change count stays, a no is asked again each time,
-    /// since a program that fills the clipboard may add the text after the count was changed. Main
-    /// thread only (`NSPasteboard` is not safe to use from two threads at once).
-    @MainActor
-    private final class ClipboardText {
-        private let pasteboard: NSPasteboard
-        private var textCount: Int?
-        private var pathRead: (count: Int, path: String?)?
-
-        init(_ pasteboard: NSPasteboard) { self.pasteboard = pasteboard }
-
-        var hasText: Bool {
-            let count = pasteboard.changeCount
-            if textCount == count {
-                return true
-            }
-            guard pasteboard.availableType(from: [.string]) != nil else {
-                return false
-            }
-            textCount = count
-            return true
-        }
-
-        /// The path the clipboard's text starts with; the text is read once for each change.
-        var path: String? {
-            let count = pasteboard.changeCount
-            if let pathRead, pathRead.count == count {
-                return pathRead.path
-            }
-            let path = pasteboard.string(forType: .string).flatMap(NavigationPlugin.path(fromClipboard:))
-            // An empty answer is asked again: the text may not have been put there yet.
-            if path != nil { pathRead = (count, path) }
-            return path
-        }
     }
 
     public func start(in owner: Kernel) {

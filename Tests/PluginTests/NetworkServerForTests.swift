@@ -71,13 +71,13 @@ internal final class TestFTPServer: @unchecked Sendable {
         private var stopped = false
         private let ended = DispatchSemaphore(value: 0)
 
-        init(listener: Int32) { self.listener = listener }
-
         var isStopped: Bool {
             lock.lock()
             defer { lock.unlock() }
             return stopped
         }
+
+        init(listener: Int32) { self.listener = listener }
 
         /// Returns when the socket is closed and nothing is accepted any more.
         func stop() {
@@ -121,33 +121,6 @@ internal final class TestFTPServer: @unchecked Sendable {
     private var stopped = false
     private var peak = 0
     private var busy = 0
-
-    internal init(root: URL, options: Options = Options()) throws {
-        self.root = root
-        currentOptions = options
-        let listener = try Self.listen()
-        port = Self.port(of: listener)
-        acceptor = Acceptor(listener: listener)
-        acceptor.run { [weak self] client in
-            guard let self else {
-                return false
-            }
-            lock.lock()
-            // Stopped between the accept and here: `stop` has cut the connections it knew.
-            if stopped {
-                lock.unlock()
-                return false
-            }
-            clients.insert(client)
-            peak = max(peak, clients.count)
-            opened += 1
-            lock.unlock()
-            Thread.detachNewThread { Session(server: self, socket: client).run() }
-            return true
-        }
-    }
-
-    deinit { stop() }
 
     internal var options: Options {
         get {
@@ -197,65 +170,29 @@ internal final class TestFTPServer: @unchecked Sendable {
         return mostListing
     }
 
-    internal func stop() {
-        lock.lock()
-        let wasStopped = stopped
-        stopped = true
-        lock.unlock()
-        guard !wasStopped else {
-            return
+    internal init(root: URL, options: Options = Options()) throws {
+        self.root = root
+        currentOptions = options
+        let listener = try Self.listen()
+        port = Self.port(of: listener)
+        acceptor = Acceptor(listener: listener)
+        acceptor.run { [weak self] client in
+            guard let self else {
+                return false
+            }
+            lock.lock()
+            // Stopped between the accept and here: `stop` has cut the connections it knew.
+            if stopped {
+                lock.unlock()
+                return false
+            }
+            clients.insert(client)
+            peak = max(peak, clients.count)
+            opened += 1
+            lock.unlock()
+            Thread.detachNewThread { Session(server: self, socket: client).run() }
+            return true
         }
-        acceptor.stop()
-        dropConnections()
-    }
-
-    /// Cuts every control connection, like a server that timed its clients out.
-    internal func dropConnections() {
-        // Under the lock: a session takes its socket out of the list, under the same lock,
-        // before it closes it, so no descriptor is shut down here that is somebody else's by now.
-        lock.lock()
-        clients.forEach { shutdown($0, SHUT_RDWR) }
-        lock.unlock()
-    }
-
-    fileprivate func record(_ command: String) {
-        lock.lock()
-        commandLog.append(command)
-        lock.unlock()
-    }
-
-    /// Closes the socket of a session that ended.
-    ///
-    /// It leaves the list first (see `dropConnections`).
-    fileprivate func closed(_ client: Int32) {
-        lock.lock()
-        clients.remove(client)
-        lock.unlock()
-        close(client)
-    }
-
-    /// True while connections are still to be refused with 421.
-    fileprivate func refusesGreeting() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        guard busy < currentOptions.busyGreetings else {
-            return false
-        }
-        busy += 1
-        return true
-    }
-
-    fileprivate func listingStarted() {
-        lock.lock()
-        listing += 1
-        mostListing = max(mostListing, listing)
-        lock.unlock()
-    }
-
-    fileprivate func listingEnded() {
-        lock.lock()
-        listing -= 1
-        lock.unlock()
     }
 
     // MARK: Sockets
@@ -337,6 +274,67 @@ internal final class TestFTPServer: @unchecked Sendable {
         }
     }
 
+    internal func stop() {
+        lock.lock()
+        let wasStopped = stopped
+        stopped = true
+        lock.unlock()
+        guard !wasStopped else {
+            return
+        }
+        acceptor.stop()
+        dropConnections()
+    }
+
+    /// Cuts every control connection, like a server that timed its clients out.
+    internal func dropConnections() {
+        // Under the lock: a session takes its socket out of the list, under the same lock,
+        // before it closes it, so no descriptor is shut down here that is somebody else's by now.
+        lock.lock()
+        clients.forEach { shutdown($0, SHUT_RDWR) }
+        lock.unlock()
+    }
+
+    fileprivate func record(_ command: String) {
+        lock.lock()
+        commandLog.append(command)
+        lock.unlock()
+    }
+
+    /// Closes the socket of a session that ended.
+    ///
+    /// It leaves the list first (see `dropConnections`).
+    fileprivate func closed(_ client: Int32) {
+        lock.lock()
+        clients.remove(client)
+        lock.unlock()
+        close(client)
+    }
+
+    /// True while connections are still to be refused with 421.
+    fileprivate func refusesGreeting() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard busy < currentOptions.busyGreetings else {
+            return false
+        }
+        busy += 1
+        return true
+    }
+
+    fileprivate func listingStarted() {
+        lock.lock()
+        listing += 1
+        mostListing = max(mostListing, listing)
+        lock.unlock()
+    }
+
+    fileprivate func listingEnded() {
+        lock.lock()
+        listing -= 1
+        lock.unlock()
+    }
+
     /// Waits for the data connection: until it comes, until the client says something else on
     /// the control connection or hangs up (it gave the transfer up), until the server stops,
     /// `Wait.ceiling` at most.
@@ -361,10 +359,17 @@ internal final class TestFTPServer: @unchecked Sendable {
         }
         return nil
     }
+
+    deinit { stop() }
 }
 
 /// One control connection of the test server.
 private final class Session {
+    private static let stampFormat = formatter("yyyyMMddHHmmss", utc: true)
+    private static let recentFormat = formatter("MMM dd HH:mm", utc: false)
+    private static let oldFormat = formatter("MMM dd  yyyy", utc: false)
+    private static let dosFormat = formatter("MM-dd-yy  hh:mma", utc: false)
+
     private let server: TestFTPServer
     private let socket: Int32
     private let fm = FileManager.default
@@ -382,6 +387,14 @@ private final class Session {
     init(server: TestFTPServer, socket: Int32) {
         self.server = server
         self.socket = socket
+    }
+
+    private static func formatter(_ format: String, utc: Bool) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = format
+        if utc { formatter.timeZone = TimeZone(identifier: "UTC") }
+        return formatter
     }
 
     func run() {
@@ -815,19 +828,6 @@ private final class Session {
     private func modified(_ url: URL) -> Date {
         ((try? fm.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date) ?? Date()
     }
-
-    private static func formatter(_ format: String, utc: Bool) -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = format
-        if utc { formatter.timeZone = TimeZone(identifier: "UTC") }
-        return formatter
-    }
-
-    private static let stampFormat = formatter("yyyyMMddHHmmss", utc: true)
-    private static let recentFormat = formatter("MMM dd HH:mm", utc: false)
-    private static let oldFormat = formatter("MMM dd  yyyy", utc: false)
-    private static let dosFormat = formatter("MM-dd-yy  hh:mma", utc: false)
 
     private func stamp(_ date: Date) -> String { Self.stampFormat.string(from: date) }
 

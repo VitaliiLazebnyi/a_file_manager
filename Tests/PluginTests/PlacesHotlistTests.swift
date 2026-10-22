@@ -287,12 +287,6 @@ internal struct PlacesHistoryModel {
 @MainActor
 @Suite
 internal struct PlacesCommands {
-    internal let memory = MemoryFileSystem()
-    internal let settings = MemorySettings()
-    internal let clock = Clock()
-    internal let plugin: PlacesPlugin
-    internal let bench: TestBench
-
     internal final class Clock {
         internal var time = Date(timeIntervalSince1970: 5_000)
     }
@@ -310,12 +304,26 @@ internal struct PlacesCommands {
         }
     }
 
+    internal let memory = MemoryFileSystem()
+    internal let settings = MemorySettings()
+    internal let clock = Clock()
+    internal let plugin: PlacesPlugin
+    internal let bench: TestBench
+
     internal let recorder = Recorder()
     internal var commands: CommandRegistry { bench.commands }
     internal var left: FakePanel { bench.left }
     internal var right: FakePanel { bench.right }
     internal var ui: ScriptedInteraction { bench.interaction }
     internal var hotlist: Hotlist { plugin.hotlist(in: bench.kernel) }
+
+    /// The rows of the list that was shown last.
+    internal var lastRows: [String] {
+        guard case .list(let rows, _)? = ui.forms.last?.first?.kind else {
+            return []
+        }
+        return rows
+    }
 
     internal init() {
         memory.addFile("/A/one.txt")
@@ -335,14 +343,6 @@ internal struct PlacesCommands {
 
     internal func pick(_ row: Int, button: Int = 0) -> ScriptedInteraction.FormAnswer {
         .values(["row": .index(row)], button: button)
-    }
-
-    /// The rows of the list that was shown last.
-    internal var lastRows: [String] {
-        guard case .list(let rows, _)? = ui.forms.last?.first?.kind else {
-            return []
-        }
-        return rows
     }
 
     internal func store(_ list: Hotlist) {

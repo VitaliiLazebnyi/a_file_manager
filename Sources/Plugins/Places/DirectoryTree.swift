@@ -5,22 +5,6 @@ public import Foundation
 ///
 /// Nodes belong to whoever owns their `DirectoryTree`.
 public final class TreeNode {
-    public let name: String
-    public fileprivate(set) weak var parent: TreeNode?
-    /// The subfolders that are known, in display order.
-    public fileprivate(set) var children: [TreeNode] = []
-    /// True once the folder has been read: its children are then all there are.
-    public fileprivate(set) var isScanned = false
-    /// The node's place in `parent.children`, kept up to date wherever the children change, so
-    /// that stepping from one folder to the next costs nothing.
-    internal fileprivate(set) var indexInParent = 0
-    /// The name in lower case, made when a quick search first needs it.
-    internal fileprivate(set) lazy var folded: String = name.lowercased()
-    /// Child by name, for folders with many children; built when first asked for and kept in step.
-    fileprivate var childIndex: [String: TreeNode]?
-    /// While `DirectoryTree.attach` links the subfolders of this folder in several turns.
-    fileprivate var attaching: Attach?
-
     /// What `attach` keeps between its turns for one folder.
     fileprivate final class Attach {
         /// Nodes that were there before the new ones: the old children of a folder that is read
@@ -42,17 +26,33 @@ public final class TreeNode {
         }
     }
 
-    /// Nodes may be made on any thread while they are not part of a tree yet (`DirectoryTree.makeNodes`).
-    fileprivate init(name: String, parent: TreeNode?) {
-        self.name = name
-        self.parent = parent
-    }
+    public let name: String
+    public fileprivate(set) weak var parent: TreeNode?
+    /// The subfolders that are known, in display order.
+    public fileprivate(set) var children: [TreeNode] = []
+    /// True once the folder has been read: its children are then all there are.
+    public fileprivate(set) var isScanned = false
+    /// The node's place in `parent.children`, kept up to date wherever the children change, so
+    /// that stepping from one folder to the next costs nothing.
+    internal fileprivate(set) var indexInParent = 0
+    /// The name in lower case, made when a quick search first needs it.
+    internal fileprivate(set) lazy var folded: String = name.lowercased()
+    /// Child by name, for folders with many children; built when first asked for and kept in step.
+    fileprivate var childIndex: [String: TreeNode]?
+    /// While `DirectoryTree.attach` links the subfolders of this folder in several turns.
+    fileprivate var attaching: Attach?
 
     /// How deep the folder lies below the root, which is 0.
     public var depth: Int {
         var (depth, node) = (0, parent)
         while let current = node { (depth, node) = (depth + 1, current.parent) }
         return depth
+    }
+
+    /// Nodes may be made on any thread while they are not part of a tree yet (`DirectoryTree.makeNodes`).
+    fileprivate init(name: String, parent: TreeNode?) {
+        self.name = name
+        self.parent = parent
     }
 
     fileprivate func child(named name: String) -> TreeNode? {
@@ -77,6 +77,14 @@ public final class TreeNode {
 /// **Threading.** Not synchronized: a tree is built on one thread and may then be handed to
 /// another (the window builds a cached tree in the background and shows it on the main thread).
 public final class DirectoryTree {
+    /// How far a quick search has come: it found a folder, found none in the whole tree, or
+    /// used up its time and goes on from `node` with `remaining` folders still to look at.
+    public enum SearchProgress {
+        case found(TreeNode)
+        case none
+        case pending(node: TreeNode, remaining: Int)
+    }
+
     public let rootURL: URL
     public let root: TreeNode
     /// The number of folders below the root.
@@ -85,6 +93,22 @@ public final class DirectoryTree {
     private var revision = 0
     /// A search text that matched nothing anywhere, and the revision it was tried on.
     private var failedSearch: (text: String, revision: Int)?
+
+    /// Every folder below the root as a relative path, parents before their children: the
+    /// form the cache stores.
+    public var paths: [String] {
+        var paths: [String] = []
+        paths.reserveCapacity(count)
+        func walk(_ node: TreeNode, _ prefix: String) {
+            for child in node.children {
+                let path = prefix.isEmpty ? child.name : prefix + "/" + child.name
+                paths.append(path)
+                walk(child, path)
+            }
+        }
+        walk(root, "")
+        return paths
+    }
 
     public init(rootURL: URL) {
         self.rootURL = rootURL
@@ -102,11 +126,6 @@ public final class DirectoryTree {
         for path in unscanned { node(at: path)?.isScanned = false }
     }
 
-    private func markScanned(_ node: TreeNode) {
-        node.isScanned = true
-        node.children.forEach(markScanned)
-    }
-
     /// Whether `first` stands before `second` in a folder: the kernel's order of names, digits
     /// by their value.
     ///
@@ -119,6 +138,44 @@ public final class DirectoryTree {
     /// Names in the order of the tree.
     internal static func sorted(names: some Sequence<String>) -> [String] {
         Sorter.sorted(Array(names), numeric: true) { $0 }
+    }
+
+    public static func relativePath(of url: URL, below root: URL) -> String? {
+        if url.isSameLocation(as: root) {
+            return ""
+        }
+        guard url.isInside(root) else {
+            return nil
+        }
+        let rootDepth = root.standardized.pathComponents.filter { $0 != "/" }.count
+        return url.standardized.pathComponents.filter { $0 != "/" }.dropFirst(rootDepth).joined(separator: "/")
+    }
+
+    /// The names of a relative path, cut at the `/` byte.
+    ///
+    /// (Not at the character `/`: a folder whose name begins with a combining mark would make `/`
+    /// and the mark one character.).
+    internal static func components(of path: String) -> [String] {
+        path.utf8.split(separator: 0x2F).map { String(decoding: $0, as: UTF8.self) }
+    }
+
+    /// The nodes for the subfolders `names` of one folder, in display order and without
+    /// doubles, not yet part of any tree: this is the work of `setChildren` that does not
+    /// touch the tree, so a scan does it on its own thread and the tree only links the result
+    /// (`attach`). `sorted` says the names come in display order already.
+    public static func makeNodes(_ names: [String], sorted: Bool = false) -> [TreeNode] {
+        let ordered = sorted ? names : Array(Set(names)).sorted(by: compare)
+        return ordered.enumerated()
+            .map { index, name in
+                let node = TreeNode(name: name, parent: nil)
+                node.indexInParent = index
+                return node
+            }
+    }
+
+    private func markScanned(_ node: TreeNode) {
+        node.isScanned = true
+        node.children.forEach(markScanned)
     }
 
     // MARK: Paths
@@ -141,17 +198,6 @@ public final class DirectoryTree {
     /// The path of `url` relative to the root; nil when it is not the root or below it.
     public func relativePath(of url: URL) -> String? {
         Self.relativePath(of: url, below: rootURL)
-    }
-
-    public static func relativePath(of url: URL, below root: URL) -> String? {
-        if url.isSameLocation(as: root) {
-            return ""
-        }
-        guard url.isInside(root) else {
-            return nil
-        }
-        let rootDepth = root.standardized.pathComponents.filter { $0 != "/" }.count
-        return url.standardized.pathComponents.filter { $0 != "/" }.dropFirst(rootDepth).joined(separator: "/")
     }
 
     /// The node of a relative path.
@@ -183,14 +229,6 @@ public final class DirectoryTree {
             node = child
         }
         return node
-    }
-
-    /// The names of a relative path, cut at the `/` byte.
-    ///
-    /// (Not at the character `/`: a folder whose name begins with a combining mark would make `/`
-    /// and the mark one character.).
-    internal static func components(of path: String) -> [String] {
-        path.utf8.split(separator: 0x2F).map { String(decoding: $0, as: UTF8.self) }
     }
 
     private func insert(_ name: String, into parent: TreeNode) -> TreeNode {
@@ -263,20 +301,6 @@ public final class DirectoryTree {
         node.attaching = nil
         node.isScanned = true
         return node
-    }
-
-    /// The nodes for the subfolders `names` of one folder, in display order and without
-    /// doubles, not yet part of any tree: this is the work of `setChildren` that does not
-    /// touch the tree, so a scan does it on its own thread and the tree only links the result
-    /// (`attach`). `sorted` says the names come in display order already.
-    public static func makeNodes(_ names: [String], sorted: Bool = false) -> [TreeNode] {
-        let ordered = sorted ? names : Array(Set(names)).sorted(by: compare)
-        return ordered.enumerated()
-            .map { index, name in
-                let node = TreeNode(name: name, parent: nil)
-                node.indexInParent = index
-                return node
-            }
     }
 
     /// What `setChildren` does for a folder, with the nodes made beforehand by `makeNodes`.
@@ -376,22 +400,6 @@ public final class DirectoryTree {
         node.children.reduce(0) { $0 + 1 + folderCount(below: $1) }
     }
 
-    /// Every folder below the root as a relative path, parents before their children: the
-    /// form the cache stores.
-    public var paths: [String] {
-        var paths: [String] = []
-        paths.reserveCapacity(count)
-        func walk(_ node: TreeNode, _ prefix: String) {
-            for child in node.children {
-                let path = prefix.isEmpty ? child.name : prefix + "/" + child.name
-                paths.append(path)
-                walk(child, path)
-            }
-        }
-        walk(root, "")
-        return paths
-    }
-
     // MARK: Quick search
 
     /// The folder after `node` in display order (as if everything were expanded), wrapping
@@ -423,14 +431,6 @@ public final class DirectoryTree {
         var current = node
         while let last = current.children.last { current = last }
         return current
-    }
-
-    /// How far a quick search has come: it found a folder, found none in the whole tree, or
-    /// used up its time and goes on from `node` with `remaining` folders still to look at.
-    public enum SearchProgress {
-        case found(TreeNode)
-        case none
-        case pending(node: TreeNode, remaining: Int)
     }
 
     /// The next folder whose name fits what was typed (spec 12 › Controls and keys), searching
@@ -508,13 +508,13 @@ public struct TreeQuickSearch {
     /// The typed text in lower case.
     internal var text: String { hasWildcards ? String(pattern.dropLast()) : pattern }
 
+    public var isEmpty: Bool { pattern.isEmpty }
+
     public init(_ typed: String) {
         let typed = typed.lowercased()
         hasWildcards = typed.contains("*") || typed.contains("?")
         pattern = hasWildcards ? typed + "*" : typed
     }
-
-    public var isEmpty: Bool { pattern.isEmpty }
 
     public func matches(_ name: String) -> Bool {
         matches(folded: name.lowercased())
@@ -595,6 +595,41 @@ public final class TreeScanner: @unchecked Sendable {
         }
     }
 
+    private struct Subfolder {
+        let name: String
+        let url: URL
+        /// Another volume is mounted on this folder.
+        var isMount = false
+        /// A scan does not go in: the folder is protected or only in the cloud (see `isProtected`).
+        var isUnread = false
+    }
+
+    /// Where a scan does not go on its own: the folders macOS asks the user's permission for
+    /// and the cloud folders, in the home folder, and the automounts.
+    ///
+    /// Whole paths.
+    private static let protectedPaths: Set<String> = {
+        let home = NSHomeDirectory()
+        var paths: Set<String> = [
+            "/net", "/home", "/Network", "/dev", "/System/Volumes", "/Volumes", "/private/var/db"
+        ]
+        for relative in [
+            "Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "Public", "Library/Mobile Documents",
+            "Library/CloudStorage", "Library/Mail", "Library/Messages", "Library/Safari", "Library/Containers",
+            "Library/Group Containers", "Library/Calendars", "Library/Cookies", "Library/HomeKit", "Library/Metadata",
+            "Library/Suggestions", "Library/Reminders", "Library/Application Support/AddressBook",
+            "Library/Application Support/CallHistoryDB", "Library/Application Support/CallHistoryTransactions",
+            "Library/Application Support/FileProvider", "Library/Application Support/CloudDocs",
+            "Library/Application Support/com.apple.TCC", "Library/Application Support/Knowledge"
+        ] {
+            paths.insert(home + "/" + relative)
+        }
+        return paths
+    }()
+
+    /// The flag of a folder or file whose content is in the cloud only (`SF_DATALESS`).
+    private static let dataless: UInt32 = 0x4000_0000
+
     public let cancellation = CancellationFlag()
     /// How long a scan may go on, and how many folders it may find.
     public var timeLimit: TimeInterval = 10 * 60
@@ -631,6 +666,63 @@ public final class TreeScanner: @unchecked Sendable {
         self.showHidden = showHidden
         self.batchSize = max(batchSize, 1)
         self.isExcluded = isExcluded
+    }
+
+    /// Folders in the order the tree shows them.
+    public static func sorted(_ folders: [(name: String, url: URL)]) -> [(name: String, url: URL)] {
+        Sorter.sorted(folders, numeric: true, byName: \.name)
+    }
+
+    /// Whether a scan leaves this folder unread.
+    internal static func isProtected(_ url: URL) -> Bool {
+        url.isFileURL && protectedPaths.contains(url.path)
+    }
+
+    /// Runs `body` with the disk work of this thread at the lowest priority, as far as the
+    /// system lets a thread do that (not a pool thread of Dispatch, which then runs at its
+    /// quality-of-service class's priority), and without the system fetching a file or folder
+    /// that is only in the cloud, which a listing would do.
+    internal static func gently<T>(_ body: () -> T) -> T {
+        let (disk, cloud) = (
+            getiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD),
+            getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
+        )
+        setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD, IOPOL_THROTTLE)
+        setiopolicy_np(
+            IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+            IOPOL_SCOPE_THREAD,
+            IOPOL_MATERIALIZE_DATALESS_FILES_OFF
+        )
+        defer {
+            // The threads are shared: they go back to what they had.
+            if disk >= 0 { setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD, disk) }
+            if cloud >= 0 { setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, cloud) }
+        }
+        return body()
+    }
+
+    /// True when a disk is mounted at `path` itself.
+    ///
+    /// A device other than the parent's is not enough to say so: the user's folders on the start-up
+    /// disk are firmlinked from the data volume, and the system answers with the volume's mount
+    /// point for them, not their own.
+    internal static func isMountPoint(_ path: String) -> Bool {
+        // The system names the mount point by its real path; a path without one is none.
+        guard let pointer = realpath(path, nil) else {
+            return false
+        }
+        let real = String(cString: pointer)
+        free(pointer)
+        var info = statfs()
+        return statfs(real, &info) == 0 && mountPoint(info) == real
+    }
+
+    /// Where the volume a `statfs` answer describes is mounted.
+    private static func mountPoint(_ info: statfs) -> String {
+        var info = info
+        return withUnsafePointer(to: &info.f_mntonname) {
+            $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
+        }
     }
 
     /// Reads the whole tree, the folders near the root first.
@@ -708,74 +800,9 @@ public final class TreeScanner: @unchecked Sendable {
         return false
     }
 
-    /// Folders in the order the tree shows them.
-    public static func sorted(_ folders: [(name: String, url: URL)]) -> [(name: String, url: URL)] {
-        Sorter.sorted(folders, numeric: true, byName: \.name)
-    }
-
     /// One level, for a folder the user opens before the scan has reached it.
     public func subfolders(of directory: URL) -> [(name: String, url: URL)] {
         folders(of: directory).map { ($0.name, $0.url) }
-    }
-
-    private struct Subfolder {
-        let name: String
-        let url: URL
-        /// Another volume is mounted on this folder.
-        var isMount = false
-        /// A scan does not go in: the folder is protected or only in the cloud (see `isProtected`).
-        var isUnread = false
-    }
-
-    /// Where a scan does not go on its own: the folders macOS asks the user's permission for
-    /// and the cloud folders, in the home folder, and the automounts.
-    ///
-    /// Whole paths.
-    private static let protectedPaths: Set<String> = {
-        let home = NSHomeDirectory()
-        var paths: Set<String> = [
-            "/net", "/home", "/Network", "/dev", "/System/Volumes", "/Volumes", "/private/var/db"
-        ]
-        for relative in [
-            "Desktop", "Documents", "Downloads", "Movies", "Music", "Pictures", "Public", "Library/Mobile Documents",
-            "Library/CloudStorage", "Library/Mail", "Library/Messages", "Library/Safari", "Library/Containers",
-            "Library/Group Containers", "Library/Calendars", "Library/Cookies", "Library/HomeKit", "Library/Metadata",
-            "Library/Suggestions", "Library/Reminders", "Library/Application Support/AddressBook",
-            "Library/Application Support/CallHistoryDB", "Library/Application Support/CallHistoryTransactions",
-            "Library/Application Support/FileProvider", "Library/Application Support/CloudDocs",
-            "Library/Application Support/com.apple.TCC", "Library/Application Support/Knowledge"
-        ] {
-            paths.insert(home + "/" + relative)
-        }
-        return paths
-    }()
-
-    /// Whether a scan leaves this folder unread.
-    internal static func isProtected(_ url: URL) -> Bool {
-        url.isFileURL && protectedPaths.contains(url.path)
-    }
-
-    /// Runs `body` with the disk work of this thread at the lowest priority, as far as the
-    /// system lets a thread do that (not a pool thread of Dispatch, which then runs at its
-    /// quality-of-service class's priority), and without the system fetching a file or folder
-    /// that is only in the cloud, which a listing would do.
-    internal static func gently<T>(_ body: () -> T) -> T {
-        let (disk, cloud) = (
-            getiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD),
-            getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
-        )
-        setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD, IOPOL_THROTTLE)
-        setiopolicy_np(
-            IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
-            IOPOL_SCOPE_THREAD,
-            IOPOL_MATERIALIZE_DATALESS_FILES_OFF
-        )
-        defer {
-            // The threads are shared: they go back to what they had.
-            if disk >= 0 { setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD, disk) }
-            if cloud >= 0 { setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, cloud) }
-        }
-        return body()
     }
 
     /// `isScan`: the folders are read for the scan, which does not go into protected ones; a
@@ -860,32 +887,5 @@ public final class TreeScanner: @unchecked Sendable {
             folders.append(Subfolder(name: name, url: url, isMount: isMount, isUnread: isUnread))
         }
         return folders
-    }
-
-    /// The flag of a folder or file whose content is in the cloud only (`SF_DATALESS`).
-    private static let dataless: UInt32 = 0x4000_0000
-
-    /// True when a disk is mounted at `path` itself.
-    ///
-    /// A device other than the parent's is not enough to say so: the user's folders on the start-up
-    /// disk are firmlinked from the data volume, and the system answers with the volume's mount
-    /// point for them, not their own.
-    internal static func isMountPoint(_ path: String) -> Bool {
-        // The system names the mount point by its real path; a path without one is none.
-        guard let pointer = realpath(path, nil) else {
-            return false
-        }
-        let real = String(cString: pointer)
-        free(pointer)
-        var info = statfs()
-        return statfs(real, &info) == 0 && mountPoint(info) == real
-    }
-
-    /// Where the volume a `statfs` answer describes is mounted.
-    private static func mountPoint(_ info: statfs) -> String {
-        var info = info
-        return withUnsafePointer(to: &info.f_mntonname) {
-            $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
-        }
     }
 }

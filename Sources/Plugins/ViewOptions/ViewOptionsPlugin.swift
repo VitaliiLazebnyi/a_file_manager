@@ -11,7 +11,20 @@ import Foundation
 /// main thread; a long list is sorted and filtered on a background thread and the result is
 /// handed to the model on the main thread, where nothing of that length is ever worked through.
 public final class ViewOptionsPlugin: Plugin {
-    public let name = "View options"
+    /// Which of the Show menu's filters a tab has.
+    private enum FilterKind {
+        case programs, custom, selected
+    }
+
+    /// The filter this plugin gave a tab.
+    ///
+    /// It counts for as long as the tab's filter still carries its title: someone who lays a filter
+    /// over it (the quick filter) keeps the title in front, and someone who replaces it does not.
+    private struct Applied {
+        weak var model: PanelModel?
+        let kind: FilterKind
+        let title: String
+    }
 
     /// The display filters of the Show menu. `cm_SrcUserDef` takes the specification as its
     /// `.text` argument; without one it asks.
@@ -29,20 +42,19 @@ public final class ViewOptionsPlugin: Plugin {
     internal static let lastMaskKey = "viewOptions.lastMask"
     internal static let defaultProgramMasks = "*.app *.command *.sh *.workflow"
 
-    /// Which of the Show menu's filters a tab has.
-    private enum FilterKind {
-        case programs, custom, selected
-    }
+    /// Lists from this length on are filtered in the background.
+    internal static let backgroundFilterThreshold = 20_000
+    /// How often a result that the list outgrew (a folder that changes while the work is
+    /// done) is worked out again in the background before the main thread does it: it is
+    /// one pass on all cores, and the user gets the filter or the order they asked for.
+    internal static let staleTries = 3
 
-    /// The filter this plugin gave a tab.
-    ///
-    /// It counts for as long as the tab's filter still carries its title: someone who lays a filter
-    /// over it (the quick filter) keeps the title in front, and someone who replaces it does not.
-    private struct Applied {
-        weak var model: PanelModel?
-        let kind: FilterKind
-        let title: String
-    }
+    // MARK: Sorting
+
+    /// Lists from this length on are sorted in the background.
+    internal static let backgroundSortThreshold = 20_000
+
+    public let name = "View options"
 
     private var applied: [ObjectIdentifier: Applied] = [:]
 
@@ -57,8 +69,33 @@ public final class ViewOptionsPlugin: Plugin {
         // The main queue runs its blocks on the main thread.
         DispatchQueue.main.async { MainActor.assumeIsolated { work() } }
     }
+    /// The number of the filter each panel was given last: a result that comes back for an
+    /// older one is dropped.
+    ///
+    /// The numbers are never used twice.
+    private var filterTickets: [ObjectIdentifier: Int] = [:]
+    private var lastFilterTicket = 0
+    /// The order each panel was last asked for and has not got yet.
+    ///
+    /// It stays the wish until it is met: every sort that goes stale starts again from the list as
+    /// it is.
+    private var pendingOrders: [ObjectIdentifier: ListOrder] = [:]
 
     public init() {}
+
+    /// What Show › Programs lists on a Mac: applications, files that may be executed, and the
+    /// files the user's masks name (the Windows list is `*.exe *.com *.bat`).
+    ///
+    /// Folders stay.
+    nonisolated internal static func isProgram(_ item: FileItem, masks: FileMask) -> Bool {
+        if item.isFolder {
+            return true
+        }
+        if masks.matches(item.name) {
+            return true
+        }
+        return !item.isDirectory && item.permissions & 0o111 != 0
+    }
 
     public func start(in kernel: Kernel) {
         registerViews(in: kernel)
@@ -239,19 +276,6 @@ public final class ViewOptionsPlugin: Plugin {
         )
     }
 
-    /// Lists from this length on are filtered in the background.
-    internal static let backgroundFilterThreshold = 20_000
-    /// How often a result that the list outgrew (a folder that changes while the work is
-    /// done) is worked out again in the background before the main thread does it: it is
-    /// one pass on all cores, and the user gets the filter or the order they asked for.
-    internal static let staleTries = 3
-    /// The number of the filter each panel was given last: a result that comes back for an
-    /// older one is dropped.
-    ///
-    /// The numbers are never used twice.
-    private var filterTickets: [ObjectIdentifier: Int] = [:]
-    private var lastFilterTicket = 0
-
     private func apply(_ filter: PanelFilter?, as kind: FilterKind?, to model: PanelModel) {
         apply(filter?.title, as: kind, to: model) { filter }
     }
@@ -325,30 +349,6 @@ public final class ViewOptionsPlugin: Plugin {
         else { return nil }
         return entry.kind
     }
-
-    /// What Show › Programs lists on a Mac: applications, files that may be executed, and the
-    /// files the user's masks name (the Windows list is `*.exe *.com *.bat`).
-    ///
-    /// Folders stay.
-    nonisolated internal static func isProgram(_ item: FileItem, masks: FileMask) -> Bool {
-        if item.isFolder {
-            return true
-        }
-        if masks.matches(item.name) {
-            return true
-        }
-        return !item.isDirectory && item.permissions & 0o111 != 0
-    }
-
-    // MARK: Sorting
-
-    /// Lists from this length on are sorted in the background.
-    internal static let backgroundSortThreshold = 20_000
-    /// The order each panel was last asked for and has not got yet.
-    ///
-    /// It stays the wish until it is met: every sort that goes stale starts again from the list as
-    /// it is.
-    private var pendingOrders: [ObjectIdentifier: ListOrder] = [:]
 
     /// Gives a panel the order `change` makes of its present one.
     ///

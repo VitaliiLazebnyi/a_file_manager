@@ -7,12 +7,6 @@ import Foundation
 ///
 /// A value type without any file access; `CommentStore` reads and writes it.
 internal struct DescriptIon: Equatable {
-    internal static let fileName = "descript.ion"
-    /// The longest comment the format takes.
-    internal static let commentLimit = 4_095
-    /// Follows a comment of several lines, whose lines are joined with a literal `\n`.
-    private static let multilineMarker = "\u{04}\u{C2}"
-
     /// How the file is written.
     ///
     /// A new file is plain text, and becomes UTF-16 only when a name or a comment needs it
@@ -29,9 +23,22 @@ internal struct DescriptIon: Equatable {
         internal var comment: String
     }
 
+    internal static let fileName = "descript.ion"
+    /// The longest comment the format takes.
+    internal static let commentLimit = 4_095
+    /// Follows a comment of several lines, whose lines are joined with a literal `\n`.
+    private static let multilineMarker = "\u{04}\u{C2}"
+
     /// In the order of the file, which is kept when the file is written again.
     internal private(set) var entries: [Entry] = []
     internal private(set) var encoding = Encoding.ansi
+
+    /// The comments by lower-cased name, for looking up many files of a folder.
+    internal var commentsByName: [String: String] {
+        Dictionary(entries.map { ($0.name.lowercased(), $0.comment) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    internal var isEmpty: Bool { entries.isEmpty }
 
     internal init() {}
 
@@ -126,16 +133,28 @@ internal struct DescriptIon: Equatable {
         return !(scalars.first == "\"" || (hasQuote && scalars.contains(" ")))
     }
 
+    /// Line ends as `\n`, and no empty lines or spaces at the end.
+    internal static func normalized(_ comment: String) -> String {
+        var text = comment.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        while let last = text.last, last == "\n" || last == " " { text.removeLast() }
+        return text
+    }
+
+    /// The text in UTF-16, without a byte-order mark.
+    private static func utf16(_ text: String, bigEndian: Bool) -> Data {
+        Data(
+            text.utf16.flatMap { unit in
+                let (high, low) = (UInt8(unit >> 8), UInt8(unit & 0xFF))
+                return bigEndian ? [high, low] : [low, high]
+            }
+        )
+    }
+
     /// Names are compared without regard to case, as the shipped `DESCRIPT.ION` writes them in
     /// capitals.
     internal func comment(for name: String) -> String? {
         let wanted = name.lowercased()
         return entries.first { $0.name.lowercased() == wanted }?.comment
-    }
-
-    /// The comments by lower-cased name, for looking up many files of a folder.
-    internal var commentsByName: [String: String] {
-        Dictionary(entries.map { ($0.name.lowercased(), $0.comment) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Sets, replaces or (with an empty text) removes the comment of a file.
@@ -157,15 +176,6 @@ internal struct DescriptIon: Equatable {
             break
         }
     }
-
-    /// Line ends as `\n`, and no empty lines or spaces at the end.
-    internal static func normalized(_ comment: String) -> String {
-        var text = comment.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
-        while let last = text.last, last == "\n" || last == " " { text.removeLast() }
-        return text
-    }
-
-    internal var isEmpty: Bool { entries.isEmpty }
 
     /// The file's bytes.
     ///
@@ -218,16 +228,6 @@ internal struct DescriptIon: Equatable {
             return Data([0xFE, 0xFF]) + Self.utf16(text, bigEndian: true)
         }
     }
-
-    /// The text in UTF-16, without a byte-order mark.
-    private static func utf16(_ text: String, bigEndian: Bool) -> Data {
-        Data(
-            text.utf16.flatMap { unit in
-                let (high, low) = (UInt8(unit >> 8), UInt8(unit & 0xFF))
-                return bigEndian ? [high, low] : [low, high]
-            }
-        )
-    }
 }
 
 /// Reads and writes the comment files through the file-system providers, so comments work
@@ -254,14 +254,14 @@ internal final class CommentStore: @unchecked Sendable {
     ///
     /// Changes made here are known at once (`forget`); this is for changes other programs make.
     private static let lifetime: TimeInterval = 3
+    /// How often a waiting thread looks at its flag.
+    private static let waitStep: TimeInterval = 0.1
     /// How long a thread waits for another thread's reading of the same folder.
     internal var waitLimit: TimeInterval {
         get { condition.withLock { patience } }
         set { condition.withLock { patience = newValue } }
     }
     private var patience: TimeInterval = 10
-    /// How often a waiting thread looks at its flag.
-    private static let waitStep: TimeInterval = 0.1
 
     private let fileSystems: FileSystemRegistry
     private let condition = NSCondition()

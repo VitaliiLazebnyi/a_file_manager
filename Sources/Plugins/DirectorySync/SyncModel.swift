@@ -131,6 +131,41 @@ public struct SyncRow: Equatable, Sendable {
     public internal(set) var defaultAction: SyncAction
     public var action: SyncAction
 
+    public var isPair: Bool { left != nil && right != nil }
+    public var relativePath: String { directory + name }
+    /// The row's place on the left; when nothing is there yet, where a copy would go.
+    public var leftURL: URL { left?.url ?? leftDirectory.appending(name: name) }
+    public var rightURL: URL { right?.url ?? rightDirectory.appending(name: name) }
+
+    /// The action with the copy direction turned round; others stay.
+    public var reversedAction: SyncAction {
+        switch action {
+        case .copyToRight where right != nil:
+            return .copyToLeft
+
+        case .copyToLeft where left != nil:
+            return .copyToRight
+
+        default:
+            return action
+        }
+    }
+
+    /// What a click on the middle column changes the row to: its default, then each copy
+    /// direction, then nothing.
+    public var nextAction: SyncAction {
+        var cycle: [SyncAction] = []
+        for candidate in [defaultAction, .copyToRight, .copyToLeft, SyncAction.none]
+        where accepts(candidate) && !cycle.contains(candidate) {
+            cycle.append(candidate)
+        }
+        // (Every row takes no action, so the cycle is never empty.)
+        guard let index = cycle.firstIndex(of: action) else {
+            return cycle[0]
+        }
+        return cycle[(index + 1) % cycle.count]
+    }
+
     internal init(
         directory: String,
         isDirectory: Bool,
@@ -173,12 +208,6 @@ public struct SyncRow: Equatable, Sendable {
         }
     }
 
-    public var isPair: Bool { left != nil && right != nil }
-    public var relativePath: String { directory + name }
-    /// The row's place on the left; when nothing is there yet, where a copy would go.
-    public var leftURL: URL { left?.url ?? leftDirectory.appending(name: name) }
-    public var rightURL: URL { right?.url ?? rightDirectory.appending(name: name) }
-
     /// Whether the action makes sense for the row: something must exist to be copied or deleted,
     /// and excluded rows take nothing.
     public func accepts(_ action: SyncAction) -> Bool {
@@ -199,42 +228,10 @@ public struct SyncRow: Equatable, Sendable {
             return isPair
         }
     }
-
-    /// The action with the copy direction turned round; others stay.
-    public var reversedAction: SyncAction {
-        switch action {
-        case .copyToRight where right != nil:
-            return .copyToLeft
-
-        case .copyToLeft where left != nil:
-            return .copyToRight
-
-        default:
-            return action
-        }
-    }
-
-    /// What a click on the middle column changes the row to: its default, then each copy
-    /// direction, then nothing.
-    public var nextAction: SyncAction {
-        var cycle: [SyncAction] = []
-        for candidate in [defaultAction, .copyToRight, .copyToLeft, SyncAction.none]
-        where accepts(candidate) && !cycle.contains(candidate) {
-            cycle.append(candidate)
-        }
-        // (Every row takes no action, so the cycle is never empty.)
-        guard let index = cycle.firstIndex(of: action) else {
-            return cycle[0]
-        }
-        return cycle[(index + 1) % cycle.count]
-    }
 }
 
 /// The Show buttons (spec 09 › Show filter); the raw values are the `SyncButtons` bits.
 public struct SyncShow: OptionSet, Codable, Equatable, Sendable {
-    public let rawValue: Int
-    public init(rawValue: Int) { self.rawValue = rawValue }
-
     public static let copyToRight = Self(rawValue: 1)
     public static let equal = Self(rawValue: 2)
     public static let notEqual = Self(rawValue: 4)
@@ -242,6 +239,9 @@ public struct SyncShow: OptionSet, Codable, Equatable, Sendable {
     public static let duplicates = Self(rawValue: 16)
     public static let singles = Self(rawValue: 32)
     public static let all = Self(rawValue: 63)
+
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
 
     /// Rows are filtered by the direction the comparison computed, not by what the user made
     /// of it, and by whether the file is on both sides or on one.
@@ -267,6 +267,12 @@ public struct SyncShow: OptionSet, Codable, Equatable, Sendable {
 public struct SyncSummary: Equatable, Sendable {
     public var files = 0, identical = 0, different = 0, uniqueLeft = 0, uniqueRight = 0
 
+    public var text: String {
+        files == 0
+            ? "Files found: 0"
+            : "Files found: \(files)  (Identical: \(identical), Different: \(different), Unique left: \(uniqueLeft), Unique right: \(uniqueRight))"
+    }
+
     public init(_ rows: [SyncRow]) {
         for row in rows where !row.isDirectory {
             files += 1
@@ -284,12 +290,6 @@ public struct SyncSummary: Equatable, Sendable {
                 different += 1
             }
         }
-    }
-
-    public var text: String {
-        files == 0
-            ? "Files found: 0"
-            : "Files found: \(files)  (Identical: \(identical), Different: \(different), Unique left: \(uniqueLeft), Unique right: \(uniqueRight))"
     }
 }
 

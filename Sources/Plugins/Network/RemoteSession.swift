@@ -51,8 +51,6 @@ public final class NetworkOptions: @unchecked Sendable {
     private let lock = NSLock()
     private var current = Values()
 
-    public init() {}
-
     public var values: Values {
         get {
             lock.lock()
@@ -65,6 +63,8 @@ public final class NetworkOptions: @unchecked Sendable {
             lock.unlock()
         }
     }
+
+    public init() {}
 
     /// Whether a file of this name is transferred as text.
     internal func transfersAsText(_ name: String) -> Bool {
@@ -107,6 +107,9 @@ public struct ConnectionProfile: Sendable {
     /// The user is asked before the first login.
     public var asksBeforeConnecting = false
 
+    /// What the server is called in titles and the volume list.
+    public var title: String { name ?? key.description }
+
     public init(
         key: ServerKey,
         name: String? = nil,
@@ -135,9 +138,6 @@ public struct ConnectionProfile: Sendable {
         self.initCommands = initCommands
         self.usesMLSD = usesMLSD
     }
-
-    /// What the server is called in titles and the volume list.
-    public var title: String { name ?? key.description }
 }
 
 /// A user name and password the user typed while connecting.
@@ -166,11 +166,6 @@ public struct Credentials: Sendable {
 /// they like) and read from any thread; they are guarded by `lock`. A question is taken under
 /// the lock and asked without it.
 public final class SessionEnvironment: @unchecked Sendable {
-    public let options: NetworkOptions
-    public let trust: CertificateTrust
-    private let lock = NSLock()
-    private var hooks = Hooks()
-
     /// What can be set, in one place, for the lock.
     private struct Hooks {
         var askCredentials: @Sendable (_ profile: ConnectionProfile, _ message: String) -> Credentials? = { _, _ in
@@ -200,13 +195,10 @@ public final class SessionEnvironment: @unchecked Sendable {
         var clock: @Sendable () -> Date = { Date() }
     }
 
-    private func hook<Value>(_ path: KeyPath<Hooks, Value>) -> Value {
-        lock.withLock { hooks[keyPath: path] }
-    }
-
-    private func setHook<Value>(_ path: WritableKeyPath<Hooks, Value>, _ value: Value) {
-        lock.withLock { hooks[keyPath: path] = value }
-    }
+    public let options: NetworkOptions
+    public let trust: CertificateTrust
+    private let lock = NSLock()
+    private var hooks = Hooks()
 
     /// Asks for the user name and password of a server; `message` says why (the first time, or
     /// what the server answered to the last attempt).
@@ -290,6 +282,14 @@ public final class SessionEnvironment: @unchecked Sendable {
         self.options = options
         self.trust = trust
     }
+
+    private func hook<Value>(_ path: KeyPath<Hooks, Value>) -> Value {
+        lock.withLock { hooks[keyPath: path] }
+    }
+
+    private func setHook<Value>(_ path: WritableKeyPath<Hooks, Value>, _ value: Value) {
+        lock.withLock { hooks[keyPath: path] = value }
+    }
 }
 
 /// A live connection to one server, whatever protocol it speaks.
@@ -300,12 +300,15 @@ public final class SessionEnvironment: @unchecked Sendable {
 /// the server has answered.
 internal protocol RemoteSession: AnyObject, Sendable {
     var profile: ConnectionProfile { get }
-    /// Connects if necessary and returns the directory the login leads to.
-    func connect(cancellation: CancellationFlag?) throws -> String
     /// True once a login has succeeded.
     var isConnected: Bool { get }
     /// True while a login is under way (also while it waits for the user's answer).
     var isConnecting: Bool { get }
+    /// False when asking about one entry costs much more than listing its directory, which the
+    /// file system then does once and remembers.
+    var singleLookupsAreCheap: Bool { get }
+    /// Connects if necessary and returns the directory the login leads to.
+    func connect(cancellation: CancellationFlag?) throws -> String
     /// A set `cancellation` ends the call soon, by throwing `NetworkError.cancelled`, and leaves
     /// the connection in a state it can be used from again, or gone. The same goes for the calls below.
     func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool)
@@ -344,9 +347,6 @@ internal protocol RemoteSession: AnyObject, Sendable {
     func setAttributes(_ attributes: FileAttributes, of path: String, cancellation: CancellationFlag?) throws
     /// Closes every connection, also those in use.
     func disconnect()
-    /// False when asking about one entry costs much more than listing its directory, which the
-    /// file system then does once and remembers.
-    var singleLookupsAreCheap: Bool { get }
 }
 
 extension RemoteSession {
@@ -399,6 +399,13 @@ internal enum Background {
     nonisolated(unsafe) private static var waitingIn: [ObjectIdentifier: Int] = [:]
     internal static let mostThreads = 24
     internal static let mostPerLane = 3
+
+    /// The threads that exist right now, for tests.
+    internal static var threadCount: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return threads
+    }
 
     internal static func run(lane owner: AnyObject, _ work: @escaping @Sendable () -> Void) {
         let lane = ObjectIdentifier(owner)
@@ -474,13 +481,6 @@ internal enum Background {
             condition.wait(until: min(deadline, Date().addingTimeInterval(0.1)))
         }
         return true
-    }
-
-    /// The threads that exist right now, for tests.
-    internal static var threadCount: Int {
-        condition.lock()
-        defer { condition.unlock() }
-        return threads
     }
 }
 

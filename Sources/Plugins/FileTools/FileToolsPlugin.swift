@@ -119,14 +119,17 @@ internal final class FileTools {
         internal static let onlyErrors = scope + "verifyOnlyErrors"
     }
 
+    /// What Verify made of its run: the text of the window, and the names to mark in the panel.
+    private struct Verified {
+        var title: String
+        var text: String
+        var failedNames: [String]
+        var errors: Int
+    }
+
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let pasteboard: NSPasteboard
-
-    internal init(_ kernel: Kernel, pasteboard: NSPasteboard) {
-        self.kernel = kernel
-        self.pasteboard = pasteboard
-    }
 
     private var source: PanelModel { kernel.panels.source.model }
     private var ui: any UserInteraction { kernel.interaction }
@@ -137,6 +140,37 @@ internal final class FileTools {
 
     /// The other panel's folder, as the dialogs propose it.
     private var targetProposal: String { fileSystems.displayPath(kernel.panels.target.model.directory) }
+
+    internal init(_ kernel: Kernel, pasteboard: NSPasteboard) {
+        self.kernel = kernel
+        self.pasteboard = pasteboard
+    }
+
+    /// Creates the target folder of a tool that, like Copy, makes it when it is missing.
+    nonisolated private static func prepare(_ folder: URL, _ run: ToolRun) throws {
+        do {
+            try run.provider(for: folder).createDirectory(at: folder)
+        } catch {
+            throw ToolError.failed("The given target path\n\(run.fileSystems.displayPath(folder))\nis invalid!")
+        }
+    }
+
+    // MARK: Checksums
+
+    /// The proposal of "Save CRC file(s) to": next to the one file under its name, or, for
+    /// several items, in the source folder under the folder's name (`checksums` at a root),
+    /// from how many items there are and the name of the first, which is all it needs.
+    nonisolated internal static func checksumProposal(
+        count: Int,
+        firstName: String?,
+        in directory: URL,
+        method: ChecksumMethod
+    )
+        -> URL
+    {
+        let name = count == 1 ? firstName : (directory.lastPathComponent == "/" ? nil : directory.lastPathComponent)
+        return directory.appending(name: (name ?? "checksums") + "." + method.fileExtension)
+    }
 
     /// An empty target is the source folder.
     private func folder(from text: String, relativeTo directory: URL) -> URL {
@@ -193,15 +227,6 @@ internal final class FileTools {
                 }
             }
         )
-    }
-
-    /// Creates the target folder of a tool that, like Copy, makes it when it is missing.
-    nonisolated private static func prepare(_ folder: URL, _ run: ToolRun) throws {
-        do {
-            try run.provider(for: folder).createDirectory(at: folder)
-        } catch {
-            throw ToolError.failed("The given target path\n\(run.fileSystems.displayPath(folder))\nis invalid!")
-        }
     }
 
     // MARK: Split and combine
@@ -378,23 +403,6 @@ internal final class FileTools {
         )
     }
 
-    // MARK: Checksums
-
-    /// The proposal of "Save CRC file(s) to": next to the one file under its name, or, for
-    /// several items, in the source folder under the folder's name (`checksums` at a root),
-    /// from how many items there are and the name of the first, which is all it needs.
-    nonisolated internal static func checksumProposal(
-        count: Int,
-        firstName: String?,
-        in directory: URL,
-        method: ChecksumMethod
-    )
-        -> URL
-    {
-        let name = count == 1 ? firstName : (directory.lastPathComponent == "/" ? nil : directory.lastPathComponent)
-        return directory.appending(name: (name ?? "checksums") + "." + method.fileExtension)
-    }
-
     internal func createChecksums() {
         let model = source
         // The operands are made on the job's thread: with 300,000 marks that is a pass over them, and the form needs
@@ -500,14 +508,6 @@ internal final class FileTools {
                 if model.directory.isSameLocation(as: directory) { model.clearSelection() }
             }
         )
-    }
-
-    /// What Verify made of its run: the text of the window, and the names to mark in the panel.
-    private struct Verified {
-        var title: String
-        var text: String
-        var failedNames: [String]
-        var errors: Int
     }
 
     internal func verifyChecksums() {

@@ -65,12 +65,6 @@ internal final class P2RecordingUI: UserInteraction {
 /// Runs the work of a job at once, on the calling thread, and keeps its completion until
 /// `deliver()`: the time in which the user goes on working while a job is under way.
 internal final class P2DeferredJobs: JobService {
-    internal private(set) var isBusy = false
-    private var pending: [() -> Void] = []
-    internal private(set) var titles: [String] = []
-    /// Called after each job's work, before its completion is kept.
-    internal var afterWork: (() -> Void)?
-
     internal final class Monitor: JobMonitor, Sendable {
         internal let cancellation = CancellationFlag()
         internal func report(_: JobProgress) {}
@@ -79,6 +73,12 @@ internal final class P2DeferredJobs: JobService {
             MainActor.assumeIsolated(question)
         }
     }
+
+    internal private(set) var isBusy = false
+    private var pending: [() -> Void] = []
+    internal private(set) var titles: [String] = []
+    /// Called after each job's work, before its completion is kept.
+    internal var afterWork: (() -> Void)?
 
     internal func run<Result: Sendable>(
         title: String,

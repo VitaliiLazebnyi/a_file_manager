@@ -430,15 +430,15 @@ internal struct Review2FileTools {
 private final class ReportCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
     func add() -> Int {
         lock.lock()
         defer { lock.unlock() }
         count += 1
-        return count
-    }
-    var value: Int {
-        lock.lock()
-        defer { lock.unlock() }
         return count
     }
 }

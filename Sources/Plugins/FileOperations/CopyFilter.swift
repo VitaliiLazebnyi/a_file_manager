@@ -43,6 +43,18 @@ public struct CopyFilter: Equatable, Sendable {
     /// `| **/`: a folder is created only when a file arrives in it.
     public private(set) var skipsEmptyFolders = false
 
+    /// True when the filter lets everything through.
+    public var isEmpty: Bool {
+        includedFolders.isEmpty && excludedFolders.isEmpty && excludedFiles.isEmpty && !excludesBaseFiles
+            && !skipsEmptyFolders
+            && includedFiles.allSatisfy { $0 == "*" || $0 == "*.*" }
+    }
+
+    /// The folder the operation starts in.
+    public var base: Position {
+        Position(depth: 0, admitted: !excludesBaseFiles, wholeSubtree: false)
+    }
+
     public init(_ text: String = "") {
         let halves = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         // Splitting keeps empty parts, so there is always a first.
@@ -66,16 +78,35 @@ public struct CopyFilter: Equatable, Sendable {
         }
     }
 
-    /// True when the filter lets everything through.
-    public var isEmpty: Bool {
-        includedFolders.isEmpty && excludedFolders.isEmpty && excludedFiles.isEmpty && !excludesBaseFiles
-            && !skipsEmptyFolders
-            && includedFiles.allSatisfy { $0 == "*" || $0 == "*.*" }
+    /// Splits at spaces; double quotes keep a name with spaces together.
+    private static func tokens(_ text: String) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+        var quoted = false
+        for character in text {
+            if character == "\"" {
+                quoted.toggle()
+            } else if character == " ", !quoted {
+                if !current.isEmpty { tokens.append(current) }
+                current = ""
+            } else {
+                current.append(character == "\\" ? "/" : character)
+            }
+        }
+        if !current.isEmpty { tokens.append(current) }
+        return tokens
     }
 
-    /// The folder the operation starts in.
-    public var base: Position {
-        Position(depth: 0, admitted: !excludesBaseFiles, wholeSubtree: false)
+    private static func folderPattern(_ token: String) -> FolderPattern? {
+        guard token.hasSuffix("/"), token != "/", token != "**/" else {
+            return nil
+        }
+        var name = String(token.dropLast())
+        let recursive = name.hasSuffix("/**")
+        if recursive { name = String(name.dropLast(3)) }
+        let anchored = name.hasPrefix("/")
+        if anchored { name = String(name.dropFirst()) }
+        return name.isEmpty ? nil : FolderPattern(name: name.lowercased(), anchored: anchored, recursive: recursive)
     }
 
     /// The position inside the subfolder `name` of the folder at `position`; nil when the
@@ -110,37 +141,6 @@ public struct CopyFilter: Equatable, Sendable {
             return false
         }
         return includedFiles.isEmpty || includedFiles.contains { Wildcard.matches($0, name) }
-    }
-
-    /// Splits at spaces; double quotes keep a name with spaces together.
-    private static func tokens(_ text: String) -> [String] {
-        var tokens: [String] = []
-        var current = ""
-        var quoted = false
-        for character in text {
-            if character == "\"" {
-                quoted.toggle()
-            } else if character == " ", !quoted {
-                if !current.isEmpty { tokens.append(current) }
-                current = ""
-            } else {
-                current.append(character == "\\" ? "/" : character)
-            }
-        }
-        if !current.isEmpty { tokens.append(current) }
-        return tokens
-    }
-
-    private static func folderPattern(_ token: String) -> FolderPattern? {
-        guard token.hasSuffix("/"), token != "/", token != "**/" else {
-            return nil
-        }
-        var name = String(token.dropLast())
-        let recursive = name.hasSuffix("/**")
-        if recursive { name = String(name.dropLast(3)) }
-        let anchored = name.hasPrefix("/")
-        if anchored { name = String(name.dropFirst()) }
-        return name.isEmpty ? nil : FolderPattern(name: name.lowercased(), anchored: anchored, recursive: recursive)
     }
 }
 

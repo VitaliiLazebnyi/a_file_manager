@@ -23,6 +23,30 @@ internal final class FTPSession: RemoteSession, @unchecked Sendable {
     /// What a connection is held for while a file is open.
     fileprivate enum TransferKind { case read, write }
 
+    /// Where the user name and password of a login come from.
+    private enum Login {
+        /// The user typed them.
+        case typed(Credentials)
+        /// Another thread's login was accepted with them meanwhile.
+        case another(user: String, password: String?, anonymous: Bool)
+    }
+
+    /// Open files may use this many connections more than `parallelConnections`, per direction.
+    private static let extraTransferConnections = 1
+    /// How many links, and for how long, are looked into in the background after a listing.
+    private static let backgroundLinks = 512
+    private static let backgroundLinkTime: TimeInterval = 20
+    /// Links asked about in one go before the connection is offered to whoever waits.
+    private static let backgroundLinkBatch = 8
+    /// How long to wait before trying again when the server answers 421 at login: it has no
+    /// room for another connection of ours until another one is closed.
+    private static let busyDelays: [TimeInterval] = [0.5, 1, 2, 3, 4]
+
+    /// An idle connection older than this is tested before it is used again.
+    private static let trustedIdleTime: TimeInterval = 20
+    /// The keep-alive stops after this long without real use (spec 11 › Field semantics).
+    private static let keepAliveLimit: TimeInterval = 3_600
+
     private let environment: SessionEnvironment
     private let condition = NSCondition()
     private var currentProfile: ConnectionProfile
@@ -98,22 +122,6 @@ internal final class FTPSession: RemoteSession, @unchecked Sendable {
     /// How often the resolver found no connection it may use and put its links back.
     private var linksPutBack = 0
 
-    /// Open files may use this many connections more than `parallelConnections`, per direction.
-    private static let extraTransferConnections = 1
-    /// How many links, and for how long, are looked into in the background after a listing.
-    private static let backgroundLinks = 512
-    private static let backgroundLinkTime: TimeInterval = 20
-    /// Links asked about in one go before the connection is offered to whoever waits.
-    private static let backgroundLinkBatch = 8
-    /// How long to wait before trying again when the server answers 421 at login: it has no
-    /// room for another connection of ours until another one is closed.
-    private static let busyDelays: [TimeInterval] = [0.5, 1, 2, 3, 4]
-
-    /// An idle connection older than this is tested before it is used again.
-    private static let trustedIdleTime: TimeInterval = 20
-    /// The keep-alive stops after this long without real use (spec 11 › Field semantics).
-    private static let keepAliveLimit: TimeInterval = 3_600
-
     /// How long a wait for a connection, or for another thread's login, goes on while nothing
     /// moves on any connection of the session and no question is open.
     ///
@@ -125,13 +133,6 @@ internal final class FTPSession: RemoteSession, @unchecked Sendable {
     private var stallTime: TimeInterval?
     /// Called with the lock held.
     private var patience: TimeInterval { stallTime ?? max(60, 2 * environment.options.values.timeout) }
-
-    internal init(profile: ConnectionProfile, environment: SessionEnvironment) {
-        currentProfile = profile
-        self.environment = environment
-    }
-
-    deinit { keepAlive?.cancel() }
 
     internal var profile: ConnectionProfile {
         condition.lock()
@@ -164,6 +165,26 @@ internal final class FTPSession: RemoteSession, @unchecked Sendable {
     /// How often the link resolver found no connection it may use (none free, or one that would ask the user
     /// something to log in) and put its links back, for tests.
     internal var linkRoundsPutBack: Int { condition.withLock { linksPutBack } }
+
+    /// False for a server without MLST, where one question costs several commands and a listing.
+    internal var singleLookupsAreCheap: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return knowsMLST
+    }
+
+    fileprivate var timeout: TimeInterval { environment.options.values.timeout }
+
+    internal init(profile: ConnectionProfile, environment: SessionEnvironment) {
+        currentProfile = profile
+        self.environment = environment
+    }
+
+    /// True for an address of this machine: nothing sent there crosses a network.
+    internal static func isLoopback(_ host: String) -> Bool {
+        let host = host.lowercased()
+        return host == "localhost" || host == "::1" || host.hasPrefix("127.")
+    }
 
     /// A reader that was closed hands its connection to the background, which gives it back
     /// (`release`) once the server was told; `change` is +1 before and -1 after.
@@ -207,14 +228,6 @@ internal final class FTPSession: RemoteSession, @unchecked Sendable {
             initCommands: profile.initCommands,
             usesMLSD: profile.usesMLSD
         )
-    }
-
-    /// Where the user name and password of a login come from.
-    private enum Login {
-        /// The user typed them.
-        case typed(Credentials)
-        /// Another thread's login was accepted with them meanwhile.
-        case another(user: String, password: String?, anonymous: Bool)
     }
 
     private func takeLoginLock(cancellation: CancellationFlag?) throws {
@@ -262,12 +275,6 @@ internal final class FTPSession: RemoteSession, @unchecked Sendable {
             condition.unlock()
         }
         return question()
-    }
-
-    /// True for an address of this machine: nothing sent there crosses a network.
-    internal static func isLoopback(_ host: String) -> Bool {
-        let host = host.lowercased()
-        return host == "localhost" || host == "::1" || host.hasPrefix("127.")
     }
 
     /// Opens and logs in one more connection, asking the user for what is missing: consent to
@@ -1068,14 +1075,7 @@ internal final class FTPSession: RemoteSession, @unchecked Sendable {
         } catch {}
     }
 
-    /// False for a server without MLST, where one question costs several commands and a listing.
-    internal var singleLookupsAreCheap: Bool {
-        condition.lock()
-        defer { condition.unlock() }
-        return knowsMLST
-    }
-
-    fileprivate var timeout: TimeInterval { environment.options.values.timeout }
+    deinit { keepAlive?.cancel() }
 }
 
 /// A file on an FTP server being downloaded (`RETR`).
@@ -1090,6 +1090,9 @@ internal final class FTPSession: RemoteSession, @unchecked Sendable {
 /// Used by one thread at a time, as `FileReader` allows; what `close` and `interrupt` touch is
 /// guarded by `stateLock` (see there).
 private final class FTPReader: FileReader, @unchecked Sendable {
+    /// A short way forward is read and thrown away instead of starting a new transfer.
+    private static let skipLimit: UInt64 = 256 * 1_024
+
     private let session: FTPSession
     private let path: String
     private let asText: Bool
@@ -1106,25 +1109,11 @@ private final class FTPReader: FileReader, @unchecked Sendable {
     private var wasClosed = false
     /// Set by `interrupt`; the waits of this reader (also for a free connection) look at it.
     private let abort = CancellationFlag()
-    /// A short way forward is read and thrown away instead of starting a new transfer.
-    private static let skipLimit: UInt64 = 256 * 1_024
 
     init(session: FTPSession, path: String, asText: Bool) {
         self.session = session
         self.path = path
         self.asText = asText
-    }
-
-    deinit {
-        // Dropped without `close`: the server is told in the background, not on this thread.
-        guard let active else {
-            return
-        }
-        let session = session
-        Background.run(lane: session) {
-            active.connection.abortTransfer()
-            session.release(active.connection, transfer: .read)
-        }
     }
 
     private func setActive(_ value: (stream: NetStream, connection: FTPConnection)?) {
@@ -1293,6 +1282,18 @@ private final class FTPReader: FileReader, @unchecked Sendable {
             session.noteReturning(-1)
         }
     }
+
+    deinit {
+        // Dropped without `close`: the server is told in the background, not on this thread.
+        guard let active else {
+            return
+        }
+        let session = session
+        Background.run(lane: session) {
+            active.connection.abortTransfer()
+            session.release(active.connection, transfer: .read)
+        }
+    }
 }
 
 /// A file being uploaded (`STOR`, or `APPE` to continue one).
@@ -1329,18 +1330,6 @@ private final class FTPWriter: FileWriter, @unchecked Sendable {
         self.connection = connection
         self.start = start
         active = (stream, connection)
-    }
-
-    deinit {
-        // Dropped without `close`: aborting waits for the server, which happens in the background.
-        guard let active else {
-            return
-        }
-        let session = session
-        Background.run(lane: session) {
-            active.connection.abortTransfer()
-            session.release(active.connection, transfer: .write)
-        }
     }
 
     func write(_ data: Data) throws {
@@ -1418,5 +1407,17 @@ private final class FTPWriter: FileWriter, @unchecked Sendable {
         holdLock.lock()
         if isHolding { connection.interrupt() }
         holdLock.unlock()
+    }
+
+    deinit {
+        // Dropped without `close`: aborting waits for the server, which happens in the background.
+        guard let active else {
+            return
+        }
+        let session = session
+        Background.run(lane: session) {
+            active.connection.abortTransfer()
+            session.release(active.connection, transfer: .write)
+        }
     }
 }

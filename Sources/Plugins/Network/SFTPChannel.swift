@@ -19,11 +19,11 @@ public struct SFTPTransport: Sendable {
 
 /// An error status of the SFTP server.
 public struct SFTPError: LocalizedError, Sendable {
-    public let code: UInt32
-    public let message: String
-
     internal static let endOfFile: UInt32 = 1
     internal static let noSuchFile: UInt32 = 2
+
+    public let code: UInt32
+    public let message: String
 
     public var errorDescription: String? {
         if !message.isEmpty, message != "Failure" {
@@ -140,6 +140,7 @@ internal struct SFTPEncoder {
 internal struct SFTPDecoder {
     private let data: Data
     private var offset: Int
+    internal var isAtEnd: Bool { offset >= data.endIndex }
 
     internal init(_ data: Data) {
         self.data = data
@@ -178,7 +179,6 @@ internal struct SFTPDecoder {
         text.append(contentsOf: raw.map { Unicode.Scalar($0) })
         return (String(text), .isoLatin1)
     }
-    internal var isAtEnd: Bool { offset >= data.endIndex }
 
     internal mutating func attributes() throws -> SFTPAttributes {
         let flags = try u32()
@@ -214,15 +214,6 @@ internal struct SFTPPacket {
     internal let kind: Kind
     internal let body: Data
 
-    /// Throws unless the packet is the success status.
-    internal func checkStatus() throws {
-        if kind == .closed { throw NetworkError.connectionLost }
-        guard kind == .status else { throw NetworkError.unexpected("SFTP packet \(kind.rawValue)") }
-        var decoder = SFTPDecoder(body)
-        let code = try decoder.u32()
-        if code != 0 { throw SFTPError(code: code, message: (try? decoder.string()) ?? "") }
-    }
-
     /// The status code when this is a status packet.
     internal var statusCode: UInt32? {
         guard kind == .status else {
@@ -230,6 +221,15 @@ internal struct SFTPPacket {
         }
         var decoder = SFTPDecoder(body)
         return try? decoder.u32()
+    }
+
+    /// Throws unless the packet is the success status.
+    internal func checkStatus() throws {
+        if kind == .closed { throw NetworkError.connectionLost }
+        guard kind == .status else { throw NetworkError.unexpected("SFTP packet \(kind.rawValue)") }
+        var decoder = SFTPDecoder(body)
+        let code = try decoder.u32()
+        if code != 0 { throw SFTPError(code: code, message: (try? decoder.string()) ?? "") }
     }
 
     /// The payload of an answer of the expected kind, which is never a status: an error status
@@ -289,14 +289,23 @@ internal final class AskpassHelper {
         internal let kind: Kind
         internal let text: String
     }
+    /// More than this is not collected while a question has no end.
+    private static let longestQuestion = 64 * 1_024
 
     internal let directory: URL
     private let question: Int32
     private let answer: Int32
     private let endMarker = "END-" + UUID().uuidString
     private var received = Data()
-    /// More than this is not collected while a question has no end.
-    private static let longestQuestion = 64 * 1_024
+
+    /// What the child process needs in its environment.
+    internal var environment: [String: String] {
+        [
+            "SSH_ASKPASS": directory.appendingPathComponent("askpass.sh").path, "SSH_ASKPASS_REQUIRE": "force",
+            "AFM_ASKPASS_QUESTION": directory.appendingPathComponent("question").path,
+            "AFM_ASKPASS_ANSWER": directory.appendingPathComponent("answer").path, "AFM_ASKPASS_END": endMarker
+        ]
+    }
 
     /// The pipes and the script go into a new folder in `parent`, the temporary folder of the user
     /// unless said otherwise.
@@ -343,21 +352,6 @@ internal final class AskpassHelper {
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptURL.path)
     }
 
-    deinit {
-        close(question)
-        close(answer)
-        try? FileManager.default.removeItem(at: directory)
-    }
-
-    /// What the child process needs in its environment.
-    internal var environment: [String: String] {
-        [
-            "SSH_ASKPASS": directory.appendingPathComponent("askpass.sh").path, "SSH_ASKPASS_REQUIRE": "force",
-            "AFM_ASKPASS_QUESTION": directory.appendingPathComponent("question").path,
-            "AFM_ASKPASS_ANSWER": directory.appendingPathComponent("answer").path, "AFM_ASKPASS_END": endMarker
-        ]
-    }
-
     /// A question that has arrived completely; nil when there is none.
     internal func pendingQuestion() -> Question? {
         var buffer = [UInt8](repeating: 0, count: 4_096)
@@ -390,6 +384,12 @@ internal final class AskpassHelper {
         let line = Data((question.id + " " + first).utf8) + Data([0x0A])
         _ = line.withUnsafeBytes { write(answer, $0.baseAddress, $0.count) }
     }
+
+    deinit {
+        close(question)
+        close(answer)
+        try? FileManager.default.removeItem(at: directory)
+    }
 }
 
 /// An SFTP dialogue over the standard input and output of a child process, normally
@@ -403,6 +403,23 @@ internal final class AskpassHelper {
 /// The state, `extensions` included, is guarded by `lock` (the error text also by `errorReading`);
 /// `writeTimeout` and `names` do not change after `init`.
 internal final class SFTPChannel: @unchecked Sendable {
+    /// A request that was sent, to be waited for or given up.
+    internal struct Ticket {
+        internal let id: UInt32
+        internal let answer: Pending<SFTPPacket>
+    }
+
+    /// How long the last words of the child process are waited for after its output ended.
+    internal static let lastWordsTime: TimeInterval = 2
+    /// How long the thread that found the connection lost waits for the reading thread to see the end.
+    internal static let endTime: TimeInterval = 8
+
+    internal static let largestPacket = 1 << 20
+
+    /// How long a writer that was cancelled in the middle of a packet goes on while the pipe
+    /// takes nothing at all.
+    private static let cancelGrace: TimeInterval = 2
+
     private let process = Process()
     private let toServer = Pipe()
     private let fromServer = Pipe()
@@ -433,25 +450,6 @@ internal final class SFTPChannel: @unchecked Sendable {
     private let version = Pending<SFTPPacket>()
     private var serverExtensions: [String: String] = [:]
 
-    internal init(
-        executable: String,
-        arguments: [String],
-        environment: [String: String],
-        writeTimeout: TimeInterval = 60,
-        names: NameMemory? = nil
-    ) {
-        self.writeTimeout = writeTimeout
-        self.names = names
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
-        process.standardInput = toServer
-        process.standardOutput = fromServer
-        process.standardError = errors
-    }
-
-    deinit { close() }
-
     /// The extensions the server named in its first answer; known once `start` has returned.
     internal var extensions: [String: String] { lock.withLock { serverExtensions } }
 
@@ -469,6 +467,97 @@ internal final class SFTPChannel: @unchecked Sendable {
             .joined(
                 separator: "\n"
             )
+    }
+
+    internal init(
+        executable: String,
+        arguments: [String],
+        environment: [String: String],
+        writeTimeout: TimeInterval = 60,
+        names: NameMemory? = nil
+    ) {
+        self.writeTimeout = writeTimeout
+        self.names = names
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
+        process.standardInput = toServer
+        process.standardOutput = fromServer
+        process.standardError = errors
+    }
+
+    /// Reads packets until the stream ends or `handle` returns false.
+    ///
+    /// Runs on the reading thread.
+    private static func readPackets(from input: FileHandle, handle: (SFTPPacket) -> Bool) {
+        // `FileHandle` reads again when a signal interrupts it; a failure is the end of the stream.
+        func readExactly(_ count: Int) -> Data? {
+            var data = Data()
+            while data.count < count {
+                guard let piece = try? input.read(upToCount: count - data.count), !piece.isEmpty else {
+                    return nil
+                }
+                data.append(piece)
+            }
+            return data
+        }
+        while let header = readExactly(4) {
+            let length = Int(header.reduce(UInt32(0)) { $0 << 8 | UInt32($1) })
+            // Nothing the protocol sends is this large (a read brings 32 KB, OpenSSH never sends more
+            // than 256 KB); a wrong length means the stream is not SFTP, and is not made room for.
+            guard length >= 1, length <= Self.largestPacket, let payload = readExactly(length),
+                let kind = SFTPPacket.Kind(rawValue: payload[0])
+            else { return }
+            // The body is a view of the payload; nothing is copied.
+            if !handle(SFTPPacket(kind: kind, body: payload.dropFirst())) {
+                return
+            }
+        }
+    }
+
+    /// Writes all of `packet` into the pipe.
+    ///
+    /// The pipe does not block: when it is full the writer waits for room, up to `writeTimeout`
+    /// without progress. A cancellation is obeyed at once before the first byte. After it, the
+    /// packet is finished for as long as the pipe keeps taking bytes: the channel is shared, a
+    /// packet left half written would end the dialogue for every transfer, and a packet is small (a
+    /// block of a file at most), so on a slow line, where the pipe is always full but always
+    /// moving, cancelling one upload costs the others nothing. Only when the pipe takes nothing for
+    /// `cancelGrace` is the cancelled writer let go, and the channel with it: that line is not
+    /// moving for anybody.
+    ///
+    /// `descriptor` does not block (a write that does not block is not interrupted by a signal);
+    /// `isClosed` says whether the channel was closed meanwhile.
+    internal static func writeAll(
+        _ packet: Data,
+        to descriptor: Int32,
+        writeTimeout: TimeInterval,
+        cancellation: CancellationFlag?,
+        isClosed: () -> Bool
+    ) throws {
+        try packet.withUnsafeBytes { buffer in
+            var sent = 0
+            var moved = Date()
+            while sent < buffer.count {
+                // A channel that was closed meanwhile sends nothing more, also while the pipe takes it.
+                guard !isClosed() else { throw NetworkError.connectionLost }
+                let count = Darwin.write(descriptor, buffer.baseAddress! + sent, buffer.count - sent)
+                if count > 0 {
+                    sent += count
+                    moved = Date()
+                    continue
+                }
+                guard count < 0, errno == EAGAIN else { throw NetworkError.connectionLost }
+                let stuck = Date().timeIntervalSince(moved)
+                if stuck >= writeTimeout { throw NetworkError.timedOut("sending to the server") }
+                if cancellation?.isCancelled == true {
+                    if sent == 0 { throw NetworkError.cancelled }
+                    if stuck >= cancelGrace { throw NetworkError.connectionLost }
+                }
+                var wanted = pollfd(fd: descriptor, events: Int16(POLLOUT), revents: 0)
+                _ = Darwin.poll(&wanted, 1, 200)
+            }
+        }
     }
 
     /// `errorMessage` once the child process has had its say: when the dialogue broke off, the
@@ -591,42 +680,6 @@ internal final class SFTPChannel: @unchecked Sendable {
         }
     }
 
-    /// How long the last words of the child process are waited for after its output ended.
-    internal static let lastWordsTime: TimeInterval = 2
-    /// How long the thread that found the connection lost waits for the reading thread to see the end.
-    internal static let endTime: TimeInterval = 8
-
-    /// Reads packets until the stream ends or `handle` returns false.
-    ///
-    /// Runs on the reading thread.
-    private static func readPackets(from input: FileHandle, handle: (SFTPPacket) -> Bool) {
-        // `FileHandle` reads again when a signal interrupts it; a failure is the end of the stream.
-        func readExactly(_ count: Int) -> Data? {
-            var data = Data()
-            while data.count < count {
-                guard let piece = try? input.read(upToCount: count - data.count), !piece.isEmpty else {
-                    return nil
-                }
-                data.append(piece)
-            }
-            return data
-        }
-        while let header = readExactly(4) {
-            let length = Int(header.reduce(UInt32(0)) { $0 << 8 | UInt32($1) })
-            // Nothing the protocol sends is this large (a read brings 32 KB, OpenSSH never sends more
-            // than 256 KB); a wrong length means the stream is not SFTP, and is not made room for.
-            guard length >= 1, length <= Self.largestPacket, let payload = readExactly(length),
-                let kind = SFTPPacket.Kind(rawValue: payload[0])
-            else { return }
-            // The body is a view of the payload; nothing is copied.
-            if !handle(SFTPPacket(kind: kind, body: payload.dropFirst())) {
-                return
-            }
-        }
-    }
-
-    internal static let largestPacket = 1 << 20
-
     private func received(_ packet: SFTPPacket) -> Bool {
         if packet.kind == .version {
             version.fulfill(packet)
@@ -662,55 +715,6 @@ internal final class SFTPChannel: @unchecked Sendable {
         while !writeLock.lock(before: min(deadline, Date().addingTimeInterval(0.1))) {
             if cancellation?.isCancelled == true { throw NetworkError.cancelled }
             if Date() >= deadline { throw NetworkError.timedOut("sending to the server") }
-        }
-    }
-
-    /// How long a writer that was cancelled in the middle of a packet goes on while the pipe
-    /// takes nothing at all.
-    private static let cancelGrace: TimeInterval = 2
-
-    /// Writes all of `packet` into the pipe.
-    ///
-    /// The pipe does not block: when it is full the writer waits for room, up to `writeTimeout`
-    /// without progress. A cancellation is obeyed at once before the first byte. After it, the
-    /// packet is finished for as long as the pipe keeps taking bytes: the channel is shared, a
-    /// packet left half written would end the dialogue for every transfer, and a packet is small (a
-    /// block of a file at most), so on a slow line, where the pipe is always full but always
-    /// moving, cancelling one upload costs the others nothing. Only when the pipe takes nothing for
-    /// `cancelGrace` is the cancelled writer let go, and the channel with it: that line is not
-    /// moving for anybody.
-    ///
-    /// `descriptor` does not block (a write that does not block is not interrupted by a signal);
-    /// `isClosed` says whether the channel was closed meanwhile.
-    internal static func writeAll(
-        _ packet: Data,
-        to descriptor: Int32,
-        writeTimeout: TimeInterval,
-        cancellation: CancellationFlag?,
-        isClosed: () -> Bool
-    ) throws {
-        try packet.withUnsafeBytes { buffer in
-            var sent = 0
-            var moved = Date()
-            while sent < buffer.count {
-                // A channel that was closed meanwhile sends nothing more, also while the pipe takes it.
-                guard !isClosed() else { throw NetworkError.connectionLost }
-                let count = Darwin.write(descriptor, buffer.baseAddress! + sent, buffer.count - sent)
-                if count > 0 {
-                    sent += count
-                    moved = Date()
-                    continue
-                }
-                guard count < 0, errno == EAGAIN else { throw NetworkError.connectionLost }
-                let stuck = Date().timeIntervalSince(moved)
-                if stuck >= writeTimeout { throw NetworkError.timedOut("sending to the server") }
-                if cancellation?.isCancelled == true {
-                    if sent == 0 { throw NetworkError.cancelled }
-                    if stuck >= cancelGrace { throw NetworkError.connectionLost }
-                }
-                var wanted = pollfd(fd: descriptor, events: Int16(POLLOUT), revents: 0)
-                _ = Darwin.poll(&wanted, 1, 200)
-            }
         }
     }
 
@@ -781,12 +785,6 @@ internal final class SFTPChannel: @unchecked Sendable {
         deferred.append(packet.data)
         lock.unlock()
         Background.run(lane: self) { [weak self] in try? self?.write(nil) }
-    }
-
-    /// A request that was sent, to be waited for or given up.
-    internal struct Ticket {
-        internal let id: UInt32
-        internal let answer: Pending<SFTPPacket>
     }
 
     /// Sends a request without waiting; several can be under way and are answered in any order.
@@ -901,4 +899,6 @@ internal final class SFTPChannel: @unchecked Sendable {
             }
         }
     }
+
+    deinit { close() }
 }

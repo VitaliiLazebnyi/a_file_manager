@@ -59,6 +59,35 @@ public enum CompareLoader {
         }
     }
 
+    // MARK: Saving
+
+    /// Why a file is not saved.
+    internal enum SaveError: LocalizedError {
+        case changedOnDisk(String)
+        case notRepresentable(String, TextEncoding)
+        case invalidSequences(String, TextEncoding)
+        case sameFile(String)
+
+        internal var errorDescription: String? {
+            switch self {
+            case .changedOnDisk(let name):
+                return
+                    "\(name) was changed by someone else after it was loaded. It is not overwritten; compare the files again."
+
+            case .notRepresentable(let name, let encoding):
+                return
+                    "\(name) has characters that \(encoding.name) cannot hold, so it is not saved (that would turn them into question marks)."
+
+            case .invalidSequences(let name, let encoding):
+                return
+                    "\(name) has bytes that are not valid \(encoding.name). Saving would change them, so it is not saved."
+
+            case .sameFile(let name):
+                return "Both sides are the same file (\(name)) and both were edited, so it is not saved."
+            }
+        }
+    }
+
     /// How much of a large local file one worker compares at a time.
     public static let stretch = 4 * 1_024 * 1_024
 
@@ -337,35 +366,6 @@ public enum CompareLoader {
         }
         // Nil when cancelled before the end.
         return verdict
-    }
-
-    // MARK: Saving
-
-    /// Why a file is not saved.
-    internal enum SaveError: LocalizedError {
-        case changedOnDisk(String)
-        case notRepresentable(String, TextEncoding)
-        case invalidSequences(String, TextEncoding)
-        case sameFile(String)
-
-        internal var errorDescription: String? {
-            switch self {
-            case .changedOnDisk(let name):
-                return
-                    "\(name) was changed by someone else after it was loaded. It is not overwritten; compare the files again."
-
-            case .notRepresentable(let name, let encoding):
-                return
-                    "\(name) has characters that \(encoding.name) cannot hold, so it is not saved (that would turn them into question marks)."
-
-            case .invalidSequences(let name, let encoding):
-                return
-                    "\(name) has bytes that are not valid \(encoding.name). Saving would change them, so it is not saved."
-
-            case .sameFile(let name):
-                return "Both sides are the same file (\(name)) and both were edited, so it is not saved."
-            }
-        }
     }
 
     /// Whether two locations are one file: the same place, or on this Mac the same device and inode.

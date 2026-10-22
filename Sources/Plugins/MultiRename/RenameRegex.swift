@@ -12,12 +12,6 @@ internal final class RenameRegexGuard: @unchecked Sendable {
     private var timeouts = 0
     private let limit = 3
 
-    internal func recordTimeout() {
-        lock.lock()
-        timeouts += 1
-        lock.unlock()
-    }
-
     internal var hasTimedOut: Bool {
         lock.lock()
         defer { lock.unlock() }
@@ -28,6 +22,12 @@ internal final class RenameRegexGuard: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return timeouts >= limit
+    }
+
+    internal func recordTimeout() {
+        lock.lock()
+        timeouts += 1
+        lock.unlock()
     }
 }
 
@@ -95,6 +95,22 @@ internal struct WildcardMatcher {
         var value: UInt32?
     }
 
+    /// The name as it is compared: every character once in the form the search has (folded
+    /// to lower case unless the search respects case), and where the line breaks are.
+    ///
+    /// Made once per name: folding a character asks the Unicode tables, and asking them again for
+    /// every place a run was tried at was where the time of a long search went.
+    private struct Subject {
+        let values: [UInt32]
+        let breaks: [Bool]
+        var count: Int { values.count }
+    }
+
+    /// What one name may take, in the thread's own processor time, as for a regular
+    /// expression (`RenameRegex.budget`): a search of many stars in a name of thousands of
+    /// characters is still the name times the search for every place it can begin at.
+    internal static let budget: TimeInterval = RenameRegex.budget
+
     private let pieces: [Piece]
     private let isAnchored: Bool
     private let caseSensitive: Bool
@@ -130,22 +146,6 @@ internal struct WildcardMatcher {
     private static func isLineBreak(_ value: UInt32) -> Bool {
         value == 0x0A || value == 0x0D || value == 0x85 || value == 0x2028 || value == 0x2029
     }
-
-    /// The name as it is compared: every character once in the form the search has (folded
-    /// to lower case unless the search respects case), and where the line breaks are.
-    ///
-    /// Made once per name: folding a character asks the Unicode tables, and asking them again for
-    /// every place a run was tried at was where the time of a long search went.
-    private struct Subject {
-        let values: [UInt32]
-        let breaks: [Bool]
-        var count: Int { values.count }
-    }
-
-    /// What one name may take, in the thread's own processor time, as for a regular
-    /// expression (`RenameRegex.budget`): a search of many stars in a name of thousands of
-    /// characters is still the name times the search for every place it can begin at.
-    internal static let budget: TimeInterval = RenameRegex.budget
 
     /// The matches in `text`, as ranges in UTF-16 units, found one after the other as
     /// `NSRegularExpression.matches(in:)` finds them: the next search starts where a match ended

@@ -29,17 +29,17 @@ internal struct ArchiveLocation: Equatable {
 /// archive's own file system; the provider hands it on. That happens when the user types a
 /// plain path while a panel is inside an archive.
 internal enum ArchiveURL {
-    /// Archives whose contents can be changed (ZIP).
-    internal static let writableScheme = "zip"
-    /// Everything else: read-only.
-    internal static let readOnlyScheme = "archive"
-    internal static let schemes = [writableScheme, readOnlyScheme]
-
     internal enum Place: Equatable {
         case inside(ArchiveLocation)
         /// Not in the archive: a place on the file system the archive lies on.
         case outside(URL)
     }
+
+    /// Archives whose contents can be changed (ZIP).
+    internal static let writableScheme = "zip"
+    /// Everything else: read-only.
+    internal static let readOnlyScheme = "archive"
+    internal static let schemes = [writableScheme, readOnlyScheme]
 
     internal static func isArchiveURL(_ url: URL) -> Bool {
         url.scheme.map(schemes.contains) ?? false
@@ -175,11 +175,6 @@ internal enum ArchiveURL {
 
 /// The kinds of archive the plugin knows (spec 08 › Format support matrix).
 internal enum ArchiveFormat: Equatable {
-    /// A compressor that wraps one stream of bytes.
-    internal enum Codec: String, Equatable {
-        case gzip, bzip2, xz
-    }
-
     case zip
     case tar
     /// A TAR archive inside a compressed stream (`.tar.gz`, `.tgz`, …).
@@ -188,6 +183,17 @@ internal enum ArchiveFormat: Equatable {
     case compressedFile(Codec)
     /// Anything else the system's `bsdtar` can read: 7z, rar, iso, cab, cpio, xar, …
     case foreign
+
+    /// A compressor that wraps one stream of bytes.
+    internal enum Codec: String, Equatable {
+        case gzip, bzip2, xz
+    }
+
+    /// The formats Pack can create, in the order of the dialog.
+    internal static let writable: [Self] = [
+        .zip, .tar, .compressedTar(.gzip), .compressedTar(.bzip2), .compressedTar(.xz),
+        .compressedFile(.gzip), .compressedFile(.bzip2), .compressedFile(.xz)
+    ]
 
     /// Whether members can be added, renamed and deleted in place.
     internal var isEditable: Bool { self == .zip }
@@ -210,25 +216,6 @@ internal enum ArchiveFormat: Equatable {
             return "archive"
         }
     }
-
-    internal static func suffix(_ codec: Codec) -> String {
-        switch codec {
-        case .gzip:
-            return "gz"
-
-        case .bzip2:
-            return "bz2"
-
-        case .xz:
-            return "xz"
-        }
-    }
-
-    /// The formats Pack can create, in the order of the dialog.
-    internal static let writable: [Self] = [
-        .zip, .tar, .compressedTar(.gzip), .compressedTar(.bzip2), .compressedTar(.xz),
-        .compressedFile(.gzip), .compressedFile(.bzip2), .compressedFile(.xz)
-    ]
 
     /// The extension a new archive of this format gets.
     internal var defaultExtension: String {
@@ -290,6 +277,19 @@ internal enum ArchiveFormat: Equatable {
 
         default:
             return defaultExtension
+        }
+    }
+
+    internal static func suffix(_ codec: Codec) -> String {
+        switch codec {
+        case .gzip:
+            return "gz"
+
+        case .bzip2:
+            return "bz2"
+
+        case .xz:
+            return "xz"
         }
     }
 

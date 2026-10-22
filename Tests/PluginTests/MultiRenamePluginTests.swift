@@ -22,6 +22,9 @@ internal struct MultiRenameRuns {
 
     internal var ui: ScriptedInteraction { bench.interaction }
     internal var left: FakePanel { bench.left }
+    internal var photos: [String] {
+        memory.allPaths.filter { $0.hasPrefix("/photos/") }.map { String($0.dropFirst(8)) }
+    }
 
     internal init() throws {
         box = try Sandbox()
@@ -56,9 +59,6 @@ internal struct MultiRenameRuns {
     }
 
     internal func names(_ session: MultiRenameSession) -> [String?] { session.rows.map(\.newName) }
-    internal var photos: [String] {
-        memory.allPaths.filter { $0.hasPrefix("/photos/") }.map { String($0.dropFirst(8)) }
-    }
 
     // MARK: Registration
 

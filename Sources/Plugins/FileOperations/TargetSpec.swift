@@ -81,10 +81,6 @@ public struct TargetSpec: Equatable, Sendable {
         a.directory.isSameLocation(as: b.directory) && a.mask == b.mask && a.isExactName == b.isExactName
     }
 
-    public func url(for sourceName: String) -> URL {
-        directory.appending(name: isExactName ? mask : TargetMask.apply(mask, to: sourceName))
-    }
-
     /// Reads the target field.
     ///
     /// Relative paths, `..` and an empty path refer to the source folder. Looks at the file system
@@ -117,6 +113,10 @@ public struct TargetSpec: Equatable, Sendable {
         return operandCount == 1
             ? Self(directory: url.deletingLastPathComponent(), mask: last)
             : Self(directory: url)
+    }
+
+    public func url(for sourceName: String) -> URL {
+        directory.appending(name: isExactName ? mask : TargetMask.apply(mask, to: sourceName))
     }
 }
 

@@ -341,6 +341,18 @@ internal final class DecodeMachine {
         var fullCount: Int?
     }
 
+    /// The value of each byte as a Base64 character; 255 for the others.
+    private static let base64Values: [UInt8] = {
+        var values = [UInt8](repeating: 255, count: 256)
+        for (index, character) in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".utf8.enumerated() {
+            values[Int(character)] = UInt8(index)
+        }
+        // The URL-safe alphabet is read as well.
+        values[Int(UInt8(ascii: "-"))] = 62
+        values[Int(UInt8(ascii: "_"))] = 63
+        return values
+    }()
+
     private let sink: any DecodeSink
     private var state = State.searching
     private var sextets: [UInt8] = []
@@ -367,10 +379,6 @@ internal final class DecodeMachine {
     private var yHeaderSize: Int64?
     private var yPartLength: Int64?
     private var yHasPart = false
-
-    internal init(sink: any DecodeSink) {
-        self.sink = sink
-    }
 
     /// Whether a file is being decoded whose end has not come yet: the next part is needed.
     internal var isInsideFile: Bool {
@@ -406,17 +414,9 @@ internal final class DecodeMachine {
         }
     }
 
-    /// The value of each byte as a Base64 character; 255 for the others.
-    private static let base64Values: [UInt8] = {
-        var values = [UInt8](repeating: 255, count: 256)
-        for (index, character) in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".utf8.enumerated() {
-            values[Int(character)] = UInt8(index)
-        }
-        // The URL-safe alphabet is read as well.
-        values[Int(UInt8(ascii: "-"))] = 62
-        values[Int(UInt8(ascii: "_"))] = 63
-        return values
-    }()
+    internal init(sink: any DecodeSink) {
+        self.sink = sink
+    }
 
     /// Whether a line opens a new encoded file or mail part: where a Base64 body ends even
     /// without padding or a boundary, and what an independent next file starts with.
@@ -429,6 +429,13 @@ internal final class DecodeMachine {
             return zip(line, wanted).allSatisfy { (folded && $0 >= 65 && $0 <= 90 ? $0 + 32 : $0) == $1 }
         }
         return has("mime-version:", folded: true) || has("content-", folded: true) || has("begin ", folded: false)
+    }
+
+    /// A line that starts with `--` and cannot be Base64 (after the padding it may end in): a boundary.
+    private static func looksLikeBoundary(_ line: ArraySlice<UInt8>) -> Bool {
+        var body = line
+        while body.last == UInt8(ascii: "="), line.count - body.count < 2 { body = body.dropLast() }
+        return body.contains { base64Values[Int($0)] == 255 }
     }
 
     /// A line as text: UTF-8, else Latin-1, which takes every byte as the character of its value.
@@ -775,13 +782,6 @@ internal final class DecodeMachine {
         }
     }
 
-    /// A line that starts with `--` and cannot be Base64 (after the padding it may end in): a boundary.
-    private static func looksLikeBoundary(_ line: ArraySlice<UInt8>) -> Bool {
-        var body = line
-        while body.last == UInt8(ascii: "="), line.count - body.count < 2 { body = body.dropLast() }
-        return body.contains { base64Values[Int($0)] == 255 }
-    }
-
     /// `=yend size=N [part=P] [pcrc32=X] [crc32=X]`: compares the size and the CRC32 with what was decoded.
     private func checkYEnd(_ line: String) {
         if let size = yParameter("size", in: line).flatMap({ Int64($0) }), size != yBytes {
@@ -889,6 +889,12 @@ internal enum Decoder {
         }
     }
 
+    /// What a decode made: the files, and what is wrong with them (see `DecodeMachine.problems`).
+    internal struct Outcome: Equatable {
+        internal var files: [URL]
+        internal var problems: [String]
+    }
+
     /// The name from the encoded data as a file name: without a path, and with the characters
     /// a name cannot have replaced by `_`.
     ///
@@ -955,12 +961,6 @@ internal enum Decoder {
             return DecodeMachine.startsNewFile(ArraySlice(line))
         }
         return false
-    }
-
-    /// What a decode made: the files, and what is wrong with them (see `DecodeMachine.problems`).
-    internal struct Outcome: Equatable {
-        internal var files: [URL]
-        internal var problems: [String]
     }
 
     /// Decodes the file and, while a file inside it is unfinished, the parts that follow it by

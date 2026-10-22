@@ -9,13 +9,6 @@ import Testing
 /// (A051, A076), and that the compact form of it behaves like the plain one.
 @Suite
 internal struct Review2ArchivesP2Memory {
-    internal let bench: ArchiveBench
-    internal var box: Sandbox { bench.box }
-
-    internal init() throws {
-        bench = try ArchiveBench()
-    }
-
     /// What one thread allocates and still holds, counted by that thread alone.
     ///
     /// The allocator's own figures are for the whole process, and the other tests of the
@@ -44,6 +37,18 @@ internal struct Review2ArchivesP2Memory {
         .assumingMemoryBound(to: Logger?.self)
 
         private static let tombstone = UInt.max
+
+        /// Called by the allocator on every thread, for every block; nothing here allocates.
+        private static let logger: Logger = { type, _, argument, _, result, _ in
+            guard let thread = Self.thread, pthread_equal(pthread_self(), thread) != 0 else {
+                return
+            }
+            Self.calls += 1
+            let (allocates, frees) = (type & 2 != 0, type & 4 != 0)
+            // A block that is resized: the old address goes, the new one comes.
+            if frees { Self.remove(argument) }
+            if allocates { Self.insert(result) }
+        }
 
         private static func index(of pointer: UInt) -> Int {
             Int(truncatingIfNeeded: (pointer >> 4) &* 0x9E37_79B9_7F4A_7C15) & (capacity - 1)
@@ -76,18 +81,6 @@ internal struct Review2ArchivesP2Memory {
                 }
                 place = (place + 1) & (capacity - 1)
             }
-        }
-
-        /// Called by the allocator on every thread, for every block; nothing here allocates.
-        private static let logger: Logger = { type, _, argument, _, result, _ in
-            guard let thread = Self.thread, pthread_equal(pthread_self(), thread) != 0 else {
-                return
-            }
-            Self.calls += 1
-            let (allocates, frees) = (type & 2 != 0, type & 4 != 0)
-            // A block that is resized: the old address goes, the new one comes.
-            if frees { Self.remove(argument) }
-            if allocates { Self.insert(result) }
         }
 
         /// The bytes `body` allocated on this thread and still holds when it returns, with
@@ -129,6 +122,13 @@ internal struct Review2ArchivesP2Memory {
             }
             return (bytes, value)
         }
+    }
+
+    internal let bench: ArchiveBench
+    internal var box: Sandbox { bench.box }
+
+    internal init() throws {
+        bench = try ArchiveBench()
     }
 
     /// A ZIP as the `zip` program writes it: each member with the exact-time field and the

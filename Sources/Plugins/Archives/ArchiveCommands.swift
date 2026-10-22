@@ -62,6 +62,13 @@ internal enum ArchiveSettings {
 /// thread to report and to refresh the panels.
 @MainActor
 internal final class ArchiveCommands {
+    nonisolated internal static let encryptionNote =
+        "The archive is encrypted with AES-256. 7-Zip, WinZip, Keka and The Unarchiver open it; "
+        + "the old unzip program and the Finder do not."
+    nonisolated internal static let legacyLabel =
+        "Use the old ZIP encryption instead (weak: it can be broken within minutes; "
+        + "only for programs that cannot open AES)"
+
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let store: ArchiveStore
@@ -70,6 +77,26 @@ internal final class ArchiveCommands {
     /// The event the application is handling now.
     private let currentEvent: @MainActor () -> NSEvent?
     private var environment: ArchiveEnvironment { store.environment }
+
+    private var ui: any UserInteraction { kernel.interaction }
+    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
+    private var settings: any SettingsStore { kernel.settings }
+    private var source: any PanelHandle { kernel.panels.source }
+    private var target: any PanelHandle { kernel.panels.target }
+
+    // MARK: Entering archives
+
+    /// True while the key being handled is Ctrl+PgDn, which enters any file as an archive
+    /// (spec 08 › Opening an archive).
+    ///
+    /// The key itself belongs to "Open Directory", which sends files to the openers like Enter
+    /// does; this is how the opener tells the two apart.
+    private var isForcedOpen: Bool {
+        guard let event = currentEvent(), event.type == .keyDown else {
+            return false
+        }
+        return event.keyCode == 121 && event.modifierFlags.contains(.control)
+    }
 
     internal init(
         kernel: Kernel,
@@ -93,11 +120,45 @@ internal final class ArchiveCommands {
         NSApp?.currentEvent
     }
 
-    private var ui: any UserInteraction { kernel.interaction }
-    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
-    private var settings: any SettingsStore { kernel.settings }
-    private var source: any PanelHandle { kernel.panels.source }
-    private var target: any PanelHandle { kernel.panels.target }
+    // MARK: Pack
+
+    /// Splits a prefix such as `tgz:` off a Pack target (spec 08 › Target string).
+    nonisolated internal static func splitPrefix(_ text: String) -> (format: ArchiveFormat?, path: String) {
+        guard let colon = text.firstIndex(of: ":"), !text[text.index(after: colon)...].hasPrefix("//") else {
+            return (nil, text)
+        }
+        let prefix = text[..<colon].lowercased()
+        guard let format = ArchiveFormat.writable.first(where: { $0.prefix == prefix || $0.defaultExtension == prefix })
+        else { return (nil, text) }
+        return (format, String(text[text.index(after: colon)...]))
+    }
+
+    /// The file name a new archive gets: the typed name with the ending of the chosen format.
+    nonisolated internal static func archiveName(_ typed: String, format: ArchiveFormat) -> String {
+        let ext = (typed as NSString).pathExtension.lowercased()
+        if format == .zip, ArchiveFileSystem.zipExtensions.contains(ext) {
+            return typed
+        }
+        if let split = ArchiveFormat.splitKnownExtension(typed) {
+            return format.extensions.contains(split.ext.lowercased())
+                ? typed : split.base + "." + format.defaultExtension
+        }
+        return typed + "." + format.defaultExtension
+    }
+
+    /// The names the panel marks the operands that were packed with.
+    ///
+    /// A branch or list view names its items by path, which is not the last name of their
+    /// locations.
+    nonisolated internal static func names(of operands: [FileItem], packedAs completed: [URL]) -> [String] {
+        let packed = Set(completed)
+        return operands.filter { packed.contains($0.url) }.map(\.name)
+    }
+
+    /// The first problems of a longer list, for a message box.
+    nonisolated internal static func summary(of problems: [String]) -> String {
+        problems.prefix(12).joined(separator: "\n") + (problems.count > 12 ? "\n… and \(problems.count - 12) more" : "")
+    }
 
     /// Copies the settings for the working threads; called on the main thread.
     internal func refreshOptions() {
@@ -109,20 +170,6 @@ internal final class ArchiveCommands {
     private func refreshPanels(_ directories: [URL], focus: URL? = nil) {
         let inArchives = kernel.panels.all.map(\.model.directory).filter(ArchiveURL.isArchiveURL)
         kernel.panels.refresh(directories + inArchives, focus: focus)
-    }
-
-    // MARK: Entering archives
-
-    /// True while the key being handled is Ctrl+PgDn, which enters any file as an archive
-    /// (spec 08 › Opening an archive).
-    ///
-    /// The key itself belongs to "Open Directory", which sends files to the openers like Enter
-    /// does; this is how the opener tells the two apart.
-    private var isForcedOpen: Bool {
-        guard let event = currentEvent(), event.type == .keyDown else {
-            return false
-        }
-        return event.keyCode == 121 && event.modifierFlags.contains(.control)
     }
 
     internal func archiveRoot(for file: URL, isZip: Bool? = nil) -> URL {
@@ -273,32 +320,6 @@ internal final class ArchiveCommands {
                 panel.show(archiveRoot(for: file.url, isZip: isZip ? true : nil))
             }
         )
-    }
-
-    // MARK: Pack
-
-    /// Splits a prefix such as `tgz:` off a Pack target (spec 08 › Target string).
-    nonisolated internal static func splitPrefix(_ text: String) -> (format: ArchiveFormat?, path: String) {
-        guard let colon = text.firstIndex(of: ":"), !text[text.index(after: colon)...].hasPrefix("//") else {
-            return (nil, text)
-        }
-        let prefix = text[..<colon].lowercased()
-        guard let format = ArchiveFormat.writable.first(where: { $0.prefix == prefix || $0.defaultExtension == prefix })
-        else { return (nil, text) }
-        return (format, String(text[text.index(after: colon)...]))
-    }
-
-    /// The file name a new archive gets: the typed name with the ending of the chosen format.
-    nonisolated internal static func archiveName(_ typed: String, format: ArchiveFormat) -> String {
-        let ext = (typed as NSString).pathExtension.lowercased()
-        if format == .zip, ArchiveFileSystem.zipExtensions.contains(ext) {
-            return typed
-        }
-        if let split = ArchiveFormat.splitKnownExtension(typed) {
-            return format.extensions.contains(split.ext.lowercased())
-                ? typed : split.base + "." + format.defaultExtension
-        }
-        return typed + "." + format.defaultExtension
     }
 
     internal func pack(move: Bool) {
@@ -454,22 +475,6 @@ internal final class ArchiveCommands {
         )
     }
 
-    /// The names the panel marks the operands that were packed with.
-    ///
-    /// A branch or list view names its items by path, which is not the last name of their
-    /// locations.
-    nonisolated internal static func names(of operands: [FileItem], packedAs completed: [URL]) -> [String] {
-        let packed = Set(completed)
-        return operands.filter { packed.contains($0.url) }.map(\.name)
-    }
-
-    nonisolated internal static let encryptionNote =
-        "The archive is encrypted with AES-256. 7-Zip, WinZip, Keka and The Unarchiver open it; "
-        + "the old unzip program and the Finder do not."
-    nonisolated internal static let legacyLabel =
-        "Use the old ZIP encryption instead (weak: it can be broken within minutes; "
-        + "only for programs that cannot open AES)"
-
     /// Asks twice for the password of a new archive, and how to encrypt; nil on Cancel.
     ///
     /// The old encryption is offered for exchange with old programs, and is said to be weak. A
@@ -616,11 +621,6 @@ internal final class ArchiveCommands {
                 refreshPanels([targetURL], focus: options.separateFolders ? nil : result.firstTarget)
             }
         )
-    }
-
-    /// The first problems of a longer list, for a message box.
-    nonisolated internal static func summary(of problems: [String]) -> String {
-        problems.prefix(12).joined(separator: "\n") + (problems.count > 12 ? "\n… and \(problems.count - 12) more" : "")
     }
 
     // MARK: Test

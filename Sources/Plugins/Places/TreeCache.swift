@@ -34,20 +34,6 @@ public final class TreeCache: @unchecked Sendable {
         public var isComplete = true
     }
 
-    /// Above this size a file is only rewritten by a scan, not for single new folders
-    /// (`TreeUpdateLimit`, 2048 KB).
-    public static let updateLimit = 2_048 * 1_024
-    /// How long additions are collected before the file is written.
-    public static let writeDelay: TimeInterval = 2
-    /// The most a cache file is read from or written to; a tree of more folders is kept in
-    /// memory only (as a partial tree on disk) and read again by the scan.
-    public static let fileLimit = 64 << 20
-    /// How many trees are kept in memory; the others are read from their files when needed.
-    internal static let memoryLimit = 8
-    /// How many folders all the trees in memory may have together (about 100 bytes each, so
-    /// ~200 MB): above that, trees that are not waiting to be written are let go, whatever their number.
-    internal static let memoryPathLimit = 2_000_000
-
     private final class Slot {
         var entry: Entry
         let root: URL
@@ -65,6 +51,20 @@ public final class TreeCache: @unchecked Sendable {
             bytes = entry.paths.reduce(0) { $0 + $1.utf8.count + 3 }
         }
     }
+
+    /// Above this size a file is only rewritten by a scan, not for single new folders
+    /// (`TreeUpdateLimit`, 2048 KB).
+    public static let updateLimit = 2_048 * 1_024
+    /// How long additions are collected before the file is written.
+    public static let writeDelay: TimeInterval = 2
+    /// The most a cache file is read from or written to; a tree of more folders is kept in
+    /// memory only (as a partial tree on disk) and read again by the scan.
+    public static let fileLimit = 64 << 20
+    /// How many trees are kept in memory; the others are read from their files when needed.
+    internal static let memoryLimit = 8
+    /// How many folders all the trees in memory may have together (about 100 bytes each, so
+    /// ~200 MB): above that, trees that are not waiting to be written are let go, whatever their number.
+    internal static let memoryPathLimit = 2_000_000
 
     private let directory: URL?
     private let lock = NSLock()
@@ -84,6 +84,149 @@ public final class TreeCache: @unchecked Sendable {
 
     private static func key(_ root: URL, _ showHidden: Bool) -> String {
         root.locationKey + (showHidden ? "\u{0}hidden" : "")
+    }
+
+    /// A cache file's bytes; nil when it is missing, unreadable or over `fileLimit`.
+    private static func read(_ file: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: file) else {
+            return nil
+        }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: fileLimit + 1), data.count <= fileLimit else {
+            return nil
+        }
+        return data
+    }
+
+    /// The tree written to the file in pieces of about a megabyte, so that a tree of a million
+    /// folders is never held again as one text (and then as one `Data`).
+    ///
+    /// False when it would be more than `fileLimit` (nothing replaces the old file then).
+    @discardableResult
+    internal static func writePrivately(_ entry: Entry, root: URL, to file: URL) -> Bool {
+        let temporary = file.path + ".tmp\(getpid())"
+        let descriptor = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
+        guard descriptor >= 0 else {
+            return true
+        }
+        var total = 0
+        var fits = true
+        var ok = true
+        format(entry, root: root) { piece in
+            total += piece.count
+            guard total <= fileLimit else {
+                fits = false
+                return false
+            }
+            ok = piece.withUnsafeBytes { buffer in write(descriptor, buffer) }
+            return ok
+        }
+        close(descriptor)
+        if fits, ok, rename(temporary, file.path) == 0 {
+            return true
+        }
+        unlink(temporary)
+        return fits
+    }
+
+    private static func write(_ descriptor: Int32, _ buffer: UnsafeRawBufferPointer) -> Bool {
+        var written = 0
+        while written < buffer.count {
+            let count = Darwin.write(descriptor, buffer.baseAddress! + written, buffer.count - written)
+            if count <= 0 {
+                return false
+            }
+            written += count
+        }
+        return true
+    }
+
+    internal static func format(_ paths: [String], root: URL) -> String {
+        format(Entry(paths: paths), root: root)
+    }
+
+    internal static func format(_ entry: Entry, root: URL) -> String {
+        var data = Data()
+        format(entry, root: root) { piece in
+            data.append(piece)
+            return true
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// The file's text in pieces of about a megabyte, for as long as `emit` says to go on.
+    internal static func format(_ entry: Entry, root: URL, emit: (Data) -> Bool) {
+        // A path with a line break would add lines to the file; such a folder is left out, and
+        // the tree then is not complete.
+        func isPlain(_ path: String) -> Bool { !path.utf8.contains { $0 == 0x0A || $0 == 0x0D } }
+        let isComplete = entry.isComplete && entry.paths.allSatisfy(isPlain)
+        var piece = Data("root=\(DirectoryHistory.stored(root))\n".utf8)
+        if !isComplete { piece.append(contentsOf: "state=partial\n".utf8) }
+        piece.reserveCapacity(1 << 20 + 4_096)
+        func line(_ open: UInt8, _ path: String, _ close: UInt8) -> Bool {
+            piece.append(open)
+            piece.append(contentsOf: path.utf8)
+            piece.append(close)
+            piece.append(0x0A)
+            guard piece.count >= 1 << 20 else {
+                return true
+            }
+            defer { piece.removeAll(keepingCapacity: true) }
+            return emit(piece)
+        }
+        for path in entry.paths where isPlain(path) {
+            if !line(0x5B, path, 0x5D) {
+                return
+            }
+        }
+        for path in entry.unscanned where isPlain(path) {
+            if !line(0x28, path, 0x29) {
+                return
+            }
+        }
+        if !piece.isEmpty { _ = emit(piece) }
+    }
+
+    /// The paths of a cache file; nil when the file is not one for `root`.
+    internal static func parse(_ text: String, root: URL) -> [String]? {
+        parseEntry(text, root: root)?.paths
+    }
+
+    /// Read byte by byte: the lines end at the line feed byte and are told apart by their
+    /// first and last byte, not by characters (a combining mark after `[` makes one
+    /// character with it, and a name that began with one would be lost).
+    internal static func parseEntry(_ text: String, root: URL) -> Entry? {
+        var text = text
+        return text.withUTF8 { bytes -> Entry? in
+            var entry = Entry(paths: [])
+            var isFirst = true
+            var position = 0
+            while position < bytes.count {
+                var end = position
+                while end < bytes.count, bytes[end] != 0x0A { end += 1 }
+                let line = UnsafeBufferPointer(rebasing: bytes[position..<end])
+                position = end + 1
+                guard !line.isEmpty else { continue }
+                if isFirst {
+                    isFirst = false
+                    let prefix = Array("root=".utf8)
+                    guard line.count >= prefix.count, Array(line.prefix(prefix.count)) == prefix,
+                        URL(string: String(decoding: line.dropFirst(prefix.count), as: UTF8.self))?.locationKey
+                            == root.locationKey
+                    else { return nil }
+                    continue
+                }
+                let (first, last) = (line[0], line[line.count - 1])
+                if line.count > 2, first == 0x5B, last == 0x5D {
+                    entry.paths.append(String(decoding: line.dropFirst().dropLast(), as: UTF8.self))
+                } else if line.count > 2, first == 0x28, last == 0x29 {
+                    entry.unscanned.append(String(decoding: line.dropFirst().dropLast(), as: UTF8.self))
+                } else if line.count == "state=partial".utf8.count, Array(line) == Array("state=partial".utf8) {
+                    entry.isComplete = false
+                }
+            }
+            return isFirst ? nil : entry
+        }
     }
 
     /// The file of a root; nil for a cache without files.
@@ -133,18 +276,6 @@ public final class TreeCache: @unchecked Sendable {
             total -= other.value.entry.paths.count
             memory[other.key] = nil
         }
-    }
-
-    /// A cache file's bytes; nil when it is missing, unreadable or over `fileLimit`.
-    private static func read(_ file: URL) -> Data? {
-        guard let handle = try? FileHandle(forReadingFrom: file) else {
-            return nil
-        }
-        defer { try? handle.close() }
-        guard let data = try? handle.read(upToCount: fileLimit + 1), data.count <= fileLimit else {
-            return nil
-        }
-        return data
     }
 
     /// The folders below `root` as relative paths; nil when the tree was never read.
@@ -291,136 +422,5 @@ public final class TreeCache: @unchecked Sendable {
         chmod(directory.path, 0o700)
         // Too big for a file: what is there would be out of date, so it goes.
         if !Self.writePrivately(entry, root: root, to: file) { try? FileManager.default.removeItem(at: file) }
-    }
-
-    /// The tree written to the file in pieces of about a megabyte, so that a tree of a million
-    /// folders is never held again as one text (and then as one `Data`).
-    ///
-    /// False when it would be more than `fileLimit` (nothing replaces the old file then).
-    @discardableResult
-    internal static func writePrivately(_ entry: Entry, root: URL, to file: URL) -> Bool {
-        let temporary = file.path + ".tmp\(getpid())"
-        let descriptor = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
-        guard descriptor >= 0 else {
-            return true
-        }
-        var total = 0
-        var fits = true
-        var ok = true
-        format(entry, root: root) { piece in
-            total += piece.count
-            guard total <= fileLimit else {
-                fits = false
-                return false
-            }
-            ok = piece.withUnsafeBytes { buffer in write(descriptor, buffer) }
-            return ok
-        }
-        close(descriptor)
-        if fits, ok, rename(temporary, file.path) == 0 {
-            return true
-        }
-        unlink(temporary)
-        return fits
-    }
-
-    private static func write(_ descriptor: Int32, _ buffer: UnsafeRawBufferPointer) -> Bool {
-        var written = 0
-        while written < buffer.count {
-            let count = Darwin.write(descriptor, buffer.baseAddress! + written, buffer.count - written)
-            if count <= 0 {
-                return false
-            }
-            written += count
-        }
-        return true
-    }
-
-    internal static func format(_ paths: [String], root: URL) -> String {
-        format(Entry(paths: paths), root: root)
-    }
-
-    internal static func format(_ entry: Entry, root: URL) -> String {
-        var data = Data()
-        format(entry, root: root) { piece in
-            data.append(piece)
-            return true
-        }
-        return String(decoding: data, as: UTF8.self)
-    }
-
-    /// The file's text in pieces of about a megabyte, for as long as `emit` says to go on.
-    internal static func format(_ entry: Entry, root: URL, emit: (Data) -> Bool) {
-        // A path with a line break would add lines to the file; such a folder is left out, and
-        // the tree then is not complete.
-        func isPlain(_ path: String) -> Bool { !path.utf8.contains { $0 == 0x0A || $0 == 0x0D } }
-        let isComplete = entry.isComplete && entry.paths.allSatisfy(isPlain)
-        var piece = Data("root=\(DirectoryHistory.stored(root))\n".utf8)
-        if !isComplete { piece.append(contentsOf: "state=partial\n".utf8) }
-        piece.reserveCapacity(1 << 20 + 4_096)
-        func line(_ open: UInt8, _ path: String, _ close: UInt8) -> Bool {
-            piece.append(open)
-            piece.append(contentsOf: path.utf8)
-            piece.append(close)
-            piece.append(0x0A)
-            guard piece.count >= 1 << 20 else {
-                return true
-            }
-            defer { piece.removeAll(keepingCapacity: true) }
-            return emit(piece)
-        }
-        for path in entry.paths where isPlain(path) {
-            if !line(0x5B, path, 0x5D) {
-                return
-            }
-        }
-        for path in entry.unscanned where isPlain(path) {
-            if !line(0x28, path, 0x29) {
-                return
-            }
-        }
-        if !piece.isEmpty { _ = emit(piece) }
-    }
-
-    /// The paths of a cache file; nil when the file is not one for `root`.
-    internal static func parse(_ text: String, root: URL) -> [String]? {
-        parseEntry(text, root: root)?.paths
-    }
-
-    /// Read byte by byte: the lines end at the line feed byte and are told apart by their
-    /// first and last byte, not by characters (a combining mark after `[` makes one
-    /// character with it, and a name that began with one would be lost).
-    internal static func parseEntry(_ text: String, root: URL) -> Entry? {
-        var text = text
-        return text.withUTF8 { bytes -> Entry? in
-            var entry = Entry(paths: [])
-            var isFirst = true
-            var position = 0
-            while position < bytes.count {
-                var end = position
-                while end < bytes.count, bytes[end] != 0x0A { end += 1 }
-                let line = UnsafeBufferPointer(rebasing: bytes[position..<end])
-                position = end + 1
-                guard !line.isEmpty else { continue }
-                if isFirst {
-                    isFirst = false
-                    let prefix = Array("root=".utf8)
-                    guard line.count >= prefix.count, Array(line.prefix(prefix.count)) == prefix,
-                        URL(string: String(decoding: line.dropFirst(prefix.count), as: UTF8.self))?.locationKey
-                            == root.locationKey
-                    else { return nil }
-                    continue
-                }
-                let (first, last) = (line[0], line[line.count - 1])
-                if line.count > 2, first == 0x5B, last == 0x5D {
-                    entry.paths.append(String(decoding: line.dropFirst().dropLast(), as: UTF8.self))
-                } else if line.count > 2, first == 0x28, last == 0x29 {
-                    entry.unscanned.append(String(decoding: line.dropFirst().dropLast(), as: UTF8.self))
-                } else if line.count == "state=partial".utf8.count, Array(line) == Array("state=partial".utf8) {
-                    entry.isComplete = false
-                }
-            }
-            return isFirst ? nil : entry
-        }
     }
 }

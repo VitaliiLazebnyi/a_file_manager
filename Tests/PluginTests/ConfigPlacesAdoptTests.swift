@@ -32,8 +32,6 @@ private final class MountedImage {
         else { return nil }
     }
 
-    deinit { _ = Self.run(["detach", "-force", mountPoint.path]) }
-
     private static func run(_ arguments: [String]) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
@@ -46,6 +44,8 @@ private final class MountedImage {
         process.waitUntilExit()
         return process.terminationStatus == 0
     }
+
+    deinit { _ = Self.run(["detach", "-force", mountPoint.path]) }
 }
 
 @Suite

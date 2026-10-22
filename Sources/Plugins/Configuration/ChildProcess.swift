@@ -11,17 +11,6 @@ internal enum LoginShell {
     /// Every macOS the program runs on has it.
     internal static let posix = (executable: "/bin/zsh", options: ["-l", "-c"])
 
-    /// The shell the user logs in with: `SHELL`, else the shell of the user's `account`, else zsh.
-    internal static func usersShell(environment: [String: String], account: String?) -> String {
-        if let path = environment["SHELL"], !path.isEmpty {
-            return path
-        }
-        if let path = account, !path.isEmpty {
-            return path
-        }
-        return "/bin/zsh"
-    }
-
     /// The shell of this user's account in the user database.
     internal static var accountShell: String? {
         getpwuid(getuid())?.pointee.pw_shell.map { String(cString: $0) }
@@ -35,6 +24,17 @@ internal enum LoginShell {
         of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell),
         waiting: .seconds(3)
     )
+
+    /// The shell the user logs in with: `SHELL`, else the shell of the user's `account`, else zsh.
+    internal static func usersShell(environment: [String: String], account: String?) -> String {
+        if let path = environment["SHELL"], !path.isEmpty {
+            return path
+        }
+        if let path = account, !path.isEmpty {
+            return path
+        }
+        return "/bin/zsh"
+    }
 
     /// The PATH that `shell` sets up: its start files are not read by zsh, so the PATH they set
     /// up is asked for and handed on.
@@ -126,57 +126,6 @@ internal enum ChildProcess {
         internal var wait: @Sendable (pid_t, inout Int32, Int32) -> (result: pid_t, error: Int32)
     }
 
-    /// Starts `executable` in `directory`, with nothing to read and its output discarded.
-    ///
-    /// Returns the process number. Blocks for the time the start takes: not for the main thread.
-    internal static func spawn(
-        executable: String,
-        arguments: [String],
-        environment: [String: String],
-        directory: String,
-        calls: SystemCalls = .system
-    ) -> Result<pid_t, Failure> {
-        var actions: posix_spawn_file_actions_t?
-        var attributes: posix_spawnattr_t?
-        // The two return the number of the error; they do not set `errno`.
-        let actionsMade = calls.initActions(&actions)
-        guard actionsMade == 0 else {
-            return .failure(Failure(code: actionsMade))
-        }
-        defer { posix_spawn_file_actions_destroy(&actions) }
-        let attributesMade = calls.initAttributes(&attributes)
-        guard attributesMade == 0 else {
-            return .failure(Failure(code: attributesMade))
-        }
-        defer { posix_spawnattr_destroy(&attributes) }
-
-        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
-        posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0)
-        posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
-        posix_spawn_file_actions_addchdir_np(&actions, directory)
-        // The child gets none of this program's open files, and signals as a new program has them.
-        var all = sigset_t()
-        var none = sigset_t()
-        sigfillset(&all)
-        sigemptyset(&none)
-        posix_spawnattr_setsigdefault(&attributes, &all)
-        posix_spawnattr_setsigmask(&attributes, &none)
-        posix_spawnattr_setflags(
-            &attributes,
-            Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
-        )
-
-        var argv: [UnsafeMutablePointer<CChar>?] = ([executable] + arguments).map { strdup($0) } + [nil]
-        var envp: [UnsafeMutablePointer<CChar>?] = environment.map { strdup($0.key + "=" + $0.value) } + [nil]
-        defer {
-            argv.forEach { free($0) }
-            envp.forEach { free($0) }
-        }
-        var pid: pid_t = 0
-        let result = posix_spawn(&pid, executable, &actions, &attributes, &argv, &envp)
-        return result == 0 ? .success(pid) : .failure(Failure(code: result))
-    }
-
     /// How a child ended.
     internal struct Ending {
         /// The exit status; nil when a signal ended it.
@@ -231,6 +180,57 @@ internal enum ChildProcess {
             let signalled = result == pid && status & 0x7F != 0
             handler(Ending(status: result == pid && !signalled ? (status >> 8) & 0xFF : nil))
         }
+    }
+
+    /// Starts `executable` in `directory`, with nothing to read and its output discarded.
+    ///
+    /// Returns the process number. Blocks for the time the start takes: not for the main thread.
+    internal static func spawn(
+        executable: String,
+        arguments: [String],
+        environment: [String: String],
+        directory: String,
+        calls: SystemCalls = .system
+    ) -> Result<pid_t, Failure> {
+        var actions: posix_spawn_file_actions_t?
+        var attributes: posix_spawnattr_t?
+        // The two return the number of the error; they do not set `errno`.
+        let actionsMade = calls.initActions(&actions)
+        guard actionsMade == 0 else {
+            return .failure(Failure(code: actionsMade))
+        }
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        let attributesMade = calls.initAttributes(&attributes)
+        guard attributesMade == 0 else {
+            return .failure(Failure(code: attributesMade))
+        }
+        defer { posix_spawnattr_destroy(&attributes) }
+
+        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
+        posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0)
+        posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
+        posix_spawn_file_actions_addchdir_np(&actions, directory)
+        // The child gets none of this program's open files, and signals as a new program has them.
+        var all = sigset_t()
+        var none = sigset_t()
+        sigfillset(&all)
+        sigemptyset(&none)
+        posix_spawnattr_setsigdefault(&attributes, &all)
+        posix_spawnattr_setsigmask(&attributes, &none)
+        posix_spawnattr_setflags(
+            &attributes,
+            Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
+        )
+
+        var argv: [UnsafeMutablePointer<CChar>?] = ([executable] + arguments).map { strdup($0) } + [nil]
+        var envp: [UnsafeMutablePointer<CChar>?] = environment.map { strdup($0.key + "=" + $0.value) } + [nil]
+        defer {
+            argv.forEach { free($0) }
+            envp.forEach { free($0) }
+        }
+        var pid: pid_t = 0
+        let result = posix_spawn(&pid, executable, &actions, &attributes, &argv, &envp)
+        return result == 0 ? .success(pid) : .failure(Failure(code: result))
     }
 }
 

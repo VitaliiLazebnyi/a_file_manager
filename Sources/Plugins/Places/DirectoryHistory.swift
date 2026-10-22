@@ -6,6 +6,8 @@ public import Foundation
 /// The panel's own back/forward list forgets what lay ahead; this one keeps every place once.
 public struct DirectoryHistory: Codable, Equatable {
     public struct Visit: Codable, Equatable {
+        private enum CodingKeys: String, CodingKey { case location, isVisible }
+
         /// The location as a URL string, so it can be on any file system.
         public var location: String
         /// False for a folder that was only passed through: thinning hides it from the list.
@@ -16,14 +18,22 @@ public struct DirectoryHistory: Codable, Equatable {
         /// Not stored.
         public private(set) var key: String
 
-        private enum CodingKeys: String, CodingKey { case location, isVisible }
-
         public init(location: String, isVisible: Bool) {
             self.location = location
             self.isVisible = isVisible
             key = URL(string: location)?.locationKey ?? ""
         }
     }
+
+    /// What is kept per panel (`HistoryLenStored`).
+    public static let storedLimit = 200
+
+    public private(set) var visits: [Visit] = []
+
+    /// The directory the panel is in, as far as the history knows.
+    public var current: URL? { visits.last.flatMap { URL(string: $0.location) } }
+
+    public init() {}
 
     /// The location as it is stored: a password in a URL is left out, because histories land
     /// in the settings, which are exported and shared.
@@ -37,16 +47,6 @@ public struct DirectoryHistory: Codable, Equatable {
         stored.removeSubrange(stored.index(before: password.lowerBound)..<password.upperBound)
         return stored
     }
-
-    /// What is kept per panel (`HistoryLenStored`).
-    public static let storedLimit = 200
-
-    public private(set) var visits: [Visit] = []
-
-    public init() {}
-
-    /// The directory the panel is in, as far as the history knows.
-    public var current: URL? { visits.last.flatMap { URL(string: $0.location) } }
 
     /// The panel shows `directory` now.
     ///
@@ -222,6 +222,9 @@ public final class DirectoryHistoryTracker {
 
     /// A stay at least this long makes a folder more than "passed through" (`HistoryThinningDelta`).
     public static let thinningDelta: TimeInterval = 5
+    /// How long a change waits for further ones before it is written.
+    public static let writeDelay: TimeInterval = 1
+    private static let frequentKey = "history.frequent"
 
     private let settings: any SettingsStore
     private let now: () -> Date
@@ -234,8 +237,6 @@ public final class DirectoryHistoryTracker {
     private var changedSides = Set<Side>()
     private var frequentChanged = false
     private var writeIsScheduled = false
-    /// How long a change waits for further ones before it is written.
-    public static let writeDelay: TimeInterval = 1
 
     /// `settings` is the plugin's own corner of the settings store. `problem` is told when
     /// stored data could not be read in full; the original is kept aside (`StoredSettings`).
@@ -265,7 +266,6 @@ public final class DirectoryHistoryTracker {
     }
 
     private static func key(_ side: Side) -> String { "history." + side.rawValue }
-    private static let frequentKey = "history.frequent"
 
     public func history(of side: Side) -> DirectoryHistory {
         histories[side] ?? DirectoryHistory()

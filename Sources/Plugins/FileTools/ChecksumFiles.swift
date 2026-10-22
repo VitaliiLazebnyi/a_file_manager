@@ -13,6 +13,33 @@ internal enum ChecksumFile {
         internal var method: ChecksumMethod?
     }
 
+    /// What was read from a checksum file: its entries, and the numbers of the lines that are
+    /// neither an entry nor a comment nor empty.
+    internal struct Parsed {
+        internal var entries: [Entry] = []
+        internal var unreadableLines: [Int] = []
+    }
+
+    private static let byExtension: [String: ChecksumMethod] = {
+        var methods = Dictionary(uniqueKeysWithValues: ChecksumMethod.allCases.map { ($0.fileExtension, $0) })
+        methods["sha1"] = .sha1
+        methods["crc32"] = .crc32
+        methods["blake3"] = .blake3
+        for method in [ChecksumMethod.sha3_224, .sha3_256, .sha3_384, .sha3_512] {
+            methods[method.fileExtension.replacingOccurrences(of: "_", with: "-")] = method
+        }
+        return methods
+    }()
+
+    private static let tags: [String: ChecksumMethod] = {
+        var tags = Dictionary(uniqueKeysWithValues: ChecksumMethod.allCases.map { ($0.tagName, $0) })
+        tags["SHA2-256"] = .sha256
+        tags["SHA2-512"] = .sha512
+        tags["SHA2-224"] = .sha224
+        tags["SHA2-384"] = .sha384
+        return tags
+    }()
+
     /// One line without its end: `<digest> *<name>`, or for SFV `<name> <DIGEST>`.
     ///
     /// A name that would be taken for something else is written so that it reads back as itself.
@@ -82,17 +109,6 @@ internal enum ChecksumFile {
         alwaysUTF8 || (!unixFormat && names.contains { !$0.allSatisfy(\.isASCII) })
     }
 
-    private static let byExtension: [String: ChecksumMethod] = {
-        var methods = Dictionary(uniqueKeysWithValues: ChecksumMethod.allCases.map { ($0.fileExtension, $0) })
-        methods["sha1"] = .sha1
-        methods["crc32"] = .crc32
-        methods["blake3"] = .blake3
-        for method in [ChecksumMethod.sha3_224, .sha3_256, .sha3_384, .sha3_512] {
-            methods[method.fileExtension.replacingOccurrences(of: "_", with: "-")] = method
-        }
-        return methods
-    }()
-
     internal static func method(forFileNamed name: String) -> ChecksumMethod? {
         byExtension[FileItem.split(name).ext.lowercased()]
     }
@@ -134,15 +150,6 @@ internal enum ChecksumFile {
         !text.isEmpty && text.allSatisfy { $0.isASCII && $0.isHexDigit }
     }
 
-    private static let tags: [String: ChecksumMethod] = {
-        var tags = Dictionary(uniqueKeysWithValues: ChecksumMethod.allCases.map { ($0.tagName, $0) })
-        tags["SHA2-256"] = .sha256
-        tags["SHA2-512"] = .sha512
-        tags["SHA2-224"] = .sha224
-        tags["SHA2-384"] = .sha384
-        return tags
-    }()
-
     /// The name of a GNU line that starts with a backslash: `\\` stands for a backslash and `\n` for a line feed.
     private static func unescaped(_ name: String) -> String {
         guard name.contains("\\") else {
@@ -161,13 +168,6 @@ internal enum ChecksumFile {
             }
         }
         return result
-    }
-
-    /// What was read from a checksum file: its entries, and the numbers of the lines that are
-    /// neither an entry nor a comment nor empty.
-    internal struct Parsed {
-        internal var entries: [Entry] = []
-        internal var unreadableLines: [Int] = []
     }
 
     /// Reads the lines of a checksum file named `fileName`: `<digest> *<name>` (also with two
@@ -288,10 +288,6 @@ internal struct VerifyReport {
     internal var sections: [Section] = []
     internal var methods: Set<ChecksumMethod> = []
 
-    internal func count(_ result: VerifyResult) -> Int {
-        sections.reduce(0) { $0 + $1.rows.filter { $0.result == result }.count }
-    }
-
     internal var errors: Int { count(.notFound) + count(.readError) + count(.wrongChecksum) + count(.unreadable) }
 
     /// The names of the files that failed, as the panel knows them; where the checksum file itself is
@@ -327,6 +323,10 @@ internal struct VerifyReport {
         }
     }
 
+    internal func count(_ result: VerifyResult) -> Int {
+        sections.reduce(0) { $0 + $1.rows.filter { $0.result == result }.count }
+    }
+
     /// The rows of the window; with `onlyErrors` just the failures and the summary.
     internal func text(onlyErrors: Bool) -> String {
         var lines: [String] = []
@@ -353,6 +353,46 @@ internal struct VerifyReport {
 /// all cores at once, each file as a stream of blocks on one of them; the results come back
 /// in the order of the input.
 internal enum ChecksumRun {
+    /// How many files are being hashed at this moment.
+    ///
+    /// Unchecked `Sendable`: `active` is guarded by `lock`.
+    private final class BusyFiles: @unchecked Sendable {
+        private let lock = NSLock()
+        private var active = 0
+
+        var count: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return active
+        }
+
+        func enter() {
+            lock.lock()
+            active += 1
+            lock.unlock()
+        }
+
+        func leave() {
+            lock.lock()
+            active -= 1
+            lock.unlock()
+        }
+    }
+
+    internal struct CreateOptions: Equatable {
+        internal var method = ChecksumMethod.crc32
+        internal var separatePerFile = false
+        internal var separatePerFolder = false
+        internal var alwaysUTF8 = false
+        internal var unixFormat = true
+    }
+
+    /// The pieces BLAKE3 is fed when it must not spread the work: smaller than the 16 chunks (16 KB)
+    /// from which it uses more than one thread.
+    internal static let serialPiece = 8 << 10
+
+    private static let bracketedChecksum = try? NSRegularExpression(pattern: #"\[([0-9A-Fa-f]{8})\]"#)
+
     /// The digests of each file for each of its methods, or the error that stopped it.
     ///
     /// With an `expected` digest and several methods of that length only the first (the likeliest)
@@ -408,32 +448,6 @@ internal enum ChecksumRun {
         }
     }
 
-    /// How many files are being hashed at this moment.
-    ///
-    /// Unchecked `Sendable`: `active` is guarded by `lock`.
-    private final class BusyFiles: @unchecked Sendable {
-        private let lock = NSLock()
-        private var active = 0
-
-        var count: Int {
-            lock.lock()
-            defer { lock.unlock() }
-            return active
-        }
-
-        func enter() {
-            lock.lock()
-            active += 1
-            lock.unlock()
-        }
-
-        func leave() {
-            lock.lock()
-            active -= 1
-            lock.unlock()
-        }
-    }
-
     /// Whether BLAKE3 may spread a block over the cores now: when fewer files than cores are
     /// being hashed, so that cores are left over.
     internal static func spreadsBLAKE3(filesInProgress: Int, cores: Int = ProcessInfo.processInfo.activeProcessorCount)
@@ -441,10 +455,6 @@ internal enum ChecksumRun {
     {
         filesInProgress < cores
     }
-
-    /// The pieces BLAKE3 is fed when it must not spread the work: smaller than the 16 chunks (16 KB)
-    /// from which it uses more than one thread.
-    internal static let serialPiece = 8 << 10
 
     /// Gives `block` to `hasher`; to a BLAKE3 hasher that must not spread it, piece by piece.
     internal static func feed(_ hasher: any StreamHasher, _ block: Data, spread: Bool) {
@@ -485,14 +495,6 @@ internal enum ChecksumRun {
             }
         }
         return files
-    }
-
-    internal struct CreateOptions: Equatable {
-        internal var method = ChecksumMethod.crc32
-        internal var separatePerFile = false
-        internal var separatePerFolder = false
-        internal var alwaysUTF8 = false
-        internal var unixFormat = true
     }
 
     /// The checksum file a file is listed in.
@@ -739,8 +741,6 @@ internal enum ChecksumRun {
         report.sections = [VerifyReport.Section(title: title, rows: rows)]
         return report
     }
-
-    private static let bracketedChecksum = try? NSRegularExpression(pattern: #"\[([0-9A-Fa-f]{8})\]"#)
 
     /// A CRC32 in square brackets in a file name: `Movie [1A2B3C4D].mkv`.
     internal static func checksumInName(_ name: String) -> String? {

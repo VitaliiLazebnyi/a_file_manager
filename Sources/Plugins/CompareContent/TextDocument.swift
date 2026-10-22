@@ -169,6 +169,8 @@ public struct TextDocument: Equatable, Sendable {
     /// characters: saving would then change them, and is refused.
     public private(set) var isLossless = true
 
+    public var usualEnding: LineEnding { usualEnding() }
+
     public init(encoding: TextEncoding = .utf8(bom: false), lines: [TextLine] = []) {
         self.encoding = encoding
         self.lines = lines
@@ -222,6 +224,15 @@ public struct TextDocument: Equatable, Sendable {
         return lines
     }
 
+    /// Files with a zero byte near the start are shown in hex; UTF-16 text is full of them
+    /// and is recognised by its byte-order mark.
+    public static func looksBinary(_ data: Data) -> Bool {
+        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
+            return false
+        }
+        return data.prefix(64 * 1_024).contains(0)
+    }
+
     /// The line break most lines use; new lines get it, and so does a last line that had
     /// none when something is put after it. `sampleLimit` looks at that many lines at the start
     /// only (an edit in a huge file must not count them all).
@@ -230,8 +241,6 @@ public struct TextDocument: Equatable, Sendable {
         for line in lines.prefix(sampleLimit) where line.ending != .none { counts[line.ending, default: 0] += 1 }
         return counts.max { $0.value < $1.value }?.key ?? .lf
     }
-
-    public var usualEnding: LineEnding { usualEnding() }
 
     private func text() -> String {
         let usual = usualEnding
@@ -257,14 +266,5 @@ public struct TextDocument: Equatable, Sendable {
             throw CompareLoader.SaveError.notRepresentable(name, encoding)
         }
         return data
-    }
-
-    /// Files with a zero byte near the start are shown in hex; UTF-16 text is full of them
-    /// and is recognised by its byte-order mark.
-    public static func looksBinary(_ data: Data) -> Bool {
-        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
-            return false
-        }
-        return data.prefix(64 * 1_024).contains(0)
     }
 }

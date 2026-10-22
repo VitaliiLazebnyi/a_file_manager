@@ -6,44 +6,10 @@ import Foundation
 ///
 /// A pure function; nothing is loaded and no script runs.
 internal enum HTMLText {
-    private static let blockTags: Set<String> = [
-        "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
-        "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"
-    ]
-    /// Elements whose content is not text.
-    ///
-    /// Each name has 8 letters at most (the scan relies on it).
-    private static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
-    private static let entities: [String: String] = [
-        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " ", "copy": "©", "reg": "®", "trade": "™",
-        "hellip": "…",
-        "mdash": "—", "ndash": "–", "laquo": "«", "raquo": "»", "euro": "€", "auml": "ä", "ouml": "ö", "uuml": "ü",
-        "Auml": "Ä",
-        "Ouml": "Ö", "Uuml": "Ü", "szlig": "ß", "eacute": "é", "egrave": "è", "agrave": "à", "ccedil": "ç", "bull": "•",
-        "middot": "·",
-        "lsquo": "‘", "rsquo": "’", "ldquo": "“", "rdquo": "”", "deg": "°", "times": "×"
-    ]
-
     internal struct Result: Equatable {
         internal var text: String
         /// The targets of the links, in the order they appear.
         internal var links: [String]
-    }
-
-    internal static func plainText(from html: String, linkBraces: Bool = true) -> Result {
-        convert(Array(html.utf16), linkBraces: linkBraces, cancellation: nil).result
-    }
-
-    /// White space as `Character.isWhitespace` and trimming know it.
-    @inline(__always)
-    private static func isWhitespace(_ unit: UInt16) -> Bool {
-        switch unit {
-        case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000:
-            return true
-
-        default:
-            return false
-        }
     }
 
     /// What a tag name stands for.
@@ -114,6 +80,24 @@ internal enum HTMLText {
         }
     }
 
+    private static let blockTags: Set<String> = [
+        "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
+        "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"
+    ]
+    /// Elements whose content is not text.
+    ///
+    /// Each name has 8 letters at most (the scan relies on it).
+    private static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
+    private static let entities: [String: String] = [
+        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " ", "copy": "©", "reg": "®", "trade": "™",
+        "hellip": "…",
+        "mdash": "—", "ndash": "–", "laquo": "«", "raquo": "»", "euro": "€", "auml": "ä", "ouml": "ö", "uuml": "ü",
+        "Auml": "Ä",
+        "Ouml": "Ö", "Uuml": "Ü", "szlig": "ß", "eacute": "é", "egrave": "è", "agrave": "à", "ccedil": "ç", "bull": "•",
+        "middot": "·",
+        "lsquo": "‘", "rsquo": "’", "ldquo": "“", "rdquo": "”", "deg": "°", "times": "×"
+    ]
+
     private static let tagTable = TagTable()
 
     /// The entities of the most text, found without making a string of the name.
@@ -122,6 +106,27 @@ internal enum HTMLText {
         .map {
             (Array($0.key.utf16), Array($0.value.utf16))
         }
+
+    private static let hrefName: [UInt16] = [0x68, 0x72, 0x65, 0x66]
+
+    /// How far a tag is looked at for its end with quotes taken into account.
+    private static let quotedTagLimit = 512
+
+    internal static func plainText(from html: String, linkBraces: Bool = true) -> Result {
+        convert(Array(html.utf16), linkBraces: linkBraces, cancellation: nil).result
+    }
+
+    /// White space as `Character.isWhitespace` and trimming know it.
+    @inline(__always)
+    private static func isWhitespace(_ unit: UInt16) -> Bool {
+        switch unit {
+        case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000:
+            return true
+
+        default:
+            return false
+        }
+    }
 
     /// The text for an entity name given as units, when it is one of `commonEntities`.
     @inline(__always)
@@ -186,11 +191,6 @@ internal enum HTMLText {
         }
         return nil
     }
-
-    private static let hrefName: [UInt16] = [0x68, 0x72, 0x65, 0x66]
-
-    /// How far a tag is looked at for its end with quotes taken into account.
-    private static let quotedTagLimit = 512
 
     /// The position of the `>` that ends the tag opened at `open`: one inside a quoted value
     /// (`title="a>b"`) does not, as long as the quote closes within `quotedTagLimit` units; else

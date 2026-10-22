@@ -42,6 +42,9 @@ internal final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate
     internal let view = NSView()
     internal var onEdit: (() -> Void)?
 
+    internal var title: String { model.title }
+    internal var isChanged: Bool { model.isChanged }
+
     internal init(model: PreferencePageModel) {
         self.model = model
         super.init()
@@ -88,9 +91,6 @@ internal final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate
         ])
         show()
     }
-
-    internal var title: String { model.title }
-    internal var isChanged: Bool { model.isChanged }
 
     @objc
     private func changed() {
@@ -173,14 +173,16 @@ internal final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate 
     }()
     internal var onEdit: (() -> Void)?
 
+    internal var isChanged: Bool { editor.isChanged }
+
+    private var selected: CommandRow? { table.selectedRow.flatMap { rows.dropFirst($0).first } }
+
     internal init(center: ConfigurationCenter) {
         self.center = center
         editor = KeyBindingEditor(kernel: center.kernel)
         super.init()
         center.keysCommitted = { [weak self] in self?.bindingsStoredElsewhere() }
     }
-
-    internal var isChanged: Bool { editor.isChanged }
 
     private func reload() {
         let kernel = center.kernel
@@ -192,8 +194,6 @@ internal final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate 
         rows = CommandCatalog.filter(all, text: filter.stringValue)
         table.show(rows.map { [$0.title, $0.id.rawValue, $0.keys + (editor.isCustomized($0.id) ? "  •" : "")] })
     }
-
-    private var selected: CommandRow? { table.selectedRow.flatMap { rows.dropFirst($0).first } }
 
     private func edited() {
         reload()
@@ -327,13 +327,13 @@ internal final class ButtonBarPage: NSObject, OptionsPage {
     )
     internal var onEdit: (() -> Void)?
 
+    internal var isChanged: Bool { editor.isChanged }
+
     internal init(center: ConfigurationCenter) {
         self.center = center
         editor = ToolbarEditor(toolbar: center.kernel.toolbar, settings: center.kernel.settings, store: center.store)
         super.init()
     }
-
-    internal var isChanged: Bool { editor.isChanged }
 
     private func reload(selecting row: Int? = nil) {
         let commands = center.kernel.commands
@@ -447,13 +447,13 @@ internal final class StartMenuPage: NSObject, OptionsPage {
     )
     internal var onEdit: (() -> Void)?
 
+    internal var isChanged: Bool { draft != stored }
+
     internal init(center: ConfigurationCenter) {
         self.center = center
         super.init()
         table.onActivate = { [unowned self] in change() }
     }
-
-    internal var isChanged: Bool { draft != stored }
 
     private func reload(selecting row: Int? = nil) {
         table.show(
@@ -584,6 +584,9 @@ internal final class OptionsWindowController: NSWindowController, NSWindowDelega
     private let container = NSView()
     private var applyButton = NSButton()
 
+    internal var pageTitles: [String] { pages.map(\.title) }
+    internal var shownPage: String { caption.stringValue }
+
     internal init(center: ConfigurationCenter) {
         self.center = center
         let registered: [any OptionsPage] = center.kernel.preferences.pages.filter { !$0.preferences.isEmpty }
@@ -646,9 +649,6 @@ internal final class OptionsWindowController: NSWindowController, NSWindowDelega
         prepare(section)
         center.effects.present(self)
     }
-
-    internal var pageTitles: [String] { pages.map(\.title) }
-    internal var shownPage: String { caption.stringValue }
 
     /// Everything `show` does short of putting the window on screen.
     internal func prepare(_ section: Section) {

@@ -13,52 +13,6 @@ import Foundation
 /// values are handed to the shell as data and the line refers to them (`ShellLine.script`).
 @MainActor
 internal final class CommandRunner {
-    private unowned let kernel: Kernel
-    private let launchesApplications: Bool
-    private let background: DispatchQueue?
-    /// List files are written and removed in order, one after the other: a removal asked for
-    /// earlier never takes a file written later.
-    private let listQueue: DispatchQueue?
-    /// Where list files are written: a folder of this process, emptied when the program starts
-    /// and removed when it quits.
-    ///
-    /// Each file goes when its command has ended.
-    internal let listFolder: URL
-    /// How long a list file outlives the command that was given it: a program started with
-    /// `open` has ended long before the application it opened has read the list.
-    internal static let defaultListGrace: TimeInterval = 60
-    /// The same for this runner (tests make it short).
-    internal var listGrace = CommandRunner.defaultListGrace
-    /// How the end of a started program comes back to the main thread.
-    ///
-    /// Tests keep it for later, to see what comes when the runner has gone meanwhile.
-    internal var backToMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { MainLoop.perform($0) }
-    /// How deep user commands may call each other, and how many steps one run may take with
-    /// everything it calls: a loop the name check does not see still ends.
-    internal static let depthLimit = 16
-    internal static let stepLimit = 1_000
-    /// With this many marked, the marked names are gathered and the placeholders replaced off
-    /// the main thread.
-    internal static let backgroundSelectionThreshold = 5_000
-    /// A line of more pieces than this is checked where it is started, off the main thread.
-    internal static let checkedHereLimit = 4_096
-    internal var environment = ProcessInfo.processInfo.environment
-    /// Finds the definition of a user command, so that a chain can wait for what it starts.
-    internal var userCommand: ((String) -> UserCommand?)?
-    /// Finds the entry of the Start menu a `cm_UserMenu<n>` runs, for the same purpose.
-    internal var startMenuEntry: ((String) -> StartMenuEntry?)?
-    /// The user commands whose steps are being performed right now, outermost first.
-    ///
-    /// A command started from inside them (through the command registry) continues this list.
-    private var active: [String] = []
-    /// The lines started without a command-line plugin, also when starting is switched off.
-    internal private(set) var launched: [String] = []
-    /// Raised by `stopWaiting`: what was waiting before belongs to an older number and ends.
-    private var generation = 0
-    /// How many timers and programs chains are waiting for.
-    private var waiting = 0
-    private let children = ChildTable()
-
     /// What one run counts with everything it calls.
     ///
     /// Main thread only. (A run whose steps are spent goes no further: nothing of it is waiting to
@@ -86,6 +40,63 @@ internal final class CommandRunner {
         let title: String
         let call: Call
     }
+    /// How long a list file outlives the command that was given it: a program started with
+    /// `open` has ended long before the application it opened has read the list.
+    internal static let defaultListGrace: TimeInterval = 60
+    /// How deep user commands may call each other, and how many steps one run may take with
+    /// everything it calls: a loop the name check does not see still ends.
+    internal static let depthLimit = 16
+    internal static let stepLimit = 1_000
+    /// With this many marked, the marked names are gathered and the placeholders replaced off
+    /// the main thread.
+    internal static let backgroundSelectionThreshold = 5_000
+    /// A line of more pieces than this is checked where it is started, off the main thread.
+    internal static let checkedHereLimit = 4_096
+
+    nonisolated private static let applicationFolders: [URL] = [
+        "/Applications", "/System/Applications", "/System/Applications/Utilities", "/Applications/Utilities",
+        NSHomeDirectory() + "/Applications"
+    ]
+    .map { URL(fileURLWithPath: $0) }
+
+    private unowned let kernel: Kernel
+    private let launchesApplications: Bool
+    private let background: DispatchQueue?
+    /// List files are written and removed in order, one after the other: a removal asked for
+    /// earlier never takes a file written later.
+    private let listQueue: DispatchQueue?
+    /// Where list files are written: a folder of this process, emptied when the program starts
+    /// and removed when it quits.
+    ///
+    /// Each file goes when its command has ended.
+    internal let listFolder: URL
+    /// The same for this runner (tests make it short).
+    internal var listGrace = CommandRunner.defaultListGrace
+    /// How the end of a started program comes back to the main thread.
+    ///
+    /// Tests keep it for later, to see what comes when the runner has gone meanwhile.
+    internal var backToMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { MainLoop.perform($0) }
+    internal var environment = ProcessInfo.processInfo.environment
+    /// Finds the definition of a user command, so that a chain can wait for what it starts.
+    internal var userCommand: ((String) -> UserCommand?)?
+    /// Finds the entry of the Start menu a `cm_UserMenu<n>` runs, for the same purpose.
+    internal var startMenuEntry: ((String) -> StartMenuEntry?)?
+    /// The user commands whose steps are being performed right now, outermost first.
+    ///
+    /// A command started from inside them (through the command registry) continues this list.
+    private var active: [String] = []
+    /// The lines started without a command-line plugin, also when starting is switched off.
+    internal private(set) var launched: [String] = []
+    /// Raised by `stopWaiting`: what was waiting before belongs to an older number and ends.
+    private var generation = 0
+    /// How many timers and programs chains are waiting for.
+    private var waiting = 0
+    private let children = ChildTable()
+
+    // MARK: Running
+
+    /// Whether a chain is waiting for a `cm_wait` or for a program to end.
+    internal var isWaiting: Bool { waiting > 0 }
 
     /// Without `background` everything runs at once on the calling thread (tests).
     internal init(kernel: Kernel, launchesApplications: Bool, background: DispatchQueue?, listFolder: URL) {
@@ -94,6 +105,60 @@ internal final class CommandRunner {
         self.background = background
         listQueue = background == nil ? nil : DispatchQueue(label: "afm.configuration.lists", qos: .userInitiated)
         self.listFolder = listFolder
+    }
+
+    /// Removes the folders of earlier runs of the program that are no longer running.
+    ///
+    /// Folders are named by process number; another running instance keeps its own.
+    nonisolated internal static func removeStaleListFolders(in parent: URL) {
+        let fm = FileManager.default
+        for url in (try? fm.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)) ?? [] {
+            guard let pid = Int32(url.lastPathComponent) else { continue }
+            if pid != getpid(), kill(pid, 0) == -1, errno == ESRCH { try? fm.removeItem(at: url) }
+        }
+    }
+
+    /// A line whose program is an application (`Safari.app`, or the bare name of an installed
+    /// application) is opened with `open`.
+    ///
+    /// Nil for any other line. For a bare name the shell decides: a program of that name on the
+    /// user's PATH, which only the login shell knows, comes first. Asks the disk: background only.
+    nonisolated internal static func applicationLine(for line: [ExpandedPiece]) -> [ExpandedPiece]? {
+        // The first word as a whole, also when it is quoted and has a space in it.
+        let (word, rest) = ShellWords.firstWord(of: line)
+        let first = ShellWords.unquoted(word)
+        guard !first.isEmpty, first.unicodeScalars.first != "-" else {
+            return nil
+        }
+        let fm = FileManager.default
+        if first.lowercased().hasSuffix(".app") {
+            let path = NSString(string: first).expandingTildeInPath
+            let exists =
+                first.contains("/")
+                ? fm.fileExists(atPath: path)
+                : applicationFolders.contains { fm.fileExists(atPath: $0.appendingPathComponent(first).path) }
+            return exists ? [.text("/usr/bin/open -a "), .value(path)] + rest : nil
+        }
+        let isAlone = rest.allSatisfy { piece in
+            if case .text(let text) = piece {
+                return text.unicodeScalars.allSatisfy { $0 == " " || $0 == "\t" }
+            }
+            return false
+        }
+        guard isAlone, !first.contains("/") else {
+            return nil
+        }
+        guard
+            applicationFolders.contains(where: { fm.fileExists(atPath: $0.appendingPathComponent(first + ".app").path) }
+            )
+        else { return nil }
+        return [.text("if command -v "), .value(first), .text(" >/dev/null 2>&1\nthen ")] + line
+            + [.text("\nelse /usr/bin/open -a "), .value(first), .text("\nfi")]
+    }
+
+    /// The same for a line as text, as text; nil for a line that is no application.
+    nonisolated internal static func applicationLine(for line: String) -> String? {
+        applicationLine(for: [.text(line)]).map(ShellLine.display)
     }
 
     /// Runs `work` away from the main thread and `completion` on it.
@@ -155,17 +220,6 @@ internal final class CommandRunner {
             }
         }
         if kept == 0 { try? fm.removeItem(at: listFolder) }
-    }
-
-    /// Removes the folders of earlier runs of the program that are no longer running.
-    ///
-    /// Folders are named by process number; another running instance keeps its own.
-    nonisolated internal static func removeStaleListFolders(in parent: URL) {
-        let fm = FileManager.default
-        for url in (try? fm.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)) ?? [] {
-            guard let pid = Int32(url.lastPathComponent) else { continue }
-            if pid != getpid(), kill(pid, 0) == -1, errno == ESRCH { try? fm.removeItem(at: url) }
-        }
     }
 
     private func removeListFile(_ url: URL?, after delay: TimeInterval = 0) {
@@ -257,11 +311,6 @@ internal final class CommandRunner {
         let lowered = name.lowercased()
         return kernel.commands.all.first { $0.id.rawValue.lowercased() == lowered }?.id
     }
-
-    // MARK: Running
-
-    /// Whether a chain is waiting for a `cm_wait` or for a program to end.
-    internal var isWaiting: Bool { waiting > 0 }
 
     /// Ends every chain that is waiting: its remaining steps are not run, and the programs it
     /// waits for are asked to end.
@@ -659,55 +708,6 @@ internal final class CommandRunner {
             }
         }
     }
-
-    /// A line whose program is an application (`Safari.app`, or the bare name of an installed
-    /// application) is opened with `open`.
-    ///
-    /// Nil for any other line. For a bare name the shell decides: a program of that name on the
-    /// user's PATH, which only the login shell knows, comes first. Asks the disk: background only.
-    nonisolated internal static func applicationLine(for line: [ExpandedPiece]) -> [ExpandedPiece]? {
-        // The first word as a whole, also when it is quoted and has a space in it.
-        let (word, rest) = ShellWords.firstWord(of: line)
-        let first = ShellWords.unquoted(word)
-        guard !first.isEmpty, first.unicodeScalars.first != "-" else {
-            return nil
-        }
-        let fm = FileManager.default
-        if first.lowercased().hasSuffix(".app") {
-            let path = NSString(string: first).expandingTildeInPath
-            let exists =
-                first.contains("/")
-                ? fm.fileExists(atPath: path)
-                : applicationFolders.contains { fm.fileExists(atPath: $0.appendingPathComponent(first).path) }
-            return exists ? [.text("/usr/bin/open -a "), .value(path)] + rest : nil
-        }
-        let isAlone = rest.allSatisfy { piece in
-            if case .text(let text) = piece {
-                return text.unicodeScalars.allSatisfy { $0 == " " || $0 == "\t" }
-            }
-            return false
-        }
-        guard isAlone, !first.contains("/") else {
-            return nil
-        }
-        guard
-            applicationFolders.contains(where: { fm.fileExists(atPath: $0.appendingPathComponent(first + ".app").path) }
-            )
-        else { return nil }
-        return [.text("if command -v "), .value(first), .text(" >/dev/null 2>&1\nthen ")] + line
-            + [.text("\nelse /usr/bin/open -a "), .value(first), .text("\nfi")]
-    }
-
-    /// The same for a line as text, as text; nil for a line that is no application.
-    nonisolated internal static func applicationLine(for line: String) -> String? {
-        applicationLine(for: [.text(line)]).map(ShellLine.display)
-    }
-
-    nonisolated private static let applicationFolders: [URL] = [
-        "/Applications", "/System/Applications", "/System/Applications/Utilities", "/Applications/Utilities",
-        NSHomeDirectory() + "/Applications"
-    ]
-    .map { URL(fileURLWithPath: $0) }
 }
 
 /// Hands a block to the main thread through the run loop (all modes that count), not through

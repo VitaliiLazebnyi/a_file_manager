@@ -17,6 +17,25 @@ import Testing
 /// Every call is forwarded to `base`. Unchecked: what it records is guarded by `lock`; its switches
 /// are set by the test before use.
 internal final class P2ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
+    /// Unchecked: used by one thread at a time, as the protocol allows.
+    private final class FailingWriter: FileWriter, @unchecked Sendable {
+        let inner: any FileWriter
+        let failure: any Error
+        var wrote = false
+        init(_ inner: any FileWriter, _ failure: any Error) { (self.inner, self.failure) = (inner, failure) }
+        func write(_ data: Data) throws {
+            wrote = true
+            try inner.write(data)
+        }
+        func close(attributes: FileAttributes) throws {
+            try inner.close(attributes: attributes)
+            if wrote {
+                wrote = false
+                throw failure
+            }
+        }
+    }
+
     internal let base: MemoryFileSystem
     internal var scheme: String { base.scheme }
     internal var capabilities: FileSystemCapabilities { base.capabilities }
@@ -39,17 +58,17 @@ internal final class P2ProbeFileSystem: FileSystemProvider, @unchecked Sendable 
     /// Called when such a removal starts to wait.
     internal var onStalledRemoval: (() -> Void)?
 
-    internal init(scheme: String = "probe") {
-        base = MemoryFileSystem(scheme: scheme)
-    }
-
     /// The changing calls that came with a cancellation flag, and those that came without.
     internal var flagged: [String] { lock.withLock { withFlag } }
     internal var unflagged: [String] { lock.withLock { withoutFlag } }
     /// The paths that were opened for reading, in that order.
     internal var reads: [String] { lock.withLock { readPaths } }
-    internal func listings(of path: String) -> Int { lock.withLock { listedPaths.filter { $0 == path }.count } }
     internal var displayed: Int { lock.withLock { shown } }
+
+    internal init(scheme: String = "probe") {
+        base = MemoryFileSystem(scheme: scheme)
+    }
+    internal func listings(of path: String) -> Int { lock.withLock { listedPaths.filter { $0 == path }.count } }
 
     private func note(_ call: String, flag: CancellationFlag?) throws {
         lock.withLock { flag == nil ? withoutFlag.append(call) : withFlag.append(call) }
@@ -74,25 +93,6 @@ internal final class P2ProbeFileSystem: FileSystemProvider, @unchecked Sendable 
     internal func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         lock.withLock { readPaths.append(url.path) }
         return try base.read(url, cancellation: cancellation)
-    }
-
-    /// Unchecked: used by one thread at a time, as the protocol allows.
-    private final class FailingWriter: FileWriter, @unchecked Sendable {
-        let inner: any FileWriter
-        let failure: any Error
-        var wrote = false
-        init(_ inner: any FileWriter, _ failure: any Error) { (self.inner, self.failure) = (inner, failure) }
-        func write(_ data: Data) throws {
-            wrote = true
-            try inner.write(data)
-        }
-        func close(attributes: FileAttributes) throws {
-            try inner.close(attributes: attributes)
-            if wrote {
-                wrote = false
-                throw failure
-            }
-        }
     }
 
     internal func write(_ url: URL) throws -> any FileWriter {
@@ -231,6 +231,8 @@ internal final class P2RacingLocalFileSystem: FileSystemProvider, @unchecked Sen
 /// says so through `realLocation(of:)`, and through nothing else: its `parent(of:)` gives
 /// nothing away.
 internal final class P2ViewFileSystem: FileSystemProvider {
+    internal struct Unused: Error {}
+
     internal let scheme = "p2view"
     internal let capabilities: FileSystemCapabilities = [.write]
     /// Unowned: the registry holds this file system.
@@ -242,8 +244,6 @@ internal final class P2ViewFileSystem: FileSystemProvider {
         URL(string: "p2view://shown" + real.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)!
     }
     internal func realLocation(of url: URL) -> URL? { URL(fileURLWithPath: url.path) }
-
-    internal struct Unused: Error {}
     internal func list(_: URL, showHidden _: Bool) throws -> [FileItem] { throw Unused() }
     internal func item(at _: URL) -> FileItem? { nil }
     internal func parent(of _: URL) -> URL? { nil }

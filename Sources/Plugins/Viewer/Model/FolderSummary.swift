@@ -5,6 +5,36 @@ import Foundation
 /// What a folder holds, for the quick-view pane (spec 03 › Quick View: "on a folder,
 /// information about its occupied space").
 internal struct FolderSummary: Equatable {
+    /// The entries still to be counted, shared by all the threads of a walk.
+    ///
+    /// All state is guarded by `lock`.
+    private final class Budget: @unchecked Sendable {
+        private let lock = NSLock()
+        private var left: Int
+        private var isExhausted = false
+
+        var exhausted: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return isExhausted
+        }
+
+        init(_ limit: Int) { left = max(0, limit) }
+
+        /// Takes `count` entries; false when there is no room for them all (the walk then ends).
+        func take(_ count: Int) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            guard left >= count else {
+                isExhausted = true
+                left = 0
+                return false
+            }
+            left -= count
+            return true
+        }
+    }
+
     internal var files = 0
     internal var folders = 0
     internal var bytes: Int64 = 0
@@ -43,36 +73,6 @@ internal struct FolderSummary: Equatable {
         var result = measure(directory, provider: provider, cancellation: cancellation, budget: budget)
         result.isPartial = budget?.exhausted == true
         return result
-    }
-
-    /// The entries still to be counted, shared by all the threads of a walk.
-    ///
-    /// All state is guarded by `lock`.
-    private final class Budget: @unchecked Sendable {
-        private let lock = NSLock()
-        private var left: Int
-        private var isExhausted = false
-
-        init(_ limit: Int) { left = max(0, limit) }
-
-        /// Takes `count` entries; false when there is no room for them all (the walk then ends).
-        func take(_ count: Int) -> Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            guard left >= count else {
-                isExhausted = true
-                left = 0
-                return false
-            }
-            left -= count
-            return true
-        }
-
-        var exhausted: Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            return isExhausted
-        }
     }
 
     private static func measure(

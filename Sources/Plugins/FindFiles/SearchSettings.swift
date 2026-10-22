@@ -24,6 +24,28 @@ public struct SearchSettings: Codable, Equatable, Sendable {
     public var fieldRules = FieldRules()
     public var duplicates = DuplicateOptions()
 
+    /// The settings that differ from a plain search, in a few words, for the list of saved
+    /// searches (spec 09 › Load/Save tab).
+    public var summary: String {
+        var parts: [String] = []
+        if !searchFor.isEmpty { parts.append(searchFor) }
+        if namesAreRegex { parts.append("regex") }
+        if findText, !text.isEmpty { parts.append("text \"\(text)\"") }
+        if criteria.dateFrom != nil || criteria.dateTo != nil || criteria.notOlderThan != nil
+            || criteria.olderThan != nil
+        {
+            parts.append("date")
+        }
+        if searchArchives { parts.append("zip") }
+        if criteria.size != nil { parts.append("size") }
+        if criteria.hasAttributes { parts.append("attr") }
+        if duplicates.isActive { parts.append("2x") }
+        if let depth { parts.append("D<=\(depth)") }
+        if fieldRules.isActive { parts.append("plugins") }
+        if useSpotlight { parts.append("Spotlight") }
+        return parts.joined(separator: ", ")
+    }
+
     public init() {}
 
     /// The start directories typed into "Search in"; relative ones count from `base`.
@@ -62,28 +84,6 @@ public struct SearchSettings: Codable, Equatable, Sendable {
         return query
     }
 
-    /// The settings that differ from a plain search, in a few words, for the list of saved
-    /// searches (spec 09 › Load/Save tab).
-    public var summary: String {
-        var parts: [String] = []
-        if !searchFor.isEmpty { parts.append(searchFor) }
-        if namesAreRegex { parts.append("regex") }
-        if findText, !text.isEmpty { parts.append("text \"\(text)\"") }
-        if criteria.dateFrom != nil || criteria.dateTo != nil || criteria.notOlderThan != nil
-            || criteria.olderThan != nil
-        {
-            parts.append("date")
-        }
-        if searchArchives { parts.append("zip") }
-        if criteria.size != nil { parts.append("size") }
-        if criteria.hasAttributes { parts.append("attr") }
-        if duplicates.isActive { parts.append("2x") }
-        if let depth { parts.append("D<=\(depth)") }
-        if fieldRules.isActive { parts.append("plugins") }
-        if useSpotlight { parts.append("Spotlight") }
-        return parts.joined(separator: ", ")
-    }
-
     /// These settings as they are loaded into a window that holds `current`: a "Search for" or
     /// "Search in" saved with a leading `>` leaves the window's field as it is.
     public func loaded(over current: Self) -> Self {
@@ -112,13 +112,9 @@ public final class SearchStore {
     public enum Field: String {
         case searchFor, searchIn, text
     }
-
-    private let settings: any SettingsStore
     private static let searchesKey = "searches"
 
-    public init(settings: any SettingsStore) {
-        self.settings = settings.scoped(to: "findFiles")
-    }
+    private let settings: any SettingsStore
 
     /// In name order.
     ///
@@ -128,8 +124,8 @@ public final class SearchStore {
             .sorted { Sorter.compare($0.name, $1.name) == .orderedAscending }
     }
 
-    public subscript(name: String) -> SavedSearch? {
-        searches.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    public init(settings: any SettingsStore) {
+        self.settings = settings.scoped(to: "findFiles")
     }
 
     /// Saves under a name; a search of that name is replaced.
@@ -165,5 +161,9 @@ public final class SearchStore {
 
     public func forget(_ text: String, in field: Field) {
         settings.set(history(field).filter { $0 != text }, forKey: "history." + field.rawValue)
+    }
+
+    public subscript(name: String) -> SavedSearch? {
+        searches.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 }

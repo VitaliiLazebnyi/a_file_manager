@@ -40,6 +40,9 @@ internal struct SearchPattern {
         case expression(NSRegularExpression)
     }
 
+    /// Stands for `\n` between unescaping and building the search.
+    private static let lineBreak: Character = "\u{E000}"
+
     internal let kind: Kind
     internal let wholeWords: Bool
     internal let caseSensitive: Bool
@@ -80,9 +83,6 @@ internal struct SearchPattern {
             }
         }
     }
-
-    /// Stands for `\n` between unescaping and building the search.
-    private static let lineBreak: Character = "\u{E000}"
 
     /// `\t` is a tab, `\n` a line break, `\\` one backslash; any other backslash is itself.
     internal static func unescape(_ text: String) -> String {
@@ -156,87 +156,6 @@ internal struct SearchPattern {
 /// Several chunks are read, decoded and searched at once on all cores; the first hit in file order
 /// wins. Blocks; call it on a background thread.
 internal enum ViewerSearch {
-    /// The longest match a regular expression can have across a chunk border.
-    internal static let expressionOverlap = 64 * 1_024
-
-    /// The next match that begins at or after `start` or, with `backwards`, the last one that
-    /// begins before `start`.
-    ///
-    /// Nil when there is none or the search was cancelled (a read that was blocked is interrupted).
-    /// `progress` receives the share of the way that has been searched, on the calling thread.
-    /// `boundaries` is what a text in a double-byte code page is cut into characters with; a search
-    /// that is repeated keeps it between the calls. `rawBytes` off decodes every chunk (the
-    /// reference the raw searches are tested against).
-    internal static func find(
-        _ pattern: SearchPattern,
-        in source: any ByteSource,
-        content: Range<Int64>,
-        from start: Int64,
-        backwards: Bool,
-        encoding: ViewerEncoding,
-        chunkSize: Int = 1 << 20,
-        parallelism: Int = ProcessInfo.processInfo.activeProcessorCount,
-        cancellation: CancellationFlag = CancellationFlag(),
-        boundaries: CharacterBoundaries? = nil,
-        rawBytes: Bool = true,
-        progress: (Double) -> Void = { _ in }
-    ) throws -> Range<Int64>? {
-        let boundaries =
-            encoding.kind == .doubleByte
-            ? boundaries ?? CharacterBoundaries(source: source, content: content, encoding: encoding) : nil
-        let context = Context(
-            source: source,
-            content: content,
-            encoding: encoding,
-            cancellation: cancellation,
-            boundaries: boundaries,
-            rawBytes: rawBytes
-        )
-        let unit = Int64(encoding.unitSize)
-        let size = max(unit, Int64(chunkSize) / unit * unit)
-        let start = min(max(start, content.lowerBound), content.upperBound)
-        // Chunk borders stay on whole code units, counted from the start of the text.
-        let origin =
-            backwards ? start + (start - content.lowerBound) % unit : start - (start - content.lowerBound) % unit
-        let total = backwards ? origin - content.lowerBound : content.upperBound - origin
-        guard total > 0 else {
-            return nil
-        }
-        let chunkCount = Int((total + size - 1) / size)
-        var next = 0
-        while next < chunkCount, !cancellation.isCancelled {
-            let wave = Array(next..<min(chunkCount, next + max(1, parallelism)))
-            let results: [Result<Range<Int64>?, any Error>] = Parallel.map(wave) { number in
-                let owned: Range<Int64> =
-                    backwards
-                    ? max(content.lowerBound, origin - Int64(number + 1) * size)..<origin - Int64(number) * size
-                    : origin + Int64(number) * size..<min(content.upperBound, origin + Int64(number + 1) * size)
-                let accepted =
-                    backwards
-                    ? owned.lowerBound..<min(owned.upperBound, start) : max(owned.lowerBound, start)..<owned.upperBound
-                // Each chunk frees what it read and decoded when it is done: the threads of the
-                // pool live on, and a search of gigabytes would keep every buffer until they idle.
-                return autoreleasepool { Result { try search(pattern, context, accepted: accepted, last: backwards) } }
-            }
-            for result in results {
-                do {
-                    if let match = try result.get() {
-                        return match
-                    }
-                } catch {
-                    // A read that the flag ended is no failure.
-                    if cancellation.isCancelled {
-                        return nil
-                    }
-                    throw error
-                }
-            }
-            next += wave.count
-            progress(min(1, Double(next) / Double(chunkCount)))
-        }
-        return nil
-    }
-
     /// What a search of one chunk needs besides the pattern.
     private struct Context {
         let source: any ByteSource
@@ -245,146 +164,6 @@ internal enum ViewerSearch {
         let cancellation: CancellationFlag
         let boundaries: CharacterBoundaries?
         let rawBytes: Bool
-    }
-
-    /// The first (or last) match that begins inside `accepted`.
-    ///
-    /// Reads a little before it, for the character a whole word must not touch, and enough behind
-    /// it for a match to end.
-    private static func search(_ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>, last: Bool) throws
-        -> Range<Int64>?
-    {
-        let (source, content, encoding, cancellation) = (
-            context.source, context.content, context.encoding, context.cancellation
-        )
-        switch pattern.kind {
-        case .bytes(let needle):
-            let lower = accepted.lowerBound
-            let data = try source.read(
-                lower..<min(content.upperBound, accepted.upperBound + Int64(needle.count - 1)),
-                cancellation: cancellation
-            )
-            return bytes(needle, in: data, base: lower, accepted: accepted, last: last)
-
-        case .text(let needle):
-            // Matching case, the needle's bytes in a UTF-8 or one-byte-per-character file are
-            // searched for in the raw bytes: no decoding, and no characters in between to go wrong.
-            if pattern.caseSensitive, !pattern.wholeWords, encoding.kind == .utf8 || encoding.kind == .singleByte,
-                let encoded = encoding.encode(needle), !encoded.isEmpty
-            {
-                let lower = accepted.lowerBound
-                let data = try source.read(
-                    lower..<min(content.upperBound, accepted.upperBound + Int64(encoded.count - 1)),
-                    cancellation: cancellation
-                )
-                return bytes(encoded, in: data, base: lower, accepted: accepted, last: last)
-            }
-            // Letters of the other case and whole words need only the neighbours of an ASCII needle.
-            if context.rawBytes, encoding.kind == .utf8 || encoding.kind == .singleByte,
-                needle.utf8.allSatisfy({ $0 < 0x80 })
-            {
-                if case .answer(let found) = try rawASCII(
-                    Array(needle.utf8),
-                    pattern,
-                    context,
-                    accepted: accepted,
-                    last: last
-                ) {
-                    return found
-                }
-            }
-            let length = needle.utf16.count
-            let matcher = TextMatcher(needle, caseSensitive: pattern.caseSensitive)
-            // Folding can lengthen a match to several times the needle (ß for ss, ﬃ for ffi).
-            return try decoded(context, accepted, Int64(max(4_096, length * 12 + 32))) { text, units, first, end in
-                matcher.find(in: units, from: first, before: end, last: last) {
-                    !pattern.wholeWords || isWholeWord($0, in: text)
-                }
-            }
-
-        case .expression(let expression):
-            return try decoded(context, accepted, Int64(expressionOverlap)) { text, _, first, end in
-                var result: NSRange?
-                // The text before `first` is context only (the 8 bytes decoded before `accepted`):
-                // with the default options the range start would count as the start of the text,
-                // and `^` and `\b` would match falsely there. `.reportProgress` lets a regular
-                // expression that backtracks for ages be stopped.
-                let options: NSRegularExpression.MatchingOptions = [
-                    .withTransparentBounds, .withoutAnchoringBounds, .reportProgress
-                ]
-                expression.enumerateMatches(
-                    in: text as String,
-                    options: options,
-                    range: NSRange(location: first, length: text.length - first)
-                ) { match, _, stop in
-                    if cancellation.isCancelled {
-                        result = nil
-                        stop.pointee = true
-                        return
-                    }
-                    guard let match else {
-                        return
-                    }
-                    if match.range.location >= end {
-                        stop.pointee = true
-                    } else if match.range.length > 0, !pattern.wholeWords || isWholeWord(match.range, in: text) {
-                        result = match.range
-                        if !last { stop.pointee = true }
-                    }
-                }
-                return result
-            }
-        }
-    }
-
-    /// Decodes the surroundings of `accepted` and lets `match` look for a match that begins in
-    /// the UTF-16 units `first..<end`, whose bytes are those of `accepted`; maps what it finds
-    /// back to bytes.
-    private static func decoded(
-        _ context: Context,
-        _ accepted: Range<Int64>,
-        _ overlap: Int64,
-        match: (_ text: NSString, _ units: [UInt16], _ first: Int, _ end: Int) -> NSRange?
-    ) throws -> Range<Int64>? {
-        let (source, content, encoding) = (context.source, context.content, context.encoding)
-        var lower = max(content.lowerBound, accepted.lowerBound - 8)
-        lower -= (lower - content.lowerBound) % Int64(encoding.unitSize)
-        // A chunk border may fall on the second byte of a character of a double-byte text, and
-        // the decoder would stay out of step with the characters from there. It starts at the
-        // beginning of the character the border is in, which is found, not guessed.
-        if let boundaries = context.boundaries, lower > content.lowerBound {
-            lower = try boundaries.characterStart(atOrBefore: lower, cancellation: context.cancellation)
-        }
-        let upper = min(content.upperBound, accepted.upperBound + overlap)
-        let data = try source.read(lower..<upper, cancellation: context.cancellation)
-        var text = DecodedText()
-        let used = encoding.decode(data, final: true, into: &text)
-        func firstUnit(at offset: Int64) -> Int {
-            var low = 0
-            var high = text.offsets.count
-            while low < high {
-                let middle = (low + high) / 2
-                if lower + Int64(text.offsets[middle]) < offset { low = middle + 1 } else { high = middle }
-            }
-            return low
-        }
-        guard !text.units.isEmpty else {
-            return nil
-        }
-        let string = text.units.withUnsafeBufferPointer { NSString(characters: $0.baseAddress!, length: $0.count) }
-        guard
-            let found = match(
-                string,
-                text.units,
-                firstUnit(at: accepted.lowerBound),
-                firstUnit(at: accepted.upperBound)
-            )
-        else { return nil }
-        let from = lower + Int64(text.offsets[found.location])
-        let to =
-            found.location + found.length < text.offsets.count
-            ? lower + Int64(text.offsets[found.location + found.length]) : lower + Int64(used)
-        return from..<to
     }
 
     // MARK: Text in decoded units
@@ -564,6 +343,9 @@ internal enum ViewerSearch {
         case answer(Range<Int64>?)
     }
 
+    /// The longest match a regular expression can have across a chunk border.
+    internal static let expressionOverlap = 64 * 1_024
+
     /// The characters other than ASCII letters that a literal, case-insensitive search of
     /// `NSString` takes for ASCII letters: ß and ẞ for `ss`, the long s, the Kelvin sign,
     /// the ligatures ﬀ…ﬆ.
@@ -572,6 +354,226 @@ internal enum ViewerSearch {
     private static let caseFolded: Set<UInt16> = [
         0xDF, 0x17F, 0x1E9E, 0x212A, 0xFB00, 0xFB01, 0xFB02, 0xFB03, 0xFB04, 0xFB05, 0xFB06
     ]
+
+    private static let wordCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
+
+    /// The next match that begins at or after `start` or, with `backwards`, the last one that
+    /// begins before `start`.
+    ///
+    /// Nil when there is none or the search was cancelled (a read that was blocked is interrupted).
+    /// `progress` receives the share of the way that has been searched, on the calling thread.
+    /// `boundaries` is what a text in a double-byte code page is cut into characters with; a search
+    /// that is repeated keeps it between the calls. `rawBytes` off decodes every chunk (the
+    /// reference the raw searches are tested against).
+    internal static func find(
+        _ pattern: SearchPattern,
+        in source: any ByteSource,
+        content: Range<Int64>,
+        from start: Int64,
+        backwards: Bool,
+        encoding: ViewerEncoding,
+        chunkSize: Int = 1 << 20,
+        parallelism: Int = ProcessInfo.processInfo.activeProcessorCount,
+        cancellation: CancellationFlag = CancellationFlag(),
+        boundaries: CharacterBoundaries? = nil,
+        rawBytes: Bool = true,
+        progress: (Double) -> Void = { _ in }
+    ) throws -> Range<Int64>? {
+        let boundaries =
+            encoding.kind == .doubleByte
+            ? boundaries ?? CharacterBoundaries(source: source, content: content, encoding: encoding) : nil
+        let context = Context(
+            source: source,
+            content: content,
+            encoding: encoding,
+            cancellation: cancellation,
+            boundaries: boundaries,
+            rawBytes: rawBytes
+        )
+        let unit = Int64(encoding.unitSize)
+        let size = max(unit, Int64(chunkSize) / unit * unit)
+        let start = min(max(start, content.lowerBound), content.upperBound)
+        // Chunk borders stay on whole code units, counted from the start of the text.
+        let origin =
+            backwards ? start + (start - content.lowerBound) % unit : start - (start - content.lowerBound) % unit
+        let total = backwards ? origin - content.lowerBound : content.upperBound - origin
+        guard total > 0 else {
+            return nil
+        }
+        let chunkCount = Int((total + size - 1) / size)
+        var next = 0
+        while next < chunkCount, !cancellation.isCancelled {
+            let wave = Array(next..<min(chunkCount, next + max(1, parallelism)))
+            let results: [Result<Range<Int64>?, any Error>] = Parallel.map(wave) { number in
+                let owned: Range<Int64> =
+                    backwards
+                    ? max(content.lowerBound, origin - Int64(number + 1) * size)..<origin - Int64(number) * size
+                    : origin + Int64(number) * size..<min(content.upperBound, origin + Int64(number + 1) * size)
+                let accepted =
+                    backwards
+                    ? owned.lowerBound..<min(owned.upperBound, start) : max(owned.lowerBound, start)..<owned.upperBound
+                // Each chunk frees what it read and decoded when it is done: the threads of the
+                // pool live on, and a search of gigabytes would keep every buffer until they idle.
+                return autoreleasepool { Result { try search(pattern, context, accepted: accepted, last: backwards) } }
+            }
+            for result in results {
+                do {
+                    if let match = try result.get() {
+                        return match
+                    }
+                } catch {
+                    // A read that the flag ended is no failure.
+                    if cancellation.isCancelled {
+                        return nil
+                    }
+                    throw error
+                }
+            }
+            next += wave.count
+            progress(min(1, Double(next) / Double(chunkCount)))
+        }
+        return nil
+    }
+
+    /// The first (or last) match that begins inside `accepted`.
+    ///
+    /// Reads a little before it, for the character a whole word must not touch, and enough behind
+    /// it for a match to end.
+    private static func search(_ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>, last: Bool) throws
+        -> Range<Int64>?
+    {
+        let (source, content, encoding, cancellation) = (
+            context.source, context.content, context.encoding, context.cancellation
+        )
+        switch pattern.kind {
+        case .bytes(let needle):
+            let lower = accepted.lowerBound
+            let data = try source.read(
+                lower..<min(content.upperBound, accepted.upperBound + Int64(needle.count - 1)),
+                cancellation: cancellation
+            )
+            return bytes(needle, in: data, base: lower, accepted: accepted, last: last)
+
+        case .text(let needle):
+            // Matching case, the needle's bytes in a UTF-8 or one-byte-per-character file are
+            // searched for in the raw bytes: no decoding, and no characters in between to go wrong.
+            if pattern.caseSensitive, !pattern.wholeWords, encoding.kind == .utf8 || encoding.kind == .singleByte,
+                let encoded = encoding.encode(needle), !encoded.isEmpty
+            {
+                let lower = accepted.lowerBound
+                let data = try source.read(
+                    lower..<min(content.upperBound, accepted.upperBound + Int64(encoded.count - 1)),
+                    cancellation: cancellation
+                )
+                return bytes(encoded, in: data, base: lower, accepted: accepted, last: last)
+            }
+            // Letters of the other case and whole words need only the neighbours of an ASCII needle.
+            if context.rawBytes, encoding.kind == .utf8 || encoding.kind == .singleByte,
+                needle.utf8.allSatisfy({ $0 < 0x80 })
+            {
+                if case .answer(let found) = try rawASCII(
+                    Array(needle.utf8),
+                    pattern,
+                    context,
+                    accepted: accepted,
+                    last: last
+                ) {
+                    return found
+                }
+            }
+            let length = needle.utf16.count
+            let matcher = TextMatcher(needle, caseSensitive: pattern.caseSensitive)
+            // Folding can lengthen a match to several times the needle (ß for ss, ﬃ for ffi).
+            return try decoded(context, accepted, Int64(max(4_096, length * 12 + 32))) { text, units, first, end in
+                matcher.find(in: units, from: first, before: end, last: last) {
+                    !pattern.wholeWords || isWholeWord($0, in: text)
+                }
+            }
+
+        case .expression(let expression):
+            return try decoded(context, accepted, Int64(expressionOverlap)) { text, _, first, end in
+                var result: NSRange?
+                // The text before `first` is context only (the 8 bytes decoded before `accepted`):
+                // with the default options the range start would count as the start of the text,
+                // and `^` and `\b` would match falsely there. `.reportProgress` lets a regular
+                // expression that backtracks for ages be stopped.
+                let options: NSRegularExpression.MatchingOptions = [
+                    .withTransparentBounds, .withoutAnchoringBounds, .reportProgress
+                ]
+                expression.enumerateMatches(
+                    in: text as String,
+                    options: options,
+                    range: NSRange(location: first, length: text.length - first)
+                ) { match, _, stop in
+                    if cancellation.isCancelled {
+                        result = nil
+                        stop.pointee = true
+                        return
+                    }
+                    guard let match else {
+                        return
+                    }
+                    if match.range.location >= end {
+                        stop.pointee = true
+                    } else if match.range.length > 0, !pattern.wholeWords || isWholeWord(match.range, in: text) {
+                        result = match.range
+                        if !last { stop.pointee = true }
+                    }
+                }
+                return result
+            }
+        }
+    }
+
+    /// Decodes the surroundings of `accepted` and lets `match` look for a match that begins in
+    /// the UTF-16 units `first..<end`, whose bytes are those of `accepted`; maps what it finds
+    /// back to bytes.
+    private static func decoded(
+        _ context: Context,
+        _ accepted: Range<Int64>,
+        _ overlap: Int64,
+        match: (_ text: NSString, _ units: [UInt16], _ first: Int, _ end: Int) -> NSRange?
+    ) throws -> Range<Int64>? {
+        let (source, content, encoding) = (context.source, context.content, context.encoding)
+        var lower = max(content.lowerBound, accepted.lowerBound - 8)
+        lower -= (lower - content.lowerBound) % Int64(encoding.unitSize)
+        // A chunk border may fall on the second byte of a character of a double-byte text, and
+        // the decoder would stay out of step with the characters from there. It starts at the
+        // beginning of the character the border is in, which is found, not guessed.
+        if let boundaries = context.boundaries, lower > content.lowerBound {
+            lower = try boundaries.characterStart(atOrBefore: lower, cancellation: context.cancellation)
+        }
+        let upper = min(content.upperBound, accepted.upperBound + overlap)
+        let data = try source.read(lower..<upper, cancellation: context.cancellation)
+        var text = DecodedText()
+        let used = encoding.decode(data, final: true, into: &text)
+        func firstUnit(at offset: Int64) -> Int {
+            var low = 0
+            var high = text.offsets.count
+            while low < high {
+                let middle = (low + high) / 2
+                if lower + Int64(text.offsets[middle]) < offset { low = middle + 1 } else { high = middle }
+            }
+            return low
+        }
+        guard !text.units.isEmpty else {
+            return nil
+        }
+        let string = text.units.withUnsafeBufferPointer { NSString(characters: $0.baseAddress!, length: $0.count) }
+        guard
+            let found = match(
+                string,
+                text.units,
+                firstUnit(at: accepted.lowerBound),
+                firstUnit(at: accepted.upperBound)
+            )
+        else { return nil }
+        let from = lower + Int64(text.offsets[found.location])
+        let to =
+            found.location + found.length < text.offsets.count
+            ? lower + Int64(text.offsets[found.location + found.length]) : lower + Int64(used)
+        return from..<to
+    }
 
     /// Whether `data` has the UTF-8 form of one of `caseFolded`.
     private static func hasCaseFolded(utf8 data: Data) -> Bool {
@@ -742,8 +744,6 @@ internal enum ViewerSearch {
         }
         return .answer(result)
     }
-
-    private static let wordCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
 
     /// A whole word is not part of a longer one: `man` is not found in `manager`.
     private static func isWholeWord(_ range: NSRange, in text: NSString) -> Bool {

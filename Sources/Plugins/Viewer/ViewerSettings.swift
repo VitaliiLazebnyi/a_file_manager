@@ -57,12 +57,6 @@ internal enum ImageFit: Int {
 ///
 /// They live in the settings store under `viewer.…`. Main thread only.
 internal final class ListerSettings {
-    private let store: any SettingsStore
-
-    internal init(_ store: any SettingsStore) {
-        self.store = store
-    }
-
     private enum Key {
         static let startupMode = "viewer.startupMode", startupFont = "viewer.startupFont"
         static let fixedFont = "viewer.fixedFont", variableFont = "viewer.variableFont"
@@ -132,15 +126,7 @@ internal final class ListerSettings {
         ]
     }
 
-    private func number(_ key: String, default value: Int, in range: ClosedRange<Int>) -> Int {
-        min(
-            range.upperBound,
-            max(
-                range.lowerBound,
-                Int(store.text(key, default: String(value)).trimmingCharacters(in: .whitespaces)) ?? value
-            )
-        )
-    }
+    private let store: any SettingsStore
 
     // MARK: Configure Lister
 
@@ -170,11 +156,6 @@ internal final class ListerSettings {
     internal var noMediaTypes: Set<String> { ViewerDetection.extensions(in: store.text(Key.noMediaTypes, default: "")) }
     internal var gifMinimumDelay: Double { Double(number(Key.gifDelay, default: 80, in: 10...5_000)) / 1_000 }
 
-    /// The page of the configuration dialog; `onChange` runs after the user changed something.
-    internal static func preferencePage(onChange: @escaping @MainActor @Sendable () -> Void) -> PreferencePage {
-        PreferencePage(title: "Lister", preferences: preferences, onChange: onChange)
-    }
-
     // MARK: Remembered by the viewer
 
     internal var wrap: Bool {
@@ -203,23 +184,6 @@ internal final class ListerSettings {
         set { store.set(min(1, max(0, newValue)), forKey: Key.volume) }
     }
 
-    /// The font of a slot as name and size; nil names the system's default font.
-    internal func font(_ slot: FontSlot) -> (name: String?, size: Double) {
-        let text = store.text(slot == .variable ? Key.variableFont : Key.fixedFont, default: "")
-        let parts = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        let size = parts.count > 1 ? Double(parts[1]).map { min(96, max(6, abs($0))) } : nil
-        return (parts.first.flatMap { $0.isEmpty ? nil : $0 }, size ?? (slot == .variable ? 13 : 12))
-    }
-
-    /// The frame of the Lister window (`quick`: of the separate quick view) in the notation of
-    /// `NSStringFromRect`; saved with Options › Save position and when a window closes.
-    internal func windowFrame(quick: Bool) -> String? {
-        store.value(String.self, forKey: quick ? Key.quickFrame : Key.frame)
-    }
-    internal func setWindowFrame(_ frame: String, quick: Bool) {
-        store.set(frame, forKey: quick ? Key.quickFrame : Key.frame)
-    }
-
     /// What was searched for, newest first; shared by every Lister window.
     internal var searchHistory: [String] {
         get { store.value([String].self, forKey: Key.searchHistory) ?? [] }
@@ -241,5 +205,41 @@ internal final class ListerSettings {
     internal var printMargins: [Double]? {
         get { store.value([Double].self, forKey: Key.margins) }
         set { store.set(newValue, forKey: Key.margins) }
+    }
+
+    internal init(_ store: any SettingsStore) {
+        self.store = store
+    }
+
+    /// The page of the configuration dialog; `onChange` runs after the user changed something.
+    internal static func preferencePage(onChange: @escaping @MainActor @Sendable () -> Void) -> PreferencePage {
+        PreferencePage(title: "Lister", preferences: preferences, onChange: onChange)
+    }
+
+    private func number(_ key: String, default value: Int, in range: ClosedRange<Int>) -> Int {
+        min(
+            range.upperBound,
+            max(
+                range.lowerBound,
+                Int(store.text(key, default: String(value)).trimmingCharacters(in: .whitespaces)) ?? value
+            )
+        )
+    }
+
+    /// The font of a slot as name and size; nil names the system's default font.
+    internal func font(_ slot: FontSlot) -> (name: String?, size: Double) {
+        let text = store.text(slot == .variable ? Key.variableFont : Key.fixedFont, default: "")
+        let parts = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let size = parts.count > 1 ? Double(parts[1]).map { min(96, max(6, abs($0))) } : nil
+        return (parts.first.flatMap { $0.isEmpty ? nil : $0 }, size ?? (slot == .variable ? 13 : 12))
+    }
+
+    /// The frame of the Lister window (`quick`: of the separate quick view) in the notation of
+    /// `NSStringFromRect`; saved with Options › Save position and when a window closes.
+    internal func windowFrame(quick: Bool) -> String? {
+        store.value(String.self, forKey: quick ? Key.quickFrame : Key.frame)
+    }
+    internal func setWindowFrame(_ frame: String, quick: Bool) {
+        store.set(frame, forKey: quick ? Key.quickFrame : Key.frame)
     }
 }

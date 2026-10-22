@@ -9,6 +9,14 @@ import Testing
 @MainActor
 @Suite
 internal struct ConfigurationModels {
+    // MARK: Key bindings
+
+    internal let keyCommands = [
+        Command("copy", "Copy", [.f(5), .cmd("c")]), Command("pack", "Pack", [.f(5, .option), .f(5)]),
+        Command("view", "View", [.f(3)]),
+        Command("em_mine", "Mine")
+    ]
+
     // MARK: Preference pages
 
     @Test
@@ -51,14 +59,6 @@ internal struct ConfigurationModels {
         let reopened = PreferencePageModel(page: model.page, settings: settings)
         #expect(reopened.value(of: flag) == .flag(false) && reopened.value(of: choice) == .index(2))
     }
-
-    // MARK: Key bindings
-
-    internal let keyCommands = [
-        Command("copy", "Copy", [.f(5), .cmd("c")]), Command("pack", "Pack", [.f(5, .option), .f(5)]),
-        Command("view", "View", [.f(3)]),
-        Command("em_mine", "Mine")
-    ]
 
     @Test
     internal func theKeyMapFollowsTheKernelsRules() {

@@ -280,73 +280,6 @@ internal enum ShellWords {
 /// What a placeholder stands for is data and stays apart from the text around it
 /// (`ExpandedPiece.value`): no name, however it is written, can become part of the command.
 internal struct ParameterExpander {
-    internal let context: ExpansionContext
-
-    internal func expand(_ parameters: String) -> ExpandedParameters {
-        expand([.text(parameters)])
-    }
-
-    /// Expands a text that came out of an expansion before (the parameters one user command
-    /// hands to another): its text is read for placeholders, its values pass through.
-    internal func expand(_ parameters: [ExpandedPiece]) -> ExpandedParameters {
-        var tokens = Run.tokens(of: parameters)
-        var asksFirst = false
-        if case .scalar("?")? = tokens.first {
-            asksFirst = true
-            tokens.removeFirst()
-        }
-        var run = Run(context: context, tokens: tokens)
-        run.expand()
-        return ExpandedParameters(
-            pieces: Self.trimmed(run.pieces),
-            asksFirst: asksFirst,
-            listFile: run.listFile,
-            usedArguments: run.usedArguments,
-            missingName: run.missingName,
-            problem: run.problem
-        )
-    }
-
-    /// Whether a text has a code that needs the marked names of a panel.
-    ///
-    /// Making that list costs a pass over the whole panel, so it is made only for a text that asks
-    /// for it.
-    internal static func usesSelection(_ pieces: [ExpandedPiece]) -> Bool {
-        let codes = Set("SsRrCcLlDFfdUW".unicodeScalars)
-        var found = false
-        Run.codes(of: Run.tokens(of: pieces)) { if codes.contains($0) { found = true } }
-        return found
-    }
-
-    /// Joins neighbouring texts and takes the blanks off both ends of the line.
-    ///
-    /// Only blanks the user wrote go: a value keeps every character, a no-break space at its end
-    /// included.
-    internal static func trimmed(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
-        var result: [ExpandedPiece] = []
-        for piece in pieces {
-            if case .text(let text) = piece {
-                if text.isEmpty { continue }
-                if case .text(let before)? = result.last {
-                    result[result.count - 1] = .text(before + text)
-                    continue
-                }
-            }
-            result.append(piece)
-        }
-        func isBlank(_ scalar: Unicode.Scalar) -> Bool { scalar == " " || scalar == "\t" }
-        if case .text(let text)? = result.first {
-            let kept = String(String.UnicodeScalarView(text.unicodeScalars.drop(while: isBlank)))
-            if kept.isEmpty { result.removeFirst() } else { result[0] = .text(kept) }
-        }
-        if case .text(let text)? = result.last {
-            var scalars = text.unicodeScalars
-            while let last = scalars.last, isBlank(last) { scalars.removeLast() }
-            if scalars.isEmpty { result.removeLast() } else { result[result.count - 1] = .text(String(scalars)) }
-        }
-        return result
-    }
-
     /// One pass over the text.
     ///
     /// Placeholders that follow each other directly (`%P%N`) form one word and one value.
@@ -354,6 +287,10 @@ internal struct ParameterExpander {
         enum Token {
             case scalar(Unicode.Scalar)
             case piece(ExpandedPiece)
+        }
+
+        private enum ListEncoding {
+            case plain, utf8WithMark, utf16WithMark
         }
 
         let context: ExpansionContext
@@ -384,6 +321,26 @@ internal struct ParameterExpander {
         let dropsListWhenUnselected: Bool
         let includesTargetSelection: Bool
 
+        private var first: PanelSnapshot { leftRight ? context.left : context.source }
+        private var second: PanelSnapshot { leftRight ? context.right : context.target }
+        /// The next character of the text; nil at the end and in front of a value.
+        private var next: Unicode.Scalar? { scalar(at: position) }
+
+        // MARK: Output
+
+        private var isInsideDoubleQuotes: Bool { lexer.place == .doubleQuoted }
+
+        init(context: ExpansionContext, tokens: [Token]) {
+            self.context = context
+            self.tokens = tokens
+            var flags = Set<Unicode.Scalar>()
+            Self.codes(of: tokens) { flags.insert($0) }
+            quotesAutomatically = !flags.contains("Q")
+            emptyWhenUnselected = flags.contains("Y")
+            dropsListWhenUnselected = flags.contains("y")
+            includesTargetSelection = flags.contains("a")
+        }
+
         static func tokens(of pieces: [ExpandedPiece]) -> [Token] {
             var tokens: [Token] = []
             for piece in pieces {
@@ -409,21 +366,19 @@ internal struct ParameterExpander {
             }
         }
 
-        init(context: ExpansionContext, tokens: [Token]) {
-            self.context = context
-            self.tokens = tokens
-            var flags = Set<Unicode.Scalar>()
-            Self.codes(of: tokens) { flags.insert($0) }
-            quotesAutomatically = !flags.contains("Q")
-            emptyWhenUnselected = flags.contains("Y")
-            dropsListWhenUnselected = flags.contains("y")
-            includesTargetSelection = flags.contains("a")
+        /// Positions `from`…`to` (1-based) of a list, counted from the start or from the end.
+        private static func slice<Element>(_ items: [Element], fromEnd: Bool, _ start: Int, _ end: Int?, open: Bool)
+            -> [Element]
+        {
+            // The numbers are the user's and may be as large as an `Int`: nothing here may overflow.
+            func fromTheEnd(_ index: Int) -> Int { index > items.count ? 0 : items.count - index + 1 }
+            let from = fromEnd ? fromTheEnd(start) : start
+            let to = open ? items.count : end.map { fromEnd ? fromTheEnd($0) : $0 } ?? from
+            guard from >= 1, from <= min(to, items.count) else {
+                return []
+            }
+            return Array(items[(from - 1)..<min(to, items.count)])
         }
-
-        private var first: PanelSnapshot { leftRight ? context.left : context.source }
-        private var second: PanelSnapshot { leftRight ? context.right : context.target }
-        /// The next character of the text; nil at the end and in front of a value.
-        private var next: Unicode.Scalar? { scalar(at: position) }
 
         private func scalar(at index: Int) -> Unicode.Scalar? {
             guard index < tokens.count, case .scalar(let scalar) = tokens[index] else {
@@ -527,10 +482,6 @@ internal struct ParameterExpander {
             flushWord()
             flushLiteral()
         }
-
-        // MARK: Output
-
-        private var isInsideDoubleQuotes: Bool { lexer.place == .doubleQuoted }
 
         /// A character the user wrote.
         private mutating func literal(_ character: Unicode.Scalar) {
@@ -640,20 +591,6 @@ internal struct ParameterExpander {
                 position += 1
             }
             return value
-        }
-
-        /// Positions `from`…`to` (1-based) of a list, counted from the start or from the end.
-        private static func slice<Element>(_ items: [Element], fromEnd: Bool, _ start: Int, _ end: Int?, open: Bool)
-            -> [Element]
-        {
-            // The numbers are the user's and may be as large as an `Int`: nothing here may overflow.
-            func fromTheEnd(_ index: Int) -> Int { index > items.count ? 0 : items.count - index + 1 }
-            let from = fromEnd ? fromTheEnd(start) : start
-            let to = open ? items.count : end.map { fromEnd ? fromTheEnd($0) : $0 } ?? from
-            guard from >= 1, from <= min(to, items.count) else {
-                return []
-            }
-            return Array(items[(from - 1)..<min(to, items.count)])
         }
 
         /// `-<m>` or an open `-` after a position; restores the position when there is neither.
@@ -948,10 +885,6 @@ internal struct ParameterExpander {
             return piece
         }
 
-        private enum ListEncoding {
-            case plain, utf8WithMark, utf16WithMark
-        }
-
         /// A list code puts the name of the list file into the line.
         ///
         /// Only the first list of a command counts.
@@ -1005,6 +938,48 @@ internal struct ParameterExpander {
         }
     }
 
+    internal let context: ExpansionContext
+
+    /// Whether a text has a code that needs the marked names of a panel.
+    ///
+    /// Making that list costs a pass over the whole panel, so it is made only for a text that asks
+    /// for it.
+    internal static func usesSelection(_ pieces: [ExpandedPiece]) -> Bool {
+        let codes = Set("SsRrCcLlDFfdUW".unicodeScalars)
+        var found = false
+        Run.codes(of: Run.tokens(of: pieces)) { if codes.contains($0) { found = true } }
+        return found
+    }
+
+    /// Joins neighbouring texts and takes the blanks off both ends of the line.
+    ///
+    /// Only blanks the user wrote go: a value keeps every character, a no-break space at its end
+    /// included.
+    internal static func trimmed(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
+        var result: [ExpandedPiece] = []
+        for piece in pieces {
+            if case .text(let text) = piece {
+                if text.isEmpty { continue }
+                if case .text(let before)? = result.last {
+                    result[result.count - 1] = .text(before + text)
+                    continue
+                }
+            }
+            result.append(piece)
+        }
+        func isBlank(_ scalar: Unicode.Scalar) -> Bool { scalar == " " || scalar == "\t" }
+        if case .text(let text)? = result.first {
+            let kept = String(String.UnicodeScalarView(text.unicodeScalars.drop(while: isBlank)))
+            if kept.isEmpty { result.removeFirst() } else { result[0] = .text(kept) }
+        }
+        if case .text(let text)? = result.last {
+            var scalars = text.unicodeScalars
+            while let last = scalars.last, isBlank(last) { scalars.removeLast() }
+            if scalars.isEmpty { result.removeLast() } else { result[result.count - 1] = .text(String(scalars)) }
+        }
+        return result
+    }
+
     /// The pieces without the empty texts.
     ///
     /// (The pieces of a run never hold two texts in a row: a text is written out only in front of a
@@ -1029,6 +1004,31 @@ internal struct ParameterExpander {
             return (withoutEmptyTexts(before), withoutEmptyTexts(after))
         }
         return nil
+    }
+
+    internal func expand(_ parameters: String) -> ExpandedParameters {
+        expand([.text(parameters)])
+    }
+
+    /// Expands a text that came out of an expansion before (the parameters one user command
+    /// hands to another): its text is read for placeholders, its values pass through.
+    internal func expand(_ parameters: [ExpandedPiece]) -> ExpandedParameters {
+        var tokens = Run.tokens(of: parameters)
+        var asksFirst = false
+        if case .scalar("?")? = tokens.first {
+            asksFirst = true
+            tokens.removeFirst()
+        }
+        var run = Run(context: context, tokens: tokens)
+        run.expand()
+        return ExpandedParameters(
+            pieces: Self.trimmed(run.pieces),
+            asksFirst: asksFirst,
+            listFile: run.listFile,
+            usedArguments: run.usedArguments,
+            missingName: run.missingName,
+            problem: run.problem
+        )
     }
 }
 

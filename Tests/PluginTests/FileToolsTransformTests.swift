@@ -12,11 +12,12 @@ import Testing
 @MainActor
 @Suite
 internal struct FileToolsTransforms {
+    internal static let megabyteOfPattern = patternData(1_048_576)
+
     internal let memory = MemoryFileSystem()
     internal let box: Sandbox
     internal let settings = MemorySettings()
     internal let bench: TestBench
-    internal static let megabyteOfPattern = patternData(1_048_576)
     internal var megabyte: Data { Self.megabyteOfPattern }
 
     internal var ui: ScriptedInteraction { bench.interaction }

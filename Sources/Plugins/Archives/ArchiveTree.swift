@@ -80,6 +80,9 @@ internal struct ArchiveTree {
     /// their length; an archive made of them is refused rather than allowed to fill the memory.
     internal static let maxImplicitBytes = 48 << 20
 
+    /// The place of the top folder, which has no entry.
+    private static let top: Int32 = -1
+
     /// The entries, each in a place of its own that it keeps for as long as it is in the
     /// tree; a place that was given up is used again.
     ///
@@ -100,24 +103,19 @@ internal struct ArchiveTree {
     /// The bytes of the paths of the folders that were made up.
     internal private(set) var implicitBytes = 0
 
-    /// The place of the top folder, which has no entry.
-    private static let top: Int32 = -1
-
     internal var count: Int { index.count }
 
     /// Every entry, in no order.
     internal var unordered: [ArchiveEntry] { slots.compactMap { $0 } }
 
-    internal func contains(where matches: (ArchiveEntry) -> Bool) -> Bool {
-        slots.contains { $0.map(matches) == true }
-    }
-
-    /// Makes room for this many entries at once, when their number is known beforehand, and
-    /// for some folders that have to be made up besides: room that is found too small is
-    /// doubled, which for a large archive is a lot of memory for a few more entries.
-    internal mutating func reserve(_ count: Int) {
-        slots.reserveCapacity(count + count / 16 + 256)
-        index.reserveCapacity(count)
+    /// Every entry in archive order.
+    ///
+    /// Sorted once; after that the order is kept up as entries come and go, so a write that follows
+    /// a change does not sort the whole archive again.
+    internal var ordered: [ArchiveEntry] {
+        mutating get {
+            sort().compactMap { slots[Int($0)] }
+        }
     }
 
     internal static func name(of path: String) -> String {
@@ -209,6 +207,18 @@ internal struct ArchiveTree {
         return joined
     }
 
+    internal func contains(where matches: (ArchiveEntry) -> Bool) -> Bool {
+        slots.contains { $0.map(matches) == true }
+    }
+
+    /// Makes room for this many entries at once, when their number is known beforehand, and
+    /// for some folders that have to be made up besides: room that is found too small is
+    /// doubled, which for a large archive is a lot of memory for a few more entries.
+    internal mutating func reserve(_ count: Int) {
+        slots.reserveCapacity(count + count / 16 + 256)
+        index.reserveCapacity(count)
+    }
+
     private func slot(of path: String) -> Int32? {
         path.isEmpty ? Self.top : index[path]
     }
@@ -273,16 +283,6 @@ internal struct ArchiveTree {
         places.sort { order(at: $0) < order(at: $1) }
         sequence = places
         return places
-    }
-
-    /// Every entry in archive order.
-    ///
-    /// Sorted once; after that the order is kept up as entries come and go, so a write that follows
-    /// a change does not sort the whole archive again.
-    internal var ordered: [ArchiveEntry] {
-        mutating get {
-            sort().compactMap { slots[Int($0)] }
-        }
     }
 
     /// The path of the entry that has this position in the archive; nil when none has.

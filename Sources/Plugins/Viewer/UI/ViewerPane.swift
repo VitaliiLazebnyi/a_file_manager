@@ -48,6 +48,33 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
         }
     }
 
+    // MARK: State
+
+    /// What is known about the loaded file.
+    internal struct Loaded {
+        internal let item: ViewerItem
+        internal let source: any ByteSource
+        internal let sample: Data
+        internal let guess: ViewerDetection.TextGuess
+        internal let content: ViewerDetection.Content
+        /// Whether reading on several threads at once pays off (a local disk, memory).
+        internal let parallel: Bool
+    }
+    internal static let menuTitles = ["File", "Edit", "Options", "Encoding"]
+
+    /// The most entries the quick view counts in a folder on a server.
+    nonisolated internal static let remoteFolderEntryLimit = 20_000
+    /// Files up to this size are read whole where a mode needs all of a file at once.
+    nonisolated internal static let wholeFileLimit: Int64 = 1 << 30
+    /// An HTML file is shown as a page up to this size (it is handed to the web view, a string
+    /// of twice the size, on the main thread); beyond it the text modes show it.
+    nonisolated internal static let htmlPageLimit: Int64 = 8 << 20
+    /// An RTF file is shown formatted up to this size (its layout is done on the main thread).
+    nonisolated internal static let rtfLimit: Int64 = 4 << 20
+    /// An HTML file is shown with its tags removed up to this size; beyond it the tags are
+    /// text, as in the plain text modes (removing them takes memory and time in proportion).
+    internal static let htmlTextLimit: Int64 = 32 << 20
+
     internal let kernel: Kernel
     internal let settings: ListerSettings
     /// True in the quick-view pane: Esc and Q do not close anything, and keys are taken only
@@ -75,19 +102,6 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
     internal var onSavePosition: () -> Void = {}
     /// Position and count of the file among those of the session, for `<< 1/3 >>`.
     internal var fileCounter: (index: Int, count: Int) = (0, 1) { didSet { updateChrome() } }
-
-    // MARK: State
-
-    /// What is known about the loaded file.
-    internal struct Loaded {
-        internal let item: ViewerItem
-        internal let source: any ByteSource
-        internal let sample: Data
-        internal let guess: ViewerDetection.TextGuess
-        internal let content: ViewerDetection.Content
-        /// Whether reading on several threads at once pays off (a local disk, memory).
-        internal let parallel: Bool
-    }
 
     internal private(set) var item: ViewerItem?
     /// Why the file could not be opened, when it could not.
@@ -147,7 +161,123 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
     private let cancelButton = NSButton(title: "Cancel", target: nil, action: nil)
     /// Set while the pane is in a window; it goes with the pane at the latest.
     private var keyMonitor: KeyMonitor?
-    internal static let menuTitles = ["File", "Edit", "Options", "Encoding"]
+
+    override internal var acceptsFirstResponder: Bool { true }
+
+    /// Whether the keyboard is somewhere inside the pane.
+    internal var hasKeyboard: Bool {
+        guard let responder = window?.firstResponder as? NSView else {
+            return false
+        }
+        return responder === self || responder.isDescendant(of: self)
+    }
+
+    /// The encoding the current mode shows text in.
+    internal var encoding: ViewerEncoding {
+        guard let loaded else {
+            return .utf8
+        }
+        switch mode {
+        case .utf8:
+            return .utf8
+
+        case .unicode:
+            if let codePage, codePage.unitSize == 2 {
+                return codePage
+            }
+            return loaded.guess.encoding.unitSize == 2 ? loaded.guess.encoding : .utf16LE
+
+        case .html where strippedHTML != nil:
+            return .utf8
+
+        default:
+            return codePage ?? fontSlot.encoding
+        }
+    }
+
+    internal var currentFont: NSFont {
+        let slot: FontSlot = fontSlot == .variable && mode != .binary && mode != .hex ? .variable : .ansi
+        let chosen = settings.font(slot)
+        let size = CGFloat(min(96, max(6, chosen.size + fontSizeChange)))
+        if let name = chosen.name, let font = NSFont(name: name, size: size) {
+            return font
+        }
+        return slot == .variable ? .systemFont(ofSize: size) : .monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    /// How the current mode lays out its rows.
+    internal var layout: ViewerLayout {
+        switch mode {
+        case .binary:
+            return .binary(width: settings.binaryWidth)
+
+        case .hex:
+            return .hex
+
+        default:
+            guard settings.wrap else {
+                return .text(
+                    TextLayoutOptions(columns: settings.unwrapWidth, wordWrap: false, tabWidth: settings.tabWidth)
+                )
+            }
+            let columns = settings.textWidth > 0 ? settings.textWidth : pager.columnsThatFit
+            return .text(TextLayoutOptions(columns: columns, wordWrap: true, tabWidth: settings.tabWidth))
+        }
+    }
+
+    /// The links of the HTML file that is shown as text.
+    internal var htmlLinks: [String] { mode == .html ? strippedHTML?.links ?? [] : [] }
+
+    /// What the percent item shows: the position in a text, the zoom of an image (spec 10 ›
+    /// Position and zoom item).
+    internal var percentText: String {
+        if let imageView {
+            return String(format: "%.1f %%", imageView.zoom * 100)
+        }
+        if contentView === pager, pager.document != nil {
+            return String(format: "%.0f %%", pager.percent)
+        }
+        return ""
+    }
+
+    internal var statusText: String {
+        if let activity {
+            return activity.text
+        }
+        guard let loaded else {
+            return item == nil ? "" : failure ?? "Reading…"
+        }
+        var parts: [String] = []
+        if let imageView {
+            parts.append("\(Int(imageView.imageSize.width)) × \(Int(imageView.imageSize.height))")
+            if imageView.isDownsampled { parts.append("shown downsampled") }
+            if imageView.framesDropped > 0 { parts.append("\(imageView.framesDropped) frames left out") }
+        } else if contentView === pager, let document = pager.document {
+            parts.append(
+                mode == .hex || mode == .binary ? "\(mode.title), \(document.encoding.name)" : document.encoding.name
+            )
+            if let position = pager.position {
+                parts.append(
+                    mode == .hex || mode == .binary
+                        ? "Offset \(Format.bytes(position.offset))" : "Line \(Format.bytes(Int64(position.line)))"
+                )
+            }
+            if let selection = pager.selection {
+                parts.append("\(Format.bytes(selection.upperBound - selection.lowerBound)) bytes selected")
+            }
+            if pager.isIndexing { parts.append(String(format: "Indexing %.0f %%", pager.indexingProgress * 100)) }
+        } else if contentView === pager, pager.isIndexing {
+            // Nothing to draw yet: the rows of the start of the file are not known.
+            parts.append(String(format: "Reading… %.0f %%", pager.indexingProgress * 100))
+        } else {
+            parts.append(mode.title)
+        }
+        if let error = pager.document?.readError {
+            parts.append("Read error: \(error.localizedDescription)")
+        }
+        parts.append("\(Format.bytes(loaded.source.length)) bytes")
+        return parts.joined(separator: "  ·  ")
+    }
 
     internal init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, isEmbedded: Bool) {
         self.kernel = kernel
@@ -173,11 +303,23 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
     /// Made in code only: an archive gives none.
     internal required init?(coder _: NSCoder) { nil }
 
-    deinit {
-        cancellation.cancel()
-        presentCancellation.cancel()
-        resizeWork?.cancel()
-        temporaryCopies.release(owner: ObjectIdentifier(self))
+    /// All the bytes of a file, for a mode that needs them at once; nil beyond `limit` or when they
+    /// cannot be read.
+    ///
+    /// A file on the local disk is mapped, the others are read through `source`.
+    nonisolated internal static func wholeData(
+        of source: any ByteSource,
+        at url: URL,
+        limit: Int64,
+        cancellation: CancellationFlag
+    ) -> Data? {
+        guard source.length <= limit else {
+            return nil
+        }
+        if url.isFileURL {
+            return try? Data(contentsOf: url, options: .mappedIfSafe)
+        }
+        return try? source.read(0..<source.length, cancellation: cancellation)
     }
 
     // MARK: Layout
@@ -252,16 +394,6 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
             contentView = view
         }
         if !isEmbedded || hasKeyboard { window?.makeFirstResponder(responder ?? self) }
-    }
-
-    override internal var acceptsFirstResponder: Bool { true }
-
-    /// Whether the keyboard is somewhere inside the pane.
-    internal var hasKeyboard: Bool {
-        guard let responder = window?.firstResponder as? NSView else {
-            return false
-        }
-        return responder === self || responder.isDescendant(of: self)
     }
 
     /// Gives the pane the keyboard: to the text when it shows text.
@@ -596,59 +728,6 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
         present()
     }
 
-    /// The encoding the current mode shows text in.
-    internal var encoding: ViewerEncoding {
-        guard let loaded else {
-            return .utf8
-        }
-        switch mode {
-        case .utf8:
-            return .utf8
-
-        case .unicode:
-            if let codePage, codePage.unitSize == 2 {
-                return codePage
-            }
-            return loaded.guess.encoding.unitSize == 2 ? loaded.guess.encoding : .utf16LE
-
-        case .html where strippedHTML != nil:
-            return .utf8
-
-        default:
-            return codePage ?? fontSlot.encoding
-        }
-    }
-
-    internal var currentFont: NSFont {
-        let slot: FontSlot = fontSlot == .variable && mode != .binary && mode != .hex ? .variable : .ansi
-        let chosen = settings.font(slot)
-        let size = CGFloat(min(96, max(6, chosen.size + fontSizeChange)))
-        if let name = chosen.name, let font = NSFont(name: name, size: size) {
-            return font
-        }
-        return slot == .variable ? .systemFont(ofSize: size) : .monospacedSystemFont(ofSize: size, weight: .regular)
-    }
-
-    /// How the current mode lays out its rows.
-    internal var layout: ViewerLayout {
-        switch mode {
-        case .binary:
-            return .binary(width: settings.binaryWidth)
-
-        case .hex:
-            return .hex
-
-        default:
-            guard settings.wrap else {
-                return .text(
-                    TextLayoutOptions(columns: settings.unwrapWidth, wordWrap: false, tabWidth: settings.tabWidth)
-                )
-            }
-            let columns = settings.textWidth > 0 ? settings.textWidth : pager.columnsThatFit
-            return .text(TextLayoutOptions(columns: columns, wordWrap: true, tabWidth: settings.tabWidth))
-        }
-    }
-
     /// Shows the loaded file in the current mode.
     internal func present(keeping offset: Int64? = nil) {
         guard let loaded else {
@@ -750,22 +829,6 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
     internal func redecodeHTML() {
         if mode == .html { strippedHTML = nil }
     }
-
-    /// The links of the HTML file that is shown as text.
-    internal var htmlLinks: [String] { mode == .html ? strippedHTML?.links ?? [] : [] }
-
-    /// The most entries the quick view counts in a folder on a server.
-    nonisolated internal static let remoteFolderEntryLimit = 20_000
-    /// Files up to this size are read whole where a mode needs all of a file at once.
-    nonisolated internal static let wholeFileLimit: Int64 = 1 << 30
-    /// An HTML file is shown as a page up to this size (it is handed to the web view, a string
-    /// of twice the size, on the main thread); beyond it the text modes show it.
-    nonisolated internal static let htmlPageLimit: Int64 = 8 << 20
-    /// An RTF file is shown formatted up to this size (its layout is done on the main thread).
-    nonisolated internal static let rtfLimit: Int64 = 4 << 20
-    /// An HTML file is shown with its tags removed up to this size; beyond it the tags are
-    /// text, as in the plain text modes (removing them takes memory and time in proportion).
-    internal static let htmlTextLimit: Int64 = 32 << 20
 
     /// Image, PDF, media, HTML page, RTF or Quick Look: read or copied in the background,
     /// shown when ready.
@@ -928,25 +991,6 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
         }
     }
 
-    /// All the bytes of a file, for a mode that needs them at once; nil beyond `limit` or when they
-    /// cannot be read.
-    ///
-    /// A file on the local disk is mapped, the others are read through `source`.
-    nonisolated internal static func wholeData(
-        of source: any ByteSource,
-        at url: URL,
-        limit: Int64,
-        cancellation: CancellationFlag
-    ) -> Data? {
-        guard source.length <= limit else {
-            return nil
-        }
-        if url.isFileURL {
-            return try? Data(contentsOf: url, options: .mappedIfSafe)
-        }
-        return try? source.read(0..<source.length, cancellation: cancellation)
-    }
-
     /// Puts an image (or the first frame of an animation) on the screen.
     private func showImage(_ image: DecodedImage) {
         let view = ImageCanvasView(frame: contentHost.bounds)
@@ -1055,57 +1099,6 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
     @objc
     private func cancelActivity() { activity?.cancel.cancel() }
 
-    /// What the percent item shows: the position in a text, the zoom of an image (spec 10 ›
-    /// Position and zoom item).
-    internal var percentText: String {
-        if let imageView {
-            return String(format: "%.1f %%", imageView.zoom * 100)
-        }
-        if contentView === pager, pager.document != nil {
-            return String(format: "%.0f %%", pager.percent)
-        }
-        return ""
-    }
-
-    internal var statusText: String {
-        if let activity {
-            return activity.text
-        }
-        guard let loaded else {
-            return item == nil ? "" : failure ?? "Reading…"
-        }
-        var parts: [String] = []
-        if let imageView {
-            parts.append("\(Int(imageView.imageSize.width)) × \(Int(imageView.imageSize.height))")
-            if imageView.isDownsampled { parts.append("shown downsampled") }
-            if imageView.framesDropped > 0 { parts.append("\(imageView.framesDropped) frames left out") }
-        } else if contentView === pager, let document = pager.document {
-            parts.append(
-                mode == .hex || mode == .binary ? "\(mode.title), \(document.encoding.name)" : document.encoding.name
-            )
-            if let position = pager.position {
-                parts.append(
-                    mode == .hex || mode == .binary
-                        ? "Offset \(Format.bytes(position.offset))" : "Line \(Format.bytes(Int64(position.line)))"
-                )
-            }
-            if let selection = pager.selection {
-                parts.append("\(Format.bytes(selection.upperBound - selection.lowerBound)) bytes selected")
-            }
-            if pager.isIndexing { parts.append(String(format: "Indexing %.0f %%", pager.indexingProgress * 100)) }
-        } else if contentView === pager, pager.isIndexing {
-            // Nothing to draw yet: the rows of the start of the file are not known.
-            parts.append(String(format: "Reading… %.0f %%", pager.indexingProgress * 100))
-        } else {
-            parts.append(mode.title)
-        }
-        if let error = pager.document?.readError {
-            parts.append("Read error: \(error.localizedDescription)")
-        }
-        parts.append("\(Format.bytes(loaded.source.length)) bytes")
-        return parts.joined(separator: "  ·  ")
-    }
-
     internal func updateChrome() {
         statusLabel.stringValue = statusText
         percentButton.title = percentText
@@ -1120,5 +1113,12 @@ internal final class ViewerPane: NSView, NSMenuDelegate {
             progressBar.doubleValue = activity.progress ?? 0
             if activity.progress == nil { progressBar.startAnimation(nil) }
         }
+    }
+
+    deinit {
+        cancellation.cancel()
+        presentCancellation.cancel()
+        resizeWork?.cancel()
+        temporaryCopies.release(owner: ObjectIdentifier(self))
     }
 }

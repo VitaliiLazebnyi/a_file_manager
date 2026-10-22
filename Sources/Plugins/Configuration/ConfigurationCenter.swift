@@ -9,6 +9,12 @@ import AppKit
 /// Main thread only.
 @MainActor
 internal final class ConfigurationCenter {
+    internal static let startMenuHint = """
+        ? as the first parameter: asks for the parameters before the command runs
+        %P source path   %T target path   %N name under the cursor   %S selected names
+        %L a file listing the selected names with their paths   %% the percent sign
+        """
+
     internal unowned let kernel: Kernel
     internal let store: ConfigurationStore
     internal let runner: CommandRunner
@@ -23,12 +29,6 @@ internal final class ConfigurationCenter {
     /// The beep, the modal run of the command picker and the settings file panel.
     internal var effects: ConfigurationEffects
     private lazy var startMenuTarget = StartMenuTarget(kernel: kernel)
-
-    internal static let startMenuHint = """
-        ? as the first parameter: asks for the parameters before the command runs
-        %P source path   %T target path   %N name under the cursor   %S selected names
-        %L a file listing the selected names with their paths   %% the percent sign
-        """
 
     internal init(
         kernel: Kernel,

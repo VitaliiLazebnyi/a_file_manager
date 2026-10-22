@@ -19,6 +19,33 @@ internal struct SystemInformation: Equatable {
         internal let value: String
     }
 
+    /// What `gather` asks the system: its named values and its volumes.
+    ///
+    /// Tests answer in its place.
+    internal struct Questions: Sendable {
+        /// The system's own.
+        internal static let system = Self(
+            text: SystemInformation.systemText,
+            number: SystemInformation.systemNumber,
+            volumes: {
+                FileManager.default.mountedVolumeURLs(
+                    includingResourceValuesForKeys: nil,
+                    options: [.skipHiddenVolumes]
+                )
+            }
+        )
+
+        /// A named value as text.
+        internal var text: @Sendable (String) -> String?
+        /// A named value as a number.
+        internal var number: @Sendable (String) -> Int?
+        /// The volumes to list; nil when the system does not tell.
+        internal var volumes: @Sendable () -> [URL]?
+    }
+
+    /// Stands for the volumes in `BlockingCalls`.
+    private static let volumeCalls = CallOwner()
+
     internal var sections: [Section]
 
     /// The sections as lines of text with the values in one column.
@@ -103,30 +130,6 @@ internal struct SystemInformation: Equatable {
         return "\(Format.bytes(Int64(free / (1_024 * 1_024)))) M (\(load) %)"
     }
 
-    /// What `gather` asks the system: its named values and its volumes.
-    ///
-    /// Tests answer in its place.
-    internal struct Questions: Sendable {
-        /// The system's own.
-        internal static let system = Self(
-            text: SystemInformation.systemText,
-            number: SystemInformation.systemNumber,
-            volumes: {
-                FileManager.default.mountedVolumeURLs(
-                    includingResourceValuesForKeys: nil,
-                    options: [.skipHiddenVolumes]
-                )
-            }
-        )
-
-        /// A named value as text.
-        internal var text: @Sendable (String) -> String?
-        /// A named value as a number.
-        internal var number: @Sendable (String) -> Int?
-        /// The volumes to list; nil when the system does not tell.
-        internal var volumes: @Sendable () -> [URL]?
-    }
-
     /// `displays` are the screens as text; they belong to the main thread and are read there
     /// before the job starts.
     ///
@@ -181,9 +184,6 @@ internal struct SystemInformation: Equatable {
             Section(title: "Volumes", rows: mounted)
         ])
     }
-
-    /// Stands for the volumes in `BlockingCalls`.
-    private static let volumeCalls = CallOwner()
 
     /// The mounted volumes with their free space.
     ///

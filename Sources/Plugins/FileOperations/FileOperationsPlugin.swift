@@ -254,6 +254,91 @@ internal final class FileOperations: FileTransferService {
         case none
     }
 
+    /// What a command works on, taken on the main thread at no cost: how many items, and the
+    /// first of them.
+    ///
+    /// The list itself is made where it is needed, on the job's thread; for a selection of several
+    /// hundred thousand that is time the main thread does not have.
+    internal struct Picked {
+        internal let count: Int
+        /// The first operand; the only one when `count` is 1.
+        internal let first: FileItem?
+        internal let snapshot: PanelModel.Operands
+
+        /// The one operand as a list, for the wording of a dialog.
+        internal var single: FileItem? { count == 1 ? first : nil }
+
+        @MainActor
+        internal init(_ model: PanelModel) {
+            let operands = model.operandsSnapshot()
+            snapshot = operands
+            if operands.markedCount > 0 {
+                count = operands.markedCount
+                // The first mark is found by looking, not by making the list of all of them.
+                first = operands.shownItems.indices.first(where: operands.isMarked).map { operands.shownItems[$0] }
+            } else {
+                (count, first) = (operands.cursorItem == nil ? 0 : 1, operands.cursorItem)
+            }
+        }
+
+        /// The operands.
+        ///
+        /// For any thread.
+        internal func items() -> [FileItem] { snapshot.items() }
+
+        /// The marked operands one after another, without the list of them being made, until
+        /// `body` answers false: for a loop that asks about each and may be left early.
+        internal func forEach(_ body: (FileItem) -> Bool) {
+            for index in snapshot.shownItems.indices where snapshot.isMarked(at: index) {
+                if !body(snapshot.shownItems[index]) {
+                    return
+                }
+            }
+        }
+    }
+
+    /// What the completion of a job takes the marks off with: the places of the processed
+    /// items in what the panel showed, and their names in case the panel shows something
+    /// else by then.
+    ///
+    /// Put together on the job's thread.
+    internal struct Processed {
+        internal var indices: [Int] = []
+        internal var names: [String] = []
+        internal var shownVersion = 0
+
+        internal init(_ completed: [URL], of picked: Picked) {
+            shownVersion = picked.snapshot.shownVersion
+            guard !completed.isEmpty, picked.snapshot.markedCount > 0 else {
+                return
+            }
+            let wanted = Set(completed.map(\.locationKey))
+            let shown = picked.snapshot.shownItems
+            for index in picked.snapshot.markedIndices() where wanted.contains(shown[index].url.locationKey) {
+                indices.append(index)
+                names.append(shown[index].name)
+            }
+        }
+
+        @MainActor
+        internal func deselect(in model: PanelModel) {
+            guard !indices.isEmpty else {
+                return
+            }
+            if !model.setSelected(false, indices: indices, shownVersion: shownVersion) { model.deselect(names) }
+        }
+    }
+
+    private struct JobRefusal: Error {
+        /// Empty: there is nothing to do and nothing to say.
+        let message: String
+    }
+
+    // MARK: Jobs
+
+    /// How long the end of the program waits for the log's last lines.
+    internal static let logFlushTimeout: TimeInterval = 2
+
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     /// The log as last configured; made again when the configuration page changed something.
@@ -269,6 +354,34 @@ internal final class FileOperations: FileTransferService {
     /// Guarded by `logLock`.
     nonisolated(unsafe) private var sharedLog: OperationLog?
 
+    /// The text of the clipboard, for `[X]`; read on a job's thread, only when a name asks for it (another program
+    /// may hand its text over slowly).
+    private let clipboard: @Sendable () -> String?
+
+    private var source: any PanelHandle { kernel.panels.source }
+    private var target: any PanelHandle { kernel.panels.target }
+    private var ui: any UserInteraction { kernel.interaction }
+    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
+
+    internal init(_ kernel: Kernel, clipboard: @escaping @Sendable () -> String?) {
+        self.kernel = kernel
+        self.clipboard = clipboard
+    }
+
+    /// The panel's names of the items a job processed.
+    ///
+    /// In a branch or list view a name is a path, not the last component of the item's location, so
+    /// the items are matched by URL.
+    internal static func names(of processed: [URL], among items: [FileItem]) -> [String] {
+        var wanted = Set(processed.map(\.locationKey))
+        guard !wanted.isEmpty else {
+            return []
+        }
+        var names: [String] = []
+        for item in items where wanted.remove(item.url.locationKey) != nil { names.append(item.name) }
+        return names
+    }
+
     /// Job thread: a log written to `volume` writes what it has and closes its file, so the
     /// volume can be ejected.
     ///
@@ -283,25 +396,6 @@ internal final class FileOperations: FileTransferService {
         let file = log.configuration.file
         if file.isSameLocation(as: volume) || file.isInside(volume) { log.flush() }
     }
-
-    /// The text of the clipboard, for `[X]`; read on a job's thread, only when a name asks for it (another program
-    /// may hand its text over slowly).
-    private let clipboard: @Sendable () -> String?
-
-    internal init(_ kernel: Kernel, clipboard: @escaping @Sendable () -> String?) {
-        self.kernel = kernel
-        self.clipboard = clipboard
-    }
-
-    private var source: any PanelHandle { kernel.panels.source }
-    private var target: any PanelHandle { kernel.panels.target }
-    private var ui: any UserInteraction { kernel.interaction }
-    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
-
-    // MARK: Jobs
-
-    /// How long the end of the program waits for the log's last lines.
-    internal static let logFlushTimeout: TimeInterval = 2
 
     internal func flushLog() {
         log?.flush(timeout: Self.logFlushTimeout)
@@ -386,86 +480,6 @@ internal final class FileOperations: FileTransferService {
         )
     }
 
-    /// What a command works on, taken on the main thread at no cost: how many items, and the
-    /// first of them.
-    ///
-    /// The list itself is made where it is needed, on the job's thread; for a selection of several
-    /// hundred thousand that is time the main thread does not have.
-    internal struct Picked {
-        internal let count: Int
-        /// The first operand; the only one when `count` is 1.
-        internal let first: FileItem?
-        internal let snapshot: PanelModel.Operands
-
-        @MainActor
-        internal init(_ model: PanelModel) {
-            let operands = model.operandsSnapshot()
-            snapshot = operands
-            if operands.markedCount > 0 {
-                count = operands.markedCount
-                // The first mark is found by looking, not by making the list of all of them.
-                first = operands.shownItems.indices.first(where: operands.isMarked).map { operands.shownItems[$0] }
-            } else {
-                (count, first) = (operands.cursorItem == nil ? 0 : 1, operands.cursorItem)
-            }
-        }
-
-        /// The operands.
-        ///
-        /// For any thread.
-        internal func items() -> [FileItem] { snapshot.items() }
-
-        /// The marked operands one after another, without the list of them being made, until
-        /// `body` answers false: for a loop that asks about each and may be left early.
-        internal func forEach(_ body: (FileItem) -> Bool) {
-            for index in snapshot.shownItems.indices where snapshot.isMarked(at: index) {
-                if !body(snapshot.shownItems[index]) {
-                    return
-                }
-            }
-        }
-
-        /// The one operand as a list, for the wording of a dialog.
-        internal var single: FileItem? { count == 1 ? first : nil }
-    }
-
-    /// What the completion of a job takes the marks off with: the places of the processed
-    /// items in what the panel showed, and their names in case the panel shows something
-    /// else by then.
-    ///
-    /// Put together on the job's thread.
-    internal struct Processed {
-        internal var indices: [Int] = []
-        internal var names: [String] = []
-        internal var shownVersion = 0
-
-        internal init(_ completed: [URL], of picked: Picked) {
-            shownVersion = picked.snapshot.shownVersion
-            guard !completed.isEmpty, picked.snapshot.markedCount > 0 else {
-                return
-            }
-            let wanted = Set(completed.map(\.locationKey))
-            let shown = picked.snapshot.shownItems
-            for index in picked.snapshot.markedIndices() where wanted.contains(shown[index].url.locationKey) {
-                indices.append(index)
-                names.append(shown[index].name)
-            }
-        }
-
-        @MainActor
-        internal func deselect(in model: PanelModel) {
-            guard !indices.isEmpty else {
-                return
-            }
-            if !model.setSelected(false, indices: indices, shownVersion: shownVersion) { model.deselect(names) }
-        }
-    }
-
-    private struct JobRefusal: Error {
-        /// Empty: there is nothing to do and nothing to say.
-        let message: String
-    }
-
     /// Where relative targets of an operation in `directory` count from: the real folder
     /// behind a branch view; for a list of files from anywhere, which has no folder of its
     /// own, the folder of the first item.
@@ -475,20 +489,6 @@ internal final class FileOperations: FileTransferService {
             return real
         }
         return first.url.deletingLastPathComponent()
-    }
-
-    /// The panel's names of the items a job processed.
-    ///
-    /// In a branch or list view a name is a path, not the last component of the item's location, so
-    /// the items are matched by URL.
-    internal static func names(of processed: [URL], among items: [FileItem]) -> [String] {
-        var wanted = Set(processed.map(\.locationKey))
-        guard !wanted.isEmpty else {
-            return []
-        }
-        var names: [String] = []
-        for item in items where wanted.remove(item.url.locationKey) != nil { names.append(item.name) }
-        return names
     }
 
     /// With "keep going on errors" nobody was asked while the job ran; the user hears of the

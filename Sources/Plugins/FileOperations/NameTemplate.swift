@@ -57,6 +57,40 @@ public enum NameTemplate {
         }
     }
 
+    /// The formatters behind `[d]` and `[t]`, made once per text and only when asked for.
+    private final class DateTexts {
+        private let calendar: Calendar
+        private var formatters: [Character: DateFormatter] = [:]
+
+        init(_ calendar: Calendar) { self.calendar = calendar }
+
+        func text(_ letter: Character, _ moment: Date) -> String {
+            let formatter =
+                formatters[letter]
+                ?? {
+                    let formatter = DateFormatter()
+                    formatter.calendar = calendar
+                    formatter.timeZone = calendar.timeZone
+                    formatter.dateStyle = letter == "d" ? .short : .none
+                    formatter.timeStyle = letter == "t" ? .short : .none
+                    formatters[letter] = formatter
+                    return formatter
+                }()
+            return formatter.string(from: moment).replacingOccurrences(of: "/", with: "-")
+                .replacingOccurrences(
+                    of: ":",
+                    with: "."
+                )
+        }
+    }
+
+    private enum Case { case original, upper, lower, title, englishTitle, untouched }
+
+    /// No name is longer than this, so no width of a counter or a range may be either.
+    private static let maxWidth = 255
+    /// Positions in a range are cut to this; no value a range is applied to is that long.
+    private static let positionLimit = 1 << 20
+
     /// Every name the text asks for, in the order they are to be created. `quotedLists` also
     /// reads `"a b.txt" "c.txt"` as several names (New file).
     public static func names(from text: String, context: Context, quotedLists: Bool = false) throws -> [String] {
@@ -100,33 +134,6 @@ public enum NameTemplate {
                 }
                 throw Failure.noFreeName(plain)
             }
-    }
-
-    /// The formatters behind `[d]` and `[t]`, made once per text and only when asked for.
-    private final class DateTexts {
-        private let calendar: Calendar
-        private var formatters: [Character: DateFormatter] = [:]
-
-        init(_ calendar: Calendar) { self.calendar = calendar }
-
-        func text(_ letter: Character, _ moment: Date) -> String {
-            let formatter =
-                formatters[letter]
-                ?? {
-                    let formatter = DateFormatter()
-                    formatter.calendar = calendar
-                    formatter.timeZone = calendar.timeZone
-                    formatter.dateStyle = letter == "d" ? .short : .none
-                    formatter.timeStyle = letter == "t" ? .short : .none
-                    formatters[letter] = formatter
-                    return formatter
-                }()
-            return formatter.string(from: moment).replacingOccurrences(of: "/", with: "-")
-                .replacingOccurrences(
-                    of: ":",
-                    with: "."
-                )
-        }
     }
 
     /// The first and the last name of a counter range, as the dialog previews them; nil when
@@ -202,13 +209,6 @@ public enum NameTemplate {
             return text[index] == "]" && !quoted
         }
     }
-
-    /// No name is longer than this, so no width of a counter or a range may be either.
-    private static let maxWidth = 255
-    /// Positions in a range are cut to this; no value a range is applied to is that long.
-    private static let positionLimit = 1 << 20
-
-    private enum Case { case original, upper, lower, title, englishTitle, untouched }
 
     private static func expand(
         _ mask: String,

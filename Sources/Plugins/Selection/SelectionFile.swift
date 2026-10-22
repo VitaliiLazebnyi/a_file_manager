@@ -156,14 +156,14 @@ internal enum DirectoryComparison {
         /// Present on both sides and the same: files of equal size and time, and folders.
         internal var sameNames: [String] = []
 
+        internal var left: Set<String> { Set(leftNames) }
+        internal var right: Set<String> { Set(rightNames) }
+        internal var same: Set<String> { Set(sameNames) }
+
         internal init() {}
         internal init(left: Set<String>, right: Set<String>, same: Set<String>) {
             (leftNames, rightNames, sameNames) = (Array(left), Array(right), Array(same))
         }
-
-        internal var left: Set<String> { Set(leftNames) }
-        internal var right: Set<String> { Set(rightNames) }
-        internal var same: Set<String> { Set(sameNames) }
 
         internal static func == (a: Self, b: Self) -> Bool {
             a.left == b.left && a.right == b.right && a.same == b.same

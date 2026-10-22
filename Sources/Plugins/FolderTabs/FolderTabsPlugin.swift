@@ -48,13 +48,6 @@ extension CommandID {
 /// becomes visible. Tab files are read and written in the background, as jobs. Main thread only,
 /// like the panels it works on.
 public final class FolderTabsPlugin: Plugin {
-    public let name = "Folder tabs"
-    internal static let confirmCloseAllKey = "folderTabs.confirmCloseAll"
-    internal static let foregroundKey = "folderTabs.openDirInForeground"
-    internal static let nearCurrentKey = "folderTabs.openNearCurrent"
-    /// How many closed tabs of a panel can be brought back.
-    internal static let closedTabsLimit = 20
-
     /// A tab that was closed, the folder it showed, and where it was.
     private struct ClosedTab {
         let tab: PanelTabState
@@ -62,16 +55,69 @@ public final class FolderTabsPlugin: Plugin {
         let index: Int
     }
 
+    private enum TabFileError: LocalizedError {
+        case notAFile(String)
+        case tooLarge(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .notAFile(let path):
+                return "\(path) is not a file."
+
+            case .tooLarge(let path):
+                return "\(path) is too large to be a tab file."
+            }
+        }
+    }
+
+    private enum SaveOutcome {
+        case saved, declined
+        case failed(any Error)
+    }
+    internal static let confirmCloseAllKey = "folderTabs.confirmCloseAll"
+    internal static let foregroundKey = "folderTabs.openDirInForeground"
+    internal static let nearCurrentKey = "folderTabs.openNearCurrent"
+    /// How many closed tabs of a panel can be brought back.
+    internal static let closedTabsLimit = 20
+
+    /// The most tabs a panel holds; more are not opened (a tab file with thousands of tabs is
+    /// no tab file).
+    internal static let tabsPerPanelLimit = 256
+
+    /// The schemes whose tabs connect to a server when they are shown, for a location that no
+    /// file system claims (one whose plugin is not loaded; a view, which looks at places that may).
+    private static let connectingSchemes: Set<String> = [
+        "ftp", "ftps", "sftp", "http", "https", "ssh", "smb", "cifs", "afp", "nfs", "webdav",
+        "dav", "davs", "vfolder"
+    ]
+
+    /// The most a tab file may hold.
+    nonisolated internal static let tabFileLimit = 1 << 20
+
+    public let name = "Folder tabs"
+
     /// The closed tabs of each panel, the most recent last (spec 03 › Closing tabs,
     /// "Recently closed tabs").
     ///
     /// Kept for the session only.
     private var closedTabs: [ObjectIdentifier: [ClosedTab]] = [:]
 
-    public init() {}
-
     /// Asked whether a location connects to a server (`FileSystemProvider.connectsToServer`).
     private var fileSystems: FileSystemRegistry?
+
+    public init() {}
+
+    /// Tabs that show a directory an earlier tab already shows; the active tab is the one
+    /// that is kept of its directory, and locked tabs stay (spec 03 › Closing tabs).
+    internal static func duplicates(in tabs: PanelTabs) -> [Int] {
+        var seen: Set<String> = [tabs.active.directory.locationKey]
+        return tabs.tabs.indices.filter { index in
+            guard index != tabs.activeIndex else {
+                return false
+            }
+            return !seen.insert(tabs.tabs[index].directory.locationKey).inserted && !tabs.tabs[index].isLocked
+        }
+    }
 
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
@@ -396,17 +442,6 @@ public final class FolderTabsPlugin: Plugin {
         )
     }
 
-    /// The most tabs a panel holds; more are not opened (a tab file with thousands of tabs is
-    /// no tab file).
-    internal static let tabsPerPanelLimit = 256
-
-    /// The schemes whose tabs connect to a server when they are shown, for a location that no
-    /// file system claims (one whose plugin is not loaded; a view, which looks at places that may).
-    private static let connectingSchemes: Set<String> = [
-        "ftp", "ftps", "sftp", "http", "https", "ssh", "smb", "cifs", "afp", "nfs", "webdav",
-        "dav", "davs", "vfolder"
-    ]
-
     /// Whether showing the tab would connect to a server (or look in a place that may): the
     /// file system of the location says so itself; the list of schemes holds for the others.
     internal func connects(_ location: String) -> Bool {
@@ -488,18 +523,6 @@ public final class FolderTabsPlugin: Plugin {
         }
     }
 
-    /// Tabs that show a directory an earlier tab already shows; the active tab is the one
-    /// that is kept of its directory, and locked tabs stay (spec 03 › Closing tabs).
-    internal static func duplicates(in tabs: PanelTabs) -> [Int] {
-        var seen: Set<String> = [tabs.active.directory.locationKey]
-        return tabs.tabs.indices.filter { index in
-            guard index != tabs.activeIndex else {
-                return false
-            }
-            return !seen.insert(tabs.tabs[index].directory.locationKey).inserted && !tabs.tabs[index].isLocked
-        }
-    }
-
     /// Closes the tabs at `indices` and remembers them for "Reopen Closed Tab".
     private func close(_ indices: [Int], in tabs: PanelTabs) {
         for index in indices.sorted(by: >) where tabs.tabs.indices.contains(index) {
@@ -551,29 +574,6 @@ public final class FolderTabsPlugin: Plugin {
         else { return nil }
         let file = kernel.fileSystems.location(from: text, relativeTo: directory)
         return file.pathExtension.isEmpty ? file.appendingPathExtension("tab") : file
-    }
-
-    /// The most a tab file may hold.
-    nonisolated internal static let tabFileLimit = 1 << 20
-
-    private enum TabFileError: LocalizedError {
-        case notAFile(String)
-        case tooLarge(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .notAFile(let path):
-                return "\(path) is not a file."
-
-            case .tooLarge(let path):
-                return "\(path) is too large to be a tab file."
-            }
-        }
-    }
-
-    private enum SaveOutcome {
-        case saved, declined
-        case failed(any Error)
     }
 
     private func save(_ argument: CommandArgument, bothSides: Bool, kernel: Kernel) {

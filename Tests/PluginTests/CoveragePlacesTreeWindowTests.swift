@@ -22,6 +22,8 @@ internal struct CoveragePlacesTreeWindow {
     /// The windows the tree was asked to show: none is put on screen.
     internal let presenter = StabilityPresenter()
 
+    internal var root: URL { folders.url("/") }
+
     internal init() {
         _ = NSApplication.shared
         memory.addDirectory("/M/m1")
@@ -183,8 +185,6 @@ internal struct CoveragePlacesTreeWindow {
         #expect(tree.status.isEmpty && tree.rows.isEmpty)
         #expect(!tree.escape())
     }
-
-    internal var root: URL { folders.url("/") }
 
     @Test
     internal func escStopsAScanWhoseLateResultsAreDropped() async {

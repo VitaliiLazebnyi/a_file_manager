@@ -21,14 +21,23 @@ extension CommandID {
 /// show (Find Files). Commands and the service are used on the main thread; reading happens in
 /// the file system, on the panel's background threads.
 public final class VirtualFoldersPlugin: Plugin, FileListService {
-    public let name = "VirtualFolders"
     internal static let listsFoldersKey = "virtualFolders.listsFolders"
     internal static let entersPackagesKey = "virtualFolders.entersPackages"
+
+    public let name = "VirtualFolders"
 
     /// The file system this plugin provides; nil until the plugin has started.
     public private(set) var fileSystem: VirtualFileSystem?
 
     public init() {}
+
+    /// Hands the user's options to the file system, which reads them on background threads.
+    private static func applyOptions(_ settings: any SettingsStore, to fileSystem: VirtualFileSystem) {
+        fileSystem.options = VirtualFileSystem.Options(
+            listsFolders: settings.flag(listsFoldersKey, default: false),
+            entersPackages: settings.flag(entersPackagesKey, default: false)
+        )
+    }
 
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
@@ -119,14 +128,6 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
                     for panel in kernel.panels.all where isVirtual(panel) { panel.reload() }
                 }
             )
-        )
-    }
-
-    /// Hands the user's options to the file system, which reads them on background threads.
-    private static func applyOptions(_ settings: any SettingsStore, to fileSystem: VirtualFileSystem) {
-        fileSystem.options = VirtualFileSystem.Options(
-            listsFolders: settings.flag(listsFoldersKey, default: false),
-            entersPackages: settings.flag(entersPackagesKey, default: false)
         )
     }
 
@@ -283,13 +284,13 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
 /// back that way. Every other line is read as it stands, so list files made without quoting
 /// (and names with backslashes in them) keep their meaning.
 public enum FileListFile {
-    /// The most a list file may hold (bytes) and name (lines): more is not a list a person made.
-    public static let sizeLimit = 16 << 20
-    public static let lineLimit = 1_000_000
-
     public struct TooLarge: LocalizedError {
         public var errorDescription: String? { "The list of files is too large to load." }
     }
+
+    /// The most a list file may hold (bytes) and name (lines): more is not a list a person made.
+    public static let sizeLimit = 16 << 20
+    public static let lineLimit = 1_000_000
 
     /// The lines of a list file.
     ///

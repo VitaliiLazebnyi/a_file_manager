@@ -18,10 +18,6 @@ internal final class CoverageRenameFileSystem: FileSystemProvider, @unchecked Se
     internal var capabilities: FileSystemCapabilities { base.capabilities }
     internal let readsRootedPaths = true
 
-    internal init(scheme: String = "moves") {
-        base = MemoryFileSystem(scheme: scheme)
-    }
-
     /// Moves to these paths fail, as on a folder without permission.
     internal var refusedTargets: Set<String> {
         get { lock.withLock { refused } }
@@ -38,6 +34,10 @@ internal final class CoverageRenameFileSystem: FileSystemProvider, @unchecked Se
     internal var foldsCase: Bool {
         get { lock.withLock { folding } }
         set { lock.withLock { folding = newValue } }
+    }
+
+    internal init(scheme: String = "moves") {
+        base = MemoryFileSystem(scheme: scheme)
     }
 
     internal func url(_ path: String) -> URL { base.url(path) }

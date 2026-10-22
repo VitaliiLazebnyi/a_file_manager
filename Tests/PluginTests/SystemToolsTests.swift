@@ -346,6 +346,10 @@ internal struct SystemToolsCommandTests {
 /// The pure parts: reading a typed line, running a child process, formats and pages.
 @Suite
 internal struct SystemToolsTypes {
+    // MARK: File lists
+
+    private let now = Date(timeIntervalSince1970: 1_700_000_000)
+
     // MARK: Typed lines
 
     @Test
@@ -524,10 +528,6 @@ internal struct SystemToolsTypes {
                 && VolumeName.problem(with: String(repeating: "x", count: 300)) != nil
         )
     }
-
-    // MARK: File lists
-
-    private let now = Date(timeIntervalSince1970: 1_700_000_000)
 
     @Test
     internal func headerPlaceholdersAreFilledIn() {

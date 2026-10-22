@@ -12,13 +12,19 @@ import Testing
 @MainActor
 @Suite(.serialized)
 internal struct CoverageViewerPaneTextTests {
+    private static let text = (1...200).map { "Line \($0) of the text, with words\n" }.joined()
+
     /// Sends a button's action, as a click does. (`performClick` runs the event loop for a moment, which can end the
     /// run loop the test runner waits in, and the test process with it.)
     private static func press(_ button: NSButton) {
         button.sendAction(button.action, to: button.target)
     }
 
-    private static let text = (1...200).map { "Line \($0) of the text, with words\n" }.joined()
+    private static func buttons(of view: NSView) -> [NSButton] {
+        view.subviews.flatMap { subview -> [NSButton] in
+            (subview as? NSButton).map { [$0] } ?? buttons(of: subview)
+        }
+    }
 
     /// Find: the dialog, its history, repeating in every direction, and what is said when nothing
     /// is found or the pattern is wrong.
@@ -223,11 +229,5 @@ internal struct CoverageViewerPaneTextTests {
         let fresh = CoverageViewerJobMonitor()
         #expect(ViewerPane.save(source, to: bench.folder.appendingPathComponent("y"), monitor: fresh) == nil)
         #expect(fresh.reports > 0)
-    }
-
-    private static func buttons(of view: NSView) -> [NSButton] {
-        view.subviews.flatMap { subview -> [NSButton] in
-            (subview as? NSButton).map { [$0] } ?? buttons(of: subview)
-        }
     }
 }

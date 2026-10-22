@@ -164,6 +164,12 @@ internal final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Se
     /// The most paths read out of this answer.
     internal let limit: Int
 
+    private var stopped: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isStopped
+    }
+
     /// `string` is a question in Spotlight's language, as `SpotlightQuery.string` makes it (the
     /// system stops the program at one it cannot read).
     ///
@@ -216,12 +222,6 @@ internal final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Se
         // Handed to `queue`, the only one that touches the query once it has started.
         let metadataQuery = Handover(metadataQuery)
         queue.addOperation { metadataQuery.value.stop() }
-    }
-
-    private var stopped: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return isStopped
     }
 
     /// Runs on `queue`.

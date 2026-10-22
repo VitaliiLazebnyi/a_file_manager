@@ -190,6 +190,8 @@ internal struct ConfigPlacesFixRunner {
     internal let plugin: ConfigurationPlugin
     internal let bench: TestBench
 
+    internal var center: ConfigurationCenter { plugin.center! }
+
     internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt")
@@ -208,8 +210,6 @@ internal struct ConfigPlacesFixRunner {
             settings: settings
         )
     }
-
-    internal var center: ConfigurationCenter { plugin.center! }
 
     @Test
     internal func aCommandWithANameCodeDoesNotRunWithoutAName() {

@@ -18,6 +18,8 @@ internal final class FTPFixture: @unchecked Sendable {
     internal let fileSystem: RemoteFileSystem
     internal var environment: SessionEnvironment { center.environment }
 
+    internal var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
+
     internal init(
         _ options: TestFTPServer.Options = TestFTPServer.Options(),
         configure: (inout NetworkOptions.Values) -> Void = { _ in }
@@ -36,13 +38,6 @@ internal final class FTPFixture: @unchecked Sendable {
         center.makeSession = { profile, environment in FTPSession(profile: profile, environment: environment) }
         fileSystem = RemoteFileSystem(scheme: "ftp", center: center)
     }
-
-    deinit {
-        center.disconnectAll()
-        server.stop()
-    }
-
-    internal var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
 
     /// Waits until the background work of this fixture's session is done (connections given
     /// back, goodbyes said).
@@ -74,6 +69,11 @@ internal final class FTPFixture: @unchecked Sendable {
         let writer = try fileSystem.write(url(path))
         try writer.write(content)
         try writer.close(attributes: attributes)
+    }
+
+    deinit {
+        center.disconnectAll()
+        server.stop()
     }
 }
 

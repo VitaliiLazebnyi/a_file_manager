@@ -49,6 +49,35 @@ internal final class DirectoryTreeWindowController: NSWindowController, NSWindow
         }
     }
 
+    /// Numbers the scans of each tree (by location key) and lets only the latest store its result.
+    ///
+    /// All state is guarded by `lock`.
+    private final class StoreTickets: @unchecked Sendable {
+        private let lock = NSLock()
+        private var latest: [String: Int] = [:]
+        private var counter = 0
+
+        func next(for key: String) -> Int {
+            lock.lock()
+            defer { lock.unlock() }
+            counter += 1
+            latest[key] = counter
+            return counter
+        }
+
+        /// Runs `store` when `ticket` is still the latest of its tree.
+        func storeIfLatest(_ ticket: Int, for key: String, _ store: () -> Void) {
+            lock.lock()
+            defer { lock.unlock() }
+            if latest[key] == ticket { store() }
+        }
+    }
+    /// How many nodes are linked into the tree in one call of `attach`.
+    internal static let linkBudget = 2_000
+    /// How long one turn of the main thread may go on linking and reloading before the rest
+    /// waits for the next one (seconds).
+    internal static let turnBudget: TimeInterval = 0.008
+
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let cache: TreeCache
@@ -86,11 +115,6 @@ internal final class DirectoryTreeWindowController: NSWindowController, NSWindow
     private var demanded = Set<ObjectIdentifier>()
     /// The key (location and hidden folders) of the scan that runs, for its store ticket.
     private var scanKey: String?
-    /// How many nodes are linked into the tree in one call of `attach`.
-    internal static let linkBudget = 2_000
-    /// How long one turn of the main thread may go on linking and reloading before the rest
-    /// waits for the next one (seconds).
-    internal static let turnBudget: TimeInterval = 0.008
     /// Folders linked whose rows must be loaded again, once each, when their turn comes.
     private var reloadQueue: [TreeNode] = []
     private var reloadQueued = Set<ObjectIdentifier>()
@@ -110,35 +134,17 @@ internal final class DirectoryTreeWindowController: NSWindowController, NSWindow
     /// Whether a later turn of linking is asked for already.
     private var isLinking = false
 
-    /// Numbers the scans of each tree (by location key) and lets only the latest store its result.
-    ///
-    /// All state is guarded by `lock`.
-    private final class StoreTickets: @unchecked Sendable {
-        private let lock = NSLock()
-        private var latest: [String: Int] = [:]
-        private var counter = 0
-
-        func next(for key: String) -> Int {
-            lock.lock()
-            defer { lock.unlock() }
-            counter += 1
-            latest[key] = counter
-            return counter
-        }
-
-        /// Runs `store` when `ticket` is still the latest of its tree.
-        func storeIfLatest(_ ticket: Int, for key: String, _ store: () -> Void) {
-            lock.lock()
-            defer { lock.unlock() }
-            if latest[key] == ticket { store() }
-        }
-    }
-
     /// Puts the window on screen.
     ///
     /// Tests replace it, so that no window shows in the session they run in, and look at what it
     /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+
+    // MARK: Cursor and quick search
+
+    private var selectedNode: TreeNode? {
+        outline.item(atRow: outline.selectedRow) as? TreeNode
+    }
 
     /// `hiddenScanLimit`: how long a scan goes on after the window was closed (a quarter of an
     /// hour); `beep`: the sound of a search that found nothing.
@@ -183,6 +189,22 @@ internal final class DirectoryTreeWindowController: NSWindowController, NSWindow
 
     internal static func isRescanKey(_ event: NSEvent) -> Bool {
         Shortcut.f(2).matches(event) || Shortcut(.character("r"), .control).matches(event)
+    }
+
+    /// Makes the folder asked for part of the tree: the way to it is known without reading anything.
+    private static func include(_ directory: URL, in tree: DirectoryTree) {
+        if let path = tree.relativePath(of: directory) { _ = tree.node(at: path, creating: true) }
+    }
+
+    /// What a key press types, when it types something: no control or command key, and not one
+    /// of the keys that only have a code (arrows, function keys).
+    private static func typedText(_ event: NSEvent) -> String? {
+        guard event.modifierFlags.isDisjoint(with: [.command, .control]), let text = event.characters, !text.isEmpty,
+            text.unicodeScalars.allSatisfy({
+                $0.value >= 0x20 && $0.value != 0x7F && !(0xF700...0xF8FF).contains($0.value)
+            })
+        else { return nil }
+        return text
     }
 
     // MARK: Layout
@@ -354,11 +376,6 @@ internal final class DirectoryTreeWindowController: NSWindowController, NSWindow
                 showCount()
             }
         }
-    }
-
-    /// Makes the folder asked for part of the tree: the way to it is known without reading anything.
-    private static func include(_ directory: URL, in tree: DirectoryTree) {
-        if let path = tree.relativePath(of: directory) { _ = tree.node(at: path, creating: true) }
     }
 
     /// Lets go of the tree on screen; a large tree is freed on a background thread.
@@ -641,12 +658,6 @@ internal final class DirectoryTreeWindowController: NSWindowController, NSWindow
         }
     }
 
-    // MARK: Cursor and quick search
-
-    private var selectedNode: TreeNode? {
-        outline.item(atRow: outline.selectedRow) as? TreeNode
-    }
-
     /// Opens the folders above the node of `directory` (or the nearest one the tree has) and
     /// puts the cursor on it.
     private func reveal(_ directory: URL, in tree: DirectoryTree) {
@@ -790,17 +801,6 @@ internal final class DirectoryTreeWindowController: NSWindowController, NSWindow
             return false
         }
         return true
-    }
-
-    /// What a key press types, when it types something: no control or command key, and not one
-    /// of the keys that only have a code (arrows, function keys).
-    private static func typedText(_ event: NSEvent) -> String? {
-        guard event.modifierFlags.isDisjoint(with: [.command, .control]), let text = event.characters, !text.isEmpty,
-            text.unicodeScalars.allSatisfy({
-                $0.value >= 0x20 && $0.value != 0x7F && !(0xF700...0xF8FF).contains($0.value)
-            })
-        else { return nil }
-        return text
     }
 
     // MARK: Result

@@ -164,6 +164,81 @@ internal final class TextPagerView: NSView {
     private let verticalScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 15, height: 100))
     private let horizontalScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 100, height: 15))
 
+    override internal var isFlipped: Bool { true }
+    override internal var acceptsFirstResponder: Bool { true }
+    override internal var isOpaque: Bool { true }
+
+    /// True while a text's rows are still being found.
+    internal var isIndexing: Bool {
+        // A text whose reading was stopped is not being indexed any more.
+        pending != nil || !(document.map { $0.isIndexComplete || $0.cancellation.isCancelled } ?? true)
+    }
+
+    /// The layout of the text shown, or of the one that is to replace it: what a new layout is
+    /// compared with.
+    internal var shownLayout: ViewerLayout? { (pending?.document ?? document)?.layout }
+
+    /// How far the indexing is, 0…1.
+    internal var indexingProgress: Double {
+        guard let document = pending?.document ?? document, document.length > 0 else {
+            return 1
+        }
+        return Double(document.indexedThrough) / Double(document.length)
+    }
+
+    private var textArea: NSRect {
+        NSRect(
+            x: 0,
+            y: 0,
+            width: max(0, bounds.width - verticalScroller.frame.width),
+            height: max(0, bounds.height - horizontalScroller.frame.height)
+        )
+    }
+
+    /// Rows that fit completely.
+    private var pageRows: Int { max(1, Int((textArea.height - inset) / lineHeight)) }
+
+    /// How many characters of the fixed-width font fit in a row: where a text is wrapped when
+    /// it is wrapped at the window's edge.
+    internal var columnsThatFit: Int { max(20, Int((textArea.width - 2 * inset) / characterWidth)) }
+
+    // MARK: Loading rows
+
+    private var rowCount: Int { document?.rowCount ?? 0 }
+
+    private var isVisibleRangeMissing: Bool {
+        let last = min(rowCount, topRow + pageRows + 1) - 1
+        return last >= topRow && (row(topRow) == nil || row(last) == nil)
+    }
+
+    // MARK: Position
+
+    /// The byte offset of the row at the top: what stays in place when the text is laid out anew.
+    internal var topOffset: Int64 {
+        row(topRow)?.range.lowerBound ?? knownTopOffset ?? document?.content.lowerBound ?? 0
+    }
+
+    /// The end of the last visible row as a percentage of the file (spec 10 › Position and
+    /// zoom item).
+    internal var percent: Double {
+        guard let document, document.length > 0 else {
+            return 100
+        }
+        let last = min(rowCount, topRow + pageRows) - 1
+        guard let row = row(last) else {
+            return rowCount > 0 ? Double(min(rowCount, topRow + pageRows)) / Double(rowCount) * 100 : 100
+        }
+        return min(100, Double(row.range.upperBound) / Double(document.length) * 100)
+    }
+
+    /// The line and the offset the status line names: those of the text cursor, else of the top row.
+    internal var position: (line: Int, offset: Int64)? {
+        if let caret, let row = row(caret.row) {
+            return (row.line, caret.offset)
+        }
+        return row(topRow).map { ($0.line, $0.range.lowerBound) }
+    }
+
     override internal init(frame: NSRect) {
         super.init(frame: frame)
         for scroller in [verticalScroller, horizontalScroller] {
@@ -181,16 +256,38 @@ internal final class TextPagerView: NSView {
     /// Made in code only: an archive gives none.
     internal required init?(coder _: NSCoder) { nil }
 
-    deinit {
-        document?.cancellation.cancel()
-        pending?.document.cancellation.cancel()
-        fetchRequest?.flag.cancel()
-        revealRequest?.flag.cancel()
+    private static func isWordUnit(_ unit: UInt16) -> Bool {
+        Unicode.Scalar(unit).map { CharacterSet.alphanumerics.contains($0) || $0 == "_" } ?? true
     }
 
-    override internal var isFlipped: Bool { true }
-    override internal var acceptsFirstResponder: Bool { true }
-    override internal var isOpaque: Bool { true }
+    internal static func wordStart(after index: Int, in text: String) -> Int {
+        let units = Array(text.utf16)
+        var index = index
+        while index < units.count, isWordUnit(units[index]) { index += 1 }
+        while index < units.count, !isWordUnit(units[index]) { index += 1 }
+        return index
+    }
+
+    internal static func wordStart(before index: Int, in text: String) -> Int {
+        let units = Array(text.utf16)
+        var index = min(index, units.count)
+        while index > 0, !isWordUnit(units[index - 1]) { index -= 1 }
+        while index > 0, isWordUnit(units[index - 1]) { index -= 1 }
+        return index
+    }
+
+    /// The word around a place in a text, for a double click.
+    internal static func wordRange(around index: Int, in text: String) -> Range<Int> {
+        let units = Array(text.utf16)
+        guard index < units.count, isWordUnit(units[index]) else {
+            return index..<min(units.count, index + 1)
+        }
+        var lower = index
+        var upper = index
+        while lower > 0, isWordUnit(units[lower - 1]) { lower -= 1 }
+        while upper < units.count, isWordUnit(units[upper]) { upper += 1 }
+        return lower..<upper
+    }
 
     // MARK: Documents
 
@@ -354,24 +451,6 @@ internal final class TextPagerView: NSView {
         needsDisplay = true
     }
 
-    /// True while a text's rows are still being found.
-    internal var isIndexing: Bool {
-        // A text whose reading was stopped is not being indexed any more.
-        pending != nil || !(document.map { $0.isIndexComplete || $0.cancellation.isCancelled } ?? true)
-    }
-
-    /// The layout of the text shown, or of the one that is to replace it: what a new layout is
-    /// compared with.
-    internal var shownLayout: ViewerLayout? { (pending?.document ?? document)?.layout }
-
-    /// How far the indexing is, 0…1.
-    internal var indexingProgress: Double {
-        guard let document = pending?.document ?? document, document.length > 0 else {
-            return 1
-        }
-        return Double(document.indexedThrough) / Double(document.length)
-    }
-
     private func rowCountChanged() {
         if revealWaitsForIndex, let waiting = outstandingReveal {
             reveal(
@@ -395,22 +474,6 @@ internal final class TextPagerView: NSView {
         ascent = ceil(font.ascender)
         characterWidth = max(1, ("0" as NSString).size(withAttributes: [.font: font]).width)
     }
-
-    private var textArea: NSRect {
-        NSRect(
-            x: 0,
-            y: 0,
-            width: max(0, bounds.width - verticalScroller.frame.width),
-            height: max(0, bounds.height - horizontalScroller.frame.height)
-        )
-    }
-
-    /// Rows that fit completely.
-    private var pageRows: Int { max(1, Int((textArea.height - inset) / lineHeight)) }
-
-    /// How many characters of the fixed-width font fit in a row: where a text is wrapped when
-    /// it is wrapped at the window's edge.
-    internal var columnsThatFit: Int { max(20, Int((textArea.width - 2 * inset) / characterWidth)) }
 
     override internal func layout() {
         super.layout()
@@ -450,18 +513,9 @@ internal final class TextPagerView: NSView {
         needsDisplay = true
     }
 
-    // MARK: Loading rows
-
-    private var rowCount: Int { document?.rowCount ?? 0 }
-
     private func row(_ index: Int) -> DisplayRow? {
         let position = index - loadedFirst
         return position >= 0 && position < loaded.count ? loaded[position] : nil
-    }
-
-    private var isVisibleRangeMissing: Bool {
-        let last = min(rowCount, topRow + pageRows + 1) - 1
-        return last >= topRow && (row(topRow) == nil || row(last) == nil)
     }
 
     /// Fetches the rows on screen and a page on either side, unless they are there already.
@@ -644,34 +698,6 @@ internal final class TextPagerView: NSView {
             scrollRemainder -= CGFloat(rows) * lineHeight
             scroll(toRow: topRow + rows)
         }
-    }
-
-    // MARK: Position
-
-    /// The byte offset of the row at the top: what stays in place when the text is laid out anew.
-    internal var topOffset: Int64 {
-        row(topRow)?.range.lowerBound ?? knownTopOffset ?? document?.content.lowerBound ?? 0
-    }
-
-    /// The end of the last visible row as a percentage of the file (spec 10 › Position and
-    /// zoom item).
-    internal var percent: Double {
-        guard let document, document.length > 0 else {
-            return 100
-        }
-        let last = min(rowCount, topRow + pageRows) - 1
-        guard let row = row(last) else {
-            return rowCount > 0 ? Double(min(rowCount, topRow + pageRows)) / Double(rowCount) * 100 : 100
-        }
-        return min(100, Double(row.range.upperBound) / Double(document.length) * 100)
-    }
-
-    /// The line and the offset the status line names: those of the text cursor, else of the top row.
-    internal var position: (line: Int, offset: Int64)? {
-        if let caret, let row = row(caret.row) {
-            return (row.line, caret.offset)
-        }
-        return row(topRow).map { ($0.line, $0.range.lowerBound) }
     }
 
     /// Where the next search starts: behind the start of the selection (the last hit), else at
@@ -974,39 +1000,6 @@ internal final class TextPagerView: NSView {
         }
     }
 
-    private static func isWordUnit(_ unit: UInt16) -> Bool {
-        Unicode.Scalar(unit).map { CharacterSet.alphanumerics.contains($0) || $0 == "_" } ?? true
-    }
-
-    internal static func wordStart(after index: Int, in text: String) -> Int {
-        let units = Array(text.utf16)
-        var index = index
-        while index < units.count, isWordUnit(units[index]) { index += 1 }
-        while index < units.count, !isWordUnit(units[index]) { index += 1 }
-        return index
-    }
-
-    internal static func wordStart(before index: Int, in text: String) -> Int {
-        let units = Array(text.utf16)
-        var index = min(index, units.count)
-        while index > 0, !isWordUnit(units[index - 1]) { index -= 1 }
-        while index > 0, isWordUnit(units[index - 1]) { index -= 1 }
-        return index
-    }
-
-    /// The word around a place in a text, for a double click.
-    internal static func wordRange(around index: Int, in text: String) -> Range<Int> {
-        let units = Array(text.utf16)
-        guard index < units.count, isWordUnit(units[index]) else {
-            return index..<min(units.count, index + 1)
-        }
-        var lower = index
-        var upper = index
-        while lower > 0, isWordUnit(units[lower - 1]) { lower -= 1 }
-        while upper < units.count, isWordUnit(units[upper]) { upper += 1 }
-        return lower..<upper
-    }
-
     // MARK: Mouse
 
     private func line(for row: DisplayRow) -> CTLine {
@@ -1149,5 +1142,12 @@ internal final class TextPagerView: NSView {
     override internal func resignFirstResponder() -> Bool {
         needsDisplay = true
         return true
+    }
+
+    deinit {
+        document?.cancellation.cancel()
+        pending?.document.cancellation.cancel()
+        fetchRequest?.flag.cancel()
+        revealRequest?.flag.cancel()
     }
 }

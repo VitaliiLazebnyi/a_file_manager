@@ -4,6 +4,13 @@ import Foundation
 /// What happens to the permissions of an item (spec 07 › Change attributes, adapted: the Mac
 /// has permissions where Windows has `r a h s`).
 internal enum PermissionChange: Equatable {
+    case unchanged
+    /// With `keepingSpecialBits` (the mode was written in letters, which cannot name them),
+    /// set-user-ID, set-group-ID and sticky stay as they are. An octal mode is the whole mode,
+    /// as it is for `chmod`: `755` clears the three, `4755` sets set-user-ID.
+    case absolute(UInt16, keepingSpecialBits: Bool)
+    case symbolic([Clause])
+
     /// One `who op permissions` part of a symbolic change, as `chmod` writes it: `go-w`.
     internal struct Clause: Equatable {
         /// The classes it applies to, as shifts of their three bits: 6 owner, 3 group, 0 others.
@@ -15,12 +22,47 @@ internal enum PermissionChange: Equatable {
         internal var conditionalExecute: Bool
     }
 
-    case unchanged
-    /// With `keepingSpecialBits` (the mode was written in letters, which cannot name them),
-    /// set-user-ID, set-group-ID and sticky stay as they are. An octal mode is the whole mode,
-    /// as it is for `chmod`: `755` clears the three, `4755` sets set-user-ID.
-    case absolute(UInt16, keepingSpecialBits: Bool)
-    case symbolic([Clause])
+    /// Whether the new mode depends on the mode the item has.
+    internal var needsCurrentMode: Bool {
+        switch self {
+        case .unchanged:
+            return false
+
+        case .absolute(_, let keepingSpecialBits):
+            return keepingSpecialBits
+
+        case .symbolic:
+            return true
+        }
+    }
+
+    /// The change as it can be typed, and read back by `init(_:)`.
+    internal var text: String {
+        switch self {
+        case .unchanged:
+            return ""
+
+        case .absolute(let mode, let keepingSpecialBits):
+            if !keepingSpecialBits {
+                return PropertyText.octal(mode)
+            }
+            return (0..<9).map { index in mode & (0o400 >> UInt16(index)) != 0 ? ["r", "w", "x"][index % 3] : "-" }
+                .joined()
+
+        case .symbolic(let clauses):
+            return
+                clauses.map { clause in
+                    let who =
+                        clause.shifts == [6, 3, 0]
+                        ? "a" : clause.shifts.map { $0 == 6 ? "u" : ($0 == 3 ? "g" : "o") }.joined()
+                    let what =
+                        (clause.bits & 4 != 0 ? "r" : "") + (clause.bits & 2 != 0 ? "w" : "")
+                        + (clause.bits & 1 != 0 ? "x" : "")
+                    return who + String(clause.operation) + what + (clause.conditionalExecute ? "X" : "")
+                }
+                .joined(separator: ",")
+        }
+    }
 
     /// Reads `755`, `0755`, `rwxr-xr-x` or `chmod` clauses such as `u+x,go-w` and `a+rX`.
     ///
@@ -115,48 +157,6 @@ internal enum PermissionChange: Equatable {
         return clause
     }
 
-    /// Whether the new mode depends on the mode the item has.
-    internal var needsCurrentMode: Bool {
-        switch self {
-        case .unchanged:
-            return false
-
-        case .absolute(_, let keepingSpecialBits):
-            return keepingSpecialBits
-
-        case .symbolic:
-            return true
-        }
-    }
-
-    /// The change as it can be typed, and read back by `init(_:)`.
-    internal var text: String {
-        switch self {
-        case .unchanged:
-            return ""
-
-        case .absolute(let mode, let keepingSpecialBits):
-            if !keepingSpecialBits {
-                return PropertyText.octal(mode)
-            }
-            return (0..<9).map { index in mode & (0o400 >> UInt16(index)) != 0 ? ["r", "w", "x"][index % 3] : "-" }
-                .joined()
-
-        case .symbolic(let clauses):
-            return
-                clauses.map { clause in
-                    let who =
-                        clause.shifts == [6, 3, 0]
-                        ? "a" : clause.shifts.map { $0 == 6 ? "u" : ($0 == 3 ? "g" : "o") }.joined()
-                    let what =
-                        (clause.bits & 4 != 0 ? "r" : "") + (clause.bits & 2 != 0 ? "w" : "")
-                        + (clause.bits & 1 != 0 ? "x" : "")
-                    return who + String(clause.operation) + what + (clause.conditionalExecute ? "X" : "")
-                }
-                .joined(separator: ",")
-        }
-    }
-
     internal func applied(to mode: UInt16, isDirectory: Bool) -> UInt16 {
         switch self {
         case .unchanged:
@@ -193,12 +193,14 @@ internal enum PermissionChange: Equatable {
 /// The date is written `yyyy-MM-dd` and the time `HH:mm:ss`, with any separators. A part written in
 /// letters (`yyyy-05-dd`, `hh:10:ss`), and an empty field, keeps what the file has.
 internal struct TimestampChange: Equatable {
+    internal static let current = Self(parts: Array(repeating: nil, count: 6), usesCurrentTime: true)
+
     /// Year, month, day, hour, minute, second; nil keeps that part of the file's own date.
     internal var parts: [Int?]
     /// The moment the command ran, for every item alike.
     internal var usesCurrentTime = false
 
-    internal static let current = Self(parts: Array(repeating: nil, count: 6), usesCurrentTime: true)
+    internal var changesNothing: Bool { !usesCurrentTime && parts.allSatisfy { $0 == nil } }
 
     internal init(parts: [Int?], usesCurrentTime: Bool = false) {
         self.parts = parts
@@ -236,7 +238,14 @@ internal struct TimestampChange: Equatable {
         return fields
     }
 
-    internal var changesNothing: Bool { !usesCurrentTime && parts.allSatisfy { $0 == nil } }
+    /// A date as the fields of the dialog show it.
+    internal static func fieldTexts(for date: Date, calendar: Calendar = .current) -> (date: String, time: String) {
+        func part(_ component: Calendar.Component) -> Int { calendar.component(component, from: date) }
+        return (
+            String(format: "%04d-%02d-%02d", part(.year), part(.month), part(.day)),
+            String(format: "%02d:%02d:%02d", part(.hour), part(.minute), part(.second))
+        )
+    }
 
     /// The new date of an item last changed at `original`; nil when the parts do not make a
     /// date (the 31st of a month with 30 days).
@@ -262,15 +271,6 @@ internal struct TimestampChange: Equatable {
             return nil
         }
         return calendar.date(from: components)
-    }
-
-    /// A date as the fields of the dialog show it.
-    internal static func fieldTexts(for date: Date, calendar: Calendar = .current) -> (date: String, time: String) {
-        func part(_ component: Calendar.Component) -> Int { calendar.component(component, from: date) }
-        return (
-            String(format: "%04d-%02d-%02d", part(.year), part(.month), part(.day)),
-            String(format: "%02d:%02d:%02d", part(.hour), part(.minute), part(.second))
-        )
     }
 }
 
@@ -380,6 +380,16 @@ internal final class AttributeJob: @unchecked Sendable {
         /// The first failures, ready to show: path and reason.
         internal var failures: [String] = []
         internal var cancelled = false
+    }
+
+    private struct LockedItem: LocalizedError {
+        var errorDescription: String? {
+            "The item is locked. Its permissions were not changed; choose Locked: Clear to unlock it."
+        }
+    }
+
+    private struct InvalidDate: LocalizedError {
+        var errorDescription: String? { "The new date does not exist in the calendar." }
     }
 
     private let change: AttributeChange
@@ -538,15 +548,5 @@ internal final class AttributeJob: @unchecked Sendable {
         if ownerID != nil || groupID != nil { try LocalInfo.setOwner(ownerID, group: groupID, of: url) }
         if let hidden = change.hidden { try LocalInfo.setFlag(UInt32(UF_HIDDEN), hidden, of: url) }
         if change.locked == true { try LocalInfo.setFlag(UInt32(UF_IMMUTABLE), true, of: url) }
-    }
-
-    private struct LockedItem: LocalizedError {
-        var errorDescription: String? {
-            "The item is locked. Its permissions were not changed; choose Locked: Clear to unlock it."
-        }
-    }
-
-    private struct InvalidDate: LocalizedError {
-        var errorDescription: String? { "The new date does not exist in the calendar." }
     }
 }

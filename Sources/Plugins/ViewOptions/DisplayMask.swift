@@ -13,6 +13,16 @@ internal struct DisplayMask: Sendable {
     private let excludes: FileMask?
     private let folderExcludes: FileMask?
 
+    /// True for `*.*`, `*` and nothing at all: every entry is shown, which is no filter.
+    internal var showsEverything: Bool {
+        excludes == nil && folderExcludes == nil && (includes == nil || ["*", "*.*"].contains(text))
+    }
+
+    /// The filter for a panel; nil when the specification shows everything.
+    internal var filter: PanelFilter? {
+        showsEverything ? nil : PanelFilter(title: text) { [self] in matches($0) }
+    }
+
     internal init(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespaces)
         self.text = text
@@ -33,20 +43,10 @@ internal struct DisplayMask: Sendable {
         folderExcludes = mask(excluded.filter(isFolderMask).map { String($0.dropLast()) }.filter { !$0.isEmpty })
     }
 
-    /// True for `*.*`, `*` and nothing at all: every entry is shown, which is no filter.
-    internal var showsEverything: Bool {
-        excludes == nil && folderExcludes == nil && (includes == nil || ["*", "*.*"].contains(text))
-    }
-
     internal func matches(_ item: FileItem) -> Bool {
         if item.isFolder {
             return !(folderExcludes?.matches(item.name) ?? false)
         }
         return (includes?.matches(item.name) ?? true) && !(excludes?.matches(item.name) ?? false)
-    }
-
-    /// The filter for a panel; nil when the specification shows everything.
-    internal var filter: PanelFilter? {
-        showsEverything ? nil : PanelFilter(title: text) { [self] in matches($0) }
     }
 }

@@ -50,11 +50,11 @@ private func runInBackground(_ job: FileJob) -> JobResult? {
 private final class SharedBox<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
-    init(_ value: Value) { stored = value }
     var value: Value {
         get { lock.withLock { stored } }
         set { lock.withLock { stored = newValue } }
     }
+    init(_ value: Value) { stored = value }
 }
 
 /// Cancels the job from a thread of its own once `gate` is signalled (or after `Wait.ceiling`).

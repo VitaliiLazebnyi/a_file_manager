@@ -11,6 +11,22 @@ import Testing
 /// readers that fail, duplicates on shares and searches that are cancelled.
 @Suite
 internal struct CoverageFindModel {
+    /// Counts calls.
+    ///
+    /// Unchecked: the count is guarded by `lock`.
+    private final class Calls: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+
+        /// Counts one more call and returns the count.
+        func next() -> Int {
+            lock.withLock {
+                count += 1
+                return count
+            }
+        }
+    }
+
     internal let box: Sandbox
     internal let memory = MemoryFileSystem()
     internal let registry = FileSystemRegistry()
@@ -370,22 +386,6 @@ internal struct CoverageFindModel {
         var found: [String] = []
         FileSearch(SearchQuery(directory: memory.url("/r")), fileSystems: registry).run { found.append($0.name) }
         #expect(found.contains("a.txt") && !found.contains("b.txt"))
-    }
-
-    /// Counts calls.
-    ///
-    /// Unchecked: the count is guarded by `lock`.
-    private final class Calls: @unchecked Sendable {
-        private let lock = NSLock()
-        private var count = 0
-
-        /// Counts one more call and returns the count.
-        func next() -> Int {
-            lock.withLock {
-                count += 1
-                return count
-            }
-        }
     }
 }
 

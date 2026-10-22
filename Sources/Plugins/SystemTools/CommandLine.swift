@@ -7,6 +7,18 @@ import Foundation
 /// The shell does the real parsing; this only finds out how the line is to be started. A value
 /// without state: usable from any thread.
 internal struct TypedCommand: Equatable {
+    /// The PATH this process was started with.
+    ///
+    /// A program started from the Dock has a short one; the PATH of a terminal is
+    /// `LoginShell.searchPath`.
+    internal static var processPath: String { path(in: ProcessInfo.processInfo.environment) }
+
+    internal static let applicationFolders: [URL] = [
+        URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/System/Applications"),
+        URL(fileURLWithPath: "/System/Applications/Utilities"), URL(fileURLWithPath: "/Applications/Utilities"),
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+    ]
+
     /// The line without surrounding blanks and without a trailing `&`.
     internal let command: String
     /// A trailing `&`: the command is started and left alone, its output is not collected.
@@ -64,6 +76,16 @@ internal struct TypedCommand: Equatable {
             .standardizedFileURL
     }
 
+    /// Whether an executable file of that name is in a folder of the PATH.
+    internal static func isOnPath(_ name: String, path: String = Self.processPath) -> Bool {
+        path.split(separator: ":").contains { FileManager.default.isExecutableFile(atPath: $0 + "/" + name) }
+    }
+
+    /// The PATH of `environment`; the system's usual one without.
+    internal static func path(in environment: [String: String]) -> String {
+        environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+    }
+
     /// Where an application of that name would be, when the first word names one: a path ending
     /// in `.app`, or a bare name found in the usual application folders.
     ///
@@ -103,28 +125,6 @@ internal struct TypedCommand: Equatable {
         }
         return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(firstWord + ".app")) }.first
     }
-
-    /// Whether an executable file of that name is in a folder of the PATH.
-    internal static func isOnPath(_ name: String, path: String = Self.processPath) -> Bool {
-        path.split(separator: ":").contains { FileManager.default.isExecutableFile(atPath: $0 + "/" + name) }
-    }
-
-    /// The PATH this process was started with.
-    ///
-    /// A program started from the Dock has a short one; the PATH of a terminal is
-    /// `LoginShell.searchPath`.
-    internal static var processPath: String { path(in: ProcessInfo.processInfo.environment) }
-
-    /// The PATH of `environment`; the system's usual one without.
-    internal static func path(in environment: [String: String]) -> String {
-        environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-    }
-
-    internal static let applicationFolders: [URL] = [
-        URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/System/Applications"),
-        URL(fileURLWithPath: "/System/Applications/Utilities"), URL(fileURLWithPath: "/Applications/Utilities"),
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
-    ]
 }
 
 /// What became of a child process.
@@ -146,6 +146,27 @@ internal struct ProcessOutcome {
 /// emptied while the child runs, so a child that writes a lot never waits for a full pipe.
 /// Cancelling asks the child to end (SIGTERM) and, if it does not listen, ends it (SIGKILL).
 internal struct ProcessRunner {
+    /// All state is guarded by `lock`.
+    private final class Buffer: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+        private var truncated = false
+
+        var contents: (data: Data, truncated: Bool) {
+            lock.lock()
+            defer { lock.unlock() }
+            return (data, truncated)
+        }
+
+        func append(_ block: Data) {
+            lock.lock()
+            defer { lock.unlock() }
+            let room = ProcessRunner.outputLimit - data.count
+            if block.count > room { truncated = true }
+            if room > 0 { data.append(block.prefix(room)) }
+        }
+    }
+
     /// The most output that is kept; a command that prints without end must not fill memory.
     internal static let outputLimit = 8 * 1_024 * 1_024
 
@@ -157,27 +178,6 @@ internal struct ProcessRunner {
     internal var collectsOutput = true
     /// The child's environment; this program's unless told otherwise.
     internal var environment = ProcessInfo.processInfo.environment
-
-    /// All state is guarded by `lock`.
-    private final class Buffer: @unchecked Sendable {
-        private let lock = NSLock()
-        private var data = Data()
-        private var truncated = false
-
-        func append(_ block: Data) {
-            lock.lock()
-            defer { lock.unlock() }
-            let room = ProcessRunner.outputLimit - data.count
-            if block.count > room { truncated = true }
-            if room > 0 { data.append(block.prefix(room)) }
-        }
-
-        var contents: (data: Data, truncated: Bool) {
-            lock.lock()
-            defer { lock.unlock() }
-            return (data, truncated)
-        }
-    }
 
     /// Ends the shell and what it started: the whole group when the shell leads one of its own,
     /// else the shell alone (the group is then ours too).

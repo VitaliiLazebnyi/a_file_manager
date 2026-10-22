@@ -8,16 +8,16 @@ internal final class SharedCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var total: Int64 = 0
 
-    internal func add(_ amount: Int64) {
-        lock.lock()
-        total += amount
-        lock.unlock()
-    }
-
     internal var value: Int64 {
         lock.lock()
         defer { lock.unlock() }
         return total
+    }
+
+    internal func add(_ amount: Int64) {
+        lock.lock()
+        total += amount
+        lock.unlock()
     }
 }
 
@@ -82,9 +82,6 @@ internal enum Quarantine {
 ///
 /// **Threading.** Any number of threads at once; each call opens and closes what it needs.
 internal final class UnpackFolder: Sendable {
-    internal let url: URL
-    private let descriptor: Int32
-
     /// What the user allows new files to be (`umask`): rights an archive stores beyond that
     /// (a file anyone may write to) are not given, as `tar` and `unzip` do not give them.
     internal static let allowed: mode_t = {
@@ -92,6 +89,9 @@ internal final class UnpackFolder: Sendable {
         umask(mask)
         return ~mask & 0o7777
     }()
+
+    internal let url: URL
+    private let descriptor: Int32
 
     /// The folder itself is taken as it is, links on the way to it included: it is the place
     /// the user chose.
@@ -103,8 +103,13 @@ internal final class UnpackFolder: Sendable {
         guard descriptor >= 0 else { throw posixError(errno, url.path) }
     }
 
-    deinit {
-        close(descriptor)
+    private static func mark(_ descriptor: Int32, _ quarantine: Data?) {
+        guard let quarantine else {
+            return
+        }
+        _ = quarantine.withUnsafeBytes {
+            fsetxattr(descriptor, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0)
+        }
     }
 
     private func path(_ names: ArraySlice<String>) -> String {
@@ -144,15 +149,6 @@ internal final class UnpackFolder: Sendable {
             current = next
         }
         return current
-    }
-
-    private static func mark(_ descriptor: Int32, _ quarantine: Data?) {
-        guard let quarantine else {
-            return
-        }
-        _ = quarantine.withUnsafeBytes {
-            fsetxattr(descriptor, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0)
-        }
     }
 
     /// Makes the folder at `names` (and those above it) and gives it the archive's mark.
@@ -243,6 +239,10 @@ internal final class UnpackFolder: Sendable {
             unlinkat(folder, temporary, 0)
             throw error
         }
+    }
+
+    deinit {
+        close(descriptor)
     }
 }
 
@@ -430,6 +430,13 @@ internal final class Unpacker: @unchecked Sendable {
     /// Set before `run`.
     internal var isOnLocalVolume: (String) -> Bool = Volume.isOnLocalVolume
 
+    /// The folders of this machine's disks that are unpacked into, open; see `UnpackFolder`.
+    ///
+    /// A target elsewhere (a server, another archive, a network volume, where a call may hang and
+    /// has to be given up through the file system's own means) has none: there the members are
+    /// written by path through its file system, after a look for links on the way.
+    private var roots: [String: UnpackFolder] = [:]
+
     internal init(
         fileSystems: FileSystemRegistry,
         monitor: any JobMonitor,
@@ -443,6 +450,40 @@ internal final class Unpacker: @unchecked Sendable {
         self.whileUnpacking = whileUnpacking
         self.askConflict = askConflict
         overwriteAll = options.overwrites
+    }
+
+    /// True when `url` is a place below `folder`, by the bytes of the two paths once `.` and
+    /// `..` are taken out of them (the kernel's check for paths from outside).
+    internal static func lies(_ url: URL, below folder: URL) -> Bool {
+        PathSafety.isContained(url, in: folder)
+    }
+
+    /// Refuses to go through a symbolic link on the way from `root` down to `url` (both on
+    /// the local disk): a link in the target folder, left by an earlier unpacking or put
+    /// there on purpose, would lead what is unpacked now to wherever it points.
+    ///
+    /// The paths are taken as they are written, as the file system takes them when it writes: a
+    /// `..` in the target leads wherever the disk says, not where the text would.
+    private static func refuseLinks(from root: URL, to url: URL) throws {
+        guard url.isFileURL, root.isFileURL else {
+            return
+        }
+        let (names, base) = (url.pathComponents, root.pathComponents)
+        guard names.count > base.count, Array(names[..<base.count]) == base else {
+            return
+        }
+        var current = root
+        for name in names[base.count...] {
+            current = current.appending(name: name)
+            var status = stat()
+            // What does not exist yet is made here, as a folder.
+            guard lstat(current.path, &status) == 0 else {
+                return
+            }
+            if status.st_mode & S_IFMT == S_IFLNK {
+                throw ArchiveError.unsupported("Unpacking through the symbolic link \(current.path)")
+            }
+        }
     }
 
     internal func run(_ sources: [Source], into target: URL) -> UnpackResult {
@@ -560,40 +601,6 @@ internal final class Unpacker: @unchecked Sendable {
         return tasks
     }
 
-    /// True when `url` is a place below `folder`, by the bytes of the two paths once `.` and
-    /// `..` are taken out of them (the kernel's check for paths from outside).
-    internal static func lies(_ url: URL, below folder: URL) -> Bool {
-        PathSafety.isContained(url, in: folder)
-    }
-
-    /// Refuses to go through a symbolic link on the way from `root` down to `url` (both on
-    /// the local disk): a link in the target folder, left by an earlier unpacking or put
-    /// there on purpose, would lead what is unpacked now to wherever it points.
-    ///
-    /// The paths are taken as they are written, as the file system takes them when it writes: a
-    /// `..` in the target leads wherever the disk says, not where the text would.
-    private static func refuseLinks(from root: URL, to url: URL) throws {
-        guard url.isFileURL, root.isFileURL else {
-            return
-        }
-        let (names, base) = (url.pathComponents, root.pathComponents)
-        guard names.count > base.count, Array(names[..<base.count]) == base else {
-            return
-        }
-        var current = root
-        for name in names[base.count...] {
-            current = current.appending(name: name)
-            var status = stat()
-            // What does not exist yet is made here, as a folder.
-            guard lstat(current.path, &status) == 0 else {
-                return
-            }
-            if status.st_mode & S_IFMT == S_IFLNK {
-                throw ArchiveError.unsupported("Unpacking through the symbolic link \(current.path)")
-            }
-        }
-    }
-
     private func mayOverwrite(_ existing: FileItem, with entry: ArchiveEntry) throws -> Bool {
         if overwriteAll {
             return true
@@ -620,13 +627,6 @@ internal final class Unpacker: @unchecked Sendable {
             throw ArchiveError.cancelled
         }
     }
-
-    /// The folders of this machine's disks that are unpacked into, open; see `UnpackFolder`.
-    ///
-    /// A target elsewhere (a server, another archive, a network volume, where a call may hang and
-    /// has to be given up through the file system's own means) has none: there the members are
-    /// written by path through its file system, after a look for links on the way.
-    private var roots: [String: UnpackFolder] = [:]
 
     private func openRoot(_ root: URL) throws -> UnpackFolder? {
         if let known = roots[root.locationKey] {

@@ -52,7 +52,11 @@ public enum ClipboardCommands {
 /// with the main thread free in between and a job that shows how far it is and can be
 /// cancelled (`FileListReading`).
 public final class ClipboardPlugin: Plugin {
-    public let name = "Clipboard"
+    private struct NothingToPaste: Error {}
+
+    private struct NotAPicture: LocalizedError {
+        var errorDescription: String? { "The picture on the clipboard cannot be read." }
+    }
     /// Settings key: whether Paste makes a file of a text or picture on the clipboard.
     public static let pastesContentsKey = "clipboard.pasteContents"
 
@@ -63,6 +67,14 @@ public final class ClipboardPlugin: Plugin {
     /// The list of paths as one property list, which the system derives from the files on
     /// the pasteboard: all of them in one read.
     internal static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+    /// Lists of more files than this from another program are read in slices.
+    internal static let readAtOnce = 256
+
+    // MARK: Text and pictures
+
+    private static let imageTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
+
+    public let name = "Clipboard"
 
     private let pasteboard: NSPasteboard
     /// The pasteboard state after the last Cut; while it is unchanged, Paste moves the files.
@@ -75,14 +87,54 @@ public final class ClipboardPlugin: Plugin {
     private var provider: FileListProvider?
     /// Counts the name lists asked for, so that a slow one does not overwrite a later one.
     private var listRequest = 0
-    /// Lists of more files than this from another program are read in slices.
-    internal static let readAtOnce = 256
     /// The state of the pasteboard in which a text or picture was last found on it.
     private var contentFoundAt: Int?
 
     /// Tests pass a pasteboard of their own, so they leave the user's clipboard alone.
     public init(pasteboard: NSPasteboard = .general) {
         self.pasteboard = pasteboard
+    }
+
+    // MARK: Files
+
+    /// How many operands a snapshot stands for, without making the list of them.
+    internal static func count(of operands: PanelModel.Operands) -> Int {
+        operands.markedCount > 0 ? operands.markedCount : (operands.cursorItem == nil ? 0 : 1)
+    }
+
+    /// The picture or text on the clipboard.
+    ///
+    /// A picture wins over a text, because programs that copy a picture often add its name. Reads
+    /// the data, which the program that owns it may make only now. Main thread.
+    private static func content(of pasteboard: NSPasteboard) -> PastedContent? {
+        if let type = pasteboard.availableType(from: imageTypes), let data = pasteboard.data(forType: type),
+            !data.isEmpty
+        {
+            return .image(data)
+        }
+        if let text = pasteboard.string(forType: .string), !text.isEmpty {
+            return .text(text)
+        }
+        return nil
+    }
+
+    /// PNG data stays as it is; anything else is converted.
+    ///
+    /// Runs on a job's thread.
+    nonisolated private static func png(from data: Data) throws -> Data {
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+            return data
+        }
+        guard let converted = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else {
+            throw NotAPicture()
+        }
+        return converted
+    }
+
+    /// A name list that writes locations as the kernel's file systems do.
+    private static func nameList(in kernel: Kernel) -> NameList {
+        let fileSystems = kernel.fileSystems
+        return NameList(displayPath: { fileSystems.displayPath($0) })
     }
 
     public func start(in owner: Kernel) {
@@ -216,13 +268,6 @@ public final class ClipboardPlugin: Plugin {
                 ]
             )
         )
-    }
-
-    // MARK: Files
-
-    /// How many operands a snapshot stands for, without making the list of them.
-    internal static func count(of operands: PanelModel.Operands) -> Int {
-        operands.markedCount > 0 ? operands.markedCount : (operands.cursorItem == nil ? 0 : 1)
     }
 
     /// Puts the operands on the clipboard; the selection stays and nothing visible happens.
@@ -366,10 +411,6 @@ public final class ClipboardPlugin: Plugin {
         )
     }
 
-    // MARK: Text and pictures
-
-    private static let imageTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
-
     /// Whether a picture or text is there to paste; looks at the kinds only, so menus can ask often.
     ///
     /// A yes is remembered for the state of the pasteboard it was found in, so that a menu that
@@ -386,24 +427,6 @@ public final class ClipboardPlugin: Plugin {
         contentFoundAt = found ? count : nil
         return found
     }
-
-    /// The picture or text on the clipboard.
-    ///
-    /// A picture wins over a text, because programs that copy a picture often add its name. Reads
-    /// the data, which the program that owns it may make only now. Main thread.
-    private static func content(of pasteboard: NSPasteboard) -> PastedContent? {
-        if let type = pasteboard.availableType(from: imageTypes), let data = pasteboard.data(forType: type),
-            !data.isEmpty
-        {
-            return .image(data)
-        }
-        if let text = pasteboard.string(forType: .string), !text.isEmpty {
-            return .text(text)
-        }
-        return nil
-    }
-
-    private struct NothingToPaste: Error {}
 
     /// Writes the content as `Clipboard.txt` or `Clipboard.png` (with a number when the name
     /// is taken) through the folder's file system, in a job; the cursor goes to the new file.
@@ -469,23 +492,6 @@ public final class ClipboardPlugin: Plugin {
         )
     }
 
-    private struct NotAPicture: LocalizedError {
-        var errorDescription: String? { "The picture on the clipboard cannot be read." }
-    }
-
-    /// PNG data stays as it is; anything else is converted.
-    ///
-    /// Runs on a job's thread.
-    nonisolated private static func png(from data: Data) throws -> Data {
-        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
-            return data
-        }
-        guard let converted = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else {
-            throw NotAPicture()
-        }
-        return converted
-    }
-
     // MARK: Names and details
 
     /// Puts a text on the clipboard.
@@ -542,12 +548,6 @@ public final class ClipboardPlugin: Plugin {
             },
             completion: completion
         )
-    }
-
-    /// A name list that writes locations as the kernel's file systems do.
-    private static func nameList(in kernel: Kernel) -> NameList {
-        let fileSystems = kernel.fileSystems
-        return NameList(displayPath: { fileSystems.displayPath($0) })
     }
 
     /// The operands and the plugin columns the source panel shows, read on the main thread.
@@ -700,6 +700,19 @@ internal final class FileListReading: @unchecked Sendable {
         changeCount = pasteboard.changeCount
     }
 
+    /// The file an item stands for, if it is one.
+    internal static func fileURL(of item: NSPasteboardItem) -> URL? {
+        guard let text = item.string(forType: .fileURL), let url = URL(string: text), url.isFileURL else {
+            return nil
+        }
+        // A reference to a file by its number instead of its path is turned into the path (newer
+        // systems give the path when it is asked for, older ones the number).
+        if text.hasPrefix("file:///.file/") {
+            return (url as NSURL).filePathURL
+        }
+        return url
+    }
+
     /// Blocks until the list is read. `progress` (done, total) is called on the calling
     /// thread about ten times a second while it waits.
     internal func run(cancellation: CancellationFlag, progress: (Int, Int) -> Void) -> Outcome {
@@ -749,18 +762,5 @@ internal final class FileListReading: @unchecked Sendable {
     private func finish(_ result: Outcome) {
         lock.withLock { outcome = result }
         finished.signal()
-    }
-
-    /// The file an item stands for, if it is one.
-    internal static func fileURL(of item: NSPasteboardItem) -> URL? {
-        guard let text = item.string(forType: .fileURL), let url = URL(string: text), url.isFileURL else {
-            return nil
-        }
-        // A reference to a file by its number instead of its path is turned into the path (newer
-        // systems give the path when it is asked for, older ones the number).
-        if text.hasPrefix("file:///.file/") {
-            return (url as NSURL).filePathURL
-        }
-        return url
     }
 }

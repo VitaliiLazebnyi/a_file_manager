@@ -25,11 +25,12 @@ public enum SystemToolsCommands {
 /// Command line execution, terminal, system information, volume name, printing file lists
 /// and Open With (spec 02 › Command line, 12 › System Information, Volume label, Printing).
 public final class SystemToolsPlugin: Plugin {
-    public let name = "SystemTools"
     /// Settings keys of the preferences page.
     nonisolated public static let terminalKey = "systemTools.terminal"
     nonisolated public static let showOutputKey = "systemTools.showOutput"
     nonisolated public static let recordHistoryKey = "systemTools.recordHistory"
+
+    public let name = "SystemTools"
 
     private let desktop: ToolsDesktop
     private var tools: SystemTools?
@@ -212,6 +213,37 @@ public final class SystemToolsPlugin: Plugin {
 /// main thread. `log` and the settings belong to the main thread.
 @MainActor
 internal final class SystemTools {
+    private enum RunResult {
+        case application(URL, files: [URL])
+        case finished(ProcessOutcome)
+    }
+
+    // MARK: Printing
+
+    private enum PrintOutput: Int, CaseIterable {
+        case printer, textFile, viewer
+
+        var title: String {
+            switch self {
+            case .printer:
+                return "Printer…"
+
+            case .textFile:
+                return "Text file…"
+
+            case .viewer:
+                return "Show as text"
+            }
+        }
+    }
+
+    /// Where a printed file list goes.
+    private enum Destination {
+        case printer
+        case file(URL)
+        case viewer
+    }
+
     internal static let printHeaderKey = "systemTools.printHeader"
     internal static let printLinesKey = "systemTools.printLines"
     internal static let printOutputKey = "systemTools.printOutput"
@@ -224,21 +256,30 @@ internal final class SystemTools {
     nonisolated internal static let harmlessCommands: Set<String> = ["echo", "printf", "true", "false", "pwd"]
     /// Characters with which a harmless first word could still start something else.
     nonisolated private static let shellOperators = CharacterSet(charactersIn: ";|&$`<>(){}\n\\")
+    /// The log keeps its newest lines; a program that runs for weeks must not grow with every command.
+    private static let logLimit = 512
+
+    // MARK: Volumes
+
+    /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
+    nonisolated private static let volumes = CallOwner()
 
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     /// What the tools do outside the program.
     private let desktop: ToolsDesktop
     internal private(set) var log: [String] = []
-    /// The log keeps its newest lines; a program that runs for weeks must not grow with every command.
-    private static let logLimit = 512
-
-    private func note(_ line: String) {
-        log.append(DisplayText.oneLine(line, limit: 400))
-        if log.count > Self.logLimit { log.removeFirst(log.count - Self.logLimit / 2) }
-    }
 
     private var ejection: VolumeEjection!
+
+    private var ui: any UserInteraction { kernel.interaction }
+    private var model: PanelModel { kernel.panels.source.model }
+    private var settings: any SettingsStore { kernel.settings }
+    private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
+
+    // MARK: Command line
+
+    private var history: [String] { CommandHistory.load(from: settings.scoped(to: "systemTools")) }
 
     internal init(_ kernel: Kernel, desktop: ToolsDesktop) {
         self.kernel = kernel
@@ -251,14 +292,75 @@ internal final class SystemTools {
         )
     }
 
-    private var ui: any UserInteraction { kernel.interaction }
-    private var model: PanelModel { kernel.panels.source.model }
-    private var settings: any SettingsStore { kernel.settings }
-    private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
+    nonisolated internal static func isHarmless(_ typed: TypedCommand) -> Bool {
+        harmlessCommands.contains(typed.firstWord) && !typed.isDetached
+            && typed.command.rangeOfCharacter(from: shellOperators) == nil
+    }
 
-    // MARK: Command line
+    /// The arguments of a line as locations, for handing them to an application.
+    nonisolated internal static func files(in arguments: String, relativeTo directory: URL) -> [URL] {
+        var urls: [URL] = []
+        var rest = arguments
+        while !rest.isEmpty {
+            let (word, remaining) = TypedCommand.split(rest)
+            if !word.isEmpty {
+                urls.append(TypedCommand.location(of: word, relativeTo: directory))
+            }
+            rest = remaining
+        }
+        return urls
+    }
 
-    private var history: [String] { CommandHistory.load(from: settings.scoped(to: "systemTools")) }
+    // MARK: Terminal
+
+    /// Finds an application by path, name or bundle identifier (`identified`).
+    ///
+    /// Asks the disk: background only.
+    nonisolated internal static func application(named name: String, identified: (String) -> URL?) -> URL? {
+        let fm = FileManager.default
+        if name.contains("/") {
+            let path = NSString(string: name).expandingTildeInPath
+            return fm.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil
+        }
+        let bundleName = name.lowercased().hasSuffix(".app") ? name : name + ".app"
+        if let found = TypedCommand.applicationFolders.map({ $0.appendingPathComponent(bundleName) })
+            .first(where: {
+                fm.fileExists(atPath: $0.path)
+            })
+        {
+            return found
+        }
+        return identified(name)
+    }
+
+    // MARK: System information
+
+    /// A screen as the dialog shows it: its pixels, and its points and scale when they differ.
+    nonisolated internal static func display(_ size: NSSize, scale: CGFloat) -> String {
+        let pixels = "\(Int(size.width * scale))x\(Int(size.height * scale))"
+        return scale == 1 ? pixels : "\(pixels) (\(Int(size.width))x\(Int(size.height)) @\(Int(scale))x)"
+    }
+
+    /// Asks something of a volume from a job.
+    ///
+    /// A volume that has stopped answering (a share whose server is gone) may never return: the
+    /// question then goes on alone on a thread of the kernel's, and the job ends, with nil, as soon
+    /// as it is cancelled, so the commands of the program are not held up by it.
+    nonisolated private static func ask<Answer: Sendable>(
+        _ question: String,
+        of url: URL,
+        _ monitor: any JobMonitor,
+        _ work: @escaping @Sendable () -> Answer
+    ) -> Answer? {
+        BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
+            work()
+        }
+    }
+
+    private func note(_ line: String) {
+        log.append(DisplayText.oneLine(line, limit: 400))
+        if log.count > Self.logLimit { log.removeFirst(log.count - Self.logLimit / 2) }
+    }
 
     internal func promptAndRun() {
         let directory = model.directory.isFileURL ? model.directory : home
@@ -271,11 +373,6 @@ internal final class SystemTools {
             )
         else { return }
         run(line)
-    }
-
-    private enum RunResult {
-        case application(URL, files: [URL])
-        case finished(ProcessOutcome)
     }
 
     /// Runs a typed line in the source panel's folder (spec 02 › Executing a line): an
@@ -354,25 +451,6 @@ internal final class SystemTools {
         )
     }
 
-    nonisolated internal static func isHarmless(_ typed: TypedCommand) -> Bool {
-        harmlessCommands.contains(typed.firstWord) && !typed.isDetached
-            && typed.command.rangeOfCharacter(from: shellOperators) == nil
-    }
-
-    /// The arguments of a line as locations, for handing them to an application.
-    nonisolated internal static func files(in arguments: String, relativeTo directory: URL) -> [URL] {
-        var urls: [URL] = []
-        var rest = arguments
-        while !rest.isEmpty {
-            let (word, remaining) = TypedCommand.split(rest)
-            if !word.isEmpty {
-                urls.append(TypedCommand.location(of: word, relativeTo: directory))
-            }
-            rest = remaining
-        }
-        return urls
-    }
-
     /// Shows what the command wrote: in the viewer when a plugin offers one, else in a dialog.
     private func show(_ outcome: ProcessOutcome, of typed: TypedCommand) {
         if let failure = outcome.failure {
@@ -417,28 +495,6 @@ internal final class SystemTools {
         }
     }
 
-    // MARK: Terminal
-
-    /// Finds an application by path, name or bundle identifier (`identified`).
-    ///
-    /// Asks the disk: background only.
-    nonisolated internal static func application(named name: String, identified: (String) -> URL?) -> URL? {
-        let fm = FileManager.default
-        if name.contains("/") {
-            let path = NSString(string: name).expandingTildeInPath
-            return fm.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil
-        }
-        let bundleName = name.lowercased().hasSuffix(".app") ? name : name + ".app"
-        if let found = TypedCommand.applicationFolders.map({ $0.appendingPathComponent(bundleName) })
-            .first(where: {
-                fm.fileExists(atPath: $0.path)
-            })
-        {
-            return found
-        }
-        return identified(name)
-    }
-
     /// Opens a terminal window in the source panel's folder (spec 12 › Miscellaneous commands,
     /// "Open command prompt window"), with the terminal chosen in the preferences.
     internal func openTerminal(in directory: URL) {
@@ -471,14 +527,6 @@ internal final class SystemTools {
         desktop.open([directory], application)
     }
 
-    // MARK: System information
-
-    /// A screen as the dialog shows it: its pixels, and its points and scale when they differ.
-    nonisolated internal static func display(_ size: NSSize, scale: CGFloat) -> String {
-        let pixels = "\(Int(size.width * scale))x\(Int(size.height * scale))"
-        return scale == 1 ? pixels : "\(pixels) (\(Int(size.width))x\(Int(size.height)) @\(Int(scale))x)"
-    }
-
     internal func showSystemInformation() {
         let displays = NSScreen.screens.map { Self.display($0.frame.size, scale: $0.backingScaleFactor) }
         kernel.jobs.run(
@@ -502,27 +550,6 @@ internal final class SystemTools {
                 }
             }
         )
-    }
-
-    // MARK: Volumes
-
-    /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
-    nonisolated private static let volumes = CallOwner()
-
-    /// Asks something of a volume from a job.
-    ///
-    /// A volume that has stopped answering (a share whose server is gone) may never return: the
-    /// question then goes on alone on a thread of the kernel's, and the job ends, with nil, as soon
-    /// as it is cancelled, so the commands of the program are not held up by it.
-    nonisolated private static func ask<Answer: Sendable>(
-        _ question: String,
-        of url: URL,
-        _ monitor: any JobMonitor,
-        _ work: @escaping @Sendable () -> Answer
-    ) -> Answer? {
-        BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
-            work()
-        }
     }
 
     /// "Set volume label" (spec 12 › Volume label): renames the volume of the source panel
@@ -592,32 +619,6 @@ internal final class SystemTools {
     /// Ejects the drive of `location`, or of the folder the source panel shows (`VolumeEjection`).
     internal func ejectVolume(_ location: URL? = nil) {
         ejection.eject(driveOf: location ?? model.directory)
-    }
-
-    // MARK: Printing
-
-    private enum PrintOutput: Int, CaseIterable {
-        case printer, textFile, viewer
-
-        var title: String {
-            switch self {
-            case .printer:
-                return "Printer…"
-
-            case .textFile:
-                return "Text file…"
-
-            case .viewer:
-                return "Show as text"
-            }
-        }
-    }
-
-    /// Where a printed file list goes.
-    private enum Destination {
-        case printer
-        case file(URL)
-        case viewer
     }
 
     /// Files › Print › File list (spec 12 › Printing): the selected items, or the whole list

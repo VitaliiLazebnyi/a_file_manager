@@ -6,9 +6,6 @@ import Foundation
 /// The specification leaves the heuristics open ("a clone must choose its own"); these are the
 /// viewer's. Pure functions on a sample of the file.
 internal enum ViewerDetection {
-    /// How many bytes from the start of a file are looked at.
-    internal static let sampleSize = 64 * 1_024
-
     internal struct TextGuess: Equatable {
         internal var encoding: ViewerEncoding
         /// The length of a byte-order mark at the start; it is not part of the text.
@@ -16,6 +13,28 @@ internal enum ViewerDetection {
         /// The sample does not look like text in any encoding.
         internal var isBinary = false
     }
+
+    internal enum UTF8Validity {
+        case ascii, multiByte, invalid
+    }
+
+    /// What a file is, beyond text and binary, by its name and its first bytes.
+    internal enum Content: Equatable {
+        case image, media, pdf, html, rtf, other
+    }
+
+    /// How many bytes from the start of a file are looked at.
+    internal static let sampleSize = 64 * 1_024
+
+    internal static let imageExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "jpe", "jfif", "gif", "bmp", "dib", "tif", "tiff", "heic", "heif", "webp",
+        "icns", "ico", "cur", "psd", "tga", "jp2", "j2k", "avif", "dng", "cr2", "nef", "arw", "raf", "orf"
+    ]
+    internal static let mediaExtensions: Set<String> = [
+        "mp3", "m4a", "aac", "wav", "aif", "aiff", "aifc", "caf", "flac", "mp4", "m4v", "mov", "mpg",
+        "mpeg", "avi", "3gp", "m4b", "mp2", "au", "snd", "ac3", "amr"
+    ]
+    internal static let htmlExtensions: Set<String> = ["html", "htm", "xhtml", "shtml"]
 
     /// A byte-order mark names the encoding outright.
     internal static func byteOrderMark(_ sample: Data) -> (encoding: ViewerEncoding, length: Int)? {
@@ -99,10 +118,6 @@ internal enum ViewerDetection {
         return controls * 20 > bytes.count
     }
 
-    internal enum UTF8Validity {
-        case ascii, multiByte, invalid
-    }
-
     internal static func utf8Validity(_ bytes: [UInt8], mayBeCutOff: Bool) -> UTF8Validity {
         var text = DecodedText()
         let used = ViewerEncoding.utf8.decode(bytes, final: false, into: &text)
@@ -148,21 +163,6 @@ internal enum ViewerDetection {
         }
         return dos > windows
     }
-
-    /// What a file is, beyond text and binary, by its name and its first bytes.
-    internal enum Content: Equatable {
-        case image, media, pdf, html, rtf, other
-    }
-
-    internal static let imageExtensions: Set<String> = [
-        "png", "jpg", "jpeg", "jpe", "jfif", "gif", "bmp", "dib", "tif", "tiff", "heic", "heif", "webp",
-        "icns", "ico", "cur", "psd", "tga", "jp2", "j2k", "avif", "dng", "cr2", "nef", "arw", "raf", "orf"
-    ]
-    internal static let mediaExtensions: Set<String> = [
-        "mp3", "m4a", "aac", "wav", "aif", "aiff", "aifc", "caf", "flac", "mp4", "m4v", "mov", "mpg",
-        "mpeg", "avi", "3gp", "m4b", "mp2", "au", "snd", "ac3", "amr"
-    ]
-    internal static let htmlExtensions: Set<String> = ["html", "htm", "xhtml", "shtml"]
 
     /// `additionalMedia` and `vetoed` are lists of extensions from the configuration
     /// (spec 10 › Type lists and vetoes).

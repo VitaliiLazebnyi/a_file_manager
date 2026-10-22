@@ -10,15 +10,15 @@ import Testing
 private final class Record<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [Value] = []
-    func add(_ value: Value) {
-        lock.lock()
-        values.append(value)
-        lock.unlock()
-    }
     var all: [Value] {
         lock.lock()
         defer { lock.unlock() }
         return values
+    }
+    func add(_ value: Value) {
+        lock.lock()
+        values.append(value)
+        lock.unlock()
     }
 }
 
@@ -371,10 +371,6 @@ internal struct Review2NetworkP2Keychain {
         var addStatus: OSStatus = errSecSuccess
         var updateStatus: OSStatus?
 
-        private func account(_ query: CFDictionary) -> String {
-            ((query as NSDictionary)[kSecAttrAccount] as? String) ?? "?"
-        }
-
         var calls: KeychainPasswords.Calls {
             var calls = KeychainPasswords.Calls()
             calls.copy = { [self] query, result in
@@ -420,6 +416,10 @@ internal struct Review2NetworkP2Keychain {
                 return items.removeValue(forKey: account(query)) == nil ? errSecItemNotFound : errSecSuccess
             }
             return calls
+        }
+
+        private func account(_ query: CFDictionary) -> String {
+            ((query as NSDictionary)[kSecAttrAccount] as? String) ?? "?"
         }
 
         func clearLog() {

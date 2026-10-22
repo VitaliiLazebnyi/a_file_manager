@@ -163,28 +163,15 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
 /// writes it back unchanged in that encoding. Shared by the connections of a session. Safe from any
 /// thread: all state is guarded by `lock`.
 internal final class NameMemory: @unchecked Sendable {
+    private static let capacity = 65_536
+
     private let lock = NSLock()
     private var spellings: [Data: String.Encoding] = [:]
-    private static let capacity = 65_536
 
     internal var isEmpty: Bool {
         lock.lock()
         defer { lock.unlock() }
         return spellings.isEmpty
-    }
-
-    internal func encoding<Bytes: Sequence>(of name: Bytes) -> String.Encoding? where Bytes.Element == UInt8 {
-        let key = Data(name)
-        lock.lock()
-        defer { lock.unlock() }
-        return spellings[key]
-    }
-
-    internal func remember(_ name: String, encoding: String.Encoding) {
-        lock.lock()
-        defer { lock.unlock() }
-        if spellings.count >= Self.capacity { spellings.removeAll() }
-        spellings[Data(name.utf8)] = encoding
     }
 
     /// Whether a name read with `encoding` needs to be remembered for a connection that
@@ -200,6 +187,20 @@ internal final class NameMemory: @unchecked Sendable {
             return !name.precomposedStringWithCanonicalMapping.utf8.elementsEqual(name.utf8)
         }
         return false
+    }
+
+    internal func encoding<Bytes: Sequence>(of name: Bytes) -> String.Encoding? where Bytes.Element == UInt8 {
+        let key = Data(name)
+        lock.lock()
+        defer { lock.unlock() }
+        return spellings[key]
+    }
+
+    internal func remember(_ name: String, encoding: String.Encoding) {
+        lock.lock()
+        defer { lock.unlock() }
+        if spellings.count >= Self.capacity { spellings.removeAll() }
+        spellings[Data(name.utf8)] = encoding
     }
 }
 
@@ -263,9 +264,10 @@ public struct FTPServerConfig: Sendable {
 /// Shared by the connections of a session, so that what one found, in the background or while
 /// listing, spares the others the question. Safe from any thread: all state is guarded by `lock`.
 internal final class LinkMemory: @unchecked Sendable {
+    private static let capacity = 2_048
+
     private let lock = NSLock()
     private var kinds: [String: Bool] = [:]
-    private static let capacity = 2_048
 
     internal func isDirectory(_ path: String) -> Bool? {
         lock.lock()
@@ -295,6 +297,28 @@ internal final class LinkMemory: @unchecked Sendable {
 /// takes it back. Every call blocks until the server has answered or the time is up.
 /// `interrupt`, the one call from another thread, touches only the two streams, under `streamsLock`.
 internal final class FTPConnection: @unchecked Sendable {
+    /// The data connection of a transfer while it is set up: one this program opens (passive
+    /// mode), or a port the server is to connect to (active mode).
+    private enum DataSide {
+        case connecting(NetStream)
+        case listening(DataListener)
+
+        /// Gives the data connection up before it was used.
+        func cancel() {
+            switch self {
+            case .connecting(let stream):
+                stream.close()
+
+            case .listening(let listener):
+                listener.cancel()
+            }
+        }
+    }
+
+    private static let resolvedLinks = 32
+    private static let linkBudget: TimeInterval = 1.5
+    private static let rememberedLinks = 2_048
+
     internal let config: FTPServerConfig
     private let trust: CertificateTrust
     private var control: NetStream?
@@ -336,6 +360,10 @@ internal final class FTPConnection: @unchecked Sendable {
     /// Called with every line sent and received, for the log.
     internal let log: (@Sendable (String) -> Void)?
 
+    internal var isUsable: Bool { control != nil && !isBroken && data == nil }
+    /// A server that offers MLST also has MLSD (RFC 3659), whether or not it lists it.
+    internal var offersMLSD: Bool { features["MLSD"] != nil || features["MLST"] != nil }
+
     /// `knownLinks` and `knownNames` are the session's, shared by its connections.
     internal init(
         config: FTPServerConfig,
@@ -357,9 +385,19 @@ internal final class FTPConnection: @unchecked Sendable {
         encoding = config.encoding
     }
 
-    internal var isUsable: Bool { control != nil && !isBroken && data == nil }
-    /// A server that offers MLST also has MLSD (RFC 3659), whether or not it lists it.
-    internal var offersMLSD: Bool { features["MLSD"] != nil || features["MLST"] != nil }
+    /// Whether the reply is a server's complaint that a data connection did not resume the TLS
+    /// session of the control connection (vsftpd `require_ssl_reuse`, ProFTPD, FileZilla Server).
+    internal static func requiresSessionReuse(_ reply: FTPReply) -> Bool {
+        guard [421, 425, 426, 450, 522, 522, 550].contains(reply.code) else {
+            return false
+        }
+        let text = reply.text.lowercased()
+        let mentionsSession = text.contains("session") || text.contains("reuse") || text.contains("re-use")
+        let says =
+            text.contains("reuse") || text.contains("re-use") || text.contains("resum") || text.contains("cached")
+            || text.contains("same")
+        return mentionsSession && says
+    }
     internal func offers(_ feature: String) -> Bool { features[feature] != nil }
 
     // MARK: Login
@@ -709,24 +747,6 @@ internal final class FTPConnection: @unchecked Sendable {
         return .connecting(stream)
     }
 
-    /// The data connection of a transfer while it is set up: one this program opens (passive
-    /// mode), or a port the server is to connect to (active mode).
-    private enum DataSide {
-        case connecting(NetStream)
-        case listening(DataListener)
-
-        /// Gives the data connection up before it was used.
-        func cancel() {
-            switch self {
-            case .connecting(let stream):
-                stream.close()
-
-            case .listening(let listener):
-                listener.cancel()
-            }
-        }
-    }
-
     /// Starts a transfer: `RETR`, `STOR`, `LIST` and the like.
     ///
     /// The returned stream carries the data; `finishTransfer` or `abortTransfer` must follow.
@@ -790,20 +810,6 @@ internal final class FTPConnection: @unchecked Sendable {
             return NetworkError.sessionReuseRequired(reply.message)
         }
         return otherwise ?? NetworkError.refused(reply)
-    }
-
-    /// Whether the reply is a server's complaint that a data connection did not resume the TLS
-    /// session of the control connection (vsftpd `require_ssl_reuse`, ProFTPD, FileZilla Server).
-    internal static func requiresSessionReuse(_ reply: FTPReply) -> Bool {
-        guard [421, 425, 426, 450, 522, 522, 550].contains(reply.code) else {
-            return false
-        }
-        let text = reply.text.lowercased()
-        let mentionsSession = text.contains("session") || text.contains("reuse") || text.contains("re-use")
-        let says =
-            text.contains("reuse") || text.contains("re-use") || text.contains("resum") || text.contains("cached")
-            || text.contains("same")
-        return mentionsSession && says
     }
 
     /// Ends a transfer whose data went through completely, and reads the server's verdict.
@@ -1019,8 +1025,4 @@ internal final class FTPConnection: @unchecked Sendable {
         }
         return isDirectory
     }
-
-    private static let resolvedLinks = 32
-    private static let linkBudget: TimeInterval = 1.5
-    private static let rememberedLinks = 2_048
 }

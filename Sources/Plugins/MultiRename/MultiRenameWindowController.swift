@@ -31,6 +31,32 @@ internal final class MultiRenameWindowController: NSWindowController, NSWindowDe
             if onKey?(event) != true { super.keyDown(with: event) }
         }
     }
+    private static let rowType = NSPasteboard.PasteboardType("afm.multirename.row")
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .medium
+        return formatter
+    }()
+
+    private static let moreFields: [(String, String)] = [
+        ("[P]", "Parent folder"), ("[G]", "Grandparent folder"), ("[A]", "Name with extension"), ("[E]", "Extension"),
+        ("[d]", "Date (regional format)"), ("[t]", "Time (regional format)"), ("[S]", "Size"),
+        ("[T4]", "From here on: date taken (pictures) instead of date changed"),
+        ("[U]", "All characters after this position in uppercase"),
+        ("[L]", "All characters after this position in lowercase"),
+        ("[F]", "First letter of each word uppercase after this position"),
+        ("[f]", "First letter of each word uppercase after this position (English in Titles)"),
+        ("[n]", "All characters after this position again as in original name"), ("[%USER%]", "User name"),
+        ("[[]", "Square bracket: open"), ("[]]", "Square bracket: close"), ("[X]", "Clipboard text"),
+        ("[c]", "Number of files in the list"),
+        ("[I]", "Folders only (on/off): The name [N] includes the extension, [E] is not used")
+    ]
+
+    private static let rangeFields: [(String, String)] = [
+        ("", "Full path+name"), ("P", "Parent folder"), ("G", "Grandparent folder"), ("A", "Name with extension"),
+        ("E", "Extension"), ("X", "Clipboard text")
+    ]
 
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
@@ -91,13 +117,6 @@ internal final class MultiRenameWindowController: NSWindowController, NSWindowDe
     private var sortAscending = true
     /// The saved settings chosen last; "Delete entry" deletes these.
     private var loadedName: String?
-    private static let rowType = NSPasteboard.PasteboardType("afm.multirename.row")
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .medium
-        return formatter
-    }()
 
     internal init(kernel: Kernel, session: MultiRenameSession) {
         self.kernel = kernel
@@ -124,6 +143,26 @@ internal final class MultiRenameWindowController: NSWindowController, NSWindowDe
 
     /// The window is made in code, never from an archive.
     internal required init?(coder _: NSCoder) { nil }
+
+    /// What the status line says about a problem of the settings.
+    internal static func describe(_ problem: any Error) -> String {
+        switch problem {
+        case RenameMaskError.invalidPlaceholder(let text):
+            return "Invalid placeholder: \(text)"
+
+        case RenameMaskError.contentPluginsUnavailable:
+            return "Content-plugin fields [=…] are not available."
+
+        case SearchReplace.Problem.invalidExpression(let text):
+            return "Invalid regular expression: \(text)"
+
+        case SearchReplace.Problem.tooSlow(let text):
+            return "The regular expression takes too long for these names: \(text)"
+
+        default:
+            return "The rename mask is invalid."
+        }
+    }
 
     // MARK: Layout
 
@@ -406,26 +445,6 @@ internal final class MultiRenameWindowController: NSWindowController, NSWindowDe
         table.selectRowIndexes(selection.filteredIndexSet { $0 < session.rowCount }, byExtendingSelection: false)
     }
 
-    /// What the status line says about a problem of the settings.
-    internal static func describe(_ problem: any Error) -> String {
-        switch problem {
-        case RenameMaskError.invalidPlaceholder(let text):
-            return "Invalid placeholder: \(text)"
-
-        case RenameMaskError.contentPluginsUnavailable:
-            return "Content-plugin fields [=…] are not available."
-
-        case SearchReplace.Problem.invalidExpression(let text):
-            return "Invalid regular expression: \(text)"
-
-        case SearchReplace.Problem.tooSlow(let text):
-            return "The regular expression takes too long for these names: \(text)"
-
-        default:
-            return "The rename mask is invalid."
-        }
-    }
-
     private func reloadHistories() {
         for (combo, history) in [
             (nameMaskBox, RenameStore.History.nameMask), (searchBox, .search), (replaceBox, .replacement)
@@ -502,25 +521,6 @@ internal final class MultiRenameWindowController: NSWindowController, NSWindowDe
     private func insertNameRange() { insertRange(of: "N", into: nameMaskBox) }
     @objc
     private func insertExtensionRange() { insertRange(of: "E", into: extensionField) }
-
-    private static let moreFields: [(String, String)] = [
-        ("[P]", "Parent folder"), ("[G]", "Grandparent folder"), ("[A]", "Name with extension"), ("[E]", "Extension"),
-        ("[d]", "Date (regional format)"), ("[t]", "Time (regional format)"), ("[S]", "Size"),
-        ("[T4]", "From here on: date taken (pictures) instead of date changed"),
-        ("[U]", "All characters after this position in uppercase"),
-        ("[L]", "All characters after this position in lowercase"),
-        ("[F]", "First letter of each word uppercase after this position"),
-        ("[f]", "First letter of each word uppercase after this position (English in Titles)"),
-        ("[n]", "All characters after this position again as in original name"), ("[%USER%]", "User name"),
-        ("[[]", "Square bracket: open"), ("[]]", "Square bracket: close"), ("[X]", "Clipboard text"),
-        ("[c]", "Number of files in the list"),
-        ("[I]", "Folders only (on/off): The name [N] includes the extension, [E] is not used")
-    ]
-
-    private static let rangeFields: [(String, String)] = [
-        ("", "Full path+name"), ("P", "Parent folder"), ("G", "Grandparent folder"), ("A", "Name with extension"),
-        ("E", "Extension"), ("X", "Clipboard text")
-    ]
 
     @objc
     private func showMoreFields(_ sender: NSButton) {

@@ -91,15 +91,15 @@ public final class KeychainPasswords: PasswordStore {
 ///
 /// `accounts` is guarded by `lock`; the store is used on `queue`.
 public final class PasswordVault: @unchecked Sendable {
+    public static let trustedAccount = "trusted-certificates"
+    /// Present once the passwords of an earlier version, kept by identifier alone, were moved.
+    public static let boundAccount = "passwords-are-bound-to-servers"
+
     private let store: any PasswordStore
     private let queue = DispatchQueue(label: "afm.network.keychain", qos: .userInitiated)
     private let lock = NSLock()
     /// The name the password of each saved connection is kept under, as the connections are now.
     private var accounts: [UUID: String] = [:]
-
-    public static let trustedAccount = "trusted-certificates"
-    /// Present once the passwords of an earlier version, kept by identifier alone, were moved.
-    public static let boundAccount = "passwords-are-bound-to-servers"
 
     public init(store: any PasswordStore) {
         self.store = store
@@ -110,6 +110,13 @@ public final class PasswordVault: @unchecked Sendable {
         let key = connection.key
         let user = connection.anonymous ? "" : connection.user
         return "\(connection.id.uuidString) \(key.scheme)://\(user)@\(key.host):\(key.port)"
+    }
+
+    private static func decode(_ text: String?) -> [String: [String]] {
+        guard let text, let all = try? JSONDecoder().decode([String: [String]].self, from: Data(text.utf8)) else {
+            return [:]
+        }
+        return all
     }
 
     /// Tells which connections exist.
@@ -211,13 +218,6 @@ public final class PasswordVault: @unchecked Sendable {
         !(trustedCertificates()[host.lowercased()] ?? []).isEmpty
     }
 
-    private static func decode(_ text: String?) -> [String: [String]] {
-        guard let text, let all = try? JSONDecoder().decode([String: [String]].self, from: Data(text.utf8)) else {
-            return [:]
-        }
-        return all
-    }
-
     /// Waits until everything that was queued is done; for tests.
     public func waitUntilDone() {
         queue.sync {}
@@ -231,6 +231,12 @@ public final class MemoryPasswords: PasswordStore, @unchecked Sendable {
     private let lock = NSLock()
     private var passwords: [String: String] = [:]
 
+    public var accounts: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return passwords.keys.sorted()
+    }
+
     public init() {}
 
     public func password(for account: String) -> String? {
@@ -243,12 +249,6 @@ public final class MemoryPasswords: PasswordStore, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         passwords[account] = password
-    }
-
-    public var accounts: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return passwords.keys.sorted()
     }
 }
 
@@ -340,6 +340,11 @@ public struct SavedConnection: Codable, Equatable, Sendable {
         }
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case id, name, kind, host, port, user, anonymous, remoteDirectory, localDirectory, passive, encoding, listing,
+            initCommands
+    }
+
     public var id = UUID()
     public var name = ""
     public var kind = Kind.ftp
@@ -356,12 +361,34 @@ public struct SavedConnection: Codable, Equatable, Sendable {
     /// Commands sent after the login, separated by `;`.
     public var initCommands = ""
 
-    public init() {}
+    public var key: ServerKey { ServerKey(scheme: kind.scheme, host: host, port: port ?? kind.defaultPort) }
 
-    private enum CodingKeys: String, CodingKey {
-        case id, name, kind, host, port, user, anonymous, remoteDirectory, localDirectory, passive, encoding, listing,
-            initCommands
+    /// `host` or `host:port`, as the dialog shows it.
+    public var hostText: String {
+        let bare = host.contains(":") ? "[\(host)]" : host
+        return port.map { "\(bare):\($0)" } ?? bare
     }
+
+    /// The row in the list of connections.
+    public var listTitle: String { "\(name)  —  \(key.description)" }
+
+    public var profile: ConnectionProfile {
+        ConnectionProfile(
+            key: key,
+            name: name.isEmpty ? nil : name,
+            savedID: id,
+            tls: kind.tls,
+            user: anonymous || user.isEmpty ? nil : user,
+            anonymous: anonymous,
+            passive: passive,
+            encoding: encoding,
+            remoteDirectory: remoteDirectory.isEmpty ? nil : RemotePath.normalized(remoteDirectory),
+            initCommands: FTPServerConfig.initCommands(from: initCommands),
+            usesMLSD: listing == .automatic ? nil : listing == .mlsd
+        )
+    }
+
+    public init() {}
 
     /// Reads a connection from the settings, which a damaged or foreign file may have filled
     /// with anything: a member that is missing or of the wrong kind takes its usual value, and
@@ -389,33 +416,6 @@ public struct SavedConnection: Codable, Equatable, Sendable {
         encoding = read(.encoding, NameEncoding.automatic)
         listing = read(.listing, Listing.automatic)
         initCommands = read(.initCommands, "")
-    }
-
-    public var key: ServerKey { ServerKey(scheme: kind.scheme, host: host, port: port ?? kind.defaultPort) }
-
-    /// `host` or `host:port`, as the dialog shows it.
-    public var hostText: String {
-        let bare = host.contains(":") ? "[\(host)]" : host
-        return port.map { "\(bare):\($0)" } ?? bare
-    }
-
-    /// The row in the list of connections.
-    public var listTitle: String { "\(name)  —  \(key.description)" }
-
-    public var profile: ConnectionProfile {
-        ConnectionProfile(
-            key: key,
-            name: name.isEmpty ? nil : name,
-            savedID: id,
-            tls: kind.tls,
-            user: anonymous || user.isEmpty ? nil : user,
-            anonymous: anonymous,
-            passive: passive,
-            encoding: encoding,
-            remoteDirectory: remoteDirectory.isEmpty ? nil : RemotePath.normalized(remoteDirectory),
-            initCommands: FTPServerConfig.initCommands(from: initCommands),
-            usesMLSD: listing == .automatic ? nil : listing == .mlsd
-        )
     }
 
     /// Fills host, port, protocol and user from what was typed into the host field, which may
@@ -450,24 +450,17 @@ public struct SavedConnection: Codable, Equatable, Sendable {
 /// Passwords go to the `PasswordStore`. Main thread only.
 @MainActor
 public final class ConnectionStore {
+    private static let connectionsKey = "connections"
+    private static let lastUsedKey = "lastUsed"
+    private static let historyKey = "history"
+    private static let historyLimit = 12
+
     private let settings: any SettingsStore
     public let passwords: any PasswordStore
     /// The passwords and accepted certificates, by server; everything goes through it.
     public let vault: PasswordVault
     /// Called after the list changed.
     public var onChange: () -> Void = {}
-
-    private static let connectionsKey = "connections"
-    private static let lastUsedKey = "lastUsed"
-    private static let historyKey = "history"
-    private static let historyLimit = 12
-
-    public init(settings: any SettingsStore, passwords: any PasswordStore) {
-        self.settings = settings.scoped(to: "network")
-        self.passwords = passwords
-        vault = PasswordVault(store: passwords)
-        vault.setConnections(connections)
-    }
 
     public var connections: [SavedConnection] {
         get { settings.value([SavedConnection].self, forKey: Self.connectionsKey) ?? [] }
@@ -476,6 +469,38 @@ public final class ConnectionStore {
             vault.setConnections(newValue)
             onChange()
         }
+    }
+
+    /// The connection the list starts on (spec 11 › The list).
+    public var lastUsed: UUID? {
+        get { settings.value(UUID.self, forKey: Self.lastUsedKey) }
+        set { settings.set(newValue, forKey: Self.lastUsedKey) }
+    }
+
+    /// The addresses of quick connections, newest first.
+    ///
+    /// They never contain a password.
+    public var history: [String] {
+        settings.value([String].self, forKey: Self.historyKey) ?? []
+    }
+
+    /// What an earlier version kept in the settings: certificates to always trust, by host.
+    ///
+    /// **Nothing trusts these any more.** The settings can be replaced by a file from somebody
+    /// else, and a fingerprint planted there would make a forged certificate pass without a
+    /// question. The certificates the user accepts for good are kept by `vault`; what stands here
+    /// is ignored and removed (`forgetTrustedCertificatesInSettings`), so each server asks once
+    /// more.
+    public var trustedCertificates: [String: [String]] {
+        get { settings.value([String: [String]].self, forKey: "trustedCertificates") ?? [:] }
+        set { settings.set(newValue, forKey: "trustedCertificates") }
+    }
+
+    public init(settings: any SettingsStore, passwords: any PasswordStore) {
+        self.settings = settings.scoped(to: "network")
+        self.passwords = passwords
+        vault = PasswordVault(store: passwords)
+        vault.setConnections(connections)
     }
 
     /// Adds the connection, or replaces the one with the same id.
@@ -499,37 +524,12 @@ public final class ConnectionStore {
         connections.first { $0.name.compare(name, options: .caseInsensitive) == .orderedSame }
     }
 
-    /// The connection the list starts on (spec 11 › The list).
-    public var lastUsed: UUID? {
-        get { settings.value(UUID.self, forKey: Self.lastUsedKey) }
-        set { settings.set(newValue, forKey: Self.lastUsedKey) }
-    }
-
-    /// The addresses of quick connections, newest first.
-    ///
-    /// They never contain a password.
-    public var history: [String] {
-        settings.value([String].self, forKey: Self.historyKey) ?? []
-    }
-
     public func remember(address: ServerAddress) {
         let text = address.textWithoutPassword
         settings.set(
             Array(([text] + history.filter { $0 != text }).prefix(Self.historyLimit)),
             forKey: Self.historyKey
         )
-    }
-
-    /// What an earlier version kept in the settings: certificates to always trust, by host.
-    ///
-    /// **Nothing trusts these any more.** The settings can be replaced by a file from somebody
-    /// else, and a fingerprint planted there would make a forged certificate pass without a
-    /// question. The certificates the user accepts for good are kept by `vault`; what stands here
-    /// is ignored and removed (`forgetTrustedCertificatesInSettings`), so each server asks once
-    /// more.
-    public var trustedCertificates: [String: [String]] {
-        get { settings.value([String: [String]].self, forKey: "trustedCertificates") ?? [:] }
-        set { settings.set(newValue, forKey: "trustedCertificates") }
     }
 
     public func forgetTrustedCertificatesInSettings() {

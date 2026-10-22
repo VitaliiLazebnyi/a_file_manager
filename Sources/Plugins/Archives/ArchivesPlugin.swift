@@ -12,12 +12,37 @@ public import Foundation
 /// everything else libarchive knows (7z, rar, iso, cab, cpio, xar, …) is read through
 /// `/usr/bin/bsdtar`, both run as child processes without a shell.
 public final class ArchivesPlugin: Plugin {
+    /// What the stop's background thread hands back.
+    ///
+    /// All state is guarded by `lock`.
+    private final class StopState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var result: [(error: any Error, name: String)]?
+
+        var reports: [(error: any Error, name: String)]? {
+            lock.lock()
+            defer { lock.unlock() }
+            return result
+        }
+
+        func finish(_ reports: [(error: any Error, name: String)]) {
+            lock.lock()
+            result = reports
+            lock.unlock()
+        }
+    }
+
     public let name = "Archives"
     // (Not private: the tests set limits and hooks.)
     internal let environment = ArchiveEnvironment()
     internal let store: ArchiveStore
     /// What "Unpack and Open" hands the unpacked member to; nil opens nothing.
     internal let openFile: (@MainActor (URL) -> Bool)?
+
+    /// True when changes made inside archives have not been written into their files yet.
+    ///
+    /// Answers from memory; any thread.
+    public var hasPendingChanges: Bool { store.hasPendingChanges }
 
     /// `flushDelay`: how long after the last change to a ZIP the changes are written into the
     /// archive file; nil leaves that to `flushPendingChanges()` (tests). `launchesApplications`
@@ -31,6 +56,22 @@ public final class ArchivesPlugin: Plugin {
         environment.flushDelay = flushDelay
         store = ArchiveStore(environment: environment)
         self.openFile = openFile
+    }
+
+    /// Waits until the state is finished or the time is up; true when it is finished.
+    ///
+    /// The main thread's run loop keeps turning meanwhile, so that what other threads send to the
+    /// main thread (a question to the user) is done and does not wait for this wait.
+    private static func wait(until deadline: Date, for state: StopState) -> Bool {
+        // A run loop with nothing to watch returns at once: this port, which nothing sends to,
+        // gives it something, so the wait below does not spin.
+        let keeper = NSMachPort()
+        RunLoop.current.add(keeper, forMode: .default)
+        defer { RunLoop.current.remove(keeper, forMode: .default) }
+        while state.reports == nil, Date() < deadline {
+            RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
+        }
+        return state.reports != nil
     }
 
     public func start(in owner: Kernel) {
@@ -297,47 +338,6 @@ public final class ArchivesPlugin: Plugin {
         for report in reports { environment.reportFailure(report.error, report.name) }
         store.close()
     }
-
-    /// What the stop's background thread hands back.
-    ///
-    /// All state is guarded by `lock`.
-    private final class StopState: @unchecked Sendable {
-        private let lock = NSLock()
-        private var result: [(error: any Error, name: String)]?
-
-        var reports: [(error: any Error, name: String)]? {
-            lock.lock()
-            defer { lock.unlock() }
-            return result
-        }
-
-        func finish(_ reports: [(error: any Error, name: String)]) {
-            lock.lock()
-            result = reports
-            lock.unlock()
-        }
-    }
-
-    /// Waits until the state is finished or the time is up; true when it is finished.
-    ///
-    /// The main thread's run loop keeps turning meanwhile, so that what other threads send to the
-    /// main thread (a question to the user) is done and does not wait for this wait.
-    private static func wait(until deadline: Date, for state: StopState) -> Bool {
-        // A run loop with nothing to watch returns at once: this port, which nothing sends to,
-        // gives it something, so the wait below does not spin.
-        let keeper = NSMachPort()
-        RunLoop.current.add(keeper, forMode: .default)
-        defer { RunLoop.current.remove(keeper, forMode: .default) }
-        while state.reports == nil, Date() < deadline {
-            RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
-        }
-        return state.reports != nil
-    }
-
-    /// True when changes made inside archives have not been written into their files yet.
-    ///
-    /// Answers from memory; any thread.
-    public var hasPendingChanges: Bool { store.hasPendingChanges }
 
     /// Writes the changes made inside ZIP archives into the archive files on a background
     /// thread and calls `completion` on the main thread with what failed, one line per

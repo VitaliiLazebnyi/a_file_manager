@@ -27,6 +27,20 @@ public struct DiffSegment: Equatable, Sendable {
 ///
 /// Pure and thread-safe: everything lives in the call.
 public enum Myers {
+    /// Scratch tables for `uniqueAnchors`, made once per diff: how often each kind of element occurs
+    /// in the stretch looked at (0, 1 or 2 for more) on either side, and where in the second one.
+    internal struct AnchorCounts {
+        internal var inA: [UInt8]
+        internal var inB: [UInt8]
+        internal var positionInB: [Int32]
+
+        internal init(kinds: Int) {
+            inA = [UInt8](repeating: 0, count: kinds)
+            inB = [UInt8](repeating: 0, count: kinds)
+            positionInB = [Int32](repeating: 0, count: kinds)
+        }
+    }
+
     /// Below this many elements (after taking out the unmatched ones) the diff is always the
     /// shortest possible.
     public static let exactBelow = 20_000
@@ -277,20 +291,6 @@ public enum Myers {
             }
         }
         return nil
-    }
-
-    /// Scratch tables for `uniqueAnchors`, made once per diff: how often each kind of element occurs
-    /// in the stretch looked at (0, 1 or 2 for more) on either side, and where in the second one.
-    internal struct AnchorCounts {
-        internal var inA: [UInt8]
-        internal var inB: [UInt8]
-        internal var positionInB: [Int32]
-
-        internal init(kinds: Int) {
-            inA = [UInt8](repeating: 0, count: kinds)
-            inB = [UInt8](repeating: 0, count: kinds)
-            positionInB = [Int32](repeating: 0, count: kinds)
-        }
     }
 
     /// The longest run, rising on both sides, of the elements that occur exactly once in each of

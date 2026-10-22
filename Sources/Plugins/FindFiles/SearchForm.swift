@@ -8,6 +8,20 @@ import AppKit
 /// that is all the rest of the window knows of them. Main thread only.
 @MainActor
 internal final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+    // Plugins
+    @MainActor
+    private struct RuleRow {
+        let field: NSPopUpButton
+        let comparison: NSPopUpButton
+        let value: NSTextField
+        let view: NSStackView
+
+        init(view: NSStackView) {
+            (field, comparison, value) = (NSPopUpButton(), NSPopUpButton(), NSTextField())
+            self.view = view
+        }
+    }
+
     internal let tabView = NSTabView()
     internal let searchForField = NSComboBox()
     /// Enter in one of the text fields.
@@ -69,20 +83,6 @@ internal final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDel
     private let sameNameBox = SearchForm.box("same name")
     private let sameSizeBox = SearchForm.box("same size")
     private let sameContentsBox = SearchForm.box("same contents")
-
-    // Plugins
-    @MainActor
-    private struct RuleRow {
-        let field: NSPopUpButton
-        let comparison: NSPopUpButton
-        let value: NSTextField
-        let view: NSStackView
-
-        init(view: NSStackView) {
-            (field, comparison, value) = (NSPopUpButton(), NSPopUpButton(), NSTextField())
-            self.view = view
-        }
-    }
     private let rulesBox = SearchForm.box("Search in plugins (columns):")
     private let combinePopup = NSPopUpButton()
     private let rulesStack = NSStackView()
@@ -93,8 +93,151 @@ internal final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDel
     private var saved: [SavedSearch] = []
     private var savedButtons: [NSButton] = []
 
-    private static func box(_ title: String) -> NSButton {
-        NSButton(checkboxWithTitle: title, target: nil, action: nil)
+    // MARK: Values
+
+    internal var settings: SearchSettings {
+        get {
+            func isOn(_ box: NSButton) -> Bool { box.state == .on }
+            func tri(_ box: NSButton) -> TriState {
+                isOn(attributesBox) ? (box.state == .mixed ? .any : box.state == .on ? .yes : .no) : .any
+            }
+            var settings = SearchSettings()
+            settings.searchFor = searchForField.stringValue
+            settings.searchIn = searchInField.stringValue
+            settings.namesAreRegex = isOn(namesRegexBox)
+            settings.onlySelected = isOn(selectedBox)
+            settings.searchArchives = isOn(archivesBox)
+            settings.useSpotlight = isOn(spotlightBox)
+            settings.depth = depthPopup.indexOfSelectedItem <= 0 ? nil : depthPopup.indexOfSelectedItem - 1
+            settings.findText = isOn(findTextBox)
+            settings.text = textField.stringValue
+            settings.caseSensitive = isOn(caseBox)
+            let encodings = zip(TextEncoding.allCases, encodingBoxes).filter { isOn($0.1) }.map(\.0)
+            settings.textOptions = TextSearchOptions(
+                wholeWords: isOn(wholeWordsBox),
+                regex: isOn(textRegexBox),
+                hex: isOn(hexBox),
+                notContaining: isOn(notContainingBox),
+                encodings: encodings.isEmpty ? [.utf8] : encodings
+            )
+            let calendar = Calendar.current
+            if isOn(dateBox) {
+                settings.criteria.dateFrom = calendar.startOfDay(for: fromPicker.dateValue)
+                // The whole last day counts.
+                settings.criteria.dateTo = calendar.date(
+                    byAdding: .day,
+                    value: 1,
+                    to: calendar.startOfDay(for: toPicker.dateValue)
+                )?
+                .addingTimeInterval(
+                    -1
+                )
+            }
+            func age(_ box: NSButton, _ field: NSTextField, _ unit: NSPopUpButton) -> Age? {
+                isOn(box)
+                    ? Age(max(field.integerValue, 0), Age.Unit(rawValue: unit.indexOfSelectedItem) ?? .days) : nil
+            }
+            settings.criteria.notOlderThan = age(notOlderBox, notOlderField, notOlderUnit)
+            settings.criteria.olderThan = age(olderBox, olderField, olderUnit)
+            if isOn(sizeBox) {
+                settings.criteria.size = SizeRule(
+                    SizeRule.Comparison(rawValue: sizeComparison.indexOfSelectedItem) ?? .equal,
+                    Double(sizeField.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0,
+                    SizeRule.Unit(rawValue: sizeUnit.indexOfSelectedItem) ?? .bytes
+                )
+            }
+            (settings.criteria.hidden, settings.criteria.directory, settings.criteria.symbolicLink) =
+                (tri(attributeBoxes[0]), tri(attributeBoxes[1]), tri(attributeBoxes[2]))
+            (settings.criteria.readOnly, settings.criteria.executable, settings.criteria.package) =
+                (tri(attributeBoxes[3]), tri(attributeBoxes[4]), tri(attributeBoxes[5]))
+            settings.duplicates = DuplicateOptions(
+                isEnabled: isOn(duplicatesBox),
+                sameName: isOn(sameNameBox),
+                sameSize: isOn(sameSizeBox),
+                sameContents: isOn(sameContentsBox)
+            )
+            let rules = ruleRows.compactMap { row -> FieldRule? in
+                guard fields.indices.contains(row.field.indexOfSelectedItem), !row.value.stringValue.isEmpty else {
+                    return nil
+                }
+                return FieldRule(
+                    fields[row.field.indexOfSelectedItem].id,
+                    FieldRule.Operator(rawValue: row.comparison.indexOfSelectedItem) ?? .contains,
+                    row.value.stringValue
+                )
+            }
+            settings.fieldRules = FieldRules(
+                isEnabled: isOn(rulesBox),
+                matchAll: combinePopup.indexOfSelectedItem == 0,
+                rules: rules
+            )
+            return settings
+        }
+        set {
+            func set(_ box: NSButton, _ isOn: Bool) { box.state = isOn ? .on : .off }
+            func set(_ box: NSButton, _ state: TriState) {
+                box.state = state == .any ? .mixed : state == .yes ? .on : .off
+            }
+            searchForField.stringValue = newValue.searchFor
+            searchInField.stringValue = newValue.searchIn
+            placedSearchIn = newValue.searchIn
+            set(namesRegexBox, newValue.namesAreRegex)
+            set(selectedBox, newValue.onlySelected && selectedBox.isEnabled)
+            set(archivesBox, newValue.searchArchives)
+            set(spotlightBox, newValue.useSpotlight)
+            depthPopup.selectItem(
+                at: min(
+                    newValue.depth.map { max($0, 0) < Int.max ? max($0, 0) + 1 : Int.max } ?? 0,
+                    depthPopup.numberOfItems - 1
+                )
+            )
+            set(findTextBox, newValue.findText)
+            textField.stringValue = newValue.text
+            set(caseBox, newValue.caseSensitive)
+            set(wholeWordsBox, newValue.textOptions.wholeWords)
+            set(textRegexBox, newValue.textOptions.regex)
+            set(hexBox, newValue.textOptions.hex)
+            set(notContainingBox, newValue.textOptions.notContaining)
+            for (encoding, box) in zip(TextEncoding.allCases, encodingBoxes) {
+                set(box, newValue.textOptions.encodings.contains(encoding))
+            }
+            let criteria = newValue.criteria
+            set(dateBox, criteria.dateFrom != nil || criteria.dateTo != nil)
+            fromPicker.dateValue = criteria.dateFrom ?? Date()
+            toPicker.dateValue = criteria.dateTo ?? Date()
+            func show(_ age: Age?, _ box: NSButton, _ field: NSTextField, _ unit: NSPopUpButton) {
+                set(box, age != nil)
+                field.integerValue = age?.count ?? 1
+                unit.selectItem(at: (age?.unit ?? .days).rawValue)
+            }
+            show(criteria.notOlderThan, notOlderBox, notOlderField, notOlderUnit)
+            show(criteria.olderThan, olderBox, olderField, olderUnit)
+            set(sizeBox, criteria.size != nil)
+            sizeComparison.selectItem(at: (criteria.size?.comparison ?? .equal).rawValue)
+            let size = criteria.size?.value ?? 1
+            // A whole number that fits an Int64 is shown without a fraction; a saved size of 1e30 or
+            // infinity is shown as it is, not trapped on.
+            sizeField.stringValue = size == size.rounded() && abs(size) < 9.0e18 ? String(Int64(size)) : String(size)
+            sizeUnit.selectItem(at: (criteria.size?.unit ?? .kilobytes).rawValue)
+            set(attributesBox, criteria.hasAttributes)
+            for (box, state) in zip(
+                attributeBoxes,
+                [
+                    criteria.hidden, criteria.directory, criteria.symbolicLink, criteria.readOnly,
+                    criteria.executable, criteria.package
+                ]
+            ) { set(box, state) }
+            set(duplicatesBox, newValue.duplicates.isEnabled)
+            set(sameNameBox, newValue.duplicates.sameName)
+            set(sameSizeBox, newValue.duplicates.sameSize)
+            set(sameContentsBox, newValue.duplicates.sameContents)
+            set(rulesBox, newValue.fieldRules.isEnabled)
+            combinePopup.selectItem(at: newValue.fieldRules.matchAll ? 0 : 1)
+            while let row = ruleRows.popLast() { remove(row) }
+            newValue.fieldRules.rules.forEach { addRuleRow($0) }
+            if ruleRows.isEmpty { addRuleRow() }
+            updateEnabled()
+        }
     }
 
     internal init(fields: [SearchField], store: SearchStore, ui: any UserInteraction) {
@@ -106,6 +249,10 @@ internal final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDel
         settings = SearchSettings()
         reloadSaved()
         reloadHistories()
+    }
+
+    private static func box(_ title: String) -> NSButton {
+        NSButton(checkboxWithTitle: title, target: nil, action: nil)
     }
 
     // MARK: Layout
@@ -327,153 +474,6 @@ internal final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDel
     internal func setSelectionAvailable(_ available: Bool) {
         selectedBox.isEnabled = available
         if !available { selectedBox.state = .off }
-    }
-
-    // MARK: Values
-
-    internal var settings: SearchSettings {
-        get {
-            func isOn(_ box: NSButton) -> Bool { box.state == .on }
-            func tri(_ box: NSButton) -> TriState {
-                isOn(attributesBox) ? (box.state == .mixed ? .any : box.state == .on ? .yes : .no) : .any
-            }
-            var settings = SearchSettings()
-            settings.searchFor = searchForField.stringValue
-            settings.searchIn = searchInField.stringValue
-            settings.namesAreRegex = isOn(namesRegexBox)
-            settings.onlySelected = isOn(selectedBox)
-            settings.searchArchives = isOn(archivesBox)
-            settings.useSpotlight = isOn(spotlightBox)
-            settings.depth = depthPopup.indexOfSelectedItem <= 0 ? nil : depthPopup.indexOfSelectedItem - 1
-            settings.findText = isOn(findTextBox)
-            settings.text = textField.stringValue
-            settings.caseSensitive = isOn(caseBox)
-            let encodings = zip(TextEncoding.allCases, encodingBoxes).filter { isOn($0.1) }.map(\.0)
-            settings.textOptions = TextSearchOptions(
-                wholeWords: isOn(wholeWordsBox),
-                regex: isOn(textRegexBox),
-                hex: isOn(hexBox),
-                notContaining: isOn(notContainingBox),
-                encodings: encodings.isEmpty ? [.utf8] : encodings
-            )
-            let calendar = Calendar.current
-            if isOn(dateBox) {
-                settings.criteria.dateFrom = calendar.startOfDay(for: fromPicker.dateValue)
-                // The whole last day counts.
-                settings.criteria.dateTo = calendar.date(
-                    byAdding: .day,
-                    value: 1,
-                    to: calendar.startOfDay(for: toPicker.dateValue)
-                )?
-                .addingTimeInterval(
-                    -1
-                )
-            }
-            func age(_ box: NSButton, _ field: NSTextField, _ unit: NSPopUpButton) -> Age? {
-                isOn(box)
-                    ? Age(max(field.integerValue, 0), Age.Unit(rawValue: unit.indexOfSelectedItem) ?? .days) : nil
-            }
-            settings.criteria.notOlderThan = age(notOlderBox, notOlderField, notOlderUnit)
-            settings.criteria.olderThan = age(olderBox, olderField, olderUnit)
-            if isOn(sizeBox) {
-                settings.criteria.size = SizeRule(
-                    SizeRule.Comparison(rawValue: sizeComparison.indexOfSelectedItem) ?? .equal,
-                    Double(sizeField.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0,
-                    SizeRule.Unit(rawValue: sizeUnit.indexOfSelectedItem) ?? .bytes
-                )
-            }
-            (settings.criteria.hidden, settings.criteria.directory, settings.criteria.symbolicLink) =
-                (tri(attributeBoxes[0]), tri(attributeBoxes[1]), tri(attributeBoxes[2]))
-            (settings.criteria.readOnly, settings.criteria.executable, settings.criteria.package) =
-                (tri(attributeBoxes[3]), tri(attributeBoxes[4]), tri(attributeBoxes[5]))
-            settings.duplicates = DuplicateOptions(
-                isEnabled: isOn(duplicatesBox),
-                sameName: isOn(sameNameBox),
-                sameSize: isOn(sameSizeBox),
-                sameContents: isOn(sameContentsBox)
-            )
-            let rules = ruleRows.compactMap { row -> FieldRule? in
-                guard fields.indices.contains(row.field.indexOfSelectedItem), !row.value.stringValue.isEmpty else {
-                    return nil
-                }
-                return FieldRule(
-                    fields[row.field.indexOfSelectedItem].id,
-                    FieldRule.Operator(rawValue: row.comparison.indexOfSelectedItem) ?? .contains,
-                    row.value.stringValue
-                )
-            }
-            settings.fieldRules = FieldRules(
-                isEnabled: isOn(rulesBox),
-                matchAll: combinePopup.indexOfSelectedItem == 0,
-                rules: rules
-            )
-            return settings
-        }
-        set {
-            func set(_ box: NSButton, _ isOn: Bool) { box.state = isOn ? .on : .off }
-            func set(_ box: NSButton, _ state: TriState) {
-                box.state = state == .any ? .mixed : state == .yes ? .on : .off
-            }
-            searchForField.stringValue = newValue.searchFor
-            searchInField.stringValue = newValue.searchIn
-            placedSearchIn = newValue.searchIn
-            set(namesRegexBox, newValue.namesAreRegex)
-            set(selectedBox, newValue.onlySelected && selectedBox.isEnabled)
-            set(archivesBox, newValue.searchArchives)
-            set(spotlightBox, newValue.useSpotlight)
-            depthPopup.selectItem(
-                at: min(
-                    newValue.depth.map { max($0, 0) < Int.max ? max($0, 0) + 1 : Int.max } ?? 0,
-                    depthPopup.numberOfItems - 1
-                )
-            )
-            set(findTextBox, newValue.findText)
-            textField.stringValue = newValue.text
-            set(caseBox, newValue.caseSensitive)
-            set(wholeWordsBox, newValue.textOptions.wholeWords)
-            set(textRegexBox, newValue.textOptions.regex)
-            set(hexBox, newValue.textOptions.hex)
-            set(notContainingBox, newValue.textOptions.notContaining)
-            for (encoding, box) in zip(TextEncoding.allCases, encodingBoxes) {
-                set(box, newValue.textOptions.encodings.contains(encoding))
-            }
-            let criteria = newValue.criteria
-            set(dateBox, criteria.dateFrom != nil || criteria.dateTo != nil)
-            fromPicker.dateValue = criteria.dateFrom ?? Date()
-            toPicker.dateValue = criteria.dateTo ?? Date()
-            func show(_ age: Age?, _ box: NSButton, _ field: NSTextField, _ unit: NSPopUpButton) {
-                set(box, age != nil)
-                field.integerValue = age?.count ?? 1
-                unit.selectItem(at: (age?.unit ?? .days).rawValue)
-            }
-            show(criteria.notOlderThan, notOlderBox, notOlderField, notOlderUnit)
-            show(criteria.olderThan, olderBox, olderField, olderUnit)
-            set(sizeBox, criteria.size != nil)
-            sizeComparison.selectItem(at: (criteria.size?.comparison ?? .equal).rawValue)
-            let size = criteria.size?.value ?? 1
-            // A whole number that fits an Int64 is shown without a fraction; a saved size of 1e30 or
-            // infinity is shown as it is, not trapped on.
-            sizeField.stringValue = size == size.rounded() && abs(size) < 9.0e18 ? String(Int64(size)) : String(size)
-            sizeUnit.selectItem(at: (criteria.size?.unit ?? .kilobytes).rawValue)
-            set(attributesBox, criteria.hasAttributes)
-            for (box, state) in zip(
-                attributeBoxes,
-                [
-                    criteria.hidden, criteria.directory, criteria.symbolicLink, criteria.readOnly,
-                    criteria.executable, criteria.package
-                ]
-            ) { set(box, state) }
-            set(duplicatesBox, newValue.duplicates.isEnabled)
-            set(sameNameBox, newValue.duplicates.sameName)
-            set(sameSizeBox, newValue.duplicates.sameSize)
-            set(sameContentsBox, newValue.duplicates.sameContents)
-            set(rulesBox, newValue.fieldRules.isEnabled)
-            combinePopup.selectItem(at: newValue.fieldRules.matchAll ? 0 : 1)
-            while let row = ruleRows.popLast() { remove(row) }
-            newValue.fieldRules.rules.forEach { addRuleRow($0) }
-            if ruleRows.isEmpty { addRuleRow() }
-            updateEnabled()
-        }
     }
 
     /// Adds what the fields hold to their histories (spec 09 › "Search for").

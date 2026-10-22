@@ -16,6 +16,15 @@ import Foundation
 ///
 /// All state is guarded by `lock`.
 internal final class ViewerWorkGate: @unchecked Sendable {
+    private struct Waiting {
+        let flag: CancellationFlag
+        let work: @Sendable () -> Void
+    }
+    private struct Running {
+        let flag: CancellationFlag
+        var token: AnyObject?
+    }
+
     /// Index builds of text documents.
     internal static let indexBuilds = ViewerWorkGate(
         live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)),
@@ -25,22 +34,9 @@ internal final class ViewerWorkGate: @unchecked Sendable {
     internal let live: Int
     internal let stuck: Int
     private let lock = NSLock()
-    private struct Waiting {
-        let flag: CancellationFlag
-        let work: @Sendable () -> Void
-    }
-    private struct Running {
-        let flag: CancellationFlag
-        var token: AnyObject?
-    }
     private var waiting: [Waiting] = []
     private var running: [Int: Running] = [:]
     private var lastID = 0
-
-    internal init(live: Int, stuck: Int) {
-        self.live = max(1, live)
-        self.stuck = max(1, stuck)
-    }
 
     /// Jobs that hold a thread now, cancelled or not (for tests).
     internal var threadsInUse: Int {
@@ -54,6 +50,11 @@ internal final class ViewerWorkGate: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return waiting.filter { !$0.flag.isCancelled }.count
+    }
+
+    internal init(live: Int, stuck: Int) {
+        self.live = max(1, live)
+        self.stuck = max(1, stuck)
     }
 
     /// Runs `work` on a background thread as soon as the limits allow, unless `flag` is set

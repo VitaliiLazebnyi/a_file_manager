@@ -197,6 +197,13 @@ internal struct Switches {
 /// The operation log (spec 13 › Operation › Log file).
 @Suite
 internal struct OperationLogs {
+    /// A clock the test moves.
+    ///
+    /// Unchecked: the test moves it only while no line is being written.
+    internal final class Clock: @unchecked Sendable {
+        internal var now = Date(timeIntervalSince1970: 1_791_813_787)
+    }
+
     internal let box: Sandbox
     internal var configuration = OperationLog.Configuration()
 
@@ -204,13 +211,6 @@ internal struct OperationLogs {
         box = try Sandbox()
         configuration.isEnabled = true
         configuration.file = box.url("logs/operations.log")
-    }
-
-    /// A clock the test moves.
-    ///
-    /// Unchecked: the test moves it only while no line is being written.
-    internal final class Clock: @unchecked Sendable {
-        internal var now = Date(timeIntervalSince1970: 1_791_813_787)
     }
 
     @Test

@@ -19,6 +19,10 @@ private final class FakeOverlayHost: PanelOverlayHost {
 @MainActor
 @Suite(.serialized)
 internal struct ViewerWindows {
+    private final class HostLookup {
+        var hosts: [ObjectIdentifier: FakeOverlayHost] = [:]
+    }
+
     internal let memory = MemoryFileSystem()
     internal let bench: TestBench
     internal let plugin: ViewerPlugin
@@ -71,10 +75,6 @@ internal struct ViewerWindows {
         hosts[ObjectIdentifier(bench.right)] = FakeOverlayHost()
         lookup.hosts = hosts
         self.hosts = hosts
-    }
-
-    private final class HostLookup {
-        var hosts: [ObjectIdentifier: FakeOverlayHost] = [:]
     }
 
     internal static func write(_ data: Data, to path: String, in memory: MemoryFileSystem) throws {

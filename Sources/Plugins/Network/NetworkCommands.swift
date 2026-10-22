@@ -20,6 +20,10 @@ internal final class NetworkCommands {
     private var lastLocal: [ObjectIdentifier: URL] = [:]
     private var panelSubscription: AnyObject?
 
+    private var ui: any UserInteraction { kernel.interaction }
+    private var source: any PanelHandle { kernel.panels.source }
+    internal var canEject: Bool { mounter != nil }
+
     internal init(kernel: Kernel, center: ConnectionCenter, store: ConnectionStore, mounter: any VolumeMounter?) {
         self.kernel = kernel
         self.center = center
@@ -33,9 +37,26 @@ internal final class NetworkCommands {
         }
     }
 
-    private var ui: any UserInteraction { kernel.interaction }
-    private var source: any PanelHandle { kernel.panels.source }
-    internal var canEject: Bool { mounter != nil }
+    /// The text of a list file.
+    ///
+    /// A list is a small text; a file that is no plain file, or larger than
+    /// `DownloadList.largestFile`, is not read.
+    nonisolated internal static func readList(_ list: URL) throws -> String {
+        let values = try list.resourceValues(forKeys: [.isRegularFileKey])
+        guard values.isRegularFile == true else { throw VolumeError(message: "\(list.path) is not a file.") }
+        let limit = DownloadList.largestFile
+        // No more than one byte beyond the limit is read: enough to tell a list that is too large.
+        let handle = try FileHandle(forReadingFrom: list)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: limit + 1) ?? Data()
+        guard data.count <= limit else {
+            throw VolumeError(message: "\(list.path) is larger than \(limit >> 20) MB, which no download list is.")
+        }
+        guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) else {
+            throw VolumeError(message: "\(list.path) is not a text file.")
+        }
+        return text
+    }
 
     // MARK: Questions asked by connections
 
@@ -647,27 +668,6 @@ internal final class NetworkCommands {
         return location.isFileURL ? location : nil
     }
 
-    /// The text of a list file.
-    ///
-    /// A list is a small text; a file that is no plain file, or larger than
-    /// `DownloadList.largestFile`, is not read.
-    nonisolated internal static func readList(_ list: URL) throws -> String {
-        let values = try list.resourceValues(forKeys: [.isRegularFileKey])
-        guard values.isRegularFile == true else { throw VolumeError(message: "\(list.path) is not a file.") }
-        let limit = DownloadList.largestFile
-        // No more than one byte beyond the limit is read: enough to tell a list that is too large.
-        let handle = try FileHandle(forReadingFrom: list)
-        defer { try? handle.close() }
-        let data = try handle.read(upToCount: limit + 1) ?? Data()
-        guard data.count <= limit else {
-            throw VolumeError(message: "\(list.path) is larger than \(limit >> 20) MB, which no download list is.")
-        }
-        guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) else {
-            throw VolumeError(message: "\(list.path) is not a text file.")
-        }
-        return text
-    }
-
     /// Download later: writes the marked files of the server into the list file, each with
     /// the place it is to go to (spec 11 › Download later).
     ///
@@ -906,6 +906,9 @@ internal struct ListPlan {
         case pause(TimeInterval)
     }
 
+    /// At most this many lines are shown in a message; a list may have a hundred thousand.
+    internal static let shownLines = 20
+
     internal private(set) var items: [Item] = []
     /// The lines that are not carried out, each with the reason.
     internal private(set) var skipped: [String] = []
@@ -973,9 +976,6 @@ internal struct ListPlan {
             )
         }
     }
-
-    /// At most this many lines are shown in a message; a list may have a hundred thousand.
-    internal static let shownLines = 20
 
     internal static func shortened(_ lines: [String]) -> String {
         let shown = lines.prefix(shownLines).map { $0.count > 300 ? String($0.prefix(300)) + "…" : $0 }

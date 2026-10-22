@@ -8,6 +8,8 @@ public struct HotlistEntry: Codable, Equatable, Sendable {
         case item, submenu, separator
     }
 
+    public static let separator = Self(kind: .separator, title: "-")
+
     public var kind: Kind
     /// As the user typed it; an `&` marks the letter after it (spec 12 › Editing entries).
     public var title: String
@@ -16,6 +18,12 @@ public struct HotlistEntry: Codable, Equatable, Sendable {
     /// Shown in the other panel at the same time; empty for none.
     public var target: String
     public var children: [Self]
+
+    /// The title as it is shown: without the `&` that marks an accelerator (`&&` is an ampersand).
+    public var displayTitle: String {
+        title.replacingOccurrences(of: "&&", with: "\u{0}").replacingOccurrences(of: "&", with: "")
+            .replacingOccurrences(of: "\u{0}", with: "&")
+    }
 
     public init(kind: Kind, title: String, command: String = "", target: String = "", children: [Self] = []) {
         self.kind = kind
@@ -33,17 +41,9 @@ public struct HotlistEntry: Codable, Equatable, Sendable {
         Self(kind: .submenu, title: title, children: children)
     }
 
-    public static let separator = Self(kind: .separator, title: "-")
-
     /// An entry for what the user typed as a title: a single `-` makes a separator.
     public static func titled(_ title: String, command: String) -> Self {
         title.trimmingCharacters(in: .whitespaces) == "-" ? .separator : .item(title, command: command)
-    }
-
-    /// The title as it is shown: without the `&` that marks an accelerator (`&&` is an ampersand).
-    public var displayTitle: String {
-        title.replacingOccurrences(of: "&&", with: "\u{0}").replacingOccurrences(of: "&", with: "")
-            .replacingOccurrences(of: "\u{0}", with: "&")
     }
 }
 
@@ -56,20 +56,6 @@ public struct Hotlist: Codable, Equatable {
     /// The position of an entry: its index on the top level, then inside each submenu.
     public typealias Path = [Int]
 
-    /// The most entries the list takes (spec 12 › Storage and limits).
-    public static let limit = 2_000
-
-    public var entries: [HotlistEntry]
-    /// Entries whose title starts with this are hidden while `hidesMarked` is on.
-    public var hideCharacter: String
-    public var hidesMarked: Bool
-
-    public init(entries: [HotlistEntry] = [], hideCharacter: String = "?", hidesMarked: Bool = false) {
-        self.entries = entries
-        self.hideCharacter = hideCharacter
-        self.hidesMarked = hidesMarked
-    }
-
     /// One line of the list written out flat, as the editor shows it.
     public struct Row: Equatable {
         public let path: Path
@@ -77,25 +63,13 @@ public struct Hotlist: Codable, Equatable {
         public var depth: Int { path.count - 1 }
     }
 
-    // MARK: Reading
+    /// The most entries the list takes (spec 12 › Storage and limits).
+    public static let limit = 2_000
 
-    /// The entries of the top level (an empty path) or of a submenu; empty when there is none.
-    public func children(of path: Path) -> [HotlistEntry] {
-        path.isEmpty ? entries : (entry(at: path)?.children ?? [])
-    }
-
-    public func entry(at path: Path) -> HotlistEntry? {
-        var level = entries
-        var found: HotlistEntry?
-        for index in path {
-            guard level.indices.contains(index) else {
-                return nil
-            }
-            found = level[index]
-            level = level[index].children
-        }
-        return found
-    }
+    public var entries: [HotlistEntry]
+    /// Entries whose title starts with this are hidden while `hidesMarked` is on.
+    public var hideCharacter: String
+    public var hidesMarked: Bool
 
     /// Every entry in display order, submenus followed by what they hold.
     public var rows: [Row] {
@@ -109,6 +83,12 @@ public struct Hotlist: Codable, Equatable {
     }
 
     public var count: Int { rows.count }
+
+    public init(entries: [HotlistEntry] = [], hideCharacter: String = "?", hidesMarked: Bool = false) {
+        self.entries = entries
+        self.hideCharacter = hideCharacter
+        self.hidesMarked = hidesMarked
+    }
 
     /// Keeps the first `room` entries (submenus and what they hold count one each, in display
     /// order) and drops the rest; `room` is what is left.
@@ -134,6 +114,31 @@ public struct Hotlist: Codable, Equatable {
         1 + entry.children.reduce(0) { $0 + size(of: $1) }
     }
 
+    /// Whether the entry, or anything inside it, `matches`.
+    public static func contains(_ entry: HotlistEntry, where matches: (HotlistEntry) -> Bool) -> Bool {
+        matches(entry) || entry.children.contains { contains($0, where: matches) }
+    }
+
+    // MARK: Reading
+
+    /// The entries of the top level (an empty path) or of a submenu; empty when there is none.
+    public func children(of path: Path) -> [HotlistEntry] {
+        path.isEmpty ? entries : (entry(at: path)?.children ?? [])
+    }
+
+    public func entry(at path: Path) -> HotlistEntry? {
+        var level = entries
+        var found: HotlistEntry?
+        for index in path {
+            guard level.indices.contains(index) else {
+                return nil
+            }
+            found = level[index]
+            level = level[index].children
+        }
+        return found
+    }
+
     /// Hidden from the Ctrl+D menu right now (spec 12 › Hiding entries).
     public func isHidden(_ entry: HotlistEntry) -> Bool {
         hidesMarked && !hideCharacter.isEmpty && entry.kind != .separator && entry.title.hasPrefix(hideCharacter)
@@ -142,11 +147,6 @@ public struct Hotlist: Codable, Equatable {
     /// The first entry of one level that `matches`, as an index into that level.
     public func index(in parent: Path, where matches: (HotlistEntry) -> Bool) -> Int? {
         children(of: parent).firstIndex(where: matches)
-    }
-
-    /// Whether the entry, or anything inside it, `matches`.
-    public static func contains(_ entry: HotlistEntry, where matches: (HotlistEntry) -> Bool) -> Bool {
-        matches(entry) || entry.children.contains { contains($0, where: matches) }
     }
 
     // MARK: Changing
@@ -364,6 +364,8 @@ public struct HotlistMenu {
         public let action: Action
     }
 
+    internal static let separatorTitle = "────────────"
+
     public let rows: [Row]
     /// The row the list opens on: the entry of the current directory, or the first.
     public let selected: Int
@@ -416,8 +418,6 @@ public struct HotlistMenu {
         rows = places.map { Row(title: Self.mark(isCurrent($0)) + $0.displayTitle, action: .run($0)) }
         selected = places.firstIndex(where: isCurrent) ?? 0
     }
-
-    internal static let separatorTitle = "────────────"
 
     private static func mark(_ isCurrent: Bool) -> String { isCurrent ? "✓ " : "    " }
 }

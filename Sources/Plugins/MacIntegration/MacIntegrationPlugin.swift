@@ -13,113 +13,17 @@ import UniformTypeIdentifiers
 /// for applications, reading or writing tags, and picking the marked items out of a long list
 /// happen in the background.
 public final class MacIntegrationPlugin: Plugin {
-    public let name = "Mac integration"
-    /// Where requests to other applications and the system's panels go: the Mac's desktop, a
-    /// test's recording one, or nowhere (tests that start nothing).
-    ///
-    /// What would have been opened is recorded in `opened` and `log` either way.
-    private let desktop: (any MacDesktop)?
-    private let pasteboard: NSPasteboard
-    private let applications: @Sendable (URL) -> [URL]
-    /// The files most recently handed to an application (or that would have been); for tests.
-    public private(set) var opened: [URL] = []
-    /// What was done, one line each, the most recent ones: `edit TextEdit /a/b.txt`,
-    /// `open-with Preview /a/c.png`, `open /a/d`, `quicklook /a/e`, `share /a/f`, `tags /a/g: Red, Work`.
-    public private(set) var log: [String] = []
+    /// Stands for Launch Services in `BlockingCalls`: used for nothing but what object it is.
+    private final class LaunchServices: Sendable {}
     /// Both lists are kept to this length; a program that runs for weeks must not grow with every click.
     private static let recordLimit = 256
-
-    private func remember(opened urls: [URL]) {
-        opened = Array((opened + urls).suffix(Self.recordLimit))
-    }
-
-    /// A line of the log.
-    ///
-    /// Names come from the disk: a line break in one cannot make a second line.
-    private func remember(_ line: String) {
-        log.append(DisplayText.oneLine(line, limit: 2_000))
-        if log.count > Self.recordLimit * 2 {
-            log.removeFirst(log.count - Self.recordLimit)
-        }
-    }
-
-    /// The files of a log line: their paths while they are few, their number when they are
-    /// many (a line with every path of a large selection would be megabytes).
-    private static func described(_ urls: [URL]) -> String {
-        urls.count <= 8 ? urls.map(\.path).joined(separator: " ") : "\(urls.count) items"
-    }
 
     /// From this many marked items on, they are picked out off the main thread.
     internal static let backgroundListThreshold = 5_000
     /// The most items Finder is asked to select, and the most that are shared, at a time.
     nonisolated internal static let revealLimit = 1_000
     internal static let shareLimit = 1_000
-    /// Stands for Launch Services in `BlockingCalls`: used for nothing but what object it is.
-    private final class LaunchServices: Sendable {}
     nonisolated private static let launchServices = LaunchServices()
-
-    /// The local operands of a panel, worked on by `work` and handed to `deliver` on the main
-    /// thread.
-    ///
-    /// With many marked items both happen on a background thread first (the marks and the list are
-    /// taken as they are, which copies nothing); with few, everything is done at once, here.
-    /// `deliver` runs from the main run loop, not from a block of the main queue: it may ask the
-    /// user something.
-    private func withLocalOperands<Result: Sendable>(
-        of model: PanelModel,
-        _ work: @escaping @Sendable ([URL]) -> Result,
-        then deliver: @escaping @MainActor @Sendable (Result) -> Void
-    ) {
-        let operands = model.operandsSnapshot()
-        @Sendable
-        func urls() -> [URL] { operands.items().map(\.url).filter(\.isFileURL) }
-        guard operands.markedCount >= Self.backgroundListThreshold else {
-            deliver(work(urls()))
-            return
-        }
-        DispatchQueue.global(qos: .userInitiated)
-            .async {
-                let result = work(urls())
-                // The main run loop runs its blocks on the main thread.
-                RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { deliver(result) } }
-                CFRunLoopWakeUp(CFRunLoopGetMain())
-            }
-    }
-
-    /// What the open Quick Look panel was given last: the panel's list and marks then.
-    private var followed: (model: ObjectIdentifier, marked: Int, listVersion: Int)?
-    private var followTicket = 0
-
-    /// Has the open Quick Look panel show what the source panel now has.
-    ///
-    /// A move of the cursor costs nothing that grows with the list: without marked items the file
-    /// under the cursor is shown, and with them the panel keeps showing those until they or the
-    /// list change.
-    private func follow(_ model: PanelModel) {
-        let marked = model.selectionCount
-        let state = (ObjectIdentifier(model), marked, model.listVersion)
-        guard marked > 0 else {
-            followed = nil
-            followTicket += 1
-            quickLook.follow(model.cursorItem.flatMap { $0.url.isFileURL ? [$0.url] : nil } ?? [])
-            return
-        }
-        if let followed, followed == state {
-            return
-        }
-        followed = state
-        followTicket += 1
-        let ticket = followTicket
-        withLocalOperands(of: model, { $0 }) { [weak self] urls in
-            // Something newer is being shown by now.
-            guard let self, followTicket == ticket, quickLook.isVisible else {
-                return
-            }
-            quickLook.follow(urls)
-        }
-    }
-    private let quickLook = QuickLookController()
-    private var subscription: AnyObject?
 
     /// The preference that names the editor for F4: an application's name, its path, or its
     /// bundle identifier.
@@ -133,6 +37,26 @@ public final class MacIntegrationPlugin: Plugin {
     public static let share: CommandID = "afm_Share"
     public static let editTags: CommandID = "afm_EditTags"
     public static let copyAsPathname: CommandID = "afm_CopyAsPathname"
+
+    public let name = "Mac integration"
+    /// Where requests to other applications and the system's panels go: the Mac's desktop, a
+    /// test's recording one, or nowhere (tests that start nothing).
+    ///
+    /// What would have been opened is recorded in `opened` and `log` either way.
+    private let desktop: (any MacDesktop)?
+    private let pasteboard: NSPasteboard
+    private let applications: @Sendable (URL) -> [URL]
+    /// The files most recently handed to an application (or that would have been); for tests.
+    public private(set) var opened: [URL] = []
+    /// What was done, one line each, the most recent ones: `edit TextEdit /a/b.txt`,
+    /// `open-with Preview /a/c.png`, `open /a/d`, `quicklook /a/e`, `share /a/f`, `tags /a/g: Red, Work`.
+    public private(set) var log: [String] = []
+
+    /// What the open Quick Look panel was given last: the panel's list and marks then.
+    private var followed: (model: ObjectIdentifier, marked: Int, listVersion: Int)?
+    private var followTicket = 0
+    private let quickLook = QuickLookController()
+    private var subscription: AnyObject?
 
     /// Tests pass a pasteboard of their own and say which applications open a file; with
     /// `launchesApplications` off they start nothing and show no system panel.
@@ -158,6 +82,12 @@ public final class MacIntegrationPlugin: Plugin {
         self.pasteboard = pasteboard
         self.applications = applications
         quickLook.panel = desktop?.preview
+    }
+
+    /// The files of a log line: their paths while they are few, their number when they are
+    /// many (a line with every path of a large selection would be megabytes).
+    private static func described(_ urls: [URL]) -> String {
+        urls.count <= 8 ? urls.map(\.path).joined(separator: " ") : "\(urls.count) items"
     }
 
     /// The applications that open a file, the default one first.
@@ -199,6 +129,105 @@ public final class MacIntegrationPlugin: Plugin {
     }
 
     private static func applicationName(_ url: URL) -> String { url.deletingPathExtension().lastPathComponent }
+
+    // MARK: Finder tags
+
+    /// The Finder tags of a file.
+    ///
+    /// Reads the disk: not for the main thread.
+    nonisolated internal static func tags(of url: URL) -> [String] {
+        var value: AnyObject?
+        try? (URL(fileURLWithPath: url.path) as NSURL).getResourceValue(&value, forKey: .tagNamesKey)
+        return value as? [String] ?? []
+    }
+
+    /// Replaces the Finder tags of a file.
+    ///
+    /// Writes to the disk: not for the main thread.
+    nonisolated internal static func setTags(_ tags: [String], of url: URL) throws {
+        try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
+    }
+
+    /// The tags as the user types them: separated by commas, no empty ones, none twice.
+    internal static func tags(from text: String) -> [String] {
+        var tags: [String] = []
+        for tag in text.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) })
+        where !tag.isEmpty && !tags.contains(tag) {
+            tags.append(tag)
+        }
+        return tags
+    }
+
+    private func remember(opened urls: [URL]) {
+        opened = Array((opened + urls).suffix(Self.recordLimit))
+    }
+
+    /// A line of the log.
+    ///
+    /// Names come from the disk: a line break in one cannot make a second line.
+    private func remember(_ line: String) {
+        log.append(DisplayText.oneLine(line, limit: 2_000))
+        if log.count > Self.recordLimit * 2 {
+            log.removeFirst(log.count - Self.recordLimit)
+        }
+    }
+
+    /// The local operands of a panel, worked on by `work` and handed to `deliver` on the main
+    /// thread.
+    ///
+    /// With many marked items both happen on a background thread first (the marks and the list are
+    /// taken as they are, which copies nothing); with few, everything is done at once, here.
+    /// `deliver` runs from the main run loop, not from a block of the main queue: it may ask the
+    /// user something.
+    private func withLocalOperands<Result: Sendable>(
+        of model: PanelModel,
+        _ work: @escaping @Sendable ([URL]) -> Result,
+        then deliver: @escaping @MainActor @Sendable (Result) -> Void
+    ) {
+        let operands = model.operandsSnapshot()
+        @Sendable
+        func urls() -> [URL] { operands.items().map(\.url).filter(\.isFileURL) }
+        guard operands.markedCount >= Self.backgroundListThreshold else {
+            deliver(work(urls()))
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated)
+            .async {
+                let result = work(urls())
+                // The main run loop runs its blocks on the main thread.
+                RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { deliver(result) } }
+                CFRunLoopWakeUp(CFRunLoopGetMain())
+            }
+    }
+
+    /// Has the open Quick Look panel show what the source panel now has.
+    ///
+    /// A move of the cursor costs nothing that grows with the list: without marked items the file
+    /// under the cursor is shown, and with them the panel keeps showing those until they or the
+    /// list change.
+    private func follow(_ model: PanelModel) {
+        let marked = model.selectionCount
+        let state = (ObjectIdentifier(model), marked, model.listVersion)
+        guard marked > 0 else {
+            followed = nil
+            followTicket += 1
+            quickLook.follow(model.cursorItem.flatMap { $0.url.isFileURL ? [$0.url] : nil } ?? [])
+            return
+        }
+        if let followed, followed == state {
+            return
+        }
+        followed = state
+        followTicket += 1
+        let ticket = followTicket
+        withLocalOperands(of: model, { $0 }) { [weak self] urls in
+            // Something newer is being shown by now.
+            guard let self, followTicket == ticket, quickLook.isVisible else {
+                return
+            }
+            quickLook.follow(urls)
+        }
+    }
 
     private func open(_ urls: [URL], with application: URL?) {
         remember(opened: urls)
@@ -466,34 +495,6 @@ public final class MacIntegrationPlugin: Plugin {
     /// Lets the user pick an application from the Applications folder; nil without a desktop.
     private func chooseApplication(title: String) -> URL? {
         desktop?.chooseApplication(title: title)
-    }
-
-    // MARK: Finder tags
-
-    /// The Finder tags of a file.
-    ///
-    /// Reads the disk: not for the main thread.
-    nonisolated internal static func tags(of url: URL) -> [String] {
-        var value: AnyObject?
-        try? (URL(fileURLWithPath: url.path) as NSURL).getResourceValue(&value, forKey: .tagNamesKey)
-        return value as? [String] ?? []
-    }
-
-    /// Replaces the Finder tags of a file.
-    ///
-    /// Writes to the disk: not for the main thread.
-    nonisolated internal static func setTags(_ tags: [String], of url: URL) throws {
-        try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
-    }
-
-    /// The tags as the user types them: separated by commas, no empty ones, none twice.
-    internal static func tags(from text: String) -> [String] {
-        var tags: [String] = []
-        for tag in text.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) })
-        where !tag.isEmpty && !tags.contains(tag) {
-            tags.append(tag)
-        }
-        return tags
     }
 
     /// Shows the tags of the first file and gives all files what the user makes of them.

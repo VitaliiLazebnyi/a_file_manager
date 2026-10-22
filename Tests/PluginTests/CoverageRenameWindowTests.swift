@@ -12,12 +12,38 @@ import Testing
 @MainActor
 @Suite(.serialized)
 internal final class CoverageRenameWindow {
+    /// A view that keeps the keyboard until it is told to let go.
+    private final class Stubborn: NSView {
+        var letsGo = false
+        override var acceptsFirstResponder: Bool { true }
+        override func resignFirstResponder() -> Bool { letsGo }
+    }
+
     internal let memory = MemoryFileSystem()
     internal let box: Sandbox
     internal let bench: TestBench
     internal let session: MultiRenameSession
     internal let controller: MultiRenameWindowController
     internal let window: NSWindow
+
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var content: NSView? { window.contentView }
+    internal var table: NSTableView? { Controls.all(NSTableView.self, in: content).first }
+    internal var combos: [NSComboBox] { Controls.all(NSComboBox.self, in: content) }
+    internal var nameMask: NSComboBox { combos[0] }
+    internal var searchBox: NSComboBox { combos[1] }
+    internal var replaceBox: NSComboBox { combos[2] }
+
+    /// The editable fields that are not combo boxes: extension, counter start and step.
+    internal var fields: [NSTextField] {
+        Controls.all(NSTextField.self, in: content).filter { $0.isEditable && !($0 is NSComboBox) }
+    }
+
+    internal var status: String {
+        Controls.all(NSTextField.self, in: content)
+            .first { !$0.isEditable && $0.lineBreakMode == .byTruncatingTail }?
+            .stringValue ?? ""
+    }
 
     internal init() throws {
         _ = NSApplication.shared
@@ -45,31 +71,6 @@ internal final class CoverageRenameWindow {
         )
         controller = MultiRenameWindowController(kernel: bench.kernel, session: session)
         window = try #require(controller.window)
-    }
-
-    /// The window goes with the test: drawn later, it would ask a kernel that is gone.
-    isolated deinit {
-        // What closing hands to the autorelease pool is let go of while the window still lives.
-        autoreleasepool { controller.close() }
-    }
-
-    internal var ui: ScriptedInteraction { bench.interaction }
-    internal var content: NSView? { window.contentView }
-    internal var table: NSTableView? { Controls.all(NSTableView.self, in: content).first }
-    internal var combos: [NSComboBox] { Controls.all(NSComboBox.self, in: content) }
-    internal var nameMask: NSComboBox { combos[0] }
-    internal var searchBox: NSComboBox { combos[1] }
-    internal var replaceBox: NSComboBox { combos[2] }
-
-    /// The editable fields that are not combo boxes: extension, counter start and step.
-    internal var fields: [NSTextField] {
-        Controls.all(NSTextField.self, in: content).filter { $0.isEditable && !($0 is NSComboBox) }
-    }
-
-    internal var status: String {
-        Controls.all(NSTextField.self, in: content)
-            .first { !$0.isEditable && $0.lineBreakMode == .byTruncatingTail }?
-            .stringValue ?? ""
     }
 
     internal func popup(_ title: String) -> NSPopUpButton? {
@@ -556,16 +557,15 @@ internal final class CoverageRenameWindow {
         #expect(memory.allPaths.contains("/w/r1.txt"))
     }
 
-    /// A view that keeps the keyboard until it is told to let go.
-    private final class Stubborn: NSView {
-        var letsGo = false
-        override var acceptsFirstResponder: Bool { true }
-        override func resignFirstResponder() -> Bool { letsGo }
-    }
-
     @Test
     internal func theWindowIsNeverMadeFromAnArchive() {
         #expect(MultiRenameWindowController(coder: NSCoder()) == nil)
+    }
+
+    /// The window goes with the test: drawn later, it would ask a kernel that is gone.
+    isolated deinit {
+        // What closing hands to the autorelease pool is let go of while the window still lives.
+        autoreleasepool { controller.close() }
     }
 }
 
@@ -580,6 +580,8 @@ internal struct CoverageRenamePluginWindow {
     /// The windows the tool was asked to show: none is put on screen.
     internal let presenter = StabilityPresenter()
 
+    internal var windows: [NSWindow] { presenter.open.filter { $0.title == "Multi-Rename Tool" } }
+
     internal init() throws {
         _ = NSApplication.shared
         box = try Sandbox()
@@ -589,8 +591,6 @@ internal struct CoverageRenamePluginWindow {
         plugin.present = presenter.present
         bench = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/p"), right: memory.url("/p"))
     }
-
-    internal var windows: [NSWindow] { presenter.open.filter { $0.title == "Multi-Rename Tool" } }
 
     @Test
     internal func openingAgainReplacesTheWindowAndClosingKeepsTheSettings() async {

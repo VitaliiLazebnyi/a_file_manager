@@ -73,6 +73,8 @@ public final class OperationLog: @unchecked Sendable {
             }
         }
     }
+    /// How long a burst of lines may wait before it is written.
+    private static let delay: TimeInterval = 0.25
 
     public let configuration: Configuration
     private let queue = DispatchQueue(label: "afm.fileoperations.log", qos: .utility)
@@ -87,8 +89,6 @@ public final class OperationLog: @unchecked Sendable {
     private var handle: FileHandle?
     /// The file the handle writes to, to notice when somebody moved or deleted it.
     private var handleFile: UInt64?
-    /// How long a burst of lines may wait before it is written.
-    private static let delay: TimeInterval = 0.25
 
     /// `now` is the clock; tests bring their own.
     public init(_ configuration: Configuration, now: @escaping @Sendable () -> Date = { Date() }) {
@@ -102,8 +102,44 @@ public final class OperationLog: @unchecked Sendable {
         day.dateFormat = "yyyy-MM-dd"
     }
 
-    deinit {
-        try? handle?.close()
+    /// One record is one line, whatever the names hold: a line break or another control
+    /// character in a file name or an error text is written out (`<U+000A>`), so that no name
+    /// can add lines of its own to the log.
+    public static func line(for record: OperationRecord, at time: String) -> String {
+        let what =
+            record.verb.rawValue + ": " + DisplayName.escaped(record.source)
+            + (record.target.map { " -> " + DisplayName.escaped($0) } ?? "")
+        switch record.status {
+        case .done:
+            return "\(time): \(what)\n"
+
+        case .failed(let message):
+            return "\(time): Error: \(what): \(DisplayName.escaped(message))\n"
+
+        case .skipped:
+            return "\(time): Skipped: \(what)\n"
+        }
+    }
+
+    /// When a file was last changed, as its `stat` says.
+    private static func modified(_ info: stat) -> Date {
+        Date(
+            timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec) + TimeInterval(info.st_mtimespec.tv_nsec)
+                / 1e9
+        )
+    }
+
+    /// `operations.2026-10-12.log`, `operations.2026-10-12-2.log` and `operations.3.log` are
+    /// copies of `operations.log`.
+    internal static func isRotatedCopy(_ name: String, of log: String) -> Bool {
+        let url = URL(fileURLWithPath: log)
+        let (base, ext) = (url.deletingPathExtension().lastPathComponent, url.pathExtension)
+        let suffix = ext.isEmpty ? "" : "." + ext
+        guard name != log, name.hasPrefix(base + "."), name.hasSuffix(suffix),
+            name.count > base.count + 1 + suffix.count
+        else { return false }
+        let tag = name.dropFirst(base.count + 1).dropLast(suffix.count)
+        return tag.range(of: #"^(\d{4}-\d{2}-\d{2}(-\d+)?|\d+)$"#, options: .regularExpression) != nil
     }
 
     /// Any thread.
@@ -201,25 +237,6 @@ public final class OperationLog: @unchecked Sendable {
         queue.async { self.drain() }
     }
 
-    /// One record is one line, whatever the names hold: a line break or another control
-    /// character in a file name or an error text is written out (`<U+000A>`), so that no name
-    /// can add lines of its own to the log.
-    public static func line(for record: OperationRecord, at time: String) -> String {
-        let what =
-            record.verb.rawValue + ": " + DisplayName.escaped(record.source)
-            + (record.target.map { " -> " + DisplayName.escaped($0) } ?? "")
-        switch record.status {
-        case .done:
-            return "\(time): \(what)\n"
-
-        case .failed(let message):
-            return "\(time): Error: \(what): \(DisplayName.escaped(message))\n"
-
-        case .skipped:
-            return "\(time): Skipped: \(what)\n"
-        }
-    }
-
     // MARK: On the log's queue
 
     private func closeHandle() {
@@ -274,14 +291,6 @@ public final class OperationLog: @unchecked Sendable {
             closeHandle()
         }
         return (Int(info.st_size), Self.modified(info))
-    }
-
-    /// When a file was last changed, as its `stat` says.
-    private static func modified(_ info: stat) -> Date {
-        Date(
-            timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec) + TimeInterval(info.st_mtimespec.tv_nsec)
-                / 1e9
-        )
     }
 
     private func writeChunk(_ chunk: inout Data) {
@@ -380,16 +389,7 @@ public final class OperationLog: @unchecked Sendable {
         for (url, _) in copies.dropFirst(configuration.keepCount) { try? fm.removeItem(at: url) }
     }
 
-    /// `operations.2026-10-12.log`, `operations.2026-10-12-2.log` and `operations.3.log` are
-    /// copies of `operations.log`.
-    internal static func isRotatedCopy(_ name: String, of log: String) -> Bool {
-        let url = URL(fileURLWithPath: log)
-        let (base, ext) = (url.deletingPathExtension().lastPathComponent, url.pathExtension)
-        let suffix = ext.isEmpty ? "" : "." + ext
-        guard name != log, name.hasPrefix(base + "."), name.hasSuffix(suffix),
-            name.count > base.count + 1 + suffix.count
-        else { return false }
-        let tag = name.dropFirst(base.count + 1).dropLast(suffix.count)
-        return tag.range(of: #"^(\d{4}-\d{2}-\d{2}(-\d+)?|\d+)$"#, options: .regularExpression) != nil
+    deinit {
+        try? handle?.close()
     }
 }

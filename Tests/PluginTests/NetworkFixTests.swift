@@ -473,15 +473,15 @@ internal struct NetworkFixConnections {
 internal final class FailureBox: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String] = []
-    internal func add(_ value: String) {
-        lock.lock()
-        values.append(value)
-        lock.unlock()
-    }
     internal var all: [String] {
         lock.lock()
         defer { lock.unlock() }
         return values
+    }
+    internal func add(_ value: String) {
+        lock.lock()
+        values.append(value)
+        lock.unlock()
     }
 }
 

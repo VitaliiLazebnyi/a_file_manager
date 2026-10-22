@@ -11,14 +11,6 @@ import Testing
 @MainActor
 @Suite
 internal struct ViewOptions {
-    internal let memory = MemoryFileSystem()
-    internal let settings = MemorySettings()
-    internal let bench: TestBench
-
-    internal var commands: CommandRegistry { bench.commands }
-    internal var left: FakePanel { bench.left }
-    internal var right: FakePanel { bench.right }
-
     /// Offers two columns, as a content plugin would.
     internal final class ColumnsPlugin: Plugin {
         internal let name = "Columns"
@@ -29,6 +21,14 @@ internal struct ViewOptions {
             )
         }
     }
+
+    internal let memory = MemoryFileSystem()
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
+
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
 
     internal init() {
         memory.addFile("/A/one.txt")

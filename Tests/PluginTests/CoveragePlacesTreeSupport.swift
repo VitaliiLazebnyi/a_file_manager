@@ -23,17 +23,29 @@ internal final class CoveragePlacesFolders: FileSystemProvider, @unchecked Senda
     internal let scheme = "tree"
     internal var capabilities: FileSystemCapabilities { [] }
 
-    internal init(_ paths: [String] = []) {
-        paths.forEach(add)
+    /// The places the file system offers; by default the disk, one inside it, and a home folder.
+    internal var placeList: [Place] {
+        get { condition.withLock { offered } }
+        set { condition.withLock { offered = newValue } }
     }
 
-    internal func url(_ path: String) -> URL {
-        URL(string: "tree://" + (path.hasPrefix("/") ? path : "/" + path)) ?? URL(fileURLWithPath: "/")
+    private lazy var offered = [
+        Place(name: "Tree", url: url("/"), kind: .internalDisk),
+        Place(name: "Inner", url: url("/Inner"), kind: .externalDisk),
+        Place(name: "Home", url: url("/Home"), kind: .home)
+    ]
+
+    internal init(_ paths: [String] = []) {
+        paths.forEach(add)
     }
 
     private static func path(of url: URL) -> String {
         let path = url.standardized.path
         return path.isEmpty ? "/" : path
+    }
+
+    internal func url(_ path: String) -> URL {
+        URL(string: "tree://" + (path.hasPrefix("/") ? path : "/" + path)) ?? URL(fileURLWithPath: "/")
     }
 
     /// Makes a folder and the folders above it.
@@ -140,18 +152,6 @@ internal final class CoveragePlacesFolders: FileSystemProvider, @unchecked Senda
         text.hasPrefix("tree:") ? url(String(text.dropFirst(5))) : nil
     }
 
-    /// The places the file system offers; by default the disk, one inside it, and a home folder.
-    internal var placeList: [Place] {
-        get { condition.withLock { offered } }
-        set { condition.withLock { offered = newValue } }
-    }
-
-    private lazy var offered = [
-        Place(name: "Tree", url: url("/"), kind: .internalDisk),
-        Place(name: "Inner", url: url("/Inner"), kind: .externalDisk),
-        Place(name: "Home", url: url("/Home"), kind: .home)
-    ]
-
     internal func places() -> [Place] { placeList }
 }
 
@@ -162,7 +162,6 @@ internal struct CoveragePlacesTreeParts {
 
     internal var window: NSWindow? { controller.window }
     private var stack: NSStackView? { window?.contentView as? NSStackView }
-    private func row(_ index: Int) -> NSStackView? { stack?.arrangedSubviews[index] as? NSStackView }
 
     internal var popup: NSPopUpButton? { stack?.arrangedSubviews[0] as? NSPopUpButton }
     internal var outline: NSOutlineView? { CoveragePlacesLoop.views(NSOutlineView.self, in: stack).first }
@@ -185,6 +184,16 @@ internal struct CoveragePlacesTreeParts {
         return title(ofRow: outline.selectedRow)
     }
 
+    /// The number of folders the status line names; 0 when it names none.
+    internal var count: Int {
+        let token = status.split(separator: " ").first { $0.contains(where: \.isNumber) } ?? ""
+        return Int(token.filter(\.isNumber)) ?? 0
+    }
+
+    /// A scan or a read of the cache is over and the count shows.
+    internal var isIdle: Bool { status.hasSuffix("directories") || status.hasSuffix("F2 reads the rest") }
+    private func row(_ index: Int) -> NSStackView? { stack?.arrangedSubviews[index] as? NSStackView }
+
     internal func title(ofRow row: Int) -> String {
         guard let outline, let item = outline.item(atRow: row) else {
             return ""
@@ -196,15 +205,6 @@ internal struct CoveragePlacesTreeParts {
     internal func row(titled title: String) -> Int {
         rows.firstIndex(of: title) ?? -1
     }
-
-    /// The number of folders the status line names; 0 when it names none.
-    internal var count: Int {
-        let token = status.split(separator: " ").first { $0.contains(where: \.isNumber) } ?? ""
-        return Int(token.filter(\.isNumber)) ?? 0
-    }
-
-    /// A scan or a read of the cache is over and the count shows.
-    internal var isIdle: Bool { status.hasSuffix("directories") || status.hasSuffix("F2 reads the rest") }
 
     internal func click(_ title: String) {
         guard let button = CoveragePlacesLoop.button(title, in: stack), let action = button.action else {

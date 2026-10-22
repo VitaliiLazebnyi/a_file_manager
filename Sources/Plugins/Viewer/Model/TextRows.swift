@@ -33,6 +33,23 @@ internal struct RowSplitter {
         self.options = options
     }
 
+    /// Units that add no column: combining marks, variation selectors and the zero width spaces
+    /// and joiners.
+    @inline(__always)
+    private static func takesNoColumn(_ unit: UInt16) -> Bool {
+        guard unit >= 0x0300 else {
+            return false
+        }
+        switch unit {
+        case 0x0300...0x036F, 0x1AB0...0x1AFF, 0x1DC0...0x1DFF, 0x200B...0x200F, 0x20D0...0x20FF, 0x3099...0x309A,
+            0xFE00...0xFE0F, 0xFE20...0xFE2F:
+            return true
+
+        default:
+            return false
+        }
+    }
+
     /// Calls `row` with the unit range of every complete row (line end included) and whether it
     /// begins a line, until `row` returns false.
     ///
@@ -149,23 +166,6 @@ internal struct RowSplitter {
         return rowStart
     }
 
-    /// Units that add no column: combining marks, variation selectors and the zero width spaces
-    /// and joiners.
-    @inline(__always)
-    private static func takesNoColumn(_ unit: UInt16) -> Bool {
-        guard unit >= 0x0300 else {
-            return false
-        }
-        switch unit {
-        case 0x0300...0x036F, 0x1AB0...0x1AFF, 0x1DC0...0x1DFF, 0x200B...0x200F, 0x20D0...0x20FF, 0x3099...0x309A,
-            0xFE00...0xFE0F, 0xFE20...0xFE2F:
-            return true
-
-        default:
-            return false
-        }
-    }
-
     private mutating func runBytes(
         _ units: UnsafeBufferPointer<UInt8>,
         final: Bool,
@@ -247,17 +247,6 @@ internal final class TextRowIndex: @unchecked Sendable {
     /// Runs the pieces of work of a parallel build, numbered from 0 to the count, and returns when all are done.
     internal typealias Spread = @Sendable (_ count: Int, _ work: @escaping @Sendable (Int) -> Void) -> Void
 
-    internal static let stride = 64
-    /// Checkpoints are at least this many bytes apart on average: a file of nothing but line
-    /// ends would need one per 64 bytes otherwise.
-    internal static let minimumCheckpointDistance = 4_096
-    /// A segment holds no more checkpoints than this (3 MB): a line of many gigabytes, which is
-    /// all rows of one segment, gets them farther apart instead (a lookup then cuts a few hundred
-    /// kilobytes more of text, which costs less than a megabyte of checkpoints per 4 MB).
-    internal static let maximumCheckpoints = 1 << 18
-    /// A scan looks at the density of its checkpoints from this many on.
-    internal static let thinningThreshold = 2_048
-
     internal struct Checkpoint {
         internal var offset: Int64
         /// Lines of this segment that begin before this row.
@@ -293,18 +282,18 @@ internal final class TextRowIndex: @unchecked Sendable {
             count += 1
         }
 
-        internal subscript(index: Int) -> Checkpoint {
-            let chunk = index >> Self.chunkShift
-            let inChunk = index & (Self.chunkSize - 1)
-            let mark = marks[chunk][inChunk]
-            return Checkpoint(offset: mark >> 1, linesBefore: Int(lines[chunk][inChunk]), startsLine: mark & 1 == 1)
-        }
-
         /// Every `step`th checkpoint, the first included.
         internal func thinned(every step: Int) -> Self {
             var result = Self()
             for index in Swift.stride(from: 0, to: count, by: Swift.max(1, step)) { result.append(self[index]) }
             return result
+        }
+
+        internal subscript(index: Int) -> Checkpoint {
+            let chunk = index >> Self.chunkShift
+            let inChunk = index & (Self.chunkSize - 1)
+            let mark = marks[chunk][inChunk]
+            return Checkpoint(offset: mark >> 1, linesBefore: Int(lines[chunk][inChunk]), startsLine: mark & 1 == 1)
         }
     }
 
@@ -380,23 +369,6 @@ internal final class TextRowIndex: @unchecked Sendable {
         var segmentSize: Int64
     }
 
-    private let lock = NSLock()
-    private var finished: [Int: (segment: Segment, end: Int64, failed: Bool)] = [:]
-    private var published: [Segment] = []
-    private var nextToPublish = 0
-    private var rows = 0, lines = 0
-    private var coveredEnd: Int64
-    private var complete = false
-    /// Whether the last published segment is the unfinished frontier one, to be replaced by
-    /// its next state.
-    private var hasPartial = false
-    private var firstFailure: any Error?
-    private var parameters: Parameters?
-    /// Every segment as it was scanned, by number: what a later layout can take over.
-    private var scanned: [Int: Segment] = [:]
-    private var previous: TextRowIndex?
-    private var reused = 0
-
     /// What the main thread asks for all the time (the scroller, the status line): a copy kept
     /// behind a lock of its own that is held for a few stores only, so the view never waits for a
     /// thread that is publishing a segment, or that has been preempted holding the index lock.
@@ -406,13 +378,16 @@ internal final class TextRowIndex: @unchecked Sendable {
         private let guarded = UnsafeMutablePointer<os_unfair_lock>.allocate(capacity: 1)
         private var rows = 0, lines = 0, covered: Int64 = 0, complete = false, failure: any Error?, reused = 0
 
+        var rowCount: Int { read { $0.rows } }
+        var lineCount: Int { read { $0.lines } }
+        var coveredEnd: Int64 { read { $0.covered } }
+        var isComplete: Bool { read { $0.complete } }
+        var failed: any Error? { read { $0.failure } }
+        var reusedCount: Int { read { $0.reused } }
+
         init(covered: Int64) {
             guarded.initialize(to: os_unfair_lock())
             self.covered = covered
-        }
-
-        deinit {
-            guarded.deallocate()
         }
 
         func store(rows: Int, lines: Int, covered: Int64, complete: Bool, failure: any Error?, reused: Int) {
@@ -432,204 +407,8 @@ internal final class TextRowIndex: @unchecked Sendable {
             return value(self)
         }
 
-        var rowCount: Int { read { $0.rows } }
-        var lineCount: Int { read { $0.lines } }
-        var coveredEnd: Int64 { read { $0.covered } }
-        var isComplete: Bool { read { $0.complete } }
-        var failed: any Error? { read { $0.failure } }
-        var reusedCount: Int { read { $0.reused } }
-    }
-
-    private let overview: Overview
-
-    /// How a parallel build runs its segments: on all cores at once.
-    private let spread: Spread
-
-    /// `reusing` is the index of the same bytes in another layout, if there is one.
-    internal convenience init(start: Int64 = 0, reusing previous: TextRowIndex? = nil) {
-        self.init(start: start, reusing: previous) { count, work in
-            DispatchQueue.concurrentPerform(iterations: count, execute: work)
-        }
-    }
-
-    /// An index whose parallel builds run their segments through `spread` (tests run each on a thread of its own).
-    internal init(start: Int64, reusing previous: TextRowIndex?, spread: @escaping Spread) {
-        coveredEnd = start
-        overview = Overview(covered: start)
-        self.previous = previous
-        self.spread = spread
-    }
-
-    private func synchronized<T>(_ body: () -> T) -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return body()
-    }
-
-    /// Copies the counters to what the main thread reads.
-    ///
-    /// Called with the lock held, after any of them changed.
-    private func mirror() {
-        overview.store(
-            rows: rows,
-            lines: lines,
-            covered: coveredEnd,
-            complete: complete,
-            failure: firstFailure,
-            reused: reused
-        )
-    }
-
-    // None of these waits for the index lock: they are read on the main thread.
-
-    /// Rows known so far.
-    internal var rowCount: Int { overview.rowCount }
-    /// Lines known so far.
-    internal var lineCount: Int { overview.lineCount }
-    /// The rows of everything before this offset are known.
-    internal var indexedThrough: Int64 { overview.coveredEnd }
-    internal var isComplete: Bool { overview.isComplete }
-    /// The first error that made a part of the file unreadable; its rows are missing.
-    internal var failure: any Error? { overview.failed }
-    /// How many segments the last build took over from the layout before (for tests).
-    internal var segmentsReused: Int { overview.reusedCount }
-    /// How many checkpoints the index holds (for tests, and to see what a file costs).
-    internal var checkpointCount: Int { synchronized { published.reduce(0) { $0 + $1.checkpoints.count } } }
-
-    // MARK: Building
-
-    /// Reads `content` of `source` and records its rows.
-    ///
-    /// Blocks until done or cancelled; call it on a background thread. With `parallel`, the
-    /// segments are read on all cores at once (each through a reader of its own); otherwise one
-    /// after another. `progress` is called from the working threads whenever more of the start of
-    /// the file is known. `rawScan` off decodes every byte (the reference the fast scan is tested
-    /// against).
-    internal func build(
-        source: any ByteSource,
-        content: Range<Int64>,
-        encoding: ViewerEncoding,
-        options: TextLayoutOptions,
-        parallel: Bool,
-        segmentSize: Int = 4 << 20,
-        chunkSize: Int = 1 << 20,
-        rawScan: Bool = true,
-        cancellation: CancellationFlag,
-        progress: @escaping @Sendable () -> Void
-    ) {
-        let unit = Int64(encoding.unitSize)
-        let size = max(unit, Int64(segmentSize) / unit * unit)
-        let now = Parameters(content: content, encoding: encoding, tabWidth: options.tabWidth, segmentSize: size)
-        let reusable: [Int: Segment]? = synchronized {
-            parameters = now
-            defer { previous = nil }
-            guard let before = previous, rawScan else {
-                return nil
-            }
-            return before.takeOverable(for: now)
-        }
-        var cuts: [Range<Int64>] = []
-        var lower = content.lowerBound
-        while lower < content.upperBound {
-            let upper = min(content.upperBound, lower + size)
-            cuts.append(lower..<upper)
-            lower = upper
-        }
-        let bounds = cuts
-        let reused = Locked(0)
-        /// `lineStart`: where the first line begins that the segments before this one do not own,
-        /// when they were read in file order (nil otherwise).
-        @Sendable
-        func work(_ number: Int, lineStart: Int64? = nil) {
-            // Each piece of work frees what the reads and the decoding left for the pool of the
-            // thread: the threads of a parallel loop live on, and a search or an index build of
-            // a big file would otherwise keep every buffer until they are idle.
-            autoreleasepool {
-                guard !cancellation.isCancelled else {
-                    return
-                }
-                if let start = lineStart, bounds[number].upperBound < start || start >= content.upperBound {
-                    // No line begins in this segment: a line of an earlier one goes through it.
-                    var empty = Segment()
-                    empty.nextStart = start
-                    // It is the same as the empty segment of the layout before, which would have been taken over.
-                    if let old = reusable?[number], old.widest <= options.columns { reused.add(1) }
-                    synchronized { scanned[number] = empty }
-                    if finish(number, empty, end: bounds[number].upperBound, failed: false) { progress() }
-                    return
-                }
-                if let old = reusable?[number], old.widest <= options.columns {
-                    reused.add(1)
-                    synchronized { scanned[number] = old }
-                    if finish(number, old, end: bounds[number].upperBound, failed: false) { progress() }
-                    return
-                }
-                var segment = Segment()
-                var failed = false
-                do {
-                    // The segment that comes next in file order shows what it has found so far, so a
-                    // file whose first line is gigabytes long is not blank until it is all read.
-                    segment = try Self.scan(
-                        source: source,
-                        content: content,
-                        segment: bounds[number],
-                        isFirst: number == 0,
-                        encoding: encoding,
-                        options: options,
-                        chunkSize: chunkSize,
-                        rawScan: rawScan,
-                        cancellation: cancellation,
-                        from: lineStart,
-                        partial: { partial, covered in
-                            if self.publishPartial(number, partial, coveredEnd: covered) { progress() }
-                        },
-                        changed: {
-                            if !cancellation.isCancelled { self.recordFailure(ViewerError.fileChanged) }
-                        }
-                    )
-                } catch {
-                    // A read that was ended because the work is dropped is no failure of the file.
-                    if !cancellation.isCancelled { recordFailure(error) }
-                    failed = true
-                }
-                guard !cancellation.isCancelled else {
-                    return
-                }
-                synchronized { scanned[number] = segment }
-                if finish(number, segment, end: bounds[number].upperBound, failed: failed) { progress() }
-            }
-        }
-        if parallel, bounds.count > 1 {
-            spread(bounds.count) { work($0) }
-        } else {
-            var lineStart: Int64?
-            for number in bounds.indices {
-                work(number, lineStart: lineStart)
-                // What this segment found out about where its last line ends is the next one's start.
-                let entry = synchronized { scanned[number] }
-                if let known = entry?.nextStart { lineStart = known } else if entry != nil { lineStart = nil }
-            }
-        }
-        guard !cancellation.isCancelled else {
-            return
-        }
-        synchronized {
-            self.reused = reused.value
-            complete = true
-            coveredEnd = content.upperBound
-            mirror()
-        }
-        progress()
-    }
-
-    /// The segments of this finished index that a layout built with `other` can use as they
-    /// are: those of the same bytes cut the same way; nil when it is not the same text.
-    private func takeOverable(for other: Parameters) -> [Int: Segment]? {
-        synchronized {
-            guard complete, firstFailure == nil, parameters == other else {
-                return nil
-            }
-            return scanned
+        deinit {
+            guarded.deallocate()
         }
     }
 
@@ -640,13 +419,13 @@ internal final class TextRowIndex: @unchecked Sendable {
         private let lock = NSLock()
         private var stored: Value
 
-        init(_ value: Value) { stored = value }
-
         var value: Value {
             lock.lock()
             defer { lock.unlock() }
             return stored
         }
+
+        init(_ value: Value) { stored = value }
 
         func add(_ amount: Value) {
             lock.lock()
@@ -654,79 +433,6 @@ internal final class TextRowIndex: @unchecked Sendable {
             lock.unlock()
         }
     }
-
-    private func recordFailure(_ error: any Error) {
-        synchronized {
-            if firstFailure == nil { firstFailure = error }
-            mirror()
-        }
-    }
-
-    /// Shows what the segment that comes next has found so far, in place of its earlier state (`scan` hands on
-    /// only a state that has rows).
-    ///
-    /// Returns whether anything was published.
-    private func publishPartial(_ number: Int, _ segment: Segment, coveredEnd covered: Int64) -> Bool {
-        synchronized {
-            guard number == nextToPublish else {
-                return false
-            }
-            dropPartial()
-            var next = segment
-            next.firstRow = rows
-            next.firstLine = lines
-            rows += next.rowCount
-            lines += next.lineCount
-            published.append(next)
-            hasPartial = true
-            coveredEnd = max(coveredEnd, covered)
-            mirror()
-            return true
-        }
-    }
-
-    private func dropPartial() {
-        guard hasPartial, let last = published.popLast() else {
-            return
-        }
-        rows -= last.rowCount
-        lines -= last.lineCount
-        hasPartial = false
-    }
-
-    /// Takes a finished segment and publishes every segment that now follows the published
-    /// ones without a gap.
-    ///
-    /// Returns whether anything was published.
-    private func finish(_ number: Int, _ segment: Segment, end: Int64, failed: Bool) -> Bool {
-        synchronized {
-            finished[number] = (segment, end, failed)
-            if number == nextToPublish { dropPartial() }
-            var publishedAny = false
-            while let (segment, nextEnd, wasFailure) = finished[nextToPublish] {
-                var next = segment
-                finished[nextToPublish] = nil
-                nextToPublish += 1
-                publishedAny = true
-                // Every row that begins before the end of a segment belongs to a line that
-                // begins in it or before it, so it is known now.
-                coveredEnd = max(coveredEnd, nextEnd)
-                // The rows after those of the segment before are not the next in the file.
-                if wasFailure, !published.isEmpty { published[published.count - 1].endsAtGap = true }
-                guard next.rowCount > 0 else { continue }
-                next.firstRow = rows
-                next.firstLine = lines
-                rows += next.rowCount
-                lines += next.lineCount
-                published.append(next)
-            }
-            mirror()
-            return publishedAny
-        }
-    }
-
-    /// How much of a segment is read between two partial results.
-    private static let partialInterval = 4 << 20
 
     /// What a scan has recorded so far and what it does with the next row.
     private struct SegmentScan {
@@ -819,6 +525,73 @@ internal final class TextRowIndex: @unchecked Sendable {
             result.lineCount += count
             result.rowCount += count
         }
+    }
+
+    internal static let stride = 64
+    /// Checkpoints are at least this many bytes apart on average: a file of nothing but line
+    /// ends would need one per 64 bytes otherwise.
+    internal static let minimumCheckpointDistance = 4_096
+    /// A segment holds no more checkpoints than this (3 MB): a line of many gigabytes, which is
+    /// all rows of one segment, gets them farther apart instead (a lookup then cuts a few hundred
+    /// kilobytes more of text, which costs less than a megabyte of checkpoints per 4 MB).
+    internal static let maximumCheckpoints = 1 << 18
+    /// A scan looks at the density of its checkpoints from this many on.
+    internal static let thinningThreshold = 2_048
+
+    /// How much of a segment is read between two partial results.
+    private static let partialInterval = 4 << 20
+
+    private let lock = NSLock()
+    private var finished: [Int: (segment: Segment, end: Int64, failed: Bool)] = [:]
+    private var published: [Segment] = []
+    private var nextToPublish = 0
+    private var rows = 0, lines = 0
+    private var coveredEnd: Int64
+    private var complete = false
+    /// Whether the last published segment is the unfinished frontier one, to be replaced by
+    /// its next state.
+    private var hasPartial = false
+    private var firstFailure: any Error?
+    private var parameters: Parameters?
+    /// Every segment as it was scanned, by number: what a later layout can take over.
+    private var scanned: [Int: Segment] = [:]
+    private var previous: TextRowIndex?
+    private var reused = 0
+
+    private let overview: Overview
+
+    /// How a parallel build runs its segments: on all cores at once.
+    private let spread: Spread
+
+    // None of these waits for the index lock: they are read on the main thread.
+
+    /// Rows known so far.
+    internal var rowCount: Int { overview.rowCount }
+    /// Lines known so far.
+    internal var lineCount: Int { overview.lineCount }
+    /// The rows of everything before this offset are known.
+    internal var indexedThrough: Int64 { overview.coveredEnd }
+    internal var isComplete: Bool { overview.isComplete }
+    /// The first error that made a part of the file unreadable; its rows are missing.
+    internal var failure: any Error? { overview.failed }
+    /// How many segments the last build took over from the layout before (for tests).
+    internal var segmentsReused: Int { overview.reusedCount }
+    /// How many checkpoints the index holds (for tests, and to see what a file costs).
+    internal var checkpointCount: Int { synchronized { published.reduce(0) { $0 + $1.checkpoints.count } } }
+
+    /// `reusing` is the index of the same bytes in another layout, if there is one.
+    internal convenience init(start: Int64 = 0, reusing previous: TextRowIndex? = nil) {
+        self.init(start: start, reusing: previous) { count, work in
+            DispatchQueue.concurrentPerform(iterations: count, execute: work)
+        }
+    }
+
+    /// An index whose parallel builds run their segments through `spread` (tests run each on a thread of its own).
+    internal init(start: Int64, reusing previous: TextRowIndex?, spread: @escaping Spread) {
+        coveredEnd = start
+        overview = Overview(covered: start)
+        self.previous = previous
+        self.spread = spread
     }
 
     /// Whether all `count` bytes are below 0x80, eight at a time.
@@ -1041,6 +814,248 @@ internal final class TextRowIndex: @unchecked Sendable {
         return state.result
     }
 
+    /// How many elements of a sorted array `matches` holds for (it holds for a prefix).
+    private static func prefixCount<Elements: RandomAccessCollection>(
+        in elements: Elements,
+        where matches: (Elements.Element) -> Bool
+    ) -> Int
+    where Elements.Index == Int {
+        var low = 0
+        var high = elements.count
+        while low < high {
+            let middle = (low + high) / 2
+            if matches(elements[middle]) { low = middle + 1 } else { high = middle }
+        }
+        return low
+    }
+
+    private func synchronized<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
+    }
+
+    /// Copies the counters to what the main thread reads.
+    ///
+    /// Called with the lock held, after any of them changed.
+    private func mirror() {
+        overview.store(
+            rows: rows,
+            lines: lines,
+            covered: coveredEnd,
+            complete: complete,
+            failure: firstFailure,
+            reused: reused
+        )
+    }
+
+    // MARK: Building
+
+    /// Reads `content` of `source` and records its rows.
+    ///
+    /// Blocks until done or cancelled; call it on a background thread. With `parallel`, the
+    /// segments are read on all cores at once (each through a reader of its own); otherwise one
+    /// after another. `progress` is called from the working threads whenever more of the start of
+    /// the file is known. `rawScan` off decodes every byte (the reference the fast scan is tested
+    /// against).
+    internal func build(
+        source: any ByteSource,
+        content: Range<Int64>,
+        encoding: ViewerEncoding,
+        options: TextLayoutOptions,
+        parallel: Bool,
+        segmentSize: Int = 4 << 20,
+        chunkSize: Int = 1 << 20,
+        rawScan: Bool = true,
+        cancellation: CancellationFlag,
+        progress: @escaping @Sendable () -> Void
+    ) {
+        let unit = Int64(encoding.unitSize)
+        let size = max(unit, Int64(segmentSize) / unit * unit)
+        let now = Parameters(content: content, encoding: encoding, tabWidth: options.tabWidth, segmentSize: size)
+        let reusable: [Int: Segment]? = synchronized {
+            parameters = now
+            defer { previous = nil }
+            guard let before = previous, rawScan else {
+                return nil
+            }
+            return before.takeOverable(for: now)
+        }
+        var cuts: [Range<Int64>] = []
+        var lower = content.lowerBound
+        while lower < content.upperBound {
+            let upper = min(content.upperBound, lower + size)
+            cuts.append(lower..<upper)
+            lower = upper
+        }
+        let bounds = cuts
+        let reused = Locked(0)
+        /// `lineStart`: where the first line begins that the segments before this one do not own,
+        /// when they were read in file order (nil otherwise).
+        @Sendable
+        func work(_ number: Int, lineStart: Int64? = nil) {
+            // Each piece of work frees what the reads and the decoding left for the pool of the
+            // thread: the threads of a parallel loop live on, and a search or an index build of
+            // a big file would otherwise keep every buffer until they are idle.
+            autoreleasepool {
+                guard !cancellation.isCancelled else {
+                    return
+                }
+                if let start = lineStart, bounds[number].upperBound < start || start >= content.upperBound {
+                    // No line begins in this segment: a line of an earlier one goes through it.
+                    var empty = Segment()
+                    empty.nextStart = start
+                    // It is the same as the empty segment of the layout before, which would have been taken over.
+                    if let old = reusable?[number], old.widest <= options.columns { reused.add(1) }
+                    synchronized { scanned[number] = empty }
+                    if finish(number, empty, end: bounds[number].upperBound, failed: false) { progress() }
+                    return
+                }
+                if let old = reusable?[number], old.widest <= options.columns {
+                    reused.add(1)
+                    synchronized { scanned[number] = old }
+                    if finish(number, old, end: bounds[number].upperBound, failed: false) { progress() }
+                    return
+                }
+                var segment = Segment()
+                var failed = false
+                do {
+                    // The segment that comes next in file order shows what it has found so far, so a
+                    // file whose first line is gigabytes long is not blank until it is all read.
+                    segment = try Self.scan(
+                        source: source,
+                        content: content,
+                        segment: bounds[number],
+                        isFirst: number == 0,
+                        encoding: encoding,
+                        options: options,
+                        chunkSize: chunkSize,
+                        rawScan: rawScan,
+                        cancellation: cancellation,
+                        from: lineStart,
+                        partial: { partial, covered in
+                            if self.publishPartial(number, partial, coveredEnd: covered) { progress() }
+                        },
+                        changed: {
+                            if !cancellation.isCancelled { self.recordFailure(ViewerError.fileChanged) }
+                        }
+                    )
+                } catch {
+                    // A read that was ended because the work is dropped is no failure of the file.
+                    if !cancellation.isCancelled { recordFailure(error) }
+                    failed = true
+                }
+                guard !cancellation.isCancelled else {
+                    return
+                }
+                synchronized { scanned[number] = segment }
+                if finish(number, segment, end: bounds[number].upperBound, failed: failed) { progress() }
+            }
+        }
+        if parallel, bounds.count > 1 {
+            spread(bounds.count) { work($0) }
+        } else {
+            var lineStart: Int64?
+            for number in bounds.indices {
+                work(number, lineStart: lineStart)
+                // What this segment found out about where its last line ends is the next one's start.
+                let entry = synchronized { scanned[number] }
+                if let known = entry?.nextStart { lineStart = known } else if entry != nil { lineStart = nil }
+            }
+        }
+        guard !cancellation.isCancelled else {
+            return
+        }
+        synchronized {
+            self.reused = reused.value
+            complete = true
+            coveredEnd = content.upperBound
+            mirror()
+        }
+        progress()
+    }
+
+    /// The segments of this finished index that a layout built with `other` can use as they
+    /// are: those of the same bytes cut the same way; nil when it is not the same text.
+    private func takeOverable(for other: Parameters) -> [Int: Segment]? {
+        synchronized {
+            guard complete, firstFailure == nil, parameters == other else {
+                return nil
+            }
+            return scanned
+        }
+    }
+
+    private func recordFailure(_ error: any Error) {
+        synchronized {
+            if firstFailure == nil { firstFailure = error }
+            mirror()
+        }
+    }
+
+    /// Shows what the segment that comes next has found so far, in place of its earlier state (`scan` hands on
+    /// only a state that has rows).
+    ///
+    /// Returns whether anything was published.
+    private func publishPartial(_ number: Int, _ segment: Segment, coveredEnd covered: Int64) -> Bool {
+        synchronized {
+            guard number == nextToPublish else {
+                return false
+            }
+            dropPartial()
+            var next = segment
+            next.firstRow = rows
+            next.firstLine = lines
+            rows += next.rowCount
+            lines += next.lineCount
+            published.append(next)
+            hasPartial = true
+            coveredEnd = max(coveredEnd, covered)
+            mirror()
+            return true
+        }
+    }
+
+    private func dropPartial() {
+        guard hasPartial, let last = published.popLast() else {
+            return
+        }
+        rows -= last.rowCount
+        lines -= last.lineCount
+        hasPartial = false
+    }
+
+    /// Takes a finished segment and publishes every segment that now follows the published
+    /// ones without a gap.
+    ///
+    /// Returns whether anything was published.
+    private func finish(_ number: Int, _ segment: Segment, end: Int64, failed: Bool) -> Bool {
+        synchronized {
+            finished[number] = (segment, end, failed)
+            if number == nextToPublish { dropPartial() }
+            var publishedAny = false
+            while let (segment, nextEnd, wasFailure) = finished[nextToPublish] {
+                var next = segment
+                finished[nextToPublish] = nil
+                nextToPublish += 1
+                publishedAny = true
+                // Every row that begins before the end of a segment belongs to a line that
+                // begins in it or before it, so it is known now.
+                coveredEnd = max(coveredEnd, nextEnd)
+                // The rows after those of the segment before are not the next in the file.
+                if wasFailure, !published.isEmpty { published[published.count - 1].endsAtGap = true }
+                guard next.rowCount > 0 else { continue }
+                next.firstRow = rows
+                next.firstLine = lines
+                rows += next.rowCount
+                lines += next.lineCount
+                published.append(next)
+            }
+            mirror()
+            return publishedAny
+        }
+    }
+
     // MARK: Looking up
 
     /// The checkpoint to start from to reach `row`; nil when the row is not known (yet).
@@ -1093,21 +1108,6 @@ internal final class TextRowIndex: @unchecked Sendable {
             linesBefore: segment.firstLine + point.linesBefore,
             endRow: segment.endsAtGap ? segment.firstRow + segment.rowCount : nil
         )
-    }
-
-    /// How many elements of a sorted array `matches` holds for (it holds for a prefix).
-    private static func prefixCount<Elements: RandomAccessCollection>(
-        in elements: Elements,
-        where matches: (Elements.Element) -> Bool
-    ) -> Int
-    where Elements.Index == Int {
-        var low = 0
-        var high = elements.count
-        while low < high {
-            let middle = (low + high) / 2
-            if matches(elements[middle]) { low = middle + 1 } else { high = middle }
-        }
-        return low
     }
 }
 

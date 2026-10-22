@@ -3,6 +3,38 @@ public import AppKit
 /// Finding the controls of a window that keeps them to itself, and pressing keys on them.
 @MainActor
 public enum Controls {
+    /// The key codes of the named keys the tests press.
+    public enum Code {
+        /// F2.
+        public static let f2: UInt16 = 120
+        /// F3.
+        public static let f3: UInt16 = 99
+        /// F4.
+        public static let f4: UInt16 = 118
+        /// F5.
+        public static let f5: UInt16 = 96
+        /// F10.
+        public static let f10: UInt16 = 109
+        /// Return.
+        public static let returnKey: UInt16 = 36
+        /// Space.
+        public static let space: UInt16 = 49
+        /// Backspace.
+        public static let backspace: UInt16 = 51
+        /// Forward delete.
+        public static let forwardDelete: UInt16 = 117
+        /// Page up.
+        public static let pageUp: UInt16 = 116
+        /// Page down.
+        public static let pageDown: UInt16 = 121
+        /// Arrow up.
+        public static let up: UInt16 = 126
+        /// Arrow down.
+        public static let down: UInt16 = 125
+        /// A key that types a character (its code is not a named key's).
+        public static let character: UInt16 = 0
+    }
+
     /// Every view of the given type in `view` and below, in the order of the view tree.
     public static func all<View: NSView>(_ type: View.Type, in view: NSView?) -> [View] {
         guard let view else {
@@ -43,37 +75,5 @@ public enum Controls {
             isARepeat: false,
             keyCode: keyCode
         ) ?? NSEvent()
-    }
-
-    /// The key codes of the named keys the tests press.
-    public enum Code {
-        /// F2.
-        public static let f2: UInt16 = 120
-        /// F3.
-        public static let f3: UInt16 = 99
-        /// F4.
-        public static let f4: UInt16 = 118
-        /// F5.
-        public static let f5: UInt16 = 96
-        /// F10.
-        public static let f10: UInt16 = 109
-        /// Return.
-        public static let returnKey: UInt16 = 36
-        /// Space.
-        public static let space: UInt16 = 49
-        /// Backspace.
-        public static let backspace: UInt16 = 51
-        /// Forward delete.
-        public static let forwardDelete: UInt16 = 117
-        /// Page up.
-        public static let pageUp: UInt16 = 116
-        /// Page down.
-        public static let pageDown: UInt16 = 121
-        /// Arrow up.
-        public static let up: UInt16 = 126
-        /// Arrow down.
-        public static let down: UInt16 = 125
-        /// A key that types a character (its code is not a named key's).
-        public static let character: UInt16 = 0
     }
 }

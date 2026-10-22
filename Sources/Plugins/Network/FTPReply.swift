@@ -6,11 +6,6 @@ public struct FTPReply: Equatable, Sendable {
     /// The text of every line, without the code and without the line ends.
     public let lines: [String]
 
-    public init(code: Int, lines: [String]) {
-        self.code = code
-        self.lines = lines
-    }
-
     public var text: String { lines.joined(separator: "\n") }
     /// 1xx: the transfer is starting, another reply follows.
     public var isPreliminary: Bool { code / 100 == 1 }
@@ -20,6 +15,11 @@ public struct FTPReply: Equatable, Sendable {
     public var isIntermediate: Bool { code / 100 == 3 }
     /// The reply as it is shown to the user.
     public var message: String { "\(code) \(lines.last ?? "")" }
+
+    public init(code: Int, lines: [String]) {
+        self.code = code
+        self.lines = lines
+    }
 }
 
 /// What is taken from a server before it is called a hostile one.
@@ -160,6 +160,12 @@ internal struct LineSplitter {
 
 /// The pieces of FTP replies that have a syntax of their own.
 public enum FTPSyntax {
+    internal static let utc: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
+        return calendar
+    }()
+
     /// The port in the reply to EPSV: `229 Entering Extended Passive Mode (|||6446|)`.
     public static func extendedPassivePort(_ text: String) -> Int? {
         guard let open = text.lastIndex(of: "("), let close = text[open...].firstIndex(of: ")") else {
@@ -281,10 +287,4 @@ public enum FTPSyntax {
         let parts: [Calendar.Component] = [.year, .month, .day, .hour, .minute, .second]
         return String(format: "%04d%02d%02d%02d%02d%02d", arguments: parts.map { utc.component($0, from: date) })
     }
-
-    internal static let utc: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .gmt
-        return calendar
-    }()
 }

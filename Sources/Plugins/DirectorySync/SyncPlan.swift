@@ -31,6 +31,8 @@ public struct SyncPlan: Equatable, Sendable {
     public var deleteLeft: [Deletion] = []
     public var deleteRight: [Deletion] = []
 
+    public var isEmpty: Bool { toRight.isEmpty && toLeft.isEmpty && deleteLeft.isEmpty && deleteRight.isEmpty }
+
     /// Plans the given rows; the caller passes the visible ones, because only those are
     /// processed (spec 09 › Window and workflow). `timeOffsetHours` is the time difference that
     /// the comparison allowed for (the dates of the right side plus this are the left's).
@@ -76,7 +78,14 @@ public struct SyncPlan: Equatable, Sendable {
         }
     }
 
-    public var isEmpty: Bool { toRight.isEmpty && toLeft.isEmpty && deleteLeft.isEmpty && deleteRight.isEmpty }
+    /// `Copy 16 files, total size: 6,363,930 bytes`.
+    public static func describe(_ copies: [Copy]) -> String {
+        let files = copies.filter { !$0.isDirectory }
+        let folders = copies.count - files.count
+        return
+            "Copy \(files.count) files, total size: \(Format.bytes(files.reduce(Int64(0)) { $0.addingSaturated($1.size) })) bytes"
+            + (folders > 0 ? ", create \(folders) directories" : "")
+    }
 
     /// Sends the copies of one direction to another folder, keeping their relative paths.
     public mutating func retarget(toRight: Bool, root: URL) {
@@ -95,15 +104,6 @@ public struct SyncPlan: Equatable, Sendable {
             }
         }
         if toRight { self.toRight = moved(self.toRight) } else { self.toLeft = moved(self.toLeft) }
-    }
-
-    /// `Copy 16 files, total size: 6,363,930 bytes`.
-    public static func describe(_ copies: [Copy]) -> String {
-        let files = copies.filter { !$0.isDirectory }
-        let folders = copies.count - files.count
-        return
-            "Copy \(files.count) files, total size: \(Format.bytes(files.reduce(Int64(0)) { $0.addingSaturated($1.size) })) bytes"
-            + (folders > 0 ? ", create \(folders) directories" : "")
     }
 }
 
@@ -162,6 +162,8 @@ public struct SyncOutcome: Sendable {
 /// Unchecked: it is handed to the job's thread before `run` and used there alone; only
 /// `cancellation`, which is safe from any thread, is touched from elsewhere.
 public final class SyncExecutor: @unchecked Sendable {
+    private struct Cancelled: Error {}
+
     private let plan: SyncPlan
     private let options: SyncRunOptions
     private let fileSystems: FileSystemRegistry
@@ -188,8 +190,6 @@ public final class SyncExecutor: @unchecked Sendable {
     private var uncommitted: [String: (provider: any FileSystemProvider, root: URL)] = [:]
     /// What the progress window says about the item being worked on.
     private var currentLines: [String] = []
-
-    private struct Cancelled: Error {}
 
     public init(
         plan: SyncPlan,

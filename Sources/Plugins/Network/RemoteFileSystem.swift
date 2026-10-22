@@ -50,6 +50,14 @@ public final class ConnectionCenter: @unchecked Sendable {
     }
     private var programName = "A File Manager"
 
+    /// The servers with a login that succeeded, in the order of their names.
+    public var connected: [ConnectionProfile] {
+        lock.lock()
+        let all = Array(sessions.values)
+        lock.unlock()
+        return all.filter(\.isConnected).map(\.profile).sorted { $0.key.description < $1.key.description }
+    }
+
     public init(environment: SessionEnvironment = SessionEnvironment()) {
         self.environment = environment
     }
@@ -163,14 +171,6 @@ public final class ConnectionCenter: @unchecked Sendable {
         return sessions[key]
     }
 
-    /// The servers with a login that succeeded, in the order of their names.
-    public var connected: [ConnectionProfile] {
-        lock.lock()
-        let all = Array(sessions.values)
-        lock.unlock()
-        return all.filter(\.isConnected).map(\.profile).sorted { $0.key.description < $1.key.description }
-    }
-
     public func isConnected(_ key: ServerKey) -> Bool {
         existingSession(for: key)?.isConnected ?? false
     }
@@ -254,15 +254,23 @@ private final class EntryCache: @unchecked Sendable {
         let entry: RemoteEntry?
     }
 
+    enum Answer {
+        case entry(RemoteEntry)
+        /// Not there. `hasNameAlike`: the listing holds a name that a server may take for this
+        /// one although it is spelled differently (in another case, or composed differently).
+        case absent(hasNameAlike: Bool)
+        case unknown
+    }
+    private static let lifetime: TimeInterval = 10
+    private static let capacity = 64
+    private static let journalLifetime: TimeInterval = 300
+    private static let journalLimit = 1_024
+
     private let lock = NSLock()
     private var directories: [String: Directory] = [:]
     private var journal: [String: [Change]] = [:]
     /// The clock: the system's, or a test's.
     let now: @Sendable () -> Date
-    private static let lifetime: TimeInterval = 10
-    private static let capacity = 64
-    private static let journalLifetime: TimeInterval = 300
-    private static let journalLimit = 1_024
 
     init(now: @escaping @Sendable () -> Date) {
         self.now = now
@@ -283,14 +291,6 @@ private final class EntryCache: @unchecked Sendable {
         }
         if directories.count >= Self.capacity { directories.removeAll() }
         directories[key] = Directory(read: now(), includesHidden: includesHidden, entries: byName)
-    }
-
-    enum Answer {
-        case entry(RemoteEntry)
-        /// Not there. `hasNameAlike`: the listing holds a name that a server may take for this
-        /// one although it is spelled differently (in another case, or composed differently).
-        case absent(hasNameAlike: Bool)
-        case unknown
     }
 
     /// What the listing of `directory` says about `name`; whether a name alike is there is
@@ -461,6 +461,37 @@ public final class RemoteFileSystem: FileSystemProvider {
         self.scheme = scheme
         self.center = center
         cache = EntryCache(now: clock)
+    }
+
+    /// True for an answer of the server that says no to a request, as opposed to a connection
+    /// that broke or a wait that was ended: only the former says anything about the files.
+    private static func isRefusal(_ error: any Error) -> Bool {
+        if error is SFTPError {
+            return true
+        }
+        if case NetworkError.refused(let reply) = error {
+            return reply.code != 421
+        }
+        return false
+    }
+
+    /// A name next to `name` for the file that is being replaced, one that nothing else has.
+    internal static func asideName(for name: String) -> String {
+        let mark = String(UInt32.random(in: 0...UInt32.max), radix: 16)
+        // Short enough for servers with a limit of 255 bytes for a name.
+        let kept = String(decoding: name.utf8.prefix(180), as: UTF8.self)
+            .replacingOccurrences(
+                of: "\u{FFFD}",
+                with: ""
+            )
+        return ".\(kept).replaced-\(mark)"
+    }
+
+    /// `flags;time;agent;event`: downloaded (`0083`, what browsers write), the time in
+    /// hexadecimal seconds, the program that fetched it, and no event of the download database.
+    internal static func quarantineMark(agent: String, at date: Date = Date()) -> Data {
+        let name = agent.replacingOccurrences(of: ";", with: " ")
+        return Data("0083;\(String(Int(max(0, date.timeIntervalSince1970)), radix: 16));\(name);".utf8)
     }
 
     private func resolve(_ url: URL, cancellation: CancellationFlag? = nil) throws -> (
@@ -832,18 +863,6 @@ public final class RemoteFileSystem: FileSystemProvider {
         cache.forgetTree(destination)
     }
 
-    /// True for an answer of the server that says no to a request, as opposed to a connection
-    /// that broke or a wait that was ended: only the former says anything about the files.
-    private static func isRefusal(_ error: any Error) -> Bool {
-        if error is SFTPError {
-            return true
-        }
-        if case NetworkError.refused(let reply) = error {
-            return reply.code != 421
-        }
-        return false
-    }
-
     /// Puts the file at `from` in the place of the file at `to` (in `directory`) on a server whose
     /// rename does not replace.
     ///
@@ -889,18 +908,6 @@ public final class RemoteFileSystem: FileSystemProvider {
                 "The replaced file could not be removed and stays on the server as \(aside): \(error.localizedDescription)"
             )
         }
-    }
-
-    /// A name next to `name` for the file that is being replaced, one that nothing else has.
-    internal static func asideName(for name: String) -> String {
-        let mark = String(UInt32.random(in: 0...UInt32.max), radix: 16)
-        // Short enough for servers with a limit of 255 bytes for a name.
-        let kept = String(decoding: name.utf8.prefix(180), as: UTF8.self)
-            .replacingOccurrences(
-                of: "\u{FFFD}",
-                with: ""
-            )
-        return ".\(kept).replaced-\(mark)"
     }
 
     /// A server does not copy; the caller reads the file and writes it again.
@@ -974,13 +981,6 @@ public final class RemoteFileSystem: FileSystemProvider {
         return Self.quarantineMark(agent: center.agentName)
     }
 
-    /// `flags;time;agent;event`: downloaded (`0083`, what browsers write), the time in
-    /// hexadecimal seconds, the program that fetched it, and no event of the download database.
-    internal static func quarantineMark(agent: String, at date: Date = Date()) -> Data {
-        let name = agent.replacingOccurrences(of: ";", with: " ")
-        return Data("0083;\(String(Int(max(0, date.timeIntervalSince1970)), radix: 16));\(name);".utf8)
-    }
-
     /// The connected servers, for the volume list.
     public func places() -> [Place] {
         center.connected.filter { $0.key.scheme == scheme }
@@ -1023,10 +1023,6 @@ private final class CachingWriter: FileWriter, @unchecked Sendable {
         self.name = name
     }
 
-    deinit {
-        if !isDone { cache.forget(directory) }
-    }
-
     func write(_ data: Data) throws {
         do {
             try writer.write(data)
@@ -1053,5 +1049,9 @@ private final class CachingWriter: FileWriter, @unchecked Sendable {
             entry.modified = modified ?? Date()
             if let permissions { entry.permissions = permissions & 0o7777 }
         }
+    }
+
+    deinit {
+        if !isDone { cache.forget(directory) }
     }
 }

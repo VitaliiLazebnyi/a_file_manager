@@ -42,20 +42,23 @@ internal final class HotlistEditorWindowController: NSWindowController, NSWindow
     private let hideField = NSTextField()
     private var entryButtons: [NSButton] = []
 
-    /// Shows the editor and waits for it.
-    ///
-    /// Returns the changed list on OK, nil on Cancel.
-    internal static func run(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) -> Hotlist? {
-        let controller = HotlistEditorWindowController(hotlist, kernel: kernel, currentDirectory: currentDirectory)
-        let window = controller.dialog
-        window.center()
-        NSApplication.shared.runModal(for: window)
-        window.orderOut(nil)
-        return controller.result
-    }
-
     /// The changed list after OK; nil before and after Cancel.
     internal var result: Hotlist? { accepted ? hotlist : nil }
+
+    // MARK: The list
+
+    private var selectedPath: Hotlist.Path? {
+        rows.indices.contains(table.selectedRow) ? rows[table.selectedRow].path : nil
+    }
+
+    /// Where a new entry goes: right below the selected line, which is inside a submenu when
+    /// that line is the submenu's title.
+    private var insertionPath: Hotlist.Path {
+        guard let path = selectedPath, let index = path.last, let entry = hotlist.entry(at: path) else {
+            return [hotlist.entries.count]
+        }
+        return entry.kind == .submenu ? path + [0] : Array(path.dropLast()) + [index + 1]
+    }
 
     internal init(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) {
         self.hotlist = hotlist
@@ -82,6 +85,33 @@ internal final class HotlistEditorWindowController: NSWindowController, NSWindow
 
     @available(*, unavailable)
     internal required init?(coder _: NSCoder) { fatalError("not used") }
+
+    /// Shows the editor and waits for it.
+    ///
+    /// Returns the changed list on OK, nil on Cancel.
+    internal static func run(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) -> Hotlist? {
+        let controller = HotlistEditorWindowController(hotlist, kernel: kernel, currentDirectory: currentDirectory)
+        let window = controller.dialog
+        window.center()
+        NSApplication.shared.runModal(for: window)
+        window.orderOut(nil)
+        return controller.result
+    }
+
+    /// A line of the editor's list: indented by its depth, submenus with a mark of their own.
+    nonisolated internal static func title(of row: Hotlist.Row) -> String {
+        let indent = String(repeating: "      ", count: row.depth)
+        switch row.entry.kind {
+        case .separator:
+            return indent + HotlistMenu.separatorTitle
+
+        case .submenu:
+            return indent + "▾ " + row.entry.title
+
+        case .item:
+            return indent + row.entry.title
+        }
+    }
 
     // MARK: Layout
 
@@ -158,12 +188,6 @@ internal final class HotlistEditorWindowController: NSWindowController, NSWindow
         window.contentView = stack
     }
 
-    // MARK: The list
-
-    private var selectedPath: Hotlist.Path? {
-        rows.indices.contains(table.selectedRow) ? rows[table.selectedRow].path : nil
-    }
-
     private func reload(selecting path: Hotlist.Path?) {
         rows = hotlist.rows
         table.reloadData()
@@ -184,15 +208,6 @@ internal final class HotlistEditorWindowController: NSWindowController, NSWindow
         entryButtons.forEach { $0.isEnabled = entry != nil }
         entryButtons[1].isEnabled = entry != nil && entry?.kind != .separator
         numberLabel.stringValue = rows.isEmpty ? "" : "Entry \(table.selectedRow + 1) of \(rows.count)"
-    }
-
-    /// Where a new entry goes: right below the selected line, which is inside a submenu when
-    /// that line is the submenu's title.
-    private var insertionPath: Hotlist.Path {
-        guard let path = selectedPath, let index = path.last, let entry = hotlist.entry(at: path) else {
-            return [hotlist.entries.count]
-        }
-        return entry.kind == .submenu ? path + [0] : Array(path.dropLast()) + [index + 1]
     }
 
     private func add(_ entry: HotlistEntry) {
@@ -326,21 +341,6 @@ internal final class HotlistEditorWindowController: NSWindowController, NSWindow
             }()
         cell.stringValue = Self.title(of: rows[row])
         return cell
-    }
-
-    /// A line of the editor's list: indented by its depth, submenus with a mark of their own.
-    nonisolated internal static func title(of row: Hotlist.Row) -> String {
-        let indent = String(repeating: "      ", count: row.depth)
-        switch row.entry.kind {
-        case .separator:
-            return indent + HotlistMenu.separatorTitle
-
-        case .submenu:
-            return indent + "▾ " + row.entry.title
-
-        case .item:
-            return indent + row.entry.title
-        }
     }
 
     internal func tableViewSelectionDidChange(_: Notification) {

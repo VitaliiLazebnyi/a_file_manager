@@ -36,6 +36,10 @@ internal struct CoverageViewerPaneEdgeTests {
         return await bench.wait { pane.loaded != nil } ? pane : nil
     }
 
+    private static func hasPreview(_ view: NSView) -> Bool {
+        view.subviews.contains { String(describing: type(of: $0)).contains("QLPreviewView") || hasPreview($0) }
+    }
+
     /// A text read slowly: the status line says it is being read, and a line the index has not
     /// reached is not there yet.
     @Test
@@ -332,9 +336,5 @@ internal struct CoverageViewerPaneEdgeTests {
         }
         window.contentView = NSView()
         #expect(await bench.wait { gone == nil })
-    }
-
-    private static func hasPreview(_ view: NSView) -> Bool {
-        view.subviews.contains { String(describing: type(of: $0)).contains("QLPreviewView") || hasPreview($0) }
     }
 }

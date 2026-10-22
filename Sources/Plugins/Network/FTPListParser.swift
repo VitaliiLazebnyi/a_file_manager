@@ -77,9 +77,36 @@ public struct RemoteEntry: Equatable, Sendable {
 /// marks, device numbers, ISO dates, month names in several languages, NetWare), Windows/DOS `dir`,
 /// and EPLF.
 public enum FTPListParser {
+    // MARK: Reading a line by hand
+
+    private typealias Scalars = [Unicode.Scalar]
+
     /// A line of a listing longer than this is not an entry: no server has names this long, and
     /// what a hostile one sends must not cost more than a glance.
     public static let longestLine = 4_096
+
+    public static let localCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar
+    }()
+
+    // MARK: Unix
+
+    private static let months: [String: Int] = {
+        let names: [[String]] = [
+            ["jan", "ene", "gen", "janv"], ["feb", "fev", "fév", "févr"], ["mar", "mär", "mrz", "mars"],
+            ["apr", "avr", "abr"],
+            ["may", "mai", "mag", "mei"], ["jun", "juin", "giu"], ["jul", "juil", "lug"],
+            ["aug", "aou", "aoû", "août", "ago"],
+            ["sep", "sept", "set"], ["oct", "okt", "ott", "out"], ["nov"], ["dec", "dez", "déc", "dic"]
+        ]
+        var months: [String: Int] = [:]
+        for (index, group) in names.enumerated() {
+            for name in group { months[name] = index + 1 }
+        }
+        return months
+    }()
 
     /// Sizes and dates come from the server and are taken as they fit: a size that is no
     /// number or below zero is 0, one too large for a number is the largest there is.
@@ -216,16 +243,6 @@ public enum FTPListParser {
             .compactMap { $0 }
     }
 
-    public static let localCalendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
-        return calendar
-    }()
-
-    // MARK: Reading a line by hand
-
-    private typealias Scalars = [Unicode.Scalar]
-
     private static func isDigit(_ scalar: Unicode.Scalar) -> Bool { scalar.value >= 0x30 && scalar.value <= 0x39 }
     private static func isSpace(_ scalar: Unicode.Scalar) -> Bool { scalar.properties.isWhitespace }
     private static func text(_ scalars: ArraySlice<Unicode.Scalar>) -> String {
@@ -305,23 +322,6 @@ public enum FTPListParser {
         }
         return text(line[start...])
     }
-
-    // MARK: Unix
-
-    private static let months: [String: Int] = {
-        let names: [[String]] = [
-            ["jan", "ene", "gen", "janv"], ["feb", "fev", "fév", "févr"], ["mar", "mär", "mrz", "mars"],
-            ["apr", "avr", "abr"],
-            ["may", "mai", "mag", "mei"], ["jun", "juin", "giu"], ["jul", "juil", "lug"],
-            ["aug", "aou", "aoû", "août", "ago"],
-            ["sep", "sept", "set"], ["oct", "okt", "ott", "out"], ["nov"], ["dec", "dez", "déc", "dic"]
-        ]
-        var months: [String: Int] = [:]
-        for (index, group) in names.enumerated() {
-            for name in group { months[name] = index + 1 }
-        }
-        return months
-    }()
 
     /// The month a token names: three to five letters, with or without a full stop.
     private static func monthNumber(_ token: ArraySlice<Unicode.Scalar>) -> Int? {

@@ -16,9 +16,17 @@ public enum TLSMode: Int, Codable, Equatable, Sendable {
 public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     public static let schemes = ["ftp", "ftps", "sftp"]
 
+    public static let validPorts = 1...65_535
+
     public let scheme: String
     public let host: String
     public let port: Int
+
+    /// `ftp://host:port`, as the server is named in menus and messages.
+    public var description: String {
+        // The location of the root, without the slash it ends with.
+        String(url().absoluteString.dropLast())
+    }
 
     public init(scheme: String, host: String, port: Int? = nil) {
         self.scheme = scheme.lowercased()
@@ -27,8 +35,6 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
         self.port =
             port.flatMap { Self.validPorts.contains($0) ? $0 : nil } ?? Self.defaultPort(of: self.scheme)
     }
-
-    public static let validPorts = 1...65_535
 
     /// Nil when the URL does not name a server of one of the network schemes.
     public init?(_ url: URL) {
@@ -90,12 +96,6 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
         // `host.invalid` of a known scheme always has a URL, so the second call ends there.
         validURL(path: path)
             ?? ServerKey(scheme: Self.schemes.contains(scheme) ? scheme : "ftp", host: "host.invalid").url(path: path)
-    }
-
-    /// `ftp://host:port`, as the server is named in menus and messages.
-    public var description: String {
-        // The location of the root, without the slash it ends with.
-        String(url().absoluteString.dropLast())
     }
 }
 
@@ -244,6 +244,20 @@ public struct ServerAddress: Equatable, Sendable {
     /// False when the text named no folder, so the server's start folder is meant.
     public var hasPath: Bool
 
+    public var key: ServerKey { ServerKey(scheme: scheme, host: host, port: port) }
+
+    /// The location to show in a panel, without the user name and password.
+    public var url: URL { key.url(path: path) }
+
+    /// The address as it may be remembered and shown: with the user name, never with the password.
+    public var textWithoutPassword: String {
+        let text = key.url(path: hasPath ? path : "/").absoluteString
+        guard let user, let range = text.range(of: "://") else {
+            return text
+        }
+        return text.replacingCharacters(in: range, with: "://" + Self.escaped(user) + "@")
+    }
+
     public init?(_ text: String, defaultScheme: String = "ftp") {
         var rest = text.trimmingCharacters(in: .whitespacesAndNewlines)
         var scheme = defaultScheme
@@ -332,20 +346,6 @@ public struct ServerAddress: Equatable, Sendable {
 
     private static func decoded(_ text: Substring) -> String {
         text.removingPercentEncoding ?? String(text)
-    }
-
-    public var key: ServerKey { ServerKey(scheme: scheme, host: host, port: port) }
-
-    /// The location to show in a panel, without the user name and password.
-    public var url: URL { key.url(path: path) }
-
-    /// The address as it may be remembered and shown: with the user name, never with the password.
-    public var textWithoutPassword: String {
-        let text = key.url(path: hasPath ? path : "/").absoluteString
-        guard let user, let range = text.range(of: "://") else {
-            return text
-        }
-        return text.replacingCharacters(in: range, with: "://" + Self.escaped(user) + "@")
     }
 
     /// A user name as a URL writes it: what may not stand there as it is, as `%` and its bytes.

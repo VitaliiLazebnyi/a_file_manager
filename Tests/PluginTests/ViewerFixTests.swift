@@ -425,13 +425,13 @@ private final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
 
-    init(_ value: Value) { stored = value }
-
     var value: Value {
         lock.lock()
         defer { lock.unlock() }
         return stored
     }
+
+    init(_ value: Value) { stored = value }
 
     func mutate(_ change: (inout Value) -> Void) {
         lock.lock()

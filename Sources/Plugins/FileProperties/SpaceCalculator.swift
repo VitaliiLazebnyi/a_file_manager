@@ -81,6 +81,13 @@ internal struct SpaceCalculator {
     /// file; "Calculate all folder sizes" shows sizes only.
     internal var measuresAllocated = true
 
+    internal static func round(_ size: Int64, to cluster: Int64?) -> Int64 {
+        guard let cluster, cluster > 1 else {
+            return size
+        }
+        return size.addingSaturated(cluster - 1) / cluster * cluster
+    }
+
     /// One figure per item, in the same order.
     ///
     /// A folder counts itself and everything below.
@@ -100,13 +107,6 @@ internal struct SpaceCalculator {
             rounded: Self.round(item.size, to: targetCluster),
             files: 1
         )
-    }
-
-    internal static func round(_ size: Int64, to cluster: Int64?) -> Int64 {
-        guard let cluster, cluster > 1 else {
-            return size
-        }
-        return size.addingSaturated(cluster - 1) / cluster * cluster
     }
 
     /// Everything below a directory, not counting the directory itself.

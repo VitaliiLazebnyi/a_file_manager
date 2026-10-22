@@ -13,9 +13,6 @@ import Testing
 /// position on, a request is never answered, or nothing is read from the pipe at all. Unchecked:
 /// set up in `init` and not changed afterwards.
 internal final class FakeSFTPServer: @unchecked Sendable {
-    internal static let python = "/usr/bin/python3"
-    internal static var isAvailable: Bool { FileManager.default.isExecutableFile(atPath: python) }
-
     internal enum Mode: String {
         case normal
         /// Reads at or behind 98304 answer with a failure.
@@ -53,16 +50,8 @@ internal final class FakeSFTPServer: @unchecked Sendable {
         case shortPacket = "shortpacket"
     }
 
-    internal let transport: SFTPTransport
-
-    internal init(root: URL, box: Sandbox, mode: Mode = .normal, delay: ClosedRange<Int> = 20...60) throws {
-        let script = box.url("fake-sftp.py")
-        try Self.script.write(to: script, atomically: true, encoding: .utf8)
-        transport = SFTPTransport(
-            executable: Self.python,
-            arguments: [script.path, mode.rawValue, root.path, String(delay.lowerBound), String(delay.upperBound)]
-        )
-    }
+    internal static let python = "/usr/bin/python3"
+    internal static var isAvailable: Bool { FileManager.default.isExecutableFile(atPath: python) }
 
     internal static let script = """
         import heapq, os, random, select, struct, sys, time
@@ -287,6 +276,17 @@ internal final class FakeSFTPServer: @unchecked Sendable {
                 _, _, data = heapq.heappop(due)
                 os.write(1, data)
         """
+
+    internal let transport: SFTPTransport
+
+    internal init(root: URL, box: Sandbox, mode: Mode = .normal, delay: ClosedRange<Int> = 20...60) throws {
+        let script = box.url("fake-sftp.py")
+        try Self.script.write(to: script, atomically: true, encoding: .utf8)
+        transport = SFTPTransport(
+            executable: Self.python,
+            arguments: [script.path, mode.rawValue, root.path, String(delay.lowerBound), String(delay.upperBound)]
+        )
+    }
 }
 
 /// The SFTP client against the delaying test server: a window of requests, answers out of
@@ -313,11 +313,11 @@ internal struct NetworkFixSFTP {
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
 
-    internal func url(_ path: String) -> URL { key.url(path: path) }
-
     internal static func pattern(_ count: Int) -> Data {
         Data((0..<count).map { UInt8(truncatingIfNeeded: $0 &* 131 &+ $0 / 997) })
     }
+
+    internal func url(_ path: String) -> URL { key.url(path: path) }
 
     @Test
     internal func movesDataThroughTheWindowInBothDirections() throws {

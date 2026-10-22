@@ -23,49 +23,6 @@ public enum VirtualLocation: Equatable {
 
     public static let scheme = "vfolder"
 
-    /// Reads a URL of the virtual scheme; nil for every other URL and for what is not one of
-    /// the forms above.
-    public init?(_ url: URL) {
-        guard url.scheme == Self.scheme, let host = url.host else {
-            return nil
-        }
-        let labels = host.split(separator: ".").map(String.init)
-        guard let kind = labels.first else {
-            return nil
-        }
-        let id = labels.dropFirst().first { $0.hasPrefix("n") }.flatMap { Int($0.dropFirst()) }
-        let hex = labels.dropFirst().filter { $0.hasPrefix("h") }.map { $0.dropFirst() }.joined()
-        guard let prefix = Self.text(fromHex: hex) else {
-            return nil
-        }
-        let path = url.path.isEmpty ? "/" : url.path
-        switch kind {
-        case "branch":
-            guard let real = Self.realURL(prefix: prefix, path: path) else {
-                return nil
-            }
-            self = .branch(of: real)
-
-        case "pick":
-            guard let id, let real = Self.realURL(prefix: prefix, path: path) else {
-                return nil
-            }
-            self = .picked(id: id, in: real)
-
-        case "list":
-            guard let id else {
-                return nil
-            }
-            // The path starts with a slash, so the folder is at least the root.
-            let folder = (path as NSString).deletingLastPathComponent
-            let origin = prefix.isEmpty ? nil : Self.realURL(prefix: prefix, path: folder)
-            self = .list(id: id, title: (path as NSString).lastPathComponent, origin: origin)
-
-        default:
-            return nil
-        }
-    }
-
     public var url: URL {
         var components = URLComponents()
         components.scheme = Self.scheme
@@ -106,6 +63,49 @@ public enum VirtualLocation: Equatable {
 
         case .list(_, _, let origin):
             return origin
+        }
+    }
+
+    /// Reads a URL of the virtual scheme; nil for every other URL and for what is not one of
+    /// the forms above.
+    public init?(_ url: URL) {
+        guard url.scheme == Self.scheme, let host = url.host else {
+            return nil
+        }
+        let labels = host.split(separator: ".").map(String.init)
+        guard let kind = labels.first else {
+            return nil
+        }
+        let id = labels.dropFirst().first { $0.hasPrefix("n") }.flatMap { Int($0.dropFirst()) }
+        let hex = labels.dropFirst().filter { $0.hasPrefix("h") }.map { $0.dropFirst() }.joined()
+        guard let prefix = Self.text(fromHex: hex) else {
+            return nil
+        }
+        let path = url.path.isEmpty ? "/" : url.path
+        switch kind {
+        case "branch":
+            guard let real = Self.realURL(prefix: prefix, path: path) else {
+                return nil
+            }
+            self = .branch(of: real)
+
+        case "pick":
+            guard let id, let real = Self.realURL(prefix: prefix, path: path) else {
+                return nil
+            }
+            self = .picked(id: id, in: real)
+
+        case "list":
+            guard let id else {
+                return nil
+            }
+            // The path starts with a slash, so the folder is at least the root.
+            let folder = (path as NSString).deletingLastPathComponent
+            let origin = prefix.isEmpty ? nil : Self.realURL(prefix: prefix, path: folder)
+            self = .list(id: id, title: (path as NSString).lastPathComponent, origin: origin)
+
+        default:
+            return nil
         }
     }
 

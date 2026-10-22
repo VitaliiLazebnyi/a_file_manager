@@ -80,6 +80,14 @@ internal enum SSHQuestion: Equatable {
 ///
 /// All mutable state is guarded by `lock`.
 internal final class SFTPSession: RemoteSession, @unchecked Sendable {
+    /// The largest piece read or written with one request; every server takes this much.
+    fileprivate static let blockSize = 32_768
+    /// The most requests of a transfer that are under way at the same time.
+    ///
+    /// With 32 KB each this keeps 2 MB on the way, which is what a fast line with a long delay
+    /// needs; a slow line gets fewer (`TransferWindow`).
+    fileprivate static let window = 64
+
     private let environment: SessionEnvironment
     private let transport: SFTPTransport?
     private let lock = NSLock()
@@ -109,20 +117,6 @@ internal final class SFTPSession: RemoteSession, @unchecked Sendable {
     }
     private var stallTime: TimeInterval?
 
-    /// The largest piece read or written with one request; every server takes this much.
-    fileprivate static let blockSize = 32_768
-    /// The most requests of a transfer that are under way at the same time.
-    ///
-    /// With 32 KB each this keeps 2 MB on the way, which is what a fast line with a long delay
-    /// needs; a slow line gets fewer (`TransferWindow`).
-    fileprivate static let window = 64
-
-    internal init(profile: ConnectionProfile, environment: SessionEnvironment, transport: SFTPTransport? = nil) {
-        currentProfile = profile
-        self.environment = environment
-        self.transport = transport
-    }
-
     internal var profile: ConnectionProfile {
         lock.lock()
         defer { lock.unlock() }
@@ -142,6 +136,12 @@ internal final class SFTPSession: RemoteSession, @unchecked Sendable {
     }
 
     fileprivate var timeout: TimeInterval { environment.options.values.timeout }
+
+    internal init(profile: ConnectionProfile, environment: SessionEnvironment, transport: SFTPTransport? = nil) {
+        currentProfile = profile
+        self.environment = environment
+        self.transport = transport
+    }
 
     // MARK: Connecting
 
@@ -709,10 +709,11 @@ internal final class SFTPSession: RemoteSession, @unchecked Sendable {
 /// them. The window therefore follows what the line carries: about `seconds` worth of data,
 /// measured over the transfer so far, between `least` and `SFTPSession.window` requests.
 private struct TransferWindow {
-    private let started = Date()
-    private var bytes = 0
     private static let seconds = 1.5
     private static let least = 2
+
+    private let started = Date()
+    private var bytes = 0
 
     mutating func moved(_ count: Int) { bytes += count }
 
@@ -748,6 +749,7 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
         /// Asks for the rest of a piece the server answered only in part.
         let isRest: Bool
     }
+    private static let firstDepth = 4
 
     private let session: SFTPSession
     private let channel: SFTPChannel
@@ -762,7 +764,6 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
     private var nextOffset: UInt64 = 0
     private var sawEnd = false
     private var depth = SFTPFileReader.firstDepth
-    private static let firstDepth = 4
     /// How many reads followed one another since the file was opened or the position jumped.
     private var readsInARow = 0
     /// How much is asked for with one request: less than the usual block once the server has
@@ -785,15 +786,6 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
         self.session = session
         self.channel = channel
         self.handle = handle
-    }
-
-    deinit {
-        // Dropped without `close`: the handle is closed all the same, which never waits.
-        guard let handle else {
-            return
-        }
-        abandonRequests()
-        session.closeHandle(handle, on: channel)
     }
 
     private func sendRequest(at offset: UInt64, length: Int, isRest: Bool = false, _ handle: Data) throws -> Chunk {
@@ -950,6 +942,15 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
     }
 
     func interrupt() { abort.cancel() }
+
+    deinit {
+        // Dropped without `close`: the handle is closed all the same, which never waits.
+        guard let handle else {
+            return
+        }
+        abandonRequests()
+        session.closeHandle(handle, on: channel)
+    }
 }
 
 /// A file being written over SFTP.
@@ -991,17 +992,6 @@ private final class SFTPFileWriter: FileWriter, @unchecked Sendable {
         self.channel = channel
         self.handle = handle
         self.position = position
-    }
-
-    deinit {
-        // Dropped without `close`: like a failure, and the handle is closed, which never waits.
-        guard let handle else {
-            return
-        }
-        if failure == nil {
-            fail(NetworkError.cancelled, firstUnconfirmed: outstanding.first?.offset ?? position, handle: handle)
-        }
-        session.closeHandle(handle, on: channel)
     }
 
     /// Records the first failure, gives up the requests under way, and has the server cut the
@@ -1126,4 +1116,15 @@ private final class SFTPFileWriter: FileWriter, @unchecked Sendable {
     }
 
     func interrupt() { abort.cancel() }
+
+    deinit {
+        // Dropped without `close`: like a failure, and the handle is closed, which never waits.
+        guard let handle else {
+            return
+        }
+        if failure == nil {
+            fail(NetworkError.cancelled, firstUnconfirmed: outstanding.first?.offset ?? position, handle: handle)
+        }
+        session.closeHandle(handle, on: channel)
+    }
 }

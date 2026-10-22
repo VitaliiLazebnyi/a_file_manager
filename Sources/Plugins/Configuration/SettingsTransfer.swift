@@ -6,17 +6,15 @@ import Foundation
 ///
 /// A plain value: made on the main thread, used on any.
 internal struct SettingsSchema {
-    /// The options of the configuration pages, with their kinds.
-    internal var preferences: [String: Preference.Kind] = [:]
-    /// Keys the running program knows by name: its own, and those it has stored.
-    internal var known: Set<String> = []
-    internal var keyBindingsKey = KeyBindings.settingsKey
-    /// What the plugin a key belongs to has said about it (`Kernel.settingsKeys`), nil for a
-    /// key nobody declared.
+    // MARK: What an import asks about
+
+    /// The parts of a settings file that can make the program run something, change what a
+    /// key does, or change whom it trusts.
     ///
-    /// Asked before the names are looked at: a plugin knows what its key does, and a name gives it
-    /// away only when it happens to hold the right word.
-    internal var declaredKind: @Sendable (String) -> SettingsKeyKind? = { _ in nil }
+    /// Each is imported only when the user says so.
+    internal enum Group: String, CaseIterable {
+        case commands, keys, programs, trust, connections, hotlist, tabs
+    }
 
     /// The corners of the settings the parts of the program keep their values in.
     ///
@@ -36,6 +34,18 @@ internal struct SettingsSchema {
     internal static let hotlistKey = "places.hotlist"
     internal static let connectionsKey = "network.connections"
     internal static let lastConnectionKey = "network.lastUsed"
+
+    /// The options of the configuration pages, with their kinds.
+    internal var preferences: [String: Preference.Kind] = [:]
+    /// Keys the running program knows by name: its own, and those it has stored.
+    internal var known: Set<String> = []
+    internal var keyBindingsKey = KeyBindings.settingsKey
+    /// What the plugin a key belongs to has said about it (`Kernel.settingsKeys`), nil for a
+    /// key nobody declared.
+    ///
+    /// Asked before the names are looked at: a plugin knows what its key does, and a name gives it
+    /// away only when it happens to hold the right word.
+    internal var declaredKind: @Sendable (String) -> SettingsKeyKind? = { _ in nil }
 
     internal func isKnown(_ key: String) -> Bool {
         if preferences[key] != nil || known.contains(key) || key == keyBindingsKey
@@ -73,16 +83,6 @@ internal struct SettingsSchema {
     internal func isConnectionData(_ key: String) -> Bool {
         key == Self.connectionsKey || key == Self.lastConnectionKey
             || group(of: key, value: nil) == .trust
-    }
-
-    // MARK: What an import asks about
-
-    /// The parts of a settings file that can make the program run something, change what a
-    /// key does, or change whom it trusts.
-    ///
-    /// Each is imported only when the user says so.
-    internal enum Group: String, CaseIterable {
-        case commands, keys, programs, trust, connections, hotlist, tabs
     }
 
     /// The group a key belongs to; nil for an ordinary setting. `value` is the value in the
@@ -149,24 +149,6 @@ internal struct SettingsSchema {
 /// Unchecked: `objects` holds only JSON values (texts, numbers, lists and dictionaries, as
 /// `JSONSerialization` reads them), which nobody changes once the file is checked.
 internal struct CheckedSettings: @unchecked Sendable {
-    /// The values that may be stored, as the JSON they are stored as.
-    internal var values: [String: Data] = [:]
-    /// The same as objects, for describing them.
-    internal var objects: [String: Any] = [:]
-    /// Entries of the file whose key the program does not know; they are left out.
-    internal var unknown: [String] = []
-    /// How many numbers were out of every sensible range and were limited.
-    internal var limited = 0
-
-    /// The largest file that is read: a settings file is some hundred kilobytes.
-    internal static let fileLimit = 16 * 1_024 * 1_024
-    /// No number of a settings file may be larger: counters are counted on, sizes multiplied.
-    internal static let numberLimit: Double = 1_000_000_000_000
-    internal static let frequentCountLimit = 1_000_000
-    internal static let userCommandLimit = 2_000
-    internal static let startMenuLimit = 500
-    internal static let textLimit = 65_536
-
     internal enum Problem: LocalizedError {
         case tooLarge
         case unreadable(String)
@@ -182,14 +164,23 @@ internal struct CheckedSettings: @unchecked Sendable {
         }
     }
 
-    /// Reads at most `fileLimit` bytes of a file.
-    internal static func read(_ url: URL) throws -> Data {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        let data = try handle.read(upToCount: fileLimit + 1) ?? Data()
-        guard data.count <= fileLimit else { throw Problem.tooLarge }
-        return data
-    }
+    /// The largest file that is read: a settings file is some hundred kilobytes.
+    internal static let fileLimit = 16 * 1_024 * 1_024
+    /// No number of a settings file may be larger: counters are counted on, sizes multiplied.
+    internal static let numberLimit: Double = 1_000_000_000_000
+    internal static let frequentCountLimit = 1_000_000
+    internal static let userCommandLimit = 2_000
+    internal static let startMenuLimit = 500
+    internal static let textLimit = 65_536
+
+    /// The values that may be stored, as the JSON they are stored as.
+    internal var values: [String: Data] = [:]
+    /// The same as objects, for describing them.
+    internal var objects: [String: Any] = [:]
+    /// Entries of the file whose key the program does not know; they are left out.
+    internal var unknown: [String] = []
+    /// How many numbers were out of every sensible range and were limited.
+    internal var limited = 0
 
     /// Checks every entry: its key must be known, a value whose shape is known must have it,
     /// and numbers are limited.
@@ -216,6 +207,15 @@ internal struct CheckedSettings: @unchecked Sendable {
             objects[key] = object
         }
         unknown.sort()
+    }
+
+    /// Reads at most `fileLimit` bytes of a file.
+    internal static func read(_ url: URL) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: fileLimit + 1) ?? Data()
+        guard data.count <= fileLimit else { throw Problem.tooLarge }
+        return data
     }
 
     private static func isBoolean(_ number: NSNumber) -> Bool { CFGetTypeID(number) == CFBooleanGetTypeID() }
@@ -572,13 +572,13 @@ internal struct SettingsImportPlan {
 
 /// What an export holds.
 internal struct SettingsExportOptions: Equatable {
+    internal static let historyNote = "typed command lines, visited folders, search texts and other histories"
+    internal static let connectionsNote = "saved connections (servers and user names) and trusted certificates"
+
     /// Typed command lines, visited folders, search texts.
     internal var includesHistory = false
     /// Saved connections (servers and user names) and the certificates trusted for them.
     internal var includesConnections = false
-
-    internal static let historyNote = "typed command lines, visited folders, search texts and other histories"
-    internal static let connectionsNote = "saved connections (servers and user names) and trusted certificates"
 
     /// The keys of `keys` that go into the file.
     internal func included(_ keys: [String], schema: SettingsSchema) -> [String] {

@@ -15,6 +15,13 @@ import Foundation
 /// once. Safe to use from several threads: `known` is guarded by `lock`, and the rest is
 /// immutable.
 internal final class CharacterBoundaries: @unchecked Sendable {
+    /// The most boundaries kept: one per 16 KB would make a map of millions for a file of
+    /// gigabytes.
+    ///
+    /// A search that comes back to a block that was let go finds it again from the nearest one that
+    /// is kept.
+    internal static let keptLimit = 1 << 16
+
     private let source: any ByteSource
     private let content: Range<Int64>
     private let table: CodeTable
@@ -24,19 +31,19 @@ internal final class CharacterBoundaries: @unchecked Sendable {
     private var known: [Int64: Int64] = [:]
     private let computing = NSLock()
 
+    /// How many blocks have a boundary now (for tests).
+    internal var blockCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return known.count
+    }
+
     internal init(source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, spacing: Int = 16 << 10) {
         self.source = source
         self.content = content
         table = CodeTable.table(for: encoding)
         self.spacing = Int64(max(16, spacing))
         known[0] = content.lowerBound
-    }
-
-    /// How many blocks have a boundary now (for tests).
-    internal var blockCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return known.count
     }
 
     private func start(ofBlock block: Int64) -> Int64 { content.lowerBound + block * spacing }
@@ -46,13 +53,6 @@ internal final class CharacterBoundaries: @unchecked Sendable {
         defer { lock.unlock() }
         return known[block]
     }
-
-    /// The most boundaries kept: one per 16 KB would make a map of millions for a file of
-    /// gigabytes.
-    ///
-    /// A search that comes back to a block that was let go finds it again from the nearest one that
-    /// is kept.
-    internal static let keptLimit = 1 << 16
 
     private func remember(_ block: Int64, _ boundary: Int64) {
         lock.lock()

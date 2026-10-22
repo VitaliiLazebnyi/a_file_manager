@@ -27,36 +27,15 @@ public struct BranchWalker: Sendable {
         }
     }
 
-    /// Folders the walk never enters, besides every mounted volume it finds out for itself (see
-    /// `isMountPoint`): other disks and shares are mounted here, and `/System/Volumes/Data`
-    /// holds a second view of everything.
-    internal static let mountFolders: Set<String> = ["/Volumes", "/System/Volumes", "/Network", "/net", "/home", "/dev"]
-
-    /// True when a disk is mounted at `path` itself.
-    ///
-    /// A folder on another device than its parent is not enough to say so: on the start-up disk the
-    /// user's folders are firmlinked from the data volume, and the system reports the volume's
-    /// mount point for them, not their own.
-    internal static func isMountPoint(_ path: String) -> Bool {
-        var info = statfs()
-        guard statfs(path, &info) == 0 else {
-            return false
-        }
-        // The system names the mount point by its real path.
-        let real = realpath(path, nil)
-            .map { pointer -> String in
-                defer { free(pointer) }
-                return String(cString: pointer)
-            }
-        return withUnsafePointer(to: &info.f_mntonname) {
-            $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
-        } == real
-    }
-
     private struct DirectoryKey: Hashable {
         let device: dev_t
         let inode: ino_t
     }
+
+    /// Folders the walk never enters, besides every mounted volume it finds out for itself (see
+    /// `isMountPoint`): other disks and shares are mounted here, and `/System/Volumes/Data`
+    /// holds a second view of everything.
+    internal static let mountFolders: Set<String> = ["/Volumes", "/System/Volumes", "/Network", "/net", "/home", "/dev"]
 
     /// How many directories are read side by side before their files are handed over.
     internal static let directoriesPerBatch = 64
@@ -80,6 +59,27 @@ public struct BranchWalker: Sendable {
         self.showHidden = showHidden
         self.listsFolders = listsFolders
         self.entersPackages = entersPackages
+    }
+
+    /// True when a disk is mounted at `path` itself.
+    ///
+    /// A folder on another device than its parent is not enough to say so: on the start-up disk the
+    /// user's folders are firmlinked from the data volume, and the system reports the volume's
+    /// mount point for them, not their own.
+    internal static func isMountPoint(_ path: String) -> Bool {
+        var info = statfs()
+        guard statfs(path, &info) == 0 else {
+            return false
+        }
+        // The system names the mount point by its real path.
+        let real = realpath(path, nil)
+            .map { pointer -> String in
+                defer { free(pointer) }
+                return String(cString: pointer)
+            }
+        return withUnsafePointer(to: &info.f_mntonname) {
+            $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
+        } == real
     }
 
     /// The start for a folder found in `parent`, or nil when it is not to be walked.

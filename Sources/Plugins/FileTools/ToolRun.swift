@@ -51,6 +51,36 @@ internal final class ToolRun: @unchecked Sendable {
     private var lastReport = Date.distantPast
     private var overwritesAll = false
 
+    // MARK: Where the data came from
+
+    /// Set by a tool whose outputs are made of what it reads (the parts of a split file, a
+    /// file put together again, an encoded or decoded one): they then carry the mark of
+    /// coming from elsewhere that their source carries (`quarantine(of:)`: a file on a
+    /// server, a download), as a copy of it would.
+    ///
+    /// A program that was split, sent and put together again is still checked by the system when it
+    /// is first opened. Not set by tools that write something about their sources (a list of
+    /// checksums).
+    internal var carriesOrigin: Bool {
+        get { lock.withLock { carries } }
+        set { lock.withLock { carries = newValue } }
+    }
+    /// Guarded by `lock`, like `origin`.
+    private var carries = false
+    private var origin: Data?
+
+    /// The mark outputs get, once a source that has one was opened.
+    fileprivate var originMark: Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        return origin
+    }
+
+    /// Outputs made with `deferred`, in the order they were created.
+    ///
+    /// Job thread only.
+    private var journal: [ToolOutput] = []
+
     /// Without a job (in tests of the tools themselves) nothing is reported and existing
     /// files are overwritten.
     internal init(
@@ -79,29 +109,21 @@ internal final class ToolRun: @unchecked Sendable {
         )
     }
 
-    // MARK: Where the data came from
-
-    /// Set by a tool whose outputs are made of what it reads (the parts of a split file, a
-    /// file put together again, an encoded or decoded one): they then carry the mark of
-    /// coming from elsewhere that their source carries (`quarantine(of:)`: a file on a
-    /// server, a download), as a copy of it would.
-    ///
-    /// A program that was split, sent and put together again is still checked by the system when it
-    /// is first opened. Not set by tools that write something about their sources (a list of
-    /// checksums).
-    internal var carriesOrigin: Bool {
-        get { lock.withLock { carries } }
-        set { lock.withLock { carries = newValue } }
+    /// `name(2).ext`, `name(3).ext`, …: the first that is free (spec 08 › Decode).
+    internal static func freeName(for url: URL, provider: any FileSystemProvider) -> URL {
+        let (base, ext) = FileItem.split(url.lastPathComponent)
+        func candidate(_ number: Int) -> URL {
+            url.deletingLastPathComponent().appending(name: "\(base)(\(number))" + (ext.isEmpty ? "" : "." + ext))
+        }
+        var number = 2
+        while provider.item(at: candidate(number)) != nil { number += 1 }
+        return candidate(number)
     }
-    /// Guarded by `lock`, like `origin`.
-    private var carries = false
-    private var origin: Data?
 
-    /// The mark outputs get, once a source that has one was opened.
-    fileprivate var originMark: Data? {
-        lock.lock()
-        defer { lock.unlock() }
-        return origin
+    /// Whether two locations are one file: the same place, or (on this Mac) the same device and
+    /// inode, which sees through letter case, links and symbolic links in the path.
+    internal static func isSameFile(_ first: URL, _ second: URL) -> Bool {
+        first.isSameLocation(as: second) || first.isSameFile(as: second, followingLinks: true)
     }
 
     private func noteOrigin(of url: URL, in provider: any FileSystemProvider) {
@@ -328,11 +350,6 @@ internal final class ToolRun: @unchecked Sendable {
         return created
     }
 
-    /// Outputs made with `deferred`, in the order they were created.
-    ///
-    /// Job thread only.
-    private var journal: [ToolOutput] = []
-
     /// Runs `body`.
     ///
     /// The outputs it made with `deferred: true` take the place of the files they replace when it
@@ -368,17 +385,6 @@ internal final class ToolRun: @unchecked Sendable {
         }
     }
 
-    /// `name(2).ext`, `name(3).ext`, …: the first that is free (spec 08 › Decode).
-    internal static func freeName(for url: URL, provider: any FileSystemProvider) -> URL {
-        let (base, ext) = FileItem.split(url.lastPathComponent)
-        func candidate(_ number: Int) -> URL {
-            url.deletingLastPathComponent().appending(name: "\(base)(\(number))" + (ext.isEmpty ? "" : "." + ext))
-        }
-        var number = 2
-        while provider.item(at: candidate(number)) != nil { number += 1 }
-        return candidate(number)
-    }
-
     /// Writes a small file in one go.
     @discardableResult
     internal func write(_ data: Data, to url: URL, deferred: Bool = false) throws -> URL? {
@@ -394,12 +400,6 @@ internal final class ToolRun: @unchecked Sendable {
         }
         return output.url
     }
-
-    /// Whether two locations are one file: the same place, or (on this Mac) the same device and
-    /// inode, which sees through letter case, links and symbolic links in the path.
-    internal static func isSameFile(_ first: URL, _ second: URL) -> Bool {
-        first.isSameLocation(as: second) || first.isSameFile(as: second, followingLinks: true)
-    }
 }
 
 /// A file being written.
@@ -407,6 +407,8 @@ internal final class ToolRun: @unchecked Sendable {
 /// What is not finished is removed again, so a failed or cancelled tool leaves no half-written
 /// files.
 internal final class ToolOutput {
+    private enum State { case open, closed, done, undone }
+
     internal let url: URL
     private let writer: any FileWriter
     private let provider: any FileSystemProvider
@@ -414,7 +416,6 @@ internal final class ToolOutput {
     private let temporary: URL?
     /// Whether the replacement waits for `commit` (see `ToolRun.transaction`).
     private let deferred: Bool
-    private enum State { case open, closed, done, undone }
     private var state = State.open
     internal private(set) var bytesWritten: Int64 = 0
     private let cancellation: CancellationFlag?
@@ -422,6 +423,8 @@ internal final class ToolOutput {
     private let interruption: AnyObject?
     /// The mark of coming from elsewhere that the finished file gets (see `ToolRun.carriesOrigin`), asked when it is finished.
     private let origin: () -> Data?
+
+    private var partial: URL { temporary ?? url }
 
     internal init(
         url: URL,
@@ -441,8 +444,6 @@ internal final class ToolOutput {
         self.deferred = deferred
         interruption = cancellation?.interrupting(writer)
     }
-
-    private var partial: URL { temporary ?? url }
 
     internal func write(_ data: Data) throws {
         do {

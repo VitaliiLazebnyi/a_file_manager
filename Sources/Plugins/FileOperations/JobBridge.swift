@@ -8,20 +8,6 @@ import Foundation
 /// `JobMonitor.ask`, which takes it to the main thread and waits. What needs to read files
 /// (comparing two files) runs on the calling job thread, between two dialogs.
 internal final class JobBridge: FileJobDelegate, Sendable {
-    private let monitor: any JobMonitor
-    private let ui: any UserInteraction
-    private let fileSystems: FileSystemRegistry
-
-    internal init(monitor: any JobMonitor, ui: any UserInteraction, fileSystems: FileSystemRegistry) {
-        self.monitor = monitor
-        self.ui = ui
-        self.fileSystems = fileSystems
-    }
-
-    internal func job(_: FileJob, progress: JobProgress) {
-        monitor.report(progress)
-    }
-
     /// What the Overwrite dialog came back with: an answer for the job, or a wish to compare first.
     private enum OverwriteStep: Sendable {
         case answer(ConflictChoice)
@@ -41,6 +27,23 @@ internal final class JobBridge: FileJobDelegate, Sendable {
         case olderOrSame = "Overwrite all older and of the same age"
         case larger = "Copy all larger files (overwrite smaller)"
         case smaller = "Copy all smaller files (overwrite larger)"
+    }
+
+    /// The button Return presses in the Overwrite dialog: Skip.
+    internal static let overwriteDefault = 2
+
+    private let monitor: any JobMonitor
+    private let ui: any UserInteraction
+    private let fileSystems: FileSystemRegistry
+
+    internal init(monitor: any JobMonitor, ui: any UserInteraction, fileSystems: FileSystemRegistry) {
+        self.monitor = monitor
+        self.ui = ui
+        self.fileSystems = fileSystems
+    }
+
+    internal func job(_: FileJob, progress: JobProgress) {
+        monitor.report(progress)
     }
 
     /// The Overwrite dialog (spec 07 › Name collisions).
@@ -269,9 +272,6 @@ internal final class JobBridge: FileJobDelegate, Sendable {
             )
         }
     }
-
-    /// The button Return presses in the Overwrite dialog: Skip.
-    internal static let overwriteDefault = 2
 
     /// A question whose first button destroys something (overwrites, deletes for good, empties
     /// another volume): Return presses the button at `safe`, which leaves things as they are,

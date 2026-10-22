@@ -88,6 +88,21 @@ internal final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableView
         didSet { table.onReturn = { [weak self] in self?.onActivate?() } }
     }
 
+    internal var tableView: NSTableView { table }
+
+    /// The selected row; nil when none is.
+    internal var selectedRow: Int? {
+        get { table.selectedRow >= 0 ? table.selectedRow : nil }
+        set {
+            if let row = newValue, rows.indices.contains(row) {
+                table.selectRowIndexes([row], byExtendingSelection: false)
+                table.scrollRowToVisible(row)
+            } else {
+                table.deselectAll(nil)
+            }
+        }
+    }
+
     internal init(columns: [(title: String, width: CGFloat)]) {
         super.init(frame: .zero)
         for (index, column) in columns.enumerated() {
@@ -113,21 +128,6 @@ internal final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableView
 
     @available(*, unavailable)
     internal required init?(coder _: NSCoder) { fatalError("not used") }
-
-    internal var tableView: NSTableView { table }
-
-    /// The selected row; nil when none is.
-    internal var selectedRow: Int? {
-        get { table.selectedRow >= 0 ? table.selectedRow : nil }
-        set {
-            if let row = newValue, rows.indices.contains(row) {
-                table.selectRowIndexes([row], byExtendingSelection: false)
-                table.scrollRowToVisible(row)
-            } else {
-                table.deselectAll(nil)
-            }
-        }
-    }
 
     /// Shows other rows and keeps the selection on the same position where there still is one.
     internal func show(_ rows: [[String]], symbols: [String?] = [], selecting row: Int? = nil) {

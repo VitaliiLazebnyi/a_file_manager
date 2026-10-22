@@ -23,16 +23,16 @@ internal final class Replies: FileJobDelegate {
     internal var cancelAtItems: Int?
     internal var cancelAtBytes: Int64?
 
-    /// The conflict answers in order; the last one is repeated.
-    internal init(_ conflicts: ConflictChoice...) {
-        conflictScript = conflicts.isEmpty ? [.overwrite] : conflicts
-    }
-
     internal var conflicts: [String] { lock.withLock { asked } }
     internal var progress: [JobProgress] { lock.withLock { reports } }
     internal var errors: [String] { lock.withLock { failureTexts } }
     internal var protections: [String] { lock.withLock { protectionAsked } }
     internal var merges: [String] { lock.withLock { mergeAsked } }
+
+    /// The conflict answers in order; the last one is repeated.
+    internal init(_ conflicts: ConflictChoice...) {
+        conflictScript = conflicts.isEmpty ? [.overwrite] : conflicts
+    }
 
     internal func job(_ job: FileJob, progress: JobProgress) {
         lock.withLock { reports.append(progress) }
@@ -70,33 +70,6 @@ internal final class Replies: FileJobDelegate {
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 internal final class WrappedFileSystem: FileSystemProvider, @unchecked Sendable {
-    internal let base: MemoryFileSystem
-    internal let scheme: String
-    internal var capabilities: FileSystemCapabilities { base.capabilities }
-    /// Every stream written here loses its first byte's value.
-    internal var corruptsWrites = false
-    /// How long a copy inside this file system and each written block take.
-    internal var delay: TimeInterval = 0
-    private let lock = NSLock()
-    private var running = 0
-    private var mostAtOnce = 0
-
-    internal init(_ base: MemoryFileSystem) {
-        self.base = base
-        scheme = base.scheme
-    }
-
-    /// The largest number of files that were being written at the same time.
-    internal var mostWritesAtOnce: Int { lock.withLock { mostAtOnce } }
-
-    private func began() {
-        lock.withLock {
-            running += 1
-            mostAtOnce = max(mostAtOnce, running)
-        }
-    }
-    private func ended() { lock.withLock { running -= 1 } }
-
     /// Unchecked: used by one thread at a time, as the protocol allows.
     private final class Writer: FileWriter, @unchecked Sendable {
         let inner: any FileWriter
@@ -121,6 +94,33 @@ internal final class WrappedFileSystem: FileSystemProvider, @unchecked Sendable 
             try inner.close(attributes: attributes)
         }
     }
+
+    internal let base: MemoryFileSystem
+    internal let scheme: String
+    internal var capabilities: FileSystemCapabilities { base.capabilities }
+    /// Every stream written here loses its first byte's value.
+    internal var corruptsWrites = false
+    /// How long a copy inside this file system and each written block take.
+    internal var delay: TimeInterval = 0
+    private let lock = NSLock()
+    private var running = 0
+    private var mostAtOnce = 0
+
+    /// The largest number of files that were being written at the same time.
+    internal var mostWritesAtOnce: Int { lock.withLock { mostAtOnce } }
+
+    internal init(_ base: MemoryFileSystem) {
+        self.base = base
+        scheme = base.scheme
+    }
+
+    private func began() {
+        lock.withLock {
+            running += 1
+            mostAtOnce = max(mostAtOnce, running)
+        }
+    }
+    private func ended() { lock.withLock { running -= 1 } }
 
     internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try base.list(directory, showHidden: showHidden)
@@ -182,6 +182,9 @@ internal struct OverwriteChoices {
     internal let box: Sandbox
     internal let old = Date(timeIntervalSince1970: 1_600_000_000), new = Date(timeIntervalSince1970: 1_700_000_000)
 
+    internal var sources: [URL] { [box.url("A/one.txt"), box.url("A/two.txt")] }
+    internal var target: TargetSpec { TargetSpec(directory: box.url("B")) }
+
     internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt", "source one", modified: new)
@@ -189,9 +192,6 @@ internal struct OverwriteChoices {
         try box.file("B/one.txt", "target", modified: old)
         try box.file("B/two.txt", "target two", modified: new)
     }
-
-    internal var sources: [URL] { [box.url("A/one.txt"), box.url("A/two.txt")] }
-    internal var target: TargetSpec { TargetSpec(directory: box.url("B")) }
 
     @Test
     internal func overwriteAndSkipAreForOneFileEach() {

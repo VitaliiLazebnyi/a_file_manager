@@ -26,11 +26,11 @@ extension VolumeMounter {
 public struct VolumeError: LocalizedError, Sendable {
     public let message: String
 
+    public var errorDescription: String? { message }
+
     public init(message: String) {
         self.message = message
     }
-
-    public var errorDescription: String? { message }
 }
 
 /// The real thing: the NetFS framework, which is what Finder's Connect to Server uses.
@@ -56,6 +56,37 @@ public final class SystemVolumeMounter: VolumeMounter {
         }
     }
 
+    /// What the system's answer is delivered into; it may come after the waiting thread left.
+    ///
+    /// The first answer counts; until it comes the value is an input/output error. `result`,
+    /// `isSet` and `failure` are guarded by `lock`.
+    private final class Outcome: @unchecked Sendable {
+        let done = DispatchSemaphore(value: 0)
+        private let lock = NSLock()
+        private var result: (status: Int32, paths: [String]) = (EIO, [])
+        private var isSet = false
+        private var failure: (any Error)?
+
+        var value: (status: Int32, paths: [String]) {
+            lock.lock()
+            defer { lock.unlock() }
+            return result
+        }
+
+        var error: (any Error)? {
+            lock.lock()
+            defer { lock.unlock() }
+            return failure
+        }
+
+        func set(_ status: Int32, _ paths: [String], failure error: (any Error)? = nil) {
+            lock.lock()
+            if !isSet { (result, failure, isSet) = ((status, paths), error, true) }
+            lock.unlock()
+            done.signal()
+        }
+    }
+
     /// How long ejecting may take before the wait for it is given up.
     internal static let unmountTime: TimeInterval = 60
     private let calls: Calls
@@ -70,39 +101,12 @@ public final class SystemVolumeMounter: VolumeMounter {
         patience = unmountTime
     }
 
-    public func mount(_ url: URL) throws -> [URL] {
-        try mount(url, cancellation: CancellationFlag())
+    private static func reason(_ status: Int32) -> String {
+        status > 0 ? String(cString: strerror(status)) : "error \(status)"
     }
 
-    /// What the system's answer is delivered into; it may come after the waiting thread left.
-    ///
-    /// The first answer counts; until it comes the value is an input/output error. `result`,
-    /// `isSet` and `failure` are guarded by `lock`.
-    private final class Outcome: @unchecked Sendable {
-        let done = DispatchSemaphore(value: 0)
-        private let lock = NSLock()
-        private var result: (status: Int32, paths: [String]) = (EIO, [])
-        private var isSet = false
-        private var failure: (any Error)?
-
-        func set(_ status: Int32, _ paths: [String], failure error: (any Error)? = nil) {
-            lock.lock()
-            if !isSet { (result, failure, isSet) = ((status, paths), error, true) }
-            lock.unlock()
-            done.signal()
-        }
-
-        var value: (status: Int32, paths: [String]) {
-            lock.lock()
-            defer { lock.unlock() }
-            return result
-        }
-
-        var error: (any Error)? {
-            lock.lock()
-            defer { lock.unlock() }
-            return failure
-        }
+    public func mount(_ url: URL) throws -> [URL] {
+        try mount(url, cancellation: CancellationFlag())
     }
 
     public func mount(_ url: URL, cancellation: CancellationFlag) throws -> [URL] {
@@ -140,10 +144,6 @@ public final class SystemVolumeMounter: VolumeMounter {
             throw VolumeError(message: "The server \(shown) could not be connected: \(Self.reason(result.status)).")
         }
         return result.paths.map { URL(fileURLWithPath: $0, isDirectory: true) }
-    }
-
-    private static func reason(_ status: Int32) -> String {
-        status > 0 ? String(cString: strerror(status)) : "error \(status)"
     }
 
     public func unmount(_ volume: URL) throws {

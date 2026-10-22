@@ -251,6 +251,160 @@ public struct TextPattern: Sendable {
         case regex(NSRegularExpression, [TextEncoding])
     }
 
+    /// Collects the bytes of a file and hands them out as text, whole lines at a time.
+    private struct LineDecoder {
+        /// A "line" longer than this is handed out in pieces.
+        private static let longestLine = 4 << 20
+
+        /// How much of a piece cut in the middle of a long line is looked at again with the next one,
+        /// so that a match across the cut is found as long as it is shorter than this.
+        private static let cutOverlap = 4_096
+
+        let encoding: TextEncoding
+        private var pending = Data()
+        private var bigEndian = false
+        private var isStart = true
+
+        init(encoding: TextEncoding) {
+            self.encoding = encoding
+        }
+
+        mutating func feed(_ block: Data) -> String? {
+            pending.append(block)
+            if isStart, encoding == .utf16, pending.count >= 2 {
+                let mark = (pending[pending.startIndex], pending[pending.startIndex + 1])
+                if mark == (0xFE, 0xFF) { bigEndian = true }
+                if mark == (0xFE, 0xFF) || mark == (0xFF, 0xFE) {
+                    pending.removeFirst(2)
+                } else {
+                    // Without a mark, text in the Latin range shows in the zero bytes: they come
+                    // first in the big-endian order, after the letter in the little-endian one.
+                    var (even, odd) = (0, 0)
+                    for (offset, byte) in pending.prefix(256).enumerated() where byte == 0 {
+                        if offset % 2 == 0 { even += 1 } else { odd += 1 }
+                    }
+                    bigEndian = even > odd
+                }
+                isStart = false
+            }
+            if let cut = lastLineEnd(), cut > 0 {
+                let text = decode(pending.prefix(cut))
+                pending.removeFirst(cut)
+                return text
+            }
+            guard pending.count > Self.longestLine else {
+                return nil
+            }
+            // A line without a break that is too long: handed out in pieces, cut between
+            // characters, with the end of each piece repeated at the start of the next.
+            let cut = boundary(atOrBefore: pending.count)
+            let text = decode(pending.prefix(cut))
+            pending.removeFirst(boundary(atOrBefore: max(0, cut - Self.cutOverlap)))
+            return text
+        }
+
+        /// The nearest place at or before `position` where a character starts.
+        private func boundary(atOrBefore position: Int) -> Int {
+            switch encoding {
+            case .utf8:
+                if position >= pending.count {
+                    // The end of what there is: a character that is not all here yet waits for the next piece.
+                    var lead = pending.count - 1
+                    var back = 0
+                    while lead > 0, back < 3, pending[pending.startIndex + lead] & 0xC0 == 0x80 {
+                        lead -= 1
+                        back += 1
+                    }
+                    // (Asked only of a line longer than `longestLine`.)
+                    let byte = pending[pending.startIndex + lead]
+                    let needed = byte >= 0xF0 ? 4 : byte >= 0xE0 ? 3 : byte >= 0xC0 ? 2 : 1
+                    return lead + needed > pending.count ? lead : pending.count
+                }
+                var index = position
+                while index > 0, pending[pending.startIndex + index] & 0xC0 == 0x80 { index -= 1 }
+                return index
+
+            case .utf16:
+                return position / 4 * 4
+
+            case .western, .dos:
+                return position
+            }
+        }
+
+        mutating func finish() -> String? {
+            defer { pending = Data() }
+            return decode(pending)
+        }
+
+        /// The number of bytes up to and including the last line break.
+        private func lastLineEnd() -> Int? {
+            // Looked at in place, from the end: no copy of the bytes, and it stops at the line end.
+            pending.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) -> Int? in
+                guard encoding == .utf16 else {
+                    var index = bytes.count - 1
+                    while index >= 0 {
+                        if bytes[index] == 0x0A {
+                            return index + 1
+                        }
+                        index -= 1
+                    }
+                    return nil
+                }
+                var index = bytes.count / 2 * 2 - 2
+                while index >= 0 {
+                    let (line, zero) = bigEndian ? (bytes[index + 1], bytes[index]) : (bytes[index], bytes[index + 1])
+                    if line == 0x0A, zero == 0 {
+                        return index + 2
+                    }
+                    index -= 2
+                }
+                return nil
+            }
+        }
+
+        private func decode(_ data: Data) -> String? {
+            switch encoding {
+            case .utf8:
+                return String(decoding: data, as: UTF8.self)
+
+            case .utf16:
+                return String(
+                    data: data.prefix(data.count / 2 * 2),
+                    encoding: bigEndian ? .utf16BigEndian : .utf16LittleEndian
+                )
+
+            case .western, .dos:
+                return String(data: data, encoding: encoding.stringEncoding)
+                    ?? String(data: data, encoding: .isoLatin1)
+            }
+        }
+    }
+
+    /// Used by one thread at a time, as `FileReader` allows; `interrupt` (which does nothing)
+    /// is the only call from another thread.
+    internal final class DataReader: FileReader, @unchecked Sendable {
+        private let data: Data
+        private var position = 0
+
+        internal init(_ data: Data) { self.data = data }
+
+        internal func read(upToCount count: Int) -> Data? {
+            guard position < data.count else {
+                return nil
+            }
+            let end = min(position + count, data.count)
+            defer { position = end }
+            return data.subdata(in: position..<end)
+        }
+
+        internal func seek(to offset: UInt64) { position = min(Int(clamping: offset), data.count) }
+        internal func close() {}
+    }
+
+    /// What one piece of a file may take a regular expression.
+    internal static let pieceBudget: TimeInterval = 2
+
     private let matcher: Matcher
     /// Counts the pieces of files a regular expression ran out of time on.
     internal let trip = RegexTrip()
@@ -410,43 +564,6 @@ public struct TextPattern: Sendable {
         }
     }
 
-    // MARK: Searching
-
-    /// Whether the file passes the text criterion: the text is in it, or, with "NOT
-    /// containing", is not.
-    ///
-    /// A file that cannot be read never passes.
-    public func accepts(_ reader: any FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20)
-        -> Bool
-    {
-        guard let found = search(reader, cancellation: cancellation, blockSize: blockSize) else {
-            return false
-        }
-        return found != notContaining
-    }
-
-    /// Whether the text occurs in the bytes the reader delivers.
-    public func isFound(in reader: any FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20)
-        -> Bool
-    {
-        search(reader, cancellation: cancellation, blockSize: blockSize) ?? false
-    }
-
-    public func isFound(in data: Data, blockSize: Int = 1 << 20) -> Bool {
-        isFound(in: DataReader(data), blockSize: blockSize)
-    }
-
-    /// Nil when the search was cancelled or the file could not be read to its end.
-    private func search(_ reader: any FileReader, cancellation: CancellationFlag?, blockSize: Int) -> Bool? {
-        switch matcher {
-        case .bytes(let needles):
-            return Self.search(needles, reader, cancellation, blockSize)
-
-        case .regex(let regex, let encodings):
-            return Self.search(regex, encodings, reader, cancellation, blockSize, trip)
-        }
-    }
-
     /// Reads block by block.
     ///
     /// The end of each block is looked at again together with the next one, so a hit across a block
@@ -570,156 +687,40 @@ public struct TextPattern: Sendable {
         return decoders.indices.contains { matches(decoders[$0].finish()) } ? true : (gaveUp ? nil : false)
     }
 
-    /// What one piece of a file may take a regular expression.
-    internal static let pieceBudget: TimeInterval = 2
+    // MARK: Searching
 
-    /// Collects the bytes of a file and hands them out as text, whole lines at a time.
-    private struct LineDecoder {
-        let encoding: TextEncoding
-        private var pending = Data()
-        private var bigEndian = false
-        private var isStart = true
-        /// A "line" longer than this is handed out in pieces.
-        private static let longestLine = 4 << 20
-
-        init(encoding: TextEncoding) {
-            self.encoding = encoding
+    /// Whether the file passes the text criterion: the text is in it, or, with "NOT
+    /// containing", is not.
+    ///
+    /// A file that cannot be read never passes.
+    public func accepts(_ reader: any FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20)
+        -> Bool
+    {
+        guard let found = search(reader, cancellation: cancellation, blockSize: blockSize) else {
+            return false
         }
-
-        /// How much of a piece cut in the middle of a long line is looked at again with the next one,
-        /// so that a match across the cut is found as long as it is shorter than this.
-        private static let cutOverlap = 4_096
-
-        mutating func feed(_ block: Data) -> String? {
-            pending.append(block)
-            if isStart, encoding == .utf16, pending.count >= 2 {
-                let mark = (pending[pending.startIndex], pending[pending.startIndex + 1])
-                if mark == (0xFE, 0xFF) { bigEndian = true }
-                if mark == (0xFE, 0xFF) || mark == (0xFF, 0xFE) {
-                    pending.removeFirst(2)
-                } else {
-                    // Without a mark, text in the Latin range shows in the zero bytes: they come
-                    // first in the big-endian order, after the letter in the little-endian one.
-                    var (even, odd) = (0, 0)
-                    for (offset, byte) in pending.prefix(256).enumerated() where byte == 0 {
-                        if offset % 2 == 0 { even += 1 } else { odd += 1 }
-                    }
-                    bigEndian = even > odd
-                }
-                isStart = false
-            }
-            if let cut = lastLineEnd(), cut > 0 {
-                let text = decode(pending.prefix(cut))
-                pending.removeFirst(cut)
-                return text
-            }
-            guard pending.count > Self.longestLine else {
-                return nil
-            }
-            // A line without a break that is too long: handed out in pieces, cut between
-            // characters, with the end of each piece repeated at the start of the next.
-            let cut = boundary(atOrBefore: pending.count)
-            let text = decode(pending.prefix(cut))
-            pending.removeFirst(boundary(atOrBefore: max(0, cut - Self.cutOverlap)))
-            return text
-        }
-
-        /// The nearest place at or before `position` where a character starts.
-        private func boundary(atOrBefore position: Int) -> Int {
-            switch encoding {
-            case .utf8:
-                if position >= pending.count {
-                    // The end of what there is: a character that is not all here yet waits for the next piece.
-                    var lead = pending.count - 1
-                    var back = 0
-                    while lead > 0, back < 3, pending[pending.startIndex + lead] & 0xC0 == 0x80 {
-                        lead -= 1
-                        back += 1
-                    }
-                    // (Asked only of a line longer than `longestLine`.)
-                    let byte = pending[pending.startIndex + lead]
-                    let needed = byte >= 0xF0 ? 4 : byte >= 0xE0 ? 3 : byte >= 0xC0 ? 2 : 1
-                    return lead + needed > pending.count ? lead : pending.count
-                }
-                var index = position
-                while index > 0, pending[pending.startIndex + index] & 0xC0 == 0x80 { index -= 1 }
-                return index
-
-            case .utf16:
-                return position / 4 * 4
-
-            case .western, .dos:
-                return position
-            }
-        }
-
-        mutating func finish() -> String? {
-            defer { pending = Data() }
-            return decode(pending)
-        }
-
-        /// The number of bytes up to and including the last line break.
-        private func lastLineEnd() -> Int? {
-            // Looked at in place, from the end: no copy of the bytes, and it stops at the line end.
-            pending.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) -> Int? in
-                guard encoding == .utf16 else {
-                    var index = bytes.count - 1
-                    while index >= 0 {
-                        if bytes[index] == 0x0A {
-                            return index + 1
-                        }
-                        index -= 1
-                    }
-                    return nil
-                }
-                var index = bytes.count / 2 * 2 - 2
-                while index >= 0 {
-                    let (line, zero) = bigEndian ? (bytes[index + 1], bytes[index]) : (bytes[index], bytes[index + 1])
-                    if line == 0x0A, zero == 0 {
-                        return index + 2
-                    }
-                    index -= 2
-                }
-                return nil
-            }
-        }
-
-        private func decode(_ data: Data) -> String? {
-            switch encoding {
-            case .utf8:
-                return String(decoding: data, as: UTF8.self)
-
-            case .utf16:
-                return String(
-                    data: data.prefix(data.count / 2 * 2),
-                    encoding: bigEndian ? .utf16BigEndian : .utf16LittleEndian
-                )
-
-            case .western, .dos:
-                return String(data: data, encoding: encoding.stringEncoding)
-                    ?? String(data: data, encoding: .isoLatin1)
-            }
-        }
+        return found != notContaining
     }
 
-    /// Used by one thread at a time, as `FileReader` allows; `interrupt` (which does nothing)
-    /// is the only call from another thread.
-    internal final class DataReader: FileReader, @unchecked Sendable {
-        private let data: Data
-        private var position = 0
+    /// Whether the text occurs in the bytes the reader delivers.
+    public func isFound(in reader: any FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20)
+        -> Bool
+    {
+        search(reader, cancellation: cancellation, blockSize: blockSize) ?? false
+    }
 
-        internal init(_ data: Data) { self.data = data }
+    public func isFound(in data: Data, blockSize: Int = 1 << 20) -> Bool {
+        isFound(in: DataReader(data), blockSize: blockSize)
+    }
 
-        internal func read(upToCount count: Int) -> Data? {
-            guard position < data.count else {
-                return nil
-            }
-            let end = min(position + count, data.count)
-            defer { position = end }
-            return data.subdata(in: position..<end)
+    /// Nil when the search was cancelled or the file could not be read to its end.
+    private func search(_ reader: any FileReader, cancellation: CancellationFlag?, blockSize: Int) -> Bool? {
+        switch matcher {
+        case .bytes(let needles):
+            return Self.search(needles, reader, cancellation, blockSize)
+
+        case .regex(let regex, let encodings):
+            return Self.search(regex, encodings, reader, cancellation, blockSize, trip)
         }
-
-        internal func seek(to offset: UInt64) { position = min(Int(clamping: offset), data.count) }
-        internal func close() {}
     }
 }

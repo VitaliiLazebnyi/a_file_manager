@@ -26,9 +26,6 @@ internal struct ViewerEncoding: Hashable {
         case gb18030
     }
 
-    internal let codePage: Int
-    internal let name: String
-
     internal static let utf8 = Self(codePage: 65_001, name: "UTF-8")
     internal static let utf16LE = Self(codePage: 1_200, name: "UTF-16 LE")
     internal static let utf16BE = Self(codePage: 1_201, name: "UTF-16 BE")
@@ -61,14 +58,8 @@ internal struct ViewerEncoding: Hashable {
     ]
     .filter(\.isAvailable)
 
-    /// Any code page the system knows, for "Other (enter code page manually)"; nil otherwise.
-    internal static func codePage(_ number: Int) -> Self? {
-        if let known = ([utf8, utf16LE, utf16BE] + codePages).first(where: { $0.codePage == number }) {
-            return known
-        }
-        let encoding = Self(codePage: number, name: "Code page \(number)")
-        return encoding.isAvailable ? encoding : nil
-    }
+    internal let codePage: Int
+    internal let name: String
 
     internal var kind: Kind {
         switch codePage {
@@ -109,14 +100,6 @@ internal struct ViewerEncoding: Hashable {
     /// every byte is a character, else ANSI.
     internal var byteOriented: Self { kind == .singleByte ? self : .ansi }
 
-    /// The encoding a layout really shows this one in.
-    internal func forLayout(_ layout: ViewerLayout) -> Self {
-        if case .text = layout {
-            return self
-        }
-        return byteOriented
-    }
-
     fileprivate var coreFoundationEncoding: CFStringEncoding? {
         guard codePage > 0, codePage <= Int(UInt32.max) else {
             return nil
@@ -140,6 +123,23 @@ internal struct ViewerEncoding: Hashable {
             return false
         }
         return Self.multiBytePages.contains(codePage) || CFStringGetMaximumSizeForEncoding(1, encoding) <= 1
+    }
+
+    /// Any code page the system knows, for "Other (enter code page manually)"; nil otherwise.
+    internal static func codePage(_ number: Int) -> Self? {
+        if let known = ([utf8, utf16LE, utf16BE] + codePages).first(where: { $0.codePage == number }) {
+            return known
+        }
+        let encoding = Self(codePage: number, name: "Code page \(number)")
+        return encoding.isAvailable ? encoding : nil
+    }
+
+    /// The encoding a layout really shows this one in.
+    internal func forLayout(_ layout: ViewerLayout) -> Self {
+        if case .text = layout {
+            return self
+        }
+        return byteOriented
     }
 
     /// The bytes of `text` in this encoding (for a search pattern); nil when it has characters
@@ -202,6 +202,10 @@ internal final class CodeTable: Sendable {
     internal static let leadByte: UInt16 = 0xFFFF
     internal static let replacement: UInt16 = 0xFFFD
 
+    private static let lock = NSLock()
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var tables: [Int: CodeTable] = [:]
+
     /// The character of each byte; `leadByte` marks the first byte of a two-byte character.
     internal let single: [UInt16]
     /// The character of each two-byte sequence, at `lead << 8 | trail`; empty for one-byte pages.
@@ -212,21 +216,6 @@ internal final class CodeTable: Sendable {
     internal let shape: ViewerEncoding.Shape
     /// Bytes of the longest character.
     internal let longestCharacter: Int
-
-    private static let lock = NSLock()
-    /// Guarded by `lock`.
-    nonisolated(unsafe) private static var tables: [Int: CodeTable] = [:]
-
-    internal static func table(for encoding: ViewerEncoding) -> CodeTable {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let table = tables[encoding.codePage] else {
-            let table = CodeTable(encoding)
-            tables[encoding.codePage] = table
-            return table
-        }
-        return table
-    }
 
     private init(_ encoding: ViewerEncoding) {
         let cfEncoding = encoding.coreFoundationEncoding ?? CFStringBuiltInEncodings.windowsLatin1.rawValue
@@ -301,6 +290,17 @@ internal final class CodeTable: Sendable {
         self.single = single
         self.double = double
         self.quad = quad
+    }
+
+    internal static func table(for encoding: ViewerEncoding) -> CodeTable {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let table = tables[encoding.codePage] else {
+            let table = CodeTable(encoding)
+            tables[encoding.codePage] = table
+            return table
+        }
+        return table
     }
 
     /// How many bytes the character at `index` takes, by the layout of the code page alone:
@@ -416,61 +416,6 @@ internal final class CodeTable: Sendable {
 }
 
 extension ViewerEncoding {
-    /// Decodes `bytes` into `text` (replacing what it held) and returns how many bytes were
-    /// used.
-    ///
-    /// Unless `final`, a character cut off at the end is left for the next call, when the rest of
-    /// it has arrived: this is how text is decoded block by block. Malformed input becomes U+FFFD,
-    /// one per offending byte, and never stops the decoding.
-    @discardableResult
-    internal func decode(_ bytes: UnsafeBufferPointer<UInt8>, final: Bool, into text: inout DecodedText) -> Int {
-        text.removeAll()
-        text.units.reserveCapacity(bytes.count / unitSize + 1)
-        if text.tracksOffsets { text.offsets.reserveCapacity(bytes.count / unitSize + 1) }
-        switch kind {
-        case .utf8:
-            return Self.decodeUTF8(bytes, final, &text)
-
-        case .utf16LE:
-            return Self.decodeUTF16(bytes, final, littleEndian: true, &text)
-
-        case .utf16BE:
-            return Self.decodeUTF16(bytes, final, littleEndian: false, &text)
-
-        case .singleByte, .doubleByte:
-            let table = CodeTable.table(for: self)
-            return table.shape == .doubleByte
-                ? Self.decodeTable(bytes, final, table, &text)
-                : Self.decodeLayout(bytes, final, table, &text)
-        }
-    }
-
-    @discardableResult
-    internal func decode(_ data: Data, final: Bool, into text: inout DecodedText) -> Int {
-        data.withUnsafeBytes { raw in decode(raw.bindMemory(to: UInt8.self), final: final, into: &text) }
-    }
-
-    @discardableResult
-    internal func decode(_ bytes: [UInt8], final: Bool, into text: inout DecodedText) -> Int {
-        bytes.withUnsafeBufferPointer { decode($0, final: final, into: &text) }
-    }
-
-    /// The whole of `data` as text.
-    internal func string(from data: Data) -> String {
-        var text = DecodedText()
-        text.tracksOffsets = false
-        decode(data, final: true, into: &text)
-        return text.string
-    }
-
-    /// The whole of `data` as UTF-16 units, without the byte offsets.
-    internal func units(from data: Data) -> [UInt16] {
-        var text = DecodedText()
-        text.tracksOffsets = false
-        decode(data, final: true, into: &text)
-        return text.units
-    }
-
     private static func decodeTable(
         _ bytes: UnsafeBufferPointer<UInt8>,
         _ final: Bool,
@@ -688,5 +633,60 @@ extension ViewerEncoding {
             index += 2
         }
         return index
+    }
+
+    /// Decodes `bytes` into `text` (replacing what it held) and returns how many bytes were
+    /// used.
+    ///
+    /// Unless `final`, a character cut off at the end is left for the next call, when the rest of
+    /// it has arrived: this is how text is decoded block by block. Malformed input becomes U+FFFD,
+    /// one per offending byte, and never stops the decoding.
+    @discardableResult
+    internal func decode(_ bytes: UnsafeBufferPointer<UInt8>, final: Bool, into text: inout DecodedText) -> Int {
+        text.removeAll()
+        text.units.reserveCapacity(bytes.count / unitSize + 1)
+        if text.tracksOffsets { text.offsets.reserveCapacity(bytes.count / unitSize + 1) }
+        switch kind {
+        case .utf8:
+            return Self.decodeUTF8(bytes, final, &text)
+
+        case .utf16LE:
+            return Self.decodeUTF16(bytes, final, littleEndian: true, &text)
+
+        case .utf16BE:
+            return Self.decodeUTF16(bytes, final, littleEndian: false, &text)
+
+        case .singleByte, .doubleByte:
+            let table = CodeTable.table(for: self)
+            return table.shape == .doubleByte
+                ? Self.decodeTable(bytes, final, table, &text)
+                : Self.decodeLayout(bytes, final, table, &text)
+        }
+    }
+
+    @discardableResult
+    internal func decode(_ data: Data, final: Bool, into text: inout DecodedText) -> Int {
+        data.withUnsafeBytes { raw in decode(raw.bindMemory(to: UInt8.self), final: final, into: &text) }
+    }
+
+    @discardableResult
+    internal func decode(_ bytes: [UInt8], final: Bool, into text: inout DecodedText) -> Int {
+        bytes.withUnsafeBufferPointer { decode($0, final: final, into: &text) }
+    }
+
+    /// The whole of `data` as text.
+    internal func string(from data: Data) -> String {
+        var text = DecodedText()
+        text.tracksOffsets = false
+        decode(data, final: true, into: &text)
+        return text.string
+    }
+
+    /// The whole of `data` as UTF-16 units, without the byte offsets.
+    internal func units(from data: Data) -> [UInt16] {
+        var text = DecodedText()
+        text.tracksOffsets = false
+        decode(data, final: true, into: &text)
+        return text.units
     }
 }

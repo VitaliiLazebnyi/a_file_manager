@@ -9,15 +9,15 @@ import Testing
 private final class Notes: @unchecked Sendable {
     private let lock = NSLock()
     private var texts: [String] = []
-    func add(_ text: String) {
-        lock.lock()
-        texts.append(text)
-        lock.unlock()
-    }
     var all: [String] {
         lock.lock()
         defer { lock.unlock() }
         return texts
+    }
+    func add(_ text: String) {
+        lock.lock()
+        texts.append(text)
+        lock.unlock()
     }
 }
 

@@ -57,8 +57,19 @@ internal final class SystemVolumes: VolumeAccess {
         unmountVolume = unmount
     }
 
-    deinit {
-        // Nothing to release.
+    /// The name the user knows a program by: the application's, else the process's.
+    internal static func programName(_ pid: pid_t) -> String? {
+        guard pid > 0 else {
+            return nil
+        }
+        if let name = NSRunningApplication(processIdentifier: pid)?.localizedName {
+            return name
+        }
+        var buffer = [CChar](repeating: 0, count: 256)
+        guard proc_name(pid, &buffer, UInt32(buffer.count)) > 0 else {
+            return nil
+        }
+        return SystemText.string(buffer)
     }
 
     internal func facts(of directory: URL) -> VolumeFacts {
@@ -104,19 +115,8 @@ internal final class SystemVolumes: VolumeAccess {
         )
     }
 
-    /// The name the user knows a program by: the application's, else the process's.
-    internal static func programName(_ pid: pid_t) -> String? {
-        guard pid > 0 else {
-            return nil
-        }
-        if let name = NSRunningApplication(processIdentifier: pid)?.localizedName {
-            return name
-        }
-        var buffer = [CChar](repeating: 0, count: 256)
-        guard proc_name(pid, &buffer, UInt32(buffer.count)) > 0 else {
-            return nil
-        }
-        return SystemText.string(buffer)
+    deinit {
+        // Nothing to release.
     }
 }
 
@@ -137,14 +137,27 @@ internal final class SystemVolumes: VolumeAccess {
 /// Main thread, except what runs inside the jobs.
 @MainActor
 internal final class VolumeEjection {
+    /// A tab that left the drive, and where it went.
+    private struct Departure {
+        weak var panel: any PanelHandle?
+        weak var tab: PanelModel?
+        let from: URL
+        var to: URL
+    }
+    /// How often, and how long apart, an eject that this program itself refused is tried again.
+    nonisolated internal static let ownRefusalRetries = 4
+    nonisolated internal static let retryDelay: TimeInterval = 0.5
+
+    /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
+    nonisolated private static let volumes = CallOwner()
+
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let access: any VolumeAccess
     private let home: () -> URL
     private let note: (String) -> Void
-    /// How often, and how long apart, an eject that this program itself refused is tried again.
-    nonisolated internal static let ownRefusalRetries = 4
-    nonisolated internal static let retryDelay: TimeInterval = 0.5
+
+    private var ui: any UserInteraction { kernel.interaction }
 
     internal init(kernel: Kernel, access: any VolumeAccess, home: @escaping () -> URL, note: @escaping (String) -> Void)
     {
@@ -154,14 +167,25 @@ internal final class VolumeEjection {
         self.note = note
     }
 
-    private var ui: any UserInteraction { kernel.interaction }
+    // MARK: Panels
 
-    /// A tab that left the drive, and where it went.
-    private struct Departure {
-        weak var panel: any PanelHandle?
-        weak var tab: PanelModel?
-        let from: URL
-        var to: URL
+    private static func isOn(_ url: URL, _ volume: URL) -> Bool {
+        url.isFileURL && (url.isSameLocation(as: volume) || url.isInside(volume))
+    }
+
+    /// Asks something of a volume from a job.
+    ///
+    /// A volume that has stopped answering may never return: the question then goes on alone, and
+    /// the job ends, with nil, once cancelled.
+    nonisolated private static func ask<Answer: Sendable>(
+        _ question: String,
+        of url: URL,
+        _ monitor: any JobMonitor,
+        _ work: @escaping @Sendable () -> Answer
+    ) -> Answer? {
+        BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
+            work()
+        }
     }
 
     /// Ejects the drive `directory` is on.
@@ -255,12 +279,6 @@ internal final class VolumeEjection {
         )
     }
 
-    // MARK: Panels
-
-    private static func isOn(_ url: URL, _ volume: URL) -> Bool {
-        url.isFileURL && (url.isSameLocation(as: volume) || url.isInside(volume))
-    }
-
     /// Takes every tab off the drive; `then` runs once the panels show where they went.
     private func leave(_ volume: URL, then proceed: @escaping ([Departure]) -> Void) {
         var departures: [Departure] = []
@@ -315,23 +333,5 @@ internal final class VolumeEjection {
             root: provider?.root(of: location) ?? location,
             history: .record
         )
-    }
-
-    /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
-    nonisolated private static let volumes = CallOwner()
-
-    /// Asks something of a volume from a job.
-    ///
-    /// A volume that has stopped answering may never return: the question then goes on alone, and
-    /// the job ends, with nil, once cancelled.
-    nonisolated private static func ask<Answer: Sendable>(
-        _ question: String,
-        of url: URL,
-        _ monitor: any JobMonitor,
-        _ work: @escaping @Sendable () -> Answer
-    ) -> Answer? {
-        BlockingCalls.answer(from: volumes, to: question + " " + url.path, cancellation: monitor.cancellation) { _ in
-            work()
-        }
     }
 }

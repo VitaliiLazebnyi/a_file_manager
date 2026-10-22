@@ -12,13 +12,13 @@ import Testing
 @MainActor
 @Suite(.serialized)
 internal struct CoverageViewerPaneKeyTests {
-    private static let text = (1...80).map { "Line \($0) of the text, with words\n" }.joined()
-
     private enum Code {
         static let left: UInt16 = 123, right: UInt16 = 124, down: UInt16 = 125, up: UInt16 = 126
         static let pageUp: UInt16 = 116, pageDown: UInt16 = 121, home: UInt16 = 115, end: UInt16 = 119
         static let escape: UInt16 = 53, tab: UInt16 = 48, space: UInt16 = 49
     }
+
+    private static let text = (1...80).map { "Line \($0) of the text, with words\n" }.joined()
 
     private static func press(
         _ pane: ViewerPane,

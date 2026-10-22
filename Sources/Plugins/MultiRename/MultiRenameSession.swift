@@ -18,6 +18,13 @@ internal final class ClipboardSource {
     /// Unchecked `Sendable`: the state is guarded by `condition`; `read` and `queue` do not change
     /// after `init`.
     internal final class Snapshot: @unchecked Sendable {
+        /// The longest text taken: a name holds a line of it at the most.
+        internal static let longest = 1 << 16
+        /// How long a mask waits for a program that does not answer.
+        internal static let patience: TimeInterval = 2
+        /// For this long after giving up, nobody waits again.
+        internal static let grace: TimeInterval = 10
+
         private let condition = NSCondition()
         private var text: String?
         private var isRead = false
@@ -25,12 +32,6 @@ internal final class ClipboardSource {
         private var gaveUpAt: Date?
         private let read: @Sendable () -> String?
         private let queue: DispatchQueue
-        /// The longest text taken: a name holds a line of it at the most.
-        internal static let longest = 1 << 16
-        /// How long a mask waits for a program that does not answer.
-        internal static let patience: TimeInterval = 2
-        /// For this long after giving up, nobody waits again.
-        internal static let grace: TimeInterval = 10
 
         fileprivate init(read: @escaping @Sendable () -> String?, queue: DispatchQueue) {
             self.read = read
@@ -116,6 +117,41 @@ internal final class MultiRenameSession {
         case name, ext, size, date
     }
 
+    // MARK: Start!
+
+    private enum ConflictChoice {
+        case autoRename, skip, cancel
+    }
+
+    /// What a run did, with everything the main thread needs worked out in the job.
+    private struct Outcome {
+        var result = RenameRunResult()
+        /// The entries the result's item numbers refer to.
+        var entries: [RenameEntry]
+        var unusable = 0
+        /// The folders to read again.
+        var folders: [URL] = []
+        /// For each entry: whether it was renamed and so leaves the list.
+        var renamed: [Bool] = []
+    }
+
+    // MARK: Undo and result list
+
+    private struct UndoOutcome {
+        var result = RenameRunResult()
+        /// What was asked for and not put back.
+        var attempted: [RenamedItem] = []
+        /// Of these, what is still to be undone later.
+        var left: [RenamedItem] = []
+        var folders: [URL] = []
+    }
+
+    /// The pause between the last change of a field and the preview it starts.
+    internal static let typingPause: TimeInterval = 0.1
+
+    /// Lists at least this long are worked on off the main thread.
+    private static let backgroundSortThreshold = 2_000
+
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     internal let store: RenameStore
@@ -139,9 +175,6 @@ internal final class MultiRenameSession {
     private var sortRequest = 0
     /// Counts the changes of the fields, so that a preview waiting out the pause can see it was overtaken.
     private var refreshRequest = 0
-
-    /// The pause between the last change of a field and the preview it starts.
-    internal static let typingPause: TimeInterval = 0.1
 
     /// The entries of the list, their new names and how they stand: parallel arrays, so that a
     /// preview is taken in by assigning two of them.
@@ -173,6 +206,19 @@ internal final class MultiRenameSession {
         }
     }
 
+    /// The rows as the list shows them.
+    ///
+    /// Made on each call: ask for one row with `row(at:)`.
+    internal var rows: [Row] { entries.indices.map(row(at:)) }
+    internal var rowCount: Int { entries.count }
+
+    /// The new names as they stand, the old one where there is none.
+    internal var targetNames: [String] { entries.indices.map { newNames[$0] ?? entries[$0].name } }
+
+    internal var logURL: URL { logDirectory.appendingPathComponent(RenameLog.fileName) }
+    internal var canUndo: Bool { !isBusy && store.undoLimit > 0 && store.undoCount > 0 }
+    internal var hasResultList: Bool { !lastRun.isEmpty }
+
     internal init(
         kernel: Kernel,
         items: [FileItem],
@@ -197,12 +243,6 @@ internal final class MultiRenameSession {
         // The runs that can be undone are decoded in the background, ready for the button.
         if previewsInBackground { store.loadUndo() }
     }
-
-    /// The rows as the list shows them.
-    ///
-    /// Made on each call: ask for one row with `row(at:)`.
-    internal var rows: [Row] { entries.indices.map(row(at:)) }
-    internal var rowCount: Int { entries.count }
 
     internal func row(at index: Int) -> Row {
         Row(entry: entries[index], newName: newNames[index], status: statuses[index])
@@ -301,9 +341,6 @@ internal final class MultiRenameSession {
         onChange?()
     }
 
-    /// The new names as they stand, the old one where there is none.
-    internal var targetNames: [String] { entries.indices.map { newNames[$0] ?? entries[$0].name } }
-
     /// The window was closed: the preview under way, and one waiting out the pause, are not wanted.
     internal func close() {
         previewCancellation.cancel()
@@ -325,9 +362,6 @@ internal final class MultiRenameSession {
         onChange?()
         refresh()
     }
-
-    /// Lists at least this long are worked on off the main thread.
-    private static let backgroundSortThreshold = 2_000
 
     /// Sorts by a column; the order drives the counter `[C]`.
     ///
@@ -663,28 +697,6 @@ internal final class MultiRenameSession {
         store.remember(settings.replacement, in: .replacement)
     }
 
-    // MARK: Start!
-
-    private enum ConflictChoice {
-        case autoRename, skip, cancel
-    }
-
-    /// What a run did, with everything the main thread needs worked out in the job.
-    private struct Outcome {
-        var result = RenameRunResult()
-        /// The entries the result's item numbers refer to.
-        var entries: [RenameEntry]
-        var unusable = 0
-        /// The folders to read again.
-        var folders: [URL] = []
-        /// For each entry: whether it was renamed and so leaves the list.
-        var renamed: [Bool] = []
-    }
-
-    internal var logURL: URL { logDirectory.appendingPathComponent(RenameLog.fileName) }
-    internal var canUndo: Bool { !isBusy && store.undoLimit > 0 && store.undoCount > 0 }
-    internal var hasResultList: Bool { !lastRun.isEmpty }
-
     /// Renames the items in list order, as a job with progress.
     ///
     /// The names are computed afresh on the job's thread, so what happens is what the fields say,
@@ -875,17 +887,6 @@ internal final class MultiRenameSession {
         listChanged()
     }
 
-    // MARK: Undo and result list
-
-    private struct UndoOutcome {
-        var result = RenameRunResult()
-        /// What was asked for and not put back.
-        var attempted: [RenamedItem] = []
-        /// Of these, what is still to be undone later.
-        var left: [RenamedItem] = []
-        var folders: [URL] = []
-    }
-
     /// Undoes the last run after asking, last renamed first. `completion` runs on the main
     /// thread with what could not be put back; it is not called when the user says no.
     internal func undo(completion: (@MainActor ([RenamedItem]) -> Void)? = nil) {
@@ -1033,6 +1034,14 @@ extension RenameStatus {
 /// for good, a stub of a file in the cloud would be downloaded, and the decoders of ImageIO are not
 /// pointed at what is not a picture.
 internal enum ContentDate {
+    /// One formatter for all files; formatting and parsing with it is safe from several threads.
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        return formatter
+    }()
+
     internal static func read(_ url: URL) -> Date? {
         guard url.isFileURL, isPicture(url), isPlainFileHere(url),
             let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -1064,14 +1073,6 @@ internal enum ContentDate {
         // SF_DATALESS: the contents are in the cloud.
         return stat(url.path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG && info.st_flags & 0x4000_0000 == 0
     }
-
-    /// One formatter for all files; formatting and parsing with it is safe from several threads.
-    private static let formatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        return formatter
-    }()
 }
 
 /// Hands a block to the main thread through the run loop (all modes that count), not through the

@@ -59,6 +59,17 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         /// Guarded by the file system's lock.
         var stamp = 0
 
+        /// The finished work; nil when it is not done yet, whoever is doing it.
+        ///
+        /// Never waits.
+        var preparedIfReady: Prepared? {
+            guard lock.try() else {
+                return nil
+            }
+            defer { lock.unlock() }
+            return result
+        }
+
         init(location: VirtualLocation, raw: [URL], isUnique: Bool = false) {
             self.location = location
             self.raw = raw
@@ -76,16 +87,119 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             result = made
             return made
         }
+    }
 
-        /// The finished work; nil when it is not done yet, whoever is doing it.
-        ///
-        /// Never waits.
-        var preparedIfReady: Prepared? {
-            guard lock.try() else {
-                return nil
-            }
+    /// A list is kept in memory only: after a restart, or when many newer ones were made, the
+    /// location of an old one leads nowhere.
+    internal struct ForgottenList: LocalizedError {
+        internal let title: String
+        internal var errorDescription: String? { "The list “\(title)” is no longer available." }
+    }
+
+    /// Passes the first report on at once and the ones that follow within a short time as one
+    /// more report after it.
+    ///
+    /// The reports go out on the main thread, whichever thread the real file system reports on, and
+    /// none goes out once `cancel` was called. A folder that keeps changing is reported ever less
+    /// often (up to `longestWindow` apart), so that the virtual folder is not walked again all the
+    /// time.
+    ///
+    /// All mutable state is guarded by `lock`.
+    private final class Coalescer: @unchecked Sendable {
+        static let window: TimeInterval = 0.5
+        static let longestWindow: TimeInterval = 8
+        private let lock = NSLock()
+        private var isQuiet = true
+        private var isDirty = false
+        private var isCancelled = false
+        private var wait = Coalescer.window
+        private let fire: @MainActor @Sendable () -> Void
+
+        init(_ fire: @escaping @MainActor @Sendable () -> Void) { self.fire = fire }
+
+        func cancel() {
+            lock.lock()
             defer { lock.unlock() }
-            return result
+            isCancelled = true
+        }
+
+        func signal() {
+            lock.lock()
+            guard !isCancelled else {
+                lock.unlock()
+                return
+            }
+            guard isQuiet else {
+                isDirty = true
+                lock.unlock()
+                return
+            }
+            isQuiet = false
+            wait = Self.window
+            let delay = wait
+            lock.unlock()
+            deliver()
+            schedule(after: delay)
+        }
+
+        @MainActor
+        private func settle() {
+            lock.lock()
+            guard !isCancelled else {
+                lock.unlock()
+                return
+            }
+            let again = isDirty
+            isDirty = false
+            if again {
+                wait = min(wait * 2, Self.longestWindow)
+            } else {
+                isQuiet = true
+                wait = Self.window
+            }
+            let delay = wait
+            lock.unlock()
+            guard again else {
+                return
+            }
+            fire()
+            schedule(after: delay)
+        }
+
+        private func deliver() {
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { fire() }
+            } else {
+                DispatchQueue.main.async { [self] in
+                    lock.lock()
+                    let cancelled = isCancelled
+                    lock.unlock()
+                    // The main queue runs its blocks on the main thread.
+                    if !cancelled { MainActor.assumeIsolated { fire() } }
+                }
+            }
+        }
+
+        private func schedule(after delay: TimeInterval) {
+            // The main queue runs its blocks on the main thread.
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in MainActor.assumeIsolated { settle() } }
+        }
+    }
+
+    /// Keeps the real file systems' watchers alive for as long as the caller keeps this.
+    private final class Watchers: Sendable {
+        let watchers: [any WatchToken]
+        private let coalescers: [Coalescer]
+        private let release: @Sendable () -> Void
+        init(_ watchers: [any WatchToken], coalescers: [Coalescer], release: @escaping @Sendable () -> Void) {
+            self.watchers = watchers
+            self.coalescers = coalescers
+            self.release = release
+        }
+        deinit {
+            // A report that is still waiting for its turn must not reach a released watcher.
+            coalescers.forEach { $0.cancel() }
+            release()
         }
     }
 
@@ -124,18 +238,8 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     /// The directories read on the last walk of a virtual folder, by its location key.
     private var walked: [String: [URL]] = [:]
 
-    public init(fileSystems: FileSystemRegistry) {
-        registry = fileSystems
-    }
-
     /// The registry, or an empty one once it has gone.
     private var fileSystems: FileSystemRegistry { registry ?? FileSystemRegistry() }
-
-    private func synchronized<T>(_ body: () throws -> T) rethrows -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return try body()
-    }
 
     public var options: Options {
         get { synchronized { options_ } }
@@ -147,6 +251,61 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     /// virtual folders shown it claims nothing that one of them cannot do.
     public var capabilities: FileSystemCapabilities {
         synchronized { noted.values.reduce([.write, .trash]) { $0.intersection($1) } }
+    }
+
+    public init(fileSystems: FileSystemRegistry) {
+        registry = fileSystems
+    }
+
+    /// What the file systems of `locations` can all do, as far as a list of files is changed
+    /// (its files are deleted, not written to).
+    private static func common(of locations: [URL], _ fileSystems: FileSystemRegistry) -> FileSystemCapabilities {
+        var common: FileSystemCapabilities = [.write, .trash]
+        for example in locations { common.formIntersection(fileSystems.capabilities(for: example)) }
+        return common
+    }
+
+    /// What identifies a file in a list, as exact bytes: two names that differ only in Unicode
+    /// normalisation are two files (a `String` key would merge them).
+    ///
+    /// The scheme, host, port and path, without a trailing slash (which `URL.path` never has), as
+    /// `locationKey` has them.
+    internal static func identity(of url: URL) -> [UInt8] {
+        var bytes = Array((url.scheme ?? "file").utf8)
+        bytes.append(0)
+        if let host = url.host { bytes.append(contentsOf: host.utf8) }
+        if let port = url.port { bytes.append(contentsOf: ":\(port)".utf8) }
+        bytes.append(0)
+        bytes.append(contentsOf: url.path.utf8)
+        return bytes
+    }
+
+    /// The names the items are listed under: their own, except where two have the very same
+    /// name (compared by bytes, as marks are), when each of those is listed by its `path`, so
+    /// that no two entries of a list are marked together.
+    internal static func uniqueNames(of items: [FileItem], path: (FileItem) -> String) -> [String] {
+        var counts: [[UInt8]: Int] = [:]
+        for item in items { counts[Array(item.name.utf8), default: 0] += 1 }
+        var names = items.map { counts[Array($0.name.utf8)] == 1 ? $0.name : path($0) }
+        // Whatever still clashes (two paths that read alike) gets a number, so that no two
+        // entries are ever marked together.
+        var used = Set<[UInt8]>()
+        for index in names.indices {
+            var candidate = names[index]
+            var number = 2
+            while !used.insert(Array(candidate.utf8)).inserted {
+                candidate = names[index] + " (\(number))"
+                number += 1
+            }
+            names[index] = candidate
+        }
+        return names
+    }
+
+    private func synchronized<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body()
     }
 
     /// What can be done in one virtual folder: a branch view or selected branch can do what
@@ -171,14 +330,6 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         case nil:
             return capabilities
         }
-    }
-
-    /// What the file systems of `locations` can all do, as far as a list of files is changed
-    /// (its files are deleted, not written to).
-    private static func common(of locations: [URL], _ fileSystems: FileSystemRegistry) -> FileSystemCapabilities {
-        var common: FileSystemCapabilities = [.write, .trash]
-        for example in locations { common.formIntersection(fileSystems.capabilities(for: example)) }
-        return common
     }
 
     // MARK: Registering lists
@@ -246,21 +397,6 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             total -= oldest.value.raw.count
             lists[oldest.key] = nil
         }
-    }
-
-    /// What identifies a file in a list, as exact bytes: two names that differ only in Unicode
-    /// normalisation are two files (a `String` key would merge them).
-    ///
-    /// The scheme, host, port and path, without a trailing slash (which `URL.path` never has), as
-    /// `locationKey` has them.
-    internal static func identity(of url: URL) -> [UInt8] {
-        var bytes = Array((url.scheme ?? "file").utf8)
-        bytes.append(0)
-        if let host = url.host { bytes.append(contentsOf: host.utf8) }
-        if let port = url.port { bytes.append(contentsOf: ":\(port)".utf8) }
-        bytes.append(0)
-        bytes.append(contentsOf: url.path.utf8)
-        return bytes
     }
 
     /// Works out what has to look at every file of the list.
@@ -461,35 +597,6 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             return nil
         }
         return cancellation.map { provider.item(at: url, cancellation: $0) } ?? provider.item(at: url)
-    }
-
-    /// The names the items are listed under: their own, except where two have the very same
-    /// name (compared by bytes, as marks are), when each of those is listed by its `path`, so
-    /// that no two entries of a list are marked together.
-    internal static func uniqueNames(of items: [FileItem], path: (FileItem) -> String) -> [String] {
-        var counts: [[UInt8]: Int] = [:]
-        for item in items { counts[Array(item.name.utf8), default: 0] += 1 }
-        var names = items.map { counts[Array($0.name.utf8)] == 1 ? $0.name : path($0) }
-        // Whatever still clashes (two paths that read alike) gets a number, so that no two
-        // entries are ever marked together.
-        var used = Set<[UInt8]>()
-        for index in names.indices {
-            var candidate = names[index]
-            var number = 2
-            while !used.insert(Array(candidate.utf8)).inserted {
-                candidate = names[index] + " (\(number))"
-                number += 1
-            }
-            names[index] = candidate
-        }
-        return names
-    }
-
-    /// A list is kept in memory only: after a restart, or when many newer ones were made, the
-    /// location of an old one leads nowhere.
-    internal struct ForgottenList: LocalizedError {
-        internal let title: String
-        internal var errorDescription: String? { "The list “\(title)” is no longer available." }
     }
 
     private func noteCapabilities(of locations: [URL], for virtual: URL) {
@@ -821,112 +928,5 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             if parents.count >= Self.watchLimit { break }
         }
         return parents
-    }
-
-    /// Passes the first report on at once and the ones that follow within a short time as one
-    /// more report after it.
-    ///
-    /// The reports go out on the main thread, whichever thread the real file system reports on, and
-    /// none goes out once `cancel` was called. A folder that keeps changing is reported ever less
-    /// often (up to `longestWindow` apart), so that the virtual folder is not walked again all the
-    /// time.
-    ///
-    /// All mutable state is guarded by `lock`.
-    private final class Coalescer: @unchecked Sendable {
-        static let window: TimeInterval = 0.5
-        static let longestWindow: TimeInterval = 8
-        private let lock = NSLock()
-        private var isQuiet = true
-        private var isDirty = false
-        private var isCancelled = false
-        private var wait = Coalescer.window
-        private let fire: @MainActor @Sendable () -> Void
-
-        init(_ fire: @escaping @MainActor @Sendable () -> Void) { self.fire = fire }
-
-        func cancel() {
-            lock.lock()
-            defer { lock.unlock() }
-            isCancelled = true
-        }
-
-        func signal() {
-            lock.lock()
-            guard !isCancelled else {
-                lock.unlock()
-                return
-            }
-            guard isQuiet else {
-                isDirty = true
-                lock.unlock()
-                return
-            }
-            isQuiet = false
-            wait = Self.window
-            let delay = wait
-            lock.unlock()
-            deliver()
-            schedule(after: delay)
-        }
-
-        @MainActor
-        private func settle() {
-            lock.lock()
-            guard !isCancelled else {
-                lock.unlock()
-                return
-            }
-            let again = isDirty
-            isDirty = false
-            if again {
-                wait = min(wait * 2, Self.longestWindow)
-            } else {
-                isQuiet = true
-                wait = Self.window
-            }
-            let delay = wait
-            lock.unlock()
-            guard again else {
-                return
-            }
-            fire()
-            schedule(after: delay)
-        }
-
-        private func deliver() {
-            if Thread.isMainThread {
-                MainActor.assumeIsolated { fire() }
-            } else {
-                DispatchQueue.main.async { [self] in
-                    lock.lock()
-                    let cancelled = isCancelled
-                    lock.unlock()
-                    // The main queue runs its blocks on the main thread.
-                    if !cancelled { MainActor.assumeIsolated { fire() } }
-                }
-            }
-        }
-
-        private func schedule(after delay: TimeInterval) {
-            // The main queue runs its blocks on the main thread.
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [self] in MainActor.assumeIsolated { settle() } }
-        }
-    }
-
-    /// Keeps the real file systems' watchers alive for as long as the caller keeps this.
-    private final class Watchers: Sendable {
-        let watchers: [any WatchToken]
-        private let coalescers: [Coalescer]
-        private let release: @Sendable () -> Void
-        init(_ watchers: [any WatchToken], coalescers: [Coalescer], release: @escaping @Sendable () -> Void) {
-            self.watchers = watchers
-            self.coalescers = coalescers
-            self.release = release
-        }
-        deinit {
-            // A report that is still waiting for its turn must not reach a released watcher.
-            coalescers.forEach { $0.cancel() }
-            release()
-        }
     }
 }

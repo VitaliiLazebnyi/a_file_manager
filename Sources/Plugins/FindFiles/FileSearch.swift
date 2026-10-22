@@ -69,26 +69,6 @@ public struct SearchMask: @unchecked Sendable {
         return tokens
     }
 
-    public func matches(_ name: String) -> Bool {
-        matches(name, cancelled: { false })
-    }
-
-    /// `cancelled` ends a regular expression that is still working on a name.
-    ///
-    /// A name the expression takes too long for does not match.
-    internal func matches(_ name: String, cancelled: () -> Bool) -> Bool {
-        guard isValid else {
-            return false
-        }
-        if let expression {
-            return FindRegex.matches(expression, in: name, trip: trip, cancelled: cancelled)
-        }
-        let name = Array(name.lowercased())
-        func hit(_ pattern: [Character]) -> Bool { Self.wildcard(pattern, name) }
-        return (includeCharacters.isEmpty || includeCharacters.contains(where: hit))
-            && !excludeCharacters.contains(where: hit)
-    }
-
     /// `*` and `?` as file masks use them, character by character (so a composed and a
     /// decomposed `é` are the same, and `[` is just a bracket). `*.*` matches every name;
     /// `name.*` and `name.` also match `name` without an extension, as under DOS.
@@ -135,6 +115,26 @@ public struct SearchMask: @unchecked Sendable {
         while p < pattern.endIndex, pattern[p] == "*" { p += 1 }
         return p == pattern.endIndex
     }
+
+    public func matches(_ name: String) -> Bool {
+        matches(name, cancelled: { false })
+    }
+
+    /// `cancelled` ends a regular expression that is still working on a name.
+    ///
+    /// A name the expression takes too long for does not match.
+    internal func matches(_ name: String, cancelled: () -> Bool) -> Bool {
+        guard isValid else {
+            return false
+        }
+        if let expression {
+            return FindRegex.matches(expression, in: name, trip: trip, cancelled: cancelled)
+        }
+        let name = Array(name.lowercased())
+        func hit(_ pattern: [Character]) -> Bool { Self.wildcard(pattern, name) }
+        return (includeCharacters.isEmpty || includeCharacters.contains(where: hit))
+            && !excludeCharacters.contains(where: hit)
+    }
 }
 
 /// Everything a search is told (spec 09 › General tab, Advanced tab, Plugins tab).
@@ -174,6 +174,21 @@ public struct SearchQuery: Sendable {
     /// of it in memory.
     public var resultLimit: Int?
 
+    /// The start directories without those that are searched anyway: a repeated one, and, when
+    /// all subdirectories are searched, one that lies inside another.
+    public var directories: [URL] {
+        let all = [directory] + moreDirectories
+        return all.enumerated()
+            .filter { index, url in
+                !all.enumerated()
+                    .contains { other, outer in
+                        other != index
+                            && (url.isSameLocation(as: outer) ? other < index : maxDepth == nil && url.isInside(outer))
+                    }
+            }
+            .map(\.element)
+    }
+
     public init(
         directory: URL,
         names: String = "",
@@ -188,21 +203,6 @@ public struct SearchQuery: Sendable {
         self.caseSensitive = caseSensitive
         self.includeHidden = includeHidden
         self.maxDepth = maxDepth
-    }
-
-    /// The start directories without those that are searched anyway: a repeated one, and, when
-    /// all subdirectories are searched, one that lies inside another.
-    public var directories: [URL] {
-        let all = [directory] + moreDirectories
-        return all.enumerated()
-            .filter { index, url in
-                !all.enumerated()
-                    .contains { other, outer in
-                        other != index
-                            && (url.isSameLocation(as: outer) ? other < index : maxDepth == nil && url.isInside(outer))
-                    }
-            }
-            .map(\.element)
     }
 }
 
@@ -225,47 +225,6 @@ public struct SearchQuery: Sendable {
 /// Safe to share as said above: `limitReached` is guarded by `limitLock`; the rest is fixed in
 /// `init`.
 public final class FileSearch: @unchecked Sendable {
-    public let query: SearchQuery
-    public let cancellation = CancellationFlag()
-    /// Why the search cannot run as asked (a text that is no hex string, a broken regular
-    /// expression); `run` then finds nothing.
-    ///
-    /// Whoever starts a search shows it first.
-    public let problem: any Error?
-    private let fileSystems: FileSystemRegistry
-    private let mask: SearchMask
-    private let pattern: TextPattern?
-    private let fields: [String: SearchField]
-    private let fieldRules: PreparedFieldRules
-    private let fieldTrip = RegexTrip()
-    /// The criteria of the Advanced tab with their moments worked out; nil when none is set.
-    private let criteria: PreparedCriteria?
-    /// The moment the search was made: "not older than" is measured from here for every file.
-    private let now: Date
-    private let limitLock = NSLock()
-    private var limitReached = false
-
-    /// File names that may be archives; only these are offered to the file systems.
-    internal static let archiveExtensions: Set<String> = [
-        "zip", "jar", "tar", "gz", "tgz", "bz2", "tbz", "xz", "txz", "7z", "rar", "cab", "lzh", "arj"
-    ]
-
-    /// The listed but not yet reported entries that hold back the listing of further folders.
-    internal static let candidateBudget = 200_000
-    /// The budget this search works to; tests make it small.
-    internal let budget: Int
-    /// The files a duplicate search collects before it stops and says so.
-    internal static let duplicateCandidateLimit = 3_000_000
-
-    public convenience init(
-        _ query: SearchQuery,
-        fileSystems: FileSystemRegistry,
-        columns: ColumnRegistry? = nil,
-        now: Date = Date()
-    ) {
-        self.init(query, fileSystems: fileSystems, columns: columns, now: now, tuning: Tuning())
-    }
-
     /// What tests make small.
     internal struct Tuning {
         internal var budget = FileSearch.candidateBudget
@@ -275,249 +234,6 @@ public final class FileSearch: @unchecked Sendable {
         /// What tells that two locations are one folder: the device and file number of a local
         /// one, nil for others (which are never taken for each other).
         internal var identity: @Sendable (URL) -> FileIdentity? = { FileIdentity.of($0)?.identity }
-    }
-
-    /// The threads of a search: all cores, and at least four for a slow disk or server.
-    internal static let threadCount = max(4, ProcessInfo.processInfo.activeProcessorCount)
-    /// See `Tuning`.
-    internal let threads: Int
-    /// See `Tuning`.
-    internal let folderIdentity: @Sendable (URL) -> FileIdentity?
-
-    internal init(
-        _ query: SearchQuery,
-        fileSystems: FileSystemRegistry,
-        columns: ColumnRegistry? = nil,
-        now: Date = Date(),
-        tuning: Tuning
-    ) {
-        (budget, partialListingAfter) = (tuning.budget, tuning.partialListingAfter)
-        (threads, folderIdentity) = (tuning.threads, tuning.identity)
-        self.query = query
-        self.fileSystems = fileSystems
-        self.now = now
-        mask = SearchMask(query.names, regex: query.namesAreRegex)
-        criteria = query.criteria.prepared(now: now)
-        fields = Dictionary(
-            SearchField.all(fileSystems: fileSystems, columns: columns).map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
-        fieldRules = query.fieldRules.prepared(trip: fieldTrip)
-        var problem: any Error? = mask.isValid ? nil : TextPattern.Problem.badRegex(query.names)
-        if problem == nil, let rule = query.fieldRules.unusableRule {
-            problem = TextPattern.Problem.badRegex(rule.value)
-        }
-        var pattern: TextPattern?
-        if !query.text.isEmpty {
-            do {
-                pattern = try TextPattern(query.text, caseSensitive: query.caseSensitive, options: query.textOptions)
-            } catch {
-                problem = problem ?? error
-            }
-        }
-        (self.pattern, self.problem) = (pattern, problem)
-    }
-
-    public func cancel() {
-        cancellation.cancel()
-    }
-
-    /// Whether a regular expression of the search (the name, the text, a rule of the Plugins
-    /// tab) ran out of time on some name or file: those were taken as not matching.
-    public var regexTimedOut: Bool {
-        mask.trip.hasTimedOut || fieldTrip.hasTimedOut || pattern?.trip.hasTimedOut == true
-    }
-
-    /// Whether the run stopped at `query.resultLimit`; more hits would have followed.
-    public var reachedResultLimit: Bool {
-        limitLock.lock()
-        defer { limitLock.unlock() }
-        return limitReached
-    }
-
-    /// Walks the trees; the hits come in path order: the matching entries of a folder by name,
-    /// then its subfolders one after the other.
-    ///
-    /// `onDirectory` reports the folder being searched, `onMatch` each hit. With a text to find,
-    /// only files can match.
-    public func run(onDirectory: (URL) -> Void = { _ in }, onMatch: (FileItem) -> Void) {
-        runWalk(limit: query.resultLimit, onDirectory: onDirectory, onMatch: onMatch)
-    }
-
-    private func runWalk(limit: Int?, onDirectory: (URL) -> Void, onMatch: (FileItem) -> Void) {
-        guard problem == nil else {
-            return
-        }
-        let walk = Walk(self)
-        var roots: [Walk.Node] = []
-        // The tree is let go of on another thread: a cancelled search may hold a million entries.
-        defer {
-            // This thread lets go of them here: nothing else holds them any more.
-            let dropped = Handover((walk.close(), roots))
-            DispatchQueue.global(qos: .utility).async { withExtendedLifetime(dropped) {} }
-        }
-        if let only = query.onlyItems {
-            let items =
-                Parallel.map(only) { url -> FileItem? in
-                    guard !self.cancellation.isCancelled else {
-                        return nil
-                    }
-                    return (try? self.fileSystems.provider(for: url))?.item(at: url, cancellation: self.cancellation)
-                }
-                .compactMap { $0 }
-            guard !cancellation.isCancelled else {
-                return
-            }
-            let searchedInside = { (item: FileItem) in item.isRealDirectory && self.query.maxDepth != 0 }
-            let folders = items.filter(searchedInside)
-            // A file listed beside a folder that holds it is found by searching the folder. With
-            // a depth limit only the folder's own files are sure to be reached; what lies deeper
-            // may be (the results are told apart below). The folders are looked up as a set and
-            // each item's parents are walked up, not every item compared with every folder.
-            let folderKeys = Set(folders.map { $0.url.locationKey })
-            let reached = { (item: FileItem) -> Bool in
-                guard !folderKeys.isEmpty else {
-                    return false
-                }
-                var url = item.url
-                for _ in 0..<(self.query.maxDepth == nil ? max(url.pathComponents.count, 1) : 1) {
-                    url = url.deletingLastPathComponent()
-                    if folderKeys.contains(url.locationKey) {
-                        return true
-                    }
-                }
-                return false
-            }
-            var own: [FileItem] = []
-            for item in items where !cancellation.isCancelled {
-                // The name goes first, it rejects most and costs least.
-                if !searchedInside(item), passesQuickChecks(item), !reached(item) { own.append(item) }
-            }
-            roots.append(walk.makeNode(files: pattern == nil ? own : own.filter { !$0.isDirectory }))
-            roots += folders.map { walk.makeNode(directory: $0.url, depth: 1) }
-        } else {
-            roots = query.directories.map { walk.makeNode(directory: $0, depth: 0) }
-        }
-        walk.start(roots)
-        // Roots that overlap (nested ones kept for their depth, files and folders chosen
-        // together) can reach a file twice: it is reported once. The same folder reached by two
-        // roads (a firmlink) is one place; two names for one file in one folder (hard links)
-        // are two files.
-        var reported = Set<String>()
-        var parents: [String: FileIdentity?] = [:]
-        func reportKey(_ item: FileItem) -> String {
-            guard item.url.isFileURL else {
-                return Self.locationKey(of: item.url)
-            }
-            let parent = item.url.deletingLastPathComponent()
-            let identity: FileIdentity?
-            if let known = parents[parent.path] {
-                identity = known
-            } else {
-                identity = FileIdentity.of(parent)?.identity
-                parents[parent.path] = .some(identity)
-            }
-            guard let identity else {
-                return item.url.locationKey
-            }
-            return "\(identity.device):\(identity.inode)/\(item.url.lastPathComponent)"
-        }
-        let overlapping = query.onlyItems != nil || roots.count > 1
-        var count = 0
-        for root in roots {
-            walk.deliver(root, onDirectory: onDirectory) { item in
-                if overlapping, !reported.insert(reportKey(item)).inserted {
-                    return
-                }
-                if let limit, count >= limit {
-                    limitLock.lock()
-                    limitReached = true
-                    limitLock.unlock()
-                    walk.stop()
-                    return
-                }
-                count += 1
-                onMatch(item)
-            }
-            if walk.isStopped { break }
-        }
-    }
-
-    /// A place by its location, with the host in lower case and no trailing slash: two ways of
-    /// writing the same remote place (`sftp://HOST/a`, `sftp://host/a/`) are one key.
-    internal static func locationKey(of url: URL) -> String {
-        var key = url.locationKey
-        if let host = url.host, !host.isEmpty, let range = key.range(of: "://" + host) {
-            key.replaceSubrange(range, with: "://" + host.lowercased())
-        }
-        return key
-    }
-
-    /// From this many entries seen in one folder on, what has passed the quick checks is
-    /// reported in parts while the listing goes on (each part in name order).
-    internal static let defaultPartialListingAfter = 100_000
-    /// Tests make it small.
-    internal let partialListingAfter: Int
-
-    /// Runs the search and returns the files that are duplicates of each other, in groups
-    /// (spec 09 › Duplicate finder); empty when the search was cancelled.
-    ///
-    /// The files are all held while they are compared, so a search stops at
-    /// `duplicateCandidateLimit` of them and says so (`reachedResultLimit`).
-    public func runForDuplicates(
-        onDirectory: (URL) -> Void = { _ in },
-        onHashing: (@Sendable (Int, Int) -> Void)? = nil
-    )
-        -> [[FileItem]]
-    {
-        var files: [FileItem] = []
-        runWalk(
-            limit: min(query.resultLimit ?? Int.max, Self.duplicateCandidateLimit),
-            onDirectory: onDirectory
-        ) {
-            if !$0.isDirectory { files.append($0) }
-        }
-        return DuplicateFinder.groups(
-            of: files,
-            options: query.duplicates,
-            fileSystems: fileSystems,
-            cancellation: cancellation,
-            onProgress: onHashing
-        )
-    }
-
-    /// Whether an item found by other means (Spotlight) passes the criteria.
-    ///
-    /// Without `checkingText` the text criterion is taken as met. Blocks like the search itself.
-    public func accepts(_ item: FileItem, checkingText: Bool = true) -> Bool {
-        problem == nil && passesQuickChecks(item) && (checkingText && pattern != nil ? !item.isDirectory : true)
-            && passesSlowChecks(item, checkingText: checkingText)
-    }
-
-    /// What can be told from the directory entry alone; the name is tried first, it is the
-    /// cheapest and rejects most.
-    private func passesQuickChecks(_ item: FileItem) -> Bool {
-        mask.matches(item.name, cancelled: { self.cancellation.isCancelled }) && (criteria?.matches(item) ?? true)
-    }
-
-    /// Field rules and text: both may read the file, so they run on all cores.
-    private func passesSlowChecks(_ item: FileItem, checkingText: Bool = true) -> Bool {
-        guard !cancellation.isCancelled,
-            fieldRules.matches(item, fields: fields, cancelled: { self.cancellation.isCancelled })
-        else { return false }
-        guard checkingText, let pattern else {
-            return true
-        }
-        // A FIFO would block the open for good, /dev/zero would never end, a cloud stub would
-        // be downloaded; a local file is opened without waiting and looked at once opened.
-        guard !item.isSpecial, let reader = fileSystems.searchReader(for: item.url, cancellation: cancellation) else {
-            return false
-        }
-        defer { reader.close() }
-        // A read blocked on a server ends when the search is cancelled.
-        let token = cancellation.interrupting(reader)
-        defer { withExtendedLifetime(token) {} }
-        return autoreleasepool { pattern.accepts(reader, cancellation: cancellation) }
     }
 
     /// The walk of one `run`: a few threads list folders and test the files found, all from
@@ -565,6 +281,15 @@ public final class FileSearch: @unchecked Sendable {
         private var needed: Node?
         private var stopped = false
 
+        var isStopped: Bool {
+            if search.cancellation.isCancelled {
+                return true
+            }
+            budgetLock.lock()
+            defer { budgetLock.unlock() }
+            return stopped
+        }
+
         init(_ search: FileSearch) {
             self.search = search
             jobs.shouldHold = { [weak self] job in self?.shouldHold(job) == true }
@@ -579,15 +304,6 @@ public final class FileSearch: @unchecked Sendable {
             condition.lock()
             condition.broadcast()
             condition.unlock()
-        }
-
-        var isStopped: Bool {
-            if search.cancellation.isCancelled {
-                return true
-            }
-            budgetLock.lock()
-            defer { budgetLock.unlock() }
-            return stopped
         }
 
         /// Drops the jobs that are left and returns them, to be let go of on another thread.
@@ -865,12 +581,12 @@ public final class FileSearch: @unchecked Sendable {
     /// `condition`; `shouldHold` is set once, before `start`.
     private final class JobStack: @unchecked Sendable {
         struct Job {
+            typealias Node = Walk.Node
+
             let node: Node?
             /// Lists a folder (as opposed to testing entries).
             let isListing: Bool
             let run: () -> Void
-
-            typealias Node = Walk.Node
 
             init(node: Node?, isListing: Bool, run: @escaping () -> Void) {
                 self.node = node
@@ -945,6 +661,290 @@ public final class FileSearch: @unchecked Sendable {
             }
             return nil
         }
+    }
+
+    /// File names that may be archives; only these are offered to the file systems.
+    internal static let archiveExtensions: Set<String> = [
+        "zip", "jar", "tar", "gz", "tgz", "bz2", "tbz", "xz", "txz", "7z", "rar", "cab", "lzh", "arj"
+    ]
+
+    /// The listed but not yet reported entries that hold back the listing of further folders.
+    internal static let candidateBudget = 200_000
+    /// The files a duplicate search collects before it stops and says so.
+    internal static let duplicateCandidateLimit = 3_000_000
+
+    /// The threads of a search: all cores, and at least four for a slow disk or server.
+    internal static let threadCount = max(4, ProcessInfo.processInfo.activeProcessorCount)
+
+    /// From this many entries seen in one folder on, what has passed the quick checks is
+    /// reported in parts while the listing goes on (each part in name order).
+    internal static let defaultPartialListingAfter = 100_000
+
+    public let query: SearchQuery
+    public let cancellation = CancellationFlag()
+    /// Why the search cannot run as asked (a text that is no hex string, a broken regular
+    /// expression); `run` then finds nothing.
+    ///
+    /// Whoever starts a search shows it first.
+    public let problem: any Error?
+    private let fileSystems: FileSystemRegistry
+    private let mask: SearchMask
+    private let pattern: TextPattern?
+    private let fields: [String: SearchField]
+    private let fieldRules: PreparedFieldRules
+    private let fieldTrip = RegexTrip()
+    /// The criteria of the Advanced tab with their moments worked out; nil when none is set.
+    private let criteria: PreparedCriteria?
+    /// The moment the search was made: "not older than" is measured from here for every file.
+    private let now: Date
+    private let limitLock = NSLock()
+    private var limitReached = false
+    /// The budget this search works to; tests make it small.
+    internal let budget: Int
+    /// See `Tuning`.
+    internal let threads: Int
+    /// See `Tuning`.
+    internal let folderIdentity: @Sendable (URL) -> FileIdentity?
+
+    /// Whether a regular expression of the search (the name, the text, a rule of the Plugins
+    /// tab) ran out of time on some name or file: those were taken as not matching.
+    public var regexTimedOut: Bool {
+        mask.trip.hasTimedOut || fieldTrip.hasTimedOut || pattern?.trip.hasTimedOut == true
+    }
+
+    /// Whether the run stopped at `query.resultLimit`; more hits would have followed.
+    public var reachedResultLimit: Bool {
+        limitLock.lock()
+        defer { limitLock.unlock() }
+        return limitReached
+    }
+    /// Tests make it small.
+    internal let partialListingAfter: Int
+
+    public convenience init(
+        _ query: SearchQuery,
+        fileSystems: FileSystemRegistry,
+        columns: ColumnRegistry? = nil,
+        now: Date = Date()
+    ) {
+        self.init(query, fileSystems: fileSystems, columns: columns, now: now, tuning: Tuning())
+    }
+
+    internal init(
+        _ query: SearchQuery,
+        fileSystems: FileSystemRegistry,
+        columns: ColumnRegistry? = nil,
+        now: Date = Date(),
+        tuning: Tuning
+    ) {
+        (budget, partialListingAfter) = (tuning.budget, tuning.partialListingAfter)
+        (threads, folderIdentity) = (tuning.threads, tuning.identity)
+        self.query = query
+        self.fileSystems = fileSystems
+        self.now = now
+        mask = SearchMask(query.names, regex: query.namesAreRegex)
+        criteria = query.criteria.prepared(now: now)
+        fields = Dictionary(
+            SearchField.all(fileSystems: fileSystems, columns: columns).map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        fieldRules = query.fieldRules.prepared(trip: fieldTrip)
+        var problem: any Error? = mask.isValid ? nil : TextPattern.Problem.badRegex(query.names)
+        if problem == nil, let rule = query.fieldRules.unusableRule {
+            problem = TextPattern.Problem.badRegex(rule.value)
+        }
+        var pattern: TextPattern?
+        if !query.text.isEmpty {
+            do {
+                pattern = try TextPattern(query.text, caseSensitive: query.caseSensitive, options: query.textOptions)
+            } catch {
+                problem = problem ?? error
+            }
+        }
+        (self.pattern, self.problem) = (pattern, problem)
+    }
+
+    /// A place by its location, with the host in lower case and no trailing slash: two ways of
+    /// writing the same remote place (`sftp://HOST/a`, `sftp://host/a/`) are one key.
+    internal static func locationKey(of url: URL) -> String {
+        var key = url.locationKey
+        if let host = url.host, !host.isEmpty, let range = key.range(of: "://" + host) {
+            key.replaceSubrange(range, with: "://" + host.lowercased())
+        }
+        return key
+    }
+
+    public func cancel() {
+        cancellation.cancel()
+    }
+
+    /// Walks the trees; the hits come in path order: the matching entries of a folder by name,
+    /// then its subfolders one after the other.
+    ///
+    /// `onDirectory` reports the folder being searched, `onMatch` each hit. With a text to find,
+    /// only files can match.
+    public func run(onDirectory: (URL) -> Void = { _ in }, onMatch: (FileItem) -> Void) {
+        runWalk(limit: query.resultLimit, onDirectory: onDirectory, onMatch: onMatch)
+    }
+
+    private func runWalk(limit: Int?, onDirectory: (URL) -> Void, onMatch: (FileItem) -> Void) {
+        guard problem == nil else {
+            return
+        }
+        let walk = Walk(self)
+        var roots: [Walk.Node] = []
+        // The tree is let go of on another thread: a cancelled search may hold a million entries.
+        defer {
+            // This thread lets go of them here: nothing else holds them any more.
+            let dropped = Handover((walk.close(), roots))
+            DispatchQueue.global(qos: .utility).async { withExtendedLifetime(dropped) {} }
+        }
+        if let only = query.onlyItems {
+            let items =
+                Parallel.map(only) { url -> FileItem? in
+                    guard !self.cancellation.isCancelled else {
+                        return nil
+                    }
+                    return (try? self.fileSystems.provider(for: url))?.item(at: url, cancellation: self.cancellation)
+                }
+                .compactMap { $0 }
+            guard !cancellation.isCancelled else {
+                return
+            }
+            let searchedInside = { (item: FileItem) in item.isRealDirectory && self.query.maxDepth != 0 }
+            let folders = items.filter(searchedInside)
+            // A file listed beside a folder that holds it is found by searching the folder. With
+            // a depth limit only the folder's own files are sure to be reached; what lies deeper
+            // may be (the results are told apart below). The folders are looked up as a set and
+            // each item's parents are walked up, not every item compared with every folder.
+            let folderKeys = Set(folders.map { $0.url.locationKey })
+            let reached = { (item: FileItem) -> Bool in
+                guard !folderKeys.isEmpty else {
+                    return false
+                }
+                var url = item.url
+                for _ in 0..<(self.query.maxDepth == nil ? max(url.pathComponents.count, 1) : 1) {
+                    url = url.deletingLastPathComponent()
+                    if folderKeys.contains(url.locationKey) {
+                        return true
+                    }
+                }
+                return false
+            }
+            var own: [FileItem] = []
+            for item in items where !cancellation.isCancelled {
+                // The name goes first, it rejects most and costs least.
+                if !searchedInside(item), passesQuickChecks(item), !reached(item) { own.append(item) }
+            }
+            roots.append(walk.makeNode(files: pattern == nil ? own : own.filter { !$0.isDirectory }))
+            roots += folders.map { walk.makeNode(directory: $0.url, depth: 1) }
+        } else {
+            roots = query.directories.map { walk.makeNode(directory: $0, depth: 0) }
+        }
+        walk.start(roots)
+        // Roots that overlap (nested ones kept for their depth, files and folders chosen
+        // together) can reach a file twice: it is reported once. The same folder reached by two
+        // roads (a firmlink) is one place; two names for one file in one folder (hard links)
+        // are two files.
+        var reported = Set<String>()
+        var parents: [String: FileIdentity?] = [:]
+        func reportKey(_ item: FileItem) -> String {
+            guard item.url.isFileURL else {
+                return Self.locationKey(of: item.url)
+            }
+            let parent = item.url.deletingLastPathComponent()
+            let identity: FileIdentity?
+            if let known = parents[parent.path] {
+                identity = known
+            } else {
+                identity = FileIdentity.of(parent)?.identity
+                parents[parent.path] = .some(identity)
+            }
+            guard let identity else {
+                return item.url.locationKey
+            }
+            return "\(identity.device):\(identity.inode)/\(item.url.lastPathComponent)"
+        }
+        let overlapping = query.onlyItems != nil || roots.count > 1
+        var count = 0
+        for root in roots {
+            walk.deliver(root, onDirectory: onDirectory) { item in
+                if overlapping, !reported.insert(reportKey(item)).inserted {
+                    return
+                }
+                if let limit, count >= limit {
+                    limitLock.lock()
+                    limitReached = true
+                    limitLock.unlock()
+                    walk.stop()
+                    return
+                }
+                count += 1
+                onMatch(item)
+            }
+            if walk.isStopped { break }
+        }
+    }
+
+    /// Runs the search and returns the files that are duplicates of each other, in groups
+    /// (spec 09 › Duplicate finder); empty when the search was cancelled.
+    ///
+    /// The files are all held while they are compared, so a search stops at
+    /// `duplicateCandidateLimit` of them and says so (`reachedResultLimit`).
+    public func runForDuplicates(
+        onDirectory: (URL) -> Void = { _ in },
+        onHashing: (@Sendable (Int, Int) -> Void)? = nil
+    )
+        -> [[FileItem]]
+    {
+        var files: [FileItem] = []
+        runWalk(
+            limit: min(query.resultLimit ?? Int.max, Self.duplicateCandidateLimit),
+            onDirectory: onDirectory
+        ) {
+            if !$0.isDirectory { files.append($0) }
+        }
+        return DuplicateFinder.groups(
+            of: files,
+            options: query.duplicates,
+            fileSystems: fileSystems,
+            cancellation: cancellation,
+            onProgress: onHashing
+        )
+    }
+
+    /// Whether an item found by other means (Spotlight) passes the criteria.
+    ///
+    /// Without `checkingText` the text criterion is taken as met. Blocks like the search itself.
+    public func accepts(_ item: FileItem, checkingText: Bool = true) -> Bool {
+        problem == nil && passesQuickChecks(item) && (checkingText && pattern != nil ? !item.isDirectory : true)
+            && passesSlowChecks(item, checkingText: checkingText)
+    }
+
+    /// What can be told from the directory entry alone; the name is tried first, it is the
+    /// cheapest and rejects most.
+    private func passesQuickChecks(_ item: FileItem) -> Bool {
+        mask.matches(item.name, cancelled: { self.cancellation.isCancelled }) && (criteria?.matches(item) ?? true)
+    }
+
+    /// Field rules and text: both may read the file, so they run on all cores.
+    private func passesSlowChecks(_ item: FileItem, checkingText: Bool = true) -> Bool {
+        guard !cancellation.isCancelled,
+            fieldRules.matches(item, fields: fields, cancelled: { self.cancellation.isCancelled })
+        else { return false }
+        guard checkingText, let pattern else {
+            return true
+        }
+        // A FIFO would block the open for good, /dev/zero would never end, a cloud stub would
+        // be downloaded; a local file is opened without waiting and looked at once opened.
+        guard !item.isSpecial, let reader = fileSystems.searchReader(for: item.url, cancellation: cancellation) else {
+            return false
+        }
+        defer { reader.close() }
+        // A read blocked on a server ends when the search is cancelled.
+        let token = cancellation.interrupting(reader)
+        defer { withExtendedLifetime(token) {} }
+        return autoreleasepool { pattern.accepts(reader, cancellation: cancellation) }
     }
 
     /// Where the contents of an archive file are listed: the location another file system

@@ -47,6 +47,9 @@ internal struct RenameStep: Equatable {
 /// Everywhere, `sources[i]` is where item i is, and `targets[i]` where it is to go: nil when
 /// the item stays (no name, skipped), the source itself when the name does not change.
 internal struct RenamePlanner {
+    /// The longest a name can be, in UTF-8 bytes.
+    internal static let longestName = 255
+
     /// Whether the file system takes `A.txt` and `a.txt` for the same name: in every folder,
     /// or only in the folders in `foldedFolders` (their `locationKey`s), as on a list whose
     /// items lie on several volumes.
@@ -61,6 +64,19 @@ internal struct RenamePlanner {
     internal init(foldedFolders: Set<String>) {
         foldsCase = false
         self.foldedFolders = foldedFolders
+    }
+
+    /// `report.txt` → `report (2).txt`; a folder keeps its dots.
+    ///
+    /// A name that the number would make too long for the file system is shortened at its base,
+    /// between two characters.
+    internal static func numbered(_ url: URL, _ number: Int, isFolder: Bool) -> URL {
+        let name = url.lastPathComponent
+        let (base, ext) = isFolder ? (name, "") : FileItem.split(name)
+        let tail = " (\(number))" + (ext.isEmpty ? "" : "." + ext)
+        var kept = base
+        while kept.utf8.count + tail.utf8.count > longestName, !kept.isEmpty { kept.removeLast() }
+        return url.deletingLastPathComponent().appending(name: kept + tail)
     }
 
     /// A location in the form in which the file system tells names apart.
@@ -166,22 +182,6 @@ internal struct RenamePlanner {
             }
         }
         return targets
-    }
-
-    /// The longest a name can be, in UTF-8 bytes.
-    internal static let longestName = 255
-
-    /// `report.txt` → `report (2).txt`; a folder keeps its dots.
-    ///
-    /// A name that the number would make too long for the file system is shortened at its base,
-    /// between two characters.
-    internal static func numbered(_ url: URL, _ number: Int, isFolder: Bool) -> URL {
-        let name = url.lastPathComponent
-        let (base, ext) = isFolder ? (name, "") : FileItem.split(name)
-        let tail = " (\(number))" + (ext.isEmpty ? "" : "." + ext)
-        var kept = base
-        while kept.utf8.count + tail.utf8.count > longestName, !kept.isEmpty { kept.removeLast() }
-        return url.deletingLastPathComponent().appending(name: kept + tail)
     }
 
     /// The items in list order, except that those which lie inside another folder of the list

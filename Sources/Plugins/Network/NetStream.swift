@@ -212,18 +212,22 @@ public final class CertificateTrust: @unchecked Sendable {
 ///
 /// `rejected` is guarded by `lock`; nothing else changes after `init`.
 internal final class TLSSettings: @unchecked Sendable {
+    /// Where certificates are checked.
+    ///
+    /// The check may ask the network (revocation) and take seconds; on a queue of its own it holds
+    /// up neither the stream it belongs to nor another.
+    private static let verifyQueue = DispatchQueue(
+        label: "afm.network.verify",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
+
     internal let host: String
     internal let trust: CertificateTrust
     private let lock = NSLock()
     private var rejectedCertificate: CertificateInfo?
     /// Called where a certificate is checked, before the check; tests make a check slow with it.
     internal let beforeEvaluating: @Sendable () -> Void
-
-    internal init(host: String, trust: CertificateTrust, beforeEvaluating: @escaping @Sendable () -> Void = {}) {
-        self.host = host
-        self.trust = trust
-        self.beforeEvaluating = beforeEvaluating
-    }
 
     internal var rejected: CertificateInfo? {
         get {
@@ -238,15 +242,14 @@ internal final class TLSSettings: @unchecked Sendable {
         }
     }
 
-    /// Where certificates are checked.
-    ///
-    /// The check may ask the network (revocation) and take seconds; on a queue of its own it holds
-    /// up neither the stream it belongs to nor another.
-    private static let verifyQueue = DispatchQueue(
-        label: "afm.network.verify",
-        qos: .userInitiated,
-        attributes: .concurrent
-    )
+    /// True when the host is a name; an address in text form has no server name to announce.
+    private var isName: Bool { IPv4Address(host) == nil && IPv6Address(host) == nil }
+
+    internal init(host: String, trust: CertificateTrust, beforeEvaluating: @escaping @Sendable () -> Void = {}) {
+        self.host = host
+        self.trust = trust
+        self.beforeEvaluating = beforeEvaluating
+    }
 
     /// Options for `NWProtocolTLS` that verify the server like the system does, and accept what
     /// the user accepted before.
@@ -265,9 +268,6 @@ internal final class TLSSettings: @unchecked Sendable {
         )
         return options
     }
-
-    /// True when the host is a name; an address in text form has no server name to announce.
-    private var isName: Bool { IPv4Address(host) == nil && IPv6Address(host) == nil }
 
     /// Whether the certificate chain is good for this host: trusted by the system and issued to
     /// the host (a name must match a DNS name of the certificate, an address one of its IP
@@ -365,6 +365,23 @@ internal final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
 
     internal init(framer _: NWProtocolFramer.Instance) {}
 
+    /// The next whole line that arrived, without its line end; nil while none has.
+    ///
+    /// One line at a time, so nothing that follows the last reply is taken away.
+    private static func nextLine(_ framer: NWProtocolFramer.Instance) -> String? {
+        var line: String?
+        _ = framer.parseInput(minimumIncompleteLength: 1, maximumLength: 16_384) { buffer, _ in
+            guard let buffer, let end = buffer.firstIndex(of: 0x0A) else {
+                return 0
+            }
+            var bytes = Array(buffer[..<end])
+            if bytes.last == 0x0D { bytes.removeLast() }
+            line = String(decoding: bytes, as: UTF8.self)
+            return end + 1
+        }
+        return line
+    }
+
     internal func start(framer _: NWProtocolFramer.Instance) -> NWProtocolFramer.StartResult { .willMarkReady }
     internal func wakeup(framer _: NWProtocolFramer.Instance) {}
     internal func stop(framer _: NWProtocolFramer.Instance) -> Bool { true }
@@ -406,23 +423,6 @@ internal final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
         return 0
     }
 
-    /// The next whole line that arrived, without its line end; nil while none has.
-    ///
-    /// One line at a time, so nothing that follows the last reply is taken away.
-    private static func nextLine(_ framer: NWProtocolFramer.Instance) -> String? {
-        var line: String?
-        _ = framer.parseInput(minimumIncompleteLength: 1, maximumLength: 16_384) { buffer, _ in
-            guard let buffer, let end = buffer.firstIndex(of: 0x0A) else {
-                return 0
-            }
-            var bytes = Array(buffer[..<end])
-            if bytes.last == 0x0D { bytes.removeLast() }
-            line = String(decoding: bytes, as: UTF8.self)
-            return end + 1
-        }
-        return line
-    }
-
     private func fail(_ framer: NWProtocolFramer.Instance, _ report: ExplicitTLSReport?, _ reply: FTPReply) -> Int {
         report?.refusal = reply
         framer.markFailed(error: .posix(.EPROTO))
@@ -449,6 +449,13 @@ internal final class NetStream: @unchecked Sendable {
         /// The FTP greeting and `AUTH TLS` in the clear, then TLS.
         case explicitFTP(TLSSettings, ExplicitTLSReport)
     }
+    /// More than this is not read ahead of the caller.
+    private static let highWater = 1 << 20
+    /// Uploads go out in pieces of this size, a few at a time.
+    private static let sendPiece = 128 * 1_024
+    private static let sendsInFlight = 4
+    /// The read part of the buffer is cut off once it is this large.
+    private static let compactAt = 1 << 20
 
     private let connection: NWConnection
     private let queue = DispatchQueue(label: "afm.network.stream")
@@ -469,13 +476,57 @@ internal final class NetStream: @unchecked Sendable {
     private var hasFinishedWriting = false
     /// True for TLS from the first byte, as data connections have it.
     internal let isEncrypted: Bool
-    /// More than this is not read ahead of the caller.
-    private static let highWater = 1 << 20
-    /// Uploads go out in pieces of this size, a few at a time.
-    private static let sendPiece = 128 * 1_024
-    private static let sendsInFlight = 4
-    /// The read part of the buffer is cut off once it is this large.
-    private static let compactAt = 1 << 20
+
+    /// Whether `close` was called; the network layer lets go of the connection later, on its queue.
+    private var wasClosed: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return isClosed
+    }
+
+    /// The address of this end of the connection, for the PORT command; nil once the stream is closed.
+    internal var localAddress: String? {
+        guard !wasClosed, case .hostPort(let host, _)? = connection.currentPath?.localEndpoint else {
+            return nil
+        }
+        let text = "\(host)"
+        return text.split(separator: "%").first.map(String.init)
+    }
+
+    /// The address of the other end, as the network layer reached it; nil when only a name is known, and
+    /// once the stream is closed.
+    internal var remoteAddress: String? {
+        guard !wasClosed else {
+            return nil
+        }
+        switch connection.currentPath?.remoteEndpoint {
+        case .hostPort(.ipv4(let address), _)?:
+            return "\(address)"
+
+        case .hostPort(.ipv6(let address), _)?:
+            return "\(address)"
+
+        default:
+            return nil
+        }
+    }
+
+    /// Bytes that arrived and were not read yet.
+    ///
+    /// Called with the lock held.
+    private var buffered: Int { buffer.count - readOffset }
+
+    /// Tells the other side that nothing more will be sent (the end of an upload).
+    ///
+    /// Under TLS nothing is sent here: the framework ends an encrypted stream properly (everything
+    /// delivered, then the closing alert) only when the connection is closed, and an end announced
+    /// before that makes it drop what is still on its way. Found by test. True once the caller has
+    /// declared its data complete.
+    internal var didFinishWriting: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return hasFinishedWriting
+    }
 
     internal init(host: String, port: Int, security: Security = .none) {
         let tcp = NWProtocolTCP.Options()
@@ -510,11 +561,6 @@ internal final class NetStream: @unchecked Sendable {
     internal init(accepted connection: NWConnection) {
         self.connection = connection
         isEncrypted = false
-    }
-
-    deinit {
-        connection.stateUpdateHandler = nil
-        connection.cancel()
     }
 
     /// Starts connecting; `waitUntilReady` tells when it is done.
@@ -553,40 +599,6 @@ internal final class NetStream: @unchecked Sendable {
         try wait(timeout: timeout, cancellation: cancellation, for: "connecting") { self.isReady ? () : nil }
     }
 
-    /// Whether `close` was called; the network layer lets go of the connection later, on its queue.
-    private var wasClosed: Bool {
-        condition.lock()
-        defer { condition.unlock() }
-        return isClosed
-    }
-
-    /// The address of this end of the connection, for the PORT command; nil once the stream is closed.
-    internal var localAddress: String? {
-        guard !wasClosed, case .hostPort(let host, _)? = connection.currentPath?.localEndpoint else {
-            return nil
-        }
-        let text = "\(host)"
-        return text.split(separator: "%").first.map(String.init)
-    }
-
-    /// The address of the other end, as the network layer reached it; nil when only a name is known, and
-    /// once the stream is closed.
-    internal var remoteAddress: String? {
-        guard !wasClosed else {
-            return nil
-        }
-        switch connection.currentPath?.remoteEndpoint {
-        case .hostPort(.ipv4(let address), _)?:
-            return "\(address)"
-
-        case .hostPort(.ipv6(let address), _)?:
-            return "\(address)"
-
-        default:
-            return nil
-        }
-    }
-
     // MARK: Reading
 
     /// Keeps one receive call outstanding while there is room in the buffer.
@@ -618,11 +630,6 @@ internal final class NetStream: @unchecked Sendable {
             receiveMore()
         }
     }
-
-    /// Bytes that arrived and were not read yet.
-    ///
-    /// Called with the lock held.
-    private var buffered: Int { buffer.count - readOffset }
 
     /// Takes `count` bytes off the front.
     ///
@@ -763,18 +770,6 @@ internal final class NetStream: @unchecked Sendable {
         }
     }
 
-    /// Tells the other side that nothing more will be sent (the end of an upload).
-    ///
-    /// Under TLS nothing is sent here: the framework ends an encrypted stream properly (everything
-    /// delivered, then the closing alert) only when the connection is closed, and an end announced
-    /// before that makes it drop what is still on its way. Found by test. True once the caller has
-    /// declared its data complete.
-    internal var didFinishWriting: Bool {
-        condition.lock()
-        defer { condition.unlock() }
-        return hasFinishedWriting
-    }
-
     internal func finishWriting(timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws {
         condition.lock()
         let alreadyFinished = hasFinishedWriting
@@ -821,6 +816,11 @@ internal final class NetStream: @unchecked Sendable {
         condition.unlock()
         connection.cancel()
     }
+
+    deinit {
+        connection.stateUpdateHandler = nil
+        connection.cancel()
+    }
 }
 
 /// Waits for the server to open a data connection to us (active mode, spec 11 › Active mode,
@@ -838,15 +838,6 @@ internal final class DataListener {
     private let accepted = Pending<NWConnection>()
     private let peer: String
 
-    /// The text of an address without what differs between two spellings of the same one: the
-    /// zone of a link-local address, and the IPv6 form of an IPv4 address.
-    internal static func comparable(_ address: String) -> String {
-        var text = address.lowercased()
-        if let zone = text.firstIndex(of: "%") { text = String(text[..<zone]) }
-        if text.hasPrefix("::ffff:"), text.contains(".") { text = String(text.dropFirst(7)) }
-        return ServerKey.bare(text)
-    }
-
     /// `peer` is the address of the server, `local` the address of this end of the control connection.
     internal init(peer: String, local: String) throws {
         self.peer = Self.comparable(peer)
@@ -855,7 +846,14 @@ internal final class DataListener {
         listener = try NWListener(using: parameters)
     }
 
-    deinit { listener.cancel() }
+    /// The text of an address without what differs between two spellings of the same one: the
+    /// zone of a link-local address, and the IPv6 form of an IPv4 address.
+    internal static func comparable(_ address: String) -> String {
+        var text = address.lowercased()
+        if let zone = text.firstIndex(of: "%") { text = String(text[..<zone]) }
+        if text.hasPrefix("::ffff:"), text.contains(".") { text = String(text.dropFirst(7)) }
+        return ServerKey.bare(text)
+    }
 
     /// Starts listening and returns the port.
     internal func start(timeout: TimeInterval) throws -> Int {
@@ -909,4 +907,6 @@ internal final class DataListener {
     }
 
     internal func cancel() { listener.cancel() }
+
+    deinit { listener.cancel() }
 }

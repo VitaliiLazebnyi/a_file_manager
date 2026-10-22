@@ -43,6 +43,8 @@ internal final class KeyBindingEditor {
     internal private(set) var overrides: [String: [String]]
     private var resolved: [CommandID: [Shortcut]] = [:]
 
+    internal var isChanged: Bool { overrides != stored }
+
     internal init(commands: [Command], overrides: [String: [String]]) {
         self.commands = commands
         stored = overrides
@@ -54,6 +56,27 @@ internal final class KeyBindingEditor {
         self.init(
             commands: kernel.commands.all,
             overrides: Self.storedOverrides(in: kernel)
+        )
+    }
+
+    internal static func storedOverrides(in kernel: Kernel) -> [String: [String]] {
+        kernel.settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) ?? [:]
+    }
+
+    internal static func apply(_ keys: [CommandID: [Shortcut]], of commands: [Command], to keyBindings: KeyBindings) {
+        var all: [String: [String]] = [:]
+        for command in commands { all[command.id.rawValue] = (keys[command.id] ?? []).map(\.notation) }
+        keyBindings.apply(overrides: all)
+    }
+
+    /// Brings the running program in line with the stored bindings, after they were replaced
+    /// as a whole (import, reset).
+    internal static func reapply(in kernel: Kernel) {
+        let overrides = kernel.settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) ?? [:]
+        apply(
+            KeyMap.resolve(kernel.commands.all, overrides: overrides),
+            of: kernel.commands.all,
+            to: kernel.keyBindings
         )
     }
 
@@ -74,10 +97,6 @@ internal final class KeyBindingEditor {
         rebase(commands: kernel.commands.all, overrides: Self.storedOverrides(in: kernel))
     }
 
-    internal static func storedOverrides(in kernel: Kernel) -> [String: [String]] {
-        kernel.settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) ?? [:]
-    }
-
     /// Forgets the bindings of commands that no longer exist (a deleted or renamed user command).
     internal func discardOverrides(where isDead: (String) -> Bool) {
         let before = overrides.count
@@ -88,8 +107,6 @@ internal final class KeyBindingEditor {
     private func resolve() {
         resolved = KeyMap.resolve(commands, overrides: overrides)
     }
-
-    internal var isChanged: Bool { overrides != stored }
 
     internal func shortcuts(for command: CommandID) -> [Shortcut] { resolved[command] ?? [] }
 
@@ -170,23 +187,6 @@ internal final class KeyBindingEditor {
         }
         Self.apply(resolved, of: commands, to: keyBindings)
     }
-
-    internal static func apply(_ keys: [CommandID: [Shortcut]], of commands: [Command], to keyBindings: KeyBindings) {
-        var all: [String: [String]] = [:]
-        for command in commands { all[command.id.rawValue] = (keys[command.id] ?? []).map(\.notation) }
-        keyBindings.apply(overrides: all)
-    }
-
-    /// Brings the running program in line with the stored bindings, after they were replaced
-    /// as a whole (import, reset).
-    internal static func reapply(in kernel: Kernel) {
-        let overrides = kernel.settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) ?? [:]
-        apply(
-            KeyMap.resolve(kernel.commands.all, overrides: overrides),
-            of: kernel.commands.all,
-            to: kernel.keyBindings
-        )
-    }
 }
 
 /// Shortcuts as the user reads and presses them.
@@ -196,6 +196,19 @@ internal enum ShortcutText {
         .returnKey, .enter, .tab, .space, .backspace, .forwardDelete, .insert, .home, .end, .pageUp, .pageDown,
         .leftArrow, .rightArrow, .upArrow, .downArrow, .keypadPlus, .keypadMinus, .keypadMultiply, .keypadDivide
     ]
+
+    private static let namedKeyCodes: [UInt16: Key] = {
+        var keys: [UInt16: Key] = [
+            36: .returnKey, 76: .enter, 48: .tab, 49: .space, 51: .backspace, 117: .forwardDelete, 114: .insert,
+            115: .home, 119: .end, 116: .pageUp, 121: .pageDown, 123: .leftArrow, 124: .rightArrow, 125: .downArrow,
+            126: .upArrow,
+            69: .keypadPlus, 78: .keypadMinus, 67: .keypadMultiply, 75: .keypadDivide
+        ]
+        for (index, code) in [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111].enumerated() {
+            keys[UInt16(code)] = .function(index + 1)
+        }
+        return keys
+    }()
 
     /// How a key is written on the Mac: `C`, `F5`, `↩`.
     internal static func name(of key: Key) -> String {
@@ -303,19 +316,6 @@ internal enum ShortcutText {
         return Shortcut(shortcut.key, shortcut.modifiers.union(modifiers))
     }
 
-    private static let namedKeyCodes: [UInt16: Key] = {
-        var keys: [UInt16: Key] = [
-            36: .returnKey, 76: .enter, 48: .tab, 49: .space, 51: .backspace, 117: .forwardDelete, 114: .insert,
-            115: .home, 119: .end, 116: .pageUp, 121: .pageDown, 123: .leftArrow, 124: .rightArrow, 125: .downArrow,
-            126: .upArrow,
-            69: .keypadPlus, 78: .keypadMinus, 67: .keypadMultiply, 75: .keypadDivide
-        ]
-        for (index, code) in [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111].enumerated() {
-            keys[UInt16(code)] = .function(index + 1)
-        }
-        return keys
-    }()
-
     /// The shortcut a key press stands for, by the rule the window shell matches key presses
     /// with: a named key by its key code, otherwise the character the key produces without
     /// its modifiers.
@@ -334,15 +334,15 @@ internal enum ShortcutText {
 
 /// A command as the lists of the editors show it.
 internal struct CommandRow: Equatable {
+    internal static let userCategory = "User commands"
+    internal static let otherCategory = "Not in a menu"
+
     internal let id: CommandID
     internal let title: String
     /// The command's keys, ready to show.
     internal let keys: String
     /// The menu the command is in, or one of the two groups below.
     internal let category: String
-
-    internal static let userCategory = "User commands"
-    internal static let otherCategory = "Not in a menu"
 }
 
 /// The command list of the *Choose command* dialog, the keyboard page and the keyboard help

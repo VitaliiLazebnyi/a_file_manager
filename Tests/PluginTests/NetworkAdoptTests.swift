@@ -15,6 +15,13 @@ internal final class AdoptOutcome: @unchecked Sendable {
     private let done = DispatchSemaphore(value: 0)
     private var error: (any Error)?
     private var finished = false
+    /// What the call threw; nil while it runs and when it succeeded.
+    internal var thrown: (any Error)? { lock.withLock { error } }
+    internal var failed: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return finished && error != nil
+    }
 
     internal init(_ work: @escaping @Sendable () throws -> Void) {
         Thread { [self] in
@@ -38,13 +45,6 @@ internal final class AdoptOutcome: @unchecked Sendable {
     /// fast it ends.
     internal func ended(within seconds: TimeInterval = Wait.ceiling) -> Bool {
         done.wait(timeout: .now() + seconds) == .success
-    }
-    /// What the call threw; nil while it runs and when it succeeded.
-    internal var thrown: (any Error)? { lock.withLock { error } }
-    internal var failed: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return finished && error != nil
     }
 }
 

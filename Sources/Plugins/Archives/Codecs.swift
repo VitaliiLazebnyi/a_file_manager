@@ -35,9 +35,6 @@ internal enum CRC32 {
 /// The system's; a test passes calls that fail as zlib can fail (no memory, a stream in a state it
 /// does not accept).
 internal struct DeflateCalls: Sendable {
-    internal let start: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
-    internal let run: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
-
     /// A raw stream, without the zlib or gzip wrapping.
     internal static let zlib = Self(
         start: { stream, level in
@@ -54,6 +51,9 @@ internal struct DeflateCalls: Sendable {
         },
         run: { stream, flush in deflate(stream, flush) }
     )
+
+    internal let start: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
+    internal let run: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
 }
 
 /// Deflate compression (ZIP method 8, GZIP) through zlib.
@@ -104,12 +104,12 @@ internal final class InflateStream: ByteStream {
     internal enum Wrapping {
         case raw, gzip
     }
+    private static let inputSize = 1 << 16
 
     private let source: any ByteStream
     private let wrapping: Wrapping
     private let stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
     private let input = UnsafeMutablePointer<UInt8>.allocate(capacity: InflateStream.inputSize)
-    private static let inputSize = 1 << 16
     private var isFinished = false
     private var sourceEnded = false
     private let control: StreamInterrupt?
@@ -120,12 +120,6 @@ internal final class InflateStream: ByteStream {
         self.control = control
         stream.initialize(to: z_stream())
         inflateInit2_(stream, wrapping == .raw ? -15 : 15 + 32, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
-    }
-
-    deinit {
-        inflateEnd(stream)
-        stream.deallocate()
-        input.deallocate()
     }
 
     private func refill() throws {
@@ -198,6 +192,12 @@ internal final class InflateStream: ByteStream {
     internal func close() {
         source.close()
     }
+
+    deinit {
+        inflateEnd(stream)
+        stream.deallocate()
+        input.deallocate()
+    }
 }
 
 /// LZMA in the `.xz` container, through the system's Compression framework.
@@ -215,9 +215,8 @@ internal final class XZCoder {
         try start()
     }
 
-    deinit {
-        if isOpen { compression_stream_destroy(stream) }
-        stream.deallocate()
+    internal static func compress(_ data: Data) throws -> Data {
+        try XZCoder(encoding: true).process(data, finish: true).output
     }
 
     private func start() throws {
@@ -277,8 +276,9 @@ internal final class XZCoder {
         try start()
     }
 
-    internal static func compress(_ data: Data) throws -> Data {
-        try XZCoder(encoding: true).process(data, finish: true).output
+    deinit {
+        if isOpen { compression_stream_destroy(stream) }
+        stream.deallocate()
     }
 }
 
@@ -491,8 +491,6 @@ internal final class ProcessStream: ByteStream, @unchecked Sendable {
         if !isClosed, process.isRunning { process.terminate() }
     }
 
-    deinit { close() }
-
     internal func read(upToCount count: Int) throws -> Data? {
         guard !ended else {
             return nil
@@ -537,6 +535,8 @@ internal final class ProcessStream: ByteStream, @unchecked Sendable {
         if process.isRunning { process.terminate() }
         try? output.fileHandleForReading.close()
     }
+
+    deinit { close() }
 }
 
 /// What a compressed file says about its unpacked size without being unpacked.
@@ -678,6 +678,13 @@ internal final class ParallelCompressor {
     private let pieceSize: Int
     private let windowSize: Int
 
+    private var isDeflate: Bool {
+        if case .gzip = method {
+            return true
+        }
+        return false
+    }
+
     internal init(_ method: Method, to output: OutputFile, modified: Date = Date()) throws {
         self.method = method
         self.output = output
@@ -768,12 +775,5 @@ internal final class ParallelCompressor {
             try output.write(packed)
             wroteAnything = true
         }
-    }
-
-    private var isDeflate: Bool {
-        if case .gzip = method {
-            return true
-        }
-        return false
     }
 }

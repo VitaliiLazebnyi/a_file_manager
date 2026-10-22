@@ -18,6 +18,18 @@ internal final class ViewerAdoptWorker: @unchecked Sendable {
     private let finished = DispatchSemaphore(value: 0)
     private var thread: Thread?
 
+    /// Whether the thread is waiting on something now (a condition, a lock).
+    internal var isWaiting: Bool {
+        var info = thread_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                thread_info(port, thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS && info.run_state == TH_STATE_WAITING
+    }
+
     internal init(_ body: @escaping @Sendable () -> Void) {
         thread = Thread { [self] in
             port = mach_thread_self()
@@ -30,18 +42,6 @@ internal final class ViewerAdoptWorker: @unchecked Sendable {
     internal func start() {
         thread?.start()
         _ = started.wait(timeout: .now() + Wait.ceiling)
-    }
-
-    /// Whether the thread is waiting on something now (a condition, a lock).
-    internal var isWaiting: Bool {
-        var info = thread_basic_info()
-        var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
-        let result = withUnsafeMutablePointer(to: &info) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                thread_info(port, thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
-            }
-        }
-        return result == KERN_SUCCESS && info.run_state == TH_STATE_WAITING
     }
 
     /// Polls until the thread waits; false after `timeout` seconds.
@@ -71,8 +71,6 @@ internal final class ViewerAdoptBox<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
 
-    internal init(_ value: Value) { stored = value }
-
     internal var value: Value {
         get {
             lock.lock()
@@ -86,6 +84,8 @@ internal final class ViewerAdoptBox<Value>: @unchecked Sendable {
         }
     }
 
+    internal init(_ value: Value) { stored = value }
+
     internal func mutate(_ change: (inout Value) -> Void) {
         lock.lock()
         change(&stored)
@@ -98,21 +98,11 @@ internal final class ViewerRemoteLike: ByteSource {
     internal let data: Data
     private let counter = ViewerAdoptBox((bytes: Int64(0), requests: 0))
 
-    internal init(_ data: Data) { self.data = data }
-
     internal var length: Int64 { Int64(data.count) }
     internal var fetched: Int64 { counter.value.bytes }
     internal var requests: Int { counter.value.requests }
 
-    internal func read(at offset: Int64, count: Int) -> Data {
-        let lower = Int(max(0, min(offset, length)))
-        let upper = min(data.count, lower + max(0, count))
-        counter.mutate {
-            $0.bytes += Int64(upper - lower)
-            $0.requests += 1
-        }
-        return data.subdata(in: lower..<upper)
-    }
+    internal init(_ data: Data) { self.data = data }
 
     /// Text of lines of 10 to 150 characters, some with tabs and some with accents: the sort of
     /// file whose layout depends on the width of the window.
@@ -142,6 +132,16 @@ internal final class ViewerRemoteLike: ByteSource {
             bytes.append(0x0A)
         }
         return Data(bytes)
+    }
+
+    internal func read(at offset: Int64, count: Int) -> Data {
+        let lower = Int(max(0, min(offset, length)))
+        let upper = min(data.count, lower + max(0, count))
+        counter.mutate {
+            $0.bytes += Int64(upper - lower)
+            $0.requests += 1
+        }
+        return data.subdata(in: lower..<upper)
     }
 }
 

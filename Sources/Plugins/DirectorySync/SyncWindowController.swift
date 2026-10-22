@@ -11,6 +11,37 @@ internal final class SyncWindowController: NSWindowController, NSWindowDelegate,
     NSTableViewDelegate,
     NSMenuDelegate
 {
+    private final class KeyTableView: NSTableView {
+        var onKey: ((NSEvent) -> Bool)?
+
+        override func keyDown(with event: NSEvent) {
+            if onKey?(event) != true { super.keyDown(with: event) }
+        }
+
+        /// A right click on a row outside the selection moves the selection there first.
+        override func menu(for event: NSEvent) -> NSMenu? {
+            let row = self.row(at: convert(event.locationInWindow, from: nil))
+            guard row >= 0 else {
+                return nil
+            }
+            if !selectedRowIndexes.contains(row) { selectRowIndexes([row], byExtendingSelection: false) }
+            return super.menu(for: event)
+        }
+    }
+
+    private static let tolerances = [0, 2, 3]
+    private static let columns: [(id: String, title: String, width: CGFloat)] = [
+        ("leftName", "Name", 210), ("leftSize", "Size", 90), ("leftDate", "Date", 140), ("action", "<=>", 44),
+        ("rightDate", "Date", 140), ("rightSize", "Size", 90), ("rightName", "Name", 210)
+    ]
+    /// Dates in the short format with seconds (spec 09 › Result list).
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .medium
+        return formatter
+    }()
+
     private let session: SyncSession
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
@@ -42,42 +73,23 @@ internal final class SyncWindowController: NSWindowController, NSWindowDelegate,
     private let table = KeyTableView()
     private let rowMenu = NSMenu()
 
-    private static let tolerances = [0, 2, 3]
-    private static let columns: [(id: String, title: String, width: CGFloat)] = [
-        ("leftName", "Name", 210), ("leftSize", "Size", 90), ("leftDate", "Date", 140), ("action", "<=>", 44),
-        ("rightDate", "Date", 140), ("rightSize", "Size", 90), ("rightName", "Name", 210)
-    ]
-    /// Dates in the short format with seconds (spec 09 › Result list).
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .medium
-        return formatter
-    }()
-
-    private final class KeyTableView: NSTableView {
-        var onKey: ((NSEvent) -> Bool)?
-
-        override func keyDown(with event: NSEvent) {
-            if onKey?(event) != true { super.keyDown(with: event) }
-        }
-
-        /// A right click on a row outside the selection moves the selection there first.
-        override func menu(for event: NSEvent) -> NSMenu? {
-            let row = self.row(at: convert(event.locationInWindow, from: nil))
-            guard row >= 0 else {
-                return nil
-            }
-            if !selectedRowIndexes.contains(row) { selectRowIndexes([row], byExtendingSelection: false) }
-            return super.menu(for: event)
-        }
-    }
-
     /// Puts a window of the tool on screen.
     ///
     /// Tests replace it, so that no window shows in the session they run in, and look at what it
     /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+
+    // MARK: Rows
+
+    /// The session rows the commands act on: the selected ones.
+    private var selectedRows: [Int] {
+        table.selectedRowIndexes.compactMap { position in
+            guard session.entries.indices.contains(position), case .row(let index) = session.entries[position] else {
+                return nil
+            }
+            return index
+        }
+    }
 
     internal init(session: SyncSession, effects: SyncWindowEffects = .system) {
         self.session = session
@@ -104,6 +116,72 @@ internal final class SyncWindowController: NSWindowController, NSWindowDelegate,
 
     /// The window is made in code, never from an archive.
     internal required init?(coder _: NSCoder) { nil }
+
+    internal static func text(of row: SyncRow, column: String) -> String {
+        func size(_ item: FileItem?) -> String { item.map { row.isDirectory ? "<DIR>" : Format.bytes($0.size) } ?? "" }
+        func date(_ item: FileItem?) -> String { item.map { dateFormatter.string(from: $0.modified) } ?? "" }
+        func name(_ item: FileItem?) -> String { item.map { row.isDirectory ? "[\($0.name)]" : $0.name } ?? "" }
+        switch column {
+        case "leftName":
+            return name(row.left)
+
+        case "leftSize":
+            return size(row.left)
+
+        case "leftDate":
+            return date(row.left)
+
+        case "rightName":
+            return name(row.right)
+
+        case "rightSize":
+            return size(row.right)
+
+        case "rightDate":
+            return date(row.right)
+
+        default:
+            if row.action != .none {
+                return row.action.symbol
+            }
+            switch row.state {
+            case .equal:
+                return "="
+
+            case .pending:
+                return "?"
+
+            case .excluded:
+                return "⊘"
+
+            default:
+                return "≠"
+            }
+        }
+    }
+
+    /// The colour shows what the comparison proposed (spec 09 › Result list).
+    internal static func color(of row: SyncRow) -> NSColor {
+        switch row.defaultAction {
+        case .copyToRight:
+            return .systemGreen
+
+        case .copyToLeft, .deleteRight:
+            return .systemBlue
+
+        default:
+            switch row.state {
+            case .equal:
+                return .labelColor
+
+            case .excluded, .pending:
+                return .secondaryLabelColor
+
+            default:
+                return .systemRed
+            }
+        }
+    }
 
     /// Shows the window with what the session holds now.
     internal func show() {
@@ -376,18 +454,6 @@ internal final class SyncWindowController: NSWindowController, NSWindowDelegate,
         indicatorLabel.stringValue = session.groupIndicator(atEntry: position)
     }
 
-    // MARK: Rows
-
-    /// The session rows the commands act on: the selected ones.
-    private var selectedRows: [Int] {
-        table.selectedRowIndexes.compactMap { position in
-            guard session.entries.indices.contains(position), case .row(let index) = session.entries[position] else {
-                return nil
-            }
-            return index
-        }
-    }
-
     @objc
     private func rowClicked() {
         guard table.clickedRow >= 0, session.entries.indices.contains(table.clickedRow), table.clickedColumn >= 0,
@@ -615,72 +681,6 @@ internal final class SyncWindowController: NSWindowController, NSWindowDelegate,
             cell.stringValue = Self.text(of: item, column: id)
         }
         return cell
-    }
-
-    internal static func text(of row: SyncRow, column: String) -> String {
-        func size(_ item: FileItem?) -> String { item.map { row.isDirectory ? "<DIR>" : Format.bytes($0.size) } ?? "" }
-        func date(_ item: FileItem?) -> String { item.map { dateFormatter.string(from: $0.modified) } ?? "" }
-        func name(_ item: FileItem?) -> String { item.map { row.isDirectory ? "[\($0.name)]" : $0.name } ?? "" }
-        switch column {
-        case "leftName":
-            return name(row.left)
-
-        case "leftSize":
-            return size(row.left)
-
-        case "leftDate":
-            return date(row.left)
-
-        case "rightName":
-            return name(row.right)
-
-        case "rightSize":
-            return size(row.right)
-
-        case "rightDate":
-            return date(row.right)
-
-        default:
-            if row.action != .none {
-                return row.action.symbol
-            }
-            switch row.state {
-            case .equal:
-                return "="
-
-            case .pending:
-                return "?"
-
-            case .excluded:
-                return "⊘"
-
-            default:
-                return "≠"
-            }
-        }
-    }
-
-    /// The colour shows what the comparison proposed (spec 09 › Result list).
-    internal static func color(of row: SyncRow) -> NSColor {
-        switch row.defaultAction {
-        case .copyToRight:
-            return .systemGreen
-
-        case .copyToLeft, .deleteRight:
-            return .systemBlue
-
-        default:
-            switch row.state {
-            case .equal:
-                return .labelColor
-
-            case .excluded, .pending:
-                return .secondaryLabelColor
-
-            default:
-                return .systemRed
-            }
-        }
     }
 
     /// A click on a column header sorts by name, size or date of that side; again reverses.

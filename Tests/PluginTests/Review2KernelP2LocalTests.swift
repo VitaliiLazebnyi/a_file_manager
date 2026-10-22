@@ -24,6 +24,12 @@ private final class Running<Value>: @unchecked Sendable {
     private let condition = NSCondition()
     private var result: Result<Value, any Error>?
 
+    var isOver: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return result != nil
+    }
+
     init(_ body: @escaping @Sendable () throws -> Value) {
         Thread.detachNewThread { [self] in
             let result = Result { try body() }
@@ -32,12 +38,6 @@ private final class Running<Value>: @unchecked Sendable {
             condition.broadcast()
             condition.unlock()
         }
-    }
-
-    var isOver: Bool {
-        condition.lock()
-        defer { condition.unlock() }
-        return result != nil
     }
 
     /// Nil when it did not end for a very long time: a hang, reported as a failure.
@@ -69,6 +69,18 @@ private final class DeadVolume: @unchecked Sendable {
     private var waitingNow = 0
     private var askedSoFar = 0
 
+    /// How many questions are waiting at this moment, and how many were ever put.
+    var waiting: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return waitingNow
+    }
+    var asked: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return askedSoFar
+    }
+
     init(_ root: URL) { self.root = root.path }
 
     func holds(_ path: String) -> Bool { path == root || path.hasPrefix(root + "/") }
@@ -83,18 +95,6 @@ private final class DeadVolume: @unchecked Sendable {
         while !answers { condition.wait() }
         waitingNow -= 1
         condition.unlock()
-    }
-
-    /// How many questions are waiting at this moment, and how many were ever put.
-    var waiting: Int {
-        condition.lock()
-        defer { condition.unlock() }
-        return waitingNow
-    }
-    var asked: Int {
-        condition.lock()
-        defer { condition.unlock() }
-        return askedSoFar
     }
 
     /// The server is back: everything that waits goes on, and nothing waits from now on.

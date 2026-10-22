@@ -40,6 +40,25 @@ internal struct HexFormat: Equatable {
         offsetDigits = max(8, String(max(0, length - 1), radix: 16).count)
     }
 
+    /// Control characters and bytes without a character show as a dot (spec 10 › Binary, Hex).
+    internal static func printable(_ unit: UInt16) -> UInt16 {
+        unit < 0x20 || (0x7F...0x9F).contains(unit) || unit == CodeTable.leadByte || unit == CodeTable.replacement
+            ? 0x2E : unit
+    }
+
+    /// Bytes as hexadecimal text for the clipboard: `52 65 70 6F`.
+    internal static func hexString(_ data: Data) -> String {
+        let digits = Array("0123456789ABCDEF".utf8)
+        var text: [UInt8] = []
+        text.reserveCapacity(data.count * 3)
+        for byte in data {
+            if !text.isEmpty { text.append(0x20) }
+            text.append(digits[Int(byte >> 4)])
+            text.append(digits[Int(byte & 0x0F)])
+        }
+        return String(decoding: text, as: UTF8.self)
+    }
+
     /// The column of the first hex digit of byte `position` in a row.
     internal func hexColumn(_ position: Int) -> Int { offsetDigits + 2 + position * 3 }
     /// The column of the character of byte `position`.
@@ -65,25 +84,6 @@ internal struct HexFormat: Equatable {
         units.append(contentsOf: [0x7C, 0x20])
         for byte in bytes { units.append(Self.printable(table.single[Int(byte)])) }
         return String(decoding: units, as: UTF16.self)
-    }
-
-    /// Control characters and bytes without a character show as a dot (spec 10 › Binary, Hex).
-    internal static func printable(_ unit: UInt16) -> UInt16 {
-        unit < 0x20 || (0x7F...0x9F).contains(unit) || unit == CodeTable.leadByte || unit == CodeTable.replacement
-            ? 0x2E : unit
-    }
-
-    /// Bytes as hexadecimal text for the clipboard: `52 65 70 6F`.
-    internal static func hexString(_ data: Data) -> String {
-        let digits = Array("0123456789ABCDEF".utf8)
-        var text: [UInt8] = []
-        text.reserveCapacity(data.count * 3)
-        for byte in data {
-            if !text.isEmpty { text.append(0x20) }
-            text.append(digits[Int(byte >> 4)])
-            text.append(digits[Int(byte & 0x0F)])
-        }
-        return String(decoding: text, as: UTF8.self)
     }
 }
 
@@ -120,6 +120,70 @@ internal final class TextDocument: @unchecked Sendable {
         return made
     }
 
+    internal var length: Int64 { source.length }
+
+    private var bytesPerRow: Int {
+        switch layout {
+        case .binary(let width):
+            return max(1, width)
+
+        default:
+            return HexFormat.bytesPerRow
+        }
+    }
+
+    /// The rows known so far; for text it grows while the index is being built.
+    internal var rowCount: Int {
+        if let index {
+            return index.rowCount
+        }
+        // (The length is what a file system says, and a server may say anything: the sum must not overflow.)
+        return Int(max(0, length).addingSaturated(Int64(bytesPerRow) - 1) / Int64(bytesPerRow))
+    }
+
+    /// Lines of text known so far; for the byte layouts every row is a line.
+    internal var lineCount: Int { index?.lineCount ?? rowCount }
+    internal var isIndexComplete: Bool { index?.isComplete ?? true }
+    /// How many segments of the index were taken over from the layout this one replaced.
+    internal var segmentsReused: Int { index?.segmentsReused ?? 0 }
+    internal var checkpointCount: Int { index?.checkpointCount ?? 0 }
+    /// The rows of everything before this offset are known.
+    internal var indexedThrough: Int64 { index.map { $0.isComplete ? length : $0.indexedThrough } ?? length }
+
+    /// The flag that ends the building of the index (the document's own ends it too).
+    internal var indexCancellation: CancellationFlag { indexStop.flag }
+
+    private let boundariesLock = NSLock()
+    private var boundaries: CharacterBoundaries?
+
+    /// What a search cuts a text in a double-byte code page into characters with; nil for any
+    /// other.
+    ///
+    /// Kept for as long as the document is, so the next search finds the boundaries of the last
+    /// one.
+    internal var characterBoundaries: CharacterBoundaries? {
+        guard encoding.kind == .doubleByte else {
+            return nil
+        }
+        boundariesLock.lock()
+        defer { boundariesLock.unlock() }
+        if boundaries == nil { boundaries = CharacterBoundaries(source: source, content: content, encoding: encoding) }
+        return boundaries
+    }
+
+    // MARK: Read errors
+
+    private let errorLock = NSLock()
+    private var fetchFailure: any Error?
+
+    /// The first error that kept a part of the file from being read, if any: what is shown
+    /// is then incomplete.
+    internal var readError: any Error? {
+        errorLock.lock()
+        defer { errorLock.unlock() }
+        return index?.failure ?? fetchFailure
+    }
+
     /// `reusing` is a document of the same bytes laid out otherwise (another width): what is
     /// the same in both is not read again.
     internal init(
@@ -153,36 +217,6 @@ internal final class TextDocument: @unchecked Sendable {
         }
     }
 
-    internal var length: Int64 { source.length }
-
-    private var bytesPerRow: Int {
-        switch layout {
-        case .binary(let width):
-            return max(1, width)
-
-        default:
-            return HexFormat.bytesPerRow
-        }
-    }
-
-    /// The rows known so far; for text it grows while the index is being built.
-    internal var rowCount: Int {
-        if let index {
-            return index.rowCount
-        }
-        // (The length is what a file system says, and a server may say anything: the sum must not overflow.)
-        return Int(max(0, length).addingSaturated(Int64(bytesPerRow) - 1) / Int64(bytesPerRow))
-    }
-
-    /// Lines of text known so far; for the byte layouts every row is a line.
-    internal var lineCount: Int { index?.lineCount ?? rowCount }
-    internal var isIndexComplete: Bool { index?.isComplete ?? true }
-    /// How many segments of the index were taken over from the layout this one replaced.
-    internal var segmentsReused: Int { index?.segmentsReused ?? 0 }
-    internal var checkpointCount: Int { index?.checkpointCount ?? 0 }
-    /// The rows of everything before this offset are known.
-    internal var indexedThrough: Int64 { index.map { $0.isComplete ? length : $0.indexedThrough } ?? length }
-
     /// Finds the rows of a text.
     ///
     /// Blocks until done or cancelled (`cancellation`); the byte layouts need no index and return
@@ -211,51 +245,17 @@ internal final class TextDocument: @unchecked Sendable {
         )
     }
 
-    /// The flag that ends the building of the index (the document's own ends it too).
-    internal var indexCancellation: CancellationFlag { indexStop.flag }
-
     /// Stops building the index (a newer layout of the same text takes over); what was found
     /// stays, and rows can be read as before.
     internal func stopIndexing() {
         indexStop.flag.cancel()
     }
 
-    private let boundariesLock = NSLock()
-    private var boundaries: CharacterBoundaries?
-
-    /// What a search cuts a text in a double-byte code page into characters with; nil for any
-    /// other.
-    ///
-    /// Kept for as long as the document is, so the next search finds the boundaries of the last
-    /// one.
-    internal var characterBoundaries: CharacterBoundaries? {
-        guard encoding.kind == .doubleByte else {
-            return nil
-        }
-        boundariesLock.lock()
-        defer { boundariesLock.unlock() }
-        if boundaries == nil { boundaries = CharacterBoundaries(source: source, content: content, encoding: encoding) }
-        return boundaries
-    }
-
-    // MARK: Read errors
-
-    private let errorLock = NSLock()
-    private var fetchFailure: any Error?
-
     /// Keeps the first error met while reading rows (the index keeps its own).
     internal func record(_ error: any Error) {
         errorLock.lock()
         if fetchFailure == nil { fetchFailure = error }
         errorLock.unlock()
-    }
-
-    /// The first error that kept a part of the file from being read, if any: what is shown
-    /// is then incomplete.
-    internal var readError: any Error? {
-        errorLock.lock()
-        defer { errorLock.unlock() }
-        return index?.failure ?? fetchFailure
     }
 
     // MARK: Rows

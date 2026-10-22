@@ -64,6 +64,8 @@ internal struct NetworkPluginCommands {
     internal var ui: ScriptedInteraction { bench.interaction }
     internal var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
     internal var address: String { "127.0.0.1:\(server.port)" }
+    /// The folder of the right panel as a copy target.
+    internal var localTarget: String { box.url("other").absoluteString + "/" }
 
     internal init() throws {
         box = try Sandbox()
@@ -91,8 +93,6 @@ internal struct NetworkPluginCommands {
     }
 
     internal func url(_ path: String) -> URL { key.url(path: path) }
-    /// The folder of the right panel as a copy target.
-    internal var localTarget: String { box.url("other").absoluteString + "/" }
 
     /// Ctrl+N with the test server's address.
     internal func quickConnect(_ text: String? = nil, anonymous: Bool = true) {

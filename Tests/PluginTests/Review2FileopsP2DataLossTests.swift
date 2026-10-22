@@ -21,9 +21,9 @@ private final class OldAnswers: FileJobDelegate {
     private var messages: [String] = []
     let conflict: ConflictChoice
 
-    init(conflict: ConflictChoice = .overwrite) { self.conflict = conflict }
-
     var errors: [String] { lock.withLock { messages } }
+
+    init(conflict: ConflictChoice = .overwrite) { self.conflict = conflict }
 
     func job(_: FileJob, progress _: JobProgress) {}
     func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { conflict }

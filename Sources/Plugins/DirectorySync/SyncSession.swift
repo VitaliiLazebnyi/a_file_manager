@@ -48,6 +48,17 @@ internal final class SyncSession {
         case idle, comparing, compared, synchronizing
     }
 
+    /// The list as it is shown, worked out from the rows alone (so it can be made on any thread).
+    internal struct Layout {
+        internal var entries: [SyncListEntry] = []
+        internal var positions: [Int] = []
+        internal var headerPositions: [Int] = []
+        internal var actionableCount = 0
+        internal var summary = SyncSummary([])
+    }
+    /// Rows from this many on are laid out and planned away from the main thread.
+    internal static let backgroundFrom = 20_000
+
     /// Unowned: the kernel owns the plugin, and through it this.
     internal unowned let kernel: Kernel
     private let settings: any SettingsStore
@@ -101,8 +112,6 @@ internal final class SyncSession {
     private var summary = SyncSummary([])
     private var layoutGeneration = 0
     private var actionEpoch = 0
-    /// Rows from this many on are laid out and planned away from the main thread.
-    internal static let backgroundFrom = 20_000
     /// The same for this session (tests make it small).
     internal var worksInBackgroundFrom = SyncSession.backgroundFrom
     /// The least time between two progress reports of a comparison, in seconds (tests: none).
@@ -116,9 +125,40 @@ internal final class SyncSession {
     /// Counts the calls of `adopt`: a long selection read in the background is dropped when another began.
     private var selectionEpoch = 0
 
-    /// The sorted names of the marked entries of the panels the snapshots were taken of.
-    nonisolated internal static func names(of snapshots: [PanelModel.Operands]) -> [String] {
-        snapshots.flatMap { $0.markedItems().map(\.name) }.sorted()
+    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
+
+    // MARK: The list
+
+    internal var visibleRows: [Int] {
+        entries.compactMap { entry in
+            if case .row(let index) = entry {
+                return index
+            }
+            return nil
+        }
+    }
+
+    /// The time tolerance the run uses: the one the comparison found necessary.
+    private var runTolerance: Int { compared.toleranceSeconds }
+
+    internal var canSynchronize: Bool { phase == .compared && actionableCount > 0 && !isPartial && !isPlanning }
+
+    private var currentLayout: Layout {
+        Layout(
+            entries: entries,
+            positions: positions,
+            headerPositions: headerPositions,
+            actionableCount: actionableCount,
+            summary: summary
+        )
+    }
+
+    /// The saved sets, sorted by name (spec 09 › Saved sync sets).
+    ///
+    /// A set that cannot be read is left out; the others stay.
+    internal var savedSets: [SyncSet] {
+        (settings.value([StoredElement<SyncSet>].self, forKey: SyncSettingsKey.sets) ?? []).compactMap(\.value)
+            .sorted { Sorter.compare($0.name, $1.name, numeric: true) == .orderedAscending }
     }
 
     internal init(kernel: Kernel) {
@@ -129,6 +169,91 @@ internal final class SyncSession {
         // With both up nothing would ever be shown (spec 09 › Show filter).
         if !show.contains(.duplicates), !show.contains(.singles) { show.formUnion([.duplicates, .singles]) }
         self.show = show
+    }
+
+    /// The sorted names of the marked entries of the panels the snapshots were taken of.
+    nonisolated internal static func names(of snapshots: [PanelModel.Operands]) -> [String] {
+        snapshots.flatMap { $0.markedItems().map(\.name) }.sorted()
+    }
+    nonisolated private static func isActionable(_ row: SyncRow) -> Bool {
+        row.action != .none && row.accepts(row.action)
+    }
+
+    /// Filters by the Show buttons, sorts inside each subdirectory and puts the captions in.
+    nonisolated internal static func layout(
+        rows: [SyncRow],
+        show: SyncShow,
+        sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
+    )
+        -> Layout
+    {
+        // The comparison delivers the rows grouped by folder, so a row mostly belongs to the group of the one before.
+        var order: [String] = []
+        var groups: [[Int]] = []
+        var groupOf: [String: Int] = [:]
+        var current = -1
+        var currentDirectory: String?
+        for index in rows.indices where show.shows(rows[index]) {
+            let directory = rows[index].directory
+            if directory != currentDirectory {
+                if let known = groupOf[directory] {
+                    current = known
+                } else {
+                    current = groups.count
+                    groupOf[directory] = current
+                    order.append(directory)
+                    groups.append([])
+                }
+                currentDirectory = directory
+            }
+            groups[current].append(index)
+        }
+        var layout = Layout()
+        layout.entries.reserveCapacity(rows.count + groups.count)
+        for (group, directory) in order.enumerated() {
+            if !directory.isEmpty { layout.entries.append(.header(directory)) }
+            layout.entries += sorted(groups[group], rows: rows, by: sort).map(SyncListEntry.row)
+        }
+        layout.positions = [Int](repeating: -1, count: rows.count)
+        for (position, entry) in layout.entries.enumerated() {
+            switch entry {
+            case .header:
+                layout.headerPositions.append(position)
+
+            case .row(let index):
+                layout.positions[index] = position
+                if isActionable(rows[index]) { layout.actionableCount += 1 }
+            }
+        }
+        layout.summary = SyncSummary(rows)
+        return layout
+    }
+
+    /// Orders the rows of one folder.
+    ///
+    /// The keys (a size, a date) are taken out once, and the pairs of key and row are sorted:
+    /// sorting the rows by looking into their files on every comparison takes seconds at a million.
+    nonisolated private static func sorted(
+        _ indexes: [Int],
+        rows: [SyncRow],
+        by sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
+    ) -> [Int] {
+        // The comparison delivers the rows by name already.
+        if sort.key == .name {
+            return sort.ascending ? indexes : indexes.reversed()
+        }
+        func key(_ index: Int) -> Int64 {
+            let row = rows[index]
+            guard let item = sort.side == .left ? row.left ?? row.right : row.right ?? row.left else {
+                return 0
+            }
+            return sort.key == .size ? item.size : Int64((item.modified.timeIntervalSince1970 * 1_000_000).rounded())
+        }
+        let ordered = indexes.map { (key: key($0), index: $0) }.sorted { ($0.key, $0.index) < ($1.key, $1.index) }
+            .map(
+                \.index
+            )
+        return sort.ascending ? ordered : ordered.reversed()
     }
 
     /// Presets the window with the directories and the selection of the two panels.
@@ -177,8 +302,6 @@ internal final class SyncSession {
         picked = (nil, nil)
         clear()
     }
-
-    private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
     internal func location(_ side: SyncSide) -> URL {
         fileSystems.location(from: side == .left ? leftPath : rightPath, relativeTo: base)
@@ -306,80 +429,7 @@ internal final class SyncSession {
         }
     }
 
-    // MARK: The list
-
-    internal var visibleRows: [Int] {
-        entries.compactMap { entry in
-            if case .row(let index) = entry {
-                return index
-            }
-            return nil
-        }
-    }
-
     private func isActionable(_ row: SyncRow) -> Bool { Self.isActionable(row) }
-    nonisolated private static func isActionable(_ row: SyncRow) -> Bool {
-        row.action != .none && row.accepts(row.action)
-    }
-
-    /// The list as it is shown, worked out from the rows alone (so it can be made on any thread).
-    internal struct Layout {
-        internal var entries: [SyncListEntry] = []
-        internal var positions: [Int] = []
-        internal var headerPositions: [Int] = []
-        internal var actionableCount = 0
-        internal var summary = SyncSummary([])
-    }
-
-    /// Filters by the Show buttons, sorts inside each subdirectory and puts the captions in.
-    nonisolated internal static func layout(
-        rows: [SyncRow],
-        show: SyncShow,
-        sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
-    )
-        -> Layout
-    {
-        // The comparison delivers the rows grouped by folder, so a row mostly belongs to the group of the one before.
-        var order: [String] = []
-        var groups: [[Int]] = []
-        var groupOf: [String: Int] = [:]
-        var current = -1
-        var currentDirectory: String?
-        for index in rows.indices where show.shows(rows[index]) {
-            let directory = rows[index].directory
-            if directory != currentDirectory {
-                if let known = groupOf[directory] {
-                    current = known
-                } else {
-                    current = groups.count
-                    groupOf[directory] = current
-                    order.append(directory)
-                    groups.append([])
-                }
-                currentDirectory = directory
-            }
-            groups[current].append(index)
-        }
-        var layout = Layout()
-        layout.entries.reserveCapacity(rows.count + groups.count)
-        for (group, directory) in order.enumerated() {
-            if !directory.isEmpty { layout.entries.append(.header(directory)) }
-            layout.entries += sorted(groups[group], rows: rows, by: sort).map(SyncListEntry.row)
-        }
-        layout.positions = [Int](repeating: -1, count: rows.count)
-        for (position, entry) in layout.entries.enumerated() {
-            switch entry {
-            case .header:
-                layout.headerPositions.append(position)
-
-            case .row(let index):
-                layout.positions[index] = position
-                if isActionable(rows[index]) { layout.actionableCount += 1 }
-            }
-        }
-        layout.summary = SyncSummary(rows)
-        return layout
-    }
 
     /// Lays the list out again.
     ///
@@ -436,33 +486,6 @@ internal final class SyncSession {
                 + (hidden > 0 ? "   [\(shown) shown, \(hidden) hidden by the Show buttons]" : "")
         }
         changed()
-    }
-
-    /// Orders the rows of one folder.
-    ///
-    /// The keys (a size, a date) are taken out once, and the pairs of key and row are sorted:
-    /// sorting the rows by looking into their files on every comparison takes seconds at a million.
-    nonisolated private static func sorted(
-        _ indexes: [Int],
-        rows: [SyncRow],
-        by sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
-    ) -> [Int] {
-        // The comparison delivers the rows by name already.
-        if sort.key == .name {
-            return sort.ascending ? indexes : indexes.reversed()
-        }
-        func key(_ index: Int) -> Int64 {
-            let row = rows[index]
-            guard let item = sort.side == .left ? row.left ?? row.right : row.right ?? row.left else {
-                return 0
-            }
-            return sort.key == .size ? item.size : Int64((item.modified.timeIntervalSince1970 * 1_000_000).rounded())
-        }
-        let ordered = indexes.map { (key: key($0), index: $0) }.sorted { ($0.key, $0.index) < ($1.key, $1.index) }
-            .map(
-                \.index
-            )
-        return sort.ascending ? ordered : ordered.reversed()
     }
 
     /// The subdirectory indicator next to the Show buttons: `6/9 dups/sub`
@@ -595,11 +618,6 @@ internal final class SyncSession {
         SyncPlan(rows: visibleRows.map { rows[$0] }, timeOffsetHours: compared.offsetHours)
     }
 
-    /// The time tolerance the run uses: the one the comparison found necessary.
-    private var runTolerance: Int { compared.toleranceSeconds }
-
-    internal var canSynchronize: Bool { phase == .compared && actionableCount > 0 && !isPartial && !isPlanning }
-
     /// Shows the Synchronize dialog and runs what the user confirmed
     /// (spec 09 › The "Synchronize" dialog and the run).
     internal func synchronize() {
@@ -633,16 +651,6 @@ internal final class SyncSession {
                 self.present(plan)
             }
         }
-    }
-
-    private var currentLayout: Layout {
-        Layout(
-            entries: entries,
-            positions: positions,
-            headerPositions: headerPositions,
-            actionableCount: actionableCount,
-            summary: summary
-        )
     }
 
     /// Asks about the plan of the last comparison and runs it.
@@ -832,14 +840,6 @@ internal final class SyncSession {
         remembered.onlyNames = nil
         settings.set(remembered, forKey: SyncSettingsKey.options)
         settings.set(show, forKey: SyncSettingsKey.show)
-    }
-
-    /// The saved sets, sorted by name (spec 09 › Saved sync sets).
-    ///
-    /// A set that cannot be read is left out; the others stay.
-    internal var savedSets: [SyncSet] {
-        (settings.value([StoredElement<SyncSet>].self, forKey: SyncSettingsKey.sets) ?? []).compactMap(\.value)
-            .sorted { Sorter.compare($0.name, $1.name, numeric: true) == .orderedAscending }
     }
 
     /// "Add current directories and settings to list"; a set of the same name is replaced.

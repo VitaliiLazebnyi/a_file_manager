@@ -11,16 +11,6 @@ internal final class RegexTrip: @unchecked Sendable {
     private var timeouts = 0
     private let limit: Int
 
-    internal init(limit: Int = 3) {
-        self.limit = limit
-    }
-
-    internal func recordTimeout() {
-        lock.lock()
-        timeouts += 1
-        lock.unlock()
-    }
-
     /// Whether any regular expression of the search ran out of time.
     internal var hasTimedOut: Bool {
         lock.lock()
@@ -34,6 +24,16 @@ internal final class RegexTrip: @unchecked Sendable {
         defer { lock.unlock() }
         return timeouts >= limit
     }
+
+    internal init(limit: Int = 3) {
+        self.limit = limit
+    }
+
+    internal func recordTimeout() {
+        lock.lock()
+        timeouts += 1
+        lock.unlock()
+    }
 }
 
 /// Runs a regular expression the user typed with a bound on its time.
@@ -43,12 +43,12 @@ internal final class RegexTrip: @unchecked Sendable {
 /// `enumerateMatches` when the budget has passed or the work was cancelled, on whatever thread the
 /// caller is.
 internal enum FindRegex {
-    /// What one match may take.
-    internal static let defaultBudget: TimeInterval = 0.25
-
     internal enum Outcome: Equatable {
         case matched, unmatched, timedOut
     }
+
+    /// What one match may take.
+    internal static let defaultBudget: TimeInterval = 0.25
 
     /// Whether `text` holds a match, within `budget` seconds of work.
     ///

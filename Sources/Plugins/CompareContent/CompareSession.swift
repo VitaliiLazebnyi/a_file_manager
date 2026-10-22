@@ -37,6 +37,33 @@ internal final class CompareSession {
         case empty, working, ready
     }
 
+    /// One change to the lines of one side: `removed` stood at `start`, and `insertedCount` lines stand there now.
+    ///
+    /// Undo puts the removed lines back; nothing of the files is copied for it.
+    private struct Splice {
+        var side: CompareSide
+        var start: Int
+        var removed: [TextLine]
+        var insertedCount: Int
+    }
+
+    // MARK: Saving
+
+    /// What the save job reports for one file.
+    private struct Saved {
+        var side: CompareSide
+        var error: any Error?
+        /// The file as it is after saving; what the next save is checked against.
+        var item: FileItem?
+    }
+    /// Steps kept for Undo.
+    private static let undoDepth = 100
+    private static let inlineCacheLimit = 4_096
+    /// Texts of fewer lines than this, none of them long, are compared again at once after an edit;
+    /// anything larger goes to the background, so that no work grows with the size of the files on the main thread.
+    private static let inlineRecompareBelow = 2_000
+    private static let inlineRecompareWidth = 1_000
+
     /// Unowned: the kernel owns the plugin, and through it this.
     ///
     /// Read only on the way of a request (a command, a click); what comes back later uses the parts
@@ -68,19 +95,7 @@ internal final class CompareSession {
     internal private(set) var modified: (left: Bool, right: Bool) = (false, false)
     internal private(set) var anchors: [(left: Int, right: Int)] = []
 
-    /// One change to the lines of one side: `removed` stood at `start`, and `insertedCount` lines stand there now.
-    ///
-    /// Undo puts the removed lines back; nothing of the files is copied for it.
-    private struct Splice {
-        var side: CompareSide
-        var start: Int
-        var removed: [TextLine]
-        var insertedCount: Int
-    }
-
     private var undoStack: [(splices: [Splice], modified: (left: Bool, right: Bool))] = []
-    /// Steps kept for Undo.
-    private static let undoDepth = 100
     /// Whether the rows shown belong to the texts held (false from an edit until the new comparison has come).
     private var diffIsCurrent = true
     /// The files as they were when loaded, for saving (see `ComparedFiles`).
@@ -93,12 +108,62 @@ internal final class CompareSession {
     ///
     /// Emptied with every new `content`.
     private var inlineCache: [Int: (left: [Range<Int>], right: [Range<Int>])] = [:]
-    private static let inlineCacheLimit = 4_096
     private var findGeneration = 0
-    /// Texts of fewer lines than this, none of them long, are compared again at once after an edit;
-    /// anything larger goes to the background, so that no work grows with the size of the files on the main thread.
-    private static let inlineRecompareBelow = 2_000
-    private static let inlineRecompareWidth = 1_000
+
+    internal var hasUnsavedChanges: Bool { modified.left || modified.right }
+    internal var canUndo: Bool { !undoStack.isEmpty }
+
+    // MARK: Rows
+
+    internal var isBinary: Bool {
+        if case .binary = content {
+            return true
+        }
+        return false
+    }
+
+    internal var rowCount: Int {
+        switch content {
+        case .none:
+            return 0
+
+        case .text(_, _, let diff, _):
+            return diff.rows.count
+
+        case .binary(_, _, let diff):
+            return diff.rowCount
+        }
+    }
+
+    /// The differences as ranges of rows.
+    internal var blocks: [Range<Int>] {
+        switch content {
+        case .none:
+            return []
+
+        case .text(_, _, let diff, _):
+            return diff.blocks
+
+        case .binary(_, _, let diff):
+            return diff.blocks
+        }
+    }
+
+    /// The length of the longest line in characters, for the width of the panes.
+    internal var width: Int {
+        switch content {
+        case .none:
+            return 0
+
+        case .text(_, _, _, let width):
+            return width
+
+        case .binary(_, _, let diff):
+            return diff.bytesPerLine * 4 + 1
+        }
+    }
+
+    private var searching: CancellationFlag?
 
     internal init(kernel: Kernel) {
         self.kernel = kernel
@@ -113,8 +178,50 @@ internal final class CompareSession {
         bytesPerLine = CompareSettingsKey.bytesPerLineChoices[max(0, min(3, choice))]
     }
 
-    internal var hasUnsavedChanges: Bool { modified.left || modified.right }
-    internal var canUndo: Bool { !undoStack.isEmpty }
+    /// The search behind `find`; nil when nothing is found or `cancellation` was set.
+    nonisolated internal static func search(
+        _ content: CompareContent,
+        _ needle: String,
+        from row: Int,
+        forward: Bool,
+        cancellation: CancellationFlag?
+    ) -> Int? {
+        let count: Int
+        let sides: (Int, CompareSide) -> String?
+        switch content {
+        case .none:
+            return nil
+
+        case .text(let left, let right, let diff, _):
+            count = diff.rows.count
+            sides = { candidate, side in
+                let (document, index) =
+                    side == .left ? (left, diff.rows[candidate].left) : (right, diff.rows[candidate].right)
+                return index.flatMap { document.lines.indices.contains($0) ? document.lines[$0].text : nil }
+            }
+
+        case .binary(let left, let right, let diff):
+            count = diff.rowCount
+            sides = { candidate, side in
+                let text = diff.text(of: side == .left ? left : right, row: candidate)
+                return text.isEmpty ? nil : text
+            }
+        }
+        guard count > 0, !needle.isEmpty else {
+            return nil
+        }
+        for step in 1...count {
+            if step & 0x3FF == 0, cancellation?.isCancelled == true {
+                return nil
+            }
+            let candidate = ((row + (forward ? step : -step)) % count + count) % count
+            for side in [CompareSide.left, .right]
+            where sides(candidate, side)?.range(of: needle, options: .caseInsensitive) != nil {
+                return candidate
+            }
+        }
+        return nil
+    }
 
     internal func displayPath(_ side: CompareSide) -> String {
         (side == .left ? leftURL : rightURL).map(fileSystems.displayPath) ?? ""
@@ -317,56 +424,6 @@ internal final class CompareSession {
         }
     }
 
-    // MARK: Rows
-
-    internal var isBinary: Bool {
-        if case .binary = content {
-            return true
-        }
-        return false
-    }
-
-    internal var rowCount: Int {
-        switch content {
-        case .none:
-            return 0
-
-        case .text(_, _, let diff, _):
-            return diff.rows.count
-
-        case .binary(_, _, let diff):
-            return diff.rowCount
-        }
-    }
-
-    /// The differences as ranges of rows.
-    internal var blocks: [Range<Int>] {
-        switch content {
-        case .none:
-            return []
-
-        case .text(_, _, let diff, _):
-            return diff.blocks
-
-        case .binary(_, _, let diff):
-            return diff.blocks
-        }
-    }
-
-    /// The length of the longest line in characters, for the width of the panes.
-    internal var width: Int {
-        switch content {
-        case .none:
-            return 0
-
-        case .text(_, _, _, let width):
-            return width
-
-        case .binary(_, _, let diff):
-            return diff.bytesPerLine * 4 + 1
-        }
-    }
-
     /// The difference a row belongs to, found by halving.
     internal func block(containing row: Int) -> Range<Int>? {
         let blocks = self.blocks
@@ -495,53 +552,6 @@ internal final class CompareSession {
                 completion(found)
             }
         }
-    }
-
-    private var searching: CancellationFlag?
-
-    /// The search behind `find`; nil when nothing is found or `cancellation` was set.
-    nonisolated internal static func search(
-        _ content: CompareContent,
-        _ needle: String,
-        from row: Int,
-        forward: Bool,
-        cancellation: CancellationFlag?
-    ) -> Int? {
-        let count: Int
-        let sides: (Int, CompareSide) -> String?
-        switch content {
-        case .none:
-            return nil
-
-        case .text(let left, let right, let diff, _):
-            count = diff.rows.count
-            sides = { candidate, side in
-                let (document, index) =
-                    side == .left ? (left, diff.rows[candidate].left) : (right, diff.rows[candidate].right)
-                return index.flatMap { document.lines.indices.contains($0) ? document.lines[$0].text : nil }
-            }
-
-        case .binary(let left, let right, let diff):
-            count = diff.rowCount
-            sides = { candidate, side in
-                let text = diff.text(of: side == .left ? left : right, row: candidate)
-                return text.isEmpty ? nil : text
-            }
-        }
-        guard count > 0, !needle.isEmpty else {
-            return nil
-        }
-        for step in 1...count {
-            if step & 0x3FF == 0, cancellation?.isCancelled == true {
-                return nil
-            }
-            let candidate = ((row + (forward ? step : -step)) % count + count) % count
-            for side in [CompareSide.left, .right]
-            where sides(candidate, side)?.range(of: needle, options: .caseInsensitive) != nil {
-                return candidate
-            }
-        }
-        return nil
     }
 
     // MARK: Resync and swap
@@ -709,16 +719,6 @@ internal final class CompareSession {
         content = .text(left: left, right: right, diff: diff, width: width)
         diffIsCurrent = false
         recompute()
-    }
-
-    // MARK: Saving
-
-    /// What the save job reports for one file.
-    private struct Saved {
-        var side: CompareSide
-        var error: any Error?
-        /// The file as it is after saving; what the next save is checked against.
-        var item: FileItem?
     }
 
     /// Writes the changed files back through their file systems, as a job; `completion` tells

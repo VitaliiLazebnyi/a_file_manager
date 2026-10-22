@@ -16,6 +16,84 @@ import UniformTypeIdentifiers
 /// that takes the place of a file.
 @Suite
 internal struct Review2PluginsBP2Viewer {
+    // MARK: A sequential scan reads a giant line once (V069)
+
+    /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+    private final class CountingSource: ByteSource, @unchecked Sendable {
+        let base: any ByteSource
+        private let lock = NSLock()
+        private var total: Int64 = 0
+        var length: Int64 { base.length }
+        var bytesRead: Int64 {
+            lock.lock()
+            defer { lock.unlock() }
+            return total
+        }
+        init(_ base: any ByteSource) { self.base = base }
+
+        func read(at offset: Int64, count: Int) throws -> Data {
+            let data = try base.read(at: offset, count: count)
+            lock.lock()
+            total += Int64(data.count)
+            lock.unlock()
+            return data
+        }
+    }
+
+    // MARK: At most so many index builds in flight (V024)
+
+    /// Unchecked: the state is guarded by `condition`.
+    private final class Latch: @unchecked Sendable {
+        private let condition = NSCondition()
+        private var open = false
+        private var started: [Int] = []
+
+        var startedJobs: [Int] {
+            condition.lock()
+            defer { condition.unlock() }
+            return started.sorted()
+        }
+
+        func wait() {
+            condition.lock()
+            while !open { condition.wait() }
+            condition.unlock()
+        }
+
+        func release() {
+            condition.lock()
+            open = true
+            condition.broadcast()
+            condition.unlock()
+        }
+
+        func started(_ number: Int) {
+            condition.lock()
+            started.append(number)
+            condition.unlock()
+        }
+    }
+
+    // MARK: A link whose target size the file system gave (L016)
+
+    private final class LinkProvider: FileSystemProvider {
+        let scheme = "link"
+        let capabilities: FileSystemCapabilities = []
+        let entry: FileItem
+        init(_ entry: FileItem) { self.entry = entry }
+        func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
+        func parent(of _: URL) -> URL? { nil }
+        func createDirectory(at _: URL) {}
+        func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("x") }
+        func remove(_: URL) {}
+        func move(_: URL, to _: URL, replacing _: Bool) {}
+        func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
+        func item(at _: URL) -> FileItem? { entry }
+        func read(_: URL) throws -> any FileReader {
+            throw FileSystemError.notSupported("a link whose target size is known is not read to be measured")
+        }
+    }
+
     private func document(
         _ data: Data,
         encoding: ViewerEncoding = .utf8,
@@ -140,30 +218,6 @@ internal struct Review2PluginsBP2Viewer {
         }
     }
 
-    // MARK: A sequential scan reads a giant line once (V069)
-
-    /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-    private final class CountingSource: ByteSource, @unchecked Sendable {
-        let base: any ByteSource
-        private let lock = NSLock()
-        private var total: Int64 = 0
-        init(_ base: any ByteSource) { self.base = base }
-        var length: Int64 { base.length }
-        var bytesRead: Int64 {
-            lock.lock()
-            defer { lock.unlock() }
-            return total
-        }
-
-        func read(at offset: Int64, count: Int) throws -> Data {
-            let data = try base.read(at: offset, count: count)
-            lock.lock()
-            total += Int64(data.count)
-            lock.unlock()
-            return data
-        }
-    }
-
     @Test
     internal func aSequentialScanDoesNotReadAGiantLineTwice() throws {
         var data = Data(repeating: UInt8(ascii: "a"), count: 400_000)
@@ -215,40 +269,6 @@ internal struct Review2PluginsBP2Viewer {
                 "round \(round) segment \(segment)"
             )
             #expect(try rows(sequential) == rows(whole), "round \(round) segment \(segment) chunk \(chunk)")
-        }
-    }
-
-    // MARK: At most so many index builds in flight (V024)
-
-    /// Unchecked: the state is guarded by `condition`.
-    private final class Latch: @unchecked Sendable {
-        private let condition = NSCondition()
-        private var open = false
-        private var started: [Int] = []
-
-        func wait() {
-            condition.lock()
-            while !open { condition.wait() }
-            condition.unlock()
-        }
-
-        func release() {
-            condition.lock()
-            open = true
-            condition.broadcast()
-            condition.unlock()
-        }
-
-        func started(_ number: Int) {
-            condition.lock()
-            started.append(number)
-            condition.unlock()
-        }
-
-        var startedJobs: [Int] {
-            condition.lock()
-            defer { condition.unlock() }
-            return started.sorted()
         }
     }
 
@@ -642,26 +662,6 @@ internal struct Review2PluginsBP2Viewer {
         try file.write(to: url)
         #expect(ImageDecoder.decode(contentsOf: url) != nil)
         #expect(ImageDecoder.decode(contentsOf: url, pixelLimit: 100) == nil)
-    }
-
-    // MARK: A link whose target size the file system gave (L016)
-
-    private final class LinkProvider: FileSystemProvider {
-        let scheme = "link"
-        let capabilities: FileSystemCapabilities = []
-        let entry: FileItem
-        init(_ entry: FileItem) { self.entry = entry }
-        func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
-        func parent(of _: URL) -> URL? { nil }
-        func createDirectory(at _: URL) {}
-        func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("x") }
-        func remove(_: URL) {}
-        func move(_: URL, to _: URL, replacing _: Bool) {}
-        func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
-        func item(at _: URL) -> FileItem? { entry }
-        func read(_: URL) throws -> any FileReader {
-            throw FileSystemError.notSupported("a link whose target size is known is not read to be measured")
-        }
     }
 
     @Test

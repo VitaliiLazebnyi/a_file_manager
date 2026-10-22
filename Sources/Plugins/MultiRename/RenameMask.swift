@@ -16,6 +16,8 @@ internal struct RenameSubject {
     /// Where the item is; only handed to `RenameContext.contentDate`.
     internal var url: URL?
 
+    internal var fullPath: String { directoryPath.hasSuffix("/") ? directoryPath + name : directoryPath + "/" + name }
+
     internal init(
         name: String,
         isFolder: Bool = false,
@@ -34,8 +36,6 @@ internal struct RenameSubject {
             folders ?? Array(directoryPath.utf8).split(separator: 0x2F).map { String(decoding: $0, as: UTF8.self) }
         self.url = url
     }
-
-    internal var fullPath: String { directoryPath.hasSuffix("/") ? directoryPath + name : directoryPath + "/" + name }
 }
 
 /// The fields of "Define counter" (spec 09 › Define counter).
@@ -193,11 +193,6 @@ internal struct RenameMask {
         internal var unit: Calendar.Component
     }
 
-    /// The units of a time offset: `[T1+5h]` is five hours later.
-    private static let offsetUnits: [Character: Calendar.Component] = [
-        "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
-    ]
-
     internal enum Token: Equatable {
         case literal(String)
         case text(Source, CharacterRange?)
@@ -214,56 +209,16 @@ internal struct RenameMask {
         case invalid(RenameMaskError)
     }
 
-    internal let tokens: [Token]
-
-    internal init(_ text: String) {
-        var tokens: [Token] = []
-        var literal = ""
-        let characters = Array(text)
-        var position = 0
-        func flush() {
-            if !literal.isEmpty { tokens.append(.literal(literal)) }
-            literal = ""
-        }
-        while position < characters.count {
-            let character = characters[position]
-            guard character == "[" else {
-                literal.append(character)
-                position += 1
-                continue
-            }
-            // `[[]` and `[]]` are the brackets themselves.
-            if position + 2 < characters.count, characters[position + 2] == "]",
-                characters[position + 1] == "[" || characters[position + 1] == "]"
-            {
-                literal.append(characters[position + 1])
-                position += 3
-                continue
-            }
-            flush()
-            guard let close = characters[position...].firstIndex(of: "]") else {
-                tokens.append(.invalid(.invalidPlaceholder(String(characters[position...]))))
-                break
-            }
-            tokens += Self.commands(Array(characters[(position + 1)..<close]))
-            position = close + 1
-        }
-        flush()
-        self.tokens = tokens
-    }
-
-    /// The first thing that is wrong with the mask, for a hint next to the field.
-    internal var error: RenameMaskError? {
-        for case .invalid(let error) in tokens { return error }
-        return nil
-    }
-
     // MARK: Parsing
 
     /// A cursor over the inside of one pair of brackets.
     private struct Scanner {
         let characters: [Character]
         var position = 0
+
+        var startsRange: Bool {
+            startsPosition() || (peek() == " " && startsPosition(1))
+        }
 
         func peek(_ offset: Int = 0) -> Character? {
             characters.indices.contains(position + offset) ? characters[position + offset] : nil
@@ -308,10 +263,6 @@ internal struct RenameMask {
             isDigit(offset) || (peek(offset) == "-" && isDigit(offset + 1))
         }
 
-        var startsRange: Bool {
-            startsPosition() || (peek() == " " && startsPosition(1))
-        }
-
         mutating func range() -> CharacterRange? {
             let start = position
             var pad: Character?
@@ -337,12 +288,61 @@ internal struct RenameMask {
         }
     }
 
+    /// The units of a time offset: `[T1+5h]` is five hours later.
+    private static let offsetUnits: [Character: Calendar.Component] = [
+        "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
+    ]
+
     private static let letterCases: [Character: LetterCase] = [
         "U": .upper, "L": .lower, "F": .words, "f": .titleWords, "n": .unchanged
     ]
     private static let sources: [Character: Source] = [
         "N": .name, "E": .ext, "A": .nameWithExt, "P": .parent, "G": .grandparent
     ]
+
+    internal let tokens: [Token]
+
+    /// The first thing that is wrong with the mask, for a hint next to the field.
+    internal var error: RenameMaskError? {
+        for case .invalid(let error) in tokens { return error }
+        return nil
+    }
+
+    internal init(_ text: String) {
+        var tokens: [Token] = []
+        var literal = ""
+        let characters = Array(text)
+        var position = 0
+        func flush() {
+            if !literal.isEmpty { tokens.append(.literal(literal)) }
+            literal = ""
+        }
+        while position < characters.count {
+            let character = characters[position]
+            guard character == "[" else {
+                literal.append(character)
+                position += 1
+                continue
+            }
+            // `[[]` and `[]]` are the brackets themselves.
+            if position + 2 < characters.count, characters[position + 2] == "]",
+                characters[position + 1] == "[" || characters[position + 1] == "]"
+            {
+                literal.append(characters[position + 1])
+                position += 3
+                continue
+            }
+            flush()
+            guard let close = characters[position...].firstIndex(of: "]") else {
+                tokens.append(.invalid(.invalidPlaceholder(String(characters[position...]))))
+                break
+            }
+            tokens += Self.commands(Array(characters[(position + 1)..<close]))
+            position = close + 1
+        }
+        flush()
+        self.tokens = tokens
+    }
 
     /// The commands inside one pair of brackets; several may share it: `[YMD]`, `[hms]`.
     private static func commands(_ content: [Character]) -> [Token] {
@@ -563,6 +563,152 @@ extension RenameMask {
         }
     }
 
+    /// The widest fill that is ever written: names do not get longer than this.
+    internal static let widestFill = 255
+
+    /// Name and extension as the masks see them: split at the last dot, also for folders
+    /// unless `[I]` is on.
+    internal static func parts(of subject: RenameSubject, _ state: MaskState) -> (name: String, ext: String) {
+        if subject.isFolder, state.foldersHaveNoExtension {
+            return (subject.name, "")
+        }
+        // As in `FileItem.split`: a leading dot starts no extension, a trailing dot ends none
+        // (`Acme Inc.` keeps its dot in the name).
+        guard let dot = subject.name.lastIndex(of: "."), dot != subject.name.startIndex,
+            subject.name.index(after: dot) != subject.name.endIndex
+        else { return (subject.name, "") }
+        return (String(subject.name[..<dot]), String(subject.name[subject.name.index(after: dot)...]))
+    }
+
+    private static func value(
+        of source: Source,
+        _ subject: RenameSubject,
+        _ context: RenameContext,
+        _ state: MaskState
+    ) throws -> String {
+        let folders = subject.folders
+        func fromRight(_ level: Int) -> String {
+            folders.indices.contains(folders.count - 1 - level) ? folders[folders.count - 1 - level] : ""
+        }
+        switch source {
+        case .name:
+            return parts(of: subject, state).name
+
+        case .ext:
+            return parts(of: subject, state).ext
+
+        case .nameWithExt:
+            return subject.name
+
+        case .fullPath:
+            return subject.fullPath
+
+        case .parent:
+            return fromRight(0)
+
+        case .grandparent:
+            return fromRight(1)
+
+        case .folderFromRight(let level):
+            return fromRight(level)
+
+        // `[B+0]` is the drive letter on Windows; a Mac path has nothing in that place.
+        case .folderFromLeft(let level):
+            return level >= 1 && folders.indices.contains(level - 1) ? folders[level - 1] : ""
+
+        case .clipboard(let optional):
+            guard let text = context.clipboard ?? context.clipboardLoader?(), !text.isEmpty else {
+                if optional {
+                    return ""
+                }
+                throw RenameMaskError.emptyClipboard
+            }
+            let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+            return String(firstLine.map { "*?:\\|\"<>/".contains($0) ? "_" : $0 })
+
+        case .environment(let name, let form):
+            let value = context.environment[name] ?? ""
+            switch form {
+            case .whole:
+                return value
+
+            case .lastPart:
+                return value.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
+
+            case .separator(let separator):
+                return String(value.compactMap { $0 == ":" ? nil : ($0 == "/" || $0 == "\\") ? separator : $0 })
+            }
+        }
+    }
+
+    /// A date or time in the regional format, made fit for a name: neither a slash nor a
+    /// colon may get into it, and the system's non-breaking spaces become plain ones.
+    private static func nameSafe(_ text: String) -> String {
+        String(text.map { $0 == "/" ? "-" : $0 == ":" ? "." : ($0 == "\u{202F}" || $0 == "\u{A0}") ? " " : $0 })
+    }
+
+    private static func width(_ digits: Int?, _ context: RenameContext) -> Int {
+        guard let digits, digits > 0 else {
+            return String(max(context.count, 1)).count
+        }
+        return min(digits, widestFill)
+    }
+
+    internal static func padded(_ value: Int, digits: Int) -> String {
+        let text = value == Int.min ? String(value.magnitude) : String(abs(value))
+        return (value < 0 ? "-" : "") + String(repeating: "0", count: max(0, min(digits, widestFill) - text.count))
+            + text
+    }
+
+    /// `start + step * times`; a result beyond the range of numbers is an error of the mask
+    /// (`<Error!>`), not a crash.
+    internal static func number(_ start: Int, plus step: Int, times: Int) throws -> Int {
+        let (distance, overflowed) = step.multipliedReportingOverflow(by: times)
+        let (sum, overflowedAgain) = start.addingReportingOverflow(distance)
+        guard !overflowed, !overflowedAgain else { throw RenameMaskError.numberTooLarge }
+        return sum
+    }
+
+    private static func counterText(_ inline: InlineCounter?, index: Int, context: RenameContext) throws -> String {
+        guard let inline else {
+            return padded(
+                try number(context.counter.start, plus: context.counter.step, times: index),
+                digits: width(context.counter.digits, context)
+            )
+        }
+        let steps = try number(0, plus: inline.step, times: index / inline.divisor)
+        if let letters = inline.letters {
+            return try alphabetic(letters, advancedBy: steps)
+        }
+        return padded(try number(inline.start, plus: steps, times: 1), digits: width(inline.digits, context))
+    }
+
+    /// `aa`, `ab`, … `az`, `ba`: the letters are the digits of a number in base 26, as wide
+    /// as the start text and in its case.
+    ///
+    /// Letters that make a number too large for the counter are an error of the mask.
+    internal static func alphabetic(_ start: String, advancedBy steps: Int) throws -> String {
+        let isUpper = start.first?.isUppercase ?? false
+        let base = UInt8(ascii: isUpper ? "A" : "a")
+        var value = 0
+        for byte in start.lowercased().utf8 {
+            let (shifted, overflowed) = value.multipliedReportingOverflow(by: 26)
+            let (next, overflowedAgain) = shifted.addingReportingOverflow(Int(byte - UInt8(ascii: "a")))
+            guard !overflowed, !overflowedAgain else { throw RenameMaskError.numberTooLarge }
+            value = next
+        }
+        let (advanced, overflowed) = value.addingReportingOverflow(steps)
+        guard !overflowed else { throw RenameMaskError.numberTooLarge }
+        value = max(0, advanced)
+        var letters: [UInt8] = []
+        repeat {
+            letters.append(base + UInt8(value % 26))
+            value /= 26
+        } while value > 0
+        while letters.count < start.count { letters.append(base) }
+        return String(decoding: letters.reversed(), as: UTF8.self)
+    }
+
     /// The text the mask gives for one item.
     ///
     /// `index` is the item's place in the list, from 0. Safe to call from several threads at once.
@@ -715,151 +861,5 @@ extension RenameMask {
         }
         let result = pieces.map { $0.letterCase.apply(to: $0.text, rule: context.titleRule) }.joined()
         return precompose ? result.precomposedStringWithCanonicalMapping : result
-    }
-
-    /// Name and extension as the masks see them: split at the last dot, also for folders
-    /// unless `[I]` is on.
-    internal static func parts(of subject: RenameSubject, _ state: MaskState) -> (name: String, ext: String) {
-        if subject.isFolder, state.foldersHaveNoExtension {
-            return (subject.name, "")
-        }
-        // As in `FileItem.split`: a leading dot starts no extension, a trailing dot ends none
-        // (`Acme Inc.` keeps its dot in the name).
-        guard let dot = subject.name.lastIndex(of: "."), dot != subject.name.startIndex,
-            subject.name.index(after: dot) != subject.name.endIndex
-        else { return (subject.name, "") }
-        return (String(subject.name[..<dot]), String(subject.name[subject.name.index(after: dot)...]))
-    }
-
-    private static func value(
-        of source: Source,
-        _ subject: RenameSubject,
-        _ context: RenameContext,
-        _ state: MaskState
-    ) throws -> String {
-        let folders = subject.folders
-        func fromRight(_ level: Int) -> String {
-            folders.indices.contains(folders.count - 1 - level) ? folders[folders.count - 1 - level] : ""
-        }
-        switch source {
-        case .name:
-            return parts(of: subject, state).name
-
-        case .ext:
-            return parts(of: subject, state).ext
-
-        case .nameWithExt:
-            return subject.name
-
-        case .fullPath:
-            return subject.fullPath
-
-        case .parent:
-            return fromRight(0)
-
-        case .grandparent:
-            return fromRight(1)
-
-        case .folderFromRight(let level):
-            return fromRight(level)
-
-        // `[B+0]` is the drive letter on Windows; a Mac path has nothing in that place.
-        case .folderFromLeft(let level):
-            return level >= 1 && folders.indices.contains(level - 1) ? folders[level - 1] : ""
-
-        case .clipboard(let optional):
-            guard let text = context.clipboard ?? context.clipboardLoader?(), !text.isEmpty else {
-                if optional {
-                    return ""
-                }
-                throw RenameMaskError.emptyClipboard
-            }
-            let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
-            return String(firstLine.map { "*?:\\|\"<>/".contains($0) ? "_" : $0 })
-
-        case .environment(let name, let form):
-            let value = context.environment[name] ?? ""
-            switch form {
-            case .whole:
-                return value
-
-            case .lastPart:
-                return value.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
-
-            case .separator(let separator):
-                return String(value.compactMap { $0 == ":" ? nil : ($0 == "/" || $0 == "\\") ? separator : $0 })
-            }
-        }
-    }
-
-    /// A date or time in the regional format, made fit for a name: neither a slash nor a
-    /// colon may get into it, and the system's non-breaking spaces become plain ones.
-    private static func nameSafe(_ text: String) -> String {
-        String(text.map { $0 == "/" ? "-" : $0 == ":" ? "." : ($0 == "\u{202F}" || $0 == "\u{A0}") ? " " : $0 })
-    }
-
-    /// The widest fill that is ever written: names do not get longer than this.
-    internal static let widestFill = 255
-
-    private static func width(_ digits: Int?, _ context: RenameContext) -> Int {
-        guard let digits, digits > 0 else {
-            return String(max(context.count, 1)).count
-        }
-        return min(digits, widestFill)
-    }
-
-    internal static func padded(_ value: Int, digits: Int) -> String {
-        let text = value == Int.min ? String(value.magnitude) : String(abs(value))
-        return (value < 0 ? "-" : "") + String(repeating: "0", count: max(0, min(digits, widestFill) - text.count))
-            + text
-    }
-
-    /// `start + step * times`; a result beyond the range of numbers is an error of the mask
-    /// (`<Error!>`), not a crash.
-    internal static func number(_ start: Int, plus step: Int, times: Int) throws -> Int {
-        let (distance, overflowed) = step.multipliedReportingOverflow(by: times)
-        let (sum, overflowedAgain) = start.addingReportingOverflow(distance)
-        guard !overflowed, !overflowedAgain else { throw RenameMaskError.numberTooLarge }
-        return sum
-    }
-
-    private static func counterText(_ inline: InlineCounter?, index: Int, context: RenameContext) throws -> String {
-        guard let inline else {
-            return padded(
-                try number(context.counter.start, plus: context.counter.step, times: index),
-                digits: width(context.counter.digits, context)
-            )
-        }
-        let steps = try number(0, plus: inline.step, times: index / inline.divisor)
-        if let letters = inline.letters {
-            return try alphabetic(letters, advancedBy: steps)
-        }
-        return padded(try number(inline.start, plus: steps, times: 1), digits: width(inline.digits, context))
-    }
-
-    /// `aa`, `ab`, … `az`, `ba`: the letters are the digits of a number in base 26, as wide
-    /// as the start text and in its case.
-    ///
-    /// Letters that make a number too large for the counter are an error of the mask.
-    internal static func alphabetic(_ start: String, advancedBy steps: Int) throws -> String {
-        let isUpper = start.first?.isUppercase ?? false
-        let base = UInt8(ascii: isUpper ? "A" : "a")
-        var value = 0
-        for byte in start.lowercased().utf8 {
-            let (shifted, overflowed) = value.multipliedReportingOverflow(by: 26)
-            let (next, overflowedAgain) = shifted.addingReportingOverflow(Int(byte - UInt8(ascii: "a")))
-            guard !overflowed, !overflowedAgain else { throw RenameMaskError.numberTooLarge }
-            value = next
-        }
-        let (advanced, overflowed) = value.addingReportingOverflow(steps)
-        guard !overflowed else { throw RenameMaskError.numberTooLarge }
-        value = max(0, advanced)
-        var letters: [UInt8] = []
-        repeat {
-            letters.append(base + UInt8(value % 26))
-            value /= 26
-        } while value > 0
-        while letters.count < start.count { letters.append(base) }
-        return String(decoding: letters.reversed(), as: UTF8.self)
     }
 }

@@ -10,13 +10,15 @@ internal final class PreferencePageModel {
     private var stored: [String: FormValues.Value] = [:]
     private var pending: [String: FormValues.Value] = [:]
 
+    internal var title: String { page.title }
+
+    internal var isChanged: Bool { pending != stored }
+
     internal init(page: PreferencePage, settings: any SettingsStore) {
         self.page = page
         self.settings = settings
         discard()
     }
-
-    internal var title: String { page.title }
 
     internal func value(of preference: Preference) -> FormValues.Value {
         pending[preference.key] ?? settings.value(of: preference)
@@ -25,8 +27,6 @@ internal final class PreferencePageModel {
     internal func set(_ value: FormValues.Value, for preference: Preference) {
         pending[preference.key] = value
     }
-
-    internal var isChanged: Bool { pending != stored }
 
     /// Apply: writes what was changed and tells the page's plugin, once, if anything was.
     internal func commit() {
@@ -96,29 +96,6 @@ internal final class ConfigurationStore {
     /// Told, on the main thread, that stored data could not be read in full and was kept aside.
     internal var onProblem: (@MainActor @Sendable (String) -> Void)?
 
-    internal init(settings: any SettingsStore) {
-        self.settings = settings.scoped(to: Self.owner)
-    }
-
-    /// Forgets what was decoded: the settings were replaced behind the store's back (import, reset).
-    internal func invalidate() {
-        cachedUserCommands = nil
-        cachedStartMenu = nil
-    }
-
-    /// The user command of this name; the first of that name, as a search of the list finds it.
-    internal func userCommand(named name: String) -> UserCommand? {
-        let commands = userCommands
-        if userCommandPlaces == nil {
-            var places: [String: Int] = [:]
-            for (index, command) in commands.enumerated() where places[command.name] == nil {
-                places[command.name] = index
-            }
-            userCommandPlaces = places
-        }
-        return userCommandPlaces?[name].map { commands[$0] }
-    }
-
     internal var userCommands: [UserCommand] {
         get {
             if let cachedUserCommands {
@@ -159,6 +136,35 @@ internal final class ConfigurationStore {
         }
     }
 
+    /// The pictures the user gave to commands: command name → system symbol.
+    internal var symbols: [String: String] {
+        get { settings.value([String: String].self, forKey: Self.symbolsKey) ?? [:] }
+        set { settings.set(newValue, forKey: Self.symbolsKey) }
+    }
+
+    internal init(settings: any SettingsStore) {
+        self.settings = settings.scoped(to: Self.owner)
+    }
+
+    /// Forgets what was decoded: the settings were replaced behind the store's back (import, reset).
+    internal func invalidate() {
+        cachedUserCommands = nil
+        cachedStartMenu = nil
+    }
+
+    /// The user command of this name; the first of that name, as a search of the list finds it.
+    internal func userCommand(named name: String) -> UserCommand? {
+        let commands = userCommands
+        if userCommandPlaces == nil {
+            var places: [String: Int] = [:]
+            for (index, command) in commands.enumerated() where places[command.name] == nil {
+                places[command.name] = index
+            }
+            userCommandPlaces = places
+        }
+        return userCommandPlaces?[name].map { commands[$0] }
+    }
+
     /// The list stored under `key`, element by element.
     ///
     /// When the data is not a list, or has elements that cannot be read, a copy of it is kept under
@@ -186,12 +192,6 @@ internal final class ConfigurationStore {
             onProblem?(message + " The original data is kept in the setting “\(Self.owner).\(backup)”.")
         }
         return list?.elements ?? []
-    }
-
-    /// The pictures the user gave to commands: command name → system symbol.
-    internal var symbols: [String: String] {
-        get { settings.value([String: String].self, forKey: Self.symbolsKey) ?? [:] }
-        set { settings.set(newValue, forKey: Self.symbolsKey) }
     }
 }
 
@@ -331,8 +331,6 @@ internal struct StartMenuDraft: Equatable {
 ///
 /// A value is kept as the JSON it is stored as, so the file can be read and changed by hand.
 internal struct SettingsArchive: Equatable {
-    internal static let format = "A File Manager settings"
-
     internal enum ArchiveError: LocalizedError {
         case notAnArchive
         case unreadable(String)
@@ -348,7 +346,30 @@ internal struct SettingsArchive: Equatable {
         }
     }
 
+    internal static let format = "A File Manager settings"
+
     internal var values: [String: Data] = [:]
+
+    internal init() {}
+
+    internal init(data: Data) throws {
+        guard let file = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            file["format"] as? String == Self.format,
+            let entries = file["settings"] as? [String: Any]
+        else { throw ArchiveError.notAnArchive }
+        for (key, value) in entries {
+            if let wrapped = value as? [String: Any], wrapped.count == 1, let text = wrapped["$data"] as? String,
+                let raw = Data(base64Encoded: text)
+            {
+                values[key] = raw
+            } else if let json = try? JSONSerialization.data(
+                withJSONObject: value,
+                options: [.fragmentsAllowed, .sortedKeys]
+            ) {
+                values[key] = json
+            }
+        }
+    }
 
     /// What the store holds under the given keys; keys without a value are left out.
     internal static func capture(from settings: any SettingsStore, keys: [String]) -> Self {
@@ -397,26 +418,5 @@ internal struct SettingsArchive: Equatable {
         }
         let file: [String: Any] = ["format": Self.format, "version": 1, "settings": entries]
         return try JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys])
-    }
-
-    internal init() {}
-
-    internal init(data: Data) throws {
-        guard let file = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            file["format"] as? String == Self.format,
-            let entries = file["settings"] as? [String: Any]
-        else { throw ArchiveError.notAnArchive }
-        for (key, value) in entries {
-            if let wrapped = value as? [String: Any], wrapped.count == 1, let text = wrapped["$data"] as? String,
-                let raw = Data(base64Encoded: text)
-            {
-                values[key] = raw
-            } else if let json = try? JSONSerialization.data(
-                withJSONObject: value,
-                options: [.fragmentsAllowed, .sortedKeys]
-            ) {
-                values[key] = json
-            }
-        }
     }
 }

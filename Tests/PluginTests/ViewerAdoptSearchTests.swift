@@ -165,9 +165,9 @@ internal struct ViewerAdoptSearch {
         final class Counting: ByteSource {
             let data: Data
             private let counter = ViewerAdoptBox(Int64(0))
-            init(_ data: Data) { self.data = data }
             var length: Int64 { Int64(data.count) }
             var bytesRead: Int64 { counter.value }
+            init(_ data: Data) { self.data = data }
             func read(at offset: Int64, count: Int) -> Data {
                 let lower = Int(max(0, min(offset, length)))
                 let upper = min(data.count, lower + max(0, count))

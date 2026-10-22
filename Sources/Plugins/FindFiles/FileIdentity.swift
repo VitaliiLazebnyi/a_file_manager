@@ -5,12 +5,12 @@ import Foundation
 /// link, and for a folder reached by two roads (macOS shows the data volume both directly and
 /// under /System/Volumes/Data).
 internal struct FileIdentity: Hashable {
-    internal let device: UInt64
-    internal let inode: UInt64
-
     /// `SF_DATALESS` of `st_flags`: a file whose contents are not on this disk (iCloud Drive
     /// with optimised storage); reading it downloads it.
     internal static let datalessFlag: UInt32 = 0x4000_0000
+
+    internal let device: UInt64
+    internal let inode: UInt64
 
     /// What a local path is, with one system call; nil for other locations or a path that
     /// cannot be examined.

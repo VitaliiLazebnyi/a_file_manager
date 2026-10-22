@@ -42,23 +42,64 @@ public struct TabFile: Equatable, Sendable {
         self.inactive = inactive
     }
 
-    /// The file's text. `displayPath` writes a location the way the user reads it.
-    public func text(displayPath: (URL) -> String) -> String {
-        func section(_ name: String, _ state: PanelTabs.State) -> String {
-            var lines = ["[\(name)]"]
-            for (index, tab) in state.tabs.enumerated() {
-                let path = URL(string: tab.location).map(displayPath) ?? tab.location
-                lines.append("\(index)_path=\(Self.value(path))")
-                if let title = tab.title, !title.isEmpty { lines.append("\(index)_caption=\(Self.value(title))") }
-                let fields = [
-                    1, tab.sortKey, tab.descending ? 1 : 0, 0, 0, tab.locked ? 1 : 0, tab.showHidden ? 1 : 0
-                ]
-                lines.append("\(index)_options=" + fields.map(String.init).joined(separator: "|"))
+    /// Reads a file's text; nil when it names no tab at all. `location` reads a path as the
+    /// user would type it; a line it cannot read is skipped.
+    public init?(text: String, location: (String) -> URL?) {
+        var sections: [String: [String: String]] = [:]
+        var current = ""
+        let text = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
+        for line in text.split(whereSeparator: \.isNewline) {
+            let line = line.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("["), line.hasSuffix("]") {
+                current = line.dropFirst().dropLast().lowercased()
+            } else if let equals = line.firstIndex(of: "="), !line.hasPrefix(";") {
+                sections[current, default: [:]][line[..<equals].lowercased()] = String(
+                    line[line.index(after: equals)...]
+                )
             }
-            lines.append("activetab=\(state.active)")
-            return lines.joined(separator: "\n") + "\n"
         }
-        return section("activetabs", active) + (inactive.map { "\n" + section("inactivetabs", $0) } ?? "")
+
+        func state(_ name: String) -> PanelTabs.State? {
+            guard let keys = sections[name] else {
+                return nil
+            }
+            let numbers = keys.keys
+                .compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil
+                }
+                .sorted()
+            var tabs: [PanelTabState] = []
+            var active = 0
+            let wanted = keys["activetab"].flatMap(Int.init) ?? 0
+            for number in numbers {
+                guard tabs.count < Self.tabLimit else { break }
+                guard let path = keys["\(number)_path"].map(Self.unquoted), path.count <= Self.pathLimit,
+                    let url = location(path)
+                else { continue }
+                let fields = (keys["\(number)_options"] ?? "").split(separator: "|", omittingEmptySubsequences: false)
+                    .map { Int($0) ?? 0 }
+                func field(_ index: Int) -> Int { fields.indices.contains(index) ? fields[index] : 0 }
+                if number == wanted { active = tabs.count }
+                var tab = PanelTabState(
+                    location: url,
+                    showHidden: field(6) == 1,
+                    title: keys["\(number)_caption"].map(Self.unquoted)
+                        .flatMap {
+                            $0.isEmpty || $0.count > Self.captionLimit ? nil : $0
+                        },
+                    locked: field(5) == 1
+                )
+                // The sort key as the file has it, known or not.
+                (tab.sortKey, tab.descending) = (field(1), field(2) == 1)
+                tabs.append(tab)
+            }
+            return tabs.isEmpty ? nil : PanelTabs.State(tabs: tabs, active: active)
+        }
+
+        guard let active = state("activetabs") ?? state("inactivetabs") else {
+            return nil
+        }
+        self.active = active
+        inactive = sections["activetabs"] == nil ? nil : state("inactivetabs")
     }
 
     /// A value as it stands on a line: in quotes with escapes when it would not read back the same.
@@ -176,63 +217,22 @@ public struct TabFile: Equatable, Sendable {
         return String(decoding: data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data, as: UTF8.self)
     }
 
-    /// Reads a file's text; nil when it names no tab at all. `location` reads a path as the
-    /// user would type it; a line it cannot read is skipped.
-    public init?(text: String, location: (String) -> URL?) {
-        var sections: [String: [String: String]] = [:]
-        var current = ""
-        let text = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
-        for line in text.split(whereSeparator: \.isNewline) {
-            let line = line.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("["), line.hasSuffix("]") {
-                current = line.dropFirst().dropLast().lowercased()
-            } else if let equals = line.firstIndex(of: "="), !line.hasPrefix(";") {
-                sections[current, default: [:]][line[..<equals].lowercased()] = String(
-                    line[line.index(after: equals)...]
-                )
+    /// The file's text. `displayPath` writes a location the way the user reads it.
+    public func text(displayPath: (URL) -> String) -> String {
+        func section(_ name: String, _ state: PanelTabs.State) -> String {
+            var lines = ["[\(name)]"]
+            for (index, tab) in state.tabs.enumerated() {
+                let path = URL(string: tab.location).map(displayPath) ?? tab.location
+                lines.append("\(index)_path=\(Self.value(path))")
+                if let title = tab.title, !title.isEmpty { lines.append("\(index)_caption=\(Self.value(title))") }
+                let fields = [
+                    1, tab.sortKey, tab.descending ? 1 : 0, 0, 0, tab.locked ? 1 : 0, tab.showHidden ? 1 : 0
+                ]
+                lines.append("\(index)_options=" + fields.map(String.init).joined(separator: "|"))
             }
+            lines.append("activetab=\(state.active)")
+            return lines.joined(separator: "\n") + "\n"
         }
-
-        func state(_ name: String) -> PanelTabs.State? {
-            guard let keys = sections[name] else {
-                return nil
-            }
-            let numbers = keys.keys
-                .compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil
-                }
-                .sorted()
-            var tabs: [PanelTabState] = []
-            var active = 0
-            let wanted = keys["activetab"].flatMap(Int.init) ?? 0
-            for number in numbers {
-                guard tabs.count < Self.tabLimit else { break }
-                guard let path = keys["\(number)_path"].map(Self.unquoted), path.count <= Self.pathLimit,
-                    let url = location(path)
-                else { continue }
-                let fields = (keys["\(number)_options"] ?? "").split(separator: "|", omittingEmptySubsequences: false)
-                    .map { Int($0) ?? 0 }
-                func field(_ index: Int) -> Int { fields.indices.contains(index) ? fields[index] : 0 }
-                if number == wanted { active = tabs.count }
-                var tab = PanelTabState(
-                    location: url,
-                    showHidden: field(6) == 1,
-                    title: keys["\(number)_caption"].map(Self.unquoted)
-                        .flatMap {
-                            $0.isEmpty || $0.count > Self.captionLimit ? nil : $0
-                        },
-                    locked: field(5) == 1
-                )
-                // The sort key as the file has it, known or not.
-                (tab.sortKey, tab.descending) = (field(1), field(2) == 1)
-                tabs.append(tab)
-            }
-            return tabs.isEmpty ? nil : PanelTabs.State(tabs: tabs, active: active)
-        }
-
-        guard let active = state("activetabs") ?? state("inactivetabs") else {
-            return nil
-        }
-        self.active = active
-        inactive = sections["activetabs"] == nil ? nil : state("inactivetabs")
+        return section("activetabs", active) + (inactive.map { "\n" + section("inactivetabs", $0) } ?? "")
     }
 }

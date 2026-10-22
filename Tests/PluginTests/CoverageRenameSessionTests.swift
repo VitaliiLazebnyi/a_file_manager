@@ -15,6 +15,17 @@ import UniformTypeIdentifiers
 @MainActor
 @Suite
 internal struct CoverageRenameSession {
+    // MARK: The result list
+
+    /// A viewer that remembers what it was asked to show.
+    private final class Viewer: ViewerService {
+        var shown: [URL] = []
+        func view(_ url: URL) { shown.append(url) }
+        func view(text _: String, title _: String) {
+            // Not asked for here.
+        }
+    }
+
     internal let memory = MemoryFileSystem()
     internal let box: Sandbox
     internal let settings = MemorySettings()
@@ -23,6 +34,8 @@ internal struct CoverageRenameSession {
     internal let jobs: CancellingJobService
 
     internal var ui: ScriptedInteraction { bench.interaction }
+
+    internal var names: [String] { memory.allPaths.filter { $0.hasPrefix("/f/") }.map { String($0.dropFirst(3)) } }
 
     internal init() throws {
         box = try Sandbox()
@@ -77,8 +90,6 @@ internal struct CoverageRenameSession {
         jobs.moment = moment
         bench.kernel.attach(jobs)
     }
-
-    internal var names: [String] { memory.allPaths.filter { $0.hasPrefix("/f/") }.map { String($0.dropFirst(3)) } }
 
     // MARK: While a run is under way
 
@@ -412,17 +423,6 @@ internal struct CoverageRenameSession {
         session.start()
         session.undo()
         #expect(ui.log.last?.hasSuffix("… (21 files)") == true)
-    }
-
-    // MARK: The result list
-
-    /// A viewer that remembers what it was asked to show.
-    private final class Viewer: ViewerService {
-        var shown: [URL] = []
-        func view(_ url: URL) { shown.append(url) }
-        func view(text _: String, title _: String) {
-            // Not asked for here.
-        }
     }
 
     @Test

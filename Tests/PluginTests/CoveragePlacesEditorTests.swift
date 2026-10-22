@@ -62,6 +62,10 @@ internal struct CoveragePlacesHotlistEditor {
     internal let bench: TestBench
     internal var ui: ScriptedInteraction { bench.interaction }
 
+    internal let sample = Hotlist(entries: [
+        .item("A", command: "cd /a"), .submenu("S", [.item("In", command: "cd /in")]), .separator
+    ])
+
     internal init() {
         _ = NSApplication.shared
         memory.addDirectory("/C")
@@ -93,10 +97,6 @@ internal struct CoveragePlacesHotlistEditor {
         #expect(!window.isVisible)
         return controller.result
     }
-
-    internal let sample = Hotlist(entries: [
-        .item("A", command: "cd /a"), .submenu("S", [.item("In", command: "cd /in")]), .separator
-    ])
 
     @Test
     internal func cancelGivesNothingBack() {

@@ -22,13 +22,13 @@ internal struct ParameterExpansion {
         listName: "test"
     )
 
+    internal let unselected: (inout ExpansionContext) -> Void = { $0.left.selection = [] }
+
     internal func expand(_ text: String, _ change: (inout ExpansionContext) -> Void = { _ in }) -> String {
         var context = context
         change(&context)
         return ParameterExpander(context: context).expand(text).text
     }
-
-    internal let unselected: (inout ExpansionContext) -> Void = { $0.left.selection = [] }
 
     @Test
     internal func singleValues() {
@@ -235,6 +235,8 @@ internal struct ConfigurationCommands {
     internal var ui: ScriptedInteraction { bench.interaction }
     internal var center: ConfigurationCenter { plugin.center! }
 
+    internal var a: String { box.url("A").path }
+
     internal init() throws {
         box = try Sandbox()
         try box.file("A/my file.txt")
@@ -275,8 +277,6 @@ internal struct ConfigurationCommands {
             )
         )
     }
-
-    internal var a: String { box.url("A").path }
 
     // MARK: User commands
 

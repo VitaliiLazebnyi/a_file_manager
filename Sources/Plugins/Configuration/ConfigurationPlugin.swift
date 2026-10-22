@@ -11,14 +11,7 @@ public import AppKit
 /// The program's language is English: Total Commander's language files (spec 16) are Windows
 /// resources and are not taken over.
 public final class ConfigurationPlugin: Plugin {
-    public let name = "Configuration"
-    private let launchesApplications: Bool
-    private let background: DispatchQueue?
-    private let listFolder: URL
-    private let sweepsStaleFolders: Bool
     private static let listsParent = FileManager.default.temporaryDirectory.appendingPathComponent("AFileManager-lists")
-    private let settingsKeys: (() -> [String])?
-    internal private(set) var center: ConfigurationCenter?
 
     // Commands only this plugin has (spec 17 › Configuration, Help, User).
     internal static let redefineHotkeys: CommandID = "cm_Confirmation"
@@ -36,6 +29,17 @@ public final class ConfigurationPlugin: Plugin {
     internal static let keyboardHelp: CommandID = "cm_Keyboard"
     internal static let helpIndex: CommandID = "cm_HelpIndex"
     internal static let about: CommandID = "cm_About"
+
+    public let name = "Configuration"
+    private let launchesApplications: Bool
+    private let background: DispatchQueue?
+    private let listFolder: URL
+    private let sweepsStaleFolders: Bool
+    private let settingsKeys: (() -> [String])?
+    internal private(set) var center: ConfigurationCenter?
+
+    /// The lines of user commands that were started without a command-line plugin.
+    public var launched: [String] { center?.runner.launched ?? [] }
 
     /// Tests turn `launchesApplications` off and pass no `background` queue, so nothing is
     /// started, nothing sounds or asks for a file (`ConfigurationEffects.silent`), and
@@ -55,9 +59,6 @@ public final class ConfigurationPlugin: Plugin {
         sweepsStaleFolders = listFolder == nil
         self.settingsKeys = settingsKeys
     }
-
-    /// The lines of user commands that were started without a command-line plugin.
-    public var launched: [String] { center?.runner.launched ?? [] }
 
     /// The keys of the values the program itself stored in the macOS preferences.
     ///

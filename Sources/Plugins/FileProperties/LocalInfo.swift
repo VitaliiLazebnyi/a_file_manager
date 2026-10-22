@@ -33,6 +33,15 @@ internal enum LocalInfo {
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var groupNames: [gid_t: String] = [:]
 
+    /// How often a name had to be asked of the system (which may be a directory server on
+    /// the network) because it was not known yet.
+    ///
+    /// For tests: they check that this happens on a job's thread and not when a dialog is put
+    /// together.
+    internal static var nameLookups: Int { lock.withLock { lookups } }
+    /// Guarded by `lock`.
+    nonisolated(unsafe) private static var lookups = 0
+
     private static func date(_ time: timespec) -> Date {
         Date(timeIntervalSince1970: TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000)
     }
@@ -93,15 +102,6 @@ internal enum LocalInfo {
         let type = st.st_mode & S_IFMT
         return type == S_IFREG || type == S_IFDIR
     }
-
-    /// How often a name had to be asked of the system (which may be a directory server on
-    /// the network) because it was not known yet.
-    ///
-    /// For tests: they check that this happens on a job's thread and not when a dialog is put
-    /// together.
-    internal static var nameLookups: Int { lock.withLock { lookups } }
-    /// Guarded by `lock`.
-    nonisolated(unsafe) private static var lookups = 0
 
     internal static func userName(_ id: uid_t) -> String {
         lock.lock()

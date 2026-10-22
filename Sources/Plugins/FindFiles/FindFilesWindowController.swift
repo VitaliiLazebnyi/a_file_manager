@@ -76,17 +76,6 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
         }
     }
 
-    internal static let keepResultsKey = "findFiles.keepResults"
-    internal static let historyLengthKey = "findFiles.historyLength"
-    internal static let spotlightKey = "findFiles.spotlight"
-    internal static let historyLengths = [10, 20, 50, 100]
-    /// The most hits a search of the window lists; it stops there and says so.
-    nonisolated internal static let resultLimit = 2_000_000
-    /// The most rows handed to the list in one piece.
-    nonisolated private static let batchSize = 2_000
-    /// Lists up to this many rows are worked on the main thread where that is simpler.
-    private static let smallList = 20_000
-
     private final class ResultsTableView: NSTableView {
         var onKey: ((NSEvent) -> Bool)?
 
@@ -107,6 +96,28 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
             return super.performKeyEquivalent(with: event)
         }
     }
+
+    /// How far the window goes; what tests make small.
+    internal struct Limits {
+        /// The most hits a search of the window lists.
+        internal var results = FindFilesWindowController.resultLimit
+        /// The most paths taken from Spotlight's answer.
+        internal var spotlight = SpotlightSearch.resultLimit
+        /// The earlier searches are kept as far as their rows are not more than this.
+        internal var earlierRows = 200_000
+    }
+
+    internal static let keepResultsKey = "findFiles.keepResults"
+    internal static let historyLengthKey = "findFiles.historyLength"
+    internal static let spotlightKey = "findFiles.spotlight"
+    internal static let historyLengths = [10, 20, 50, 100]
+    /// The most hits a search of the window lists; it stops there and says so.
+    nonisolated internal static let resultLimit = 2_000_000
+    /// The most rows handed to the list in one piece.
+    nonisolated private static let batchSize = 2_000
+    /// Lists up to this many rows are worked on the main thread where that is simpler.
+    private static let smallList = 20_000
+    private static let earlierLimit = 10
 
     internal let form: SearchForm
     /// Called when the window was closed.
@@ -144,17 +155,6 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
     private var copyRequest = 0
     private var showsDuplicates = false
     private var earlier: [ResultSet] = []
-    private static let earlierLimit = 10
-
-    /// How far the window goes; what tests make small.
-    internal struct Limits {
-        /// The most hits a search of the window lists.
-        internal var results = FindFilesWindowController.resultLimit
-        /// The most paths taken from Spotlight's answer.
-        internal var spotlight = SpotlightSearch.resultLimit
-        /// The earlier searches are kept as far as their rows are not more than this.
-        internal var earlierRows = 200_000
-    }
 
     internal var limits = Limits()
     private var earlierIndex = 0
@@ -174,6 +174,49 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
     /// Tests replace it, so that no window shows in the session they run in, and look at what it
     /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
+
+    /// Whether anything is marked in the source panel; asked often, so it does not look at the items.
+    private var hasSelectedItems: Bool { kernel.panels.source.model.selectionCount > 0 }
+
+    /// The marked items of the source panel, for "Only search in selected directories/files".
+    private var selectedItems: [URL] {
+        let model = kernel.panels.source.model
+        return model.items.filter { model.isSelected($0) }.map(\.url)
+    }
+
+    // MARK: Searching
+
+    internal var isSearching: Bool { search != nil }
+
+    // MARK: Results
+
+    /// The files and folders in the list, in list order.
+    internal var resultItems: [FileItem] {
+        rows.compactMap { row in
+            if case .item(let item) = row {
+                return item
+            }
+            return nil
+        }
+    }
+
+    /// The lines of the list as they are shown and copied.
+    internal var lines: [String] { rows.map(text) }
+
+    private var selectedItem: FileItem? {
+        guard rows.indices.contains(resultsTable.selectedRow), case .item(let item) = rows[resultsTable.selectedRow]
+        else { return nil }
+        return item
+    }
+
+    private var selectedResult: URL? { selectedItem?.url }
+
+    private var shiftIsDown: Bool { modifierFlags().contains(.shift) }
+
+    /// The list as text: one line per result, an empty line between groups of duplicates.
+    internal var copyText: String {
+        Self.copyText(of: rows, showsDuplicates: showsDuplicates, fileSystems: kernel.fileSystems)
+    }
 
     internal init(kernel: Kernel, title: String = "Find Files") {
         self.kernel = kernel
@@ -221,6 +264,43 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
     /// The window is made in code, never from an archive.
     internal required init?(coder _: NSCoder) { nil }
 
+    nonisolated private static func text(of item: FileItem, showsDuplicates: Bool, fileSystems: FileSystemRegistry)
+        -> String
+    {
+        guard showsDuplicates else {
+            return fileSystems.displayPath(item.url)
+        }
+        // Duplicates read `name  -  folder/` (spec 09 › Duplicate finder, Output).
+        let folder = fileSystems.displayPath(item.url.deletingLastPathComponent())
+        return "\(item.name)  -  \(folder.hasSuffix("/") ? folder : folder + "/")"
+    }
+
+    nonisolated private static func copyText(of rows: [Row], showsDuplicates: Bool, fileSystems: FileSystemRegistry)
+        -> String
+    {
+        var lines: [String] = []
+        lines.reserveCapacity(rows.count)
+        for row in rows {
+            switch row {
+            case .summary(let text):
+                lines.append(text)
+
+            case .separator:
+                lines.append("")
+
+            case .item(let item):
+                lines.append(
+                    Self.text(
+                        of: item,
+                        showsDuplicates: showsDuplicates,
+                        fileSystems: fileSystems
+                    )
+                )
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
     /// Shows the window with "Search in" set to `directory`.
     ///
     /// Results are viewed, edited and shown in the panel through the kernel's commands.
@@ -251,15 +331,6 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
         if !isSearching, !kernel.settings.flag(Self.keepResultsKey, default: true) {
             clearResults()
         }
-    }
-
-    /// Whether anything is marked in the source panel; asked often, so it does not look at the items.
-    private var hasSelectedItems: Bool { kernel.panels.source.model.selectionCount > 0 }
-
-    /// The marked items of the source panel, for "Only search in selected directories/files".
-    private var selectedItems: [URL] {
-        let model = kernel.panels.source.model
-        return model.items.filter { model.isSelected($0) }.map(\.url)
     }
 
     // MARK: Layout
@@ -347,10 +418,6 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
         backButton.isEnabled = !isSearching && earlierIndex > 0
         forwardButton.isEnabled = !isSearching && earlierIndex < earlier.count - 1
     }
-
-    // MARK: Searching
-
-    internal var isSearching: Bool { search != nil }
 
     @objc
     private func startPressed() {
@@ -658,21 +725,6 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
         onFinished()
     }
 
-    // MARK: Results
-
-    /// The files and folders in the list, in list order.
-    internal var resultItems: [FileItem] {
-        rows.compactMap { row in
-            if case .item(let item) = row {
-                return item
-            }
-            return nil
-        }
-    }
-
-    /// The lines of the list as they are shown and copied.
-    internal var lines: [String] { rows.map(text) }
-
     private func text(of row: Row) -> String {
         switch row {
         case .summary(let text):
@@ -689,25 +741,6 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
             )
         }
     }
-
-    nonisolated private static func text(of item: FileItem, showsDuplicates: Bool, fileSystems: FileSystemRegistry)
-        -> String
-    {
-        guard showsDuplicates else {
-            return fileSystems.displayPath(item.url)
-        }
-        // Duplicates read `name  -  folder/` (spec 09 › Duplicate finder, Output).
-        let folder = fileSystems.displayPath(item.url.deletingLastPathComponent())
-        return "\(item.name)  -  \(folder.hasSuffix("/") ? folder : folder + "/")"
-    }
-
-    private var selectedItem: FileItem? {
-        guard rows.indices.contains(resultsTable.selectedRow), case .item(let item) = rows[resultsTable.selectedRow]
-        else { return nil }
-        return item
-    }
-
-    private var selectedResult: URL? { selectedItem?.url }
 
     private func clearResults() {
         let dropped = (rows, resultURLs)
@@ -756,8 +789,6 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
         form.tabView.selectTabViewItem(at: 0)
         window?.makeFirstResponder(form.searchForField)
     }
-
-    private var shiftIsDown: Bool { modifierFlags().contains(.shift) }
 
     /// Go to file: closes the window and puts the panel's cursor on the result; with Shift in
     /// a new tab.
@@ -818,37 +849,6 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
             return false
         }
         return true
-    }
-
-    /// The list as text: one line per result, an empty line between groups of duplicates.
-    internal var copyText: String {
-        Self.copyText(of: rows, showsDuplicates: showsDuplicates, fileSystems: kernel.fileSystems)
-    }
-
-    nonisolated private static func copyText(of rows: [Row], showsDuplicates: Bool, fileSystems: FileSystemRegistry)
-        -> String
-    {
-        var lines: [String] = []
-        lines.reserveCapacity(rows.count)
-        for row in rows {
-            switch row {
-            case .summary(let text):
-                lines.append(text)
-
-            case .separator:
-                lines.append("")
-
-            case .item(let item):
-                lines.append(
-                    Self.text(
-                        of: item,
-                        showsDuplicates: showsDuplicates,
-                        fileSystems: fileSystems
-                    )
-                )
-            }
-        }
-        return lines.joined(separator: "\n")
     }
 
     /// Cmd+C: a long list is turned into text on a background queue (that takes a second for

@@ -63,6 +63,10 @@ internal final class RandomAccessFile: Sendable {
     internal let signature: FileSignature
     private let descriptor: Int32
 
+    /// False when another file lies at the path now: a child process that opens the path
+    /// would read that one.
+    internal var isStillAtItsPath: Bool { FileSignature.of(path) == signature }
+
     /// `shownAs` names the file in messages and to child processes when it is opened under a
     /// temporary name that it is about to lose.
     internal init(_ url: URL, shownAs: String? = nil) throws {
@@ -78,12 +82,6 @@ internal final class RandomAccessFile: Sendable {
         size = UInt64(status.st_size)
         signature = FileSignature(status)
     }
-
-    deinit { Darwin.close(descriptor) }
-
-    /// False when another file lies at the path now: a child process that opens the path
-    /// would read that one.
-    internal var isStillAtItsPath: Bool { FileSignature.of(path) == signature }
 
     /// Up to `count` bytes; fewer only at the end of the file.
     internal func read(at offset: UInt64, count: Int) throws -> Data {
@@ -112,6 +110,8 @@ internal final class RandomAccessFile: Sendable {
         }
         return Data(bytesNoCopy: buffer, count: done, deallocator: .free)
     }
+
+    deinit { Darwin.close(descriptor) }
 }
 
 /// A request to end a read that runs through streams (decompressing, skipping on to a member,
@@ -361,6 +361,9 @@ internal final class OutputFile {
     private var flushed: UInt64 = 0
     private var isClosed = false
 
+    /// Where the next byte goes.
+    internal var position: UInt64 { flushed + UInt64(buffer.count) }
+
     /// The file must not exist yet.
     ///
     /// It is the user's alone until whoever writes it says otherwise (`setMode`): a half-written
@@ -371,17 +374,6 @@ internal final class OutputFile {
         guard descriptor >= 0 else {
             throw errno == EEXIST ? FileSystemError.alreadyExists(url.path) : posixError(errno, url.path)
         }
-    }
-
-    /// The rights of the file, whatever the process's mask says.
-    internal func setMode(_ mode: mode_t) {
-        if !isClosed { fchmod(descriptor, mode & 0o7777) }
-    }
-
-    /// Gives up what was written: the room it took is free at once, not when the file goes.
-    internal func discard() {
-        buffer.removeAll()
-        if !isClosed { ftruncate(descriptor, 0) }
     }
 
     /// Continues an existing file at `offset`; what the file held from there on is cut off.
@@ -408,12 +400,16 @@ internal final class OutputFile {
         flushed = offset
     }
 
-    deinit {
-        if !isClosed { Darwin.close(descriptor) }
+    /// The rights of the file, whatever the process's mask says.
+    internal func setMode(_ mode: mode_t) {
+        if !isClosed { fchmod(descriptor, mode & 0o7777) }
     }
 
-    /// Where the next byte goes.
-    internal var position: UInt64 { flushed + UInt64(buffer.count) }
+    /// Gives up what was written: the room it took is free at once, not when the file goes.
+    internal func discard() {
+        buffer.removeAll()
+        if !isClosed { ftruncate(descriptor, 0) }
+    }
 
     internal func write(_ data: Data) throws {
         if data.count >= 1 << 16 {
@@ -473,6 +469,10 @@ internal final class OutputFile {
         isClosed = true
         if Darwin.close(descriptor) != 0 { throw posixError(errno, url.path) }
     }
+
+    deinit {
+        if !isClosed { Darwin.close(descriptor) }
+    }
 }
 
 /// Makes writes last through a loss of power.
@@ -517,11 +517,11 @@ internal struct ByteReader {
     internal let data: Data
     internal var position = 0
 
+    internal var remaining: Int { data.count - position }
+
     internal init(_ data: Data) {
         self.data = data
     }
-
-    internal var remaining: Int { data.count - position }
 
     internal mutating func u8() -> UInt8 {
         guard remaining >= 1 else {
@@ -604,21 +604,16 @@ internal final class SpaceWatch {
 /// Unchecked: what changes, here and in the table of all folders, is guarded by the static
 /// `lock`.
 internal final class ScratchFolder: @unchecked Sendable {
-    internal let url: URL
+    private struct Paths {
+        var externals: [String]
+        var list: String
+    }
 
     internal static let prefix = "afm-archives-"
     private static let keptMark = "kept-unsaved-changes"
     private static let lock = NSLock()
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var folders: [String: ScratchFolder.Paths] = [:]
-    private var isKept = false
-    private var isMade = false
-    private var externals: [String] = []
-
-    private struct Paths {
-        var externals: [String]
-        var list: String
-    }
 
     /// Registers the clean-up at exit once, for whatever folders exist by then.
     private static let atExit: Void = {
@@ -634,6 +629,13 @@ internal final class ScratchFolder: @unchecked Sendable {
         }
     }()
 
+    internal let url: URL
+    private var isKept = false
+    private var isMade = false
+    private var externals: [String] = []
+
+    private var listPath: String { url.path + ".external" }
+
     internal init(in parent: URL = FileManager.default.temporaryDirectory) {
         url = parent.appendingPathComponent(
             "\(Self.prefix)\(getpid())-\(UUID().uuidString)",
@@ -641,7 +643,46 @@ internal final class ScratchFolder: @unchecked Sendable {
         )
     }
 
-    private var listPath: String { url.path + ".external" }
+    /// The names temporary things get outside the folder; nothing else is ever removed there.
+    internal static func isOwnExternalName(_ name: String) -> Bool {
+        name.hasPrefix(".")
+            && (name.hasSuffix(".afm-zip.tmp") || name.hasSuffix(".afm-pack.tmp") || name.hasPrefix(".afm-spool-"))
+    }
+
+    private static func removeExternal(_ path: String) {
+        guard isOwnExternalName((path as NSString).lastPathComponent) else {
+            return
+        }
+        try? FileManager.default.removeItem(atPath: path)
+    }
+
+    /// Removes the folders, and the temporary files noted outside them, of processes that no
+    /// longer run: what a crash or a kill left behind.
+    ///
+    /// Folders that were kept on purpose stay. Touches the disk; meant for a background thread,
+    /// once at the start.
+    internal static func sweepLeftovers(in parent: URL = FileManager.default.temporaryDirectory) {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else {
+            return
+        }
+        for name in names where name.hasPrefix(prefix) {
+            let rest = name.dropFirst(prefix.count)
+            guard let pid = pid_t(rest.prefix { $0 != "-" }), pid > 0, pid != getpid() else { continue }
+            // Still running (or not ours to ask about): not touched.
+            guard kill(pid, 0) != 0, errno == ESRCH else { continue }
+            let path = parent.appendingPathComponent(name).path
+            if name.hasSuffix(".external") {
+                // Only while the folder it belongs to is not one that was kept.
+                let folder = String(path.dropLast(".external".count))
+                guard !FileManager.default.fileExists(atPath: folder + "/" + keptMark) else { continue }
+                let listed = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
+                for line in listed.split(separator: "\n") { removeExternal(String(line)) }
+                unlink(path)
+            } else if !FileManager.default.fileExists(atPath: path + "/" + keptMark) {
+                try? FileManager.default.removeItem(atPath: path)
+            }
+        }
+    }
 
     /// Makes the folder if it is not there.
     ///
@@ -668,19 +709,6 @@ internal final class ScratchFolder: @unchecked Sendable {
     internal func newFile(_ suffix: String = "tmp") throws -> URL {
         try prepare()
         return url.appendingPathComponent(UUID().uuidString + "." + suffix, isDirectory: false)
-    }
-
-    /// The names temporary things get outside the folder; nothing else is ever removed there.
-    internal static func isOwnExternalName(_ name: String) -> Bool {
-        name.hasPrefix(".")
-            && (name.hasSuffix(".afm-zip.tmp") || name.hasSuffix(".afm-pack.tmp") || name.hasPrefix(".afm-spool-"))
-    }
-
-    private static func removeExternal(_ path: String) {
-        guard isOwnExternalName((path as NSString).lastPathComponent) else {
-            return
-        }
-        try? FileManager.default.removeItem(atPath: path)
     }
 
     /// Notes a temporary file or folder that lies outside this folder.
@@ -739,34 +767,6 @@ internal final class ScratchFolder: @unchecked Sendable {
             atPath: url.appendingPathComponent(Self.keptMark).path,
             contents: Data()
         )
-    }
-
-    /// Removes the folders, and the temporary files noted outside them, of processes that no
-    /// longer run: what a crash or a kill left behind.
-    ///
-    /// Folders that were kept on purpose stay. Touches the disk; meant for a background thread,
-    /// once at the start.
-    internal static func sweepLeftovers(in parent: URL = FileManager.default.temporaryDirectory) {
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else {
-            return
-        }
-        for name in names where name.hasPrefix(prefix) {
-            let rest = name.dropFirst(prefix.count)
-            guard let pid = pid_t(rest.prefix { $0 != "-" }), pid > 0, pid != getpid() else { continue }
-            // Still running (or not ours to ask about): not touched.
-            guard kill(pid, 0) != 0, errno == ESRCH else { continue }
-            let path = parent.appendingPathComponent(name).path
-            if name.hasSuffix(".external") {
-                // Only while the folder it belongs to is not one that was kept.
-                let folder = String(path.dropLast(".external".count))
-                guard !FileManager.default.fileExists(atPath: folder + "/" + keptMark) else { continue }
-                let listed = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
-                for line in listed.split(separator: "\n") { removeExternal(String(line)) }
-                unlink(path)
-            } else if !FileManager.default.fileExists(atPath: path + "/" + keptMark) {
-                try? FileManager.default.removeItem(atPath: path)
-            }
-        }
     }
 }
 

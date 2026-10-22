@@ -122,8 +122,6 @@ internal final class Interruption: @unchecked Sendable {
 /// about a path on a share that has stopped answering. Kept for a moment and then read again. All
 /// state is guarded by `lock`.
 internal final class MountTable: @unchecked Sendable {
-    internal static let shared = MountTable()
-
     internal struct Mount {
         internal let path: String
         /// A disk of this Mac.
@@ -133,34 +131,15 @@ internal final class MountTable: @unchecked Sendable {
         internal let isLocal: Bool
     }
 
-    private let lock = NSLock()
-    private var mounts: [Mount] = []
-    private var read: UInt64 = 0
+    internal static let shared = MountTable()
     private static let lifetime: UInt64 = 2_000_000_000
-
-    /// Called with the lock held.
-    private func refresh() {
-        let now = DispatchTime.now().uptimeNanoseconds
-        guard read == 0 || now &- read > Self.lifetime else {
-            return
-        }
-        mounts = Self.readMounts()
-        read = now
-    }
 
     /// The start-up disk, on which every path lies that lies on no other mount.
     internal static let root = Mount(path: "/", isLocal: true)
 
-    /// The mount a path lies on (by its text: the path is not looked at on disk).
-    internal func mount(containing path: String) -> Mount {
-        lock.lock()
-        refresh()
-        let current = mounts
-        lock.unlock()
-        return current.first { mount in path == mount.path || path.hasPrefix(mount.path + "/") } ?? Self.root
-    }
-
-    internal func isLocal(_ path: String) -> Bool { mount(containing: path).isLocal }
+    private let lock = NSLock()
+    private var mounts: [Mount] = []
+    private var read: UInt64 = 0
 
     private static func readMounts() -> [Mount] {
         // (A failure, -1, counts as none.)
@@ -186,6 +165,27 @@ internal final class MountTable: @unchecked Sendable {
         // the start-up disk is `root`.
         return mounts.filter { $0.path != "/" }.sorted { $0.path.utf8.count > $1.path.utf8.count }
     }
+
+    /// Called with the lock held.
+    private func refresh() {
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard read == 0 || now &- read > Self.lifetime else {
+            return
+        }
+        mounts = Self.readMounts()
+        read = now
+    }
+
+    /// The mount a path lies on (by its text: the path is not looked at on disk).
+    internal func mount(containing path: String) -> Mount {
+        lock.lock()
+        refresh()
+        let current = mounts
+        lock.unlock()
+        return current.first { mount in path == mount.path || path.hasPrefix(mount.path + "/") } ?? Self.root
+    }
+
+    internal func isLocal(_ path: String) -> Bool { mount(containing: path).isLocal }
 }
 
 /// What a symbolic link leads to.
@@ -206,11 +206,11 @@ internal struct LinkTarget {
 /// are no longer followed. All state is guarded by `lock`.
 internal final class LinkResolver: @unchecked Sendable {
     internal static let shared = LinkResolver()
+    /// How many questions into places that are not disks of this Mac may be under way at once.
+    internal static let limit = 8
 
     private let lock = NSLock()
     private var inFlight = 0
-    /// How many questions into places that are not disks of this Mac may be under way at once.
-    internal static let limit = 8
     private let patience: TimeInterval
     /// Asks the system where a link leads (`stat`); it may wait for as long as the volume does.
     private let lookup: @Sendable (String) -> LinkTarget?
@@ -224,45 +224,6 @@ internal final class LinkResolver: @unchecked Sendable {
     /// that does not answer.
     internal init(patience: TimeInterval, lookup: @escaping @Sendable (String) -> LinkTarget?) {
         (self.patience, self.lookup) = (patience, lookup)
-    }
-
-    /// Nil when the target does not exist (a dangling link) or did not answer in time.
-    internal func resolve(_ path: String) -> LinkTarget? {
-        if let target = Self.absoluteTarget(of: path), MountTable.shared.isLocal(target) {
-            return lookup(path)
-        }
-        lock.lock()
-        guard inFlight < Self.limit else {
-            lock.unlock()
-            return nil
-        }
-        inFlight += 1
-        lock.unlock()
-        /// All state is guarded by `lock`.
-        final class Answer: @unchecked Sendable {
-            let lock = NSLock()
-            var target: LinkTarget?
-        }
-        let answer = Answer()
-        let done = DispatchSemaphore(value: 0)
-        // A thread of the kernel's own: one that never comes back is not one of a dispatch queue's few.
-        let ask = lookup
-        BlockingCalls.run {
-            let target = ask(path)
-            answer.lock.lock()
-            answer.target = target
-            answer.lock.unlock()
-            self.lock.lock()
-            self.inFlight -= 1
-            self.lock.unlock()
-            done.signal()
-        }
-        guard done.wait(timeout: .now() + patience) == .success else {
-            return nil
-        }
-        answer.lock.lock()
-        defer { answer.lock.unlock() }
-        return answer.target
     }
 
     /// What the link at `path` leads to, as the system says (`stat`); nil when nothing is there.
@@ -312,6 +273,45 @@ internal final class LinkResolver: @unchecked Sendable {
             if part.elementsEqual([0x2E, 0x2E]) { _ = parts.popLast() } else { parts.append(part) }
         }
         return "/" + parts.map { String(decoding: $0, as: UTF8.self) }.joined(separator: "/")
+    }
+
+    /// Nil when the target does not exist (a dangling link) or did not answer in time.
+    internal func resolve(_ path: String) -> LinkTarget? {
+        if let target = Self.absoluteTarget(of: path), MountTable.shared.isLocal(target) {
+            return lookup(path)
+        }
+        lock.lock()
+        guard inFlight < Self.limit else {
+            lock.unlock()
+            return nil
+        }
+        inFlight += 1
+        lock.unlock()
+        /// All state is guarded by `lock`.
+        final class Answer: @unchecked Sendable {
+            let lock = NSLock()
+            var target: LinkTarget?
+        }
+        let answer = Answer()
+        let done = DispatchSemaphore(value: 0)
+        // A thread of the kernel's own: one that never comes back is not one of a dispatch queue's few.
+        let ask = lookup
+        BlockingCalls.run {
+            let target = ask(path)
+            answer.lock.lock()
+            answer.target = target
+            answer.lock.unlock()
+            self.lock.lock()
+            self.inFlight -= 1
+            self.lock.unlock()
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + patience) == .success else {
+            return nil
+        }
+        answer.lock.lock()
+        defer { answer.lock.unlock() }
+        return answer.target
     }
 }
 
@@ -435,6 +435,15 @@ internal final class LocalCall: Sendable {
 /// further changes there fail at once (`ETIMEDOUT`), instead of costing a thread each.
 /// All state is guarded by `lock`.
 internal final class RemoteChanges: @unchecked Sendable {
+    /// Where the call's thread leaves its result, and learns that nobody waits for it.
+    ///
+    /// All state is guarded by `lock`.
+    private final class Outcome<Value: Sendable>: @unchecked Sendable {
+        let lock = NSLock()
+        var result: Result<Value, any Error>?
+        var isLeftBehind = false
+    }
+
     internal static let shared = RemoteChanges()
 
     /// The most calls on one volume that may be left behind at a time.
@@ -448,15 +457,6 @@ internal final class RemoteChanges: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return stranded[volume] ?? 0
-    }
-
-    /// Where the call's thread leaves its result, and learns that nobody waits for it.
-    ///
-    /// All state is guarded by `lock`.
-    private final class Outcome<Value: Sendable>: @unchecked Sendable {
-        let lock = NSLock()
-        var result: Result<Value, any Error>?
-        var isLeftBehind = false
     }
 
     internal func run<Value: Sendable>(

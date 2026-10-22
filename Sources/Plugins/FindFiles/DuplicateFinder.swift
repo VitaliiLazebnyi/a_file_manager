@@ -11,15 +11,15 @@ public struct DuplicateOptions: Codable, Equatable, Sendable {
     public var sameSize: Bool
     public var sameContents: Bool
 
+    /// With no sub-criterion ticked the option counts as off.
+    public var isActive: Bool { isEnabled && (sameName || sameSize || sameContents) }
+
     public init(isEnabled: Bool = false, sameName: Bool = true, sameSize: Bool = true, sameContents: Bool = false) {
         self.isEnabled = isEnabled
         self.sameName = sameName
         self.sameSize = sameSize
         self.sameContents = sameContents
     }
-
-    /// With no sub-criterion ticked the option counts as off.
-    public var isActive: Bool { isEnabled && (sameName || sameSize || sameContents) }
 }
 
 /// Sorts found files into groups of duplicates.
@@ -33,6 +33,35 @@ public enum DuplicateFinder {
         var name: String
         var size: Int64
         var digest = Data()
+    }
+
+    /// A disk that is somebody else's: a share of a server, mounted here.
+    internal struct Mount {
+        /// What the system calls the source of the mount (`//user@host/share`), and where it is mounted.
+        internal let from: String
+        internal let on: String
+
+        /// The mount that holds `url`, when it is not a local disk; nil otherwise.
+        internal static func of(_ url: URL) -> Self? {
+            var info = statfs()
+            func text<T>(_ field: T) -> String {
+                withUnsafePointer(to: field) {
+                    $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout<T>.size) { String(cString: $0) }
+                }
+            }
+            guard statfs(url.path, &info) == 0, info.f_flags & UInt32(MNT_LOCAL) == 0,
+                case let from = text(info.f_mntfromname), !from.isEmpty
+            else { return nil }
+            return Self(from: text(info.f_fstypename) + ":" + from, on: text(info.f_mntonname))
+        }
+
+        /// The file in the share, as the same text for every place the share is mounted at.
+        internal func place(of path: String) -> String {
+            let inside =
+                path.utf8.starts(with: on.utf8)
+                ? String(decoding: Array(path.utf8.dropFirst(on.utf8.count)), as: UTF8.self) : path
+            return from + (inside.hasPrefix("/") ? "" : "/") + inside
+        }
     }
 
     /// The groups of two or more files that are equal by the ticked criteria.
@@ -163,35 +192,6 @@ public enum DuplicateFinder {
             result.append(entry)
         }
         return result
-    }
-
-    /// A disk that is somebody else's: a share of a server, mounted here.
-    internal struct Mount {
-        /// What the system calls the source of the mount (`//user@host/share`), and where it is mounted.
-        internal let from: String
-        internal let on: String
-
-        /// The mount that holds `url`, when it is not a local disk; nil otherwise.
-        internal static func of(_ url: URL) -> Self? {
-            var info = statfs()
-            func text<T>(_ field: T) -> String {
-                withUnsafePointer(to: field) {
-                    $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout<T>.size) { String(cString: $0) }
-                }
-            }
-            guard statfs(url.path, &info) == 0, info.f_flags & UInt32(MNT_LOCAL) == 0,
-                case let from = text(info.f_mntfromname), !from.isEmpty
-            else { return nil }
-            return Self(from: text(info.f_fstypename) + ":" + from, on: text(info.f_mntonname))
-        }
-
-        /// The file in the share, as the same text for every place the share is mounted at.
-        internal func place(of path: String) -> String {
-            let inside =
-                path.utf8.starts(with: on.utf8)
-                ? String(decoding: Array(path.utf8.dropFirst(on.utf8.count)), as: UTF8.self) : path
-            return from + (inside.hasPrefix("/") ? "" : "/") + inside
-        }
     }
 
     private static func withoutSingles(_ keyed: [(key: Key, item: FileItem)]) -> [(key: Key, item: FileItem)] {

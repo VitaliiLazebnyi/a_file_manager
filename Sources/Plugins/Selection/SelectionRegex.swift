@@ -12,12 +12,6 @@ internal final class SelectionRegexTrip: @unchecked Sendable {
     private let lock = NSLock()
     private var timeouts = 0
 
-    internal func recordTimeout() {
-        lock.lock()
-        timeouts += 1
-        lock.unlock()
-    }
-
     internal var hasTimedOut: Bool {
         lock.lock()
         defer { lock.unlock() }
@@ -28,6 +22,12 @@ internal final class SelectionRegexTrip: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return timeouts >= 3
+    }
+
+    internal func recordTimeout() {
+        lock.lock()
+        timeouts += 1
+        lock.unlock()
     }
 }
 

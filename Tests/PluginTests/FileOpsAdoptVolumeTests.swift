@@ -43,8 +43,8 @@ internal final class LocalProbe: FileSystemProvider, @unchecked Sendable {
 
     internal var mostCopiesAtOnce: Int { lock.withLock { most } }
     internal var totalCopies: Int { lock.withLock { copied.values.reduce(0, +) } }
-    internal func copies(of name: String) -> Int { lock.withLock { copied[name] ?? 0 } }
     internal var failedRemovals: Int { lock.withLock { removalsFailed } }
+    internal func copies(of name: String) -> Int { lock.withLock { copied[name] ?? 0 } }
 
     internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try local.list(directory, showHidden: showHidden)
