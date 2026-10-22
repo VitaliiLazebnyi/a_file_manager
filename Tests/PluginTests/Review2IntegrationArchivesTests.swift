@@ -47,7 +47,7 @@ internal final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sen
     internal func displayPath(_ url: URL) -> String { base.displayPath(url) }
     internal func location(from text: String) -> URL? { base.location(from: text) }
     internal func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
-    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func createDirectory(at url: URL) { base.createDirectory(at: url) }
     internal func createDirectory(at url: URL, exclusive: Bool) throws {
         if exclusive {
             beforeMaking?(url)

@@ -128,7 +128,7 @@ internal final class WrappedFileSystem: FileSystemProvider, @unchecked Sendable 
     internal func item(at url: URL) -> FileItem? { base.item(at: url) }
     internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
     internal func read(_ url: URL) throws -> any FileReader { try base.read(url) }
-    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func createDirectory(at url: URL) { base.createDirectory(at: url) }
     internal func write(_ url: URL) throws -> any FileWriter {
         let writer = Writer(try base.write(url), self)
         began()

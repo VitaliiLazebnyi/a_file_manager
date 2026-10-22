@@ -48,7 +48,7 @@ internal final class CancellingFileSystem: FileSystemProvider, @unchecked Sendab
     internal func item(at url: URL) -> FileItem? { base.item(at: url) }
     internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
 
-    internal func read(_ url: URL) throws -> any FileReader {
+    internal func read(_ url: URL) -> any FileReader {
         Reader(Data((base.contents(url.path) ?? "").utf8), cancellation: cancellation)
     }
 
@@ -69,7 +69,7 @@ internal final class CancellingFileSystem: FileSystemProvider, @unchecked Sendab
     internal func displayPath(_ url: URL) -> String { base.displayPath(url) }
     internal func location(from text: String) -> URL? { base.location(from: text) }
     internal func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
-    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func createDirectory(at url: URL) { base.createDirectory(at: url) }
 
     deinit {
         // Nothing to release.

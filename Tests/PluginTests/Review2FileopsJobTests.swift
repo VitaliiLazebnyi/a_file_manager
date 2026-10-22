@@ -69,7 +69,7 @@ internal final class FlakyFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         return Reader(try base.read(url), fails: fails, hook: hook)
     }
-    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func createDirectory(at url: URL) { base.createDirectory(at: url) }
     internal func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     internal func remove(_ url: URL) throws { try base.remove(url) }
     internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
@@ -908,7 +908,7 @@ internal struct Review2FileopsJob {
             }
             func parent(of directory: URL) -> URL? { base.parent(of: directory) }
             func read(_ url: URL) throws -> any FileReader { try base.read(url) }
-            func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+            func createDirectory(at url: URL) { base.createDirectory(at: url) }
             func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
             func remove(_ url: URL) throws { try base.remove(url) }
             func move(_ source: URL, to destination: URL, replacing: Bool) throws {

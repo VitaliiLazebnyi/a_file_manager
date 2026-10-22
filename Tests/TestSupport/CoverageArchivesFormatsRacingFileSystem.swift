@@ -70,7 +70,7 @@ public final class CoverageArchivesFormatsRacingFileSystem: FileSystemProvider, 
     }
 
     /// Makes a folder in the inner file system.
-    public func createDirectory(at url: URL) throws {
+    public func createDirectory(at url: URL) {
         inner.createDirectory(at: url)
     }
 

@@ -186,7 +186,7 @@ internal struct CoverageRenameEngine {
     }
 
     @Test
-    internal func namedGroupsOfTheSpecDialect() throws {
+    internal func namedGroupsOfTheSpecDialect() {
         #expect(SearchReplace.systemPattern("(?P<a>x)(?P=a)") == "(?<a>x)\\k<a>")
         #expect(SearchReplace.systemPattern("(?'b'y)") == "(?<b>y)")
     }

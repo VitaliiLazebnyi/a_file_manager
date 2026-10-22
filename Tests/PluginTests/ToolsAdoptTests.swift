@@ -52,7 +52,7 @@ private final class ProbingFileSystem: FileSystemProvider {
         reading.signal()
         return reader
     }
-    func createDirectory(at url: URL) throws { memory.createDirectory(at: url) }
+    func createDirectory(at url: URL) { memory.createDirectory(at: url) }
     func write(_ url: URL) throws -> any FileWriter { try memory.write(url) }
     func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         let writer = try memory.write(url, cancellation: cancellation)

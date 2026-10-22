@@ -78,7 +78,7 @@ internal final class ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
     internal func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         Reader(try base.read(url, cancellation: cancellation), self)
     }
-    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func createDirectory(at url: URL) { base.createDirectory(at: url) }
     internal func write(_ url: URL) throws -> any FileWriter {
         count("write")
         return Writer(try base.write(url), self)

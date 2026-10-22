@@ -57,7 +57,7 @@ internal final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         return try base.read(url)
     }
-    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func createDirectory(at url: URL) { base.createDirectory(at: url) }
     internal func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     internal func remove(_ url: URL) throws {
         let fails: Bool = lock.withLock {

@@ -105,7 +105,7 @@ internal final class CoverageRenameWindow {
     // MARK: Fields
 
     @Test
-    internal func typingInAFieldShowsAtOnce() throws {
+    internal func typingInAFieldShowsAtOnce() {
         nameMask.stringValue = "n[C]"
         controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: nameMask))
         #expect(session.settings.nameMask == "n[C]" && cell("new", 0)?.stringValue == "n1.txt")
@@ -483,7 +483,7 @@ internal final class CoverageRenameWindow {
     }
 
     @Test
-    internal func namesComeFromTheNamesMenu() throws {
+    internal func namesComeFromTheNamesMenu() {
         ui.formAnswers = [.values(["names": .text("x\ny")])]
         choose("Edit names…", in: "F10 Names")
         #expect(session.givenNames == ["x", "y"])

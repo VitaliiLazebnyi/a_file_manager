@@ -146,7 +146,7 @@ internal struct CoveragePlacesCacheFiles {
     }
 
     @Test
-    internal func aPathOfSlashesNotesNothing() throws {
+    internal func aPathOfSlashesNotesNothing() {
         let cache = TreeCache(directory: nil)
         cache.store(["a"], for: root)
         cache.noteFolder("//", below: root)
@@ -155,7 +155,7 @@ internal struct CoveragePlacesCacheFiles {
     }
 
     @Test
-    internal func aLongTreeStillKnowsItsFoldersAfterAWrite() throws {
+    internal func aLongTreeStillKnowsItsFoldersAfterAWrite() {
         let cache = TreeCache(directory: nil)
         let paths = (0...100_000).map { "f\($0)" }
         cache.store(paths, for: root)

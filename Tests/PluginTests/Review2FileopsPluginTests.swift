@@ -461,7 +461,7 @@ internal final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         return reader
     }
-    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func createDirectory(at url: URL) { base.createDirectory(at: url) }
     internal func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
     internal func remove(_ url: URL) throws { try base.remove(url) }
     internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {

@@ -237,7 +237,7 @@ internal struct CoverageRenameRun {
     }
 
     @Test
-    internal func theVolumeAnswersForFoldersAwayFromTheList() throws {
+    internal func theVolumeAnswersForFoldersAwayFromTheList() {
         #expect(RenameSurvey.volumeFoldsCase(url("/x")) == nil)
         let missing = box.url("not/there/yet")
         #expect(RenameSurvey.volumeFoldsCase(missing) == RenameSurvey.volumeFoldsCase(box.root))
