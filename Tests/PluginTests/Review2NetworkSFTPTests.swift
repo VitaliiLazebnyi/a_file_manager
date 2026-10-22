@@ -8,7 +8,7 @@ import Testing
 /// Uploads over SFTP are only a success when the server has all of the file
 /// (review 2: N038, N040, and the length of every upload).
 @Suite(.enabled(if: FakeSFTPServer.isAvailable))
-struct Review2NetworkSFTPUploads {
+internal struct Review2NetworkSFTPUploads {
     private func upload(_ suite: NetworkFixSFTP, _ content: Data) throws {
         let writer = try suite.fileSystem.write(suite.url("/up.bin"))
         do {
@@ -24,7 +24,7 @@ struct Review2NetworkSFTPUploads {
     }
 
     @Test
-    func aGoodUploadIsMeasuredAndConfirmed() throws {
+    internal func aGoodUploadIsMeasuredAndConfirmed() throws {
         let suite = try NetworkFixSFTP()
         let content = NetworkFixSFTP.pattern(700_000)
         try upload(suite, content)
@@ -35,7 +35,7 @@ struct Review2NetworkSFTPUploads {
     }
 
     @Test
-    func aClosingThatFailsIsAFailedUpload() throws {
+    internal func aClosingThatFailsIsAFailedUpload() throws {
         let suite = try NetworkFixSFTP(mode: .failingClose)
         #expect(throws: (any Error).self) { try upload(suite, NetworkFixSFTP.pattern(50_000)) }
         // Reading is not affected: the closing of a handle that was only read tells nothing.
@@ -46,7 +46,7 @@ struct Review2NetworkSFTPUploads {
     }
 
     @Test
-    func aRefusedWriteLeavesNoGapBehind() throws {
+    internal func aRefusedWriteLeavesNoGapBehind() throws {
         let suite = try NetworkFixSFTP(mode: .failingWrite)
         let content = NetworkFixSFTP.pattern(900_000)
         #expect(throws: (any Error).self) { try upload(suite, content) }
@@ -58,7 +58,7 @@ struct Review2NetworkSFTPUploads {
     }
 
     @Test
-    func aServerThatForgetsWhatItConfirmedIsNoticed() throws {
+    internal func aServerThatForgetsWhatItConfirmedIsNoticed() throws {
         let suite = try NetworkFixSFTP(mode: .forgetfulWrite)
         #expect(throws: NetworkError.self) { try upload(suite, NetworkFixSFTP.pattern(300_000)) }
     }
@@ -66,9 +66,9 @@ struct Review2NetworkSFTPUploads {
 
 /// The shared channel (review 2: N035, N036, N037, N060, N063, N064, N090, N093, N094, N095).
 @Suite(.enabled(if: FakeSFTPServer.isAvailable))
-struct Review2NetworkSFTPChannel {
+internal struct Review2NetworkSFTPChannel {
     @Test
-    func aServerThatSaysNothingAtAllIsGivenUp() throws {
+    internal func aServerThatSaysNothingAtAllIsGivenUp() throws {
         let suite = try NetworkFixSFTP(mode: .hangingStat, timeout: 1)
         try NetworkFixSFTP.pattern(1_000).write(to: suite.box.url("srv/f.bin"))
         let session = try suite.center.session(for: suite.key)
@@ -85,7 +85,7 @@ struct Review2NetworkSFTPChannel {
     }
 
     @Test
-    func closingAHandleNeverWaitsAndComesBeforeWhatFollows() throws {
+    internal func closingAHandleNeverWaitsAndComesBeforeWhatFollows() throws {
         let suite = try NetworkFixSFTP(mode: .normal, timeout: 10)
         try NetworkFixSFTP.pattern(200_000).write(to: suite.box.url("srv/f.bin"))
         let session = try suite.center.session(for: suite.key)
@@ -109,7 +109,7 @@ struct Review2NetworkSFTPChannel {
     }
 
     @Test
-    func disconnectEndsALoginThatIsUnderWay() throws {
+    internal func disconnectEndsALoginThatIsUnderWay() throws {
         let environment = SessionEnvironment()
         var values = NetworkOptions.Values()
         values.timeout = 60
@@ -135,7 +135,7 @@ struct Review2NetworkSFTPChannel {
     }
 
     @Test
-    func aChannelClosedBeforeItStartsDoesNotStart() {
+    internal func aChannelClosedBeforeItStartsDoesNotStart() {
         // A disconnect may close the channel before the login starts it; the closed pipe must
         // not be touched (its handle raises, which ended the whole program).
         let channel = SFTPChannel(executable: "/bin/sleep", arguments: ["600"], environment: [:])
@@ -145,7 +145,7 @@ struct Review2NetworkSFTPChannel {
     }
 
     @Test
-    func aPacketThatIsNotSFTPEndsTheChannelAndItsProcess() throws {
+    internal func aPacketThatIsNotSFTPEndsTheChannelAndItsProcess() throws {
         // Announces a packet far larger than any the protocol has, after the greeting.
         let box = try Sandbox()
         let script = try box.file(
@@ -167,7 +167,7 @@ struct Review2NetworkSFTPChannel {
     }
 
     @Test
-    func cancellingOneWriterInTheMiddleOfAPacketLeavesTheChannelToTheOthers() throws {
+    internal func cancellingOneWriterInTheMiddleOfAPacketLeavesTheChannelToTheOthers() throws {
         let suite = try NetworkFixSFTP(mode: .normal, timeout: 20)
         try NetworkFixSFTP.pattern(400_000).write(to: suite.box.url("srv/f.bin"))
         let session = try suite.center.session(for: suite.key)
@@ -192,9 +192,9 @@ struct Review2NetworkSFTPChannel {
 /// Renaming over SFTP (review 2: N005, N034), against a server whose rename does not replace
 /// and against the system's own.
 @Suite(.enabled(if: FakeSFTPServer.isAvailable))
-struct Review2NetworkSFTPRename {
+internal struct Review2NetworkSFTPRename {
     @Test
-    func aServerWithoutReplacingRenameGetsTheOldFileMovedAside() throws {
+    internal func aServerWithoutReplacingRenameGetsTheOldFileMovedAside() throws {
         let suite = try NetworkFixSFTP(mode: .strictRename)
         try suite.box.file("srv/new.txt", "new")
         try suite.box.file("srv/keep.txt", "old")
@@ -204,7 +204,7 @@ struct Review2NetworkSFTPRename {
     }
 
     @Test
-    func aRefusalForAnotherReasonLosesNothing() throws {
+    internal func aRefusalForAnotherReasonLosesNothing() throws {
         let suite = try NetworkFixSFTP(mode: .strictRename)
         try suite.box.file("srv/locked", "new")
         try suite.box.file("srv/keep.txt", "old")
@@ -227,13 +227,13 @@ struct Review2NetworkSFTPRename {
 }
 
 @Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer)))
-struct Review2NetworkSFTPSystemServer {
-    let box: Sandbox
-    let center: ConnectionCenter
-    let fileSystem: RemoteFileSystem
-    let key = ServerKey(scheme: "sftp", host: "test.invalid")
+internal struct Review2NetworkSFTPSystemServer {
+    internal let box: Sandbox
+    internal let center: ConnectionCenter
+    internal let fileSystem: RemoteFileSystem
+    internal let key = ServerKey(scheme: "sftp", host: "test.invalid")
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         let environment = SessionEnvironment()
         var values = NetworkOptions.Values()
@@ -250,10 +250,10 @@ struct Review2NetworkSFTPSystemServer {
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
 
-    func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
+    internal func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
 
     @Test
-    func renamingReplacesOnlyWhenAsked() throws {
+    internal func renamingReplacesOnlyWhenAsked() throws {
         try box.file("new.txt", "new")
         try box.file("keep.txt", "old")
         _ = try fileSystem.list(url(""), showHidden: true)
@@ -278,7 +278,7 @@ struct Review2NetworkSFTPSystemServer {
     }
 
     @Test
-    func uploadsAreMeasuredAndNamesGoBackAsTheyCame() throws {
+    internal func uploadsAreMeasuredAndNamesGoBackAsTheyCame() throws {
         let content = Data((0..<300_000).map { UInt8(truncatingIfNeeded: $0 &* 13) })
         let writer = try fileSystem.write(url("up.bin"))
         try writer.write(content)
@@ -300,7 +300,7 @@ struct Review2NetworkSFTPSystemServer {
     }
 
     @Test
-    func aViewerThatReadsOnePageAsksForOnePage() throws {
+    internal func aViewerThatReadsOnePageAsksForOnePage() throws {
         let content = Data((0..<4_000_000).map { UInt8(truncatingIfNeeded: $0 &* 7) })
         try content.write(to: box.url("big.bin"))
         let reader = try fileSystem.read(url("big.bin"))
@@ -319,7 +319,7 @@ struct Review2NetworkSFTPSystemServer {
 
 /// The login through the secure shell (review 2: N089, N091, N092, N097, N099).
 @Suite
-struct Review2NetworkSFTPLogin {
+internal struct Review2NetworkSFTPLogin {
     /// Stands in for `ssh`: asks for the password the way ssh does, through the same helper, and
     /// is the system's SFTP server once the right one came. `prompt` is the question it asks.
     private func fakeShell(_ box: Sandbox, prompt: String, password: String) throws -> SFTPTransport {
@@ -341,7 +341,7 @@ struct Review2NetworkSFTPLogin {
     }
 
     @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer)))
-    func aStoredPasswordThatIsWrongIsAskedForAgain() throws {
+    internal func aStoredPasswordThatIsWrongIsAskedForAgain() throws {
         let box = try Sandbox()
         try box.file("srv/a.txt", "a")
         let environment = SessionEnvironment()
@@ -397,7 +397,7 @@ struct Review2NetworkSFTPLogin {
     }
 
     @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer)))
-    func whatAServerOrAJumpHostAsksIsNotAnsweredWithTheStoredPassword() throws {
+    internal func whatAServerOrAJumpHostAsksIsNotAnsweredWithTheStoredPassword() throws {
         let box = try Sandbox()
         let environment = SessionEnvironment()
         environment.declineMemory = 0
@@ -445,7 +445,7 @@ struct Review2NetworkSFTPLogin {
     /// The real `ssh` with the options the program gives it, against a secure-shell server of
     /// the system on 127.0.0.1 that shows a banner made to look like an error.
     @Test(.enabled(if: LocalSSHServer.isAvailable))
-    func theRealShellTakesTheOptionsAndTheBannerIsNotShownAsTheError()
+    internal func theRealShellTakesTheOptionsAndTheBannerIsNotShownAsTheError()
         throws
     {
         let box = try Sandbox()

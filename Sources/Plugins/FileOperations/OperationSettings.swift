@@ -5,38 +5,38 @@ import Foundation
 /// (spec 13 › Operation › Copy/Delete, Operation › Log file).
 ///
 /// Main thread, like the settings store.
-enum OperationSettings {
-    static let overwrite = "fileOperations.overwriteMode"
-    static let attributes = "fileOperations.keepAttributes"
-    static let folderDates = "fileOperations.copyFolderDates"
-    static let links = "fileOperations.links"
-    static let verify = "fileOperations.verify"
-    static let skipErrors = "fileOperations.keepGoingOnErrors"
-    static let parallel = "fileOperations.parallelSmallFiles"
-    static let keepPartial = "fileOperations.keepPartialFiles"
-    static let alwaysOptions = "fileOperations.alwaysShowOptions"
-    static let useTrash = "fileOperations.useTrash"
-    static let askReadOnly = "fileOperations.askReadOnly"
-    static let askHidden = "fileOperations.askHidden"
-    static let askNonEmpty = "fileOperations.askNonEmptyFolders"
-    static let askMerge = "fileOperations.askBeforeMerging"
+internal enum OperationSettings {
+    internal static let overwrite = "fileOperations.overwriteMode"
+    internal static let attributes = "fileOperations.keepAttributes"
+    internal static let folderDates = "fileOperations.copyFolderDates"
+    internal static let links = "fileOperations.links"
+    internal static let verify = "fileOperations.verify"
+    internal static let skipErrors = "fileOperations.keepGoingOnErrors"
+    internal static let parallel = "fileOperations.parallelSmallFiles"
+    internal static let keepPartial = "fileOperations.keepPartialFiles"
+    internal static let alwaysOptions = "fileOperations.alwaysShowOptions"
+    internal static let useTrash = "fileOperations.useTrash"
+    internal static let askReadOnly = "fileOperations.askReadOnly"
+    internal static let askHidden = "fileOperations.askHidden"
+    internal static let askNonEmpty = "fileOperations.askNonEmptyFolders"
+    internal static let askMerge = "fileOperations.askBeforeMerging"
 
-    static let logEnabled = "fileOperations.log.enabled"
-    static let logFile = "fileOperations.log.file"
-    static let logTransfers = "fileOperations.log.transfers"
-    static let logDeletes = "fileOperations.log.deletes"
-    static let logFolders = "fileOperations.log.folders"
-    static let logSuccess = "fileOperations.log.success"
-    static let logErrors = "fileOperations.log.errors"
-    static let logSkipped = "fileOperations.log.skipped"
-    static let logRotation = "fileOperations.log.rotation"
-    static let logSizeLimit = "fileOperations.log.sizeLimitKB"
-    static let logKeepCount = "fileOperations.log.keepCount"
+    internal static let logEnabled = "fileOperations.log.enabled"
+    internal static let logFile = "fileOperations.log.file"
+    internal static let logTransfers = "fileOperations.log.transfers"
+    internal static let logDeletes = "fileOperations.log.deletes"
+    internal static let logFolders = "fileOperations.log.folders"
+    internal static let logSuccess = "fileOperations.log.success"
+    internal static let logErrors = "fileOperations.log.errors"
+    internal static let logSkipped = "fileOperations.log.skipped"
+    internal static let logRotation = "fileOperations.log.rotation"
+    internal static let logSizeLimit = "fileOperations.log.sizeLimitKB"
+    internal static let logKeepCount = "fileOperations.log.keepCount"
 
-    static let defaultLogFile = "~/Library/Logs/A File Manager/operations.log"
-    static let linkTitles = ["Copy the link itself", "Copy what the link points to"]
+    internal static let defaultLogFile = "~/Library/Logs/A File Manager/operations.log"
+    internal static let linkTitles = ["Copy the link itself", "Copy what the link points to"]
 
-    static var copyDeletePage: PreferencePage {
+    internal static var copyDeletePage: PreferencePage {
         PreferencePage(
             title: "Copy/Delete",
             preferences: [
@@ -74,7 +74,7 @@ enum OperationSettings {
         )
     }
 
-    static var logPage: PreferencePage {
+    internal static var logPage: PreferencePage {
         PreferencePage(
             title: "Log file",
             preferences: [
@@ -104,7 +104,7 @@ enum OperationSettings {
     }
 
     /// The options of a job as the configuration has them.
-    static func options(from settings: any SettingsStore) -> TransferOptions {
+    internal static func options(from settings: any SettingsStore) -> TransferOptions {
         var options = TransferOptions()
         options.overwrite = OverwriteMode(rawValue: settings.index(overwrite, default: 0)) ?? .ask
         options.preservesAttributes = settings.flag(attributes, default: true)
@@ -121,7 +121,7 @@ enum OperationSettings {
         return options
     }
 
-    static func logConfiguration(from settings: any SettingsStore) -> OperationLog.Configuration {
+    internal static func logConfiguration(from settings: any SettingsStore) -> OperationLog.Configuration {
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = settings.flag(logEnabled, default: false)
         let path = settings.text(logFile, default: defaultLogFile).trimmingCharacters(in: .whitespaces)

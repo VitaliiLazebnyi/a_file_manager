@@ -15,17 +15,17 @@ import Testing
 /// No window is involved.
 @MainActor
 @Suite
-struct DirectorySyncCommands {
-    let memory = MemoryFileSystem()
-    let plugin = DirectorySyncPlugin(opensWindows: false)
-    let compareTool = CompareContentPlugin(opensWindows: false)
-    let settings = MemorySettings()
-    let bench: TestBench
-    let early = Date(timeIntervalSince1970: 1_000_000)
+internal struct DirectorySyncCommands {
+    internal let memory = MemoryFileSystem()
+    internal let plugin = DirectorySyncPlugin(opensWindows: false)
+    internal let compareTool = CompareContentPlugin(opensWindows: false)
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
+    internal let early = Date(timeIntervalSince1970: 1_000_000)
 
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() {
+    internal init() {
         memory.addFile("/A/new.txt", "from the left", modified: early.addingTimeInterval(500))
         memory.addFile("/A/update.txt", "newer on the left", modified: early.addingTimeInterval(60))
         memory.addFile("/B/update.txt", "older", modified: early)
@@ -46,7 +46,7 @@ struct DirectorySyncCommands {
     }
 
     /// Opens the tool and compares.
-    func opened(_ configure: (SyncSession) -> Void = { _ in }) -> SyncSession {
+    internal func opened(_ configure: (SyncSession) -> Void = { _ in }) -> SyncSession {
         bench.commands.perform(.synchronizeDirectories)
         let session = plugin.session!
         configure(session)
@@ -54,12 +54,12 @@ struct DirectorySyncCommands {
         return session
     }
 
-    func rows(_ session: SyncSession, _ names: String...) -> [Int] {
+    internal func rows(_ session: SyncSession, _ names: String...) -> [Int] {
         session.rows.indices.filter { names.contains(session.rows[$0].name) }
     }
 
     @Test
-    func commandIsRegisteredWithMenuButtonAndPreferences() {
+    internal func commandIsRegisteredWithMenuButtonAndPreferences() {
         #expect(bench.commands[.synchronizeDirectories]?.title == "Synchronize Dirs…")
         #expect(
             bench.kernel.menus.menus.first { $0.title == "Commands" }?.items.contains(.synchronizeDirectories) == true
@@ -74,7 +74,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func opensWithThePanelsDirectoriesAndSelection() {
+    internal func opensWithThePanelsDirectoriesAndSelection() {
         bench.right.focus()
         bench.right.model.select(mask: "same.txt")
         bench.left.model.select(mask: "new.txt")
@@ -94,7 +94,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func listIsGroupedBySubdirectoryAndFilteredByTheShowButtons() {
+    internal func listIsGroupedBySubdirectoryAndFilteredByTheShowButtons() {
         let session = opened()
         #expect(session.entries.count == 7 && session.entries[5] == .header("sub/"))
         #expect(session.status == "Files found: 6  (Identical: 1, Different: 3, Unique left: 1, Unique right: 1)")
@@ -117,7 +117,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func synchronizeRunsBothDirectionsAndComparesAgain() {
+    internal func synchronizeRunsBothDirectionsAndComparesAgain() {
         let session = opened()
         #expect(session.canSynchronize)
         ui.formAnswers = [.accept]
@@ -149,7 +149,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func theDialogDecidesWhatRuns() {
+    internal func theDialogDecidesWhatRuns() {
         var session = opened()
         ui.formAnswers = [.cancel]
         session.synchronize()
@@ -182,7 +182,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func onlyVisibleRowsAreSynchronized() {
+    internal func onlyVisibleRowsAreSynchronized() {
         let session = opened()
         session.show = [.copyToLeft, .duplicates, .singles]
         ui.formAnswers = [.values(["confirm": .flag(false)])]
@@ -193,7 +193,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func directionsAreChangedForOneRowOrMany() {
+    internal func directionsAreChangedForOneRowOrMany() {
         let session = opened()
         func actions(_ names: String...) -> [SyncAction] {
             rows(session, names[0], names.count > 1 ? names[1] : names[0]).map { session.rows[$0].action }
@@ -239,7 +239,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func asymmetricDeletesOnTheRightAfterConfirmation() {
+    internal func asymmetricDeletesOnTheRightAfterConfirmation() {
         let session = opened {
             $0.options.asymmetric = true
             $0.options.emptyDirectories = true
@@ -255,7 +255,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func failuresAreAskedAboutAndTheRestStillRuns() {
+    internal func failuresAreAskedAboutAndTheRestStillRuns() {
         let session = opened()
         memory.removeTree("/A/new.txt")
         ui.formAnswers = [.values(["confirm": .flag(false)])]
@@ -266,7 +266,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func unreadableFoldersAreReported() {
+    internal func unreadableFoldersAreReported() {
         memory.unreadable = ["/B/sub"]
         let session = opened()
         #expect(ui.log.contains { $0.hasPrefix("inform: Some directories or files could not be read") })
@@ -274,7 +274,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func viewAndCompareGoThroughOtherPluginsCommands() {
+    internal func viewAndCompareGoThroughOtherPluginsCommands() {
         var viewed: [URL] = []
         bench.commands.register(Command(.view, "View"), parameterized: { viewed += [$0.location].compactMap { $0 } })
         let session = opened()
@@ -304,7 +304,7 @@ struct DirectorySyncCommands {
     }
 
     @Test
-    func settingsAreSavedUnderNamesAndLoaded() {
+    internal func settingsAreSavedUnderNamesAndLoaded() {
         var session = opened {
             $0.options.byContent = true
             $0.options.mask = "*.txt | odd*"
@@ -348,9 +348,9 @@ struct DirectorySyncCommands {
 /// The window itself: built, filled by a comparison that runs in the background, and drawn.
 @MainActor
 @Suite
-struct DirectorySyncWindow {
+internal struct DirectorySyncWindow {
     @Test
-    func windowShowsABackgroundComparison() async {
+    internal func windowShowsABackgroundComparison() async {
         let memory = MemoryFileSystem()
         for index in 0..<40 {
             memory.addFile("/A/d\(index % 4)/f\(index).txt", "left \(index)")

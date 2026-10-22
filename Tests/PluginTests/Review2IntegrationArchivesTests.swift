@@ -14,58 +14,58 @@ import Testing
 ///
 /// Every call is forwarded to `base`. Unchecked: what it records is guarded by `lock`; its switches
 /// are set by the test before use.
-final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
-    let base = MemoryFileSystem(scheme: "hooked")
-    var scheme: String { base.scheme }
-    var capabilities: FileSystemCapabilities { base.capabilities }
-    let readsRootedPaths = true
-    var beforeMaking: ((URL) -> Void)?
+internal final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
+    internal let base = MemoryFileSystem(scheme: "hooked")
+    internal var scheme: String { base.scheme }
+    internal var capabilities: FileSystemCapabilities { base.capabilities }
+    internal let readsRootedPaths = true
+    internal var beforeMaking: ((URL) -> Void)?
     private let lock = NSLock()
     private var exclusive: [String] = []
 
     /// The folders that were made exclusively.
-    var madeExclusively: [String] { lock.withLock { exclusive } }
+    internal var madeExclusively: [String] { lock.withLock { exclusive } }
 
-    func capabilities(for url: URL) -> FileSystemCapabilities { base.capabilities(for: url) }
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    internal func capabilities(for url: URL) -> FileSystemCapabilities { base.capabilities(for: url) }
+    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try base.list(directory, showHidden: showHidden)
     }
-    func item(at url: URL) -> FileItem? { base.item(at: url) }
-    func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader { try base.read(url) }
-    func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
-    func remove(_ url: URL) throws { try base.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    internal func item(at url: URL) -> FileItem? { base.item(at: url) }
+    internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
+    internal func read(_ url: URL) throws -> any FileReader { try base.read(url) }
+    internal func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
+    internal func remove(_ url: URL) throws { try base.remove(url) }
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    internal func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         try base.copy(source, to: destination, progress: progress)
     }
-    func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
+    internal func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
         try base.setAttributes(attributes, of: url)
     }
-    func displayPath(_ url: URL) -> String { base.displayPath(url) }
-    func location(from text: String) -> URL? { base.location(from: text) }
-    func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
-    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
-    func createDirectory(at url: URL, exclusive: Bool) throws {
+    internal func displayPath(_ url: URL) -> String { base.displayPath(url) }
+    internal func location(from text: String) -> URL? { base.location(from: text) }
+    internal func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
+    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func createDirectory(at url: URL, exclusive: Bool) throws {
         if exclusive {
             beforeMaking?(url)
             lock.withLock { self.exclusive.append(url.path) }
         }
         try base.createDirectory(at: url, exclusive: exclusive)
     }
-    func createDirectory(at url: URL, exclusive: Bool, cancellation _: CancellationFlag) throws {
+    internal func createDirectory(at url: URL, exclusive: Bool, cancellation _: CancellationFlag) throws {
         try createDirectory(at: url, exclusive: exclusive)
     }
 }
 
 @Suite
-struct Review2IntegrationArchives {
-    let bench: ArchiveBench
-    var box: Sandbox { bench.box }
+internal struct Review2IntegrationArchives {
+    internal let bench: ArchiveBench
+    internal var box: Sandbox { bench.box }
 
-    init() throws {
+    internal init() throws {
         bench = try ArchiveBench()
     }
 
@@ -91,7 +91,7 @@ struct Review2IntegrationArchives {
     // MARK: F046 — the commit of an archive asks between its members
 
     @Test
-    func theCommitOfAnArchiveAsksBetweenTheMembersItWrites() throws {
+    internal func theCommitOfAnArchiveAsksBetweenTheMembersItWrites() throws {
         let url = try writeZip("commit.zip", members: (0..<40).map { "old-\($0).txt" })
         for number in 0..<20 { try write("new \(number)", to: bench.inside(url, "new-\(number).txt")) }
         // (A member that was there is given another name, so the file is written anew.)
@@ -110,7 +110,7 @@ struct Review2IntegrationArchives {
     }
 
     @Test
-    func aCommitThatIsEndedWhileItRunsHasChangedNothingAndCanBeMadeAgain() throws {
+    internal func aCommitThatIsEndedWhileItRunsHasChangedNothingAndCanBeMadeAgain() throws {
         let url = try writeZip("stopped.zip", members: (0..<30).map { "old-\($0).txt" })
         for number in 0..<10 { try write("new \(number)", to: bench.inside(url, "new-\(number).txt")) }
         let before = try Data(contentsOf: url)
@@ -143,7 +143,7 @@ struct Review2IntegrationArchives {
     /// wrong answers and expects "wrong password"). Many wrong passwords here, so that some pass
     /// the byte: none may be reported as damage, and none may open anything.
     @Test
-    func noWrongPasswordForTheOldEncryptionIsTakenForADamagedArchive() throws {
+    internal func noWrongPasswordForTheOldEncryptionIsTakenForADamagedArchive() throws {
         let tree = try bench.makeTree()
         let own = box.url("own.zip")
         try bench.pack([tree], to: own) {
@@ -178,7 +178,7 @@ struct Review2IntegrationArchives {
     // MARK: L043 — by path (a target that is not a disk of this machine), folders are made exclusively
 
     @Test
-    func foldersOfATargetThatIsNotALocalDiskAreMadeForThisUnpackingAlone() throws {
+    internal func foldersOfATargetThatIsNotALocalDiskAreMadeForThisUnpackingAlone() throws {
         let hooked = IntegrationHookedMemory()
         bench.fileSystems.register(hooked)
         hooked.base.addFile("/target/there/kept.txt", "kept")
@@ -204,7 +204,7 @@ struct Review2IntegrationArchives {
     }
 
     @Test
-    func whatAppearsUnderAFoldersNameBeforeItIsMadeIsNotWrittenThrough() throws {
+    internal func whatAppearsUnderAFoldersNameBeforeItIsMadeIsNotWrittenThrough() throws {
         let hooked = IntegrationHookedMemory()
         bench.fileSystems.register(hooked)
         hooked.base.addDirectory("/target")

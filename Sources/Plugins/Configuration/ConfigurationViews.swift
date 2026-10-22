@@ -4,10 +4,10 @@ import AFMShell
 import AppKit
 
 /// A button that runs a closure.
-final class ActionButton: NSButton {
+internal final class ActionButton: NSButton {
     private var handler: (() -> Void)?
 
-    convenience init(_ title: String, _ handler: @escaping () -> Void) {
+    internal convenience init(_ title: String, _ handler: @escaping () -> Void) {
         self.init(title: title, target: nil, action: nil)
         self.handler = handler
         target = self
@@ -22,7 +22,7 @@ final class ActionButton: NSButton {
 /// A stack whose parts fill it: across, every part is as wide (or as high) as the stack, and
 /// along it the parts without a size of their own (lists, spacers) take the room that is left.
 @MainActor
-func filledStack(_ views: [NSView], vertical: Bool, spacing: CGFloat = 8) -> NSStackView {
+internal func filledStack(_ views: [NSView], vertical: Bool, spacing: CGFloat = 8) -> NSStackView {
     let stack = NSStackView(views: views)
     stack.orientation = vertical ? .vertical : .horizontal
     stack.distribution = .fill
@@ -40,7 +40,7 @@ func filledStack(_ views: [NSView], vertical: Bool, spacing: CGFloat = 8) -> NSS
 
 /// A view with a margin around it, as the content of a window.
 @MainActor
-func padded(_ view: NSView, by margin: CGFloat = 14) -> NSView {
+internal func padded(_ view: NSView, by margin: CGFloat = 14) -> NSView {
     let holder = NSView()
     view.translatesAutoresizingMaskIntoConstraints = false
     holder.addSubview(view)
@@ -55,7 +55,7 @@ func padded(_ view: NSView, by margin: CGFloat = 14) -> NSView {
 
 /// Takes the room nothing else wants.
 @MainActor
-func spacer() -> NSView {
+internal func spacer() -> NSView {
     let view = NSView()
     view.setContentHuggingPriority(.init(1), for: .horizontal)
     view.setContentHuggingPriority(.init(1), for: .vertical)
@@ -65,7 +65,7 @@ func spacer() -> NSView {
 /// A list of text rows in columns, as the editors of the configuration windows use it.
 ///
 /// Main thread only.
-final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate {
+internal final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate {
     private final class Table: NSTableView {
         var onReturn: (() -> Void)?
 
@@ -82,13 +82,13 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
     private var rows: [[String]] = []
     /// A system symbol shown in front of each row; rows without one show none.
     private var symbols: [String?] = []
-    var onSelect: () -> Void = {}
+    internal var onSelect: () -> Void = {}
     /// A double click or Return on a row.
-    var onActivate: (() -> Void)? {
+    internal var onActivate: (() -> Void)? {
         didSet { table.onReturn = { [weak self] in self?.onActivate?() } }
     }
 
-    init(columns: [(title: String, width: CGFloat)]) {
+    internal init(columns: [(title: String, width: CGFloat)]) {
         super.init(frame: .zero)
         for (index, column) in columns.enumerated() {
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("\(index)"))
@@ -112,12 +112,12 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
     }
 
     @available(*, unavailable)
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    internal required init?(coder _: NSCoder) { fatalError("not used") }
 
-    var tableView: NSTableView { table }
+    internal var tableView: NSTableView { table }
 
     /// The selected row; nil when none is.
-    var selectedRow: Int? {
+    internal var selectedRow: Int? {
         get { table.selectedRow >= 0 ? table.selectedRow : nil }
         set {
             if let row = newValue, rows.indices.contains(row) {
@@ -130,7 +130,7 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
     }
 
     /// Shows other rows and keeps the selection on the same position where there still is one.
-    func show(_ rows: [[String]], symbols: [String?] = [], selecting row: Int? = nil) {
+    internal func show(_ rows: [[String]], symbols: [String?] = [], selecting row: Int? = nil) {
         let selected = row ?? selectedRow
         self.rows = rows
         self.symbols = symbols
@@ -138,9 +138,9 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
         selectedRow = selected.map { min($0, rows.count - 1) }
     }
 
-    func numberOfRows(in _: NSTableView) -> Int { rows.count }
+    internal func numberOfRows(in _: NSTableView) -> Int { rows.count }
 
-    func tableView(_: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    internal func tableView(_: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let column = tableColumn.flatMap { Int($0.identifier.rawValue) } ?? 0
         let label = NSTextField(labelWithString: rows[row].indices.contains(column) ? rows[row][column] : "")
         label.lineBreakMode = .byTruncatingTail
@@ -168,7 +168,7 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
         return cell
     }
 
-    func tableViewSelectionDidChange(_: Notification) { onSelect() }
+    internal func tableViewSelectionDidChange(_: Notification) { onSelect() }
 
     @objc
     private func doubleClicked() {
@@ -177,10 +177,10 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
 }
 
 /// A window that shows a text: the keyboard help and the "what is where" page.
-final class TextWindowController: NSWindowController {
+internal final class TextWindowController: NSWindowController {
     private let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 640, height: 560))
 
-    init(title: String) {
+    internal init(title: String) {
         let window = ToolWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 560),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
@@ -205,10 +205,10 @@ final class TextWindowController: NSWindowController {
     }
 
     @available(*, unavailable)
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    internal required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// Shows `text`; `present` puts the window on screen.
-    func show(_ text: String, present: (NSWindowController) -> Void) {
+    internal func show(_ text: String, present: (NSWindowController) -> Void) {
         textView.string = text
         present(self)
         window?.makeFirstResponder(textView)
@@ -217,10 +217,10 @@ final class TextWindowController: NSWindowController {
 
 /// Runs the entries of the Start menu after the menu was rebuilt while the program runs.
 @MainActor
-final class StartMenuTarget: NSObject, NSMenuItemValidation {
+internal final class StartMenuTarget: NSObject, NSMenuItemValidation {
     private unowned let kernel: Kernel
 
-    init(kernel: Kernel) {
+    internal init(kernel: Kernel) {
         self.kernel = kernel
     }
 
@@ -229,11 +229,11 @@ final class StartMenuTarget: NSObject, NSMenuItemValidation {
     }
 
     @objc
-    func runEntry(_ sender: NSMenuItem) {
+    internal func runEntry(_ sender: NSMenuItem) {
         if let id = command(of: sender) { kernel.commands.perform(id) }
     }
 
-    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+    internal func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         command(of: menuItem).map(kernel.commands.isEnabled) ?? false
     }
 }
@@ -243,7 +243,7 @@ final class StartMenuTarget: NSObject, NSMenuItemValidation {
 /// The shell builds its menus once, from the registries; its items carry the name of their command,
 /// which is all that is relied on here.
 @MainActor
-enum LiveMenus {
+internal enum LiveMenus {
     private static let slotPrefix = "cm_UserMenu"
 
     /// The key as a menu shows it; nil for keys a menu cannot show.
@@ -322,7 +322,7 @@ enum LiveMenus {
     }
 
     /// Shows the keys in force next to every menu item that stands for a command.
-    static func refreshKeys(in menu: NSMenu, kernel: Kernel) {
+    internal static func refreshKeys(in menu: NSMenu, kernel: Kernel) {
         for item in menu.items {
             if let submenu = item.submenu { refreshKeys(in: submenu, kernel: kernel) }
             guard let name = item.representedObject as? String, kernel.commands[CommandID(rawValue: name)] != nil else {
@@ -338,7 +338,7 @@ enum LiveMenus {
     /// entries stay below them.
     ///
     /// Does nothing when the menu bar has no Start menu.
-    static func rebuildStartMenu(in mainMenu: NSMenu, entries: [StartMenuEntry], target: StartMenuTarget) {
+    internal static func rebuildStartMenu(in mainMenu: NSMenu, entries: [StartMenuEntry], target: StartMenuTarget) {
         guard let menu = mainMenu.items.first(where: { $0.submenu?.title == MenuID.start.title })?.submenu else {
             return
         }

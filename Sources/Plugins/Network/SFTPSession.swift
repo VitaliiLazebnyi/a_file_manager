@@ -6,7 +6,7 @@ import Foundation
 /// A server can make ssh show any text it likes (keyboard-interactive logins, and a jump host can
 /// do the same), so a question is only taken for ssh's own when it has exactly the shape ssh gives
 /// it, and everything a server may have written is shown to the user as the server's.
-enum SSHQuestion: Equatable {
+internal enum SSHQuestion: Equatable {
     /// `user@host's password:`, asked by ssh itself.
     case password(user: String, host: String)
     /// `(user@host) text`: a keyboard-interactive login. The text is the server's.
@@ -17,7 +17,7 @@ enum SSHQuestion: Equatable {
     case hostKey
     case other
 
-    init(_ question: String) {
+    internal init(_ question: String) {
         let text = question.trimmingCharacters(in: .whitespacesAndNewlines)
         /// `user@host`, cut at the last `@`: a host has none, a user name may.
         func login(_ text: Substring) -> (user: String, host: String)? {
@@ -55,7 +55,7 @@ enum SSHQuestion: Equatable {
 
     /// The question as the user is shown it: what a server wrote is marked as the server's, so
     /// it cannot pass for a question of this Mac (`Enter passphrase for key …`).
-    func shown(_ question: String) -> String {
+    internal func shown(_ question: String) -> String {
         switch self {
         case .server(_, let host, let text):
             return "The server \(host) asks (this text comes from the server):\n\n\(text)"
@@ -79,7 +79,7 @@ enum SSHQuestion: Equatable {
 /// opened on first use and opened again when it broke.
 ///
 /// All mutable state is guarded by `lock`.
-final class SFTPSession: RemoteSession, @unchecked Sendable {
+internal final class SFTPSession: RemoteSession, @unchecked Sendable {
     private let environment: SessionEnvironment
     private let transport: SFTPTransport?
     private let lock = NSLock()
@@ -103,7 +103,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     /// usual time (see `open`).
     ///
     /// Tests shorten it.
-    var stallLimit: TimeInterval? {
+    internal var stallLimit: TimeInterval? {
         get { lock.withLock { stallTime } }
         set { lock.withLock { stallTime = newValue } }
     }
@@ -117,25 +117,25 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     /// needs; a slow line gets fewer (`TransferWindow`).
     fileprivate static let window = 64
 
-    init(profile: ConnectionProfile, environment: SessionEnvironment, transport: SFTPTransport? = nil) {
+    internal init(profile: ConnectionProfile, environment: SessionEnvironment, transport: SFTPTransport? = nil) {
         currentProfile = profile
         self.environment = environment
         self.transport = transport
     }
 
-    var profile: ConnectionProfile {
+    internal var profile: ConnectionProfile {
         lock.lock()
         defer { lock.unlock() }
         return currentProfile
     }
 
-    var isConnected: Bool {
+    internal var isConnected: Bool {
         lock.lock()
         defer { lock.unlock() }
         return hasConnected && !isClosed
     }
 
-    var isConnecting: Bool {
+    internal var isConnecting: Bool {
         lock.lock()
         defer { lock.unlock() }
         return opening != nil && !isClosed
@@ -146,7 +146,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     // MARK: Connecting
 
     /// The arguments for `ssh` that open the SFTP subsystem on the profile's server.
-    static func sshArguments(for profile: ConnectionProfile, options: NetworkOptions.Values) -> [String] {
+    internal static func sshArguments(for profile: ConnectionProfile, options: NetworkOptions.Values) -> [String] {
         // ssh notices a dead connection by its own probes, also when the user wants no
         // keep-alive of ours: without them it would never end on a line that swallows everything.
         let probe = options.keepAliveInterval > 0 ? Int(options.keepAliveInterval) : max(15, Int(options.timeout))
@@ -175,7 +175,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     ///
     /// A question that names another login or host is passed on to the user, and so is one that
     /// names none: who asks it cannot be told.
-    static func asksForPassword(_ question: String, of profile: ConnectionProfile) -> Bool {
+    internal static func asksForPassword(_ question: String, of profile: ConnectionProfile) -> Bool {
         let (user, host): (String, String)
         switch SSHQuestion(question) {
         case .password(let asked, let server):
@@ -408,7 +408,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         try work(try open(cancellation: cancellation))
     }
 
-    func connect(cancellation: CancellationFlag?) throws -> String {
+    internal func connect(cancellation: CancellationFlag?) throws -> String {
         _ = try open(cancellation: cancellation)
         lock.lock()
         defer { lock.unlock() }
@@ -418,7 +418,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     /// Returns at once.
     ///
     /// A login that is under way ends with it: its ssh is stopped too.
-    func disconnect() {
+    internal func disconnect() {
         lock.lock()
         isClosed = true
         let (open, starting) = (channel, opening)
@@ -466,7 +466,12 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         channel.sendWithoutAnswer(.close) { $0.bytes(handle) }
     }
 
-    func list(_ path: String, showHidden _: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool)
+    internal func list(
+        _ path: String,
+        showHidden _: Bool,
+        cancellation: CancellationFlag?,
+        receive: ([RemoteEntry]) -> Bool
+    )
         throws
     {
         try perform(cancellation: cancellation) { channel in
@@ -529,7 +534,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    func entry(at path: String, cancellation: CancellationFlag?) throws -> RemoteEntry? {
+    internal func entry(at path: String, cancellation: CancellationFlag?) throws -> RemoteEntry? {
         let path = RemotePath.normalized(path)
         return try perform(cancellation: cancellation) { channel in
             guard let attributes = try attributes(of: path, following: false, on: channel, cancellation: cancellation)
@@ -556,7 +561,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     // The four calls that change something end on the caller's flag and on `closing`, which
     // is set when the session is disconnected.
 
-    func makeDirectory(_ path: String, cancellation: CancellationFlag?) throws {
+    internal func makeDirectory(_ path: String, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
             try perform(cancellation: closing) {
                 try $0.request(.mkdir, timeout: timeout, cancellation: closing) {
@@ -568,7 +573,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    func remove(_ path: String, isDirectory: Bool?, cancellation: CancellationFlag?) throws {
+    internal func remove(_ path: String, isDirectory: Bool?, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
             try perform(cancellation: closing) { channel in
                 var isFolder = isDirectory
@@ -591,7 +596,9 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     /// Without, the plain rename of the protocol, which a server refuses when the destination
     /// exists. What the server answers is thrown as it is (`SFTPError`): a refusal is not turned
     /// into "something is in the way", which only the caller can find out.
-    func rename(_ source: String, to destination: String, replacing: Bool, cancellation: CancellationFlag?) throws {
+    internal func rename(_ source: String, to destination: String, replacing: Bool, cancellation: CancellationFlag?)
+        throws
+    {
         try withEither(closing, cancellation) { closing in
             try perform(cancellation: closing) { channel in
                 if replacing, channel.extensions["posix-rename@openssh.com"] != nil {
@@ -612,7 +619,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    func setAttributes(_ attributes: FileAttributes, of path: String, cancellation: CancellationFlag?) throws {
+    internal func setAttributes(_ attributes: FileAttributes, of path: String, cancellation: CancellationFlag?) throws {
         var changes = SFTPAttributes()
         changes.modified = attributes.modified.map { UInt32(clamping: Int64($0.timeIntervalSince1970)) }
         changes.permissions = attributes.permissions.map { UInt32($0 & 0o7777) }
@@ -627,7 +634,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    func openRead(_ path: String, cancellation: CancellationFlag?) throws -> any FileReader {
+    internal func openRead(_ path: String, cancellation: CancellationFlag?) throws -> any FileReader {
         try perform(cancellation: cancellation) { channel in
             let handle = try openHandle(.open, on: channel, cancellation: cancellation) {
                 $0.string(path)
@@ -638,7 +645,7 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> any FileWriter {
+    internal func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> any FileWriter {
         try perform(cancellation: cancellation) { channel in
             // Write, create, and fail if the file exists.
             let handle = try openHandle(.open, on: channel, cancellation: cancellation) {
@@ -651,11 +658,11 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     }
 
     /// Every server can write at any position of a file it has open.
-    func canAppend(_: String) -> Bool { true }
+    internal func canAppend(_: String) -> Bool { true }
 
     /// Opens the file for writing without creating or emptying it, cuts it to `offset` when it is
     /// longer (`fsetstat` with a size), and writes from there.
-    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
+    internal func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
         writer: any FileWriter, size: Int64
     ) {
         try perform(cancellation: cancellation) { channel in

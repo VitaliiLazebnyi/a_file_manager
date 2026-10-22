@@ -14,57 +14,57 @@ import Testing
 /// The local file system with a moment to interfere right before an entry is removed.
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-final class IntegrationRacingLocalFileSystem: FileSystemProvider, @unchecked Sendable {
-    let local = LocalFileSystem()
-    var scheme: String { local.scheme }
-    var capabilities: FileSystemCapabilities { local.capabilities }
-    var readsRootedPaths: Bool { local.readsRootedPaths }
-    var beforeRemoving: ((URL) -> Void)?
+internal final class IntegrationRacingLocalFileSystem: FileSystemProvider, @unchecked Sendable {
+    internal let local = LocalFileSystem()
+    internal var scheme: String { local.scheme }
+    internal var capabilities: FileSystemCapabilities { local.capabilities }
+    internal var readsRootedPaths: Bool { local.readsRootedPaths }
+    internal var beforeRemoving: ((URL) -> Void)?
     private let lock = NSLock()
     private var rooted: [String] = []
     private var plain: [String] = []
 
     /// The removals that came with the top of their tree, and those that came by path alone.
-    var removals: (below: [String], byPath: [String]) { lock.withLock { (rooted, plain) } }
+    internal var removals: (below: [String], byPath: [String]) { lock.withLock { (rooted, plain) } }
 
-    func capabilities(for url: URL) -> FileSystemCapabilities { local.capabilities(for: url) }
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    internal func capabilities(for url: URL) -> FileSystemCapabilities { local.capabilities(for: url) }
+    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try local.list(directory, showHidden: showHidden)
     }
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
+    internal func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
         try local.list(directory, showHidden: showHidden, cancellation: cancellation)
     }
-    func item(at url: URL) -> FileItem? { local.item(at: url) }
-    func parent(of directory: URL) -> URL? { local.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader { try local.read(url) }
-    func write(_ url: URL) throws -> any FileWriter { try local.write(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    internal func item(at url: URL) -> FileItem? { local.item(at: url) }
+    internal func parent(of directory: URL) -> URL? { local.parent(of: directory) }
+    internal func read(_ url: URL) throws -> any FileReader { try local.read(url) }
+    internal func write(_ url: URL) throws -> any FileWriter { try local.write(url) }
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try local.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    internal func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         try local.copy(source, to: destination, progress: progress)
     }
-    func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
+    internal func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
         try local.setAttributes(attributes, of: url)
     }
-    func copyMetadata(from source: URL, to destination: URL) throws {
+    internal func copyMetadata(from source: URL, to destination: URL) throws {
         try local.copyMetadata(from: source, to: destination)
     }
-    func displayPath(_ url: URL) -> String { local.displayPath(url) }
-    func location(from text: String) -> URL? { local.location(from: text) }
-    func volume(of url: URL) -> VolumeInfo? { local.volume(of: url) }
-    func createDirectory(at url: URL) throws { try local.createDirectory(at: url) }
-    func remove(_ url: URL) throws {
+    internal func displayPath(_ url: URL) -> String { local.displayPath(url) }
+    internal func location(from text: String) -> URL? { local.location(from: text) }
+    internal func volume(of url: URL) -> VolumeInfo? { local.volume(of: url) }
+    internal func createDirectory(at url: URL) throws { try local.createDirectory(at: url) }
+    internal func remove(_ url: URL) throws {
         beforeRemoving?(url)
         lock.withLock { plain.append(url.lastPathComponent) }
         try local.remove(url)
     }
-    func remove(_ url: URL, cancellation: CancellationFlag) throws {
+    internal func remove(_ url: URL, cancellation: CancellationFlag) throws {
         beforeRemoving?(url)
         lock.withLock { plain.append(url.lastPathComponent) }
         try local.remove(url, cancellation: cancellation)
     }
-    func remove(_ url: URL, below root: URL, cancellation: CancellationFlag) throws {
+    internal func remove(_ url: URL, below root: URL, cancellation: CancellationFlag) throws {
         beforeRemoving?(url)
         lock.withLock { rooted.append(url.lastPathComponent) }
         try local.remove(url, below: root, cancellation: cancellation)
@@ -72,33 +72,33 @@ final class IntegrationRacingLocalFileSystem: FileSystemProvider, @unchecked Sen
 }
 
 /// Answers every question with "go on" and keeps what was reported.
-final class IntegrationReplies: FileJobDelegate {
+internal final class IntegrationReplies: FileJobDelegate {
     private let lock = NSLock()
     private var messages: [String] = []
     private var reports = 0
     /// Called with every progress report, on the thread that reports.
-    var onProgress: ((JobProgress) -> Void)?
+    internal var onProgress: ((JobProgress) -> Void)?
 
-    var errors: [String] { lock.withLock { messages } }
-    var progressReports: Int { lock.withLock { reports } }
+    internal var errors: [String] { lock.withLock { messages } }
+    internal var progressReports: Int { lock.withLock { reports } }
 
-    func job(_: FileJob, progress: JobProgress) {
+    internal func job(_: FileJob, progress: JobProgress) {
         lock.withLock { reports += 1 }
         onProgress?(progress)
     }
-    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
-    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
+    internal func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
+    internal func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock { messages.append(error.localizedDescription) }
         return .skip
     }
-    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
+    internal func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 }
 
 @Suite
-struct Review2IntegrationFileops {
-    let box: Sandbox
+internal struct Review2IntegrationFileops {
+    internal let box: Sandbox
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
     }
 
@@ -109,7 +109,7 @@ struct Review2IntegrationFileops {
     // MARK: F043 — a tree is deleted from its top folder down, through no link
 
     @Test
-    func whatLiesBelowADeletedFolderIsRemovedFromThatFolderDownAndTheFolderByItsPath() throws {
+    internal func whatLiesBelowADeletedFolderIsRemovedFromThatFolderDownAndTheFolderByItsPath() throws {
         let racing = IntegrationRacingLocalFileSystem()
         let registry = FileSystemRegistry()
         registry.register(racing)
@@ -133,7 +133,7 @@ struct Review2IntegrationFileops {
     }
 
     @Test
-    func aFolderSwappedForALinkWhileItsTreeIsDeletedCostsNothingOutsideTheTree() throws {
+    internal func aFolderSwappedForALinkWhileItsTreeIsDeletedCostsNothingOutsideTheTree() throws {
         let racing = IntegrationRacingLocalFileSystem()
         let registry = FileSystemRegistry()
         registry.register(racing)
@@ -174,7 +174,7 @@ struct Review2IntegrationFileops {
     }
 
     @Test
-    func aMoveToAnotherFileSystemTakesTheOriginalsAwayFromTheirTopFolderDown() {
+    internal func aMoveToAnotherFileSystemTakesTheOriginalsAwayFromTheirTopFolderDown() {
         let (from, to) = (MemoryFileSystem(scheme: "from"), MemoryFileSystem(scheme: "to"))
         let registry = FileSystemRegistry()
         registry.register(from)
@@ -222,7 +222,7 @@ struct Review2IntegrationFileops {
     }
 
     @Test
-    func aCommitThatTakesLongReportsWhileItRunsSoThatAPausedJobWaitsInsideIt() {
+    internal func aCommitThatTakesLongReportsWhileItRunsSoThatAPausedJobWaitsInsideIt() {
         let (from, to, registry) = slowTarget()
         let replies = IntegrationReplies()
         let lock = NSLock()
@@ -246,7 +246,7 @@ struct Review2IntegrationFileops {
     }
 
     @Test
-    func aCommitThatIsStoppedWhileItRunsRemovesNoOriginal() {
+    internal func aCommitThatIsStoppedWhileItRunsRemovesNoOriginal() {
         let (from, to, registry) = slowTarget()
         let replies = IntegrationReplies()
         let job = FileJob(

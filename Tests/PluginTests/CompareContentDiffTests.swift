@@ -47,9 +47,9 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
 }
 
 @Suite
-struct MyersDiff {
+internal struct MyersDiff {
     @Test
-    func edgeCases() {
+    internal func edgeCases() {
         #expect(Myers.diff([Int](), []) == [])
         #expect(Myers.diff([], [1, 2]) == [DiffSegment(a: 0..<0, b: 0..<2, isEqual: false)])
         #expect(Myers.diff([1, 2], []) == [DiffSegment(a: 0..<2, b: 0..<0, isEqual: false)])
@@ -73,7 +73,7 @@ struct MyersDiff {
     }
 
     @Test
-    func applyingTheDiffToAYieldsBAndItIsTheShortest() {
+    internal func applyingTheDiffToAYieldsBAndItIsTheShortest() {
         var random = Seeded(state: 42)
         for round in 0..<600 {
             let alphabet = [2, 3, 5, 12][round % 4]
@@ -92,7 +92,7 @@ struct MyersDiff {
     }
 
     @Test
-    func editedCopiesAreFoundExactly() {
+    internal func editedCopiesAreFoundExactly() {
         var random = Seeded(state: 7)
         for _ in 0..<40 {
             let a = (0..<Int.random(in: 50...400, using: &random)).map { _ in Int.random(in: 0..<60, using: &random) }
@@ -112,7 +112,7 @@ struct MyersDiff {
     }
 
     @Test
-    func aBoundedSearchStillGivesACorrectDiff() {
+    internal func aBoundedSearchStillGivesACorrectDiff() {
         var random = Seeded(state: 99)
         for limit in [1, 2, 5] {
             for _ in 0..<150 {
@@ -126,7 +126,7 @@ struct MyersDiff {
     }
 
     @Test
-    func hugeInputsFallBackToTheHeuristicAndStayCorrect() {
+    internal func hugeInputsFallBackToTheHeuristicAndStayCorrect() {
         // Two long texts in different order: far more differences than an exact search could
         // go through, and more elements than `exactBelow`.
         var random = Seeded(state: 3)
@@ -148,7 +148,7 @@ struct MyersDiff {
     }
 
     @Test
-    func linesWithoutAPartnerAreTakenOutFirst() {
+    internal func linesWithoutAPartnerAreTakenOutFirst() {
         // 200,000 lines on each side with nothing in common but three lines: no search to speak of.
         var a = (0..<200_000).map { "left \($0)" }
         var b = (0..<200_000).map { "right \($0)" }
@@ -162,7 +162,7 @@ struct MyersDiff {
     }
 
     @Test
-    func aLargeFileWithFewChangesIsExact() {
+    internal func aLargeFileWithFewChangesIsExact() {
         var a = (0..<120_000).map { "line \($0 % 5_000) of block \($0 / 5_000)" }
         var b = a
         b.remove(at: 70_000)
@@ -175,7 +175,7 @@ struct MyersDiff {
     }
 
     @Test
-    func cancelledDiffEndsEarlyButIsStillACover() {
+    internal func cancelledDiffEndsEarlyButIsStillACover() {
         let flag = CancellationFlag()
         flag.cancel()
         let (a, b) = ([1, 2, 3, 4], [1, 3, 4, 5])
@@ -185,10 +185,10 @@ struct MyersDiff {
 }
 
 @Suite
-struct TextComparing {
-    func lines(_ text: String) -> [TextLine] { TextDocument.split(text) }
+internal struct TextComparing {
+    internal func lines(_ text: String) -> [TextLine] { TextDocument.split(text) }
 
-    func kinds(_ left: String, _ right: String, _ options: DiffOptions = DiffOptions()) -> String {
+    internal func kinds(_ left: String, _ right: String, _ options: DiffOptions = DiffOptions()) -> String {
         TextDiff.compute(left: lines(left), right: lines(right), options: options).rows
             .map { row in
                 switch row.kind {
@@ -209,7 +209,7 @@ struct TextComparing {
     }
 
     @Test
-    func encodingsAreDetectedAndWrittenBackUnchanged() {
+    internal func encodingsAreDetectedAndWrittenBackUnchanged() {
         let samples: [(Data, TextEncoding, [String])] = [
             (Data("grüße\nwelt\n".utf8), .utf8(bom: false), ["grüße", "welt"]),
             (Data([0xEF, 0xBB, 0xBF]) + Data("a\r\nb".utf8), .utf8(bom: true), ["a", "b"]),
@@ -228,7 +228,7 @@ struct TextComparing {
     }
 
     @Test
-    func linesKeepTheirOwnLineBreaks() {
+    internal func linesKeepTheirOwnLineBreaks() {
         let document = TextDocument(data: Data("one\ntwo\r\nthree\rfour\n\nlast".utf8))
         #expect(document.lines.map(\.text) == ["one", "two", "three", "four", "", "last"])
         #expect(document.lines.map(\.ending) == [.lf, .crlf, .cr, .lf, .lf, .none])
@@ -245,14 +245,14 @@ struct TextComparing {
     }
 
     @Test
-    func binaryFilesAreRecognised() {
+    internal func binaryFilesAreRecognised() {
         #expect(TextDocument.looksBinary(Data([0x7F, 0x45, 0x4C, 0x46, 0x00, 0x01])))
         #expect(!TextDocument.looksBinary(Data("plain text".utf8)) && !TextDocument.looksBinary(Data()))
         #expect(!TextDocument.looksBinary(Data([0xFF, 0xFE, 0x68, 0x00])))
     }
 
     @Test
-    func rowsShowChangedAddedAndRemovedLines() {
+    internal func rowsShowChangedAddedAndRemovedLines() {
         #expect(kinds("a\nb\nc\n", "a\nb\nc\n") == "===")
         #expect(kinds("a\nb\nc\n", "a\nx\nc\n") == "=~=")
         #expect(kinds("a\nc\n", "a\nb\nc\n") == "=+=")
@@ -271,7 +271,7 @@ struct TextComparing {
     }
 
     @Test
-    func optionsDecideWhichLinesAreEqual() {
+    internal func optionsDecideWhichLinesAreEqual() {
         let exact = DiffOptions(ignoreCase: false, ignoreRepeatedSpaces: false, ignoreLineEndings: false)
         #expect(kinds("Hello\n", "hello\n") == "=" && kinds("Hello\n", "hello\n", exact) == "~")
         #expect(kinds("  a   b\t c  \n", "a b c\n") == "=" && kinds("  a   b\t c  \n", "a b c\n", exact) == "~")
@@ -285,7 +285,7 @@ struct TextComparing {
     }
 
     @Test
-    func theRowsAlwaysRebuildTheRightFile() {
+    internal func theRowsAlwaysRebuildTheRightFile() {
         var random = Seeded(state: 11)
         let words = ["alpha", "Alpha", "beta", " beta", "gamma  delta", "gamma delta", "", "end", "END", "x"]
         for round in 0..<300 {
@@ -312,7 +312,7 @@ struct TextComparing {
     }
 
     @Test
-    func longTextsAreKeyedOnAllCores() {
+    internal func longTextsAreKeyedOnAllCores() {
         let left = (0..<60_000).map { TextLine("Line   NUMBER \($0)") }
         var right = left.map { TextLine($0.text.lowercased().replacingOccurrences(of: "   ", with: " ")) }
         right[30_000].text = "different"
@@ -323,7 +323,7 @@ struct TextComparing {
     }
 
     @Test
-    func resyncAnchorsForceLinesTogether() {
+    internal func resyncAnchorsForceLinesTogether() {
         let left = lines("start\nrepeat\nrepeat\nleft only\nend\n")
         let right = lines("start\nrepeat\nright only\nrepeat\nend\n")
         let free = TextDiff.compute(left: left, right: right)
@@ -344,7 +344,7 @@ struct TextComparing {
     }
 
     @Test
-    func differencesInsideALine() {
+    internal func differencesInsideALine() {
         func marked(_ left: String, _ right: String) -> [String] {
             let ranges = TextDiff.inline(left, right)
             func cut(_ text: String, _ ranges: [Range<Int>]) -> String {
@@ -370,9 +370,9 @@ struct TextComparing {
 }
 
 @Suite
-struct BinaryComparing {
+internal struct BinaryComparing {
     @Test
-    func bytesAreComparedAtTheSameOffsets() {
+    internal func bytesAreComparedAtTheSameOffsets() {
         let left = Data((0..<40).map { UInt8($0) })
         var right = left
         right[3] = 0xFF
@@ -395,7 +395,7 @@ struct BinaryComparing {
     }
 
     @Test
-    func edgeCases() {
+    internal func edgeCases() {
         #expect(
             BinaryDiff.compute(left: Data(), right: Data()).isIdentical
                 && BinaryDiff.compute(left: Data(), right: Data()).rowCount == 0
@@ -414,7 +414,7 @@ struct BinaryComparing {
     }
 
     @Test
-    func largeFilesAreComparedInPiecesOnAllCores() {
+    internal func largeFilesAreComparedInPiecesOnAllCores() {
         var random = Seeded(state: 5)
         var left = Data(count: 3_000_000)
         left.withUnsafeMutableBytes { bytes in
@@ -434,17 +434,17 @@ struct BinaryComparing {
 }
 
 @Suite
-struct CompareLoading {
-    let fileSystems = FileSystemRegistry()
-    let memory = MemoryFileSystem()
+internal struct CompareLoading {
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
 
-    init() {
+    internal init() {
         fileSystems.register(LocalFileSystem())
         fileSystems.register(memory)
     }
 
     @Test
-    func textFilesAreLoadedAndCompared() {
+    internal func textFilesAreLoadedAndCompared() {
         memory.addFile("/a.txt", "one\ntwo\nthree\n")
         memory.addFile("/b.txt", "one\n2\nthree\nfour\n")
         let result = CompareLoader.load(
@@ -461,7 +461,7 @@ struct CompareLoading {
     }
 
     @Test
-    func identicalAndBinaryAndMissingFiles() {
+    internal func identicalAndBinaryAndMissingFiles() {
         memory.addFile("/a.txt", "same\n")
         memory.addFile("/b.txt", "same\n")
         memory.addFile("/c.txt", "SAME\n")
@@ -512,7 +512,7 @@ struct CompareLoading {
     }
 
     @Test
-    func largeLocalFilesAreCheckedInStretchesOnAllCores() throws {
+    internal func largeLocalFilesAreCheckedInStretchesOnAllCores() throws {
         let box = try Sandbox()
         var random = Seeded(state: 1)
         var data = Data(count: 1_000_003)
@@ -547,7 +547,7 @@ struct CompareLoading {
     }
 
     @Test
-    func filesElsewhereAreReadOnceSideBySide() throws {
+    internal func filesElsewhereAreReadOnceSideBySide() throws {
         memory.isLocal = false
         let text = String(repeating: "0123456789abcdef", count: 200_000)
         memory.addFile("/a", text)
@@ -569,7 +569,7 @@ struct CompareLoading {
     }
 
     @Test
-    func savingReplacesTheFileAndLeavesNothingBehind() throws {
+    internal func savingReplacesTheFileAndLeavesNothingBehind() throws {
         memory.addFile("/dir/file.txt", "old content", permissions: 0o600)
         try CompareLoader.replace(
             memory.url("/dir/file.txt"),

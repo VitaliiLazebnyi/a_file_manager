@@ -2,20 +2,20 @@ import AFMKernel
 import Foundation
 
 /// The switches of the Find dialog (spec 10 › Find dialog); all off by default.
-struct SearchOptions: Equatable, Codable {
-    var wholeWords = false
-    var caseSensitive = false
-    var backwards = false
-    var hex = false
-    var regex = false
+internal struct SearchOptions: Equatable, Codable {
+    internal var wholeWords = false
+    internal var caseSensitive = false
+    internal var backwards = false
+    internal var hex = false
+    internal var regex = false
 }
 
-enum SearchError: LocalizedError, Equatable {
+internal enum SearchError: LocalizedError, Equatable {
     case empty
     case badHex(String)
     case badExpression(String)
 
-    var errorDescription: String? {
+    internal var errorDescription: String? {
         switch self {
         case .empty:
             return "There is nothing to search for."
@@ -33,20 +33,20 @@ enum SearchError: LocalizedError, Equatable {
 /// rules).
 ///
 /// An immutable value; safe to share between the searching threads.
-struct SearchPattern {
-    enum Kind {
+internal struct SearchPattern {
+    internal enum Kind {
         case bytes([UInt8])
         case text(String)
         case expression(NSRegularExpression)
     }
 
-    let kind: Kind
-    let wholeWords: Bool
-    let caseSensitive: Bool
+    internal let kind: Kind
+    internal let wholeWords: Bool
+    internal let caseSensitive: Bool
 
     /// `encoding` is the encoding the file is shown in; quoted text in a hex string is searched
     /// as its bytes in that encoding.
-    init(_ text: String, options: SearchOptions, encoding: ViewerEncoding) throws {
+    internal init(_ text: String, options: SearchOptions, encoding: ViewerEncoding) throws {
         guard !text.isEmpty else { throw SearchError.empty }
         wholeWords = options.wholeWords && !options.hex
         caseSensitive = options.caseSensitive
@@ -85,7 +85,7 @@ struct SearchPattern {
     private static let lineBreak: Character = "\u{E000}"
 
     /// `\t` is a tab, `\n` a line break, `\\` one backslash; any other backslash is itself.
-    static func unescape(_ text: String) -> String {
+    internal static func unescape(_ text: String) -> String {
         var result = ""
         var characters = text.makeIterator()
         while let character = characters.next() {
@@ -114,7 +114,7 @@ struct SearchPattern {
     }
 
     /// `00 FF 12`, with or without spaces; text in double quotes stands for its bytes: `"PK"0102`.
-    static func hexBytes(_ text: String, encoding: ViewerEncoding) throws -> [UInt8] {
+    internal static func hexBytes(_ text: String, encoding: ViewerEncoding) throws -> [UInt8] {
         var bytes: [UInt8] = []
         var pending: UInt8?
         var characters = text.makeIterator()
@@ -155,9 +155,9 @@ struct SearchPattern {
 ///
 /// Several chunks are read, decoded and searched at once on all cores; the first hit in file order
 /// wins. Blocks; call it on a background thread.
-enum ViewerSearch {
+internal enum ViewerSearch {
     /// The longest match a regular expression can have across a chunk border.
-    static let expressionOverlap = 64 * 1_024
+    internal static let expressionOverlap = 64 * 1_024
 
     /// The next match that begins at or after `start` or, with `backwards`, the last one that
     /// begins before `start`.
@@ -167,7 +167,7 @@ enum ViewerSearch {
     /// `boundaries` is what a text in a double-byte code page is cut into characters with; a search
     /// that is repeated keeps it between the calls. `rawBytes` off decodes every chunk (the
     /// reference the raw searches are tested against).
-    static func find(
+    internal static func find(
         _ pattern: SearchPattern,
         in source: any ByteSource,
         content: Range<Int64>,
@@ -396,11 +396,11 @@ enum ViewerSearch {
     /// ligatures and the Kelvin sign) and a match must begin and end at the border of a character
     /// of the text; nothing is skipped over, so a control character in the text is a character that
     /// does not match, as it is in the raw bytes.
-    struct TextMatcher {
+    internal struct TextMatcher {
         private let needle: [UInt16]
         private let caseSensitive: Bool
 
-        init(_ text: String, caseSensitive: Bool) {
+        internal init(_ text: String, caseSensitive: Bool) {
             self.caseSensitive = caseSensitive
             let units = Array(text.utf16)
             if caseSensitive {
@@ -489,7 +489,7 @@ enum ViewerSearch {
 
         /// The first (or last) match that begins in the units `first..<end`, and ends in `units`
         /// (it may reach behind `end`) and for which `accepts` holds; units are indexes into `units`.
-        func find(in units: [UInt16], from first: Int, before end: Int, last: Bool, accepts: (NSRange) -> Bool)
+        internal func find(in units: [UInt16], from first: Int, before end: Int, last: Bool, accepts: (NSRange) -> Bool)
             -> NSRange?
         {
             guard !needle.isEmpty, first >= 0, first < end, first < units.count else {
@@ -757,9 +757,11 @@ enum ViewerSearch {
     }
 
     /// The first (or last) place `needle` is in `data` at an offset inside `accepted`.
-    static func bytes(_ needle: [UInt8], in data: Data, base: Int64, accepted: Range<Int64>, last: Bool) -> Range<
-        Int64
-    >? {
+    internal static func bytes(_ needle: [UInt8], in data: Data, base: Int64, accepted: Range<Int64>, last: Bool)
+        -> Range<
+            Int64
+        >?
+    {
         data.withUnsafeBytes { (haystack: UnsafeRawBufferPointer) -> Range<Int64>? in
             guard !needle.isEmpty, haystack.count >= needle.count, let start = haystack.baseAddress else {
                 return nil

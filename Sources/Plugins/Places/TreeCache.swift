@@ -43,10 +43,10 @@ public final class TreeCache: @unchecked Sendable {
     /// memory only (as a partial tree on disk) and read again by the scan.
     public static let fileLimit = 64 << 20
     /// How many trees are kept in memory; the others are read from their files when needed.
-    static let memoryLimit = 8
+    internal static let memoryLimit = 8
     /// How many folders all the trees in memory may have together (about 100 bytes each, so
     /// ~200 MB): above that, trees that are not waiting to be written are let go, whatever their number.
-    static let memoryPathLimit = 2_000_000
+    internal static let memoryPathLimit = 2_000_000
 
     private final class Slot {
         var entry: Entry
@@ -298,7 +298,7 @@ public final class TreeCache: @unchecked Sendable {
     ///
     /// False when it would be more than `fileLimit` (nothing replaces the old file then).
     @discardableResult
-    static func writePrivately(_ entry: Entry, root: URL, to file: URL) -> Bool {
+    internal static func writePrivately(_ entry: Entry, root: URL, to file: URL) -> Bool {
         let temporary = file.path + ".tmp\(getpid())"
         let descriptor = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
         guard descriptor >= 0 else {
@@ -336,11 +336,11 @@ public final class TreeCache: @unchecked Sendable {
         return true
     }
 
-    static func format(_ paths: [String], root: URL) -> String {
+    internal static func format(_ paths: [String], root: URL) -> String {
         format(Entry(paths: paths), root: root)
     }
 
-    static func format(_ entry: Entry, root: URL) -> String {
+    internal static func format(_ entry: Entry, root: URL) -> String {
         var data = Data()
         format(entry, root: root) { piece in
             data.append(piece)
@@ -350,7 +350,7 @@ public final class TreeCache: @unchecked Sendable {
     }
 
     /// The file's text in pieces of about a megabyte, for as long as `emit` says to go on.
-    static func format(_ entry: Entry, root: URL, emit: (Data) -> Bool) {
+    internal static func format(_ entry: Entry, root: URL, emit: (Data) -> Bool) {
         // A path with a line break would add lines to the file; such a folder is left out, and
         // the tree then is not complete.
         func isPlain(_ path: String) -> Bool { !path.utf8.contains { $0 == 0x0A || $0 == 0x0D } }
@@ -383,14 +383,14 @@ public final class TreeCache: @unchecked Sendable {
     }
 
     /// The paths of a cache file; nil when the file is not one for `root`.
-    static func parse(_ text: String, root: URL) -> [String]? {
+    internal static func parse(_ text: String, root: URL) -> [String]? {
         parseEntry(text, root: root)?.paths
     }
 
     /// Read byte by byte: the lines end at the line feed byte and are told apart by their
     /// first and last byte, not by characters (a combining mark after `[` makes one
     /// character with it, and a name that began with one would be lost).
-    static func parseEntry(_ text: String, root: URL) -> Entry? {
+    internal static func parseEntry(_ text: String, root: URL) -> Entry? {
         var text = text
         return text.withUTF8 { bytes -> Entry? in
             var entry = Entry(paths: [])

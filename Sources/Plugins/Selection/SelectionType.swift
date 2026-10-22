@@ -7,33 +7,33 @@ import Foundation
 ///
 /// Total Commander saves a whole search here; this holds what a file list knows of its entries:
 /// kind, size, date of last change, hidden and link.
-struct SelectionType: Codable, Equatable {
-    enum Kind: Int, Codable {
+internal struct SelectionType: Codable, Equatable {
+    internal enum Kind: Int, Codable {
         case any, files, folders
     }
 
     /// A condition on a yes/no property.
-    enum Tri: Int, Codable {
+    internal enum Tri: Int, Codable {
         case any, yes, no
 
-        func accepts(_ value: Bool) -> Bool { self == .any || (self == .yes) == value }
+        internal func accepts(_ value: Bool) -> Bool { self == .any || (self == .yes) == value }
     }
 
-    var name: String
-    var mask = "*.*"
-    var kind = Kind.any
+    internal var name: String
+    internal var mask = "*.*"
+    internal var kind = Kind.any
     /// Size limits in bytes; they are asked of files only, and a folder never passes them.
-    var minSize: Int64?
-    var maxSize: Int64?
-    var modifiedFrom: Date?
-    var modifiedTo: Date?
+    internal var minSize: Int64?
+    internal var maxSize: Int64?
+    internal var modifiedFrom: Date?
+    internal var modifiedTo: Date?
     /// Changed within the last so many days, counted back from the moment of selecting.
-    var notOlderThanDays: Int?
-    var hidden = Tri.any
-    var links = Tri.any
+    internal var notOlderThanDays: Int?
+    internal var hidden = Tri.any
+    internal var links = Tri.any
 
     /// The conditions beyond the mask.
-    func accepts(_ item: FileItem, now: Date = Date()) -> Bool {
+    internal func accepts(_ item: FileItem, now: Date = Date()) -> Bool {
         switch kind {
         case .any:
             break
@@ -74,7 +74,7 @@ struct SelectionType: Codable, Equatable {
     // MARK: Text forms of the dialog
 
     /// `1500`, `10k`, `1.5 M`, `2g`; nil for anything else.
-    static func size(from text: String) -> Int64? {
+    internal static func size(from text: String) -> Int64? {
         var text = text.trimmingCharacters(in: .whitespaces).lowercased()
         guard !text.isEmpty else {
             return nil
@@ -92,7 +92,7 @@ struct SelectionType: Codable, Equatable {
         return bytes.isFinite && bytes < 9.2e18 ? Int64(bytes) : Int64.max
     }
 
-    static func text(ofSize size: Int64?) -> String {
+    internal static func text(ofSize size: Int64?) -> String {
         guard let size else {
             return ""
         }
@@ -116,7 +116,7 @@ struct SelectionType: Codable, Equatable {
     ///
     /// A day without a time means its start, or with `endOfDay` its last second, so that "to
     /// 2026-10-11" includes that day.
-    static func date(from text: String, endOfDay: Bool = false) -> Date? {
+    internal static func date(from text: String, endOfDay: Bool = false) -> Date? {
         let text = text.trimmingCharacters(in: .whitespaces)
         if let date = formatter("yyyy-MM-dd HH:mm").date(from: text) {
             return date
@@ -127,7 +127,7 @@ struct SelectionType: Codable, Equatable {
         return endOfDay ? day.addingTimeInterval(86_399) : day
     }
 
-    static func text(ofDate date: Date?) -> String {
+    internal static func text(ofDate date: Date?) -> String {
         date.map(formatter("yyyy-MM-dd HH:mm").string(from:)) ?? ""
     }
 }
@@ -135,30 +135,30 @@ struct SelectionType: Codable, Equatable {
 /// A mask or a selection type, ready to be asked which entries of a list it selects.
 ///
 /// A value without shared state; `names` may run on any thread.
-struct SelectionRule {
-    let mask: SelectionMask
-    let type: SelectionType?
+internal struct SelectionRule {
+    internal let mask: SelectionMask
+    internal let type: SelectionType?
 
-    init(mask text: String) {
+    internal init(mask text: String) {
         mask = SelectionMask(text)
         type = nil
     }
 
-    init(_ type: SelectionType) {
+    internal init(_ type: SelectionType) {
         mask = SelectionMask(type.mask)
         self.type = type
     }
 
     /// The names of the entries the rule selects, as a set (two names that read the same are
     /// one member; use `matching` where each entry counts).
-    func names(among items: [FileItem], base: URL, now: Date = Date()) -> Set<String> {
+    internal func names(among items: [FileItem], base: URL, now: Date = Date()) -> Set<String> {
         Set(matching(among: items, base: base, now: now))
     }
 
     /// The names of the entries the rule selects, one per entry in list order, written as the
     /// entries have them. `base` is the directory the list belongs to; path-limited masks are
     /// read relative to it.
-    func matching(among items: [FileItem], base: URL, now: Date = Date()) -> [String] {
+    internal func matching(among items: [FileItem], base: URL, now: Date = Date()) -> [String] {
         matching(among: items, base: base, now: now, cancelled: { false })
     }
 
@@ -166,16 +166,16 @@ struct SelectionRule {
     /// use).
     ///
     /// Whether a regular expression of the mask ran out of time is told by `mask.timedOut`.
-    func matching(among items: [FileItem], base: URL, now: Date = Date(), cancelled: () -> Bool) -> [String] {
+    internal func matching(among items: [FileItem], base: URL, now: Date = Date(), cancelled: () -> Bool) -> [String] {
         matchingIndices(among: items, base: base, now: now, cancelled: cancelled).map { items[$0].name }
     }
 
     /// Whether the rule looks at other entries than the one it judges (`A>B` takes the files
     /// that belong to the matching ones): such a rule has to be run over the whole list.
-    var isPairwise: Bool { mask.pairsRelatedFiles }
+    internal var isPairwise: Bool { mask.pairsRelatedFiles }
 
     /// The same as places in `items`, of the entries `scope` lets through.
-    func matchingIndices(
+    internal func matchingIndices(
         among items: [FileItem],
         base: URL,
         now: Date = Date(),
@@ -195,7 +195,7 @@ struct SelectionRule {
     /// Whether the rule selects one entry on its own, for a rule that is not `isPairwise`.
     ///
     /// A function of the entry alone, so it may be asked from several threads at once.
-    func probe(base: URL, now: Date = Date()) -> @Sendable (FileItem) -> Bool {
+    internal func probe(base: URL, now: Date = Date()) -> @Sendable (FileItem) -> Bool {
         let (mask, type, entry) = (self.mask, self.type, entryMaker(base: base))
         return { item in mask.matches(entry(item)) && (type?.accepts(item, now: now) ?? true) }
     }
@@ -224,50 +224,50 @@ struct SelectionRule {
 /// predefined selection types and the options of the configuration page.
 ///
 /// Main thread only.
-final class SelectionStore {
-    static let historyLimit = 20
-    static let scope = "selection"
+internal final class SelectionStore {
+    internal static let historyLimit = 20
+    internal static let scope = "selection"
     /// Full settings keys of the options, as the configuration dialog writes them.
-    static let marksFoldersKey = scope + ".markDirectories"
-    static let oneHourKey = scope + ".oneHourDifference"
+    internal static let marksFoldersKey = scope + ".markDirectories"
+    internal static let oneHourKey = scope + ".oneHourDifference"
 
     private let settings: any SettingsStore
     private let scoped: any SettingsStore
 
-    init(settings: any SettingsStore) {
+    internal init(settings: any SettingsStore) {
         self.settings = settings
         scoped = settings.scoped(to: Self.scope)
     }
 
     /// Whether Num +, Ctrl+Num + and Num * also affect folders (`MarkDirectories`).
-    var marksFolders: Bool { settings.flag(Self.marksFoldersKey, default: true) }
+    internal var marksFolders: Bool { settings.flag(Self.marksFoldersKey, default: true) }
     /// Whether comparing treats times exactly one hour apart as equal (`1hourdif`).
-    var ignoresOneHour: Bool { settings.flag(Self.oneHourKey, default: false) }
+    internal var ignoresOneHour: Bool { settings.flag(Self.oneHourKey, default: false) }
 
     /// The masks used so far, the newest first.
-    var history: [String] { scoped.value([String].self, forKey: "maskHistory") ?? [] }
+    internal var history: [String] { scoped.value([String].self, forKey: "maskHistory") ?? [] }
 
-    func remember(_ mask: String) {
+    internal func remember(_ mask: String) {
         var masks = history.filter { $0 != mask }
         masks.insert(mask, at: 0)
         scoped.set(Array(masks.prefix(Self.historyLimit)), forKey: "maskHistory")
     }
 
-    func forget(mask: String) {
+    internal func forget(mask: String) {
         scoped.set(history.filter { $0 != mask }, forKey: "maskHistory")
     }
 
     /// The saved types; one that does not read is left out, the others stay.
-    var types: [SelectionType] {
+    internal var types: [SelectionType] {
         (scoped.value([Readable<SelectionType>].self, forKey: "types") ?? []).compactMap(\.value)
     }
 
-    func type(named name: String) -> SelectionType? {
+    internal func type(named name: String) -> SelectionType? {
         types.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 
     /// Saves a type; one of the same name is replaced.
-    func save(_ type: SelectionType) {
+    internal func save(_ type: SelectionType) {
         var all = types
         if let index = all.firstIndex(where: { $0.name.caseInsensitiveCompare(type.name) == .orderedSame }) {
             all[index] = type
@@ -277,7 +277,7 @@ final class SelectionStore {
         scoped.set(all, forKey: "types")
     }
 
-    func removeType(named name: String) {
+    internal func removeType(named name: String) {
         scoped.set(types.filter { $0.name.caseInsensitiveCompare(name) != .orderedSame }, forKey: "types")
     }
 }

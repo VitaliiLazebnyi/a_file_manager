@@ -54,16 +54,16 @@ private func folder(_ output: String?) -> String? {
 /// `false` and the like.
 @MainActor
 @Suite
-struct SystemToolsCommandTests {
-    let memory = MemoryFileSystem()
-    let tools = SystemToolsPlugin(launchesApplications: false)
-    let bench: TestBench
-    let box: Sandbox
+internal struct SystemToolsCommandTests {
+    internal let memory = MemoryFileSystem()
+    internal let tools = SystemToolsPlugin(launchesApplications: false)
+    internal let bench: TestBench
+    internal let box: Sandbox
 
-    var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -83,7 +83,7 @@ struct SystemToolsCommandTests {
     // MARK: Command line
 
     @Test
-    func aTypedLineRunsInTheSourceFolderAndItsOutputIsShown() {
+    internal func aTypedLineRunsInTheSourceFolderAndItsOutputIsShown() {
         ui.formAnswers = [.accept, .accept]
         commands.perform(.runCommandLine, .text("echo hello"))
         #expect(shownText(ui) == "hello\n" && ui.log.last == "form: echo hello")
@@ -99,7 +99,7 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func aFailingCommandReportsItsExitStatus() {
+    internal func aFailingCommandReportsItsExitStatus() {
         commands.perform(.runCommandLine, .text("false"))
         #expect(ui.log.last == "form: false (exit status 1)")
         #expect(shownText(ui) == "The command ended with exit status 1 and wrote nothing.")
@@ -115,7 +115,7 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func testsRunOnlyHarmlessLines() {
+    internal func testsRunOnlyHarmlessLines() {
         for line in [
             "make install", "rm -rf x", "echo hi; rm x", "echo `id`", "echo $(id)", "echo hi > file", "echo hi &",
             "open -a Terminal",
@@ -130,14 +130,14 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func outsideTheLocalDisksTheHomeFolderIsUsed() {
+    internal func outsideTheLocalDisksTheHomeFolderIsUsed() {
         bench.left.show(memory.url("/A"))
         commands.perform(.runCommandLine, .text("pwd"))
         #expect(folder(shownText(ui)) == FileManager.default.homeDirectoryForCurrentUser.resolvingSymlinksInPath().path)
     }
 
     @Test
-    func runCommandAsksForTheLine() {
+    internal func runCommandAsksForTheLine() {
         ui.promptAnswers = [.text("echo asked"), .accept, .cancel]
         commands.perform(SystemToolsCommands.runPrompt)
         #expect(shownText(ui) == "asked\n")
@@ -151,7 +151,7 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func theViewerShowsTheOutputWhenThereIsOne() {
+    internal func theViewerShowsTheOutputWhenThereIsOne() {
         let viewer = RecordingViewer()
         let tools = SystemToolsPlugin(launchesApplications: false)
         let bench = TestBench(
@@ -170,7 +170,7 @@ struct SystemToolsCommandTests {
     // MARK: Terminal, system, volumes
 
     @Test
-    func whatWouldStartApplicationsIsOnlyRecorded() async {
+    internal func whatWouldStartApplicationsIsOnlyRecorded() async {
         commands.perform(SystemToolsCommands.openTerminal)
         // The terminal is looked up off the main thread.
         #expect(await settle { !tools.log.isEmpty })
@@ -187,7 +187,7 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func systemInformationIsShownAsText() {
+    internal func systemInformationIsShownAsText() {
         ui.formAnswers = [.accept]
         commands.perform(SystemToolsCommands.systemInformation)
         let text = shownText(ui) ?? ""
@@ -200,7 +200,7 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func aVolumeIsRenamedOnlyWithAValidName() {
+    internal func aVolumeIsRenamedOnlyWithAValidName() {
         ui.promptAnswers = [.text("Work Disk"), .text("a/b"), .accept, .cancel]
         commands.perform(SystemToolsCommands.renameVolume)
         #expect(
@@ -216,13 +216,13 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func theSystemVolumeCannotBeEjected() {
+    internal func theSystemVolumeCannotBeEjected() {
         commands.perform(SystemToolsCommands.ejectVolume)
         #expect(ui.log.last?.hasSuffix("cannot be ejected.") == true && tools.log.isEmpty)
     }
 
     @Test
-    func openWithListsApplications() {
+    internal func openWithListsApplications() {
         bench.left.moveCursor(toName: "one.txt")
         ui.formAnswers = [.accept]
         commands.perform(SystemToolsCommands.openWith)
@@ -234,7 +234,7 @@ struct SystemToolsCommandTests {
     // MARK: Printing
 
     @Test
-    func theFileListGoesToThePrinterAsPages() {
+    internal func theFileListGoesToThePrinterAsPages() {
         bench.left.show(memory.url("/A"))
         commands.perform(.selectAll)
         ui.formAnswers = [.values(["lines": .text("5"), "header": .text("")])]
@@ -248,7 +248,7 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func theFileListCanBeShownAsText() {
+    internal func theFileListCanBeShownAsText() {
         bench.left.show(memory.url("/A"))
         bench.left.moveCursor(toName: "one.txt")
         ui.formAnswers = [.values(["output": .index(2)]), .accept]
@@ -264,7 +264,7 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func theListWithSubfoldersAsksForDepthAndMask() {
+    internal func theListWithSubfoldersAsksForDepthAndMask() {
         bench.left.show(memory.url("/A"))
         commands.perform(.selectAll)
         ui.promptAnswers = [.text("-1"), .text("*.txt | two.*"), .text("list.txt")]
@@ -292,7 +292,7 @@ struct SystemToolsCommandTests {
     }
 
     @Test
-    func printingFileContentsIsConfirmedFirst() {
+    internal func printingFileContentsIsConfirmedFirst() {
         bench.left.moveCursor(toName: "one.txt")
         ui.choiceAnswers = [1, 0]
         commands.perform(SystemToolsCommands.printFile)
@@ -306,7 +306,7 @@ struct SystemToolsCommandTests {
     // MARK: Registration
 
     @Test
-    func registration() {
+    internal func registration() {
         let menus = bench.kernel.menus
         let inMenus = menus.menus.flatMap(\.items).compactMap { $0 } + menus.contextMenu(onItem: true).compactMap { $0 }
         #expect(
@@ -345,11 +345,11 @@ struct SystemToolsCommandTests {
 
 /// The pure parts: reading a typed line, running a child process, formats and pages.
 @Suite
-struct SystemToolsTypes {
+internal struct SystemToolsTypes {
     // MARK: Typed lines
 
     @Test
-    func aLineIsTakenApart() throws {
+    internal func aLineIsTakenApart() throws {
         let plain = try #require(TypedCommand("  ls -la  "))
         #expect(plain.command == "ls -la" && plain.firstWord == "ls" && plain.arguments == "-la" && !plain.isDetached)
         let detached = try #require(TypedCommand("open . &"))
@@ -363,7 +363,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func applicationsAreFoundByNameOrPath() throws {
+    internal func applicationsAreFoundByNameOrPath() throws {
         let box = try Sandbox()
         try box.folder("Apps/Tool.app")
         try box.file("Apps/script.app", "not a bundle")
@@ -390,14 +390,14 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func onlyPlainHarmlessLinesAreHarmless() throws {
+    internal func onlyPlainHarmlessLinesAreHarmless() throws {
         #expect(SystemTools.isHarmless(try #require(TypedCommand("echo a b"))))
         #expect(!SystemTools.isHarmless(try #require(TypedCommand("echo a | sh"))))
         #expect(!SystemTools.isHarmless(try #require(TypedCommand("sh -c 'echo a'"))))
     }
 
     @Test
-    func theHistoryKeepsEachLineOnceNewestFirst() {
+    internal func theHistoryKeepsEachLineOnceNewestFirst() {
         var history: [String] = []
         for line in ["a", "b", "a"] { history = CommandHistory.adding(line, to: history) }
         #expect(history == ["a", "b"])
@@ -417,7 +417,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func outputAndStatusAreCollected() {
+    internal func outputAndStatusAreCollected() {
         let outcome = sh("echo out; echo err 1>&2; exit 3").run(cancellation: CancellationFlag())
         #expect(
             outcome.output == "out\nerr\n" && outcome.status == 3 && outcome.failure == nil && !outcome.wasCancelled
@@ -425,7 +425,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func aLotOfOutputDoesNotBlockTheChild() {
+    internal func aLotOfOutputDoesNotBlockTheChild() {
         // Far more than a pipe holds: the child would wait for ever if nobody read.
         var reported = 0
         let outcome = sh("head -c 3000000 /dev/zero | tr '\\0' x")
@@ -436,7 +436,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func cancellingEndsTheChild() {
+    internal func cancellingEndsTheChild() {
         let cancellation = CancellationFlag()
         Thread {
             Thread.sleep(forTimeInterval: 0.2)
@@ -450,7 +450,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func aProgramThatDoesNotExistIsAFailure() {
+    internal func aProgramThatDoesNotExistIsAFailure() {
         let runner = ProcessRunner(
             executable: URL(fileURLWithPath: "/nonexistent/program"),
             arguments: [],
@@ -460,13 +460,13 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func aDetachedCommandIsNotReadFrom() {
+    internal func aDetachedCommandIsNotReadFrom() {
         let outcome = sh("echo unseen", collects: false).run(cancellation: CancellationFlag())
         #expect(outcome.output.isEmpty && outcome.status == 0)
     }
 
     @Test
-    func severalChildrenRunAtOnce() {
+    internal func severalChildrenRunAtOnce() {
         let outputs = Parallel.map(Array(0..<8)) { number in
             sh("echo \(number)").run(cancellation: CancellationFlag()).output
         }
@@ -476,7 +476,7 @@ struct SystemToolsTypes {
     // MARK: System information
 
     @Test
-    func informationIsLaidOutInAlignedColumns() {
+    internal func informationIsLaidOutInAlignedColumns() {
         let information = SystemInformation(sections: [
             .init(
                 title: "Hardware",
@@ -490,7 +490,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func formatsFollowTheDialog() {
+    internal func formatsFollowTheDialog() {
         #expect(SystemInformation.memory(128 << 30) == "131,072 M (128 G)")
         #expect(SystemInformation.memory(UInt64(1.5 * Double(1 << 30))) == "1,536 M (1.5 G)")
         #expect(SystemInformation.memory(512 << 20) == "512 M")
@@ -500,7 +500,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func theSystemAnswers() throws {
+    internal func theSystemAnswers() throws {
         let gathered = SystemInformation.gather(displays: ["1x1"], cancellation: CancellationFlag(), asking: .system)
         let information = try #require(gathered)
         #expect(information.sections.map(\.title) == ["Hardware", "Software", "Volumes"])
@@ -513,7 +513,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func volumeNamesAreChecked() {
+    internal func volumeNamesAreChecked() {
         #expect(VolumeName.problem(with: "Work Disk 2") == nil && VolumeName.problem(with: "Диск") == nil)
         #expect(
             VolumeName.problem(with: "") != nil && VolumeName.problem(with: "a/b") != nil
@@ -530,7 +530,7 @@ struct SystemToolsTypes {
     private let now = Date(timeIntervalSince1970: 1_700_000_000)
 
     @Test
-    func headerPlaceholdersAreFilledIn() {
+    internal func headerPlaceholdersAreFilledIn() {
         #expect(
             DirectoryListFormatter.expand("%d - Page %p/%t", directory: "/tmp/A", page: 2, pages: 3, now: now)
                 == "/tmp/A - Page 2/3"
@@ -544,7 +544,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func rowsAreAlignedAndTheFooterCounts() {
+    internal func rowsAreAlignedAndTheFooterCounts() {
         let rows = [
             ListRow(name: "images", isFolder: true, modified: now, permissions: 0o755),
             ListRow(name: "green.png", isFolder: false, size: 782, modified: now),
@@ -566,7 +566,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func longListsAreSplitIntoPagesWithAHeaderEach() {
+    internal func longListsAreSplitIntoPagesWithAHeaderEach() {
         let rows = (1...10).map { ListRow(name: "file\($0)", isFolder: false, size: 1) }
         var formatter = DirectoryListFormatter()
         formatter.isDetailed = false
@@ -582,7 +582,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func masksIncludeAndExclude() {
+    internal func masksIncludeAndExclude() {
         #expect(ListMask("*.doc *.txt").matches("a.txt") && !ListMask("*.doc *.txt").matches("a.png"))
         #expect(ListMask("*.* | *.bak *.~*").matches("a.txt") && !ListMask("*.* | *.bak *.~*").matches("a.bak"))
         #expect(
@@ -592,7 +592,7 @@ struct SystemToolsTypes {
     }
 
     @Test
-    func subfoldersAreCollectedToTheGivenDepth() {
+    internal func subfoldersAreCollectedToTheGivenDepth() {
         let (fileSystems, memory) = makeFileSystems()
         for path in ["/A/b.txt", "/A/a.md", "/A/sub/c.txt", "/A/sub/deeper/d.txt", "/A/.hidden/e.txt"] {
             memory.addFile(path)

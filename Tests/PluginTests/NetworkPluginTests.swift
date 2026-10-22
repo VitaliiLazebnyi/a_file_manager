@@ -49,23 +49,23 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
 /// server, and the real copy job between the test server and the local disk.
 @MainActor
 @Suite
-struct NetworkPluginCommands {
-    let box: Sandbox
-    let server: TestFTPServer
-    let passwords = MemoryPasswords()
+internal struct NetworkPluginCommands {
+    internal let box: Sandbox
+    internal let server: TestFTPServer
+    internal let passwords = MemoryPasswords()
     private let settings = RecordingSettings()
     private let mounter = FakeMounter()
-    let plugin: NetworkPlugin
-    let bench: TestBench
+    internal let plugin: NetworkPlugin
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.interaction }
-    var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
-    var address: String { "127.0.0.1:\(server.port)" }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
+    internal var address: String { "127.0.0.1:\(server.port)" }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("srv/pub/report.txt", "report")
         try box.file("srv/pub/sub/deep.txt", "deep")
@@ -90,12 +90,12 @@ struct NetworkPluginCommands {
         plugin.center.environment.declineMemory = 0
     }
 
-    func url(_ path: String) -> URL { key.url(path: path) }
+    internal func url(_ path: String) -> URL { key.url(path: path) }
     /// The folder of the right panel as a copy target.
-    var localTarget: String { box.url("other").absoluteString + "/" }
+    internal var localTarget: String { box.url("other").absoluteString + "/" }
 
     /// Ctrl+N with the test server's address.
-    func quickConnect(_ text: String? = nil, anonymous: Bool = true) {
+    internal func quickConnect(_ text: String? = nil, anonymous: Bool = true) {
         ui.formAnswers = [.values(["address": .text(text ?? address), "anonymous": .flag(anonymous)])]
         commands.perform(.ftpNew)
     }
@@ -103,7 +103,7 @@ struct NetworkPluginCommands {
     // MARK: Registration
 
     @Test
-    func registersCommandsMenusAndFileSystems() throws {
+    internal func registersCommandsMenusAndFileSystems() throws {
         let net = try #require(bench.kernel.menus.menus.first { $0.title == "Net" })
         #expect(
             net.items == [
@@ -131,7 +131,7 @@ struct NetworkPluginCommands {
     // MARK: Connecting and disconnecting
 
     @Test
-    func quickConnectShowsTheServerAndDisconnectReturns() {
+    internal func quickConnectShowsTheServerAndDisconnectReturns() {
         quickConnect()
         #expect(left.model.directory == url("/") && left.names == ["pub", "readme.txt"])
         #expect(left.model.volume?.isLocal == false)
@@ -154,7 +154,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func disconnectCanSaveTheQuickConnection() throws {
+    internal func disconnectCanSaveTheQuickConnection() throws {
         quickConnect("ftp://\(address)/pub")
         #expect(left.model.directory == url("/pub"))
         // Yes opens the connection details, filled in from the session.
@@ -173,7 +173,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func aFailedConnectionIsReportedAndLeavesThePanel() {
+    internal func aFailedConnectionIsReportedAndLeavesThePanel() {
         server.stop()
         quickConnect()
         #expect(left.model.directory == box.url("local"))
@@ -183,7 +183,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func savedConnectionsKeepTheirPasswordInThePasswordStore() throws {
+    internal func savedConnectionsKeepTheirPasswordInThePasswordStore() throws {
         server.options.user = "anna"
         server.options.password = "s3cret-pw"
         // Ctrl+F: New Connection…, fill in the details, then Connect on the new entry.
@@ -245,7 +245,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func asksForAPasswordThatIsNotStored() {
+    internal func asksForAPasswordThatIsNotStored() {
         server.options.user = "anna"
         server.options.password = "pw"
         // Not anonymous and no user in the address: user name and password are asked while connecting.
@@ -270,7 +270,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func aTypedURLConnectsByItself() {
+    internal func aTypedURLConnectsByItself() {
         // `cd ftp://…` (spec 11 › Opening connections by command).
         // Nobody chose this server in a dialog of the program, so the user is asked first. (Answered
         // here without the dialog: the test's panel reads on the main thread, where the dialog
@@ -289,7 +289,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func anAddressTheUserTypedInPersonIsNotAskedAbout() throws {
+    internal func anAddressTheUserTypedInPersonIsNotAskedAbout() throws {
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var asked: [ServerKey] = []
         plugin.center.environment.askToConnect = { profile in
@@ -310,7 +310,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func theQuestionsBeforeConnecting() {
+    internal func theQuestionsBeforeConnecting() {
         let environment = plugin.center.environment
         var profile = ConnectionProfile(key: key, anonymous: true)
         profile.asksBeforeConnecting = true
@@ -338,7 +338,7 @@ struct NetworkPluginCommands {
     // MARK: File operations on the server
 
     @Test
-    func downloadsWithTheCopyJob() {
+    internal func downloadsWithTheCopyJob() {
         quickConnect("ftp://\(address)/pub")
         right.show(box.url("other"))
         // One file, then a folder with what is in it. The target is written as a `file:` URL:
@@ -356,7 +356,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func uploadsRenamesAndDeletesWithTheUsualCommands() throws {
+    internal func uploadsRenamesAndDeletesWithTheUsualCommands() throws {
         quickConnect("ftp://\(address)/pub")
         bench.panelSet.source = right
         right.show(box.url("local"))
@@ -400,7 +400,7 @@ struct NetworkPluginCommands {
     }
 
     @Test
-    func movesBetweenServerAndDisk() {
+    internal func movesBetweenServerAndDisk() {
         quickConnect("ftp://\(address)/pub")
         left.moveCursor(toName: "report.txt")
         ui.promptAnswers = [.text(localTarget)]
@@ -417,7 +417,7 @@ struct NetworkPluginCommands {
     // MARK: Options
 
     @Test
-    func hiddenFilesAndTransferMode() throws {
+    internal func hiddenFilesAndTransferMode() throws {
         try box.file("srv/.secret", "s")
         quickConnect()
         #expect(left.names == ["pub", "readme.txt"] && !commands.isChecked(.ftpHiddenFiles))
@@ -444,7 +444,7 @@ struct NetworkPluginCommands {
     // MARK: Download list
 
     @Test
-    func downloadListIsWrittenAndWorkedThrough() throws {
+    internal func downloadListIsWrittenAndWorkedThrough() throws {
         quickConnect("ftp://\(address)/pub")
         let list = box.url("list.txt")
         left.moveCursor(toName: "report.txt")
@@ -472,7 +472,7 @@ struct NetworkPluginCommands {
     // MARK: Network volumes
 
     @Test
-    func connectToServerMountsAndEjects() throws {
+    internal func connectToServerMountsAndEjects() throws {
         let volume = try box.folder("Volumes/Share")
         mounter.mountPoint = volume
         ui.promptAnswers = [.text("smb://nas.local/Share")]

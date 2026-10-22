@@ -6,17 +6,17 @@ import Foundation
 ///
 /// The shell does the real parsing; this only finds out how the line is to be started. A value
 /// without state: usable from any thread.
-struct TypedCommand: Equatable {
+internal struct TypedCommand: Equatable {
     /// The line without surrounding blanks and without a trailing `&`.
-    let command: String
+    internal let command: String
     /// A trailing `&`: the command is started and left alone, its output is not collected.
-    let isDetached: Bool
+    internal let isDetached: Bool
     /// The first word with quotes and backslash escapes resolved: the program to start.
-    let firstWord: String
+    internal let firstWord: String
     /// What follows the first word, as typed.
-    let arguments: String
+    internal let arguments: String
 
-    init?(_ line: String) {
+    internal init?(_ line: String) {
         var text = line.trimmingCharacters(in: .whitespacesAndNewlines)
         // `&&` at the end is an unfinished line, not a request to run in the background.
         let detached = text.hasSuffix("&") && !text.hasSuffix("&&")
@@ -31,7 +31,7 @@ struct TypedCommand: Equatable {
 
     /// The first word as a shell would read it (quotes group, a backslash keeps the next
     /// character), and what follows it.
-    static func split(_ text: String) -> (word: String, rest: String) {
+    internal static func split(_ text: String) -> (word: String, rest: String) {
         var word = ""
         var quote: Character?
         var escaped = false
@@ -58,7 +58,7 @@ struct TypedCommand: Equatable {
     }
 
     /// A path as typed (`~/x`, `/x`, `x/y`) as a location; relative paths start at `directory`.
-    static func location(of path: String, relativeTo directory: URL) -> URL {
+    internal static func location(of path: String, relativeTo directory: URL) -> URL {
         let expanded = NSString(string: path).expandingTildeInPath
         return (expanded.hasPrefix("/") ? URL(fileURLWithPath: expanded) : directory.appendingPathComponent(expanded))
             .standardizedFileURL
@@ -73,7 +73,7 @@ struct TypedCommand: Equatable {
     /// name that lies in the panel's folder (a downloaded folder, a memory stick) is opened
     /// only when no installed one has the name, or when it is asked for by path (`./Preview.app`).
     /// `path` is the PATH that decides whether a bare name is a program instead.
-    func application(
+    internal func application(
         relativeTo directory: URL,
         searching folders: [URL] = Self.applicationFolders,
         path: String = Self.processPath
@@ -105,7 +105,7 @@ struct TypedCommand: Equatable {
     }
 
     /// Whether an executable file of that name is in a folder of the PATH.
-    static func isOnPath(_ name: String, path: String = Self.processPath) -> Bool {
+    internal static func isOnPath(_ name: String, path: String = Self.processPath) -> Bool {
         path.split(separator: ":").contains { FileManager.default.isExecutableFile(atPath: $0 + "/" + name) }
     }
 
@@ -113,14 +113,14 @@ struct TypedCommand: Equatable {
     ///
     /// A program started from the Dock has a short one; the PATH of a terminal is
     /// `LoginShell.searchPath`.
-    static var processPath: String { path(in: ProcessInfo.processInfo.environment) }
+    internal static var processPath: String { path(in: ProcessInfo.processInfo.environment) }
 
     /// The PATH of `environment`; the system's usual one without.
-    static func path(in environment: [String: String]) -> String {
+    internal static func path(in environment: [String: String]) -> String {
         environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
     }
 
-    static let applicationFolders: [URL] = [
+    internal static let applicationFolders: [URL] = [
         URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/System/Applications"),
         URL(fileURLWithPath: "/System/Applications/Utilities"), URL(fileURLWithPath: "/Applications/Utilities"),
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
@@ -128,15 +128,15 @@ struct TypedCommand: Equatable {
 }
 
 /// What became of a child process.
-struct ProcessOutcome {
+internal struct ProcessOutcome {
     /// Standard output and standard error in the order they were written.
-    var output = ""
-    var status: Int32 = 0
+    internal var output = ""
+    internal var status: Int32 = 0
     /// More was written than is kept.
-    var isTruncated = false
-    var wasCancelled = false
+    internal var isTruncated = false
+    internal var wasCancelled = false
     /// Set when the process could not be started at all.
-    var failure: String?
+    internal var failure: String?
 }
 
 /// Runs a child process to its end and collects what it writes.
@@ -145,18 +145,18 @@ struct ProcessOutcome {
 /// child's output arrives on a queue of the system and is kept behind a lock; the pipe is
 /// emptied while the child runs, so a child that writes a lot never waits for a full pipe.
 /// Cancelling asks the child to end (SIGTERM) and, if it does not listen, ends it (SIGKILL).
-struct ProcessRunner {
+internal struct ProcessRunner {
     /// The most output that is kept; a command that prints without end must not fill memory.
-    static let outputLimit = 8 * 1_024 * 1_024
+    internal static let outputLimit = 8 * 1_024 * 1_024
 
-    let executable: URL
-    let arguments: [String]
-    let directory: URL?
+    internal let executable: URL
+    internal let arguments: [String]
+    internal let directory: URL?
     /// Without, nothing is read: the child writes into the void and is not waited for longer
     /// than it takes the shell to start it.
-    var collectsOutput = true
+    internal var collectsOutput = true
     /// The child's environment; this program's unless told otherwise.
-    var environment = ProcessInfo.processInfo.environment
+    internal var environment = ProcessInfo.processInfo.environment
 
     /// All state is guarded by `lock`.
     private final class Buffer: @unchecked Sendable {
@@ -187,7 +187,7 @@ struct ProcessRunner {
     }
 
     /// `progress` is told now and then how many bytes have arrived.
-    func run(cancellation: CancellationFlag, progress: (Int) -> Void = { _ in }) -> ProcessOutcome {
+    internal func run(cancellation: CancellationFlag, progress: (Int) -> Void = { _ in }) -> ProcessOutcome {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -255,22 +255,22 @@ struct ProcessRunner {
 }
 
 /// The lines the user ran, newest first (spec 02 › Limits and persistence: 20 entries).
-struct CommandHistory {
-    static let limit = 20
-    static let key = "history"
+internal struct CommandHistory {
+    internal static let limit = 20
+    internal static let key = "history"
 
-    static func load(from settings: any SettingsStore) -> [String] {
+    internal static func load(from settings: any SettingsStore) -> [String] {
         settings.value([String].self, forKey: key) ?? []
     }
 
     /// A line typed with a blank in front is not remembered, as in a shell: the way to run
     /// something with a password in it without leaving it in the settings.
-    static func isPrivate(_ line: String) -> Bool {
+    internal static func isPrivate(_ line: String) -> Bool {
         line.unicodeScalars.first == " " || line.unicodeScalars.first == "\t"
     }
 
     /// Puts `line` first; an earlier occurrence of the same line goes.
-    static func adding(_ line: String, to history: [String]) -> [String] {
+    internal static func adding(_ line: String, to history: [String]) -> [String] {
         Array(([line] + history.filter { $0 != line }).prefix(limit))
     }
 }

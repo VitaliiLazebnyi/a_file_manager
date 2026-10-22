@@ -28,22 +28,22 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
 /// The Net commands (review 2: N003, N016, N017, N018, N020, N033, N083, N084, N086, N100, N104, N105).
 @MainActor
 @Suite
-struct Review2NetworkCommands {
-    let box: Sandbox
-    let server: TestFTPServer
-    let passwords = MemoryPasswords()
-    let settings = MemorySettings()
-    let plugin: NetworkPlugin
-    let bench: TestBench
+internal struct Review2NetworkCommands {
+    internal let box: Sandbox
+    internal let server: TestFTPServer
+    internal let passwords = MemoryPasswords()
+    internal let settings = MemorySettings()
+    internal let plugin: NetworkPlugin
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.interaction }
-    var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
-    var address: String { "127.0.0.1:\(server.port)" }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
+    internal var address: String { "127.0.0.1:\(server.port)" }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("srv/pub/report.txt", "report")
         try box.file("srv/readme.txt", "read me")
@@ -62,9 +62,9 @@ struct Review2NetworkCommands {
         plugin.center.environment.declineMemory = 0
     }
 
-    func url(_ path: String) -> URL { key.url(path: path) }
+    internal func url(_ path: String) -> URL { key.url(path: path) }
 
-    func quickConnect(_ text: String) {
+    internal func quickConnect(_ text: String) {
         ui.formAnswers = [.values(["address": .text(text), "anonymous": .flag(true)])]
         commands.perform(.ftpNew)
     }
@@ -79,7 +79,7 @@ struct Review2NetworkCommands {
     // MARK: Download list
 
     @Test
-    func aListIsShownBeforeItRunsAndNothingHappensWithoutAYes() throws {
+    internal func aListIsShownBeforeItRunsAndNothingHappensWithoutAYes() throws {
         quickConnect("ftp://\(address)/pub")
         // The last button, Cancel.
         try runList(
@@ -101,7 +101,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func anExistingFileIsNotReplacedWithoutAsking() throws {
+    internal func anExistingFileIsNotReplacedWithoutAsking() throws {
         quickConnect("ftp://\(address)/pub")
         // The list wants the download to take the name of a file that is already there.
         let precious = try box.file("other/precious.txt", "mine")
@@ -116,7 +116,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func aPlainLineOnlyDownloads() throws {
+    internal func aPlainLineOnlyDownloads() throws {
         quickConnect("ftp://\(address)/pub")
         // No `put:`: a plain line that would send a file of this Mac away, or copy between
         // two local places, is not carried out.
@@ -137,7 +137,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func aListOfLinesThatCannotBeCarriedOutIsToldInShort() throws {
+    internal func aListOfLinesThatCannotBeCarriedOutIsToldInShort() throws {
         // Very many lines that are no transfers: one message, and no call inside a call for each.
         let lines = (0..<30_000).map { "header: X-\($0): y" }
         try runList(lines, answers: [])
@@ -152,7 +152,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func aNameWithALineBreakIsNotAddedToAList() throws {
+    internal func aNameWithALineBreakIsNotAddedToAList() throws {
         // A server offers a file whose name would read as two lines of a list.
         try box.file("srv/pub/payload\u{2028}move:~x -> ftp:~~evil~k", "p")
         quickConnect("ftp://\(address)/pub")
@@ -176,7 +176,7 @@ struct Review2NetworkCommands {
     // MARK: Secrets
 
     @Test
-    func theQuickConnectPasswordIsKeptOnlyWhenTheBoxStaysTicked() throws {
+    internal func theQuickConnectPasswordIsKeptOnlyWhenTheBoxStaysTicked() throws {
         server.options.user = "anna"
         server.options.password = "s3cret-pw"
         for (keeps, name) in [(false, "No password"), (true, "With password")] {
@@ -197,7 +197,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func aPasswordBelongsToItsServerAndUser() {
+    internal func aPasswordBelongsToItsServerAndUser() {
         let store = ConnectionStore(settings: MemorySettings(), passwords: passwords)
         var connection = SavedConnection()
         (connection.name, connection.host, connection.user) = ("Work", "files.example.com", "anna")
@@ -240,7 +240,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func passwordsOfAnEarlierVersionAreMovedOnce() {
+    internal func passwordsOfAnEarlierVersionAreMovedOnce() {
         var connection = SavedConnection()
         (connection.name, connection.host, connection.user) = ("Old", "files.example.com", "anna")
         let settings = MemorySettings()
@@ -264,7 +264,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func certificatesInTheSettingsAreNotBelieved() {
+    internal func certificatesInTheSettingsAreNotBelieved() {
         // A settings file that came with a fingerprint for a server: it is not trusted, and it is removed.
         let settings = MemorySettings()
         settings.set(["files.example.com": ["AA:BB"]], forKey: "network.trustedCertificates")
@@ -305,7 +305,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func theDialogForAChangedCertificateNeedsMoreThanAButton() throws {
+    internal func theDialogForAChangedCertificateNeedsMoreThanAButton() throws {
         let environment = plugin.center.environment
         let profile = ConnectionProfile(key: ServerKey(scheme: "ftps", host: "files.example.com"))
         let old = CertificateInfo(fingerprint: "AA:BB", subject: "files", problem: "self-signed")
@@ -334,7 +334,7 @@ struct Review2NetworkCommands {
     }
 
     @Test
-    func noMessageShowsAPassword() {
+    internal func noMessageShowsAPassword() {
         // A mount that fails, and an address that is none.
         commands.perform(.netConnect, .text("smb://anna:s3cret-pw@nas.invalid/share"))
         commands.perform(.netConnect, .text("gopher://anna:s3cret-pw@old.invalid/x"))

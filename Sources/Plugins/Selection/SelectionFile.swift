@@ -6,15 +6,15 @@ import Foundation
 /// the last.
 ///
 /// Pure functions, usable on any thread.
-enum SelectionFile {
-    enum Encoding {
+internal enum SelectionFile {
+    internal enum Encoding {
         /// UTF-16 LE with a byte-order mark (`cm_SaveSelectionToFileW`, and the default).
         case unicode
         /// Windows-1252 (`cm_SaveSelectionToFileA`); characters outside it are approximated.
         case ansi
     }
 
-    static func encode(_ items: [FileItem], as encoding: Encoding) -> Data {
+    internal static func encode(_ items: [FileItem], as encoding: Encoding) -> Data {
         let text = items.map { $0.isFolder ? $0.name + "\\" : $0.name }.joined(separator: "\r\n")
         switch encoding {
         case .unicode:
@@ -30,7 +30,7 @@ enum SelectionFile {
     /// A character outside it is written as its base letter where it has one (`ą` as `a`), else as
     /// `?`. Foundation's lossy conversion of the whole text is not used: for some names (`U+3000
     /// U+0300`) it raises an exception that nothing catches.
-    static func windows1252(_ text: String) -> Data {
+    internal static func windows1252(_ text: String) -> Data {
         var bytes: [UInt8] = []
         bytes.reserveCapacity(text.utf8.count)
         var known: [UInt32: UInt8] = [:]
@@ -59,7 +59,7 @@ enum SelectionFile {
 
     /// The text of a selection file: UTF-16 or UTF-8 by its byte-order mark, else UTF-8 when
     /// the bytes are valid UTF-8, else Windows-1252.
-    static func text(from data: Data) -> String {
+    internal static func text(from data: Data) -> String {
         if data.starts(with: [0xFF, 0xFE]) {
             return String(data: data.dropFirst(2), encoding: .utf16LittleEndian) ?? ""
         }
@@ -76,13 +76,13 @@ enum SelectionFile {
     ///
     /// A line may be a name, a folder's name with a trailing `\` or `/`, or a full path, of which
     /// the last part counts: so the lists of *Copy Names To Clipboard* can be loaded as well.
-    static func names(in text: String, among known: Set<String>) -> Set<String> {
+    internal static func names(in text: String, among known: Set<String>) -> Set<String> {
         Set(listed(in: text, among: known))
     }
 
     /// The same in the order of the lines, each as the text writes it: a name that reads like
     /// two entries' names still finds the one written exactly like it (`PanelModel.setSelection(names:)`).
-    static func listed(in text: String, among known: Set<String>) -> [String] {
+    internal static func listed(in text: String, among known: Set<String>) -> [String] {
         var names: [String] = []
         for line in text.split(whereSeparator: \.isNewline) {
             var name = String(line)
@@ -104,17 +104,17 @@ enum SelectionFile {
 /// treats `é` and `e` + U+0301 as one name).
 ///
 /// Hashing and comparing go over the UTF-8 in place.
-struct NameBytes: Hashable {
-    let name: String
+internal struct NameBytes: Hashable {
+    internal let name: String
 
-    init(_ name: String) {
+    internal init(_ name: String) {
         var name = name
         // Nearly every name is in one piece of UTF-8 already; then this does nothing.
         name.makeContiguousUTF8()
         self.name = name
     }
 
-    static func == (a: Self, b: Self) -> Bool {
+    internal static func == (a: Self, b: Self) -> Bool {
         // The copies share the names' storage, which is one piece of UTF-8 already (`init`).
         var (first, second) = (a.name, b.name)
         return first.withUTF8 { one in
@@ -125,7 +125,7 @@ struct NameBytes: Hashable {
         }
     }
 
-    func hash(into hasher: inout Hasher) {
+    internal func hash(into hasher: inout Hasher) {
         var name = name
         name.withUTF8 { hasher.combine(bytes: UnsafeRawBufferPointer($0)) }
     }
@@ -135,8 +135,8 @@ struct NameBytes: Hashable {
 /// entries of two lists differ.
 ///
 /// Works on the lists the panels hold; pure, any thread.
-enum DirectoryComparison {
-    enum Mode: Int {
+internal enum DirectoryComparison {
+    internal enum Mode: Int {
         /// Missing on the other side, newer, or of another size at the same time
         /// (`cm_CompareDirs 0`).
         case newerOrDifferent = 0
@@ -150,35 +150,37 @@ enum DirectoryComparison {
 
     /// The entries to mark on each side, by name in list order: two entries whose names differ
     /// only in Unicode normalisation are two marks. `left`, `right` and `same` read them as sets.
-    struct Marks: Equatable {
-        var leftNames: [String] = []
-        var rightNames: [String] = []
+    internal struct Marks: Equatable {
+        internal var leftNames: [String] = []
+        internal var rightNames: [String] = []
         /// Present on both sides and the same: files of equal size and time, and folders.
-        var sameNames: [String] = []
+        internal var sameNames: [String] = []
 
-        init() {}
-        init(left: Set<String>, right: Set<String>, same: Set<String>) {
+        internal init() {}
+        internal init(left: Set<String>, right: Set<String>, same: Set<String>) {
             (leftNames, rightNames, sameNames) = (Array(left), Array(right), Array(same))
         }
 
-        var left: Set<String> { Set(leftNames) }
-        var right: Set<String> { Set(rightNames) }
-        var same: Set<String> { Set(sameNames) }
+        internal var left: Set<String> { Set(leftNames) }
+        internal var right: Set<String> { Set(rightNames) }
+        internal var same: Set<String> { Set(sameNames) }
 
-        static func == (a: Self, b: Self) -> Bool { a.left == b.left && a.right == b.right && a.same == b.same }
+        internal static func == (a: Self, b: Self) -> Bool {
+            a.left == b.left && a.right == b.right && a.same == b.same
+        }
     }
 
     /// The same as places in the two lists that were compared.
-    struct IndexMarks {
-        var left: [Int] = []
-        var right: [Int] = []
+    internal struct IndexMarks {
+        internal var left: [Int] = []
+        internal var right: [Int] = []
         /// The entries (of the left and of the right list) that are the same on both sides, in
         /// pairs: `sameLeft[i]` and `sameRight[i]` are the two of one pair.
-        var sameLeft: [Int] = []
-        var sameRight: [Int] = []
+        internal var sameLeft: [Int] = []
+        internal var sameRight: [Int] = []
     }
 
-    static func compare(
+    internal static func compare(
         left: [FileItem],
         right: [FileItem],
         mode: Mode = .newer,
@@ -212,7 +214,7 @@ enum DirectoryComparison {
     /// does not tell `Photo.JPG` from `photo.jpg`) names are paired without regard to case.
     /// `cancelled` is looked at every few thousand entries; a cancelled comparison returns what it
     /// had.
-    static func compareIndices(
+    internal static func compareIndices(
         left: [FileItem],
         right: [FileItem],
         mode: Mode = .newer,

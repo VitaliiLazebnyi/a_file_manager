@@ -11,12 +11,12 @@ import AppKit
 /// (`onDismiss`). Main thread only; the pane does its reading in the background and drops the
 /// load of the item before when the cursor moves on.
 @MainActor
-final class QuickViewPanel {
-    let pane: ViewerPane
+internal final class QuickViewPanel {
+    internal let pane: ViewerPane
     /// The panel whose list is covered.
-    private(set) weak var covered: any PanelHandle?
+    internal private(set) weak var covered: any PanelHandle?
     /// The panel whose cursor is followed.
-    private(set) weak var followed: any PanelHandle?
+    internal private(set) weak var followed: any PanelHandle?
     private weak var host: any PanelOverlayHost?
     private let container = NSView()
     private let header = NSTextField(labelWithString: "")
@@ -24,11 +24,11 @@ final class QuickViewPanel {
     private var subscription: AnyObject?
     private let kernel: Kernel
     /// What the bar above the pane says.
-    private(set) var headerText = "" { didSet { header.stringValue = headerText } }
+    internal private(set) var headerText = "" { didSet { header.stringValue = headerText } }
     /// The item that is shown, as the followed panel lists it.
-    private(set) var shownItem: FileItem?
+    internal private(set) var shownItem: FileItem?
 
-    init(
+    internal init(
         kernel: Kernel,
         settings: ListerSettings,
         temporaryCopies: TemporaryCopies,
@@ -103,12 +103,12 @@ final class QuickViewPanel {
     }
 
     /// Reads the shown item again (`cm_UpdateQuickView`).
-    func refresh() { follower?.refresh() }
+    internal func refresh() { follower?.refresh() }
 
     /// Brings the file list back.
     ///
     /// Safe to call more than once.
-    func remove() {
+    internal func remove() {
         follower = nil
         subscription = nil
         pane.stopWork()

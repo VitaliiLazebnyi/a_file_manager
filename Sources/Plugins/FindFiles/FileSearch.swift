@@ -10,13 +10,13 @@ public import Foundation
 /// case. Unchecked: immutable, and `NSRegularExpression` may match on several threads at once.
 public struct SearchMask: @unchecked Sendable {
     /// The masks in wildcard form (`*` and `?` only), lowercased.
-    let include: [String]
-    let exclude: [String]
+    internal let include: [String]
+    internal let exclude: [String]
     private let includeCharacters: [[Character]]
     private let excludeCharacters: [[Character]]
     private let expression: NSRegularExpression?
     /// Counts the names a regular expression ran out of time on.
-    let trip = RegexTrip()
+    internal let trip = RegexTrip()
     /// False when the field was to be a regular expression and is not one; nothing matches then.
     public let isValid: Bool
 
@@ -76,7 +76,7 @@ public struct SearchMask: @unchecked Sendable {
     /// `cancelled` ends a regular expression that is still working on a name.
     ///
     /// A name the expression takes too long for does not match.
-    func matches(_ name: String, cancelled: () -> Bool) -> Bool {
+    internal func matches(_ name: String, cancelled: () -> Bool) -> Bool {
         guard isValid else {
             return false
         }
@@ -92,7 +92,7 @@ public struct SearchMask: @unchecked Sendable {
     /// `*` and `?` as file masks use them, character by character (so a composed and a
     /// decomposed `é` are the same, and `[` is just a bracket). `*.*` matches every name;
     /// `name.*` and `name.` also match `name` without an extension, as under DOS.
-    static func wildcard(_ pattern: [Character], _ name: [Character]) -> Bool {
+    internal static func wildcard(_ pattern: [Character], _ name: [Character]) -> Bool {
         if pattern.count == 3, pattern == ["*", ".", "*"] {
             return true
         }
@@ -246,16 +246,16 @@ public final class FileSearch: @unchecked Sendable {
     private var limitReached = false
 
     /// File names that may be archives; only these are offered to the file systems.
-    static let archiveExtensions: Set<String> = [
+    internal static let archiveExtensions: Set<String> = [
         "zip", "jar", "tar", "gz", "tgz", "bz2", "tbz", "xz", "txz", "7z", "rar", "cab", "lzh", "arj"
     ]
 
     /// The listed but not yet reported entries that hold back the listing of further folders.
-    static let candidateBudget = 200_000
+    internal static let candidateBudget = 200_000
     /// The budget this search works to; tests make it small.
-    let budget: Int
+    internal let budget: Int
     /// The files a duplicate search collects before it stops and says so.
-    static let duplicateCandidateLimit = 3_000_000
+    internal static let duplicateCandidateLimit = 3_000_000
 
     public convenience init(
         _ query: SearchQuery,
@@ -267,24 +267,24 @@ public final class FileSearch: @unchecked Sendable {
     }
 
     /// What tests make small.
-    struct Tuning {
-        var budget = FileSearch.candidateBudget
-        var partialListingAfter = FileSearch.defaultPartialListingAfter
+    internal struct Tuning {
+        internal var budget = FileSearch.candidateBudget
+        internal var partialListingAfter = FileSearch.defaultPartialListingAfter
         /// How many threads list folders and test files: one walks in a fixed order.
-        var threads = FileSearch.threadCount
+        internal var threads = FileSearch.threadCount
         /// What tells that two locations are one folder: the device and file number of a local
         /// one, nil for others (which are never taken for each other).
-        var identity: @Sendable (URL) -> FileIdentity? = { FileIdentity.of($0)?.identity }
+        internal var identity: @Sendable (URL) -> FileIdentity? = { FileIdentity.of($0)?.identity }
     }
 
     /// The threads of a search: all cores, and at least four for a slow disk or server.
-    static let threadCount = max(4, ProcessInfo.processInfo.activeProcessorCount)
+    internal static let threadCount = max(4, ProcessInfo.processInfo.activeProcessorCount)
     /// See `Tuning`.
-    let threads: Int
+    internal let threads: Int
     /// See `Tuning`.
-    let folderIdentity: @Sendable (URL) -> FileIdentity?
+    internal let folderIdentity: @Sendable (URL) -> FileIdentity?
 
-    init(
+    internal init(
         _ query: SearchQuery,
         fileSystems: FileSystemRegistry,
         columns: ColumnRegistry? = nil,
@@ -445,7 +445,7 @@ public final class FileSearch: @unchecked Sendable {
 
     /// A place by its location, with the host in lower case and no trailing slash: two ways of
     /// writing the same remote place (`sftp://HOST/a`, `sftp://host/a/`) are one key.
-    static func locationKey(of url: URL) -> String {
+    internal static func locationKey(of url: URL) -> String {
         var key = url.locationKey
         if let host = url.host, !host.isEmpty, let range = key.range(of: "://" + host) {
             key.replaceSubrange(range, with: "://" + host.lowercased())
@@ -455,9 +455,9 @@ public final class FileSearch: @unchecked Sendable {
 
     /// From this many entries seen in one folder on, what has passed the quick checks is
     /// reported in parts while the listing goes on (each part in name order).
-    static let defaultPartialListingAfter = 100_000
+    internal static let defaultPartialListingAfter = 100_000
     /// Tests make it small.
-    let partialListingAfter: Int
+    internal let partialListingAfter: Int
 
     /// Runs the search and returns the files that are duplicates of each other, in groups
     /// (spec 09 › Duplicate finder); empty when the search was cancelled.

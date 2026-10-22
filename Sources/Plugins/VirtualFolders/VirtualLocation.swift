@@ -91,7 +91,7 @@ public enum VirtualLocation: Equatable {
         return components.url!
     }
 
-    var isList: Bool {
+    internal var isList: Bool {
         if case .list = self {
             return true
         }
@@ -110,7 +110,7 @@ public enum VirtualLocation: Equatable {
     }
 
     /// A title cannot hold a path separator, because it is one component of the URL's path.
-    static func pathComponent(_ title: String) -> String {
+    internal static func pathComponent(_ title: String) -> String {
         let cleaned = title.replacingOccurrences(of: "/", with: ":").trimmingCharacters(in: .whitespaces)
         return cleaned.isEmpty || cleaned == "." || cleaned == ".." ? "List" : cleaned
     }
@@ -150,7 +150,7 @@ public enum VirtualLocation: Equatable {
 
     /// A path without `.` and `..` components and empty ones, resolved on the text alone; it
     /// starts with a slash.
-    static func plain(_ path: String) -> String {
+    internal static func plain(_ path: String) -> String {
         var kept: [String] = []
         // By scalars: a slash followed by a combining mark is not a separator to `Character`.
         for scalars in path.unicodeScalars.split(separator: "/", omittingEmptySubsequences: true) {

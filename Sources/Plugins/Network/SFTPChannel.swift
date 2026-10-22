@@ -22,8 +22,8 @@ public struct SFTPError: LocalizedError, Sendable {
     public let code: UInt32
     public let message: String
 
-    static let endOfFile: UInt32 = 1
-    static let noSuchFile: UInt32 = 2
+    internal static let endOfFile: UInt32 = 1
+    internal static let noSuchFile: UInt32 = 2
 
     public var errorDescription: String? {
         if !message.isEmpty, message != "Failure" {
@@ -46,18 +46,18 @@ public struct SFTPError: LocalizedError, Sendable {
 }
 
 /// The attributes SFTP sends with a name (draft-ietf-secsh-filexfer-02 › File Attributes).
-struct SFTPAttributes {
-    var size: UInt64?
-    var permissions: UInt32?
-    var modified: UInt32?
+internal struct SFTPAttributes {
+    internal var size: UInt64?
+    internal var permissions: UInt32?
+    internal var modified: UInt32?
 
-    var isDirectory: Bool { (permissions ?? 0) & 0o170000 == 0o040000 }
-    var isSymlink: Bool { (permissions ?? 0) & 0o170000 == 0o120000 }
+    internal var isDirectory: Bool { (permissions ?? 0) & 0o170000 == 0o040000 }
+    internal var isSymlink: Bool { (permissions ?? 0) & 0o170000 == 0o120000 }
 
     /// A device, a pipe or a socket.
-    var isSpecial: Bool { [0o010000, 0o020000, 0o060000, 0o140000].contains((permissions ?? 0) & 0o170000) }
+    internal var isSpecial: Bool { [0o010000, 0o020000, 0o060000, 0o140000].contains((permissions ?? 0) & 0o170000) }
 
-    func entry(named name: String) -> RemoteEntry {
+    internal func entry(named name: String) -> RemoteEntry {
         var entry = RemoteEntry(
             name: name,
             isDirectory: isDirectory,
@@ -72,29 +72,29 @@ struct SFTPAttributes {
 }
 
 /// Builds the body of a packet: big-endian numbers and length-prefixed strings.
-struct SFTPEncoder {
-    private(set) var data = Data()
+internal struct SFTPEncoder {
+    internal private(set) var data = Data()
     /// The names of the server that are written back as they came (see `NameMemory`).
-    var names: NameMemory?
+    internal var names: NameMemory?
 
-    mutating func u8(_ value: UInt8) { data.append(value) }
-    mutating func u32(_ value: UInt32) { withUnsafeBytes(of: value.bigEndian) { data.append(contentsOf: $0) } }
-    mutating func u64(_ value: UInt64) { withUnsafeBytes(of: value.bigEndian) { data.append(contentsOf: $0) } }
+    internal mutating func u8(_ value: UInt8) { data.append(value) }
+    internal mutating func u32(_ value: UInt32) { withUnsafeBytes(of: value.bigEndian) { data.append(contentsOf: $0) } }
+    internal mutating func u64(_ value: UInt64) { withUnsafeBytes(of: value.bigEndian) { data.append(contentsOf: $0) } }
 
-    mutating func bytes(_ value: Data) {
+    internal mutating func bytes(_ value: Data) {
         u32(UInt32(value.count))
         data.append(value)
     }
 
     /// Starts a packet: the length, filled in by `finishPacket`, the type and the request number.
-    mutating func beginPacket(_ type: UInt8, id: UInt32? = nil) {
+    internal mutating func beginPacket(_ type: UInt8, id: UInt32? = nil) {
         u32(0)
         u8(type)
         if let id { u32(id) }
     }
 
     /// Writes the length at the front, now that the packet is complete.
-    mutating func finishPacket() {
+    internal mutating func finishPacket() {
         let length = UInt32(data.count - 4).bigEndian
         withUnsafeBytes(of: length) { data.replaceSubrange(0..<4, with: $0) }
     }
@@ -102,7 +102,7 @@ struct SFTPEncoder {
     /// Names travel as composed UTF-8, which is what servers store, except the names the
     /// server itself spelled another way (decomposed, or not UTF-8 at all): those go back as
     /// the bytes they came as, or they would not name the same file.
-    mutating func string(_ value: String) {
+    internal mutating func string(_ value: String) {
         guard let names, !names.isEmpty else {
             bytes(Data(value.precomposedStringWithCanonicalMapping.utf8))
             return
@@ -122,7 +122,7 @@ struct SFTPEncoder {
         bytes(result)
     }
 
-    mutating func attributes(_ value: SFTPAttributes = SFTPAttributes()) {
+    internal mutating func attributes(_ value: SFTPAttributes = SFTPAttributes()) {
         u32((value.size != nil ? 1 : 0) | (value.permissions != nil ? 4 : 0) | (value.modified != nil ? 8 : 0))
         if let size = value.size { u64(size) }
         if let permissions = value.permissions { u32(permissions) }
@@ -137,11 +137,11 @@ struct SFTPEncoder {
 /// Reads the body of a packet.
 ///
 /// Everything comes from the server, so every step is checked.
-struct SFTPDecoder {
+internal struct SFTPDecoder {
     private let data: Data
     private var offset: Int
 
-    init(_ data: Data) {
+    internal init(_ data: Data) {
         self.data = data
         offset = data.startIndex
     }
@@ -154,21 +154,21 @@ struct SFTPDecoder {
         return data[offset..<offset + count]
     }
 
-    mutating func u8() throws -> UInt8 {
+    internal mutating func u8() throws -> UInt8 {
         let byte = try take(1)
         return byte[byte.startIndex]
     }
-    mutating func u32() throws -> UInt32 { try take(4).reduce(UInt32(0)) { $0 << 8 | UInt32($1) } }
-    mutating func u64() throws -> UInt64 { try take(8).reduce(UInt64(0)) { $0 << 8 | UInt64($1) } }
-    mutating func bytes() throws -> Data { try take(Int(try u32())) }
-    mutating func string() throws -> String { String(decoding: try bytes(), as: UTF8.self) }
+    internal mutating func u32() throws -> UInt32 { try take(4).reduce(UInt32(0)) { $0 << 8 | UInt32($1) } }
+    internal mutating func u64() throws -> UInt64 { try take(8).reduce(UInt64(0)) { $0 << 8 | UInt64($1) } }
+    internal mutating func bytes() throws -> Data { try take(Int(try u32())) }
+    internal mutating func string() throws -> String { String(decoding: try bytes(), as: UTF8.self) }
 
     /// A file name, and the encoding that read it: UTF-8 where the bytes are UTF-8, else
     /// Latin 1, which reads any bytes and writes the same bytes back.
     ///
     /// Read as UTF-8 with replacement characters, such a name could never be sent to the server
     /// again.
-    mutating func name() throws -> (text: String, encoding: String.Encoding) {
+    internal mutating func name() throws -> (text: String, encoding: String.Encoding) {
         let raw = Data(try bytes())
         if let text = String(data: raw, encoding: .utf8) {
             return (text, .utf8)
@@ -178,9 +178,9 @@ struct SFTPDecoder {
         text.append(contentsOf: raw.map { Unicode.Scalar($0) })
         return (String(text), .isoLatin1)
     }
-    var isAtEnd: Bool { offset >= data.endIndex }
+    internal var isAtEnd: Bool { offset >= data.endIndex }
 
-    mutating func attributes() throws -> SFTPAttributes {
+    internal mutating func attributes() throws -> SFTPAttributes {
         let flags = try u32()
         var attributes = SFTPAttributes()
         if flags & 1 != 0 { attributes.size = try u64() }
@@ -198,8 +198,8 @@ struct SFTPDecoder {
 }
 
 /// One answer of the server: its type and what follows the request number.
-struct SFTPPacket {
-    enum Kind: UInt8 {
+internal struct SFTPPacket {
+    internal enum Kind: UInt8 {
         case version = 2
         case status = 101
         case handle = 102
@@ -211,11 +211,11 @@ struct SFTPPacket {
         case closed = 0
     }
 
-    let kind: Kind
-    let body: Data
+    internal let kind: Kind
+    internal let body: Data
 
     /// Throws unless the packet is the success status.
-    func checkStatus() throws {
+    internal func checkStatus() throws {
         if kind == .closed { throw NetworkError.connectionLost }
         guard kind == .status else { throw NetworkError.unexpected("SFTP packet \(kind.rawValue)") }
         var decoder = SFTPDecoder(body)
@@ -224,7 +224,7 @@ struct SFTPPacket {
     }
 
     /// The status code when this is a status packet.
-    var statusCode: UInt32? {
+    internal var statusCode: UInt32? {
         guard kind == .status else {
             return nil
         }
@@ -234,7 +234,7 @@ struct SFTPPacket {
 
     /// The payload of an answer of the expected kind, which is never a status: an error status
     /// is thrown, and so is a success where something else was expected.
-    func expect(_ wanted: Kind) throws -> SFTPDecoder {
+    internal func expect(_ wanted: Kind) throws -> SFTPDecoder {
         if kind == .closed { throw NetworkError.connectionLost }
         if kind == .status { try checkStatus() }
         guard kind == wanted else { throw NetworkError.unexpected("SFTP packet \(kind.rawValue)") }
@@ -243,7 +243,7 @@ struct SFTPPacket {
 }
 
 /// The request types of SFTP version 3.
-enum SFTPRequest: UInt8 {
+internal enum SFTPRequest: UInt8 {
     case open = 3
     case close = 4
     case read = 5
@@ -273,9 +273,9 @@ enum SFTPRequest: UInt8 {
 /// Every run of the script gives its question a number of its own and takes only the answer
 /// that carries it: an answer that was written for a script which ssh had ended meanwhile
 /// stays in the pipe, and must not answer the next question.
-final class AskpassHelper {
+internal final class AskpassHelper {
     /// What ssh wants from the helper (`SSH_ASKPASS_PROMPT`).
-    enum Kind: Equatable {
+    internal enum Kind: Equatable {
         /// A text to be typed: a password, a passphrase, or `yes` to a host key.
         case entry
         /// Yes or no (the touch of a security key to be allowed).
@@ -284,13 +284,13 @@ final class AskpassHelper {
         case notice
     }
 
-    struct Question: Equatable {
-        let id: String
-        let kind: Kind
-        let text: String
+    internal struct Question: Equatable {
+        internal let id: String
+        internal let kind: Kind
+        internal let text: String
     }
 
-    let directory: URL
+    internal let directory: URL
     private let question: Int32
     private let answer: Int32
     private let endMarker = "END-" + UUID().uuidString
@@ -300,7 +300,7 @@ final class AskpassHelper {
 
     /// The pipes and the script go into a new folder in `parent`, the temporary folder of the user
     /// unless said otherwise.
-    init(in parent: URL = FileManager.default.temporaryDirectory) throws {
+    internal init(in parent: URL = FileManager.default.temporaryDirectory) throws {
         directory = parent.appendingPathComponent("afm-askpass-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
             at: directory,
@@ -350,7 +350,7 @@ final class AskpassHelper {
     }
 
     /// What the child process needs in its environment.
-    var environment: [String: String] {
+    internal var environment: [String: String] {
         [
             "SSH_ASKPASS": directory.appendingPathComponent("askpass.sh").path, "SSH_ASKPASS_REQUIRE": "force",
             "AFM_ASKPASS_QUESTION": directory.appendingPathComponent("question").path,
@@ -359,7 +359,7 @@ final class AskpassHelper {
     }
 
     /// A question that has arrived completely; nil when there is none.
-    func pendingQuestion() -> Question? {
+    internal func pendingQuestion() -> Question? {
         var buffer = [UInt8](repeating: 0, count: 4_096)
         while true {
             let count = read(question, &buffer, buffer.count)
@@ -384,7 +384,7 @@ final class AskpassHelper {
     }
 
     /// Answers `question`, and no other.
-    func reply(_ text: String, to question: Question) {
+    internal func reply(_ text: String, to question: Question) {
         // One line; a line break inside would be read as the end of the answer.
         let first = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         let line = Data((question.id + " " + first).utf8) + Data([0x0A])
@@ -402,7 +402,7 @@ final class AskpassHelper {
 ///
 /// The state, `extensions` included, is guarded by `lock` (the error text also by `errorReading`);
 /// `writeTimeout` and `names` do not change after `init`.
-final class SFTPChannel: @unchecked Sendable {
+internal final class SFTPChannel: @unchecked Sendable {
     private let process = Process()
     private let toServer = Pipe()
     private let fromServer = Pipe()
@@ -412,7 +412,7 @@ final class SFTPChannel: @unchecked Sendable {
     private let writeLock = NSLock()
     /// How long writing a packet may make no progress before the channel is given up: ssh
     /// that does not read its input is stuck, and everything waiting behind it with it.
-    let writeTimeout: TimeInterval
+    internal let writeTimeout: TimeInterval
     private var waiting: [UInt32: Pending<SFTPPacket>] = [:]
     private var nextID: UInt32 = 1
     private var closed = false
@@ -424,7 +424,7 @@ final class SFTPChannel: @unchecked Sendable {
     /// When the server was last heard from.
     private var lastReceived = Date()
     /// The names of the server that are written back as they came.
-    let names: NameMemory?
+    internal let names: NameMemory?
     private var errorText = Data()
     /// Held while a piece of the error output is read and kept (see `start`).
     private let errorReading = NSLock()
@@ -433,7 +433,7 @@ final class SFTPChannel: @unchecked Sendable {
     private let version = Pending<SFTPPacket>()
     private var serverExtensions: [String: String] = [:]
 
-    init(
+    internal init(
         executable: String,
         arguments: [String],
         environment: [String: String],
@@ -453,16 +453,16 @@ final class SFTPChannel: @unchecked Sendable {
     deinit { close() }
 
     /// The extensions the server named in its first answer; known once `start` has returned.
-    var extensions: [String: String] { lock.withLock { serverExtensions } }
+    internal var extensions: [String: String] { lock.withLock { serverExtensions } }
 
-    var isClosed: Bool {
+    internal var isClosed: Bool {
         lock.lock()
         defer { lock.unlock() }
         return closed
     }
 
     /// What the child process wrote to its error output, e.g. why the login failed.
-    var errorMessage: String {
+    internal var errorMessage: String {
         lock.lock()
         defer { lock.unlock() }
         return String(decoding: errorText, as: UTF8.self).split(whereSeparator: \.isNewline).suffix(3)
@@ -476,7 +476,7 @@ final class SFTPChannel: @unchecked Sendable {
     /// moment at most.
     ///
     /// For the thread that found the connection lost and wants to say why.
-    func errorMessageAtTheEnd() -> String {
+    internal func errorMessageAtTheEnd() -> String {
         // The reading thread comes to the end once the process has gone; on a busy machine that
         // can take a moment longer than the process itself, so it is given a few seconds.
         if lastWords.wait(timeout: .now() + Self.lastWordsTime + Self.endTime) == .success {
@@ -487,7 +487,7 @@ final class SFTPChannel: @unchecked Sendable {
 
     /// Starts the process and the protocol. `service` is called a few times a second while the
     /// login is under way, to answer ssh's questions; it returns false to give up.
-    func start(timeout: TimeInterval, cancellation: CancellationFlag?, service: () -> Bool) throws {
+    internal func start(timeout: TimeInterval, cancellation: CancellationFlag?, service: () -> Bool) throws {
         errors.fileHandleForReading.readabilityHandler = { [weak self, errorReading] handle in
             // Reading and keeping are one step under `errorReading`: whoever reads the rest at
             // the end (`drainErrors`) must not find the pipe empty while a piece that was
@@ -592,9 +592,9 @@ final class SFTPChannel: @unchecked Sendable {
     }
 
     /// How long the last words of the child process are waited for after its output ended.
-    static let lastWordsTime: TimeInterval = 2
+    internal static let lastWordsTime: TimeInterval = 2
     /// How long the thread that found the connection lost waits for the reading thread to see the end.
-    static let endTime: TimeInterval = 8
+    internal static let endTime: TimeInterval = 8
 
     /// Reads packets until the stream ends or `handle` returns false.
     ///
@@ -625,7 +625,7 @@ final class SFTPChannel: @unchecked Sendable {
         }
     }
 
-    static let largestPacket = 1 << 20
+    internal static let largestPacket = 1 << 20
 
     private func received(_ packet: SFTPPacket) -> Bool {
         if packet.kind == .version {
@@ -682,7 +682,7 @@ final class SFTPChannel: @unchecked Sendable {
     ///
     /// `descriptor` does not block (a write that does not block is not interrupted by a signal);
     /// `isClosed` says whether the channel was closed meanwhile.
-    static func writeAll(
+    internal static func writeAll(
         _ packet: Data,
         to descriptor: Int32,
         writeTimeout: TimeInterval,
@@ -765,7 +765,7 @@ final class SFTPChannel: @unchecked Sendable {
     /// request, by whoever writes next or, when nobody does, in the background. The server
     /// therefore sees it before anything that is asked afterwards (the removal of a file whose
     /// handle is closed here).
-    func sendWithoutAnswer(_ type: SFTPRequest, _ build: (inout SFTPEncoder) -> Void) {
+    internal func sendWithoutAnswer(_ type: SFTPRequest, _ build: (inout SFTPEncoder) -> Void) {
         var packet = SFTPEncoder()
         packet.names = names
         lock.lock()
@@ -784,13 +784,14 @@ final class SFTPChannel: @unchecked Sendable {
     }
 
     /// A request that was sent, to be waited for or given up.
-    struct Ticket {
-        let id: UInt32
-        let answer: Pending<SFTPPacket>
+    internal struct Ticket {
+        internal let id: UInt32
+        internal let answer: Pending<SFTPPacket>
     }
 
     /// Sends a request without waiting; several can be under way and are answered in any order.
-    func send(_ type: SFTPRequest, cancellation: CancellationFlag? = nil, _ build: (inout SFTPEncoder) -> Void) throws
+    internal func send(_ type: SFTPRequest, cancellation: CancellationFlag? = nil, _ build: (inout SFTPEncoder) -> Void)
+        throws
         -> Ticket
     {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
@@ -818,12 +819,12 @@ final class SFTPChannel: @unchecked Sendable {
     }
 
     /// The answer when it has arrived; never waits.
-    func poll(_ ticket: Ticket) -> SFTPPacket? { ticket.answer.poll() }
+    internal func poll(_ ticket: Ticket) -> SFTPPacket? { ticket.answer.poll() }
 
     /// Stops expecting the answer of a request.
     ///
     /// If it still comes it is dropped.
-    func abandon(_ ticket: Ticket) {
+    internal func abandon(_ ticket: Ticket) {
         lock.lock()
         waiting[ticket.id] = nil
         lock.unlock()
@@ -837,7 +838,9 @@ final class SFTPChannel: @unchecked Sendable {
     /// time, the connection is taken for dead and the channel is closed: every later request would
     /// otherwise wait out its own time limit on it, one after the other. The next request opens a
     /// new channel.
-    func wait(for ticket: Ticket, timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws -> SFTPPacket {
+    internal func wait(for ticket: Ticket, timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws
+        -> SFTPPacket
+    {
         let began = Date()
         let packet: SFTPPacket?
         do {
@@ -858,7 +861,7 @@ final class SFTPChannel: @unchecked Sendable {
         return packet
     }
 
-    func request(
+    internal func request(
         _ type: SFTPRequest,
         timeout: TimeInterval,
         cancellation: CancellationFlag? = nil,
@@ -876,7 +879,7 @@ final class SFTPChannel: @unchecked Sendable {
     /// Ends the dialogue and the child process.
     ///
     /// Returns at once, from any thread.
-    func close() {
+    internal func close() {
         errors.fileHandleForReading.readabilityHandler = nil
         // Marked closed first: a `start` under way then either starts nothing, or has started
         // the process by now (it holds `lock` meanwhile), which is ended here.

@@ -30,14 +30,14 @@ public struct BranchWalker: Sendable {
     /// Folders the walk never enters, besides every mounted volume it finds out for itself (see
     /// `isMountPoint`): other disks and shares are mounted here, and `/System/Volumes/Data`
     /// holds a second view of everything.
-    static let mountFolders: Set<String> = ["/Volumes", "/System/Volumes", "/Network", "/net", "/home", "/dev"]
+    internal static let mountFolders: Set<String> = ["/Volumes", "/System/Volumes", "/Network", "/net", "/home", "/dev"]
 
     /// True when a disk is mounted at `path` itself.
     ///
     /// A folder on another device than its parent is not enough to say so: on the start-up disk the
     /// user's folders are firmlinked from the data volume, and the system reports the volume's
     /// mount point for them, not their own.
-    static func isMountPoint(_ path: String) -> Bool {
+    internal static func isMountPoint(_ path: String) -> Bool {
         var info = statfs()
         guard statfs(path, &info) == 0 else {
             return false
@@ -59,7 +59,7 @@ public struct BranchWalker: Sendable {
     }
 
     /// How many directories are read side by side before their files are handed over.
-    static let directoriesPerBatch = 64
+    internal static let directoriesPerBatch = 64
 
     public let fileSystems: FileSystemRegistry
     public var showHidden: Bool
@@ -201,7 +201,7 @@ public struct BranchWalker: Sendable {
 
 extension FileItem {
     /// The same entry under another name: its place in a virtual folder.
-    func named(_ name: String) -> FileItem {
+    internal func named(_ name: String) -> FileItem {
         var item = FileItem(url: url, name: name, kind: kind, stat: stat)
         item.computedSize = computedSize
         return item

@@ -15,21 +15,21 @@ import VirtualFoldersPlugin
 /// connection that breaks does.
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-final class FlakyFileSystem: FileSystemProvider, @unchecked Sendable {
-    let base = MemoryFileSystem(scheme: "flaky")
-    var scheme: String { base.scheme }
-    var capabilities: FileSystemCapabilities { [.write] }
+internal final class FlakyFileSystem: FileSystemProvider, @unchecked Sendable {
+    internal let base = MemoryFileSystem(scheme: "flaky")
+    internal var scheme: String { base.scheme }
+    internal var capabilities: FileSystemCapabilities { [.write] }
     private let lock = NSLock()
     private var failures = 0
     /// Called once, after the first block of the next read.
-    var afterFirstBlock: (() -> Void)?
+    internal var afterFirstBlock: (() -> Void)?
 
-    struct Broken: LocalizedError {
-        var errorDescription: String? { "the connection broke" }
+    internal struct Broken: LocalizedError {
+        internal var errorDescription: String? { "the connection broke" }
     }
 
     /// The next `count` readers fail after their first block.
-    func failNextReads(_ count: Int) { lock.withLock { failures = count } }
+    internal func failNextReads(_ count: Int) { lock.withLock { failures = count } }
 
     /// Unchecked: used by one thread at a time, as the protocol allows.
     private final class Reader: FileReader, @unchecked Sendable {
@@ -53,12 +53,12 @@ final class FlakyFileSystem: FileSystemProvider, @unchecked Sendable {
         func close() { inner.close() }
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try base.list(directory, showHidden: showHidden)
     }
-    func item(at url: URL) -> FileItem? { base.item(at: url) }
-    func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader {
+    internal func item(at url: URL) -> FileItem? { base.item(at: url) }
+    internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
+    internal func read(_ url: URL) throws -> any FileReader {
         let (fails, hook): (Bool, (() -> Void)?) = lock.withLock {
             defer { afterFirstBlock = nil }
             if failures > 0 {
@@ -69,55 +69,61 @@ final class FlakyFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         return Reader(try base.read(url), fails: fails, hook: hook)
     }
-    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
-    func remove(_ url: URL) throws { try base.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
+    internal func remove(_ url: URL) throws { try base.remove(url) }
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)
     }
-    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
+    internal func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.crossesVolumes
     }
-    func displayPath(_ url: URL) -> String { base.displayPath(url) }
-    func location(from text: String) -> URL? { base.location(from: text) }
-    func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
+    internal func displayPath(_ url: URL) -> String { base.displayPath(url) }
+    internal func location(from text: String) -> URL? { base.location(from: text) }
+    internal func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
 }
 
 /// Answers a job's questions with fixed choices, from whatever thread they come.
 ///
 /// Unchecked: what it records is guarded by `lock`; the choices are set by the test before use.
-final class Review2Replies: FileJobDelegate, @unchecked Sendable {
+internal final class Review2Replies: FileJobDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private var failureAnswers: [ErrorChoice]
-    private(set) var errors: [String] = []
-    private(set) var conflicts: [String] = []
-    private(set) var volumes: [String] = []
-    private(set) var locked = 0
-    var conflict: ConflictChoice
-    var volume: ProtectionChoice
+    internal private(set) var errors: [String] = []
+    internal private(set) var conflicts: [String] = []
+    internal private(set) var volumes: [String] = []
+    internal private(set) var locked = 0
+    internal var conflict: ConflictChoice
+    internal var volume: ProtectionChoice
 
     /// `failures`: the answers to the errors in turn; the last one holds for the rest.
-    init(conflict: ConflictChoice = .overwrite, failures: [ErrorChoice] = [.skip], volume: ProtectionChoice = .skip) {
+    internal init(
+        conflict: ConflictChoice = .overwrite,
+        failures: [ErrorChoice] = [.skip],
+        volume: ProtectionChoice = .skip
+    ) {
         (self.conflict, failureAnswers, self.volume) = (conflict, failures, volume)
     }
 
-    func job(_: FileJob, progress _: JobProgress) {}
-    func job(_: FileJob, conflictAt target: FileItem, source _: FileItem) -> ConflictChoice {
+    internal func job(_: FileJob, progress _: JobProgress) {}
+    internal func job(_: FileJob, conflictAt target: FileItem, source _: FileItem) -> ConflictChoice {
         lock.withLock { conflicts.append(target.name) }
         return conflict
     }
-    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
+    internal func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock {
             errors.append(error.localizedDescription)
             return failureAnswers.count > 1 ? failureAnswers.removeFirst() : failureAnswers[0]
         }
     }
-    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
-    func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
+    internal func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
+    internal func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         if question.reason == .locked { lock.withLock { locked += 1 } }
         return .proceed
     }
-    func job(_: FileJob, crossVolumeAt folder: FileItem, purpose _: ProtectionQuestion.Purpose) -> ProtectionChoice {
+    internal func job(_: FileJob, crossVolumeAt folder: FileItem, purpose _: ProtectionQuestion.Purpose)
+        -> ProtectionChoice
+    {
         lock.withLock { volumes.append(folder.name) }
         return volume
     }
@@ -155,12 +161,12 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 }
 
 @Suite
-struct Review2FileopsBranchView {
-    let box: Sandbox
-    let fileSystems = FileSystemRegistry()
-    let virtual: VirtualFileSystem
+internal struct Review2FileopsBranchView {
+    internal let box: Sandbox
+    internal let fileSystems = FileSystemRegistry()
+    internal let virtual: VirtualFileSystem
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         fileSystems.register(LocalFileSystem())
         virtual = VirtualFileSystem(fileSystems: fileSystems)
@@ -182,7 +188,7 @@ struct Review2FileopsBranchView {
 
     // F001, F018
     @Test
-    func movingAFileOntoItselfThroughABranchViewKeepsTheFile() throws {
+    internal func movingAFileOntoItselfThroughABranchViewKeepsTheFile() throws {
         let file = try box.file("d/a.txt", "precious")
         let replies = Review2Replies()
         let result = run(.move, [file], to: TargetSpec(directory: virtual.branch(of: box.url("d"))), replies: replies)
@@ -192,7 +198,7 @@ struct Review2FileopsBranchView {
     }
 
     @Test
-    func aTargetInABranchViewIsTheRealFolder() throws {
+    internal func aTargetInABranchViewIsTheRealFolder() throws {
         let job = FileJob(
             kind: .move,
             sources: [try box.file("d/a.txt")],
@@ -211,7 +217,7 @@ struct Review2FileopsBranchView {
     }
 
     @Test
-    func aRenameToAnotherLetterCaseInABranchViewIsARename() throws {
+    internal func aRenameToAnotherLetterCaseInABranchViewIsARename() throws {
         let file = try box.file("d/a.txt", "precious")
         let before = try #require(inode(file))
         let replies = Review2Replies()
@@ -228,7 +234,7 @@ struct Review2FileopsBranchView {
     }
 
     @Test
-    func aPlainRenameInABranchViewIsARenameNotACopy() throws {
+    internal func aPlainRenameInABranchViewIsARenameNotACopy() throws {
         let file = try box.file("d/a.txt", "precious")
         let before = try #require(inode(file))
         #expect(setxattr(file.path, "user.afm.test", "v", 1, 0, 0) == 0)
@@ -243,7 +249,7 @@ struct Review2FileopsBranchView {
     }
 
     @Test
-    func aFolderIsNotMovedIntoItselfThroughABranchView() throws {
+    internal func aFolderIsNotMovedIntoItselfThroughABranchView() throws {
         try box.file("d/sub/in.txt", "inside")
         let replies = Review2Replies()
         // Into itself under its own name, and into its own subfolder.
@@ -263,7 +269,7 @@ struct Review2FileopsBranchView {
     }
 
     @Test
-    func copyingOntoItselfThroughABranchViewIsRefused() throws {
+    internal func copyingOntoItselfThroughABranchViewIsRefused() throws {
         let file = try box.file("d/a.txt", "precious")
         let replies = Review2Replies()
         _ = run(.copy, [file], to: TargetSpec(directory: virtual.branch(of: box.url("d"))), replies: replies)
@@ -272,7 +278,7 @@ struct Review2FileopsBranchView {
     }
 
     @Test
-    func aHardLinkOfTheSourceIsNotOverwrittenWithItself() throws {
+    internal func aHardLinkOfTheSourceIsNotOverwrittenWithItself() throws {
         let file = try box.file("d/a.txt", "precious")
         try box.folder("t")
         try FileManager.default.linkItem(at: file, to: box.url("t/a.txt"))
@@ -285,7 +291,7 @@ struct Review2FileopsBranchView {
 
     // F006: a rename of several items to one name.
     @Test
-    func severalItemsRenamedToOneNameAreAllKept() throws {
+    internal func severalItemsRenamedToOneNameAreAllKept() throws {
         let sources = [
             try box.file("d/a.doc", "doc"), try box.file("d/a.pdf", "pdf"), try box.file("d/sub/a.rtf", "rtf")
         ]
@@ -302,17 +308,17 @@ struct Review2FileopsBranchView {
 }
 
 @Suite
-struct Review2FileopsJob {
-    let box: Sandbox
+internal struct Review2FileopsJob {
+    internal let box: Sandbox
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
     }
 
     // MARK: F007, F017
 
     @Test
-    func aPipeInAStreamedCopyIsReportedAndNeverOpened() throws {
+    internal func aPipeInAStreamedCopyIsReportedAndNeverOpened() throws {
         let (fileSystems, memory) = makeFileSystems()
         try box.file("s/real.txt", "data")
         let pipe = box.url("s/pipe")
@@ -342,7 +348,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aPipeIsNotReadForAChecksumOrACopyThatFollowsLinks() throws {
+    internal func aPipeIsNotReadForAChecksumOrACopyThatFollowsLinks() throws {
         let (fileSystems, _) = makeFileSystems()
         let pipe = box.url("pipe")
         #expect(mkfifo(pipe.path, 0o644) == 0)
@@ -375,7 +381,7 @@ struct Review2FileopsJob {
     // MARK: F006, F013
 
     @Test
-    func equallyNamedSourcesFromTwoFoldersBothArriveUnderOverwriteAll() throws {
+    internal func equallyNamedSourcesFromTwoFoldersBothArriveUnderOverwriteAll() throws {
         let (fileSystems, _) = makeFileSystems()
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
@@ -396,7 +402,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aMaskThatGivesSeveralSourcesOneNameLosesNone() throws {
+    internal func aMaskThatGivesSeveralSourcesOneNameLosesNone() throws {
         let (fileSystems, _) = makeFileSystems()
         let sources = [
             try box.file("s/a.doc", "doc"), try box.file("s/a.pdf", "pdf"), try box.file("s/a.rtf", "rtf")
@@ -428,7 +434,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func anAnswerForAllDoesNotOverwriteTheJobsOwnFileButAnAnswerForOneDoes() throws {
+    internal func anAnswerForAllDoesNotOverwriteTheJobsOwnFileButAnAnswerForOneDoes() throws {
         let (fileSystems, _) = makeFileSystems()
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
@@ -446,7 +452,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func twoSourceFoldersThatLandInOneTargetFolderKeepEachOthersFiles() throws {
+    internal func twoSourceFoldersThatLandInOneTargetFolderKeepEachOthersFiles() throws {
         let (fileSystems, _) = makeFileSystems()
         try box.file("s/one/sub/x.txt", "first")
         try box.file("s/one/sub/only1.txt", "1")
@@ -467,7 +473,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aFileThatWasThereBeforeTheJobIsStillOverwrittenByTheRule() throws {
+    internal func aFileThatWasThereBeforeTheJobIsStillOverwrittenByTheRule() throws {
         let (fileSystems, _) = makeFileSystems()
         try box.file("s/x.txt", "new")
         try box.file("t/x.txt", "old")
@@ -485,7 +491,7 @@ struct Review2FileopsJob {
     // MARK: F022, F033
 
     @Test
-    func resumeAndAppendNeverWriteThroughALinkAtTheTarget() throws {
+    internal func resumeAndAppendNeverWriteThroughALinkAtTheTarget() throws {
         let (fileSystems, memory) = makeFileSystems()
         let victim = try box.file("elsewhere/victim.txt", "the victim's own, longer contents: fifty-three bytes.")
         try box.file("s/f.txt", String(repeating: "source-bytes ", count: 20))
@@ -515,7 +521,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func resumeByWritingAnewChecksThatTheTargetIsTheStartOfTheSource() throws {
+    internal func resumeByWritingAnewChecksThatTheTargetIsTheStartOfTheSource() throws {
         // A file system that cannot continue a file: the longer file is written next to the old one.
         let fileSystems = FileSystemRegistry()
         let flaky = FlakyFileSystem()
@@ -549,7 +555,7 @@ struct Review2FileopsJob {
     // MARK: F032, F044
 
     @Test
-    func aRefusedDeleteNeverChangesTheTargetOfALinkOrAFileThatIsNotLocked() throws {
+    internal func aRefusedDeleteNeverChangesTheTargetOfALinkOrAFileThatIsNotLocked() throws {
         let (fileSystems, _) = makeFileSystems()
         let key = try box.file("private/key.pem", "secret")
         try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: key.path)
@@ -575,7 +581,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aLockedFileIsStillUnlockedAndDeletedWhenTheUserAgrees() throws {
+    internal func aLockedFileIsStillUnlockedAndDeletedWhenTheUserAgrees() throws {
         let (fileSystems, _) = makeFileSystems()
         let file = try box.file("d/locked.txt", "x")
         #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -589,7 +595,7 @@ struct Review2FileopsJob {
     // MARK: F023, F072
 
     @Test
-    func agesAreComparedExactlyWhereTheVolumesKeepThemExactly() throws {
+    internal func agesAreComparedExactlyWhereTheVolumesKeepThemExactly() throws {
         let (fileSystems, _) = makeFileSystems()
         // The scratch folder is on APFS on every Mac this runs on; on anything coarser the test says nothing.
         guard FileIdentity.timestampGrain(of: box.root) == 0 else {
@@ -623,7 +629,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func theGrainOfAVolumeDecidesTheTolerance() {
+    internal func theGrainOfAVolumeDecidesTheTolerance() {
         let (_, memory) = makeFileSystems()
         #expect(FileIdentity.timestampGrain(of: memory.url("/a/b.txt")) == 2)
         // A place that does not exist yet answers for the folder above it.
@@ -635,7 +641,7 @@ struct Review2FileopsJob {
     // MARK: F019, F031
 
     @Test
-    func aLinkBackToAFolderItLiesInIsSeenThroughAnotherLink() throws {
+    internal func aLinkBackToAFolderItLiesInIsSeenThroughAnotherLink() throws {
         let (fileSystems, _) = makeFileSystems()
         try box.file("Y/f.txt", "inside")
         try FileManager.default.createSymbolicLink(atPath: box.url("Y/m").path, withDestinationPath: ".")
@@ -661,7 +667,7 @@ struct Review2FileopsJob {
     // MARK: F024, F073 and what a cancel may remove
 
     @Test
-    func aRetryAfterAKeptPartialFileCompletesTheCopy() throws {
+    internal func aRetryAfterAKeptPartialFileCompletesTheCopy() throws {
         let fileSystems = FileSystemRegistry()
         let flaky = FlakyFileSystem()
         fileSystems.register(LocalFileSystem())
@@ -687,7 +693,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aSkipAfterAFailedCopyKeepsThePartialFileWhenAskedTo() throws {
+    internal func aSkipAfterAFailedCopyKeepsThePartialFileWhenAskedTo() throws {
         let fileSystems = FileSystemRegistry()
         let flaky = FlakyFileSystem()
         fileSystems.register(LocalFileSystem())
@@ -709,7 +715,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aCancelledOrFailedOverwriteLeavesTheFileThatWasThere() throws {
+    internal func aCancelledOrFailedOverwriteLeavesTheFileThatWasThere() throws {
         let fileSystems = FileSystemRegistry()
         let flaky = FlakyFileSystem()
         fileSystems.register(LocalFileSystem())
@@ -752,7 +758,7 @@ struct Review2FileopsJob {
     // MARK: F046, F045, F049, F053, F051, F021
 
     @Test
-    func abortAlsoSetsTheJobsOwnFlagSoThatNothingWaitsOnIt() {
+    internal func abortAlsoSetsTheJobsOwnFlagSoThatNothingWaitsOnIt() {
         let (fileSystems, memory) = makeFileSystems()
         let flag = CancellationFlag()
         let job = FileJob(
@@ -768,7 +774,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func recordsNobodyWantsAreNotMade() throws {
+    internal func recordsNobodyWantsAreNotMade() throws {
         let (fileSystems, _) = makeFileSystems()
         try box.file("s/a.txt")
         try box.file("s/sub/b.txt")
@@ -794,7 +800,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aSourceWhoseNameLeadsOutOfItsFolderIsRefused() throws {
+    internal func aSourceWhoseNameLeadsOutOfItsFolderIsRefused() throws {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/A/keep.txt", "keep")
         memory.addDirectory("/B")
@@ -816,7 +822,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func rightsFromAnotherFileSystemArriveWithoutSpecialBitsAndUnderTheUmask() throws {
+    internal func rightsFromAnotherFileSystemArriveWithoutSpecialBitsAndUnderTheUmask() throws {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/s/tool", "#!", permissions: 0o6777)
         memory.addFile("/s/plain.txt", "x", permissions: 0o640)
@@ -842,7 +848,7 @@ struct Review2FileopsJob {
 
     // F050
     @Test
-    func aLockedSourceOfAMoveToAnotherFileSystemIsAskedAboutLikeADelete() throws {
+    internal func aLockedSourceOfAMoveToAnotherFileSystemIsAskedAboutLikeADelete() throws {
         let (fileSystems, memory) = makeFileSystems()
         let file = try box.file("s/locked.txt", "contents")
         #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -863,7 +869,7 @@ struct Review2FileopsJob {
 
     // F054
     @Test
-    func anAppendedFileKeepsWhatTheOldOneCarriedBesidesItsContents() throws {
+    internal func anAppendedFileKeepsWhatTheOldOneCarriedBesidesItsContents() throws {
         let (fileSystems, memory) = makeFileSystems()
         try box.file("s/log.txt", "-more")
         memory.addFile("/t/log.txt", "start")
@@ -884,7 +890,7 @@ struct Review2FileopsJob {
 
     // F048
     @Test
-    func aSourceOnAServerIsAskedAboutOnceNotThreeTimes() throws {
+    internal func aSourceOnAServerIsAskedAboutOnceNotThreeTimes() throws {
         /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
         final class Counting: FileSystemProvider, @unchecked Sendable {
             let base = MemoryFileSystem(scheme: "counted")
@@ -930,7 +936,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func oldTemporaryFilesAreSweptAndNothingElse() throws {
+    internal func oldTemporaryFilesAreSweptAndNothingElse() throws {
         let stale = ".afm-\(UUID().uuidString).tmp"
         try box.file("t/\(stale)", "half a copy")
         try box.file("t/.afm-not-a-uuid.tmp", "mine")
@@ -952,7 +958,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aTreeAsDeepAsPathsAllowIsCopiedAndDeleted() throws {
+    internal func aTreeAsDeepAsPathsAllowIsCopiedAndDeleted() throws {
         let (fileSystems, _) = makeFileSystems()
         // As deep as the system's limit on the length of a path lets a tree be.
         var deep = try box.folder("s")
@@ -994,7 +1000,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aTreeDeeperThanTheLimitIsReportedNotEntered() {
+    internal func aTreeDeeperThanTheLimitIsReportedNotEntered() {
         let (fileSystems, memory) = makeFileSystems()
         let limit = 12
         var path = "/deep"
@@ -1027,7 +1033,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func aListOfSourcesFromManyFoldersIsLookedAtFolderByFolder() throws {
+    internal func aListOfSourcesFromManyFoldersIsLookedAtFolderByFolder() throws {
         let (fileSystems, memory) = makeFileSystems()
         // One source on the local disk, one in memory (which is not a fast local disk): no
         // pool, and the copy still works.
@@ -1044,7 +1050,7 @@ struct Review2FileopsJob {
     }
 
     @Test
-    func manySmallFilesStillArriveThroughThePoolWithOrderedProgress() throws {
+    internal func manySmallFilesStillArriveThroughThePoolWithOrderedProgress() throws {
         let (fileSystems, _) = makeFileSystems()
         for index in 0..<300 { try box.file("s/f\(index).txt", "contents \(index)") }
         try box.folder("t")
@@ -1074,12 +1080,12 @@ struct Review2FileopsJob {
 /// Where the system does not let a test make or attach one (a sandbox), the suite has nothing to
 /// say.
 @Suite(.serialized)
-struct Review2FileopsMounts {
-    let box: Sandbox
-    let mount: URL
-    let attached: Bool
+internal struct Review2FileopsMounts {
+    internal let box: Sandbox
+    internal let mount: URL
+    internal let attached: Bool
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         mount = box.url("tree/mnt")
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
@@ -1125,7 +1131,7 @@ struct Review2FileopsMounts {
 
     // F012, F020
     @Test
-    func deletingAFolderDoesNotGoIntoAVolumeMountedInsideIt() {
+    internal func deletingAFolderDoesNotGoIntoAVolumeMountedInsideIt() {
         defer { detach() }
         guard attached else {
             return
@@ -1155,7 +1161,7 @@ struct Review2FileopsMounts {
     }
 
     @Test
-    func movingAFolderDoesNotEmptyAVolumeMountedInsideIt() throws {
+    internal func movingAFolderDoesNotEmptyAVolumeMountedInsideIt() throws {
         defer { detach() }
         guard attached else {
             return
@@ -1178,7 +1184,7 @@ struct Review2FileopsMounts {
     }
 
     @Test
-    func withAnExplicitYesTheVolumeIsEntered() {
+    internal func withAnExplicitYesTheVolumeIsEntered() {
         defer { detach() }
         guard attached else {
             return

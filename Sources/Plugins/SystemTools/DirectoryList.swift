@@ -3,15 +3,15 @@ import AFMKernel
 import AppKit
 
 /// One line of a printed file list (spec 12 › Printing).
-struct ListRow: Equatable {
+internal struct ListRow: Equatable {
     /// The name, or the path below the list's base folder for an item of a subfolder.
-    let name: String
-    let isFolder: Bool
-    let size: Int64
-    let modified: Date
-    let permissions: UInt16
+    internal let name: String
+    internal let isFolder: Bool
+    internal let size: Int64
+    internal let modified: Date
+    internal let permissions: UInt16
 
-    init(
+    internal init(
         name: String,
         isFolder: Bool,
         size: Int64 = 0,
@@ -25,7 +25,7 @@ struct ListRow: Equatable {
         self.permissions = permissions
     }
 
-    init(_ item: FileItem, path: String? = nil) {
+    internal init(_ item: FileItem, path: String? = nil) {
         self.init(
             name: path ?? item.name,
             isFolder: item.isFolder,
@@ -40,11 +40,11 @@ struct ListRow: Equatable {
 /// some out (spec 18 › Core syntax).
 ///
 /// Folders are always listed and entered.
-struct ListMask {
+internal struct ListMask {
     private let include: FileMask?
     private let exclude: FileMask?
 
-    init(_ text: String) {
+    internal init(_ text: String) {
         let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
             .map {
                 $0.trimmingCharacters(in: .whitespaces)
@@ -54,7 +54,7 @@ struct ListMask {
         exclude = parts.count > 1 && !parts[1].isEmpty ? FileMask(parts[1]) : nil
     }
 
-    func matches(_ name: String) -> Bool {
+    internal func matches(_ name: String) -> Bool {
         (include?.matches(name) ?? true) && !(exclude?.matches(name) ?? false)
     }
 }
@@ -63,15 +63,15 @@ struct ListMask {
 ///
 /// Blocks; runs on a job's thread. The subfolders of one folder are read on all cores at once,
 /// since on a server each listing is a trip of its own; the rows keep the order of the names.
-struct ListCollector {
-    let fileSystems: FileSystemRegistry
-    let showHidden: Bool
-    let mask: ListMask
+internal struct ListCollector {
+    internal let fileSystems: FileSystemRegistry
+    internal let showHidden: Bool
+    internal let mask: ListMask
     /// How many levels of subfolders are entered; negative means all (spec: `-1` = unlimited).
-    let depth: Int
-    let cancellation: CancellationFlag
+    internal let depth: Int
+    internal let cancellation: CancellationFlag
 
-    func rows(of items: [FileItem]) -> [ListRow] {
+    internal func rows(of items: [FileItem]) -> [ListRow] {
         rows(of: items, prefix: "", level: 0)
     }
 
@@ -106,20 +106,20 @@ struct ListCollector {
 /// dialog, 12 › Print margins and header).
 ///
 /// Pure: the same input gives the same pages.
-struct DirectoryListFormatter {
-    static let defaultHeader = "%d - Page %p/%t"
+internal struct DirectoryListFormatter {
+    internal static let defaultHeader = "%d - Page %p/%t"
 
     /// The header with its placeholders; empty turns the header off.
-    var header = Self.defaultHeader
+    internal var header = Self.defaultHeader
     /// Lines on a page, header included.
-    var linesPerPage = 60
+    internal var linesPerPage = 60
     /// Full view prints size, date and attributes; Brief prints the names only.
-    var isDetailed = true
+    internal var isDetailed = true
     /// Names longer than this are not padded to; the columns then move for that row.
-    var nameWidthLimit = 60
+    internal var nameWidthLimit = 60
 
     /// `%p` page, `%t` number of pages, `%d` base folder, `%D` date, `%T` time, `%%` a percent sign.
-    static func expand(_ template: String, directory: String, page: Int, pages: Int, now: Date) -> String {
+    internal static func expand(_ template: String, directory: String, page: Int, pages: Int, now: Date) -> String {
         var result = ""
         var characters = template.makeIterator()
         while let character = characters.next() {
@@ -157,14 +157,14 @@ struct DirectoryListFormatter {
     }
 
     /// The totals line: `3,607 k in 2 files`, with the folders when there are any.
-    static func footer(_ rows: [ListRow]) -> String {
+    internal static func footer(_ rows: [ListRow]) -> String {
         let files = rows.filter { !$0.isFolder }
         let folders = rows.count - files.count
         let text = "\(Format.kilobytes(files.reduce(0) { $0.addingSaturated($1.size) })) in \(files.count) files"
         return folders > 0 ? text + ", \(folders) folders" : text
     }
 
-    func line(_ row: ListRow, nameWidth: Int, sizeWidth: Int) -> String {
+    internal func line(_ row: ListRow, nameWidth: Int, sizeWidth: Int) -> String {
         let name = row.isFolder && !row.name.hasSuffix("/") ? row.name + "/" : row.name
         guard isDetailed else {
             return name
@@ -177,7 +177,7 @@ struct DirectoryListFormatter {
     }
 
     /// The lines of the list without headers: the rows, an empty line, the footer.
-    func body(_ rows: [ListRow]) -> [String] {
+    internal func body(_ rows: [ListRow]) -> [String] {
         let nameWidth = min(nameWidthLimit, rows.map { $0.name.count + ($0.isFolder ? 1 : 0) }.max() ?? 0)
         let sizeWidth = rows.map { $0.isFolder ? 5 : Format.bytes($0.size).count }.max() ?? 0
         return rows.map { line($0, nameWidth: nameWidth, sizeWidth: sizeWidth) } + [
@@ -188,7 +188,7 @@ struct DirectoryListFormatter {
     /// The pages, each as its lines.
     ///
     /// There is always at least one page.
-    func pages(directory: String, rows: [ListRow], now: Date = Date()) -> [[String]] {
+    internal func pages(directory: String, rows: [ListRow], now: Date = Date()) -> [[String]] {
         let lines = body(rows)
         let hasHeader = !header.isEmpty
         let perPage = max(1, linesPerPage - (hasHeader ? 2 : 0))
@@ -214,7 +214,7 @@ struct DirectoryListFormatter {
     }
 
     /// The whole list as one text; pages are separated by a form feed, as text printers expect.
-    func text(directory: String, rows: [ListRow], now: Date = Date()) -> String {
+    internal func text(directory: String, rows: [ListRow], now: Date = Date()) -> String {
         pages(directory: directory, rows: rows, now: now).map { $0.joined(separator: "\n") }
             .joined(
                 separator: "\n\u{0C}\n"
@@ -226,7 +226,7 @@ struct DirectoryListFormatter {
 /// font sized so that the page's lines fit the sheet.
 ///
 /// Main thread only, like every view.
-final class PagePrintView: NSView {
+internal final class PagePrintView: NSView {
     private let pages: [[String]]
     private let pageSize: NSSize
     private let attributes: [NSAttributedString.Key: Any]
@@ -237,7 +237,7 @@ final class PagePrintView: NSView {
     ///
     /// Without it the lines are measured here, in UTF-16 units (a count that does not cut every
     /// line into characters).
-    init(pages: [[String]], longestLine: Int? = nil, linesPerPage: Int, printInfo: NSPrintInfo) {
+    internal init(pages: [[String]], longestLine: Int? = nil, linesPerPage: Int, printInfo: NSPrintInfo) {
         self.pages = pages
         let bounds = printInfo.imageablePageBounds
         let paper = printInfo.paperSize
@@ -262,20 +262,20 @@ final class PagePrintView: NSView {
             )
     }
 
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
-    override var isFlipped: Bool { true }
+    override internal var isFlipped: Bool { true }
 
-    override func knowsPageRange(_ range: NSRangePointer) -> Bool {
+    override internal func knowsPageRange(_ range: NSRangePointer) -> Bool {
         range.pointee = NSRange(location: 1, length: max(pages.count, 1))
         return true
     }
 
-    override func rectForPage(_ page: Int) -> NSRect {
+    override internal func rectForPage(_ page: Int) -> NSRect {
         NSRect(x: 0, y: CGFloat(page - 1) * pageSize.height, width: pageSize.width, height: pageSize.height)
     }
 
-    override func draw(_ dirtyRect: NSRect) {
+    override internal func draw(_ dirtyRect: NSRect) {
         for (index, lines) in pages.enumerated() where rectForPage(index + 1).intersects(dirtyRect) {
             let top = CGFloat(index) * pageSize.height
             for (row, line) in lines.enumerated() {

@@ -7,17 +7,17 @@ import Foundation
 /// catalogue); the `afm_` ones exist only here.
 extension CommandID {
     /// Copy to the other panel, with the dialog (the spec's "Copy to other").
-    static let copyOtherPanel: CommandID = "cm_CopyOtherpanel"
+    internal static let copyOtherPanel: CommandID = "cm_CopyOtherpanel"
     /// F6 as a move, with the dialog.
-    static let moveOnly: CommandID = "cm_MoveOnly"
+    internal static let moveOnly: CommandID = "cm_MoveOnly"
     /// `.text`: the new name; without, the name under the cursor is edited in place, whatever is selected.
-    static let renameSingleFile: CommandID = "cm_RenameSingleFile"
-    static let makeDirectoryOther: CommandID = "cm_MkDirOther"
-    static let copyWithOptions: CommandID = "afm_CopyWithOptions"
-    static let moveWithOptions: CommandID = "afm_MoveWithOptions"
+    internal static let renameSingleFile: CommandID = "cm_RenameSingleFile"
+    internal static let makeDirectoryOther: CommandID = "cm_MkDirOther"
+    internal static let copyWithOptions: CommandID = "afm_CopyWithOptions"
+    internal static let moveWithOptions: CommandID = "afm_MoveWithOptions"
     /// Copy / move to the other panel under the same names, at once, without a dialog.
-    static let copyNoAsk: CommandID = "afm_CopyNoAsk"
-    static let moveNoAsk: CommandID = "afm_MoveNoAsk"
+    internal static let copyNoAsk: CommandID = "afm_CopyNoAsk"
+    internal static let moveNoAsk: CommandID = "afm_MoveNoAsk"
 }
 
 /// Copy, move, rename, new folder, new file and delete (spec 07 › File operations), the
@@ -34,7 +34,7 @@ public final class FileOperationsPlugin: Plugin {
     }
 
     /// The plugin reading the clipboard through `clipboard`; tests bring a text of their own.
-    init(clipboard: @escaping @Sendable () -> String?) {
+    internal init(clipboard: @escaping @Sendable () -> String?) {
         self.clipboard = clipboard
     }
 
@@ -243,9 +243,9 @@ public final class FileOperationsPlugin: Plugin {
 /// panel's state and the settings and ask the user. Everything that touches a file system runs
 /// inside a job, on the job's thread; the job's completion returns to the main thread to
 /// refresh the panels. The operation log writes on its own queue.
-final class FileOperations: FileTransferService {
+internal final class FileOperations: FileTransferService {
     /// How a copy or move learns where to go.
-    enum Dialog {
+    internal enum Dialog {
         /// One line: the target. The common case, and as fast as it can be.
         case quick
         /// The target with every option of the job.
@@ -273,7 +273,7 @@ final class FileOperations: FileTransferService {
     /// volume can be ejected.
     ///
     /// The next line opens it again.
-    nonisolated func closeLog(on volume: URL) {
+    nonisolated internal func closeLog(on volume: URL) {
         logLock.lock()
         let log = sharedLog
         logLock.unlock()
@@ -288,7 +288,7 @@ final class FileOperations: FileTransferService {
     /// may hand its text over slowly).
     private let clipboard: @Sendable () -> String?
 
-    init(_ kernel: Kernel, clipboard: @escaping @Sendable () -> String?) {
+    internal init(_ kernel: Kernel, clipboard: @escaping @Sendable () -> String?) {
         self.kernel = kernel
         self.clipboard = clipboard
     }
@@ -301,15 +301,15 @@ final class FileOperations: FileTransferService {
     // MARK: Jobs
 
     /// How long the end of the program waits for the log's last lines.
-    static let logFlushTimeout: TimeInterval = 2
+    internal static let logFlushTimeout: TimeInterval = 2
 
-    func flushLog() {
+    internal func flushLog() {
         log?.flush(timeout: Self.logFlushTimeout)
     }
 
     /// Writes what the log still holds, off the calling thread; `completion` is called once,
     /// on some thread, when it is written or `cancellation` was set.
-    func flushLog(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
+    internal func flushLog(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         guard let log else {
             completion()
             return
@@ -391,14 +391,14 @@ final class FileOperations: FileTransferService {
     ///
     /// The list itself is made where it is needed, on the job's thread; for a selection of several
     /// hundred thousand that is time the main thread does not have.
-    struct Picked {
-        let count: Int
+    internal struct Picked {
+        internal let count: Int
         /// The first operand; the only one when `count` is 1.
-        let first: FileItem?
-        let snapshot: PanelModel.Operands
+        internal let first: FileItem?
+        internal let snapshot: PanelModel.Operands
 
         @MainActor
-        init(_ model: PanelModel) {
+        internal init(_ model: PanelModel) {
             let operands = model.operandsSnapshot()
             snapshot = operands
             if operands.markedCount > 0 {
@@ -413,11 +413,11 @@ final class FileOperations: FileTransferService {
         /// The operands.
         ///
         /// For any thread.
-        func items() -> [FileItem] { snapshot.items() }
+        internal func items() -> [FileItem] { snapshot.items() }
 
         /// The marked operands one after another, without the list of them being made, until
         /// `body` answers false: for a loop that asks about each and may be left early.
-        func forEach(_ body: (FileItem) -> Bool) {
+        internal func forEach(_ body: (FileItem) -> Bool) {
             for index in snapshot.shownItems.indices where snapshot.isMarked(at: index) {
                 if !body(snapshot.shownItems[index]) {
                     return
@@ -426,7 +426,7 @@ final class FileOperations: FileTransferService {
         }
 
         /// The one operand as a list, for the wording of a dialog.
-        var single: FileItem? { count == 1 ? first : nil }
+        internal var single: FileItem? { count == 1 ? first : nil }
     }
 
     /// What the completion of a job takes the marks off with: the places of the processed
@@ -434,12 +434,12 @@ final class FileOperations: FileTransferService {
     /// else by then.
     ///
     /// Put together on the job's thread.
-    struct Processed {
-        var indices: [Int] = []
-        var names: [String] = []
-        var shownVersion = 0
+    internal struct Processed {
+        internal var indices: [Int] = []
+        internal var names: [String] = []
+        internal var shownVersion = 0
 
-        init(_ completed: [URL], of picked: Picked) {
+        internal init(_ completed: [URL], of picked: Picked) {
             shownVersion = picked.snapshot.shownVersion
             guard !completed.isEmpty, picked.snapshot.markedCount > 0 else {
                 return
@@ -453,7 +453,7 @@ final class FileOperations: FileTransferService {
         }
 
         @MainActor
-        func deselect(in model: PanelModel) {
+        internal func deselect(in model: PanelModel) {
             guard !indices.isEmpty else {
                 return
             }
@@ -481,7 +481,7 @@ final class FileOperations: FileTransferService {
     ///
     /// In a branch or list view a name is a path, not the last component of the item's location, so
     /// the items are matched by URL.
-    static func names(of processed: [URL], among items: [FileItem]) -> [String] {
+    internal static func names(of processed: [URL], among items: [FileItem]) -> [String] {
         var wanted = Set(processed.map(\.locationKey))
         guard !wanted.isEmpty else {
             return []
@@ -507,7 +507,7 @@ final class FileOperations: FileTransferService {
 
     /// Copy and move (spec 07 › Copy dialog, Target field, Rename and move). `switches` are
     /// the dialog's options as a command line would give them; `G` among them starts at once.
-    func transfer(
+    internal func transfer(
         _ kind: TransferKind,
         sameFolder: Bool = false,
         dialog: Dialog = .quick,
@@ -729,7 +729,7 @@ final class FileOperations: FileTransferService {
     /// deletes directly.
     ///
     /// The configuration can turn the two around (spec 07 › Recycle bin or direct deletion).
-    func delete(shifted: Bool) {
+    internal func delete(shifted: Bool) {
         withOperands { picked, _ in delete(picked, shifted: shifted) }
     }
 
@@ -779,7 +779,7 @@ final class FileOperations: FileTransferService {
     }
 
     // FileTransferService
-    func transfer(
+    internal func transfer(
         _ kind: TransferKind,
         _ sources: [URL],
         into directory: URL,
@@ -863,7 +863,7 @@ final class FileOperations: FileTransferService {
     }
 
     /// Finishes an in-place rename; the cursor follows the renamed item.
-    func renameCursorItem(to newName: String) {
+    internal func renameCursorItem(to newName: String) {
         let model = source.model
         guard let item = model.cursorItem, !newName.isEmpty, newName != item.name else {
             return
@@ -914,7 +914,7 @@ final class FileOperations: FileTransferService {
     /// (spec 07 › Shift+F6 with several items).
     ///
     /// Name conflicts get the Overwrite dialog.
-    func renameSelection() {
+    internal func renameSelection() {
         withOperands { picked, first in renameSelection(picked, first: first) }
     }
 
@@ -1027,7 +1027,7 @@ final class FileOperations: FileTransferService {
 
     /// F7 and Shift+F7 (spec 07 › New folder). `names` given: no dialog; it is the text of the
     /// dialog or the command's switches (`N="a|b"`).
-    func makeDirectory(in panel: any PanelHandle, names given: String?) {
+    internal func makeDirectory(in panel: any PanelHandle, names given: String?) {
         let directory = panel.model.directory
         let openedAt = Date()
         let typed: String
@@ -1119,7 +1119,7 @@ final class FileOperations: FileTransferService {
 
     /// Shift+F4 (spec 10 › New text file): the names follow the rules of new folders; several
     /// names create several files and do not start the editor.
-    func newTextFile(opensEditor: Bool = true) {
+    internal func newTextFile(opensEditor: Bool = true) {
         let model = source.model
         let directory = model.directory
         let openedAt = Date()

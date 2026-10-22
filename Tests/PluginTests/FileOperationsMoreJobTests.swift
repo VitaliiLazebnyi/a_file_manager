@@ -9,7 +9,7 @@ import Testing
 /// Answers a job's questions from scripts and records what was asked.
 ///
 /// Safe to call from the job's worker threads.
-final class Replies: FileJobDelegate {
+internal final class Replies: FileJobDelegate {
     private let lock = NSLock()
     private var conflictScript: [ConflictChoice]
     private var asked: [String] = []
@@ -17,49 +17,49 @@ final class Replies: FileJobDelegate {
     private var failureTexts: [String] = []
     private var protectionAsked: [String] = []
     private var mergeAsked: [String] = []
-    var failure = ErrorChoice.skip
-    var protection = ProtectionChoice.proceed
-    var merge = MergeChoice.merge
-    var cancelAtItems: Int?
-    var cancelAtBytes: Int64?
+    internal var failure = ErrorChoice.skip
+    internal var protection = ProtectionChoice.proceed
+    internal var merge = MergeChoice.merge
+    internal var cancelAtItems: Int?
+    internal var cancelAtBytes: Int64?
 
     /// The conflict answers in order; the last one is repeated.
-    init(_ conflicts: ConflictChoice...) {
+    internal init(_ conflicts: ConflictChoice...) {
         conflictScript = conflicts.isEmpty ? [.overwrite] : conflicts
     }
 
-    var conflicts: [String] { lock.withLock { asked } }
-    var progress: [JobProgress] { lock.withLock { reports } }
-    var errors: [String] { lock.withLock { failureTexts } }
-    var protections: [String] { lock.withLock { protectionAsked } }
-    var merges: [String] { lock.withLock { mergeAsked } }
+    internal var conflicts: [String] { lock.withLock { asked } }
+    internal var progress: [JobProgress] { lock.withLock { reports } }
+    internal var errors: [String] { lock.withLock { failureTexts } }
+    internal var protections: [String] { lock.withLock { protectionAsked } }
+    internal var merges: [String] { lock.withLock { mergeAsked } }
 
-    func job(_ job: FileJob, progress: JobProgress) {
+    internal func job(_ job: FileJob, progress: JobProgress) {
         lock.withLock { reports.append(progress) }
         if let cancelAtItems, progress.itemsDone >= cancelAtItems { job.cancel() }
         if let cancelAtBytes, progress.bytesDone >= cancelAtBytes { job.cancel() }
     }
 
-    func job(_: FileJob, conflictAt target: FileItem, source _: FileItem) -> ConflictChoice {
+    internal func job(_: FileJob, conflictAt target: FileItem, source _: FileItem) -> ConflictChoice {
         lock.withLock {
             asked.append(target.name)
             return conflictScript.count > 1 ? conflictScript.removeFirst() : conflictScript[0]
         }
     }
 
-    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
+    internal func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock { failureTexts.append(error.localizedDescription) }
         return failure
     }
 
-    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
+    internal func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 
-    func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
+    internal func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         lock.withLock { protectionAsked.append("\(question.reason) \(question.purpose) \(question.item.name)") }
         return protection
     }
 
-    func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
+    internal func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
         lock.withLock { mergeAsked.append(existing.name) }
         return merge
     }
@@ -69,25 +69,25 @@ final class Replies: FileJobDelegate {
 /// way: damage what is written, take its time, and count how many copies run at once.
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-final class WrappedFileSystem: FileSystemProvider, @unchecked Sendable {
-    let base: MemoryFileSystem
-    let scheme: String
-    var capabilities: FileSystemCapabilities { base.capabilities }
+internal final class WrappedFileSystem: FileSystemProvider, @unchecked Sendable {
+    internal let base: MemoryFileSystem
+    internal let scheme: String
+    internal var capabilities: FileSystemCapabilities { base.capabilities }
     /// Every stream written here loses its first byte's value.
-    var corruptsWrites = false
+    internal var corruptsWrites = false
     /// How long a copy inside this file system and each written block take.
-    var delay: TimeInterval = 0
+    internal var delay: TimeInterval = 0
     private let lock = NSLock()
     private var running = 0
     private var mostAtOnce = 0
 
-    init(_ base: MemoryFileSystem) {
+    internal init(_ base: MemoryFileSystem) {
         self.base = base
         scheme = base.scheme
     }
 
     /// The largest number of files that were being written at the same time.
-    var mostWritesAtOnce: Int { lock.withLock { mostAtOnce } }
+    internal var mostWritesAtOnce: Int { lock.withLock { mostAtOnce } }
 
     private func began() {
         lock.withLock {
@@ -122,35 +122,35 @@ final class WrappedFileSystem: FileSystemProvider, @unchecked Sendable {
         }
     }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try base.list(directory, showHidden: showHidden)
     }
-    func item(at url: URL) -> FileItem? { base.item(at: url) }
-    func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader { try base.read(url) }
-    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> any FileWriter {
+    internal func item(at url: URL) -> FileItem? { base.item(at: url) }
+    internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
+    internal func read(_ url: URL) throws -> any FileReader { try base.read(url) }
+    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func write(_ url: URL) throws -> any FileWriter {
         let writer = Writer(try base.write(url), self)
         began()
         return writer
     }
-    func remove(_ url: URL) throws { try base.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    internal func remove(_ url: URL) throws { try base.remove(url) }
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    internal func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         began()
         defer { ended() }
         if delay > 0 { Thread.sleep(forTimeInterval: delay) }
         try base.copy(source, to: destination, progress: progress)
     }
-    func displayPath(_ url: URL) -> String { base.displayPath(url) }
-    func location(from text: String) -> URL? { base.location(from: text) }
-    func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
+    internal func displayPath(_ url: URL) -> String { base.displayPath(url) }
+    internal func location(from text: String) -> URL? { base.location(from: text) }
+    internal func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
 }
 
 /// The local disk plus a wrapped in-memory file system.
-func makeWrappedFileSystems() -> (FileSystemRegistry, WrappedFileSystem) {
+internal func makeWrappedFileSystems() -> (FileSystemRegistry, WrappedFileSystem) {
     let fileSystems = FileSystemRegistry()
     let wrapped = WrappedFileSystem(MemoryFileSystem())
     fileSystems.register(LocalFileSystem())
@@ -160,7 +160,7 @@ func makeWrappedFileSystems() -> (FileSystemRegistry, WrappedFileSystem) {
 
 /// Runs a job whose questions `replies` answers; `configure` sets its options first.
 @discardableResult
-func runJob(
+internal func runJob(
     _ kind: JobKind,
     _ sources: [URL],
     to target: TargetSpec? = nil,
@@ -178,11 +178,11 @@ func runJob(
 
 /// Every answer of the Overwrite dialog and every preset of the Copy dialog.
 @Suite
-struct OverwriteChoices {
-    let box: Sandbox
-    let old = Date(timeIntervalSince1970: 1_600_000_000), new = Date(timeIntervalSince1970: 1_700_000_000)
+internal struct OverwriteChoices {
+    internal let box: Sandbox
+    internal let old = Date(timeIntervalSince1970: 1_600_000_000), new = Date(timeIntervalSince1970: 1_700_000_000)
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt", "source one", modified: new)
         try box.file("A/two.txt", "s2", modified: old)
@@ -190,11 +190,11 @@ struct OverwriteChoices {
         try box.file("B/two.txt", "target two", modified: new)
     }
 
-    var sources: [URL] { [box.url("A/one.txt"), box.url("A/two.txt")] }
-    var target: TargetSpec { TargetSpec(directory: box.url("B")) }
+    internal var sources: [URL] { [box.url("A/one.txt"), box.url("A/two.txt")] }
+    internal var target: TargetSpec { TargetSpec(directory: box.url("B")) }
 
     @Test
-    func overwriteAndSkipAreForOneFileEach() {
+    internal func overwriteAndSkipAreForOneFileEach() {
         let replies = Replies(.overwrite, .skip)
         let result = runJob(.copy, sources, to: target, replies: replies)
         #expect(replies.conflicts == ["one.txt", "two.txt"])
@@ -203,7 +203,7 @@ struct OverwriteChoices {
     }
 
     @Test
-    func overwriteAllAndSkipAllAskOnce() {
+    internal func overwriteAllAndSkipAllAskOnce() {
         let all = Replies(.overwriteAll)
         runJob(.copy, sources, to: target, replies: all)
         #expect(all.conflicts == ["one.txt"] && box.read("B/two.txt") == "s2")
@@ -214,7 +214,7 @@ struct OverwriteChoices {
     }
 
     @Test
-    func renameAsksAgainWhenTheNewNameIsTakenToo() {
+    internal func renameAsksAgainWhenTheNewNameIsTakenToo() {
         let replies = Replies(.rename("two.txt"), .rename("fresh.txt"), .skip)
         runJob(.copy, [box.url("A/one.txt")], to: target, replies: replies)
         #expect(replies.conflicts == ["one.txt", "two.txt"])
@@ -225,14 +225,14 @@ struct OverwriteChoices {
     }
 
     @Test
-    func renameExistingMovesTheTargetAsideFirst() {
+    internal func renameExistingMovesTheTargetAsideFirst() {
         let result = runJob(.copy, [box.url("A/one.txt")], to: target, replies: Replies(.renameExisting("one.old")))
         #expect(box.read("B/one.old") == "target" && box.read("B/one.txt") == "source one")
         #expect(result.lastTarget?.lastPathComponent == "one.txt")
     }
 
     @Test
-    func autoRenameCopiedHoldsForTheRestOfTheJob() {
+    internal func autoRenameCopiedHoldsForTheRestOfTheJob() {
         let replies = Replies(.autoRenameCopied)
         let result = runJob(.copy, sources, to: target, replies: replies)
         #expect(replies.conflicts == ["one.txt"])
@@ -241,14 +241,14 @@ struct OverwriteChoices {
     }
 
     @Test
-    func autoRenameExistingKeepsTheOldFilesUnderNumberedNames() {
+    internal func autoRenameExistingKeepsTheOldFilesUnderNumberedNames() {
         runJob(.copy, sources, to: target, replies: Replies(.autoRenameExisting))
         #expect(box.read("B/one (2).txt") == "target" && box.read("B/one.txt") == "source one")
         #expect(box.read("B/two (2).txt") == "target two" && box.read("B/two.txt") == "s2")
     }
 
     @Test
-    func theRulesByAgeAndSize() throws {
+    internal func theRulesByAgeAndSize() throws {
         // one.txt: the source is newer and larger; two.txt: older and smaller.
         runJob(.copy, sources, to: target, replies: Replies(.copyAllLarger))
         #expect(box.read("B/one.txt") == "source one" && box.read("B/two.txt") == "target two")
@@ -264,14 +264,14 @@ struct OverwriteChoices {
     }
 
     @Test
-    func renameOlderSkipNewer() {
+    internal func renameOlderSkipNewer() {
         runJob(.copy, sources, to: target, replies: Replies(.renameOlderSkipNewer))
         #expect(box.read("B/one (2).txt") == "target" && box.read("B/one.txt") == "source one")
         #expect(box.read("B/two.txt") == "target two" && !box.exists("B/two (2).txt"))
     }
 
     @Test
-    func cancelLeavesEverythingAsItWas() {
+    internal func cancelLeavesEverythingAsItWas() {
         let result = runJob(.copy, sources, to: target, replies: Replies(.cancel))
         #expect(
             result.cancelled && box.read("B/one.txt") == "target"
@@ -280,7 +280,7 @@ struct OverwriteChoices {
     }
 
     @Test
-    func aPresetAnswersWithoutAsking() {
+    internal func aPresetAnswersWithoutAsking() {
         let presets: [(OverwriteMode, String, String)] = [
             (.skipAll, "target", "target two"), (.overwriteOlder, "source one", "target two"),
             (.overwriteAll, "source one", "s2")
@@ -301,14 +301,14 @@ struct OverwriteChoices {
     }
 
     @Test
-    func appendAddsTheSourceToTheEndOfTheTarget() {
+    internal func appendAddsTheSourceToTheEndOfTheTarget() {
         let result = runJob(.copy, [box.url("A/one.txt")], to: target, replies: Replies(.append))
         #expect(box.read("B/one.txt") == "targetsource one" && box.read("A/one.txt") == "source one")
         #expect(result.completed.count == 1 && namesOnDisk(box.url("B")) == ["one.txt", "two.txt"])
     }
 
     @Test
-    func resumeContinuesAPartialFile() throws {
+    internal func resumeContinuesAPartialFile() throws {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/out/big.bin", "0123456789", modified: new, permissions: 0o600)
         try box.file("B/big.bin", "0123", modified: old)
@@ -333,7 +333,7 @@ struct OverwriteChoices {
     }
 
     @Test
-    func aMoveOntoAnExistingNameAsksToo() {
+    internal func aMoveOntoAnExistingNameAsksToo() {
         let replies = Replies(.overwrite, .skip)
         let result = runJob(.move, sources, to: target, replies: replies)
         #expect(!box.exists("A/one.txt") && box.read("B/one.txt") == "source one")
@@ -343,9 +343,9 @@ struct OverwriteChoices {
 
 /// Read-only, hidden and locked items, and merging into an existing folder.
 @Suite
-struct ProtectedItems {
+internal struct ProtectedItems {
     @Test
-    func aReadOnlyTargetAsksASecondTime() throws {
+    internal func aReadOnlyTargetAsksASecondTime() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "new")
         try box.file("B/one.txt", "old")
@@ -372,7 +372,7 @@ struct ProtectedItems {
     }
 
     @Test
-    func deletingReadOnlyAndHiddenFilesAsks() {
+    internal func deletingReadOnlyAndHiddenFilesAsks() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/ro.txt", "r", permissions: 0o444)
         memory.addFile("/a/.hidden", "h")
@@ -395,7 +395,7 @@ struct ProtectedItems {
     }
 
     @Test
-    func aLockedFileIsAskedAboutWhenTheSystemRefuses() throws {
+    internal func aLockedFileIsAskedAboutWhenTheSystemRefuses() throws {
         let box = try Sandbox()
         let locked = try box.file("A/locked.txt", "l")
         #expect(chflags(locked.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -413,7 +413,7 @@ struct ProtectedItems {
     }
 
     @Test
-    func mergingIntoAnExistingFolderCanBeAskedAbout() {
+    internal func mergingIntoAnExistingFolderCanBeAskedAbout() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/one.txt", "1")
         memory.addFile("/b/docs/keep.txt", "k")
@@ -438,9 +438,9 @@ struct ProtectedItems {
 
 /// The options of the Copy dialog: filter, attributes, links, verify, errors, the log's records.
 @Suite
-struct TransferOptionsInJobs {
+internal struct TransferOptionsInJobs {
     @Test
-    func theFilterChoosesWhatIsCopied() {
+    internal func theFilterChoosesWhatIsCopied() {
         let (fileSystems, memory) = makeFileSystems()
         for path in [
             "/a/one.txt", "/a/two.bak", "/a/docs/in.txt", "/a/docs/pic.jpg", "/a/docs/build/out.txt",
@@ -480,7 +480,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func aFilteredMoveKeepsWhatWasLeftOut() {
+    internal func aFilteredMoveKeepsWhatWasLeftOut() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/in.txt", "t")
         memory.addFile("/a/docs/pic.jpg", "j")
@@ -498,7 +498,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func renameMasksInTheTarget() throws {
+    internal func renameMasksInTheTarget() throws {
         let (fileSystems, memory) = makeFileSystems()
         let box = try Sandbox()
         try box.file("A/report.txt", "r")
@@ -538,7 +538,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func attributesAndFolderDates() throws {
+    internal func attributesAndFolderDates() throws {
         let box = try Sandbox()
         let stamp = Date(timeIntervalSince1970: 1_500_000_000)
         try box.file("A/docs/tool.sh", "#!/bin/sh", modified: stamp)
@@ -569,7 +569,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func linksAreCopiedAsLinksOrFollowed() throws {
+    internal func linksAreCopiedAsLinksOrFollowed() throws {
         let box = try Sandbox()
         try box.file("real/inside.txt", "i")
         try box.file("real.txt", "content")
@@ -592,7 +592,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func verifyCatchesACorruptedCopy() throws {
+    internal func verifyCatchesACorruptedCopy() throws {
         let box = try Sandbox()
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         try box.file("A/data.bin", String(repeating: "d", count: 3_000))
@@ -634,7 +634,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func checksumsCompareContents() throws {
+    internal func checksumsCompareContents() throws {
         let (fileSystems, memory) = makeFileSystems()
         let box = try Sandbox()
         try box.file("a.txt", "same")
@@ -653,7 +653,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func keepingGoingOnErrorsSkipsWithoutAskingAndCounts() {
+    internal func keepingGoingOnErrorsSkipsWithoutAskingAndCounts() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/one.txt", "1")
         memory.addDirectory("/b")
@@ -672,7 +672,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func aPartFileCanBeKeptAndResumed() throws {
+    internal func aPartFileCanBeKeptAndResumed() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         let content = String(repeating: "0123456789abcdef", count: (5 << 20) / 16)
@@ -700,7 +700,7 @@ struct TransferOptionsInJobs {
     }
 
     @Test
-    func everyItemIsRecordedForTheLog() {
+    internal func everyItemIsRecordedForTheLog() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/in.txt", "1")
         memory.addFile("/a/one.txt", "new")
@@ -751,11 +751,11 @@ struct TransferOptionsInJobs {
 
 /// Several small files at once, and what stays the same when they are.
 @Suite
-struct ParallelCopies {
-    static let count = 120
+internal struct ParallelCopies {
+    internal static let count = 120
 
     /// A tree of small files in memory: /src/file000.txt … and /src/sub/….
-    func fill(_ memory: MemoryFileSystem) {
+    internal func fill(_ memory: MemoryFileSystem) {
         for index in 0..<Self.count {
             memory.addFile(String(format: "/src/file%03d.txt", index), "content \(index)")
             if index % 4 == 0 { memory.addFile(String(format: "/src/sub/deep%03d.txt", index), "deep \(index)") }
@@ -763,7 +763,7 @@ struct ParallelCopies {
     }
 
     @Test
-    func smallFilesAreCopiedSeveralAtOnceOnLocalStorage() {
+    internal func smallFilesAreCopiedSeveralAtOnceOnLocalStorage() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
         wrapped.base.addDirectory("/dst")
@@ -801,7 +801,7 @@ struct ParallelCopies {
     }
 
     @Test
-    func aNetworkVolumeGetsASingleStream() {
+    internal func aNetworkVolumeGetsASingleStream() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
         wrapped.base.addDirectory("/dst")
@@ -833,7 +833,7 @@ struct ParallelCopies {
     }
 
     @Test
-    func conflictsAreAskedOneAtATimeInProcessingOrder() {
+    internal func conflictsAreAskedOneAtATimeInProcessingOrder() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
         for index in stride(from: 0, to: Self.count, by: 10) {
@@ -860,7 +860,7 @@ struct ParallelCopies {
     }
 
     @Test
-    func aCancelledParallelCopyLeavesNoPartialFiles() throws {
+    internal func aCancelledParallelCopyLeavesNoPartialFiles() throws {
         let box = try Sandbox()
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         // Streams from memory onto the disk: each file arrives under a temporary name first.
@@ -893,7 +893,7 @@ struct ParallelCopies {
     }
 
     @Test
-    func manySmallFilesOnDiskArriveCompleteInBothDirections() throws {
+    internal func manySmallFilesOnDiskArriveCompleteInBothDirections() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         for index in 0..<200 {
@@ -931,7 +931,7 @@ struct ParallelCopies {
     }
 
     @Test
-    func anErrorInAWorkerAsksLikeAnyOtherAndAbortStopsEverything() {
+    internal func anErrorInAWorkerAsksLikeAnyOtherAndAbortStopsEverything() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
         wrapped.base.addDirectory("/dst")

@@ -11,21 +11,21 @@ import UniformTypeIdentifiers
 /// The parts of a rename run below the session: the runner that moves the files, the survey of
 /// the folders, the dates inside pictures and the result log, where things go wrong.
 @Suite
-struct CoverageRenameRun {
-    let fileSystem = CoverageRenameFileSystem()
-    let registry = FileSystemRegistry()
-    let box: Sandbox
+internal struct CoverageRenameRun {
+    internal let fileSystem = CoverageRenameFileSystem()
+    internal let registry = FileSystemRegistry()
+    internal let box: Sandbox
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         registry.register(fileSystem)
         registry.register(LocalFileSystem())
     }
 
-    func url(_ path: String) -> URL { fileSystem.url(path) }
+    internal func url(_ path: String) -> URL { fileSystem.url(path) }
 
     /// The steps of a plan for these renames, run.
-    func run(
+    internal func run(
         _ renames: [(String, String)],
         cancellation: CancellationFlag = CancellationFlag(),
         onProgress: ((RenameStep, Int) -> Void)? = nil
@@ -40,7 +40,7 @@ struct CoverageRenameRun {
     // MARK: The runner
 
     @Test
-    func aCancelledRunStopsBeforeTheNextStep() {
+    internal func aCancelledRunStopsBeforeTheNextStep() {
         fileSystem.base.addFile("/d/a")
         let cancellation = CancellationFlag()
         cancellation.cancel()
@@ -51,7 +51,7 @@ struct CoverageRenameRun {
     /// A ring of two, cancelled once the first is parked under a temporary name: its new name
     /// is still taken, so it comes back to its own.
     @Test
-    func aParkedItemWhoseTurnNeverCameComesBack() {
+    internal func aParkedItemWhoseTurnNeverCameComesBack() {
         fileSystem.base.addFile("/d/1", "one")
         fileSystem.base.addFile("/d/2", "two")
         let cancellation = CancellationFlag()
@@ -66,7 +66,7 @@ struct CoverageRenameRun {
     /// The second of a ring cannot take the first one's name, so the first cannot go on, and it
     /// cannot come back either: it stays under the temporary name, and the user is told which.
     @Test
-    func aParkedItemThatCannotComeBackIsReported() throws {
+    internal func aParkedItemThatCannotComeBackIsReported() throws {
         fileSystem.base.addFile("/d/1", "one")
         fileSystem.base.addFile("/d/2", "two")
         fileSystem.refusedTargets = ["/d/1"]
@@ -80,7 +80,7 @@ struct CoverageRenameRun {
     /// A run cancelled after the second item moved: the parked first item still goes on to its
     /// new name, which is free by then.
     @Test
-    func aParkedItemGoesOnWhenItsNameIsFree() {
+    internal func aParkedItemGoesOnWhenItsNameIsFree() {
         fileSystem.base.addFile("/d/1", "one")
         fileSystem.base.addFile("/d/2", "two")
         let cancellation = CancellationFlag()
@@ -94,7 +94,7 @@ struct CoverageRenameRun {
     /// The first of a ring cannot be parked: neither of the two moves, and the first is not
     /// tried again.
     @Test
-    func anItemThatCannotBeParkedStays() {
+    internal func anItemThatCannotBeParkedStays() {
         fileSystem.base.addFile("/d/1", "one")
         fileSystem.base.addFile("/d/2", "two")
         fileSystem.refusesTemporaryNames = true
@@ -105,7 +105,7 @@ struct CoverageRenameRun {
 
     /// Two rings that both fail leave two items parked; each is reported, in list order.
     @Test
-    func twoParkedItemsAreReportedInOrder() {
+    internal func twoParkedItemsAreReportedInOrder() {
         for name in ["1", "2", "3", "4"] { fileSystem.base.addFile("/d/" + name, name) }
         fileSystem.refusedTargets = ["/d/1", "/d/3"]
         let result = run([("/d/1", "/d/2"), ("/d/2", "/d/1"), ("/d/3", "/d/4"), ("/d/4", "/d/3")])
@@ -116,7 +116,7 @@ struct CoverageRenameRun {
     /// A name that differs in its accents only goes by way of a temporary name; when the second
     /// half fails, the file is put back under its old name.
     @Test
-    func aRenameOfTheAccentsAloneThatFailsIsUndone() {
+    internal func aRenameOfTheAccentsAloneThatFailsIsUndone() {
         let decomposed = "e\u{301}.txt"
         let precomposed = "\u{E9}.txt"
         fileSystem.base.addFile("/d/" + decomposed)
@@ -139,7 +139,7 @@ struct CoverageRenameRun {
     /// A wildcard search over a very long name runs out of its time: the name gets no new name,
     /// and after three such names the search is given up.
     @Test
-    func aWildcardSearchThatTakesTooLongIsGivenUp() throws {
+    internal func aWildcardSearchThatTakesTooLongIsGivenUp() throws {
         let long = String(repeating: "a", count: 20_000)
         let matcher = WildcardMatcher("a*a*a*a*b", caseSensitive: true)
         let guardian = RenameRegexGuard()
@@ -155,7 +155,7 @@ struct CoverageRenameRun {
 
     /// Cancelled in the middle of a name, the search answers nothing and counts no timeout.
     @Test
-    func aWildcardSearchCancelledMidwayCountsNoTimeout() {
+    internal func aWildcardSearchCancelledMidwayCountsNoTimeout() {
         let long = String(repeating: "a", count: 20_000)
         let guardian = RenameRegexGuard()
         let asked = Asked()
@@ -165,12 +165,12 @@ struct CoverageRenameRun {
     }
 
     @Test
-    func locationsOffTheDiskAreTakenAtTheirWord() {
+    internal func locationsOffTheDiskAreTakenAtTheirWord() {
         #expect(RenameRunner.isSameFile(url("/d/a"), url("/d/A")))
     }
 
     @Test
-    func aSourceThatIsGoneIsNoSameFile() throws {
+    internal func aSourceThatIsGoneIsNoSameFile() throws {
         let present = try box.file("present")
         #expect(!RenameRunner.isSameFile(box.url("gone"), present))
         #expect(!RenameRunner.isSameFile(present, box.url("gone")))
@@ -181,14 +181,14 @@ struct CoverageRenameRun {
 
     /// A name in capitals is tried in small letters.
     @Test
-    func aNameInCapitalsIsTriedInSmallLetters() throws {
+    internal func aNameInCapitalsIsTriedInSmallLetters() throws {
         let file = try box.file("README")
         let item = try #require(registry.item(at: file))
         #expect(RenameSurvey(fileSystems: registry).foldsCase([item]))
     }
 
     @Test
-    func aCancelledSurveyFoldsNothing() throws {
+    internal func aCancelledSurveyFoldsNothing() throws {
         let file = try box.file("notes.txt")
         let item = try #require(registry.item(at: file))
         let cancellation = CancellationFlag()
@@ -199,7 +199,7 @@ struct CoverageRenameRun {
     /// Off the local disk the folder is listed: a server that finds `NOTES.TXT` for `notes.txt`
     /// folds letter case, unless it holds both spellings.
     @Test
-    func aServerIsAskedByListingTheFolder() throws {
+    internal func aServerIsAskedByListingTheFolder() throws {
         fileSystem.foldsCase = true
         fileSystem.base.addFile("/s/notes.txt", "abc")
         let item = try #require(registry.item(at: url("/s/notes.txt")))
@@ -213,7 +213,7 @@ struct CoverageRenameRun {
 
     /// A file with a second name (a hard link) is asked by listing its folder too.
     @Test
-    func aFileWithTwoNamesIsAskedByListing() throws {
+    internal func aFileWithTwoNamesIsAskedByListing() throws {
         let file = try box.file("linked.txt")
         try FileManager.default.linkItem(at: file, to: box.url("other.txt"))
         let item = try #require(registry.item(at: file))
@@ -221,7 +221,7 @@ struct CoverageRenameRun {
     }
 
     @Test
-    func theVolumeAnswersForFoldersAwayFromTheList() throws {
+    internal func theVolumeAnswersForFoldersAwayFromTheList() throws {
         #expect(RenameSurvey.volumeFoldsCase(url("/x")) == nil)
         let missing = box.url("not/there/yet")
         #expect(RenameSurvey.volumeFoldsCase(missing) == RenameSurvey.volumeFoldsCase(box.root))
@@ -229,7 +229,7 @@ struct CoverageRenameRun {
     }
 
     @Test
-    func noFoldersHoldNothing() {
+    internal func noFoldersHoldNothing() {
         let keys = RenameSurvey(fileSystems: registry)
             .existingKeys(
                 in: [:],
@@ -242,7 +242,7 @@ struct CoverageRenameRun {
     /// A list of items on the local disk and on a server that tells the cases apart: only the
     /// folder on the disk folds them.
     @Test
-    func eachFolderIsJudgedOnItsOwn() throws {
+    internal func eachFolderIsJudgedOnItsOwn() throws {
         let local = try box.file("a.txt")
         let remote = fileSystem.base.addFile("/r/b.txt")
         let entries = try [local, remote].map { RenameEntry(try #require(registry.item(at: $0))) }
@@ -261,7 +261,7 @@ struct CoverageRenameRun {
     /// A name given with a slash in front moves the item from the top of its file system; the
     /// folder it goes to is not near any of the list, and its volume is asked.
     @Test
-    func aNameFromTheTopGoesElsewhere() throws {
+    internal func aNameFromTheTopGoesElsewhere() throws {
         let file = try box.file("a/one.txt")
         let entry = RenameEntry(try #require(registry.item(at: file)))
         let target = RenameComputation.target(of: entry, named: box.url("b/two.txt").path)
@@ -280,7 +280,7 @@ struct CoverageRenameRun {
 
     /// Accents written another way on the local disk: the name is put into the folder as typed.
     @Test
-    func accentsWrittenAnotherWayKeepTheirForm() throws {
+    internal func accentsWrittenAnotherWayKeepTheirForm() throws {
         let file = try box.file("e\u{301}.txt")
         let entry = RenameEntry(FileItem(url: file, name: "e\u{301}.txt"))
         let target = RenameComputation.target(of: entry, named: "\u{E9}.txt")
@@ -289,7 +289,7 @@ struct CoverageRenameRun {
 
     /// A preview that is cancelled once the planner is made does not list the folders.
     @Test
-    func aPreviewCancelledAfterThePlannerListsNothing() {
+    internal func aPreviewCancelledAfterThePlannerListsNothing() {
         fileSystem.base.addFile("/p/a.txt")
         fileSystem.base.addFile("/p/b.txt")
         let entries = ["/p/a.txt"].compactMap { registry.item(at: url($0)) }.map(RenameEntry.init)
@@ -309,7 +309,7 @@ struct CoverageRenameRun {
 
     /// A listing that is cut short by the cancellation counts for nothing.
     @Test
-    func aListingCutShortHoldsNothing() {
+    internal func aListingCutShortHoldsNothing() {
         fileSystem.base.addFile("/q/a.txt")
         let cancellation = CancellationFlag()
         let keys = RenameSurvey(fileSystems: registry, cancellation: cancellation)
@@ -327,7 +327,7 @@ struct CoverageRenameRun {
     // MARK: Dates in pictures
 
     /// A picture with the given EXIF and TIFF dates.
-    func picture(_ name: String, exif: [CFString: Any]? = nil, tiff: [CFString: Any]? = nil) throws -> URL {
+    internal func picture(_ name: String, exif: [CFString: Any]? = nil, tiff: [CFString: Any]? = nil) throws -> URL {
         let url = box.url(name)
         let context = try #require(
             CGContext(
@@ -357,7 +357,7 @@ struct CoverageRenameRun {
         return url
     }
 
-    func taken(_ url: URL) -> String? {
+    internal func taken(_ url: URL) -> String? {
         ContentDate.read(url)
             .map {
                 var calendar = Calendar(identifier: .gregorian)
@@ -368,7 +368,7 @@ struct CoverageRenameRun {
     }
 
     @Test
-    func theDateTakenComesFromTheBestField() throws {
+    internal func theDateTakenComesFromTheBestField() throws {
         let original = try picture("o.jpg", exif: [kCGImagePropertyExifDateTimeOriginal: "2021:05:06 07:08:09"])
         #expect(taken(original) == "2021-5-6 7")
         let digitized = try picture("d.jpg", exif: [kCGImagePropertyExifDateTimeDigitized: "2020:01:02 03:04:05"])
@@ -379,7 +379,7 @@ struct CoverageRenameRun {
     }
 
     @Test
-    func onlyPlainPicturesOnTheDiskAreOpened() throws {
+    internal func onlyPlainPicturesOnTheDiskAreOpened() throws {
         #expect(ContentDate.read(url("/x.jpg")) == nil)
         #expect(ContentDate.read(try box.file("notes.txt")) == nil)
         #expect(ContentDate.read(try box.file("noextension")) == nil)
@@ -391,7 +391,7 @@ struct CoverageRenameRun {
 
     /// `[T4]` reads each picture once, however often the preview is made.
     @Test
-    func theDateTakenIsReadOnce() throws {
+    internal func theDateTakenIsReadOnce() throws {
         let file = try picture("p.jpg", exif: [kCGImagePropertyExifDateTimeOriginal: "2021:05:06 07:08:09"])
         let cache = RenameCache()
         #expect(cache.contentDate(of: file) != nil)
@@ -404,7 +404,7 @@ struct CoverageRenameRun {
     // MARK: The result log
 
     @Test
-    func aLogThatCannotBeWrittenIsLeftOut() throws {
+    internal func aLogThatCannotBeWrittenIsLeftOut() throws {
         let folder = try box.folder("locked")
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path) }
@@ -414,7 +414,7 @@ struct CoverageRenameRun {
     }
 
     @Test
-    func aFileMovedElsewhereIsLoggedWithItsWholePath() {
+    internal func aFileMovedElsewhereIsLoggedWithItsWholePath() {
         let text = RenameLog.text([RenamedItem(from: url("/a/x.txt"), to: url("/b/y.txt"))], fileSystems: registry)
         #expect(
             text == "\"\(registry.displayPath(url("/a/x.txt")))\" -> \"\(registry.displayPath(url("/b/y.txt")))\"\n"

@@ -3,41 +3,41 @@ public import AFMKernel
 import Foundation
 
 extension CommandID {
-    static let newTabInBackground: CommandID = "cm_OpenNewTabBg"
-    static let newTabInOtherPanel: CommandID = "cm_OpenNewTabOther"
-    static let newTabInBackgroundInOtherPanel: CommandID = "cm_OpenNewTabBgOther"
-    static let openInNewTabInOtherPanel: CommandID = "cm_OpenDirInNewTabOther"
+    internal static let newTabInBackground: CommandID = "cm_OpenNewTabBg"
+    internal static let newTabInOtherPanel: CommandID = "cm_OpenNewTabOther"
+    internal static let newTabInBackgroundInOtherPanel: CommandID = "cm_OpenNewTabBgOther"
+    internal static let openInNewTabInOtherPanel: CommandID = "cm_OpenDirInNewTabOther"
     /// Closes every tab but the active one and the locked ones.
-    static let closeAllTabs: CommandID = "cm_CloseAllTabs"
-    static let closeDuplicateTabs: CommandID = "cm_CloseDuplicateTabs"
-    static let toggleTabLock: CommandID = "cm_ToggleLockCurrentTab"
-    static let unlockTab: CommandID = "cm_SetTabOptionNormal"
-    static let lockTab: CommandID = "cm_SetTabOptionPathLocked"
-    static let unlockAllTabs: CommandID = "cm_SetAllTabsOptionNormal"
-    static let lockAllTabs: CommandID = "cm_SetAllTabsOptionPathLocked"
+    internal static let closeAllTabs: CommandID = "cm_CloseAllTabs"
+    internal static let closeDuplicateTabs: CommandID = "cm_CloseDuplicateTabs"
+    internal static let toggleTabLock: CommandID = "cm_ToggleLockCurrentTab"
+    internal static let unlockTab: CommandID = "cm_SetTabOptionNormal"
+    internal static let lockTab: CommandID = "cm_SetTabOptionPathLocked"
+    internal static let unlockAllTabs: CommandID = "cm_SetAllTabsOptionNormal"
+    internal static let lockAllTabs: CommandID = "cm_SetAllTabsOptionPathLocked"
     /// `.text`: the new name (empty for the folder's name); without, the user is asked.
-    static let renameTab: CommandID = "cm_RenameTab"
-    static let moveTabLeft: CommandID = "cm_MoveTabLeft"
-    static let moveTabRight: CommandID = "cm_MoveTabRight"
-    static let exchangeWithTabs: CommandID = "cm_ExchangeWithTabs"
-    static let sourceTabsList: CommandID = "cm_SrcTabsList"
-    static let targetTabsList: CommandID = "cm_TrgTabsList"
-    static let leftTabsList: CommandID = "cm_LeftTabsList"
-    static let rightTabsList: CommandID = "cm_RightTabsList"
-    static let duplicateTab: CommandID = "afm_DuplicateTab"
-    static let copyTabToOtherPanel: CommandID = "afm_CopyTabToOtherPanel"
-    static let moveTabToOtherPanel: CommandID = "afm_MoveTabToOtherPanel"
-    static let reopenClosedTab: CommandID = "afm_ReopenClosedTab"
-    static let recentlyClosedTabs: CommandID = "afm_RecentlyClosedTabs"
+    internal static let renameTab: CommandID = "cm_RenameTab"
+    internal static let moveTabLeft: CommandID = "cm_MoveTabLeft"
+    internal static let moveTabRight: CommandID = "cm_MoveTabRight"
+    internal static let exchangeWithTabs: CommandID = "cm_ExchangeWithTabs"
+    internal static let sourceTabsList: CommandID = "cm_SrcTabsList"
+    internal static let targetTabsList: CommandID = "cm_TrgTabsList"
+    internal static let leftTabsList: CommandID = "cm_LeftTabsList"
+    internal static let rightTabsList: CommandID = "cm_RightTabsList"
+    internal static let duplicateTab: CommandID = "afm_DuplicateTab"
+    internal static let copyTabToOtherPanel: CommandID = "afm_CopyTabToOtherPanel"
+    internal static let moveTabToOtherPanel: CommandID = "afm_MoveTabToOtherPanel"
+    internal static let reopenClosedTab: CommandID = "afm_ReopenClosedTab"
+    internal static let recentlyClosedTabs: CommandID = "afm_RecentlyClosedTabs"
     /// The commands with parameters of the specification (03 › Tab files and storage).
     /// `.location` or `.text`: the tab file; without, the user is asked for it.
-    static let saveTabs: CommandID = "SAVETABS"
-    static let saveTabsOfBothSides: CommandID = "SAVETABS2"
-    static let openTabs: CommandID = "OPENTABS"
-    static let appendTabs: CommandID = "APPENDTABS"
+    internal static let saveTabs: CommandID = "SAVETABS"
+    internal static let saveTabsOfBothSides: CommandID = "SAVETABS2"
+    internal static let openTabs: CommandID = "OPENTABS"
+    internal static let appendTabs: CommandID = "APPENDTABS"
 
     /// `cm_SrcActivateTab1`…`10` and the `Trg`, `Left` and `Right` variants.
-    static func activateTab(_ side: String, _ number: Int) -> CommandID {
+    internal static func activateTab(_ side: String, _ number: Int) -> CommandID {
         CommandID(rawValue: "cm_\(side)ActivateTab\(number)")
     }
 }
@@ -49,11 +49,11 @@ extension CommandID {
 /// like the panels it works on.
 public final class FolderTabsPlugin: Plugin {
     public let name = "Folder tabs"
-    static let confirmCloseAllKey = "folderTabs.confirmCloseAll"
-    static let foregroundKey = "folderTabs.openDirInForeground"
-    static let nearCurrentKey = "folderTabs.openNearCurrent"
+    internal static let confirmCloseAllKey = "folderTabs.confirmCloseAll"
+    internal static let foregroundKey = "folderTabs.openDirInForeground"
+    internal static let nearCurrentKey = "folderTabs.openNearCurrent"
     /// How many closed tabs of a panel can be brought back.
-    static let closedTabsLimit = 20
+    internal static let closedTabsLimit = 20
 
     /// A tab that was closed, the folder it showed, and where it was.
     private struct ClosedTab {
@@ -398,7 +398,7 @@ public final class FolderTabsPlugin: Plugin {
 
     /// The most tabs a panel holds; more are not opened (a tab file with thousands of tabs is
     /// no tab file).
-    static let tabsPerPanelLimit = 256
+    internal static let tabsPerPanelLimit = 256
 
     /// The schemes whose tabs connect to a server when they are shown, for a location that no
     /// file system claims (one whose plugin is not loaded; a view, which looks at places that may).
@@ -409,7 +409,7 @@ public final class FolderTabsPlugin: Plugin {
 
     /// Whether showing the tab would connect to a server (or look in a place that may): the
     /// file system of the location says so itself; the list of schemes holds for the others.
-    func connects(_ location: String) -> Bool {
+    internal func connects(_ location: String) -> Bool {
         guard let url = URL(string: location), let scheme = url.scheme?.lowercased() else {
             return false
         }
@@ -490,7 +490,7 @@ public final class FolderTabsPlugin: Plugin {
 
     /// Tabs that show a directory an earlier tab already shows; the active tab is the one
     /// that is kept of its directory, and locked tabs stay (spec 03 › Closing tabs).
-    static func duplicates(in tabs: PanelTabs) -> [Int] {
+    internal static func duplicates(in tabs: PanelTabs) -> [Int] {
         var seen: Set<String> = [tabs.active.directory.locationKey]
         return tabs.tabs.indices.filter { index in
             guard index != tabs.activeIndex else {
@@ -554,7 +554,7 @@ public final class FolderTabsPlugin: Plugin {
     }
 
     /// The most a tab file may hold.
-    nonisolated static let tabFileLimit = 1 << 20
+    nonisolated internal static let tabFileLimit = 1 << 20
 
     private enum TabFileError: LocalizedError {
         case notAFile(String)

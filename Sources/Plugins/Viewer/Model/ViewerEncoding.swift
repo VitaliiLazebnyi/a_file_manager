@@ -5,8 +5,8 @@ import Foundation
 ///
 /// A value type without state; the conversion tables behind it are built once and shared
 /// (`CodeTable`).
-struct ViewerEncoding: Hashable {
-    enum Kind {
+internal struct ViewerEncoding: Hashable {
+    internal enum Kind {
         case utf8, utf16LE, utf16BE
         /// One byte per character (the Windows, DOS and Mac code pages).
         case singleByte
@@ -16,7 +16,7 @@ struct ViewerEncoding: Hashable {
     }
 
     /// How the bytes of a character are laid out in a code page of more than one byte.
-    enum Shape {
+    internal enum Shape {
         /// A byte below 0x80 or a lead byte and the byte after it, from 0x40 on (932, 936, 949, 950).
         case doubleByte
         /// EUC-JP: ASCII; 0x8E and a katakana byte; 0x8F and two bytes (JIS X 0212); two bytes from 0xA1.
@@ -26,23 +26,23 @@ struct ViewerEncoding: Hashable {
         case gb18030
     }
 
-    let codePage: Int
-    let name: String
+    internal let codePage: Int
+    internal let name: String
 
-    static let utf8 = Self(codePage: 65_001, name: "UTF-8")
-    static let utf16LE = Self(codePage: 1_200, name: "UTF-16 LE")
-    static let utf16BE = Self(codePage: 1_201, name: "UTF-16 BE")
+    internal static let utf8 = Self(codePage: 65_001, name: "UTF-8")
+    internal static let utf16LE = Self(codePage: 1_200, name: "UTF-16 LE")
+    internal static let utf16BE = Self(codePage: 1_201, name: "UTF-16 BE")
     /// What the specification calls ANSI: the Windows code page of Western Europe.
-    static let ansi = Self(codePage: 1_252, name: "ANSI / Western Latin 1 (1252)")
+    internal static let ansi = Self(codePage: 1_252, name: "ANSI / Western Latin 1 (1252)")
     /// What the specification calls ASCII: the DOS code page with the box-drawing characters.
-    static let dos = Self(codePage: 437, name: "ASCII / DOS-USA (437)")
-    static let latin1 = Self(codePage: 28_591, name: "ISO Latin 1 (8859-1)")
-    static let macRoman = Self(codePage: 10_000, name: "Mac OS Roman (10000)")
+    internal static let dos = Self(codePage: 437, name: "ASCII / DOS-USA (437)")
+    internal static let latin1 = Self(codePage: 28_591, name: "ISO Latin 1 (8859-1)")
+    internal static let macRoman = Self(codePage: 10_000, name: "Mac OS Roman (10000)")
 
     private static let multiBytePages: Set<Int> = [932, 936, 949, 950, 51_932, 54_936]
 
     /// The code pages of the specification's Encoding menu, as far as this Mac can convert them.
-    static let codePages: [Self] = [
+    internal static let codePages: [Self] = [
         ansi, dos, macRoman, latin1,
         Self(codePage: 1_250, name: "Eastern Europe (1250)"),
         Self(codePage: 1_251, name: "Cyrillic Windows (1251)"),
@@ -62,7 +62,7 @@ struct ViewerEncoding: Hashable {
     .filter(\.isAvailable)
 
     /// Any code page the system knows, for "Other (enter code page manually)"; nil otherwise.
-    static func codePage(_ number: Int) -> Self? {
+    internal static func codePage(_ number: Int) -> Self? {
         if let known = ([utf8, utf16LE, utf16BE] + codePages).first(where: { $0.codePage == number }) {
             return known
         }
@@ -70,7 +70,7 @@ struct ViewerEncoding: Hashable {
         return encoding.isAvailable ? encoding : nil
     }
 
-    var kind: Kind {
+    internal var kind: Kind {
         switch codePage {
         case 65_001:
             return .utf8
@@ -87,7 +87,7 @@ struct ViewerEncoding: Hashable {
     }
 
     /// The layout of a character's bytes; `.doubleByte` for everything that is not EUC-JP or GB 18030.
-    var shape: Shape {
+    internal var shape: Shape {
         switch codePage {
         case 51_932:
             return .eucJP
@@ -101,16 +101,16 @@ struct ViewerEncoding: Hashable {
     }
 
     /// Bytes per code unit: line ends and chunk borders fall on multiples of it.
-    var unitSize: Int { kind == .utf16LE || kind == .utf16BE ? 2 : 1 }
+    internal var unitSize: Int { kind == .utf16LE || kind == .utf16BE ? 2 : 1 }
 
-    var isUnicode: Bool { kind == .utf8 || kind == .utf16LE || kind == .utf16BE }
+    internal var isUnicode: Bool { kind == .utf8 || kind == .utf16LE || kind == .utf16BE }
 
     /// The encoding the byte-oriented modes (binary, hex) show characters in: this one when
     /// every byte is a character, else ANSI.
-    var byteOriented: Self { kind == .singleByte ? self : .ansi }
+    internal var byteOriented: Self { kind == .singleByte ? self : .ansi }
 
     /// The encoding a layout really shows this one in.
-    func forLayout(_ layout: ViewerLayout) -> Self {
+    internal func forLayout(_ layout: ViewerLayout) -> Self {
         if case .text = layout {
             return self
         }
@@ -132,7 +132,7 @@ struct ViewerEncoding: Hashable {
     /// more than one byte a character is decoded here only for the six it knows the layout of
     /// (932, 936, 949, 950, EUC-JP 51932 and GB 18030 54936); the others (ISO-2022…) would show
     /// every byte above 0x7F as a replacement character, so they are not offered.
-    var isAvailable: Bool {
+    internal var isAvailable: Bool {
         if isUnicode {
             return true
         }
@@ -144,7 +144,7 @@ struct ViewerEncoding: Hashable {
 
     /// The bytes of `text` in this encoding (for a search pattern); nil when it has characters
     /// the encoding lacks.
-    func encode(_ text: String) -> [UInt8]? {
+    internal func encode(_ text: String) -> [UInt8]? {
         switch kind {
         case .utf8:
             return Array(text.utf8)
@@ -171,19 +171,19 @@ struct ViewerEncoding: Hashable {
 ///
 /// The positions are what let a place in the shown text be found in the file again (selection,
 /// search results, the row index).
-struct DecodedText {
-    var units: [UInt16] = []
+internal struct DecodedText {
+    internal var units: [UInt16] = []
     /// Byte offset of each unit, counted from the start of the decoded bytes.
     ///
     /// The two halves of a surrogate pair share one offset.
-    var offsets: [Int32] = []
+    internal var offsets: [Int32] = []
     /// Off for callers that only want the text (copying, HTML): `offsets` then stays empty and
     /// nothing is spent on it.
-    var tracksOffsets = true
+    internal var tracksOffsets = true
 
-    var string: String { String(decoding: units, as: UTF16.self) }
+    internal var string: String { String(decoding: units, as: UTF16.self) }
 
-    mutating func removeAll() {
+    internal mutating func removeAll() {
         units.removeAll(keepingCapacity: true)
         offsets.removeAll(keepingCapacity: true)
     }
@@ -198,26 +198,26 @@ struct DecodedText {
 /// The conversion tables of a code page, built once from the system's converter.
 ///
 /// Immutable after creation, so every thread may read them.
-final class CodeTable: Sendable {
-    static let leadByte: UInt16 = 0xFFFF
-    static let replacement: UInt16 = 0xFFFD
+internal final class CodeTable: Sendable {
+    internal static let leadByte: UInt16 = 0xFFFF
+    internal static let replacement: UInt16 = 0xFFFD
 
     /// The character of each byte; `leadByte` marks the first byte of a two-byte character.
-    let single: [UInt16]
+    internal let single: [UInt16]
     /// The character of each two-byte sequence, at `lead << 8 | trail`; empty for one-byte pages.
-    let double: [UInt16]
+    internal let double: [UInt16]
     /// GB 18030: the character of each four-byte sequence of the Basic Multilingual Plane, at
     /// `((b1 - 0x81) * 10 + b2 - 0x30) * 1260 + (b3 - 0x81) * 10 + b4 - 0x30` (b1 up to 0x84).
-    let quad: [UInt16]
-    let shape: ViewerEncoding.Shape
+    internal let quad: [UInt16]
+    internal let shape: ViewerEncoding.Shape
     /// Bytes of the longest character.
-    let longestCharacter: Int
+    internal let longestCharacter: Int
 
     private static let lock = NSLock()
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var tables: [Int: CodeTable] = [:]
 
-    static func table(for encoding: ViewerEncoding) -> CodeTable {
+    internal static func table(for encoding: ViewerEncoding) -> CodeTable {
         lock.lock()
         defer { lock.unlock() }
         guard let table = tables[encoding.codePage] else {
@@ -307,7 +307,7 @@ final class CodeTable: Sendable {
     /// 1 for a byte that stands by itself or that cannot begin a character it is part of (a
     /// stray byte, which the decoder turns into a replacement character); 0 when the bytes
     /// there are too few to tell (the end of what was given).
-    func characterLength(_ bytes: UnsafeBufferPointer<UInt8>, at index: Int) -> Int {
+    internal func characterLength(_ bytes: UnsafeBufferPointer<UInt8>, at index: Int) -> Int {
         let count = bytes.count
         let byte = bytes[index]
         if byte < 0x80 {
@@ -401,7 +401,7 @@ final class CodeTable: Sendable {
     ///
     /// In a layout where the trail bytes are lead bytes too (EUC-JP) and where they run into the
     /// ASCII range (GB 18030) that is a smaller set than "not a lead byte".
-    func isSynchronizing(_ byte: UInt8) -> Bool {
+    internal func isSynchronizing(_ byte: UInt8) -> Bool {
         switch shape {
         case .doubleByte:
             return single[Int(byte)] != Self.leadByte
@@ -423,7 +423,7 @@ extension ViewerEncoding {
     /// it has arrived: this is how text is decoded block by block. Malformed input becomes U+FFFD,
     /// one per offending byte, and never stops the decoding.
     @discardableResult
-    func decode(_ bytes: UnsafeBufferPointer<UInt8>, final: Bool, into text: inout DecodedText) -> Int {
+    internal func decode(_ bytes: UnsafeBufferPointer<UInt8>, final: Bool, into text: inout DecodedText) -> Int {
         text.removeAll()
         text.units.reserveCapacity(bytes.count / unitSize + 1)
         if text.tracksOffsets { text.offsets.reserveCapacity(bytes.count / unitSize + 1) }
@@ -446,17 +446,17 @@ extension ViewerEncoding {
     }
 
     @discardableResult
-    func decode(_ data: Data, final: Bool, into text: inout DecodedText) -> Int {
+    internal func decode(_ data: Data, final: Bool, into text: inout DecodedText) -> Int {
         data.withUnsafeBytes { raw in decode(raw.bindMemory(to: UInt8.self), final: final, into: &text) }
     }
 
     @discardableResult
-    func decode(_ bytes: [UInt8], final: Bool, into text: inout DecodedText) -> Int {
+    internal func decode(_ bytes: [UInt8], final: Bool, into text: inout DecodedText) -> Int {
         bytes.withUnsafeBufferPointer { decode($0, final: final, into: &text) }
     }
 
     /// The whole of `data` as text.
-    func string(from data: Data) -> String {
+    internal func string(from data: Data) -> String {
         var text = DecodedText()
         text.tracksOffsets = false
         decode(data, final: true, into: &text)
@@ -464,7 +464,7 @@ extension ViewerEncoding {
     }
 
     /// The whole of `data` as UTF-16 units, without the byte offsets.
-    func units(from data: Data) -> [UInt16] {
+    internal func units(from data: Data) -> [UInt16] {
         var text = DecodedText()
         text.tracksOffsets = false
         decode(data, final: true, into: &text)

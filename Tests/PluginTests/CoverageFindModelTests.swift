@@ -10,12 +10,12 @@ import Testing
 /// The parts of Find Files below the window at their edges: masks, criteria, text patterns,
 /// readers that fail, duplicates on shares and searches that are cancelled.
 @Suite
-struct CoverageFindModel {
-    let box: Sandbox
-    let memory = MemoryFileSystem()
-    let registry = FileSystemRegistry()
+internal struct CoverageFindModel {
+    internal let box: Sandbox
+    internal let memory = MemoryFileSystem()
+    internal let registry = FileSystemRegistry()
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         registry.register(LocalFileSystem())
         registry.register(memory)
@@ -24,30 +24,30 @@ struct CoverageFindModel {
     // MARK: Masks and criteria
 
     @Test
-    func aBrokenExpressionMatchesNoName() {
+    internal func aBrokenExpressionMatchesNoName() {
         #expect(!SearchMask("(", regex: true).matches("x"))
     }
 
     @Test
-    func aMaskEndingInADotMatchesANameWithoutExtension() {
+    internal func aMaskEndingInADotMatchesANameWithoutExtension() {
         #expect(SearchMask("readme.").matches("readme") && !SearchMask("readme.").matches("readme.txt"))
         #expect(SearchMask("read*.*").matches("readme"))
     }
 
     @Test
-    func anAgeBeyondTheCalendarReachesBackForever() {
+    internal func anAgeBeyondTheCalendarReachesBackForever() {
         // The Chinese calendar does not count a million years back.
         let chinese = Calendar(identifier: .chinese)
         #expect(Age(Int.max, .years).cutoff(before: Date(), calendar: chinese) == .distantPast)
     }
 
     @Test
-    func aSizeInBytesEndsOneByteLater() {
+    internal func aSizeInBytesEndsOneByteLater() {
         #expect(SizeRule(.equal, 10).upperBytes == 11 && SizeRule(.equal, 2, .kilobytes).upperBytes == 3_072)
     }
 
     @Test
-    func theBuiltInFieldsShowPathDateAndPermissions() throws {
+    internal func theBuiltInFieldsShowPathDateAndPermissions() throws {
         let item = FileItem(url: memory.addFile("/f/a.txt", "abc"), name: "a.txt")
         let fields = Dictionary(uniqueKeysWithValues: SearchField.builtIn(fileSystems: registry).map { ($0.id, $0) })
         #expect(try #require(fields["tc.path"]).value(item) == registry.displayPath(memory.url("/f/")))
@@ -56,7 +56,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aColumnOfTheSameNameAsABuiltInFieldGivesWay() {
+    internal func aColumnOfTheSameNameAsABuiltInFieldGivesWay() {
         let columns = ColumnRegistry()
         columns.register(ContentColumn(id: "tc.name", title: "Other") { _ in "other" })
         var query = SearchQuery(directory: memory.url("/"))
@@ -66,14 +66,14 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aRegexRuleIsMatchedAsAnExpression() {
+    internal func aRegexRuleIsMatchedAsAnExpression() {
         #expect(FieldRule("tc.name", .regex, "^a.c$").matches("abc"))
         // One that takes too long for the text matches nothing.
         #expect(!FieldRule("tc.name", .regex, "(a*)*b").matches(String(repeating: "a", count: 40)))
     }
 
     @Test
-    func anyRuleMayMatchWhenAskedSo() {
+    internal func anyRuleMayMatchWhenAskedSo() {
         let rules = FieldRules(
             isEnabled: true,
             matchAll: false,
@@ -86,7 +86,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aNameTheExpressionTakesTooLongForIsNoHit() {
+    internal func aNameTheExpressionTakesTooLongForIsNoHit() {
         var query = SearchQuery(directory: memory.url("/"), names: "(a*)*b")
         query.namesAreRegex = true
         let search = FileSearch(query, fileSystems: registry)
@@ -96,7 +96,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func cancelledRulesMatchNothing() {
+    internal func cancelledRulesMatchNothing() {
         let rules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .contains, "a")]).prepared()
         let item = FileItem(url: memory.addFile("/a.txt"), name: "a.txt")
         let fields = Dictionary(uniqueKeysWithValues: SearchField.builtIn(fileSystems: registry).map { ($0.id, $0) })
@@ -106,14 +106,14 @@ struct CoverageFindModel {
     // MARK: Regular expressions
 
     @Test
-    func anEmptyTextIsMatchedAsIs() throws {
+    internal func anEmptyTextIsMatchedAsIs() throws {
         let empty = try NSRegularExpression(pattern: "^$")
         #expect(FindRegex.firstMatch(empty, in: "", cancelled: { false }) == .matched)
         #expect(FindRegex.firstMatch(try NSRegularExpression(pattern: "a"), in: "", cancelled: { false }) == .unmatched)
     }
 
     @Test
-    func aTrippedExpressionIsNotTriedAgain() throws {
+    internal func aTrippedExpressionIsNotTriedAgain() throws {
         let trip = RegexTrip(limit: 1)
         trip.recordTimeout()
         #expect(!FindRegex.matches(try NSRegularExpression(pattern: "a"), in: "a", trip: trip, cancelled: { false }))
@@ -122,7 +122,7 @@ struct CoverageFindModel {
     // MARK: Text patterns
 
     @Test
-    func problemsSayWhatIsWrong() {
+    internal func problemsSayWhatIsWrong() {
         #expect(TextPattern.Problem.emptyText.errorDescription == "There is no text to find.")
         #expect(TextPattern.Problem.badRegex("x").errorDescription == "The regular expression cannot be used: x")
         #expect(
@@ -133,7 +133,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func noEncodingChosenMeansUTF8AndRepeatedNeedlesAreOne() throws {
+    internal func noEncodingChosenMeansUTF8AndRepeatedNeedlesAreOne() throws {
         var options = TextSearchOptions()
         options.encodings = []
         #expect(try TextPattern("abc", options: options).isFound(in: Data("xabcx".utf8)))
@@ -142,12 +142,12 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aTrailingBackslashStays() {
+    internal func aTrailingBackslashStays() {
         #expect(TextPattern.unescape("a\\") == "a\\" && TextPattern.unescape("a\\q") == "a\\q")
     }
 
     @Test
-    func hexDigitsMustComeInPairs() {
+    internal func hexDigitsMustComeInPairs() {
         var options = TextSearchOptions()
         options.hex = true
         #expect(throws: TextPattern.Problem.badHex("0\"A\"")) { try TextPattern("0\"A\"", options: options) }
@@ -155,7 +155,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aWholeWordThatGoesOnIsNoHit() throws {
+    internal func aWholeWordThatGoesOnIsNoHit() throws {
         var options = TextSearchOptions()
         options.wholeWords = true
         #expect(try !TextPattern("ab", options: options).isFound(in: Data("abc".utf8)))
@@ -165,7 +165,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aCancelledSearchFindsNothing() throws {
+    internal func aCancelledSearchFindsNothing() throws {
         let cancellation = CancellationFlag()
         cancellation.cancel()
         let reader = TextPattern.DataReader(Data("abc".utf8))
@@ -177,7 +177,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aReaderThatFailsFindsNothing() throws {
+    internal func aReaderThatFailsFindsNothing() throws {
         #expect(try !TextPattern("b").isFound(in: FailingReader()))
         var options = TextSearchOptions()
         options.regex = true
@@ -189,7 +189,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aTrippedExpressionGivesUpOnTheFile() throws {
+    internal func aTrippedExpressionGivesUpOnTheFile() throws {
         var options = TextSearchOptions()
         options.regex = true
         let pattern = try TextPattern("(a*)*b", options: options)
@@ -200,7 +200,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func longLinesAreCutBetweenCharacters() throws {
+    internal func longLinesAreCutBetweenCharacters() throws {
         var options = TextSearchOptions()
         options.regex = true
         let longest = 4 << 20
@@ -225,12 +225,12 @@ struct CoverageFindModel {
     }
 
     @Test
-    func anEmptyFileHoldsNoText() throws {
+    internal func anEmptyFileHoldsNoText() throws {
         #expect(try !TextPattern("a").isFound(in: Data()))
     }
 
     @Test
-    func theDataReaderSeeksAndCloses() {
+    internal func theDataReaderSeeksAndCloses() {
         let reader = TextPattern.DataReader(Data("abcdef".utf8))
         reader.seek(to: 4)
         #expect(reader.read(upToCount: 10) == Data("ef".utf8))
@@ -242,7 +242,7 @@ struct CoverageFindModel {
     // MARK: The local reader
 
     @Test
-    func aLocalReaderOnlyReadsPlainFilesHere() throws {
+    internal func aLocalReaderOnlyReadsPlainFilesHere() throws {
         #expect(LocalFileReader.open(memory.url("/a")) == nil)
         #expect(FileIdentity.canBeRead(memory.url("/a")) && !FileIdentity.canBeRead(box.url("gone")))
         let file = try box.file("a.txt", "abcdef")
@@ -258,7 +258,7 @@ struct CoverageFindModel {
     }
 
     @Test
-    func anInterruptedReadIsTriedAgainAndAFailedOneReported() throws {
+    internal func anInterruptedReadIsTriedAgainAndAFailedOneReported() throws {
         let file = try box.file("b.txt", "abc")
         let calls = Calls()
         let interrupted = try #require(
@@ -290,7 +290,7 @@ struct CoverageFindModel {
     // MARK: Duplicates
 
     @Test
-    func aShareIsToldByItsSourceAndThePathInIt() throws {
+    internal func aShareIsToldByItsSourceAndThePathInIt() throws {
         let mount = DuplicateFinder.Mount(from: "smbfs://host/share", on: "/Volumes/share")
         #expect(mount.place(of: "/Volumes/share/a/b.txt") == "smbfs://host/share/a/b.txt")
         #expect(mount.place(of: "/elsewhere/c.txt") == "smbfs://host/share/elsewhere/c.txt")
@@ -303,7 +303,7 @@ struct CoverageFindModel {
 
     /// One share mounted at two places: the same file in it is one file.
     @Test
-    func theSameFileOfAShareMountedTwiceIsOne() throws {
+    internal func theSameFileOfAShareMountedTwiceIsOne() throws {
         // Two files on two volumes: the shared cache of the system lies on a volume of its own.
         let local = try box.file("one/dyld_shared_cache_arm64e", "x")
         let system = URL(
@@ -317,14 +317,14 @@ struct CoverageFindModel {
     }
 
     @Test
-    func aLocalFileThatIsGoneIsLeftOut() throws {
+    internal func aLocalFileThatIsGoneIsLeftOut() throws {
         let here = try box.file("here.txt", "same")
         let items = [here, box.url("gone.txt")].map { FileItem(url: $0, name: $0.lastPathComponent) }
         #expect(DuplicateFinder.distinctFiles(items.map { (key: 0, item: $0) }).map(\.item.url) == [here])
     }
 
     @Test
-    func aDigestCancelledWhileReadingIsNone() {
+    internal func aDigestCancelledWhileReadingIsNone() {
         let cancellation = CancellationFlag()
         let reads = CancellingFileSystem(cancellation: cancellation)
         let files = FileSystemRegistry()
@@ -336,7 +336,7 @@ struct CoverageFindModel {
     // MARK: Searches
 
     @Test
-    func aSearchOfChosenItemsThatIsCancelledFindsNothing() {
+    internal func aSearchOfChosenItemsThatIsCancelledFindsNothing() {
         let file = memory.addFile("/c/a.txt")
         var query = SearchQuery(directory: memory.url("/c"))
         query.onlyItems = [file, memory.url("/c")]
@@ -349,7 +349,7 @@ struct CoverageFindModel {
 
     /// A folder whose listing breaks off after its entries came in parts: what was found stays.
     @Test
-    func aListingThatBreaksOffKeepsWhatCame() {
+    internal func aListingThatBreaksOffKeepsWhatCame() {
         let breaking = BreakingListingFileSystem()
         let files = FileSystemRegistry()
         files.register(breaking)
@@ -363,7 +363,7 @@ struct CoverageFindModel {
 
     /// A folder that cannot be listed at all is left out; the others are searched.
     @Test
-    func aFolderThatCannotBeListedIsLeftOut() {
+    internal func aFolderThatCannotBeListedIsLeftOut() {
         memory.addFile("/r/ok/a.txt")
         memory.addFile("/r/closed/b.txt")
         memory.unreadable = ["/r/closed"]

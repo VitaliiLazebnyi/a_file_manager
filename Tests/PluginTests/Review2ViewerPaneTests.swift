@@ -13,13 +13,13 @@ import UniformTypeIdentifiers
 /// leads nowhere, a text that is no longer read keeps what it shows, images are made once.
 @MainActor
 @Suite(.serialized)
-struct Review2ViewerPane {
-    let memory = MemoryFileSystem()
-    let hook = Review2HookProvider()
-    let plugin: ViewerPlugin
-    let bench: TestBench
+internal struct Review2ViewerPane {
+    internal let memory = MemoryFileSystem()
+    internal let hook = Review2HookProvider()
+    internal let plugin: ViewerPlugin
+    internal let bench: TestBench
 
-    init() {
+    internal init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
         plugin.mediaPlayback = CovViewPlayback.factory
@@ -35,7 +35,7 @@ struct Review2ViewerPane {
     }
 
     @discardableResult
-    func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
+    internal func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
@@ -55,7 +55,7 @@ struct Review2ViewerPane {
     // MARK: Nothing waits for the server
 
     @Test
-    func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async {
+    internal func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async {
         hook.contents["/slow.txt"] = Data(String(repeating: "a line of text\n", count: 2_000).utf8)
         let gate = DispatchSemaphore(value: 0)
         hook.onClose = { _ = gate.wait(timeout: .now() + Wait.ceiling) }
@@ -77,7 +77,7 @@ struct Review2ViewerPane {
     // MARK: The text that is no longer read
 
     @Test
-    func aTextThatIsNoLongerReadKeepsWhatItShowsWhenScrolled() async {
+    internal func aTextThatIsNoLongerReadKeepsWhatItShowsWhenScrolled() async {
         let pane = pane()
         pane.frame = NSRect(x: 0, y: 0, width: 700, height: 200)
         memory.addFile("/A/many.txt", (1...2_000).map { "line number \($0)" }.joined(separator: "\n"))
@@ -95,7 +95,7 @@ struct Review2ViewerPane {
     // MARK: Links in the page
 
     @Test
-    func aLinkInAPageLeadsOnlyToFilesBesideIt() async {
+    internal func aLinkInAPageLeadsOnlyToFilesBesideIt() async {
         let pane = pane()
         pane.load(ViewerItem(source: .file(memory.url("/A/index.html")), title: "index"))
         #expect(await wait { pane.loaded != nil })
@@ -114,7 +114,7 @@ struct Review2ViewerPane {
     // MARK: Big documents
 
     @Test
-    func aHugeHTMLFileIsNotLaidOutAsAPageOnTheMainThread() async throws {
+    internal func aHugeHTMLFileIsNotLaidOutAsAPageOnTheMainThread() async throws {
         let pane = pane()
         var html = Data("<html><body>".utf8)
         let line = Data(String(repeating: "<p>paragraph of the page</p>\n", count: 1_000).utf8)
@@ -131,7 +131,7 @@ struct Review2ViewerPane {
     }
 
     @Test
-    func aHugeRTFFileIsNotFormattedOnTheMainThread() async throws {
+    internal func aHugeRTFFileIsNotFormattedOnTheMainThread() async throws {
         let pane = pane()
         var rtf = Data("{\\rtf1\\ansi ".utf8)
         let line = Data(String(repeating: "word ", count: 2_000).utf8)
@@ -171,7 +171,7 @@ struct Review2ViewerPane {
     }
 
     @Test
-    func aZoomThatPassesThroughManySizesMakesOneBitmap() async throws {
+    internal func aZoomThatPassesThroughManySizesMakesOneBitmap() async throws {
         let frame = try picture(2_000, 1_000)
         let cache = ScaledFrameCache()
         // The queue stands still while the sizes are asked for, so how fast this loop runs on a busy
@@ -205,14 +205,14 @@ struct Review2ViewerPane {
     }
 
     @Test
-    func theImagesOfAnIconOrAMultiPageTIFFAreNotPlayedAsAnAnimation() throws {
+    internal func theImagesOfAnIconOrAMultiPageTIFFAreNotPlayedAsAnAnimation() throws {
         let tiff = try encoded([try picture(64, 64), try picture(300, 200), try picture(128, 128)], type: .tiff)
         let still = try #require(ImageDecoder.decode(tiff))
         #expect(still.frames.count == 1 && still.frames[0].image.width == 300 && still.frames[0].image.height == 200)
     }
 
     @Test
-    func aGIFWithSeveralFramesIsStillAnAnimation() throws {
+    internal func aGIFWithSeveralFramesIsStillAnAnimation() throws {
         let gif = try encoded(
             [try picture(20, 20), try picture(20, 20), try picture(20, 20)],
             type: .gif,
@@ -226,7 +226,7 @@ struct Review2ViewerPane {
     // MARK: Row text
 
     @Test
-    func linksAndTextOfHTMLThatHasLoneAngleBrackets() {
+    internal func linksAndTextOfHTMLThatHasLoneAngleBrackets() {
         let result = HTMLText.plainText(from: "<p>if a < b then c</p><p>done</p>")
         #expect(result.text == "if a < b then c\ndone\n", "\(result.text.debugDescription)")
         // A lone `<` at the very end does not drop the rest of the document before it.

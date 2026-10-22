@@ -81,15 +81,15 @@ private final class BreakingAnswers: FileJobDelegate {
 }
 
 @Suite
-struct ArchiveJobsEndToEnd {
-    let bench: ArchiveBench
-    var box: Sandbox { bench.box }
+internal struct ArchiveJobsEndToEnd {
+    internal let bench: ArchiveBench
+    internal var box: Sandbox { bench.box }
 
-    init() throws {
+    internal init() throws {
         bench = try ArchiveBench()
     }
 
-    func makeZip() throws -> URL {
+    internal func makeZip() throws -> URL {
         try box.file("tree/readme.txt", "readme")
         try box.folder("tree/sub")
         #expect(runTool("/usr/bin/zip", ["-qr", "tree.zip", "tree"], in: box.root).status == 0)
@@ -97,7 +97,7 @@ struct ArchiveJobsEndToEnd {
     }
 
     /// Files of the given sizes in `in/`, each of its own text.
-    func makeSources(_ sizes: [String: Int]) throws -> [URL] {
+    internal func makeSources(_ sizes: [String: Int]) throws -> [URL] {
         try sizes.sorted { $0.key < $1.key }
             .map { name, size in
                 try box.file("in/" + name, String(repeating: name + " ", count: size / (name.count + 1)))
@@ -105,7 +105,7 @@ struct ArchiveJobsEndToEnd {
     }
 
     @Test
-    func aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() throws {
+    internal func aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() throws {
         let archive = try makeZip()
         let sources = try makeSources([
             "a.txt": 20, "b.txt": 3_000, "big1.txt": 300_000, "big2.txt": 700_000, "c.txt": 7
@@ -141,7 +141,7 @@ struct ArchiveJobsEndToEnd {
     /// Without it the renames succeed and everything waits for the commit; the folder of the
     /// archive stops being writable when the last file is begun, so that file and the commit fail.
     @Test(arguments: [true, false])
-    func aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites: Bool) throws {
+    internal func aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites: Bool) throws {
         if !quickWrites { bench.environment.immediateWriteLimit = 0 }
         let archive = try makeZip()
         let sources = try makeSources(["big1.txt": 300_000, "big2.txt": 700_000, "big3.txt": 400_000])
@@ -177,7 +177,7 @@ struct ArchiveJobsEndToEnd {
     }
 
     @Test
-    func aCopyOutOfAnArchiveCarriesTheArchivesQuarantineMark() throws {
+    internal func aCopyOutOfAnArchiveCarriesTheArchivesQuarantineMark() throws {
         try box.file("tree/sub/deep/inner.txt", "inner")
         let archive = try makeZip()
         let value = "0083;5e8b1c2d;Safari;"
@@ -195,7 +195,7 @@ struct ArchiveJobsEndToEnd {
     }
 
     @Test
-    func aCopyFromOneFolderOfTheDiskToAnotherIsNotMarked() throws {
+    internal func aCopyFromOneFolderOfTheDiskToAnotherIsNotMarked() throws {
         // The folder of the source is marked, as a folder that was downloaded is; its files are not.
         try box.file("plain/x.txt", "x")
         mark(box.url("plain"), with: "0083;5e8b1c2d;Safari;")
@@ -213,13 +213,13 @@ struct ArchiveJobsEndToEnd {
 
 /// A job that reads or writes through a virtual folder, with a server that stops answering.
 @Suite
-struct JobsThroughVirtualFolders {
-    let memory = MemoryFileSystem()
-    let probe: ProbeFileSystem
-    let registry = FileSystemRegistry()
-    let virtual: VirtualFileSystem
+internal struct JobsThroughVirtualFolders {
+    internal let memory = MemoryFileSystem()
+    internal let probe: ProbeFileSystem
+    internal let registry = FileSystemRegistry()
+    internal let virtual: VirtualFileSystem
 
-    init() {
+    internal init() {
         probe = ProbeFileSystem(memory)
         registry.register(LocalFileSystem())
         registry.register(probe)
@@ -228,7 +228,7 @@ struct JobsThroughVirtualFolders {
     }
 
     @Test
-    func cancelEndsAReadOfAFileNamedThroughABranchViewAtOnce() throws {
+    internal func cancelEndsAReadOfAFileNamedThroughABranchViewAtOnce() throws {
         let box = try Sandbox()
         memory.stallsReads = true
         let gate = DispatchSemaphore(value: 0)
@@ -247,7 +247,7 @@ struct JobsThroughVirtualFolders {
     }
 
     @Test
-    func cancelEndsAWriteIntoABranchViewAtOnce() throws {
+    internal func cancelEndsAWriteIntoABranchViewAtOnce() throws {
         let box = try Sandbox()
         memory.stallsWrites = true
         let gate = DispatchSemaphore(value: 0)
@@ -270,7 +270,7 @@ struct JobsThroughVirtualFolders {
     }
 
     @Test
-    func cancelEndsTheListingOfABranchViewThatWaits() {
+    internal func cancelEndsTheListingOfABranchViewThatWaits() {
         memory.stallsListings = true
         let gate = DispatchSemaphore(value: 0)
         probe.onList = { gate.signal() }
@@ -296,9 +296,9 @@ struct JobsThroughVirtualFolders {
 /// found by location.
 @MainActor
 @Suite
-struct NamesInBranchViews {
+internal struct NamesInBranchViews {
     @Test
-    func processedItemsAreFoundByLocationWhereNamesArePaths() throws {
+    internal func processedItemsAreFoundByLocationWhereNamesArePaths() throws {
         let registry = FileSystemRegistry()
         let memory = MemoryFileSystem()
         registry.register(memory)
@@ -324,9 +324,9 @@ struct NamesInBranchViews {
 
 /// The viewer reads a file that a branch view names, from a server that stops answering.
 @Suite
-struct ViewerThroughVirtualFolders {
+internal struct ViewerThroughVirtualFolders {
     @Test
-    func aBlockedReadEndsWhenItsFlagIsSet() throws {
+    internal func aBlockedReadEndsWhenItsFlagIsSet() throws {
         let memory = MemoryFileSystem()
         let probe = ProbeFileSystem(memory)
         let registry = FileSystemRegistry()

@@ -131,7 +131,7 @@ public struct SyncRow: Equatable, Sendable {
     public internal(set) var defaultAction: SyncAction
     public var action: SyncAction
 
-    init(
+    internal init(
         directory: String,
         isDirectory: Bool,
         left: FileItem?,

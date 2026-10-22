@@ -3,14 +3,14 @@ import Foundation
 
 /// A place inside an archive: the archive file, on whatever file system it lives (the local
 /// disk, a server, another archive), and the path inside it.
-struct ArchiveLocation: Equatable {
+internal struct ArchiveLocation: Equatable {
     /// The archive file itself, as its own file system names it.
-    let archive: URL
+    internal let archive: URL
     /// The path inside, with `/` between the names and none at either end; empty for the
     /// archive's top folder.
-    let innerPath: String
+    internal let innerPath: String
 
-    var isRoot: Bool { innerPath.isEmpty }
+    internal var isRoot: Bool { innerPath.isEmpty }
 }
 
 /// The URLs of the archive file systems (spec 08 › Archives as folders).
@@ -28,24 +28,24 @@ struct ArchiveLocation: Equatable {
 /// does not pass through the archive (the check value does not match) is a place on the
 /// archive's own file system; the provider hands it on. That happens when the user types a
 /// plain path while a panel is inside an archive.
-enum ArchiveURL {
+internal enum ArchiveURL {
     /// Archives whose contents can be changed (ZIP).
-    static let writableScheme = "zip"
+    internal static let writableScheme = "zip"
     /// Everything else: read-only.
-    static let readOnlyScheme = "archive"
-    static let schemes = [writableScheme, readOnlyScheme]
+    internal static let readOnlyScheme = "archive"
+    internal static let schemes = [writableScheme, readOnlyScheme]
 
-    enum Place: Equatable {
+    internal enum Place: Equatable {
         case inside(ArchiveLocation)
         /// Not in the archive: a place on the file system the archive lies on.
         case outside(URL)
     }
 
-    static func isArchiveURL(_ url: URL) -> Bool {
+    internal static func isArchiveURL(_ url: URL) -> Bool {
         url.scheme.map(schemes.contains) ?? false
     }
 
-    static func make(scheme: String, archive: URL, innerPath: String = "") -> URL {
+    internal static func make(scheme: String, archive: URL, innerPath: String = "") -> URL {
         let names = pathNames(of: archive)
         let archivePath = "/" + names.joined(separator: "/")
         var host = "d\(names.count)-" + checkValue(archivePath)
@@ -61,7 +61,7 @@ enum ArchiveURL {
     }
 
     /// Nil for URLs of other schemes and for hosts this code did not write.
-    static func parse(_ url: URL) -> Place? {
+    internal static func parse(_ url: URL) -> Place? {
         guard isArchiveURL(url), let host = url.host else {
             return nil
         }
@@ -90,7 +90,7 @@ enum ArchiveURL {
 
     /// How many archives a location lies inside of: one for a place in an archive on a disk
     /// or a server, two for a place in an archive inside such an archive, and so on.
-    static func nesting(of url: URL) -> Int {
+    internal static func nesting(of url: URL) -> Int {
         var (depth, current) = (0, url)
         while depth < 64, case .inside(let location)? = parse(current) {
             depth += 1
@@ -100,7 +100,7 @@ enum ArchiveURL {
     }
 
     /// The location inside an archive; nil for anything else.
-    static func location(of url: URL) -> ArchiveLocation? {
+    internal static func location(of url: URL) -> ArchiveLocation? {
         if case .inside(let location)? = parse(url) {
             return location
         }
@@ -109,7 +109,7 @@ enum ArchiveURL {
 
     /// What a URL means outside this plugin: a place that only passes through an archive
     /// scheme becomes the place on the real file system; everything else stays as it is.
-    static func resolved(_ url: URL) -> URL {
+    internal static func resolved(_ url: URL) -> URL {
         if case .outside(let outer)? = parse(url) {
             return outer
         }
@@ -174,9 +174,9 @@ enum ArchiveURL {
 }
 
 /// The kinds of archive the plugin knows (spec 08 › Format support matrix).
-enum ArchiveFormat: Equatable {
+internal enum ArchiveFormat: Equatable {
     /// A compressor that wraps one stream of bytes.
-    enum Codec: String, Equatable {
+    internal enum Codec: String, Equatable {
         case gzip, bzip2, xz
     }
 
@@ -190,9 +190,9 @@ enum ArchiveFormat: Equatable {
     case foreign
 
     /// Whether members can be added, renamed and deleted in place.
-    var isEditable: Bool { self == .zip }
+    internal var isEditable: Bool { self == .zip }
 
-    var title: String {
+    internal var title: String {
         switch self {
         case .zip:
             return "ZIP"
@@ -211,7 +211,7 @@ enum ArchiveFormat: Equatable {
         }
     }
 
-    static func suffix(_ codec: Codec) -> String {
+    internal static func suffix(_ codec: Codec) -> String {
         switch codec {
         case .gzip:
             return "gz"
@@ -225,13 +225,13 @@ enum ArchiveFormat: Equatable {
     }
 
     /// The formats Pack can create, in the order of the dialog.
-    static let writable: [Self] = [
+    internal static let writable: [Self] = [
         .zip, .tar, .compressedTar(.gzip), .compressedTar(.bzip2), .compressedTar(.xz),
         .compressedFile(.gzip), .compressedFile(.bzip2), .compressedFile(.xz)
     ]
 
     /// The extension a new archive of this format gets.
-    var defaultExtension: String {
+    internal var defaultExtension: String {
         switch self {
         case .zip:
             return "zip"
@@ -251,7 +251,7 @@ enum ArchiveFormat: Equatable {
     }
 
     /// Every way a file of this format may end, longest first.
-    var extensions: [String] {
+    internal var extensions: [String] {
         switch self {
         case .zip:
             return ["zip"]
@@ -277,7 +277,7 @@ enum ArchiveFormat: Equatable {
     }
 
     /// The prefix of a Pack target (`tgz:/path/name`), spec 08 › Target string.
-    var prefix: String {
+    internal var prefix: String {
         switch self {
         case .compressedTar(.gzip):
             return "tgz"
@@ -297,7 +297,7 @@ enum ArchiveFormat: Equatable {
     /// `backup.tar.gz` → (`backup`, `tar.gz`).
     ///
     /// Nil when the name does not end like an archive that Pack can write.
-    static func splitKnownExtension(_ name: String) -> (base: String, ext: String)? {
+    internal static func splitKnownExtension(_ name: String) -> (base: String, ext: String)? {
         let lower = name.lowercased()
         let endings = writable.flatMap(\.extensions).sorted { $0.count > $1.count }
         for ending in endings where lower.hasSuffix("." + ending) && lower.count > ending.count + 1 {
@@ -308,7 +308,7 @@ enum ArchiveFormat: Equatable {
 
     /// Looks at the first bytes of a file. `tarInside` is asked only for compressed streams:
     /// whether what they hold starts like a TAR archive.
-    static func detect(head: Data, name: String, tarInside: (Codec) -> Bool) -> Self {
+    internal static func detect(head: Data, name: String, tarInside: (Codec) -> Bool) -> Self {
         let bytes = [UInt8](head.prefix(512))
         func starts(_ signature: [UInt8]) -> Bool {
             bytes.count >= signature.count && Array(bytes[..<signature.count]) == signature
@@ -346,15 +346,15 @@ enum ArchiveFormat: Equatable {
 /// list below, and that have a zero byte in their first line: a file with one is never taken
 /// for a list by libarchive (tried with the system's bsdtar), whatever else it holds.
 /// Compressed streams are not on the list, because the stream inside may be anything.
-enum ForeignArchive {
-    enum Kind {
+internal enum ForeignArchive {
+    internal enum Kind {
         /// 7z, RAR, CAB, XAR, cpio, ISO 9660, LHA: read through `bsdtar`.
         case libarchive
         /// The old `compress` format (`.Z`): unpacked by `gzip`, and read here if it holds a TAR.
         case compressedTar
     }
 
-    static func kind(of file: RandomAccessFile) -> Kind? {
+    internal static func kind(of file: RandomAccessFile) -> Kind? {
         guard let head = try? file.read(at: 0, count: 512), head.count >= 8 else {
             return nil
         }
@@ -392,7 +392,7 @@ enum ForeignArchive {
     }
 }
 
-enum ArchiveError: LocalizedError {
+internal enum ArchiveError: LocalizedError {
     case notAnArchive(String)
     case damaged(String)
     case unsupported(String)
@@ -415,7 +415,7 @@ enum ArchiveError: LocalizedError {
     /// Never reaches the user.
     case retired
 
-    var errorDescription: String? {
+    internal var errorDescription: String? {
         switch self {
         case .notAnArchive(let name):
             return "\(name) is not an archive, or its format is not supported."

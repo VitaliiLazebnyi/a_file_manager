@@ -5,14 +5,14 @@ import Foundation
 /// Always a POSIX shell, whatever the user's login shell is: the lines of user commands are written
 /// for one, a reference to a value is written the way such a shell reads it, and `csh` and `tcsh`
 /// do not even take the options.
-enum LoginShell {
+internal enum LoginShell {
     /// `/bin/zsh` as a login shell, so that a command finds the PATH of a terminal.
     ///
     /// Every macOS the program runs on has it.
-    static let posix = (executable: "/bin/zsh", options: ["-l", "-c"])
+    internal static let posix = (executable: "/bin/zsh", options: ["-l", "-c"])
 
     /// The shell the user logs in with: `SHELL`, else the shell of the user's `account`, else zsh.
-    static func usersShell(environment: [String: String], account: String?) -> String {
+    internal static func usersShell(environment: [String: String], account: String?) -> String {
         if let path = environment["SHELL"], !path.isEmpty {
             return path
         }
@@ -23,7 +23,7 @@ enum LoginShell {
     }
 
     /// The shell of this user's account in the user database.
-    static var accountShell: String? {
+    internal static var accountShell: String? {
         getpwuid(getuid())?.pointee.pw_shell.map { String(cString: $0) }
     }
 
@@ -31,7 +31,7 @@ enum LoginShell {
     /// tcsh …), asked for once.
     ///
     /// Starts a process and waits up to a few seconds for it: never for the main thread.
-    static let foreignPath = foreignPath(
+    internal static let foreignPath = foreignPath(
         of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell),
         waiting: .seconds(3)
     )
@@ -41,7 +41,7 @@ enum LoginShell {
     ///
     /// Nil for zsh and when the shell does not answer within `waiting`. Starts a process and waits
     /// for it: never for the main thread.
-    static func foreignPath(of shell: String, waiting: DispatchTimeInterval) -> String? {
+    internal static func foreignPath(of shell: String, waiting: DispatchTimeInterval) -> String? {
         guard URL(fileURLWithPath: shell).lastPathComponent != "zsh",
             FileManager.default.isExecutableFile(atPath: shell)
         else { return nil }
@@ -80,7 +80,7 @@ enum LoginShell {
 
     /// The environment a command line runs in: this program's, with the PATH of a login shell
     /// that is not zsh.
-    static func environment(foreignPath: String?) -> [String: String] {
+    internal static func environment(foreignPath: String?) -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         if let path = foreignPath { environment["PATH"] = path }
         return environment
@@ -92,10 +92,10 @@ enum LoginShell {
 /// (Foundation's `Process` rewrites every argument in decomposed form, so a name with an accent
 /// would arrive as another name on a volume that tells the two forms apart.) Its end is reported
 /// through a dispatch source: no thread waits for it.
-enum ChildProcess {
-    struct Failure: Error {
-        let code: Int32
-        var message: String {
+internal enum ChildProcess {
+    internal struct Failure: Error {
+        internal let code: Int32
+        internal var message: String {
             code == E2BIG
                 ? "The command line is too long. Pass many names through a list file (%L) instead."
                 : String(cString: strerror(code))
@@ -129,7 +129,7 @@ enum ChildProcess {
     /// Starts `executable` in `directory`, with nothing to read and its output discarded.
     ///
     /// Returns the process number. Blocks for the time the start takes: not for the main thread.
-    static func spawn(
+    internal static func spawn(
         executable: String,
         arguments: [String],
         environment: [String: String],
@@ -178,15 +178,15 @@ enum ChildProcess {
     }
 
     /// How a child ended.
-    struct Ending {
+    internal struct Ending {
         /// The exit status; nil when a signal ended it.
-        let status: Int32?
+        internal let status: Int32?
     }
 
     /// Reports the end of a child once, on a queue of the system.
     ///
     /// Lives in a `ChildTable`. `reported` is guarded by `lock`; nothing else changes after `init`.
-    final class Watch: @unchecked Sendable {
+    internal final class Watch: @unchecked Sendable {
         private let pid: pid_t
         private let handler: @Sendable (Ending) -> Void
         private let calls: SystemCalls
@@ -194,14 +194,14 @@ enum ChildProcess {
         private let lock = NSLock()
         private var reported = false
 
-        init(pid: pid_t, calls: SystemCalls = .system, handler: @escaping @Sendable (Ending) -> Void) {
+        internal init(pid: pid_t, calls: SystemCalls = .system, handler: @escaping @Sendable (Ending) -> Void) {
             self.pid = pid
             self.handler = handler
             self.calls = calls
             source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .global(qos: .utility))
         }
 
-        func start() {
+        internal func start() {
             source.setEventHandler { [self] in reap(waiting: true) }
             source.resume()
             // A child that ended before the source was there is collected here.
@@ -210,7 +210,7 @@ enum ChildProcess {
 
         /// Collects the child and reports it, once: `waiting` when the system said it ended (it
         /// may have been collected elsewhere then), else only when it has ended already.
-        func reap(waiting: Bool) {
+        internal func reap(waiting: Bool) {
             lock.lock()
             if reported {
                 lock.unlock()
@@ -239,13 +239,13 @@ enum ChildProcess {
 ///
 /// Used from the thread that starts a child, from the system's queue that reports its end, and from
 /// the main thread. All state is guarded by `lock`.
-final class ChildTable: @unchecked Sendable {
+internal final class ChildTable: @unchecked Sendable {
     private let lock = NSLock()
     private var children: [pid_t: (watch: ChildProcess.Watch, waitedFor: Bool)] = [:]
 
     /// Calls `handler` once, on a queue of the system, when the child has ended; also when
     /// it has ended already.
-    func watch(_ pid: pid_t, waitedFor: Bool, handler: @escaping @Sendable (ChildProcess.Ending) -> Void) {
+    internal func watch(_ pid: pid_t, waitedFor: Bool, handler: @escaping @Sendable (ChildProcess.Ending) -> Void) {
         let watch = ChildProcess.Watch(pid: pid) { [weak self] ending in
             self?.remove(pid)
             handler(ending)
@@ -263,7 +263,7 @@ final class ChildTable: @unchecked Sendable {
     }
 
     /// Asks the children a chain waits for to end.
-    func terminateWaitedFor() {
+    internal func terminateWaitedFor() {
         lock.lock()
         let waited = children.filter(\.value.waitedFor).map(\.key)
         lock.unlock()

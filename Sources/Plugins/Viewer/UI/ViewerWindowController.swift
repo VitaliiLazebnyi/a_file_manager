@@ -6,20 +6,20 @@ import AppKit
 /// step through with N and P.
 ///
 /// Main thread only.
-final class ViewerWindowController: NSWindowController, NSWindowDelegate {
-    let pane: ViewerPane
+internal final class ViewerWindowController: NSWindowController, NSWindowDelegate {
+    internal let pane: ViewerPane
     private let settings: ListerSettings
     private let onClose: (ViewerWindowController) -> Void
-    private(set) var items: [ViewerItem] = []
-    private(set) var index = 0
+    internal private(set) var items: [ViewerItem] = []
+    internal private(set) var index = 0
     /// The separate quick view: it shows whatever the panel cursor is on, and its title is
     /// `Lister*` (spec 10 › Title bar).
-    let followsCursor: Bool
+    internal let followsCursor: Bool
     private var follower: CursorFollower?
     /// The window, which the controller keeps for as long as it lives.
     private let toolWindow: ToolWindow
 
-    init(
+    internal init(
         kernel: Kernel,
         settings: ListerSettings,
         temporaryCopies: TemporaryCopies,
@@ -75,10 +75,10 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Made in code only: an archive gives none.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
     /// Shows the files of a session, the first one first.
-    func show(_ items: [ViewerItem]) {
+    internal func show(_ items: [ViewerItem]) {
         self.items = items
         index = 0
         loadCurrent()
@@ -86,7 +86,7 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
 
     /// N / P: the next or the previous file; nothing happens at either end or with one file
     /// (spec 10 › Multi-file sessions).
-    func step(by delta: Int) {
+    internal func step(by delta: Int) {
         let target = index + delta
         guard items.indices.contains(target), target != index else {
             return
@@ -120,7 +120,7 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Reads what the panel cursor is on again (`cm_UpdateQuickView`).
-    func refreshFollowing() { follower?.refresh() }
+    internal func refreshFollowing() { follower?.refresh() }
 
     private func setTitle(_ text: String) {
         let name = followsCursor ? "Lister*" : "Lister"
@@ -128,11 +128,11 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Options › Save position (spec 10 › Geometry); the separate quick view has a place of its own.
-    func savePosition() {
+    internal func savePosition() {
         settings.setWindowFrame(NSStringFromRect(toolWindow.frame), quick: followsCursor)
     }
 
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         savePosition()
         follower = nil
         pane.stopWork()
@@ -146,7 +146,7 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
 /// Events that follow each other quickly (holding an arrow key) are answered once, for the last
 /// one. Main thread only.
 @MainActor
-final class CursorFollower {
+internal final class CursorFollower {
     private let delay: TimeInterval
     private let panel: () -> any PanelHandle?
     private let show: (FileItem?) -> Void
@@ -156,7 +156,7 @@ final class CursorFollower {
 
     /// `panel` names the panel to follow at the time of each event; `show` receives the item
     /// under its cursor (nil on `[..]` or in an empty folder).
-    init(
+    internal init(
         kernel: Kernel,
         delay: TimeInterval,
         panel: @escaping () -> any PanelHandle?,
@@ -174,7 +174,7 @@ final class CursorFollower {
     }
 
     /// Reports the item under the cursor now, also when it is the one reported last.
-    func refresh() { schedule(force: true) }
+    internal func refresh() { schedule(force: true) }
 
     private func schedule(force: Bool) {
         generation += 1

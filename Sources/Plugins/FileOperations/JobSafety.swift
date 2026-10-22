@@ -9,7 +9,7 @@ import Foundation
 /// same path under another scheme. Whatever is built from such a location (a target, a new
 /// name) would be a second spelling of a real place, which no comparison of locations sees
 /// through; so the real one is taken before anything is planned.
-enum RealLocation {
+internal enum RealLocation {
     /// The real place behind `url`; `url` itself when it stands for nothing else.
     ///
     /// Works on the text of the locations alone, so it may be asked on the main thread.
@@ -17,7 +17,7 @@ enum RealLocation {
     /// A file system that shows the files of others says so itself
     /// (`FileSystemProvider.realLocation(of:)`), and that answer is taken first. One that
     /// does not is still seen through by what its `parent(of:)` answers.
-    static func resolve(_ url: URL, in fileSystems: FileSystemRegistry) -> URL {
+    internal static func resolve(_ url: URL, in fileSystems: FileSystemRegistry) -> URL {
         var current = fileSystems.realLocation(of: url)
         // The place a location of a file system that shows another one's files stands for; nil for any other.
         func seenThrough(_ location: URL) -> URL? {
@@ -47,7 +47,7 @@ enum RealLocation {
     /// a name after it, which is how the target field of a dialog names them.
     ///
     /// A list of files from anywhere is not such a place.
-    static func takesNames(_ directory: URL, in fileSystems: FileSystemRegistry) -> Bool {
+    internal static func takesNames(_ directory: URL, in fileSystems: FileSystemRegistry) -> Bool {
         if directory.isFileURL {
             return true
         }
@@ -78,7 +78,7 @@ public enum DisplayName {
 extension FileIdentity {
     /// Device and inode of the entry itself (a link is not followed); nil for what is not a
     /// local path or is not there.
-    static func id(of url: URL, followingLinks: Bool = false) -> (device: dev_t, inode: ino_t)? {
+    internal static func id(of url: URL, followingLinks: Bool = false) -> (device: dev_t, inode: ino_t)? {
         guard url.isFileURL else {
             return nil
         }
@@ -90,7 +90,7 @@ extension FileIdentity {
     }
 
     /// True when both locations are known to be one and the same file on disk right now.
-    static func sameFile(_ a: URL, _ b: URL) -> Bool {
+    internal static func sameFile(_ a: URL, _ b: URL) -> Bool {
         guard let first = id(of: a), let second = id(of: b) else {
             return false
         }
@@ -101,7 +101,7 @@ extension FileIdentity {
     /// read may wait for ever.
     ///
     /// False for what is not a local path or is not there.
-    static func isSpecialNode(_ url: URL, followingLinks: Bool) -> Bool {
+    internal static func isSpecialNode(_ url: URL, followingLinks: Bool) -> Bool {
         guard url.isFileURL else {
             return false
         }
@@ -113,7 +113,7 @@ extension FileIdentity {
         return type != S_IFREG && type != S_IFDIR && type != S_IFLNK
     }
 
-    static func isSymlink(_ url: URL) -> Bool {
+    internal static func isSymlink(_ url: URL) -> Bool {
         guard url.isFileURL else {
             return false
         }
@@ -125,7 +125,7 @@ extension FileIdentity {
     /// (the Finder's Locked among them).
     ///
     /// Nil for what is not a local path: there nobody knows.
-    static func isLocked(_ url: URL) -> Bool? {
+    internal static func isLocked(_ url: URL) -> Bool? {
         guard url.isFileURL else {
             return nil
         }
@@ -140,7 +140,7 @@ extension FileIdentity {
     /// image or share.
     ///
     /// False when either cannot be asked.
-    static func isMountPoint(_ folder: URL) -> Bool {
+    internal static func isMountPoint(_ folder: URL) -> Bool {
         guard let own = id(of: folder), let above = id(of: folder.deletingLastPathComponent(), followingLinks: true)
         else { return false }
         return own.device != above.device
@@ -148,7 +148,7 @@ extension FileIdentity {
 
     /// How coarsely the volume of `url` (or of the nearest folder above it that exists) keeps
     /// the time of last change, in seconds: 0 where it keeps it exactly.
-    static func timestampGrain(of url: URL) -> TimeInterval {
+    internal static func timestampGrain(of url: URL) -> TimeInterval {
         // A server or an archive: FTP lists minutes, ZIP stores even seconds.
         guard url.isFileURL else {
             return 2
@@ -166,7 +166,7 @@ extension FileIdentity {
     }
 
     /// The same for a volume of the file system type `type` (`apfs`, `hfs`, `msdos` …), local or not.
-    static func timestampGrain(ofType type: String, isLocal: Bool) -> TimeInterval {
+    internal static func timestampGrain(ofType type: String, isLocal: Bool) -> TimeInterval {
         // A share keeps what its server keeps, which nobody can tell from here.
         guard isLocal else {
             return 2

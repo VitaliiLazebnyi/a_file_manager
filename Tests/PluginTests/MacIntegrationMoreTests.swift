@@ -15,18 +15,18 @@ import Testing
 /// Nothing is started and no system panel is shown.
 @MainActor
 @Suite
-struct MacIntegrationMore {
-    let box: Sandbox
+internal struct MacIntegrationMore {
+    internal let box: Sandbox
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let mac: MacIntegrationPlugin
-    let memory = MemoryFileSystem()
-    let bench: TestBench
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let mac: MacIntegrationPlugin
+    internal let memory = MemoryFileSystem()
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/notes.txt", "hello")
         try box.file("A/photo.png")
@@ -47,10 +47,10 @@ struct MacIntegrationMore {
         )
     }
 
-    func path(_ name: String) -> String { box.url("A/" + name).path }
+    internal func path(_ name: String) -> String { box.url("A/" + name).path }
 
     @Test
-    func f4UsesTheEditorOfThePreferences() {
+    internal func f4UsesTheEditorOfThePreferences() {
         let page = bench.kernel.preferences.pages.first { $0.title == "Edit (F4)" }
         #expect(page?.preferences.map(\.key) == [MacIntegrationPlugin.editorKey])
         #expect(bench.kernel.keyBindings.command(for: .f(4)) == .edit && bench.kernel.keyClashes.isEmpty)
@@ -80,7 +80,7 @@ struct MacIntegrationMore {
     }
 
     @Test
-    func theEditorPreferenceNamesAnApplication() {
+    internal func theEditorPreferenceNamesAnApplication() {
         let textEdit = "/System/Applications/TextEdit.app"
         #expect(MacIntegrationPlugin.editorApplication(named: "TextEdit").path == textEdit)
         #expect(MacIntegrationPlugin.editorApplication(named: " TextEdit.app ").path == textEdit)
@@ -95,7 +95,7 @@ struct MacIntegrationMore {
     }
 
     @Test
-    func openWithOffersTheApplicationsForTheFile() {
+    internal func openWithOffersTheApplicationsForTheFile() {
         bench.left.moveCursor(toName: "notes.txt")
         ui.formAnswers = [.values(["row": .index(1)]), .cancel, .values(["row": .index(2)])]
         commands.perform(MacIntegrationPlugin.openWith)
@@ -121,7 +121,7 @@ struct MacIntegrationMore {
     }
 
     @Test
-    func quickLookShareAndPathnameTakeTheOperands() {
+    internal func quickLookShareAndPathnameTakeTheOperands() {
         bench.left.moveCursor(toName: "photo.png")
         commands.perform(MacIntegrationPlugin.quickLook)
         commands.perform(.selectAll)
@@ -153,7 +153,7 @@ struct MacIntegrationMore {
     }
 
     @Test
-    func finderTagsAreReadEditedAndWritten() {
+    internal func finderTagsAreReadEditedAndWritten() {
         #expect(
             MacIntegrationPlugin.tags(from: " Red, Work ,, Red,") == ["Red", "Work"]
                 && MacIntegrationPlugin.tags(from: " ").isEmpty

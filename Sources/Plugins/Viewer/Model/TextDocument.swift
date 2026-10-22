@@ -3,7 +3,7 @@ import Foundation
 
 /// The three ways bytes are laid out in rows (spec 10 › Display modes 1–3; Unicode and UTF-8
 /// are text in another encoding).
-enum ViewerLayout: Equatable {
+internal enum ViewerLayout: Equatable {
     case text(TextLayoutOptions)
     /// A continuous stream of characters cut into rows of a fixed number of bytes.
     case binary(width: Int)
@@ -12,40 +12,40 @@ enum ViewerLayout: Equatable {
 }
 
 /// One row as it is drawn, with what is needed to find a place in it in the file again.
-struct DisplayRow {
-    let index: Int
+internal struct DisplayRow {
+    internal let index: Int
     /// The bytes of the row, line end included.
-    let range: Range<Int64>
+    internal let range: Range<Int64>
     /// Where the line end begins (the end of the row when it has none).
-    let contentEnd: Int64
+    internal let contentEnd: Int64
     /// What is drawn: no line end, tabs expanded, control characters replaced.
-    let text: String
+    internal let text: String
     /// For each UTF-16 unit of `text`, its byte offset from the start of the row.
     ///
     /// Empty for hex rows, whose columns are fixed (`HexFormat`).
-    let offsets: [Int32]
-    let startsLine: Bool
+    internal let offsets: [Int32]
+    internal let startsLine: Bool
     /// The number of the line the row belongs to, counted from 1.
-    let line: Int
+    internal let line: Int
 }
 
 /// The hex display of the specification (10 › Hex):
 /// `00000000: 52 65 70 6F 72 74 20 31|0D 0A 4C 6F 72 65 6D 20 | Report 1..Lorem `.
-struct HexFormat: Equatable {
-    static let bytesPerRow = 16
+internal struct HexFormat: Equatable {
+    internal static let bytesPerRow = 16
     /// Eight digits as in the specification; more for files they cannot address.
-    let offsetDigits: Int
+    internal let offsetDigits: Int
 
-    init(length: Int64) {
+    internal init(length: Int64) {
         offsetDigits = max(8, String(max(0, length - 1), radix: 16).count)
     }
 
     /// The column of the first hex digit of byte `position` in a row.
-    func hexColumn(_ position: Int) -> Int { offsetDigits + 2 + position * 3 }
+    internal func hexColumn(_ position: Int) -> Int { offsetDigits + 2 + position * 3 }
     /// The column of the character of byte `position`.
-    func characterColumn(_ position: Int) -> Int { offsetDigits + 2 + Self.bytesPerRow * 3 + 2 + position }
+    internal func characterColumn(_ position: Int) -> Int { offsetDigits + 2 + Self.bytesPerRow * 3 + 2 + position }
 
-    func line(offset: Int64, bytes: [UInt8], table: CodeTable) -> String {
+    internal func line(offset: Int64, bytes: [UInt8], table: CodeTable) -> String {
         let digits = Array("0123456789ABCDEF".utf16)
         var units: [UInt16] = []
         units.reserveCapacity(characterColumn(Self.bytesPerRow))
@@ -68,13 +68,13 @@ struct HexFormat: Equatable {
     }
 
     /// Control characters and bytes without a character show as a dot (spec 10 › Binary, Hex).
-    static func printable(_ unit: UInt16) -> UInt16 {
+    internal static func printable(_ unit: UInt16) -> UInt16 {
         unit < 0x20 || (0x7F...0x9F).contains(unit) || unit == CodeTable.leadByte || unit == CodeTable.replacement
             ? 0x2E : unit
     }
 
     /// Bytes as hexadecimal text for the clipboard: `52 65 70 6F`.
-    static func hexString(_ data: Data) -> String {
+    internal static func hexString(_ data: Data) -> String {
         let digits = Array("0123456789ABCDEF".utf8)
         var text: [UInt8] = []
         text.reserveCapacity(data.count * 3)
@@ -93,15 +93,15 @@ struct HexFormat: Equatable {
 /// safe to call from several threads; nothing is meant for the main thread except the plain
 /// properties and the geometry functions, which touch no file. What changes is guarded by a lock
 /// each (`tableLock`, `boundariesLock`, `errorLock`); the rest is immutable.
-final class TextDocument: @unchecked Sendable {
-    let source: any ByteSource
-    let encoding: ViewerEncoding
-    let layout: ViewerLayout
+internal final class TextDocument: @unchecked Sendable {
+    internal let source: any ByteSource
+    internal let encoding: ViewerEncoding
+    internal let layout: ViewerLayout
     /// The bytes that are shown: for text, everything after a byte-order mark.
-    let content: Range<Int64>
-    let hexFormat: HexFormat
+    internal let content: Range<Int64>
+    internal let hexFormat: HexFormat
     /// Stops everything the document is doing (indexing, reading rows); set by whoever drops it.
-    let cancellation: CancellationFlag
+    internal let cancellation: CancellationFlag
     /// Stops the indexing alone, which ends with `cancellation` too: rows can still be read.
     private let indexStop: LinkedCancellation
     private let index: TextRowIndex?
@@ -122,7 +122,7 @@ final class TextDocument: @unchecked Sendable {
 
     /// `reusing` is a document of the same bytes laid out otherwise (another width): what is
     /// the same in both is not read again.
-    init(
+    internal init(
         source: any ByteSource,
         encoding: ViewerEncoding,
         bomLength: Int = 0,
@@ -153,7 +153,7 @@ final class TextDocument: @unchecked Sendable {
         }
     }
 
-    var length: Int64 { source.length }
+    internal var length: Int64 { source.length }
 
     private var bytesPerRow: Int {
         switch layout {
@@ -166,7 +166,7 @@ final class TextDocument: @unchecked Sendable {
     }
 
     /// The rows known so far; for text it grows while the index is being built.
-    var rowCount: Int {
+    internal var rowCount: Int {
         if let index {
             return index.rowCount
         }
@@ -175,19 +175,19 @@ final class TextDocument: @unchecked Sendable {
     }
 
     /// Lines of text known so far; for the byte layouts every row is a line.
-    var lineCount: Int { index?.lineCount ?? rowCount }
-    var isIndexComplete: Bool { index?.isComplete ?? true }
+    internal var lineCount: Int { index?.lineCount ?? rowCount }
+    internal var isIndexComplete: Bool { index?.isComplete ?? true }
     /// How many segments of the index were taken over from the layout this one replaced.
-    var segmentsReused: Int { index?.segmentsReused ?? 0 }
-    var checkpointCount: Int { index?.checkpointCount ?? 0 }
+    internal var segmentsReused: Int { index?.segmentsReused ?? 0 }
+    internal var checkpointCount: Int { index?.checkpointCount ?? 0 }
     /// The rows of everything before this offset are known.
-    var indexedThrough: Int64 { index.map { $0.isComplete ? length : $0.indexedThrough } ?? length }
+    internal var indexedThrough: Int64 { index.map { $0.isComplete ? length : $0.indexedThrough } ?? length }
 
     /// Finds the rows of a text.
     ///
     /// Blocks until done or cancelled (`cancellation`); the byte layouts need no index and return
     /// at once. `progress` is called from working threads.
-    func buildIndex(
+    internal func buildIndex(
         parallel: Bool,
         segmentSize: Int = 4 << 20,
         chunkSize: Int = 1 << 20,
@@ -212,11 +212,11 @@ final class TextDocument: @unchecked Sendable {
     }
 
     /// The flag that ends the building of the index (the document's own ends it too).
-    var indexCancellation: CancellationFlag { indexStop.flag }
+    internal var indexCancellation: CancellationFlag { indexStop.flag }
 
     /// Stops building the index (a newer layout of the same text takes over); what was found
     /// stays, and rows can be read as before.
-    func stopIndexing() {
+    internal func stopIndexing() {
         indexStop.flag.cancel()
     }
 
@@ -228,7 +228,7 @@ final class TextDocument: @unchecked Sendable {
     ///
     /// Kept for as long as the document is, so the next search finds the boundaries of the last
     /// one.
-    var characterBoundaries: CharacterBoundaries? {
+    internal var characterBoundaries: CharacterBoundaries? {
         guard encoding.kind == .doubleByte else {
             return nil
         }
@@ -244,7 +244,7 @@ final class TextDocument: @unchecked Sendable {
     private var fetchFailure: any Error?
 
     /// Keeps the first error met while reading rows (the index keeps its own).
-    func record(_ error: any Error) {
+    internal func record(_ error: any Error) {
         errorLock.lock()
         if fetchFailure == nil { fetchFailure = error }
         errorLock.unlock()
@@ -252,7 +252,7 @@ final class TextDocument: @unchecked Sendable {
 
     /// The first error that kept a part of the file from being read, if any: what is shown
     /// is then incomplete.
-    var readError: any Error? {
+    internal var readError: any Error? {
         errorLock.lock()
         defer { errorLock.unlock() }
         return index?.failure ?? fetchFailure
@@ -261,7 +261,7 @@ final class TextDocument: @unchecked Sendable {
     // MARK: Rows
 
     /// Up to `count` rows from row `first` on; fewer at the end of what is known.
-    func rows(from first: Int, count: Int, cancellation: CancellationFlag? = nil) throws -> [DisplayRow] {
+    internal func rows(from first: Int, count: Int, cancellation: CancellationFlag? = nil) throws -> [DisplayRow] {
         let available = rowCount
         guard first >= 0, first < available, count > 0 else {
             return []
@@ -294,7 +294,7 @@ final class TextDocument: @unchecked Sendable {
     }
 
     /// The row a byte offset is in; nil while that part of a text is not indexed yet.
-    func row(containing offset: Int64, cancellation: CancellationFlag? = nil) throws -> Int? {
+    internal func row(containing offset: Int64, cancellation: CancellationFlag? = nil) throws -> Int? {
         guard let index, case .text(let options) = layout else {
             return min(max(0, rowCount - 1), Int(max(0, offset) / Int64(bytesPerRow)))
         }
@@ -314,7 +314,7 @@ final class TextDocument: @unchecked Sendable {
     }
 
     /// The first row of a line (counted from 1); nil when the line is not known (yet).
-    func row(ofLine line: Int, cancellation: CancellationFlag? = nil) throws -> Int? {
+    internal func row(ofLine line: Int, cancellation: CancellationFlag? = nil) throws -> Int? {
         guard let index, case .text(let options) = layout else {
             return line >= 1 && line <= rowCount ? line - 1 : nil
         }
@@ -474,7 +474,7 @@ final class TextDocument: @unchecked Sendable {
     // MARK: Geometry (no file access)
 
     /// The byte offset of the place before UTF-16 unit `textIndex` of a row's text.
-    func byteOffset(in row: DisplayRow, at textIndex: Int) -> Int64 {
+    internal func byteOffset(in row: DisplayRow, at textIndex: Int) -> Int64 {
         if layout == .hex {
             let count = Int(row.range.upperBound - row.range.lowerBound)
             let position =
@@ -493,7 +493,7 @@ final class TextDocument: @unchecked Sendable {
     /// when the offset is behind the row's text).
     ///
     /// In hex rows, the place in the hex part.
-    func textIndex(in row: DisplayRow, of offset: Int64) -> Int {
+    internal func textIndex(in row: DisplayRow, of offset: Int64) -> Int {
         if layout == .hex {
             return hexFormat.hexColumn(
                 Int(min(max(offset, row.range.lowerBound), row.range.upperBound) - row.range.lowerBound)
@@ -512,7 +512,7 @@ final class TextDocument: @unchecked Sendable {
     /// The parts of a row's text that show bytes of `selection`.
     ///
     /// A hex row shows them twice: in the hex part and in the character part (spec 10 › Hex).
-    func textRanges(in row: DisplayRow, for selection: Range<Int64>) -> [Range<Int>] {
+    internal func textRanges(in row: DisplayRow, for selection: Range<Int64>) -> [Range<Int>] {
         let lower = max(selection.lowerBound, row.range.lowerBound)
         let upper = min(selection.upperBound, row.range.upperBound)
         guard lower < upper else {
@@ -537,7 +537,7 @@ final class TextDocument: @unchecked Sendable {
     /// a space (spec 10 › Selection and clipboard).
     ///
     /// Blocks.
-    func text(in range: Range<Int64>, cancellation: CancellationFlag? = nil) throws -> String {
+    internal func text(in range: Range<Int64>, cancellation: CancellationFlag? = nil) throws -> String {
         var text = DecodedText()
         text.tracksOffsets = false
         encoding.decode(try source.read(range, cancellation: cancellation), final: true, into: &text)

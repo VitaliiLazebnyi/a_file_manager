@@ -41,7 +41,7 @@ public struct RemoteEntry: Equatable, Sendable {
     /// The name must also stay one component when the path it becomes part of is read as
     /// text: a name that begins with a combining mark would melt into the slash before it
     /// (`RemotePath.hasSeparableNames`), and is left out like the others.
-    static func isSafeName(_ name: String, isDOSFormat: Bool = false) -> Bool {
+    internal static func isSafeName(_ name: String, isDOSFormat: Bool = false) -> Bool {
         // The kernel's check of a single name (by bytes: not empty, no `.` or `..`, no slash, no
         // zero byte), and what only a server's listing adds to it.
         guard PathSafety.isSafeName(name), !(isDOSFormat && name.utf8.contains(0x5C)) else {
@@ -51,7 +51,7 @@ public struct RemoteEntry: Equatable, Sendable {
     }
 
     /// The entry as a panel shows it.
-    func item(in directory: URL) -> FileItem {
+    internal func item(in directory: URL) -> FileItem {
         FileItem(
             url: directory.appending(name: name),
             name: name,
@@ -83,7 +83,7 @@ public enum FTPListParser {
 
     /// Sizes and dates come from the server and are taken as they fit: a size that is no
     /// number or below zero is 0, one too large for a number is the largest there is.
-    static func size(_ digits: Substring) -> Int64 {
+    internal static func size(_ digits: Substring) -> Int64 {
         guard !digits.isEmpty, digits.utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }) else {
             return 0
         }
@@ -91,7 +91,7 @@ public enum FTPListParser {
     }
 
     /// A date built from numbers a server sent; nil when they are not a date of our era.
-    static func date(_ components: DateComponents, calendar: Calendar) -> Date? {
+    internal static func date(_ components: DateComponents, calendar: Calendar) -> Date? {
         // Every caller gives a year, a month and a day; the time of day may be left out.
         guard let year = components.year, (1...9_999).contains(year), let month = components.month,
             (1...12).contains(month), let day = components.day, (1...31).contains(day),
@@ -438,7 +438,7 @@ public enum FTPListParser {
     }
 
     /// `rwxr-sr-t` as permission bits, with set-user-id, set-group-id and sticky.
-    static func permissions(_ mode: ArraySlice<Character>) -> UInt16 {
+    internal static func permissions(_ mode: ArraySlice<Character>) -> UInt16 {
         var bits: UInt16 = 0
         for (index, character) in mode.prefix(9).enumerated() {
             let bit = UInt16(1) << UInt16(8 - index)

@@ -7,18 +7,18 @@ import Foundation
 /// **Threading.** The job calls from its own threads; every dialog is shown through
 /// `JobMonitor.ask`, which takes it to the main thread and waits. What needs to read files
 /// (comparing two files) runs on the calling job thread, between two dialogs.
-final class JobBridge: FileJobDelegate, Sendable {
+internal final class JobBridge: FileJobDelegate, Sendable {
     private let monitor: any JobMonitor
     private let ui: any UserInteraction
     private let fileSystems: FileSystemRegistry
 
-    init(monitor: any JobMonitor, ui: any UserInteraction, fileSystems: FileSystemRegistry) {
+    internal init(monitor: any JobMonitor, ui: any UserInteraction, fileSystems: FileSystemRegistry) {
         self.monitor = monitor
         self.ui = ui
         self.fileSystems = fileSystems
     }
 
-    func job(_: FileJob, progress: JobProgress) {
+    internal func job(_: FileJob, progress: JobProgress) {
         monitor.report(progress)
     }
 
@@ -46,7 +46,7 @@ final class JobBridge: FileJobDelegate, Sendable {
     /// The Overwrite dialog (spec 07 › Name collisions).
     ///
     /// The six everyday answers and Rename are buttons; the rest is behind "More…".
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
+    internal func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
         func describe(_ item: FileItem) -> String {
             "\(shown(item.url))\n\(Format.bytes(item.size)) bytes, \(Format.date(item.modified))"
         }
@@ -203,7 +203,7 @@ final class JobBridge: FileJobDelegate, Sendable {
         return text
     }
 
-    func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
+    internal func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
         monitor.ask { @MainActor @Sendable in
             ui.pick(
                 "Error with \(DisplayName.escaped(url.lastPathComponent))",
@@ -214,7 +214,7 @@ final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
-    func job(_: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
+    internal func job(_: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
         monitor.ask { @MainActor @Sendable in
             pick(
                 "The directory \(shown(directory)) is not empty!",
@@ -226,7 +226,7 @@ final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
-    func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
+    internal func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         let text = OperationText.protection(question, path: shown(question.item.url))
         return monitor.ask { @MainActor @Sendable in
             pick(
@@ -239,7 +239,7 @@ final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
-    func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
+    internal func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
         monitor.ask { @MainActor @Sendable in
             ui.pick(
                 "The folder \(shown(existing.url)) already exists!",
@@ -251,7 +251,9 @@ final class JobBridge: FileJobDelegate, Sendable {
     }
 
     /// Skip comes first, so that Return keeps the other volume as it is.
-    func job(_: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose) -> ProtectionChoice {
+    internal func job(_: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose)
+        -> ProtectionChoice
+    {
         let (action, detail) =
             purpose == .move
             ? ("Move its contents", "Moving it would move everything on that volume away. Do you want that?")
@@ -269,7 +271,7 @@ final class JobBridge: FileJobDelegate, Sendable {
     }
 
     /// The button Return presses in the Overwrite dialog: Skip.
-    static let overwriteDefault = 2
+    internal static let overwriteDefault = 2
 
     /// A question whose first button destroys something (overwrites, deletes for good, empties
     /// another volume): Return presses the button at `safe`, which leaves things as they are,

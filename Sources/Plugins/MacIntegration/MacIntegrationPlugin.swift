@@ -50,10 +50,10 @@ public final class MacIntegrationPlugin: Plugin {
     }
 
     /// From this many marked items on, they are picked out off the main thread.
-    static let backgroundListThreshold = 5_000
+    internal static let backgroundListThreshold = 5_000
     /// The most items Finder is asked to select, and the most that are shared, at a time.
-    nonisolated static let revealLimit = 1_000
-    static let shareLimit = 1_000
+    nonisolated internal static let revealLimit = 1_000
+    internal static let shareLimit = 1_000
     /// Stands for Launch Services in `BlockingCalls`: used for nothing but what object it is.
     private final class LaunchServices: Sendable {}
     nonisolated private static let launchServices = LaunchServices()
@@ -149,7 +149,11 @@ public final class MacIntegrationPlugin: Plugin {
     }
 
     /// A plugin that hands its requests to `desktop`.
-    init(desktop: (any MacDesktop)?, pasteboard: NSPasteboard, applications: @escaping @Sendable (URL) -> [URL]) {
+    internal init(
+        desktop: (any MacDesktop)?,
+        pasteboard: NSPasteboard,
+        applications: @escaping @Sendable (URL) -> [URL]
+    ) {
         self.desktop = desktop
         self.pasteboard = pasteboard
         self.applications = applications
@@ -172,7 +176,7 @@ public final class MacIntegrationPlugin: Plugin {
     /// Finds the application the editor preference names.
     ///
     /// Looks at the disk: not for the main thread.
-    nonisolated static func editorApplication(named text: String) -> URL {
+    nonisolated internal static func editorApplication(named text: String) -> URL {
         let fallback = URL(fileURLWithPath: "/System/Applications/TextEdit.app")
         let text = text.trimmingCharacters(in: .whitespaces)
         let fm = FileManager.default
@@ -469,7 +473,7 @@ public final class MacIntegrationPlugin: Plugin {
     /// The Finder tags of a file.
     ///
     /// Reads the disk: not for the main thread.
-    nonisolated static func tags(of url: URL) -> [String] {
+    nonisolated internal static func tags(of url: URL) -> [String] {
         var value: AnyObject?
         try? (URL(fileURLWithPath: url.path) as NSURL).getResourceValue(&value, forKey: .tagNamesKey)
         return value as? [String] ?? []
@@ -478,12 +482,12 @@ public final class MacIntegrationPlugin: Plugin {
     /// Replaces the Finder tags of a file.
     ///
     /// Writes to the disk: not for the main thread.
-    nonisolated static func setTags(_ tags: [String], of url: URL) throws {
+    nonisolated internal static func setTags(_ tags: [String], of url: URL) throws {
         try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
     }
 
     /// The tags as the user types them: separated by commas, no empty ones, none twice.
-    static func tags(from text: String) -> [String] {
+    internal static func tags(from text: String) -> [String] {
         var tags: [String] = []
         for tag in text.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) })
         where !tag.isEmpty && !tags.contains(tag) {

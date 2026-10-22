@@ -4,19 +4,19 @@ import Foundation
 /// Which file a local path really is: the device and inode, which are the same for a hard
 /// link, and for a folder reached by two roads (macOS shows the data volume both directly and
 /// under /System/Volumes/Data).
-struct FileIdentity: Hashable {
-    let device: UInt64
-    let inode: UInt64
+internal struct FileIdentity: Hashable {
+    internal let device: UInt64
+    internal let inode: UInt64
 
     /// `SF_DATALESS` of `st_flags`: a file whose contents are not on this disk (iCloud Drive
     /// with optimised storage); reading it downloads it.
-    static let datalessFlag: UInt32 = 0x4000_0000
+    internal static let datalessFlag: UInt32 = 0x4000_0000
 
     /// What a local path is, with one system call; nil for other locations or a path that
     /// cannot be examined.
     ///
     /// Links are followed.
-    static func of(_ url: URL) -> (identity: Self, isRegularFile: Bool)? {
+    internal static func of(_ url: URL) -> (identity: Self, isRegularFile: Bool)? {
         guard let info = status(of: url) else {
             return nil
         }
@@ -39,7 +39,7 @@ struct FileIdentity: Hashable {
     /// every file of a search).
     ///
     /// A location that is not a local path is given the benefit of the doubt.
-    static func canBeRead(_ url: URL) -> Bool {
+    internal static func canBeRead(_ url: URL) -> Bool {
         guard url.isFileURL else {
             return true
         }
@@ -56,9 +56,9 @@ struct FileIdentity: Hashable {
 ///
 /// The descriptor is guarded by `lock`; it is used outside the lock, which is safe because a
 /// `FileReader` is used by one thread at a time (`close` too) and `interrupt` does nothing.
-final class LocalFileReader: FileReader, @unchecked Sendable {
+internal final class LocalFileReader: FileReader, @unchecked Sendable {
     /// Reads from a descriptor into a buffer, as `read(2)` does, setting `errno` when it fails.
-    typealias SystemRead = @Sendable (Int32, UnsafeMutableRawPointer, Int) -> Int
+    internal typealias SystemRead = @Sendable (Int32, UnsafeMutableRawPointer, Int) -> Int
 
     private var descriptor: Int32
     private let lock = NSLock()
@@ -71,7 +71,9 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
 
     /// Nil when the file cannot be opened or is not a plain file that is here. `systemRead`
     /// does the reading: the system's `read`, unless a test stands in for the disk.
-    static func open(_ url: URL, systemRead: @escaping SystemRead = { Darwin.read($0, $1, $2) }) -> LocalFileReader? {
+    internal static func open(_ url: URL, systemRead: @escaping SystemRead = { Darwin.read($0, $1, $2) })
+        -> LocalFileReader?
+    {
         guard url.isFileURL else {
             return nil
         }
@@ -91,7 +93,7 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
         return LocalFileReader(descriptor: descriptor, systemRead: systemRead)
     }
 
-    func read(upToCount count: Int) throws -> Data? {
+    internal func read(upToCount count: Int) throws -> Data? {
         lock.lock()
         let descriptor = self.descriptor
         lock.unlock()
@@ -115,7 +117,7 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
         return data
     }
 
-    func seek(to offset: UInt64) throws {
+    internal func seek(to offset: UInt64) throws {
         lock.lock()
         let descriptor = self.descriptor
         lock.unlock()
@@ -124,7 +126,7 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
         }
     }
 
-    func close() {
+    internal func close() {
         lock.lock()
         let descriptor = self.descriptor
         self.descriptor = -1
@@ -132,7 +134,7 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
         if descriptor >= 0 { Darwin.close(descriptor) }
     }
 
-    func interrupt() {}
+    internal func interrupt() {}
 
     deinit {
         close()
@@ -142,7 +144,7 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
 extension FileSystemRegistry {
     /// A reader for a file a search or comparison is about to read through: local files by
     /// way of `LocalFileReader`, others through their file system.
-    func searchReader(for url: URL, cancellation: CancellationFlag) -> any FileReader? {
+    internal func searchReader(for url: URL, cancellation: CancellationFlag) -> any FileReader? {
         if url.isFileURL {
             return LocalFileReader.open(url)
         }

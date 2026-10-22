@@ -8,20 +8,20 @@ import Testing
 
 /// The parts of the hotlist editor's window, found by their place in it.
 @MainActor
-struct CoveragePlacesEditorParts {
-    let window: NSWindow
-    var controller: HotlistEditorWindowController? { window.delegate as? HotlistEditorWindowController }
-    var content: NSView? { window.contentView }
-    var table: NSTableView? { CoveragePlacesLoop.views(NSTableView.self, in: content).first }
-    var fields: [NSTextField] { CoveragePlacesLoop.views(NSTextField.self, in: content).filter(\.isEditable) }
-    var command: NSTextField { fields[0] }
-    var target: NSTextField { fields[1] }
-    var hideCharacter: NSTextField { fields[2] }
-    var number: String {
+internal struct CoveragePlacesEditorParts {
+    internal let window: NSWindow
+    internal var controller: HotlistEditorWindowController? { window.delegate as? HotlistEditorWindowController }
+    internal var content: NSView? { window.contentView }
+    internal var table: NSTableView? { CoveragePlacesLoop.views(NSTableView.self, in: content).first }
+    internal var fields: [NSTextField] { CoveragePlacesLoop.views(NSTextField.self, in: content).filter(\.isEditable) }
+    internal var command: NSTextField { fields[0] }
+    internal var target: NSTextField { fields[1] }
+    internal var hideCharacter: NSTextField { fields[2] }
+    internal var number: String {
         ((content as? NSStackView)?.arrangedSubviews.last as? NSStackView)?.arrangedSubviews.first
             .map { ($0 as? NSTextField)?.stringValue ?? "" } ?? ""
     }
-    var titles: [String] {
+    internal var titles: [String] {
         guard let table, let controller else {
             return []
         }
@@ -32,7 +32,7 @@ struct CoveragePlacesEditorParts {
     }
 
     /// Clicks the button titled `title`, whether it is enabled or not.
-    func click(_ title: String) {
+    internal func click(_ title: String) {
         guard let button = CoveragePlacesLoop.button(title, in: content), let action = button.action else {
             Issue.record("no button \(title)")
             return
@@ -40,16 +40,16 @@ struct CoveragePlacesEditorParts {
         NSApp.sendAction(action, to: button.target, from: button)
     }
 
-    func select(_ row: Int) {
+    internal func select(_ row: Int) {
         table?.selectRowIndexes([row], byExtendingSelection: false)
     }
 
-    func type(_ text: String, into field: NSTextField) {
+    internal func type(_ text: String, into field: NSTextField) {
         field.stringValue = text
         controller?.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: field))
     }
 
-    func press(_ characters: String, code: UInt16, _ modifiers: NSEvent.ModifierFlags = []) {
+    internal func press(_ characters: String, code: UInt16, _ modifiers: NSEvent.ModifierFlags = []) {
         table?.keyDown(with: CoveragePlacesLoop.key(characters, code: code, modifiers: modifiers))
     }
 }
@@ -57,12 +57,12 @@ struct CoveragePlacesEditorParts {
 /// The hotlist editor, run as the modal window it is, with a script that works it.
 @MainActor
 @Suite(.serialized)
-struct CoveragePlacesHotlistEditor {
-    let memory = MemoryFileSystem()
-    let bench: TestBench
-    var ui: ScriptedInteraction { bench.interaction }
+internal struct CoveragePlacesHotlistEditor {
+    internal let memory = MemoryFileSystem()
+    internal let bench: TestBench
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() {
+    internal init() {
         _ = NSApplication.shared
         memory.addDirectory("/C")
         bench = TestBench(
@@ -74,7 +74,7 @@ struct CoveragePlacesHotlistEditor {
     }
 
     /// Opens the editor on `list` without a modal loop; `script` works the window and ends it.
-    func edit(
+    internal func edit(
         _ list: Hotlist,
         in directory: URL? = nil,
         script: (CoveragePlacesEditorParts) -> Void
@@ -94,12 +94,12 @@ struct CoveragePlacesHotlistEditor {
         return controller.result
     }
 
-    let sample = Hotlist(entries: [
+    internal let sample = Hotlist(entries: [
         .item("A", command: "cd /a"), .submenu("S", [.item("In", command: "cd /in")]), .separator
     ])
 
     @Test
-    func cancelGivesNothingBack() {
+    internal func cancelGivesNothingBack() {
         var hidden = sample
         hidden.hidesMarked = true
         let result = edit(hidden) { parts in
@@ -112,7 +112,7 @@ struct CoveragePlacesHotlistEditor {
     }
 
     @Test
-    func theFieldsBelongToTheSelectedEntry() {
+    internal func theFieldsBelongToTheSelectedEntry() {
         let result = edit(sample) { parts in
             #expect(parts.command.stringValue == "cd /a" && parts.number == "Entry 1 of 4")
             parts.select(2)
@@ -133,7 +133,7 @@ struct CoveragePlacesHotlistEditor {
     }
 
     @Test
-    func entriesAreAddedBelowTheSelectionOrIntoTheSubmenu() {
+    internal func entriesAreAddedBelowTheSelectionOrIntoTheSubmenu() {
         ui.promptAnswers = [.accept, .text("-"), .cancel, .text(""), .text("Sub"), .cancel, .text("")]
         let result = edit(sample) { parts in
             parts.select(1)
@@ -160,7 +160,7 @@ struct CoveragePlacesHotlistEditor {
     }
 
     @Test
-    func titlesChangeExceptForSeparators() {
+    internal func titlesChangeExceptForSeparators() {
         ui.promptAnswers = [.text("&First"), .cancel, .text("")]
         let result = edit(sample) { parts in
             parts.click("Change Title…")
@@ -177,7 +177,7 @@ struct CoveragePlacesHotlistEditor {
     }
 
     @Test
-    func entriesMoveAndAreDeletedByButtonAndKey() {
+    internal func entriesMoveAndAreDeletedByButtonAndKey() {
         let result = edit(sample) { parts in
             parts.click("Move Down")
             #expect(parts.titles.prefix(2) == ["▾ S", "      A"])
@@ -205,7 +205,7 @@ struct CoveragePlacesHotlistEditor {
     }
 
     @Test
-    func aDoubleClickMarksAnEntryHiddenAndTheBoxHidesThem() {
+    internal func aDoubleClickMarksAnEntryHiddenAndTheBoxHidesThem() {
         let result = edit(sample) { parts in
             guard let table = parts.table, let action = table.doubleAction else {
                 return
@@ -229,7 +229,7 @@ struct CoveragePlacesHotlistEditor {
     }
 
     @Test
-    func aFullListTakesNoMoreAndANamelessFolderIsProposedByItsPath() throws {
+    internal func aFullListTakesNoMoreAndANamelessFolderIsProposedByItsPath() throws {
         let full = Hotlist(entries: (0..<Hotlist.limit).map { .item("e\($0)", command: "") })
         let nameless = try #require(URL(string: "mem:"))
         ui.promptAnswers = [.accept]

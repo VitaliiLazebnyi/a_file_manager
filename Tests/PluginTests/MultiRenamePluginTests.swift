@@ -13,17 +13,17 @@ import Testing
 /// No window is involved.
 @MainActor
 @Suite
-struct MultiRenameRuns {
-    let memory = MemoryFileSystem()
-    let box: Sandbox
-    let settings = MemorySettings()
-    let plugin: MultiRenamePlugin
-    let bench: TestBench
+internal struct MultiRenameRuns {
+    internal let memory = MemoryFileSystem()
+    internal let box: Sandbox
+    internal let settings = MemorySettings()
+    internal let plugin: MultiRenamePlugin
+    internal let bench: TestBench
 
-    var ui: ScriptedInteraction { bench.interaction }
-    var left: FakePanel { bench.left }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var left: FakePanel { bench.left }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         for (index, name) in ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"].enumerated() {
             memory.addFile(
@@ -46,7 +46,7 @@ struct MultiRenameRuns {
 
     /// Opens the tool on the given names of the left panel (all of them when none are given).
     @discardableResult
-    func open(_ names: [String] = [], settingsName: String? = nil) -> MultiRenameSession {
+    internal func open(_ names: [String] = [], settingsName: String? = nil) -> MultiRenameSession {
         left.model.clearSelection()
         for name in names { left.model.select(mask: name) }
         if names.isEmpty { left.model.selectAll() }
@@ -55,13 +55,15 @@ struct MultiRenameRuns {
         return session
     }
 
-    func names(_ session: MultiRenameSession) -> [String?] { session.rows.map(\.newName) }
-    var photos: [String] { memory.allPaths.filter { $0.hasPrefix("/photos/") }.map { String($0.dropFirst(8)) } }
+    internal func names(_ session: MultiRenameSession) -> [String?] { session.rows.map(\.newName) }
+    internal var photos: [String] {
+        memory.allPaths.filter { $0.hasPrefix("/photos/") }.map { String($0.dropFirst(8)) }
+    }
 
     // MARK: Registration
 
     @Test
-    func commandMenuAndPreferences() {
+    internal func commandMenuAndPreferences() {
         #expect(bench.commands[.multiRename]?.title == "Multi-Rename Tool…")
         #expect(bench.kernel.keyBindings.command(for: Shortcut(.character("m"), .control)) == .multiRename)
         #expect(bench.kernel.menus.menus.first?.items == [.multiRename])
@@ -73,7 +75,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func operandsAreTheSelectionOrTheCursorItem() {
+    internal func operandsAreTheSelectionOrTheCursorItem() {
         #expect(open(["IMG_1002.jpg", "notes.txt"]).rows.map(\.entry.name) == ["IMG_1002.jpg", "notes.txt"])
         left.model.clearSelection()
         left.moveCursor(toName: "IMG_1003.jpg")
@@ -84,7 +86,7 @@ struct MultiRenameRuns {
     // MARK: Preview
 
     @Test
-    func previewFollowsTheSettings() {
+    internal func previewFollowsTheSettings() {
         let session = open(["IMG_*"])
         #expect(
             names(session) == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"]
@@ -105,7 +107,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func previewMarksConflictsAndInvalidNames() {
+    internal func previewMarksConflictsAndInvalidNames() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "same"
         #expect(session.rows.allSatisfy { $0.status == .duplicate } && session.counts.conflicts == 3)
@@ -123,7 +125,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func previewInTheBackground() async {
+    internal func previewInTheBackground() async {
         let items = (0..<3_000)
             .map {
                 FileItem(url: memory.addFile("/many/f\($0).txt"), name: "f\($0).txt")
@@ -155,7 +157,7 @@ struct MultiRenameRuns {
     // MARK: Runs
 
     @Test
-    func renamesAndEmptiesTheList() {
+    internal func renamesAndEmptiesTheList() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "Photo_[C:2]"
         session.settings.letterCase = .upper
@@ -173,7 +175,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func unchangedItemsStayInTheList() {
+    internal func unchangedItemsStayInTheList() {
         let session = open()
         session.settings.search = "IMG_"
         session.settings.replacement = "pic"
@@ -183,7 +185,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func resultLog() throws {
+    internal func resultLog() throws {
         let session = open(["IMG_1001.jpg", "IMG_1002.jpg"])
         session.settings.nameMask = "[C]/pic"
         session.start()
@@ -197,7 +199,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func slashesMoveIntoFoldersThatAreCreated() {
+    internal func slashesMoveIntoFoldersThatAreCreated() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "[C+1/2]/[N]"
         session.start()
@@ -212,7 +214,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func swapsAndShiftsThroughGivenNames() {
+    internal func swapsAndShiftsThroughGivenNames() {
         let session = open(["IMG_*"])
         session.loadNames(fromText: "IMG_1002.jpg\r\nIMG_1003.jpg\r\nIMG_1001.jpg\r\n")
         #expect(session.givenNames?.count == 3 && session.rows.allSatisfy { $0.status == .ready })
@@ -235,7 +237,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func counterShiftOnTheLocalDisk() throws {
+    internal func counterShiftOnTheLocalDisk() throws {
         for index in 1...4 { try box.file("A/\(index).txt", "content \(index)") }
         left.show(box.url("A"))
         let session = open()
@@ -253,7 +255,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func swapAndCaseOnlyRenameOnTheLocalDisk() throws {
+    internal func swapAndCaseOnlyRenameOnTheLocalDisk() throws {
         try box.file("A/one.txt", "1")
         try box.file("A/two.txt", "2")
         try box.file("A/readme.md", "r")
@@ -272,7 +274,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func allUppercaseOnTheLocalDisk() throws {
+    internal func allUppercaseOnTheLocalDisk() throws {
         try box.file("A/a.txt", "a")
         try box.file("A/b.txt", "b")
         left.show(box.url("A"))
@@ -286,7 +288,7 @@ struct MultiRenameRuns {
     // MARK: Conflicts
 
     @Test
-    func conflictsAreAutoRenamedWhenAsked() {
+    internal func conflictsAreAutoRenamedWhenAsked() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "notes"
         session.settings.extensionMask = "txt"
@@ -298,7 +300,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func conflictsCanBeSkippedOrCancelTheRun() {
+    internal func conflictsCanBeSkippedOrCancelTheRun() {
         let session = open()
         session.settings.search = "IMG_1001.jpg|IMG_1002"
         session.settings.replacement = "notes.txt|pic"
@@ -312,7 +314,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func aFileThatAppearsMeanwhileIsNotOverwritten() {
+    internal func aFileThatAppearsMeanwhileIsNotOverwritten() {
         let session = open(["IMG_1001.jpg", "IMG_1002.jpg"])
         session.settings.nameMask = "new[C]"
         // After the preview, behind the tool's back; the run finds it and asks.
@@ -324,7 +326,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func failuresAreReportedAndStayInTheList() throws {
+    internal func failuresAreReportedAndStayInTheList() throws {
         try box.file("A/a.txt", "a")
         try box.file("A/b.txt", "b")
         try box.file("A/keep.txt", "k")
@@ -345,7 +347,7 @@ struct MultiRenameRuns {
     // MARK: Undo
 
     @Test
-    func undoAsksAndRestoresInReverseOrder() {
+    internal func undoAsksAndRestoresInReverseOrder() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "Photo_[C]"
         session.start()
@@ -365,7 +367,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func undoWorksAfterTheToolWasClosedAndKeepsWhatFailed() {
+    internal func undoWorksAfterTheToolWasClosedAndKeepsWhatFailed() {
         var session = open(["IMG_*"])
         session.settings.nameMask = "a[C]"
         session.start()
@@ -390,7 +392,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func undoHistoryIsLimited() {
+    internal func undoHistoryIsLimited() {
         settings.set("2", forKey: RenameStore.undoLimitKey)
         for round in 1...3 {
             let session = open(["notes*"])
@@ -408,7 +410,7 @@ struct MultiRenameRuns {
     // MARK: The list
 
     @Test
-    func orderDrivesTheCounter() {
+    internal func orderDrivesTheCounter() {
         let session = open()
         session.settings.nameMask = "[C]"
         #expect(names(session) == ["1.jpg", "2.jpg", "3.jpg", "4.txt"])
@@ -444,7 +446,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func nextStepChainsRules() {
+    internal func nextStepChainsRules() {
         let session = open(["IMG_*"])
         session.settings.search = "IMG_"
         session.settings.replacement = "holiday "
@@ -459,7 +461,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func editNamesAndLoadNamesFromAFile() throws {
+    internal func editNamesAndLoadNamesFromAFile() throws {
         let session = open(["IMG_*"])
         session.settings.nameMask = "[N]x"
         ui.formAnswers = [.values(["names": .text("first.jpg\nsecond.jpg")])]
@@ -494,7 +496,7 @@ struct MultiRenameRuns {
     // MARK: Settings
 
     @Test
-    func savedSettings() {
+    internal func savedSettings() {
         var session = open(["IMG_*"])
         session.settings.nameMask = "[N]_[C]"
         session.settings.regularExpression = true
@@ -525,7 +527,7 @@ struct MultiRenameRuns {
     }
 
     @Test
-    func historiesAndTitleWords() {
+    internal func historiesAndTitleWords() {
         let store = RenameStore(settings: settings)
         store.remember(" a", in: .search)
         store.remember("b", in: .search)
@@ -549,9 +551,9 @@ struct MultiRenameRuns {
 /// The window itself: built without being shown, to see that it holds together.
 @MainActor
 @Suite
-struct MultiRenameWindow {
+internal struct MultiRenameWindow {
     @Test
-    func windowShowsTheSessionAndFollowsIt() throws {
+    internal func windowShowsTheSessionAndFollowsIt() throws {
         _ = NSApplication.shared
         let memory = MemoryFileSystem()
         memory.addFile("/w/a.txt")

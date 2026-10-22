@@ -8,7 +8,7 @@ import AppKit
 ///
 /// It works on a copy of the list; only OK hands the copy back. Main thread only; nothing here
 /// touches a file system.
-final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
+internal final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
     NSTableViewDelegate,
     NSTextFieldDelegate
 {
@@ -45,7 +45,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     /// Shows the editor and waits for it.
     ///
     /// Returns the changed list on OK, nil on Cancel.
-    static func run(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) -> Hotlist? {
+    internal static func run(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) -> Hotlist? {
         let controller = HotlistEditorWindowController(hotlist, kernel: kernel, currentDirectory: currentDirectory)
         let window = controller.dialog
         window.center()
@@ -55,9 +55,9 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// The changed list after OK; nil before and after Cancel.
-    var result: Hotlist? { accepted ? hotlist : nil }
+    internal var result: Hotlist? { accepted ? hotlist : nil }
 
-    init(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) {
+    internal init(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) {
         self.hotlist = hotlist
         self.kernel = kernel
         proposedCommand = "cd " + kernel.fileSystems.displayPath(currentDirectory)
@@ -81,7 +81,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     @available(*, unavailable)
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    internal required init?(coder _: NSCoder) { fatalError("not used") }
 
     // MARK: Layout
 
@@ -293,7 +293,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// The fields below the list belong to the selected entry and are taken over as typed.
-    func controlTextDidChange(_ notification: Notification) {
+    internal func controlTextDidChange(_ notification: Notification) {
         let field = notification.object as? NSTextField
         if field === hideField {
             // Any character but the dash, which already means separators and submenus.
@@ -312,9 +312,9 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    func numberOfRows(in _: NSTableView) -> Int { rows.count }
+    internal func numberOfRows(in _: NSTableView) -> Int { rows.count }
 
-    func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
+    internal func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("entry")
         let cell =
             tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
@@ -329,7 +329,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// A line of the editor's list: indented by its depth, submenus with a mark of their own.
-    nonisolated static func title(of row: Hotlist.Row) -> String {
+    nonisolated internal static func title(of row: Hotlist.Row) -> String {
         let indent = String(repeating: "      ", count: row.depth)
         switch row.entry.kind {
         case .separator:
@@ -343,7 +343,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    func tableViewSelectionDidChange(_: Notification) {
+    internal func tableViewSelectionDidChange(_: Notification) {
         showSelection()
     }
 
@@ -362,7 +362,7 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         close()
     }
 
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         // Only the loop this window runs in is ended: a stop without one would end whatever
         // loop the main thread runs.
         if NSApplication.shared.modalWindow === window { NSApplication.shared.stopModal() }

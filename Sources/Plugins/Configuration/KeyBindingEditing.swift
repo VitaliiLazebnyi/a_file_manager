@@ -4,8 +4,8 @@ import Foundation
 /// Which command ends up with which keys, worked out the way the kernel does it at start-up:
 /// every command's default keys in registration order (a key stays with its first owner), then
 /// the user's bindings by command name (a key given to a command is taken from its owner).
-enum KeyMap {
-    static func resolve(_ commands: [Command], overrides: [String: [String]]) -> [CommandID: [Shortcut]] {
+internal enum KeyMap {
+    internal static func resolve(_ commands: [Command], overrides: [String: [String]]) -> [CommandID: [Shortcut]] {
         var owners: [Shortcut: CommandID] = [:]
         var keys: [CommandID: [Shortcut]] = [:]
         for command in commands {
@@ -36,21 +36,21 @@ enum KeyMap {
 /// Unlike Total Commander's dialog, this one knows every key of every command, so it can say
 /// which command a key belongs to before it is taken away.
 @MainActor
-final class KeyBindingEditor {
+internal final class KeyBindingEditor {
     private var commands: [Command]
     private var stored: [String: [String]]
     /// The user's bindings as they will be stored: command name → shortcuts in text form.
-    private(set) var overrides: [String: [String]]
+    internal private(set) var overrides: [String: [String]]
     private var resolved: [CommandID: [Shortcut]] = [:]
 
-    init(commands: [Command], overrides: [String: [String]]) {
+    internal init(commands: [Command], overrides: [String: [String]]) {
         self.commands = commands
         stored = overrides
         self.overrides = overrides
         resolve()
     }
 
-    convenience init(kernel: Kernel) {
+    internal convenience init(kernel: Kernel) {
         self.init(
             commands: kernel.commands.all,
             overrides: Self.storedOverrides(in: kernel)
@@ -59,7 +59,7 @@ final class KeyBindingEditor {
 
     /// Takes bindings that were stored elsewhere since this editor was made (the Start menu's
     /// keys, a command's shortcut field) as the base, and keeps what was edited here on top.
-    func rebase(commands: [Command], overrides fresh: [String: [String]]) {
+    internal func rebase(commands: [Command], overrides fresh: [String: [String]]) {
         var merged = fresh
         for name in Set(overrides.keys).union(stored.keys) where overrides[name] != stored[name] {
             merged[name] = overrides[name]
@@ -70,16 +70,16 @@ final class KeyBindingEditor {
         resolve()
     }
 
-    func rebase(kernel: Kernel) {
+    internal func rebase(kernel: Kernel) {
         rebase(commands: kernel.commands.all, overrides: Self.storedOverrides(in: kernel))
     }
 
-    static func storedOverrides(in kernel: Kernel) -> [String: [String]] {
+    internal static func storedOverrides(in kernel: Kernel) -> [String: [String]] {
         kernel.settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) ?? [:]
     }
 
     /// Forgets the bindings of commands that no longer exist (a deleted or renamed user command).
-    func discardOverrides(where isDead: (String) -> Bool) {
+    internal func discardOverrides(where isDead: (String) -> Bool) {
         let before = overrides.count
         overrides = overrides.filter { !isDead($0.key) }
         if overrides.count != before { resolve() }
@@ -89,23 +89,23 @@ final class KeyBindingEditor {
         resolved = KeyMap.resolve(commands, overrides: overrides)
     }
 
-    var isChanged: Bool { overrides != stored }
+    internal var isChanged: Bool { overrides != stored }
 
-    func shortcuts(for command: CommandID) -> [Shortcut] { resolved[command] ?? [] }
+    internal func shortcuts(for command: CommandID) -> [Shortcut] { resolved[command] ?? [] }
 
     /// The command that has the key now.
-    func owner(of shortcut: Shortcut) -> CommandID? {
+    internal func owner(of shortcut: Shortcut) -> CommandID? {
         resolved.first { $0.value.contains(shortcut) }?.key
     }
 
     /// Whether the command's keys are the user's choice rather than the defaults.
-    func isCustomized(_ command: CommandID) -> Bool { overrides[command.rawValue] != nil }
+    internal func isCustomized(_ command: CommandID) -> Bool { overrides[command.rawValue] != nil }
 
     /// Gives the command exactly these keys.
     ///
     /// A key another command has is taken from it, and that is written down for the other command
     /// too, so the result is the same after a restart.
-    func set(_ shortcuts: [Shortcut], for command: CommandID) {
+    internal func set(_ shortcuts: [Shortcut], for command: CommandID) {
         for shortcut in shortcuts {
             guard let owner = owner(of: shortcut), owner != command else { continue }
             overrides[owner.rawValue] = self.shortcuts(for: owner).filter { $0 != shortcut }.map(\.notation)
@@ -116,7 +116,7 @@ final class KeyBindingEditor {
         resolve()
     }
 
-    func add(_ shortcut: Shortcut, to command: CommandID) {
+    internal func add(_ shortcut: Shortcut, to command: CommandID) {
         set(shortcuts(for: command).filter { $0 != shortcut } + [shortcut], for: command)
     }
 
@@ -125,7 +125,9 @@ final class KeyBindingEditor {
     ///
     /// Returns false when the key stayed where it was.
     @discardableResult
-    func assign(_ shortcut: Shortcut, to command: CommandID, adding: Bool, asking ui: any UserInteraction) -> Bool {
+    internal func assign(_ shortcut: Shortcut, to command: CommandID, adding: Bool, asking ui: any UserInteraction)
+        -> Bool
+    {
         if let owner = owner(of: shortcut), owner != command {
             let title = commands.first { $0.id == owner }?.title ?? owner.rawValue
             let answer = ui.choose(
@@ -148,19 +150,19 @@ final class KeyBindingEditor {
 
     /// Back to the keys the command's plugin proposed, as far as no other command of the
     /// user's own bindings holds them.
-    func reset(_ command: CommandID) {
+    internal func reset(_ command: CommandID) {
         overrides[command.rawValue] = nil
         resolve()
     }
 
-    func resetAll() {
+    internal func resetAll() {
         overrides = [:]
         resolve()
     }
 
     /// Stores the bindings and applies them to the running program: every command is given
     /// its final keys, so the state is the one the next start arrives at.
-    func commit(to settings: any SettingsStore, keyBindings: KeyBindings) {
+    internal func commit(to settings: any SettingsStore, keyBindings: KeyBindings) {
         if overrides.isEmpty {
             settings.set(nil as Data?, forKey: KeyBindings.settingsKey)
         } else {
@@ -169,7 +171,7 @@ final class KeyBindingEditor {
         Self.apply(resolved, of: commands, to: keyBindings)
     }
 
-    static func apply(_ keys: [CommandID: [Shortcut]], of commands: [Command], to keyBindings: KeyBindings) {
+    internal static func apply(_ keys: [CommandID: [Shortcut]], of commands: [Command], to keyBindings: KeyBindings) {
         var all: [String: [String]] = [:]
         for command in commands { all[command.id.rawValue] = (keys[command.id] ?? []).map(\.notation) }
         keyBindings.apply(overrides: all)
@@ -177,7 +179,7 @@ final class KeyBindingEditor {
 
     /// Brings the running program in line with the stored bindings, after they were replaced
     /// as a whole (import, reset).
-    static func reapply(in kernel: Kernel) {
+    internal static func reapply(in kernel: Kernel) {
         let overrides = kernel.settings.value([String: [String]].self, forKey: KeyBindings.settingsKey) ?? [:]
         apply(
             KeyMap.resolve(kernel.commands.all, overrides: overrides),
@@ -188,15 +190,15 @@ final class KeyBindingEditor {
 }
 
 /// Shortcuts as the user reads and presses them.
-enum ShortcutText {
+internal enum ShortcutText {
     /// The keys that are written by a name of their own rather than by a character or a number.
-    static let namedKeys: [Key] = [
+    internal static let namedKeys: [Key] = [
         .returnKey, .enter, .tab, .space, .backspace, .forwardDelete, .insert, .home, .end, .pageUp, .pageDown,
         .leftArrow, .rightArrow, .upArrow, .downArrow, .keypadPlus, .keypadMinus, .keypadMultiply, .keypadDivide
     ]
 
     /// How a key is written on the Mac: `C`, `F5`, `↩`.
-    static func name(of key: Key) -> String {
+    internal static func name(of key: Key) -> String {
         switch key {
         case .character(let character):
             character.uppercased()
@@ -264,7 +266,7 @@ enum ShortcutText {
     }
 
     /// The Mac's way of writing a shortcut: `⌃⌥⇧⌘C`, `⇧F5`.
-    static func display(_ shortcut: Shortcut) -> String {
+    internal static func display(_ shortcut: Shortcut) -> String {
         var text = ""
         if shortcut.modifiers.contains(.control) { text += "⌃" }
         if shortcut.modifiers.contains(.option) { text += "⌥" }
@@ -273,7 +275,7 @@ enum ShortcutText {
         return text + name(of: shortcut.key)
     }
 
-    static func display(_ shortcuts: [Shortcut]) -> String {
+    internal static func display(_ shortcuts: [Shortcut]) -> String {
         shortcuts.map(display).joined(separator: ", ")
     }
 
@@ -281,7 +283,7 @@ enum ShortcutText {
     /// or the Mac's symbols (`⌃⇧N`).
     ///
     /// Nil when it names no key.
-    static func parse(_ text: String) -> Shortcut? {
+    internal static func parse(_ text: String) -> Shortcut? {
         var rest = text.trimmingCharacters(in: .whitespaces)
         guard !rest.isEmpty else {
             return nil
@@ -319,7 +321,7 @@ enum ShortcutText {
     /// its modifiers.
     ///
     /// Nil for a press that produces nothing.
-    static func shortcut(keyCode: UInt16, characters: String?, modifiers: KeyModifiers) -> Shortcut? {
+    internal static func shortcut(keyCode: UInt16, characters: String?, modifiers: KeyModifiers) -> Shortcut? {
         if let key = namedKeyCodes[keyCode] {
             return Shortcut(key, modifiers)
         }
@@ -331,24 +333,24 @@ enum ShortcutText {
 }
 
 /// A command as the lists of the editors show it.
-struct CommandRow: Equatable {
-    let id: CommandID
-    let title: String
+internal struct CommandRow: Equatable {
+    internal let id: CommandID
+    internal let title: String
     /// The command's keys, ready to show.
-    let keys: String
+    internal let keys: String
     /// The menu the command is in, or one of the two groups below.
-    let category: String
+    internal let category: String
 
-    static let userCategory = "User commands"
-    static let otherCategory = "Not in a menu"
+    internal static let userCategory = "User commands"
+    internal static let otherCategory = "Not in a menu"
 }
 
 /// The command list of the *Choose command* dialog, the keyboard page and the keyboard help
 /// (spec 14 › The Choose command dialog).
 ///
 /// The categories are the menus the commands are in, since that is where the user knows them from.
-enum CommandCatalog {
-    static func rows(commands: [Command], menus: [MenuRegistry.Menu], shortcuts: (CommandID) -> [Shortcut])
+internal enum CommandCatalog {
+    internal static func rows(commands: [Command], menus: [MenuRegistry.Menu], shortcuts: (CommandID) -> [Shortcut])
         -> [CommandRow]
     {
         var menuOf: [CommandID: String] = [:]
@@ -367,14 +369,14 @@ enum CommandCatalog {
     }
 
     /// The categories in menu order, the two general groups last.
-    static func categories(of rows: [CommandRow], menus: [MenuRegistry.Menu]) -> [String] {
+    internal static func categories(of rows: [CommandRow], menus: [MenuRegistry.Menu]) -> [String] {
         let present = Set(rows.map(\.category))
         return (menus.map(\.title) + [CommandRow.userCategory, CommandRow.otherCategory]).filter(present.contains)
     }
 
     /// The rows of a category (nil = all) that contain every word of the filter in their
     /// name, title or keys.
-    static func filter(_ rows: [CommandRow], text: String, category: String? = nil) -> [CommandRow] {
+    internal static func filter(_ rows: [CommandRow], text: String, category: String? = nil) -> [CommandRow] {
         let words = text.lowercased().split(separator: " ")
         return rows.filter { row in
             guard category == nil || row.category == category else {
@@ -387,7 +389,7 @@ enum CommandCatalog {
 
     /// The keyboard help: every command that has a key, grouped by menu (spec 17 › Help,
     /// `cm_Keyboard`), generated from the bindings in force.
-    static func shortcutSheet(_ rows: [CommandRow], menus: [MenuRegistry.Menu]) -> String {
+    internal static func shortcutSheet(_ rows: [CommandRow], menus: [MenuRegistry.Menu]) -> String {
         var text = ""
         for category in categories(of: rows, menus: menus) {
             let bound = rows.filter { $0.category == category && !$0.keys.isEmpty }

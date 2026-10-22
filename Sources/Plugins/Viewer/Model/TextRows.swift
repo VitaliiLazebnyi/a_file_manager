@@ -6,12 +6,12 @@ import Foundation
 /// With wrapping on, a row breaks at a word boundary after at most `columns` characters; with
 /// wrapping off it is simply cut there (the specification's `UnwrapWidth`), so no row is ever
 /// unbounded.
-struct TextLayoutOptions: Equatable {
-    var columns: Int
-    var wordWrap: Bool
-    var tabWidth: Int
+internal struct TextLayoutOptions: Equatable {
+    internal var columns: Int
+    internal var wordWrap: Bool
+    internal var tabWidth: Int
 
-    init(columns: Int, wordWrap: Bool, tabWidth: Int = 8) {
+    internal init(columns: Int, wordWrap: Bool, tabWidth: Int = 8) {
         self.columns = max(1, columns)
         self.wordWrap = wordWrap
         self.tabWidth = max(1, tabWidth)
@@ -23,13 +23,13 @@ struct TextLayoutOptions: Equatable {
 /// CR, LF and CR+LF each end a line; a line longer than the allowed width continues in further
 /// rows. It works on one piece of text after another: what is left of an unfinished row is handed
 /// in again with the next piece. A value without shared state.
-struct RowSplitter {
-    let options: TextLayoutOptions
+internal struct RowSplitter {
+    internal let options: TextLayoutOptions
     /// Whether the row at the start of the next piece begins a line (and is not the
     /// continuation of a wrapped one).
-    var startsLine = true
+    internal var startsLine = true
 
-    init(_ options: TextLayoutOptions) {
+    internal init(_ options: TextLayoutOptions) {
         self.options = options
     }
 
@@ -39,7 +39,7 @@ struct RowSplitter {
     /// Returns the index of the first unit that is not part of a reported row: the start of the
     /// unfinished row to hand in again. With `final`, the text ends here and the last row is
     /// reported too.
-    mutating func split(
+    internal mutating func split(
         _ units: UnsafeBufferPointer<UInt16>,
         final: Bool,
         row: (_ start: Int, _ end: Int, _ startsLine: Bool) -> Bool
@@ -48,7 +48,7 @@ struct RowSplitter {
     }
 
     /// `split`, which also tells how many columns each row takes (its line end not counted).
-    mutating func splitMeasuring(
+    internal mutating func splitMeasuring(
         _ units: UnsafeBufferPointer<UInt16>,
         final: Bool,
         row: (_ start: Int, _ end: Int, _ startsLine: Bool, _ width: Int) -> Bool
@@ -58,7 +58,7 @@ struct RowSplitter {
 
     /// The same for text that is plain ASCII, cut straight from its bytes: no decoding, no
     /// table of offsets (a byte is a unit).
-    mutating func splitMeasuring(
+    internal mutating func splitMeasuring(
         _ bytes: UnsafeBufferPointer<UInt8>,
         final: Bool,
         row: (_ start: Int, _ end: Int, _ startsLine: Bool, _ width: Int) -> Bool
@@ -243,26 +243,26 @@ struct RowSplitter {
 /// the segments of the one before wherever every line took one row and still does
 /// (`Segment.widest`), and reads only the others. All members are safe to use from any thread:
 /// the state is guarded by `lock`, and `overview` has a lock of its own.
-final class TextRowIndex: @unchecked Sendable {
+internal final class TextRowIndex: @unchecked Sendable {
     /// Runs the pieces of work of a parallel build, numbered from 0 to the count, and returns when all are done.
     internal typealias Spread = @Sendable (_ count: Int, _ work: @escaping @Sendable (Int) -> Void) -> Void
 
-    static let stride = 64
+    internal static let stride = 64
     /// Checkpoints are at least this many bytes apart on average: a file of nothing but line
     /// ends would need one per 64 bytes otherwise.
-    static let minimumCheckpointDistance = 4_096
+    internal static let minimumCheckpointDistance = 4_096
     /// A segment holds no more checkpoints than this (3 MB): a line of many gigabytes, which is
     /// all rows of one segment, gets them farther apart instead (a lookup then cuts a few hundred
     /// kilobytes more of text, which costs less than a megabyte of checkpoints per 4 MB).
-    static let maximumCheckpoints = 1 << 18
+    internal static let maximumCheckpoints = 1 << 18
     /// A scan looks at the density of its checkpoints from this many on.
-    static let thinningThreshold = 2_048
+    internal static let thinningThreshold = 2_048
 
-    struct Checkpoint {
-        var offset: Int64
+    internal struct Checkpoint {
+        internal var offset: Int64
         /// Lines of this segment that begin before this row.
-        var linesBefore: Int
-        var startsLine: Bool
+        internal var linesBefore: Int
+        internal var startsLine: Bool
     }
 
     /// Checkpoints in 12 bytes each instead of 24: the offset with the flag in its lowest bit,
@@ -271,17 +271,17 @@ final class TextRowIndex: @unchecked Sendable {
     /// They are kept in chunks, so a copy of the list that was published (the partial state of a
     /// segment) shares all full chunks and appending to the original copies the outer array and one
     /// chunk at most, whatever the length of the list.
-    struct CheckpointList: RandomAccessCollection {
+    internal struct CheckpointList: RandomAccessCollection {
         private static let chunkShift = 12
         private static let chunkSize = 1 << chunkShift
         private var marks: [[Int64]] = []
         private var lines: [[UInt32]] = []
-        private(set) var count = 0
+        internal private(set) var count = 0
 
-        var startIndex: Int { 0 }
-        var endIndex: Int { count }
+        internal var startIndex: Int { 0 }
+        internal var endIndex: Int { count }
 
-        mutating func append(_ checkpoint: Checkpoint) {
+        internal mutating func append(_ checkpoint: Checkpoint) {
             if count & (Self.chunkSize - 1) == 0 {
                 marks.append([])
                 lines.append([])
@@ -293,7 +293,7 @@ final class TextRowIndex: @unchecked Sendable {
             count += 1
         }
 
-        subscript(index: Int) -> Checkpoint {
+        internal subscript(index: Int) -> Checkpoint {
             let chunk = index >> Self.chunkShift
             let inChunk = index & (Self.chunkSize - 1)
             let mark = marks[chunk][inChunk]
@@ -301,34 +301,34 @@ final class TextRowIndex: @unchecked Sendable {
         }
 
         /// Every `step`th checkpoint, the first included.
-        func thinned(every step: Int) -> Self {
+        internal func thinned(every step: Int) -> Self {
             var result = Self()
             for index in Swift.stride(from: 0, to: count, by: Swift.max(1, step)) { result.append(self[index]) }
             return result
         }
     }
 
-    struct Segment {
-        var firstRow = 0
-        var firstLine = 0
-        var rowCount = 0
-        var lineCount = 0
-        var checkpoints = CheckpointList()
+    internal struct Segment {
+        internal var firstRow = 0
+        internal var firstLine = 0
+        internal var rowCount = 0
+        internal var lineCount = 0
+        internal var checkpoints = CheckpointList()
         /// Rows between two checkpoints: 64, or a multiple of it where rows are very short.
-        var stride = TextRowIndex.stride
+        internal var stride = TextRowIndex.stride
         /// The widest line of the segment in columns (an upper bound), or `Int.max` when a line
         /// takes more than one row: with a width that holds the widest line, every line takes
         /// one row and the segment is the same as it is here.
-        var widest = 0
+        internal var widest = 0
         /// Whether the segment that follows in the file is missing (it could not be read), so
         /// the rows after the last one of this segment are not those of the next row number.
-        var endsAtGap = false
+        internal var endsAtGap = false
         /// Where the first line begins that this segment does not own: the line start behind its
         /// last row, or the end of the text. nil when the scan did not get there.
         ///
         /// A sequential build passes it on, so the segments in between (a line longer than they
         /// are) are not read again only to find that no line begins in them.
-        var nextStart: Int64?
+        internal var nextStart: Int64?
 
         /// Keeps fewer checkpoints when the segment has too many for the bytes its rows cover:
         /// `bytes` is that span (from the first checkpoint to the end of the last row, which is
@@ -336,7 +336,7 @@ final class TextRowIndex: @unchecked Sendable {
         ///
         /// On average they stay `minimumCheckpointDistance` bytes apart, and there are never more
         /// than `maximumCheckpoints`.
-        mutating func thin(spanning bytes: Int64) {
+        internal mutating func thin(spanning bytes: Int64) {
             let count = checkpoints.count
             guard count > 1 else {
                 return
@@ -359,17 +359,17 @@ final class TextRowIndex: @unchecked Sendable {
     }
 
     /// Where to start cutting to reach a row.
-    struct Position {
+    internal struct Position {
         /// The byte offset of the checkpoint row.
-        var offset: Int64
+        internal var offset: Int64
         /// The number of the checkpoint row.
-        var row: Int
-        var startsLine: Bool
+        internal var row: Int
+        internal var startsLine: Bool
         /// Lines that begin before the checkpoint row, in the whole text.
-        var linesBefore: Int
+        internal var linesBefore: Int
         /// The row the text must not be walked past from here (a segment that could not be read
         /// follows); nil when the rows go on.
-        var endRow: Int?
+        internal var endRow: Int?
     }
 
     /// What a build was given: a later layout may take its segments over when this is the same.
@@ -483,18 +483,18 @@ final class TextRowIndex: @unchecked Sendable {
     // None of these waits for the index lock: they are read on the main thread.
 
     /// Rows known so far.
-    var rowCount: Int { overview.rowCount }
+    internal var rowCount: Int { overview.rowCount }
     /// Lines known so far.
-    var lineCount: Int { overview.lineCount }
+    internal var lineCount: Int { overview.lineCount }
     /// The rows of everything before this offset are known.
-    var indexedThrough: Int64 { overview.coveredEnd }
-    var isComplete: Bool { overview.isComplete }
+    internal var indexedThrough: Int64 { overview.coveredEnd }
+    internal var isComplete: Bool { overview.isComplete }
     /// The first error that made a part of the file unreadable; its rows are missing.
-    var failure: any Error? { overview.failed }
+    internal var failure: any Error? { overview.failed }
     /// How many segments the last build took over from the layout before (for tests).
-    var segmentsReused: Int { overview.reusedCount }
+    internal var segmentsReused: Int { overview.reusedCount }
     /// How many checkpoints the index holds (for tests, and to see what a file costs).
-    var checkpointCount: Int { synchronized { published.reduce(0) { $0 + $1.checkpoints.count } } }
+    internal var checkpointCount: Int { synchronized { published.reduce(0) { $0 + $1.checkpoints.count } } }
 
     // MARK: Building
 
@@ -505,7 +505,7 @@ final class TextRowIndex: @unchecked Sendable {
     /// after another. `progress` is called from the working threads whenever more of the start of
     /// the file is known. `rawScan` off decodes every byte (the reference the fast scan is tested
     /// against).
-    func build(
+    internal func build(
         source: any ByteSource,
         content: Range<Int64>,
         encoding: ViewerEncoding,
@@ -853,7 +853,7 @@ final class TextRowIndex: @unchecked Sendable {
     /// line to the first segment), wherever it ends, so the segments need nothing from each other:
     /// each looks for the first line start behind its lower bound and reads on past its upper bound
     /// to the end of its last line. `partial` is handed what is found so far, every few megabytes.
-    static func scan(
+    internal static func scan(
         source: any ByteSource,
         content: Range<Int64>,
         segment: Range<Int64>,
@@ -1044,7 +1044,7 @@ final class TextRowIndex: @unchecked Sendable {
     // MARK: Looking up
 
     /// The checkpoint to start from to reach `row`; nil when the row is not known (yet).
-    func position(ofRow row: Int) -> Position? {
+    internal func position(ofRow row: Int) -> Position? {
         synchronized {
             guard row >= 0, row < rows else {
                 return nil
@@ -1056,7 +1056,7 @@ final class TextRowIndex: @unchecked Sendable {
     }
 
     /// The last checkpoint at or before a byte offset; nil when that part is not indexed yet.
-    func position(before offset: Int64) -> Position? {
+    internal func position(before offset: Int64) -> Position? {
         synchronized {
             // None when the offset is before the first segment that could be read.
             let segments = Self.prefixCount(in: published) { $0.checkpoints[0].offset <= offset }
@@ -1070,7 +1070,7 @@ final class TextRowIndex: @unchecked Sendable {
     }
 
     /// The last checkpoint at or before the first row of a line (counted from 0).
-    func position(beforeLine line: Int) -> Position? {
+    internal func position(beforeLine line: Int) -> Position? {
         synchronized {
             guard line >= 0, line < lines else {
                 return nil
@@ -1113,7 +1113,7 @@ final class TextRowIndex: @unchecked Sendable {
 
 /// The East Asian Width property (Unicode 15.1, UAX #11): characters of class W (wide) and F
 /// (fullwidth) take two columns of a monospaced text; the others, one.
-enum EastAsianWidth {
+internal enum EastAsianWidth {
     /// Ranges of wide and fullwidth characters, sorted: first, last.
     private static let wide: [(UInt32, UInt32)] = [
         (0x1100, 0x115F), (0x231A, 0x231B), (0x2329, 0x232A), (0x23E9, 0x23EC), (0x23F0, 0x23F0), (0x23F3, 0x23F3),
@@ -1142,7 +1142,7 @@ enum EastAsianWidth {
     ]
 
     /// Whether the code point takes two columns.
-    static func isWide(_ scalar: UInt32) -> Bool {
+    internal static func isWide(_ scalar: UInt32) -> Bool {
         guard scalar >= 0x1100 else {
             return false
         }
@@ -1158,7 +1158,7 @@ enum EastAsianWidth {
     /// Whether the character that begins at `index` of the UTF-16 units takes two columns (a
     /// surrogate pair is looked at as the one character it is).
     @inline(__always)
-    static func isWide(_ units: UnsafeBufferPointer<UInt16>, at index: Int) -> Bool {
+    internal static func isWide(_ units: UnsafeBufferPointer<UInt16>, at index: Int) -> Bool {
         let unit = units[index]
         if (0xD800...0xDBFF).contains(unit) {
             guard index + 1 < units.count, (0xDC00...0xDFFF).contains(units[index + 1]) else {

@@ -16,14 +16,14 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     public let capabilities: FileSystemCapabilities = [.write, .trash, .append]
     private let fm = FileManager.default
     /// Nil everywhere unless a test stands in for the system (`LocalProbes`).
-    let probes: LocalProbes
+    internal let probes: LocalProbes
 
     public convenience init() {
         self.init(probes: LocalProbes())
     }
 
     /// Tests stand in for the system with `probes`.
-    init(probes: LocalProbes) {
+    internal init(probes: LocalProbes) {
         self.probes = probes
         knownPlaces = Self.fixedPlaces(home: probes.home ?? FileManager.default.homeDirectoryForCurrentUser)
         // Disks that come and go change the list of places; it is read again behind the scenes.
@@ -1053,7 +1053,7 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
 
     /// Whether `url` is named like the temporary files the callers of `copy` use for a file
     /// that is not complete yet: a dot, and `.tmp` or the `afm-` of the program's own.
-    static func isTemporaryName(_ url: URL) -> Bool {
+    internal static func isTemporaryName(_ url: URL) -> Bool {
         let name = url.lastPathComponent
         return name.hasPrefix(".") && (name.hasSuffix(".tmp") || name.contains(".afm-"))
     }
@@ -1485,7 +1485,7 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         } == 0
     }
 
-    static func posixError(_ code: Int32, _ url: URL) -> any Error {
+    internal static func posixError(_ code: Int32, _ url: URL) -> any Error {
         NSError(
             domain: NSPOSIXErrorDomain,
             code: Int(code),
@@ -1727,7 +1727,13 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     /// taken out.
     ///
     /// A volume the system knows nothing about counts as external.
-    static func volumeKind(path: String, isInternal: Bool?, isLocal: Bool?, isRemovable: Bool?, isEjectable: Bool?)
+    internal static func volumeKind(
+        path: String,
+        isInternal: Bool?,
+        isLocal: Bool?,
+        isRemovable: Bool?,
+        isEjectable: Bool?
+    )
         -> Place.Kind
     {
         if path == "/" {
@@ -1939,17 +1945,17 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         )
     }
 
-    let spareLock = NSLock()
+    internal let spareLock = NSLock()
     /// Mount point → what the system would free on demand there (the free space it reports
     /// for important uses, less the space that is plainly free), when that was measured, and
     /// of which volume (a different one mounted at the same place starts afresh).
     ///
     /// Nil where the system has no such figure. Guarded by `spareLock`.
-    var spareSpace: [String: (bytes: Int64?, measured: UInt64, isMeasuring: Bool, volume: fsid_t)] = [:]
+    internal var spareSpace: [String: (bytes: Int64?, measured: UInt64, isMeasuring: Bool, volume: fsid_t)] = [:]
     /// How old a measurement may be before the next question has it taken again.
-    static let spareSpaceAge: UInt64 = 3_000_000_000
+    internal static let spareSpaceAge: UInt64 = 3_000_000_000
     /// A measurement that has taken this long is taken for lost (the disk does not answer).
-    static let spareSpaceLoss: UInt64 = 30_000_000_000
+    internal static let spareSpaceLoss: UInt64 = 30_000_000_000
 
     /// The free space as the Finder states it, which counts what the system can clear away.
     ///
@@ -2162,7 +2168,7 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     // MARK: System calls
 
     /// Opens a folder to be read. `O_CLOEXEC`, and an `EINTR` nobody asked for is tried again.
-    static func openDirectory(_ path: String) -> Int32 {
+    internal static func openDirectory(_ path: String) -> Int32 {
         var descriptor: Int32
         repeat {
             descriptor = Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)

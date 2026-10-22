@@ -5,9 +5,9 @@ import Testing
 
 /// Review 2, second pass: G001, G003 and G004 of the general findings, all in `Format`.
 @Suite
-struct Review2KernelP2Format {
+internal struct Review2KernelP2Format {
     @Test
-    func theLargestSizesAreWrittenAndNotTrappedOn() {
+    internal func theLargestSizesAreWrittenAndNotTrappedOn() {
         // G001: a ZIP64 entry or a server may say any size; the status line shows it in k.
         #expect(Format.kilobytes(.max) == "9,007,199,254,740,992 k")
         #expect(
@@ -24,7 +24,7 @@ struct Review2KernelP2Format {
     }
 
     @Test
-    func speedsAndTimesThatAreNoNumbersAreWrittenAndNotTrappedOn() {
+    internal func speedsAndTimesThatAreNoNumbersAreWrittenAndNotTrappedOn() {
         // G003: a speed over no time, an estimate from a speed of nothing.
         for value in [
             Double.nan, .infinity, -.infinity, 1e300, -1e300, Double.greatestFiniteMagnitude, 9.3e18, 0, -0.0, 0.4
@@ -40,7 +40,7 @@ struct Review2KernelP2Format {
     }
 
     @Test
-    func numbersAndDatesAreWrittenFromManyThreadsWhileTheRegionChanges() {
+    internal func numbersAndDatesAreWrittenFromManyThreadsWhileTheRegionChanges() {
         // G004: no formatter is shared for numbers, and the one for dates is replaced, never
         // changed, when the region or the time zone does (the notifications are what the
         // system sends then).

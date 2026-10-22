@@ -8,10 +8,10 @@ import Testing
 
 /// The directory tree as a model: filling, paths and quick search.
 @Suite
-struct PlacesTreeModel {
-    let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
+internal struct PlacesTreeModel {
+    internal let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
 
-    func sample() -> DirectoryTree {
+    internal func sample() -> DirectoryTree {
         DirectoryTree(
             rootURL: root,
             paths: ["Apps", "Apps/Tools", "Apps/Tools/test", "Work", "Work/file10", "Work/file2", "Work/Tests"]
@@ -19,7 +19,7 @@ struct PlacesTreeModel {
     }
 
     @Test
-    func buildsFromCachedPathsInNaturalOrder() {
+    internal func buildsFromCachedPathsInNaturalOrder() {
         let tree = sample()
         #expect(tree.count == 7)
         #expect(tree.root.children.map(\.name) == ["Apps", "Work"])
@@ -36,7 +36,7 @@ struct PlacesTreeModel {
     }
 
     @Test
-    func pathsAndLocations() throws {
+    internal func pathsAndLocations() throws {
         let tree = sample()
         let node = try #require(tree.node(at: "Apps/Tools"))
         #expect(tree.relativePath(of: node) == "Apps/Tools" && tree.relativePath(of: tree.root) == "")
@@ -57,7 +57,7 @@ struct PlacesTreeModel {
     }
 
     @Test
-    func settingChildrenKeepsKnownFoldersAndDropsVanishedOnes() throws {
+    internal func settingChildrenKeepsKnownFoldersAndDropsVanishedOnes() throws {
         let tree = DirectoryTree(rootURL: root)
         let known = try #require(tree.node(at: "Work/Deep/Deeper", creating: true))
         #expect(tree.count == 3 && !tree.root.isScanned && !known.isScanned)
@@ -72,7 +72,7 @@ struct PlacesTreeModel {
     }
 
     @Test
-    func neighboursFollowDisplayOrderAndWrapAround() {
+    internal func neighboursFollowDisplayOrderAndWrapAround() {
         let tree = sample()
         var node = tree.root
         var forward: [String] = []
@@ -90,7 +90,7 @@ struct PlacesTreeModel {
     }
 
     @Test
-    func quickSearchFindsTheNextFolderStartingWithTheText() {
+    internal func quickSearchFindsTheNextFolderStartingWithTheText() {
         let tree = sample()
         func find(_ text: String, from path: String?, forward: Bool = true, includingStart: Bool = false) -> String? {
             tree.find(text, from: path.flatMap { tree.node(at: $0) }, forward: forward, includingStart: includingStart)
@@ -115,7 +115,7 @@ struct PlacesTreeModel {
     }
 
     @Test
-    func rootsFollowTheDisksOfTheVolumeList() {
+    internal func rootsFollowTheDisksOfTheVolumeList() {
         let home = URL(fileURLWithPath: "/Users/x")
         let places = [
             Place(name: "Home", url: home, kind: .home),
@@ -143,11 +143,11 @@ struct PlacesTreeModel {
 
 /// Reading trees from file systems and keeping them: these run on several threads.
 @Suite
-struct PlacesTreeScanning {
-    let memory = MemoryFileSystem()
+internal struct PlacesTreeScanning {
+    internal let memory = MemoryFileSystem()
 
     /// Runs a scan and puts what it delivers into a tree.
-    func scan(_ scanner: TreeScanner, root: URL) -> (tree: DirectoryTree, completed: Bool, batches: Int) {
+    internal func scan(_ scanner: TreeScanner, root: URL) -> (tree: DirectoryTree, completed: Bool, batches: Int) {
         let tree = DirectoryTree(rootURL: root)
         var batches = 0
         let completed = scanner.run { levels in
@@ -158,7 +158,7 @@ struct PlacesTreeScanning {
     }
 
     @Test
-    func scansFoldersOnlyLevelByLevel() {
+    internal func scansFoldersOnlyLevelByLevel() {
         memory.addFile("/V/a/file.txt")
         memory.addFile("/V/a/b/c/deep.txt")
         memory.addDirectory("/V/z")
@@ -178,7 +178,7 @@ struct PlacesTreeScanning {
     }
 
     @Test
-    func excludedFoldersAreListedButNotRead() {
+    internal func excludedFoldersAreListedButNotRead() {
         memory.addDirectory("/V/Volumes/Other/deep")
         memory.addDirectory("/V/keep/inner")
         let excluded = memory.url("/V/Volumes").locationKey
@@ -192,7 +192,7 @@ struct PlacesTreeScanning {
     }
 
     @Test
-    func wideTreesAreReadInBatches() {
+    internal func wideTreesAreReadInBatches() {
         for folder in 0..<300 {
             for sub in 0..<3 { memory.addDirectory("/W/d\(folder)/s\(sub)") }
         }
@@ -215,7 +215,7 @@ struct PlacesTreeScanning {
     }
 
     @Test
-    func cancellingStopsTheScan() {
+    internal func cancellingStopsTheScan() {
         for folder in 0..<50 { memory.addDirectory("/C/d\(folder)/sub/deeper") }
         let scanner = TreeScanner(root: memory.url("/C"), provider: memory, batchSize: 10)
         var received = 0
@@ -239,7 +239,7 @@ struct PlacesTreeScanning {
     }
 
     @Test
-    func unreadableFoldersCountAsEmptyAndLinksAndPackagesAreLeftOut() throws {
+    internal func unreadableFoldersCountAsEmptyAndLinksAndPackagesAreLeftOut() throws {
         let box = try Sandbox()
         try box.folder("real/inner")
         try box.folder("Some.app/Contents")
@@ -257,7 +257,7 @@ struct PlacesTreeScanning {
     // MARK: Cache
 
     @Test
-    func cacheKeepsTreesInMemoryAndInFilesOfItsOwnFolder() throws {
+    internal func cacheKeepsTreesInMemoryAndInFilesOfItsOwnFolder() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let root = memory.url("/V")
@@ -284,14 +284,14 @@ struct PlacesTreeScanning {
     }
 
     @Test
-    func cacheWithoutFolderStaysInMemory() {
+    internal func cacheWithoutFolderStaysInMemory() {
         let cache = TreeCache(directory: nil)
         cache.store(["a"], for: memory.url("/"))
         #expect(cache.paths(for: memory.url("/")) == ["a"] && cache.fileURL(for: memory.url("/")) == nil)
     }
 
     @Test
-    func cacheFilesOfOtherRootsAndBrokenFilesAreNotTaken() {
+    internal func cacheFilesOfOtherRootsAndBrokenFilesAreNotTaken() {
         let root = memory.url("/V")
         #expect(TreeCache.parse("root=mem:///V\n[a]\n\ngarbage\n[]\n[b/c]\n", root: root) == ["a", "b/c"])
         #expect(TreeCache.parse("root=mem:///elsewhere\n[a]\n", root: root) == nil)
@@ -300,7 +300,7 @@ struct PlacesTreeScanning {
     }
 
     @Test
-    func cacheLearnsFoldersThePanelsShow() throws {
+    internal func cacheLearnsFoldersThePanelsShow() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let root = memory.url("/")
@@ -323,7 +323,7 @@ struct PlacesTreeScanning {
     }
 
     @Test
-    func cacheIsSafeToUseFromManyThreads() throws {
+    internal func cacheIsSafeToUseFromManyThreads() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let roots = (0..<4).map { memory.url("/r\($0)") }
@@ -351,7 +351,7 @@ struct PlacesTreeScanning {
 
     @MainActor
     @Test
-    func pluginTellsTheCacheAboutVisitedFoldersWithoutTouchingRealFolders() throws {
+    internal func pluginTellsTheCacheAboutVisitedFoldersWithoutTouchingRealFolders() throws {
         let box = try Sandbox()
         memory.addDirectory("/A/new")
         memory.addDirectory("/B")

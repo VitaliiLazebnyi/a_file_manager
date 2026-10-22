@@ -3,16 +3,16 @@ import Foundation
 
 /// What happens to the permissions of an item (spec 07 › Change attributes, adapted: the Mac
 /// has permissions where Windows has `r a h s`).
-enum PermissionChange: Equatable {
+internal enum PermissionChange: Equatable {
     /// One `who op permissions` part of a symbolic change, as `chmod` writes it: `go-w`.
-    struct Clause: Equatable {
+    internal struct Clause: Equatable {
         /// The classes it applies to, as shifts of their three bits: 6 owner, 3 group, 0 others.
-        var shifts: [UInt16]
-        var operation: Character
+        internal var shifts: [UInt16]
+        internal var operation: Character
         /// `r` 4, `w` 2, `x` 1.
-        var bits: UInt16
+        internal var bits: UInt16
         /// `X`: execute only for folders and for files that are executable for someone already.
-        var conditionalExecute: Bool
+        internal var conditionalExecute: Bool
     }
 
     case unchanged
@@ -25,7 +25,7 @@ enum PermissionChange: Equatable {
     /// Reads `755`, `0755`, `rwxr-xr-x` or `chmod` clauses such as `u+x,go-w` and `a+rX`.
     ///
     /// An empty text changes nothing; nil when the text is none of these.
-    init?(_ text: String) {
+    internal init?(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespaces)
         if text.isEmpty {
             self = .unchanged
@@ -116,7 +116,7 @@ enum PermissionChange: Equatable {
     }
 
     /// Whether the new mode depends on the mode the item has.
-    var needsCurrentMode: Bool {
+    internal var needsCurrentMode: Bool {
         switch self {
         case .unchanged:
             return false
@@ -130,7 +130,7 @@ enum PermissionChange: Equatable {
     }
 
     /// The change as it can be typed, and read back by `init(_:)`.
-    var text: String {
+    internal var text: String {
         switch self {
         case .unchanged:
             return ""
@@ -157,7 +157,7 @@ enum PermissionChange: Equatable {
         }
     }
 
-    func applied(to mode: UInt16, isDirectory: Bool) -> UInt16 {
+    internal func applied(to mode: UInt16, isDirectory: Bool) -> UInt16 {
         switch self {
         case .unchanged:
             return mode
@@ -192,21 +192,21 @@ enum PermissionChange: Equatable {
 ///
 /// The date is written `yyyy-MM-dd` and the time `HH:mm:ss`, with any separators. A part written in
 /// letters (`yyyy-05-dd`, `hh:10:ss`), and an empty field, keeps what the file has.
-struct TimestampChange: Equatable {
+internal struct TimestampChange: Equatable {
     /// Year, month, day, hour, minute, second; nil keeps that part of the file's own date.
-    var parts: [Int?]
+    internal var parts: [Int?]
     /// The moment the command ran, for every item alike.
-    var usesCurrentTime = false
+    internal var usesCurrentTime = false
 
-    static let current = Self(parts: Array(repeating: nil, count: 6), usesCurrentTime: true)
+    internal static let current = Self(parts: Array(repeating: nil, count: 6), usesCurrentTime: true)
 
-    init(parts: [Int?], usesCurrentTime: Bool = false) {
+    internal init(parts: [Int?], usesCurrentTime: Bool = false) {
         self.parts = parts
         self.usesCurrentTime = usesCurrentTime
     }
 
     /// Nil when a field is neither empty nor a date or time in the form above.
-    init?(date: String, time: String) {
+    internal init?(date: String, time: String) {
         guard let day = Self.fields(date, count: 3...3, limits: [1...9_999, 1...12, 1...31]),
             var clock = Self.fields(time, count: 2...4, limits: [0...23, 0...59, 0...59, 0...999])
         else { return nil }
@@ -236,11 +236,11 @@ struct TimestampChange: Equatable {
         return fields
     }
 
-    var changesNothing: Bool { !usesCurrentTime && parts.allSatisfy { $0 == nil } }
+    internal var changesNothing: Bool { !usesCurrentTime && parts.allSatisfy { $0 == nil } }
 
     /// The new date of an item last changed at `original`; nil when the parts do not make a
     /// date (the 31st of a month with 30 days).
-    func applied(to original: Date, now: Date, calendar: Calendar = .current) -> Date? {
+    internal func applied(to original: Date, now: Date, calendar: Calendar = .current) -> Date? {
         if usesCurrentTime {
             return now
         }
@@ -265,7 +265,7 @@ struct TimestampChange: Equatable {
     }
 
     /// A date as the fields of the dialog show it.
-    static func fieldTexts(for date: Date, calendar: Calendar = .current) -> (date: String, time: String) {
+    internal static func fieldTexts(for date: Date, calendar: Calendar = .current) -> (date: String, time: String) {
         func part(_ component: Calendar.Component) -> Int { calendar.component(component, from: date) }
         return (
             String(format: "%04d-%02d-%02d", part(.year), part(.month), part(.day)),
@@ -277,25 +277,25 @@ struct TimestampChange: Equatable {
 /// Everything the Change Attributes dialog can ask for.
 ///
 /// Nil members stay as they are.
-struct AttributeChange: Equatable {
-    var permissions = PermissionChange.unchanged
+internal struct AttributeChange: Equatable {
+    internal var permissions = PermissionChange.unchanged
     /// The hidden flag (`UF_HIDDEN`); local files only.
-    var hidden: Bool?
+    internal var hidden: Bool?
     /// Finder's Locked (`UF_IMMUTABLE`), the Mac's read-only attribute; local files only.
-    var locked: Bool?
-    var timestamp: TimestampChange?
+    internal var locked: Bool?
+    internal var timestamp: TimestampChange?
     /// User and group by name or number; local files only.
-    var owner: String?
-    var group: String?
+    internal var owner: String?
+    internal var group: String?
     /// Also change everything inside the folders among the operands.
-    var recurse = false
+    internal var recurse = false
 
-    var isEmpty: Bool {
+    internal var isEmpty: Bool {
         permissions == .unchanged && hidden == nil && locked == nil && (timestamp?.changesNothing ?? true)
             && owner == nil && group == nil
     }
 
-    var needsLocalFileSystem: Bool { hidden != nil || locked != nil || owner != nil || group != nil }
+    internal var needsLocalFileSystem: Bool { hidden != nil || locked != nil || owner != nil || group != nil }
 
     /// Reads the parameter text of the command, modelled on `OPENATTRIBUTES` (spec 07 ›
     /// `OPENATTRIBUTES`): `+h`/`-h` hidden, `+r`/`-r` locked (read only), `+f`/`-f` recurse,
@@ -303,7 +303,7 @@ struct AttributeChange: Equatable {
     ///
     /// A leading `=` means "apply without showing the dialog". Windows' `a` and `s` have no
     /// counterpart and are ignored. Nil when a token cannot be read.
-    static func parse(parameters: String) -> (change: Self, applyAtOnce: Bool)? {
+    internal static func parse(parameters: String) -> (change: Self, applyAtOnce: Bool)? {
         var change = Self()
         var applyAtOnce = false
         var (date, time, changesDate) = ("", "", false)
@@ -373,13 +373,13 @@ struct AttributeChange: Equatable {
 /// calls and exist for `file:` URLs only.
 ///
 /// `outcome`, `ownerID` and `groupID` are guarded by `lock`; everything else is fixed in `init`.
-final class AttributeJob: @unchecked Sendable {
-    struct Outcome {
-        var changed = 0
-        var failed = 0
+internal final class AttributeJob: @unchecked Sendable {
+    internal struct Outcome {
+        internal var changed = 0
+        internal var failed = 0
         /// The first failures, ready to show: path and reason.
-        var failures: [String] = []
-        var cancelled = false
+        internal var failures: [String] = []
+        internal var cancelled = false
     }
 
     private let change: AttributeChange
@@ -393,7 +393,7 @@ final class AttributeJob: @unchecked Sendable {
     private var ownerID: uid_t?
     private var groupID: gid_t?
 
-    init(
+    internal init(
         change: AttributeChange,
         fileSystems: FileSystemRegistry,
         cancellation: CancellationFlag = CancellationFlag(),
@@ -405,7 +405,7 @@ final class AttributeJob: @unchecked Sendable {
         self.meter = meter
     }
 
-    func run(_ items: [FileItem]) -> Outcome {
+    internal func run(_ items: [FileItem]) -> Outcome {
         if let owner = change.owner {
             guard let id = LocalInfo.userID(owner) else {
                 return Outcome(failed: items.count, failures: ["There is no user called \(owner)."])

@@ -14,17 +14,17 @@ import UniformTypeIdentifiers
 /// are cancelled, and messages that are cut short.
 @MainActor
 @Suite
-struct CoverageRenameSession {
-    let memory = MemoryFileSystem()
-    let box: Sandbox
-    let settings = MemorySettings()
-    let bench: TestBench
+internal struct CoverageRenameSession {
+    internal let memory = MemoryFileSystem()
+    internal let box: Sandbox
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
     /// Holds or cancels the jobs of the tests that attach it.
-    let jobs: CancellingJobService
+    internal let jobs: CancellingJobService
 
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         for name in ["a.txt", "b.txt", "c.txt"] { memory.addFile("/f/" + name, name) }
         bench = TestBench(
@@ -38,7 +38,7 @@ struct CoverageRenameSession {
     }
 
     /// A session on the given items (the left panel's when none are given).
-    func session(
+    internal func session(
         _ items: [FileItem]? = nil,
         inBackground: Bool = false,
         clipboard: (@Sendable () -> String?)? = nil
@@ -68,22 +68,22 @@ struct CoverageRenameSession {
     }
 
     /// `count` files in a folder of their own.
-    func many(_ count: Int, in folder: String = "/many") -> [FileItem] {
+    internal func many(_ count: Int, in folder: String = "/many") -> [FileItem] {
         (0..<count).map { FileItem(url: memory.addFile("\(folder)/f\($0).txt"), name: "f\($0).txt") }
     }
 
     /// Lets jobs run through `jobs`, at `moment`.
-    func attachJobs(_ moment: CancellingJobService.Moment) {
+    internal func attachJobs(_ moment: CancellingJobService.Moment) {
         jobs.moment = moment
         bench.kernel.attach(jobs)
     }
 
-    var names: [String] { memory.allPaths.filter { $0.hasPrefix("/f/") }.map { String($0.dropFirst(3)) } }
+    internal var names: [String] { memory.allPaths.filter { $0.hasPrefix("/f/") }.map { String($0.dropFirst(3)) } }
 
     // MARK: While a run is under way
 
     @Test
-    func theListStaysAsItIsWhileARunIsUnderWay() {
+    internal func theListStaysAsItIsWhileARunIsUnderWay() {
         attachJobs(.held)
         let session = session()
         session.settings.nameMask = "x[N]"
@@ -110,7 +110,7 @@ struct CoverageRenameSession {
     // MARK: Cancelled runs
 
     @Test
-    func aRunCancelledAtOnceRenamesNothing() {
+    internal func aRunCancelledAtOnceRenamesNothing() {
         attachJobs(.atStart)
         let session = session()
         session.settings.nameMask = "x[N]"
@@ -120,7 +120,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func aRunCancelledWhileAskingAboutConflictsRenamesNothing() {
+    internal func aRunCancelledWhileAskingAboutConflictsRenamesNothing() {
         attachJobs(.afterQuestion(1))
         let session = session()
         session.settings.nameMask = "same"
@@ -133,7 +133,7 @@ struct CoverageRenameSession {
 
     /// An Undo cancelled before anything was put back keeps the run, so it can be undone later.
     @Test
-    func anUndoCancelledAtOnceKeepsTheRun() {
+    internal func anUndoCancelledAtOnceKeepsTheRun() {
         let session = session()
         session.settings.nameMask = "x[N]"
         session.start()
@@ -154,7 +154,7 @@ struct CoverageRenameSession {
     // MARK: Long lists in the background
 
     @Test
-    func nextStepOfALongListIsMadeInTheBackground() async {
+    internal func nextStepOfALongListIsMadeInTheBackground() async {
         let session = session(many(2_000), inBackground: true)
         session.settings.nameMask = "g[C]"
         #expect(await RunLoopWait.until { !session.isComputing })
@@ -164,7 +164,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func aNextStepOvertakenByAChangeOfTheListIsDropped() async {
+    internal func aNextStepOvertakenByAChangeOfTheListIsDropped() async {
         let session = session(many(2_000), inBackground: true)
         session.settings.nameMask = "g[C]"
         #expect(await RunLoopWait.until { !session.isComputing })
@@ -176,7 +176,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func theNamesOfALongListAreEditedFromTheBackground() async {
+    internal func theNamesOfALongListAreEditedFromTheBackground() async {
         let session = session(many(2_000), inBackground: true)
         // No name for any of them: the text holds the old names.
         session.settings.nameMask = "[X]"
@@ -190,7 +190,7 @@ struct CoverageRenameSession {
     /// The text of the first edit was made for the list before a change: only the second edit,
     /// made for the list as it is, is shown.
     @Test
-    func anEditOfALongListThatIsOvertakenIsDropped() async {
+    internal func anEditOfALongListThatIsOvertakenIsDropped() async {
         let session = session(many(2_000), inBackground: true)
         session.editNames()
         session.clearGivenNames()
@@ -201,7 +201,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func namesAreLoadedFromAFileInTheBackground() async {
+    internal func namesAreLoadedFromAFileInTheBackground() async {
         memory.addFile("/lists/names.txt", "one\ntwo\nthree")
         let session = session(inBackground: true)
         var loaded = false
@@ -211,7 +211,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func anEmptyListOfNamesGivesTheMasksBack() {
+    internal func anEmptyListOfNamesGivesTheMasksBack() {
         let session = session()
         session.loadNames(fromText: "x")
         #expect(session.givenNames == ["x"])
@@ -220,7 +220,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func anUndoInTheBackgroundDecodesTheRunsFirst() async {
+    internal func anUndoInTheBackgroundDecodesTheRunsFirst() async {
         let session = session(inBackground: true)
         session.settings.nameMask = "x[N]"
         session.start()
@@ -235,7 +235,7 @@ struct CoverageRenameSession {
     // MARK: Odd lists and settings
 
     @Test
-    func theSameSettingsAgainChangeNothing() {
+    internal func theSameSettingsAgainChangeNothing() {
         let session = session()
         var changes = 0
         session.onChange = { changes += 1 }
@@ -244,14 +244,14 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func movingRowsThatAreNotThereMovesNothing() {
+    internal func movingRowsThatAreNotThereMovesNothing() {
         let session = session()
         #expect(session.move([7, 8], to: 0).isEmpty)
         #expect(session.rows.map(\.entry.name) == ["a.txt", "b.txt", "c.txt"])
     }
 
     @Test
-    func nextStepTakesGivenNamesAsTheOldOnes() {
+    internal func nextStepTakesGivenNamesAsTheOldOnes() {
         let session = session()
         session.loadNames(fromText: "x.txt\ny.txt\nz.txt")
         session.nextStep()
@@ -260,7 +260,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func nextStepGoesBackToNoChange() {
+    internal func nextStepGoesBackToNoChange() {
         let session = session()
         session.settings.nameMask = "[N]2"
         session.nextStep()
@@ -268,7 +268,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func editingANameThatGivesNoNameShowsTheOldOne() {
+    internal func editingANameThatGivesNoNameShowsTheOldOne() {
         let session = session()
         session.settings.nameMask = "[X]"
         #expect(session.row(at: 0).newName == nil)
@@ -283,14 +283,14 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func withoutAClipboardTheOptionalPlaceholderIsEmpty() {
+    internal func withoutAClipboardTheOptionalPlaceholderIsEmpty() {
         let session = session()
         session.settings.nameMask = "[X+]n"
         #expect(session.row(at: 0).newName == "n.txt")
     }
 
     @Test
-    func theDateTakenIsReadThroughTheSession() throws {
+    internal func theDateTakenIsReadThroughTheSession() throws {
         let file = box.url("p.jpg")
         let context = try #require(
             CGContext(
@@ -321,7 +321,7 @@ struct CoverageRenameSession {
     // MARK: Messages of a run
 
     @Test
-    func namesThatMoveManyFilesAreShownInPart() {
+    internal func namesThatMoveManyFilesAreShownInPart() {
         let items = many(10)
         let session = session(items)
         session.loadNames(fromText: (0..<10).map { "sub/n\($0).txt" }.joined(separator: "\n"))
@@ -332,7 +332,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func aGivenNameThatCannotBeUsedIsNotAskedAbout() {
+    internal func aGivenNameThatCannotBeUsedIsNotAskedAbout() {
         let session = session()
         session.loadNames(fromText: "x/y.txt\nb.txt\n")
         ui.choiceAnswers = [0]
@@ -342,7 +342,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func manyConflictsAreShownInPart() {
+    internal func manyConflictsAreShownInPart() {
         let session = session(many(13))
         session.settings.nameMask = "same"
         session.start()
@@ -351,7 +351,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func aRunWhereEveryRenameFailsKeepsTheList() throws {
+    internal func aRunWhereEveryRenameFailsKeepsTheList() throws {
         try box.file("A/one.txt")
         try box.file("A/two.txt")
         let items = try ["one.txt", "two.txt"]
@@ -367,7 +367,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func sixteenFailuresAreCutShort() throws {
+    internal func sixteenFailuresAreCutShort() throws {
         let names = (0..<16).map { "f\($0).txt" }
         for name in names { try box.file("B/" + name) }
         try box.file("B/blocker")
@@ -380,7 +380,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func namesThatCannotBeUsedAreToldAfterTheRun() {
+    internal func namesThatCannotBeUsedAreToldAfterTheRun() {
         let session = session()
         session.loadNames(fromText: "x.txt\n..\n")
         session.start()
@@ -390,14 +390,14 @@ struct CoverageRenameSession {
     // MARK: Undo
 
     @Test
-    func undoNeedsSomethingToUndo() {
+    internal func undoNeedsSomethingToUndo() {
         let session = session()
         session.undo()
         #expect(ui.log.isEmpty && !session.isBusy)
     }
 
     @Test
-    func aCountWithoutRunsUndoesNothing() {
+    internal func aCountWithoutRunsUndoesNothing() {
         settings.set(1, forKey: "multirename.undoCount")
         let session = session()
         #expect(session.canUndo)
@@ -406,7 +406,7 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func aLongRunIsShownInPartWhenUndone() {
+    internal func aLongRunIsShownInPartWhenUndone() {
         let session = session(many(21))
         session.settings.nameMask = "u[C]"
         session.start()
@@ -426,13 +426,13 @@ struct CoverageRenameSession {
     }
 
     @Test
-    func theResultListNeedsARun() {
+    internal func theResultListNeedsARun() {
         session().showResultList()
         #expect(ui.log.isEmpty)
     }
 
     @Test
-    func theResultListGoesToTheViewerOrTheViewCommand() {
+    internal func theResultListGoesToTheViewerOrTheViewCommand() {
         let session = session()
         session.settings.nameMask = "x[N]"
         session.start()

@@ -3,11 +3,11 @@ import Foundation
 
 /// One row of the rename list: the file as it is on disk, and the name the masks work on
 /// (which differs from the file's after "next step").
-struct RenameEntry {
-    var item: FileItem
-    var name: String
+internal struct RenameEntry {
+    internal var item: FileItem
+    internal var name: String
 
-    init(_ item: FileItem) {
+    internal init(_ item: FileItem) {
         self.item = item
         name = Self.diskName(of: item)
     }
@@ -17,38 +17,38 @@ struct RenameEntry {
     /// A list gathered from elsewhere (a branch view, a search result) names its items by path, on
     /// every file system; the item's own location says what it is called. (A name with a slash
     /// would otherwise be read as a folder to move into.).
-    static func diskName(of item: FileItem) -> String {
+    internal static func diskName(of item: FileItem) -> String {
         item.name.utf8.contains(0x2F) ? item.url.lastPathComponent : item.name
     }
 
-    var diskName: String { Self.diskName(of: item) }
+    internal var diskName: String { Self.diskName(of: item) }
 
-    var directory: URL { item.url.deletingLastPathComponent() }
+    internal var directory: URL { item.url.deletingLastPathComponent() }
 }
 
 /// The new names of a list and how each of them stands.
-struct RenamePreview {
+internal struct RenamePreview {
     /// How the items stand, worked out with the preview (in the background) so that whoever
     /// shows it need not count the rows.
-    struct Counts: Equatable {
-        var changing = 0
-        var conflicts = 0
-        var errors = 0
+    internal struct Counts: Equatable {
+        internal var changing = 0
+        internal var conflicts = 0
+        internal var errors = 0
     }
 
-    var names: [String?]
+    internal var names: [String?]
     /// Where each item goes; nil where there is no usable name.
-    var targets: [URL?]
-    var statuses: [RenameStatus]
-    var planner: RenamePlanner
+    internal var targets: [URL?]
+    internal var statuses: [RenameStatus]
+    internal var planner: RenamePlanner
     /// The keys of everything that is in the target folders now.
-    var existing: Set<String>
+    internal var existing: Set<String>
     /// What is wrong with the settings as a whole (an invalid mask or expression).
-    var problem: any Error?
+    internal var problem: any Error?
 
-    var conflicts: [Int] { statuses.indices.filter { statuses[$0].isConflict } }
+    internal var conflicts: [Int] { statuses.indices.filter { statuses[$0].isConflict } }
 
-    var counts: Counts {
+    internal var counts: Counts {
         var counts = Counts()
         for status in statuses {
             switch status {
@@ -75,11 +75,11 @@ struct RenamePreview {
 /// Safe to use from several threads.
 ///
 /// Unchecked `Sendable`: `dates` is guarded by `lock`.
-final class ContentDateStore: @unchecked Sendable {
+internal final class ContentDateStore: @unchecked Sendable {
     private let lock = NSLock()
     private var dates: [URL: Date?] = [:]
 
-    func date(of url: URL) -> Date? {
+    internal func date(of url: URL) -> Date? {
         lock.lock()
         let known = dates[url]
         lock.unlock()
@@ -103,11 +103,11 @@ final class ContentDateStore: @unchecked Sendable {
 /// lists them afresh. Safe to use from several threads.
 ///
 /// Unchecked `Sendable`: all mutable state is guarded by `lock`; `dates` does not change.
-final class RenameCache: @unchecked Sendable {
-    struct Rows {
-        var subjects: [RenameSubject]
-        var folders: [URL]
-        var folderKeys: [String]
+internal final class RenameCache: @unchecked Sendable {
+    internal struct Rows {
+        internal var subjects: [RenameSubject]
+        internal var folders: [URL]
+        internal var folderKeys: [String]
     }
 
     private let lock = NSLock()
@@ -116,7 +116,7 @@ final class RenameCache: @unchecked Sendable {
     private var keys: [String: Set<String>]
     private let dates: ContentDateStore
 
-    init(
+    internal init(
         dates: ContentDateStore = ContentDateStore(),
         folding: [String: Bool] = [:],
         keys: [String: Set<String>] = [:]
@@ -131,13 +131,13 @@ final class RenameCache: @unchecked Sendable {
     /// rows are made again.
     ///
     /// Previews under way keep the cache they have.
-    func forChangedOrder() -> RenameCache {
+    internal func forChangedOrder() -> RenameCache {
         lock.lock()
         defer { lock.unlock() }
         return RenameCache(dates: dates, folding: folding, keys: keys)
     }
 
-    func rows(for entries: [RenameEntry], fileSystems: FileSystemRegistry) -> Rows {
+    internal func rows(for entries: [RenameEntry], fileSystems: FileSystemRegistry) -> Rows {
         lock.lock()
         let known = rows
         lock.unlock()
@@ -159,32 +159,32 @@ final class RenameCache: @unchecked Sendable {
         return result
     }
 
-    func foldsCase(folderKey: String) -> Bool? {
+    internal func foldsCase(folderKey: String) -> Bool? {
         lock.lock()
         defer { lock.unlock() }
         return folding[folderKey]
     }
 
-    func setFoldsCase(_ folds: Bool, folderKey: String) {
+    internal func setFoldsCase(_ folds: Bool, folderKey: String) {
         lock.lock()
         defer { lock.unlock() }
         folding[folderKey] = folds
     }
 
-    func existingKeys(folderKey: String) -> Set<String>? {
+    internal func existingKeys(folderKey: String) -> Set<String>? {
         lock.lock()
         defer { lock.unlock() }
         return keys[folderKey]
     }
 
-    func setExistingKeys(_ found: Set<String>, folderKey: String) {
+    internal func setExistingKeys(_ found: Set<String>, folderKey: String) {
         lock.lock()
         defer { lock.unlock() }
         keys[folderKey] = found
     }
 
     /// `[T4]` for a file: read once, however often the preview is computed.
-    func contentDate(of url: URL) -> Date? {
+    internal func contentDate(of url: URL) -> Date? {
         dates.date(of: url)
     }
 }
@@ -193,15 +193,17 @@ final class RenameCache: @unchecked Sendable {
 ///
 /// Everything here blocks (it lists the target folders) and belongs on a background thread; the
 /// names themselves are computed on all cores.
-enum RenameComputation {
+internal enum RenameComputation {
     /// Lists below this size are not worth spreading over the cores.
-    static let parallelThreshold = 256
+    internal static let parallelThreshold = 256
 
-    static func subject(for entry: RenameEntry, fileSystems: FileSystemRegistry) -> RenameSubject {
+    internal static func subject(for entry: RenameEntry, fileSystems: FileSystemRegistry) -> RenameSubject {
         subject(for: entry, directory: entry.directory, fileSystems: fileSystems)
     }
 
-    static func subject(for entry: RenameEntry, directory: URL, fileSystems: FileSystemRegistry) -> RenameSubject {
+    internal static func subject(for entry: RenameEntry, directory: URL, fileSystems: FileSystemRegistry)
+        -> RenameSubject
+    {
         RenameSubject(
             name: entry.name,
             isFolder: entry.item.isFolder,
@@ -215,7 +217,7 @@ enum RenameComputation {
 
     /// Where a new name puts an item: next to where it is, or, with slashes in the name, in
     /// a folder below (or, with a slash in front, anywhere on the same file system).
-    static func target(of entry: RenameEntry, named name: String) -> URL {
+    internal static func target(of entry: RenameEntry, named name: String) -> URL {
         if name.utf8.first == 0x2F {
             // From the top of the item's file system.
             var root = entry.directory
@@ -253,7 +255,7 @@ enum RenameComputation {
     /// `subjects` are the entries' subjects when they are known already. A cancelled computation
     /// returns names that are not to be used. `isCancelled` also ends a regular expression that is
     /// working on a name; one that takes too long gives that name no new name (`<Error!>`).
-    static func names(
+    internal static func names(
         _ entries: [RenameEntry],
         settings: RenameSettings,
         context: RenameContext,
@@ -288,7 +290,7 @@ enum RenameComputation {
     /// (with whatever it has). A `cache` of the session saves listing the same folders and building
     /// the same subjects for every keystroke. `cancellation` ends the listing of a folder that does
     /// not answer.
-    static func preview(
+    internal static func preview(
         _ entries: [RenameEntry],
         settings: RenameSettings,
         context: RenameContext,
@@ -367,14 +369,14 @@ enum RenameComputation {
 /// What the planner has to know about the file systems.
 ///
 /// Blocks; not for the main thread.
-struct RenameSurvey {
-    let fileSystems: FileSystemRegistry
+internal struct RenameSurvey {
+    internal let fileSystems: FileSystemRegistry
     /// What was found out about the same folders before, if the caller keeps any.
-    var cache: RenameCache?
+    internal var cache: RenameCache?
     /// Ends the listing of a folder that does not answer.
-    var cancellation: CancellationFlag?
+    internal var cancellation: CancellationFlag?
 
-    init(fileSystems: FileSystemRegistry, cache: RenameCache? = nil, cancellation: CancellationFlag? = nil) {
+    internal init(fileSystems: FileSystemRegistry, cache: RenameCache? = nil, cancellation: CancellationFlag? = nil) {
         self.fileSystems = fileSystems
         self.cache = cache
         self.cancellation = cancellation
@@ -383,7 +385,7 @@ struct RenameSurvey {
     /// The keys of every entry of the given folders (by `locationKey`).
     ///
     /// A folder that does not exist yet has none.
-    func existingKeys(
+    internal func existingKeys(
         in folders: [String: URL],
         planner: RenamePlanner,
         isCancelled: @Sendable () -> Bool
@@ -415,7 +417,9 @@ struct RenameSurvey {
     ///
     /// A folder that holds none of the items takes the verdict of the nearest folder above it that
     /// does.
-    func planner(for entries: [RenameEntry], rows: RenameCache.Rows, targetFolders: [String: URL]) -> RenamePlanner {
+    internal func planner(for entries: [RenameEntry], rows: RenameCache.Rows, targetFolders: [String: URL])
+        -> RenamePlanner
+    {
         var samples: [String: [FileItem]] = [:]
         var sourceFolders: [String: URL] = [:]
         for index in entries.indices {
@@ -459,7 +463,7 @@ struct RenameSurvey {
     }
 
     /// What a local volume says about letter case in names; nil for anything else or when it does not say.
-    static func volumeFoldsCase(_ folder: URL) -> Bool? {
+    internal static func volumeFoldsCase(_ folder: URL) -> Bool? {
         guard folder.isFileURL else {
             return nil
         }
@@ -475,7 +479,7 @@ struct RenameSurvey {
     ///
     /// Found out by asking for one of the items under a differently cased name; no provider says it
     /// of itself.
-    func foldsCase(_ items: [FileItem]) -> Bool {
+    internal func foldsCase(_ items: [FileItem]) -> Bool {
         for item in items.prefix(16) {
             let name = RenameEntry.diskName(of: item)
             let swapped = name == name.uppercased() ? name.lowercased() : name.uppercased()
@@ -514,36 +518,36 @@ struct RenameSurvey {
 }
 
 /// A rename that was carried out, for Undo and the result log.
-struct RenamedItem: Codable, Equatable {
-    var from: URL
-    var to: URL
+internal struct RenamedItem: Codable, Equatable {
+    internal var from: URL
+    internal var to: URL
 }
 
 /// What a run did.
-struct RenameRunResult {
-    var renamed: [RenamedItem] = []
+internal struct RenameRunResult {
+    internal var renamed: [RenamedItem] = []
     /// Item index and what went wrong.
-    var failures: [(item: Int, message: String)] = []
-    var cancelled = false
+    internal var failures: [(item: Int, message: String)] = []
+    internal var cancelled = false
 }
 
 /// Carries out the steps of a plan through the file-system providers, one after the other.
 ///
 /// Used on one thread, the job's.
-final class RenameRunner {
+internal final class RenameRunner {
     private let fileSystems: FileSystemRegistry
     private let cancellation: CancellationFlag
     /// Called before each step with the number of items done so far.
-    var onProgress: ((_ step: RenameStep, _ done: Int) -> Void)?
+    internal var onProgress: ((_ step: RenameStep, _ done: Int) -> Void)?
 
-    init(fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()) {
+    internal init(fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag()) {
         self.fileSystems = fileSystems
         self.cancellation = cancellation
     }
 
     /// Whether the two locations are in one folder and their names are the same letters,
     /// differing only in how accents are written.
-    static func differsInNormalizationOnly(_ first: URL, _ second: URL) -> Bool {
+    internal static func differsInNormalizationOnly(_ first: URL, _ second: URL) -> Bool {
         guard first.deletingLastPathComponent().isSameLocation(as: second.deletingLastPathComponent()) else {
             return false
         }
@@ -557,7 +561,7 @@ final class RenameRunner {
     /// Locations that are not on the local disk cannot be asked and are taken at the planner's
     /// word. A target that is not there is no file at all: the volume tells upper from lower case
     /// after all, and the rename is an ordinary one that replaces nothing.
-    static func isSameFile(_ first: URL, _ second: URL) -> Bool {
+    internal static func isSameFile(_ first: URL, _ second: URL) -> Bool {
         guard first.isFileURL, second.isFileURL else {
             return true
         }
@@ -577,7 +581,7 @@ final class RenameRunner {
     /// Whether two local locations are one file (device and inode); nil when either cannot be
     /// asked, and when the answer "yes" could be two names of a file with several links (the
     /// folder's listing tells those apart).
-    static func isSameFileOnDisk(_ first: URL, _ second: URL) -> Bool? {
+    internal static func isSameFileOnDisk(_ first: URL, _ second: URL) -> Bool? {
         func identity(_ url: URL) -> (dev_t, ino_t, nlink_t)? {
             var info = stat()
             return lstat(url.path, &info) == 0 ? (info.st_dev, info.st_ino, info.st_nlink) : nil
@@ -591,7 +595,7 @@ final class RenameRunner {
         return one.2 > 1 ? nil : true
     }
 
-    func run(_ steps: [RenameStep], sources: [URL]) -> RenameRunResult {
+    internal func run(_ steps: [RenameStep], sources: [URL]) -> RenameRunResult {
         var result = RenameRunResult()
         var failed = Set<Int>()
         /// Items that sit under a temporary name right now.
@@ -686,10 +690,10 @@ final class RenameRunner {
     }
 }
 
-enum RenameRunError: LocalizedError {
+internal enum RenameRunError: LocalizedError {
     case leftUnderTemporaryName(String, String)
 
-    var errorDescription: String? {
+    internal var errorDescription: String? {
         switch self {
         case .leftUnderTemporaryName(let name, let reason):
             return "The file was left under the temporary name \(name): \(reason)"
@@ -699,12 +703,12 @@ enum RenameRunError: LocalizedError {
 
 /// The result log (spec 19 › Multi-Rename result log): one line per renamed file, the old
 /// full path and the new name, both quoted and joined by ` -> `.
-enum RenameLog {
-    static let fileName = "renlog.txt"
+internal enum RenameLog {
+    internal static let fileName = "renlog.txt"
 
     /// Writes the log where only the user can read it: a folder and a file of their own, never
     /// one in a place that others can write to.
-    static func write(_ renamed: [RenamedItem], to url: URL, fileSystems: FileSystemRegistry) {
+    internal static func write(_ renamed: [RenamedItem], to url: URL, fileSystems: FileSystemRegistry) {
         let manager = FileManager.default
         try? manager.createDirectory(
             at: url.deletingLastPathComponent(),
@@ -717,7 +721,7 @@ enum RenameLog {
         try? manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
-    static func text(_ renamed: [RenamedItem], fileSystems: FileSystemRegistry) -> String {
+    internal static func text(_ renamed: [RenamedItem], fileSystems: FileSystemRegistry) -> String {
         renamed.map { item -> String in
             // A file that moved into another folder is logged with its path from the old one.
             let oldFolder = item.from.deletingLastPathComponent()

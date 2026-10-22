@@ -18,24 +18,24 @@ import Testing
 /// list names that lead out of their folder, refuse the Trash in different ways, fail a removal.
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
-    let base = MemoryFileSystem(scheme: "odd")
-    var scheme: String { base.scheme }
-    var capabilities: FileSystemCapabilities { [.write, .trash] }
+internal final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
+    internal let base = MemoryFileSystem(scheme: "odd")
+    internal var scheme: String { base.scheme }
+    internal var capabilities: FileSystemCapabilities { [.write, .trash] }
     private let lock = NSLock()
     private var hostile: [String: [String]] = [:]
     private var failures = 0
     private var removedURLs: [URL] = []
     private var trashed: [URL] = []
     /// What `trash` throws; nil trashes for real.
-    var trashError: (any Error)?
+    internal var trashError: (any Error)?
 
-    func addHostile(names: [String], in directory: String) { lock.withLock { hostile[directory] = names } }
-    func failNextRemovals(_ count: Int) { lock.withLock { failures = count } }
-    var removed: [URL] { lock.withLock { removedURLs } }
-    var trashedItems: [URL] { lock.withLock { trashed } }
+    internal func addHostile(names: [String], in directory: String) { lock.withLock { hostile[directory] = names } }
+    internal func failNextRemovals(_ count: Int) { lock.withLock { failures = count } }
+    internal var removed: [URL] { lock.withLock { removedURLs } }
+    internal var trashedItems: [URL] { lock.withLock { trashed } }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         var items = try base.list(directory, showHidden: showHidden)
         for (index, name) in (lock.withLock { hostile[directory.path] } ?? []).enumerated() {
             items.append(
@@ -44,22 +44,22 @@ final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         return items
     }
-    func item(at url: URL) -> FileItem? {
+    internal func item(at url: URL) -> FileItem? {
         if url.lastPathComponent.hasPrefix("hostile") {
             return FileItem(url: url, name: url.lastPathComponent, stat: .init(size: 4))
         }
         return base.item(at: url)
     }
-    func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader {
+    internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
+    internal func read(_ url: URL) throws -> any FileReader {
         if url.lastPathComponent.hasPrefix("hostile") {
             return try base.read(base.addFile("/hostile-data", "evil"))
         }
         return try base.read(url)
     }
-    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
-    func remove(_ url: URL) throws {
+    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
+    internal func remove(_ url: URL) throws {
         let fails: Bool = lock.withLock {
             removedURLs.append(url)
             if failures > 0 {
@@ -71,35 +71,35 @@ final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
         if fails { throw CocoaError(.fileWriteUnknown) }
         try base.remove(url)
     }
-    func trash(_ url: URL) throws {
+    internal func trash(_ url: URL) throws {
         lock.withLock { trashed.append(url) }
         if let trashError { throw trashError }
         try base.remove(url)
     }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)
     }
-    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
+    internal func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) throws {
         throw FileSystemError.crossesVolumes
     }
-    func displayPath(_ url: URL) -> String { base.displayPath(url) }
-    func location(from text: String) -> URL? { base.location(from: text) }
-    func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
+    internal func displayPath(_ url: URL) -> String { base.displayPath(url) }
+    internal func location(from text: String) -> URL? { base.location(from: text) }
+    internal func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
 }
 
 /// Answers `retry` the first time a step fails and `skip` afterwards.
-final class RetryOnce: FileJobDelegate {
+internal final class RetryOnce: FileJobDelegate {
     private let lock = NSLock()
-    private(set) var errors: [String] = []
-    func job(_: FileJob, progress _: JobProgress) {}
-    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
-    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
+    internal private(set) var errors: [String] = []
+    internal func job(_: FileJob, progress _: JobProgress) {}
+    internal func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { .overwrite }
+    internal func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
         lock.withLock {
             errors.append(error.localizedDescription)
             return errors.count == 1 ? .retry : .skip
         }
     }
-    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
+    internal func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 }
 
 private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
@@ -108,11 +108,11 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 }
 
 @Suite
-struct FileOpsFixJobs {
+internal struct FileOpsFixJobs {
     // MARK: F1
 
     @Test
-    func aCopyOfALockedFileLeavesNoTemporaryFileBehind() throws {
+    internal func aCopyOfALockedFileLeavesNoTemporaryFileBehind() throws {
         let box = try Sandbox()
         let source = try box.file("A/locked.txt", "l")
         try box.folder("B")
@@ -128,7 +128,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aFinderLockedFileIsCopiedWithItsLockByTheJobItself() throws {
+    internal func aFinderLockedFileIsCopiedWithItsLockByTheJobItself() throws {
         let box = try Sandbox()
         let source = try box.file("A/locked.txt", "locked content")
         try box.folder("B")
@@ -162,7 +162,7 @@ struct FileOpsFixJobs {
     // MARK: F4
 
     @Test
-    func aTargetInsideTheSourceThroughALinkIsRefused() throws {
+    internal func aTargetInsideTheSourceThroughALinkIsRefused() throws {
         let box = try Sandbox()
         try box.file("A/Foo/one.txt", "1")
         try FileManager.default.createSymbolicLink(at: box.url("A/link"), withDestinationURL: box.url("A/Foo"))
@@ -178,7 +178,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aCaseOnlyRenameIsNotAConflict() throws {
+    internal func aCaseOnlyRenameIsNotAConflict() throws {
         let box = try Sandbox()
         try box.file("A/readme.txt", "r")
         try box.file("A/Folder/in.txt", "i")
@@ -202,7 +202,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aCopyOntoItsOwnNameInOtherLetterCaseIsACopyOntoItself() throws {
+    internal func aCopyOntoItsOwnNameInOtherLetterCaseIsACopyOntoItself() throws {
         let box = try Sandbox()
         guard try isCaseInsensitive(box) else {
             return
@@ -220,7 +220,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func twoSourcesWhoseTargetNamesDifferInCaseOnlyAreOneConflict() throws {
+    internal func twoSourcesWhoseTargetNamesDifferInCaseOnlyAreOneConflict() throws {
         let box = try Sandbox()
         guard try isCaseInsensitive(box) else {
             return
@@ -242,7 +242,7 @@ struct FileOpsFixJobs {
     // MARK: F5
 
     @Test
-    func namesThatLeadOutOfTheirFolderAreNotTransferred() throws {
+    internal func namesThatLeadOutOfTheirFolderAreNotTransferred() throws {
         let box = try Sandbox()
         try box.folder("Target")
         let fileSystems = FileSystemRegistry()
@@ -268,7 +268,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aMoveKeepsAFolderWithARefusedName() throws {
+    internal func aMoveKeepsAFolderWithARefusedName() throws {
         let box = try Sandbox()
         try box.folder("Target")
         let fileSystems = FileSystemRegistry()
@@ -289,7 +289,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func deletingNeverFollowsAHostileName() {
+    internal func deletingNeverFollowsAHostileName() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -304,7 +304,7 @@ struct FileOpsFixJobs {
     // MARK: F6
 
     @Test
-    func onlyAPlaceWithoutATrashOffersPermanentDeletion() {
+    internal func onlyAPlaceWithoutATrashOffersPermanentDeletion() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -331,7 +331,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aFailedTrashCanBeRetried() {
+    internal func aFailedTrashCanBeRetried() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -352,7 +352,7 @@ struct FileOpsFixJobs {
     // MARK: F7
 
     @Test
-    func removingTheSourceOfAMoveIsRetriedWithoutCopyingAgain() throws {
+    internal func removingTheSourceOfAMoveIsRetriedWithoutCopyingAgain() throws {
         let box = try Sandbox()
         try box.folder("B")
         let fileSystems = FileSystemRegistry()
@@ -376,7 +376,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aSourceThatCannotBeRemovedStaysAndIsNotReportedAsMoved() throws {
+    internal func aSourceThatCannotBeRemovedStaysAndIsNotReportedAsMoved() throws {
         let box = try Sandbox()
         try box.folder("B")
         let fileSystems = FileSystemRegistry()
@@ -399,7 +399,7 @@ struct FileOpsFixJobs {
     // MARK: F8
 
     @Test
-    func aFolderThatMovesByOneRenameIsNotWalked() throws {
+    internal func aFolderThatMovesByOneRenameIsNotWalked() throws {
         let box = try Sandbox()
         for index in 0..<30 { try box.file("A/docs/sub/f\(index).txt", "x") }
         try box.folder("B")
@@ -412,7 +412,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aFolderMergedIntoAnExistingOneIsCountedInFull() throws {
+    internal func aFolderMergedIntoAnExistingOneIsCountedInFull() throws {
         let box = try Sandbox()
         for index in 0..<5 { try box.file("A/docs/f\(index).txt", "x") }
         try box.file("B/docs/keep.txt", "k")
@@ -424,7 +424,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aSkippedFolderAdvancesTheCounterToTheEnd() throws {
+    internal func aSkippedFolderAdvancesTheCounterToTheEnd() throws {
         let box = try Sandbox()
         for index in 0..<4 { try box.file("A/docs/f\(index).txt", "x") }
         try box.file("A/one.txt", "1")
@@ -447,7 +447,7 @@ struct FileOpsFixJobs {
     // MARK: F10
 
     @Test
-    func manyFilesAreDeletedBySeveralWorkersAndProtectedOnesAreAskedInOrder() throws {
+    internal func manyFilesAreDeletedBySeveralWorkersAndProtectedOnesAreAskedInOrder() throws {
         let box = try Sandbox()
         for index in 0..<200 { try box.file(String(format: "A/tree/f%03d.txt", index), "x") }
         for name in ["ro1", "ro2", "ro3"] {
@@ -468,7 +468,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aCancelDuringAParallelDeleteStopsAndReturns() throws {
+    internal func aCancelDuringAParallelDeleteStopsAndReturns() throws {
         let box = try Sandbox()
         for index in 0..<300 { try box.file(String(format: "A/tree/f%03d.txt", index), "x") }
         let replies = Replies()
@@ -479,7 +479,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func aDeleteTreeWithoutAPoolStillDeletesEverything() throws {
+    internal func aDeleteTreeWithoutAPoolStillDeletesEverything() throws {
         let box = try Sandbox()
         for index in 0..<50 { try box.file("A/tree/d\(index % 5)/f\(index).txt", "x") }
         let replies = Replies()
@@ -492,7 +492,7 @@ struct FileOpsFixJobs {
     // MARK: F13
 
     @Test
-    func filesOfDifferentSizesAreDifferentWithoutReadingThem() throws {
+    internal func filesOfDifferentSizesAreDifferentWithoutReadingThem() throws {
         let box = try Sandbox()
         try box.file("a.txt", "short")
         try box.file("b.txt", "longer text")
@@ -507,7 +507,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func verifyingShowsProgressAndStillCatchesDamage() throws {
+    internal func verifyingShowsProgressAndStillCatchesDamage() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", String(repeating: "x", count: 3 << 20))
         try box.folder("B")
@@ -522,7 +522,7 @@ struct FileOpsFixJobs {
     // MARK: F14
 
     @Test
-    func olderMeansOlderByMoreThanTheGranularityOfTheTarget() {
+    internal func olderMeansOlderByMoreThanTheGranularityOfTheTarget() {
         let (fileSystems, memory) = makeFileSystems()
         let base = Date(timeIntervalSince1970: 1_000_000)
         memory.addFile("/a/near.txt", "new", modified: base.addingTimeInterval(1.5))
@@ -542,7 +542,7 @@ struct FileOpsFixJobs {
     }
 
     @Test
-    func olderOrSameKeepsAnOlderTargetOnlyBeyondTheTolerance() {
+    internal func olderOrSameKeepsAnOlderTargetOnlyBeyondTheTolerance() {
         let (fileSystems, memory) = makeFileSystems()
         let base = Date(timeIntervalSince1970: 1_000_000)
         memory.addFile("/a/near.txt", "new", modified: base)
@@ -563,7 +563,7 @@ struct FileOpsFixJobs {
     // MARK: F20
 
     @Test
-    func hugeWidthsInNamesAreClamped() throws {
+    internal func hugeWidthsInNamesAreClamped() throws {
         var context = NameTemplate.Context()
         context.cursorName = "abc.txt"
         let counter = try NameTemplate.names(from: "<1-2>x[C:999999999]", context: context)
@@ -578,9 +578,9 @@ struct FileOpsFixJobs {
 
 /// The operation log: bursts, the handle, the end of a job and the pruning of old copies.
 @Suite
-struct FileOpsFixLog {
+internal struct FileOpsFixLog {
     @Test
-    func linesAreWrittenWithoutAFlushAfterAShortWhile() throws {
+    internal func linesAreWrittenWithoutAFlushAfterAShortWhile() throws {
         let box = try Sandbox()
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
@@ -602,7 +602,7 @@ struct FileOpsFixLog {
     }
 
     @Test
-    func aFileThatWasDeletedWhileTheLogWasOpenIsWrittenAgain() throws {
+    internal func aFileThatWasDeletedWhileTheLogWasOpenIsWrittenAgain() throws {
         let box = try Sandbox()
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
@@ -625,7 +625,7 @@ struct FileOpsFixLog {
     }
 
     @Test
-    func pruningLeavesOtherPeoplesFilesAlone() throws {
+    internal func pruningLeavesOtherPeoplesFilesAlone() throws {
         let box = try Sandbox()
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
@@ -648,7 +648,7 @@ struct FileOpsFixLog {
     }
 
     @Test
-    func theNamesOfRotatedCopiesAreRecognisedExactly() {
+    internal func theNamesOfRotatedCopiesAreRecognisedExactly() {
         #expect(OperationLog.isRotatedCopy("operations.2026-10-12.log", of: "operations.log"))
         #expect(OperationLog.isRotatedCopy("operations.2026-10-12-3.log", of: "operations.log"))
         #expect(OperationLog.isRotatedCopy("operations.7.log", of: "operations.log"))
@@ -662,11 +662,11 @@ struct FileOpsFixLog {
 /// The commands of the plugins, through a kernel with fake panels.
 @MainActor
 @Suite
-struct FileOpsFixCommands {
+internal struct FileOpsFixCommands {
     // MARK: F3
 
     @Test
-    func aCaseOnlyRenameWorksAndNeverReplacesAnotherFile() throws {
+    internal func aCaseOnlyRenameWorksAndNeverReplacesAnotherFile() throws {
         let box = try Sandbox()
         try box.file("A/readme", "mine")
         try box.folder("B")
@@ -683,7 +683,7 @@ struct FileOpsFixCommands {
     }
 
     @Test
-    func renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() {
+    internal func renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() {
         // A file system that tells the two names apart, as a case-sensitive volume does.
         let memory = MemoryFileSystem()
         memory.addFile("/A/readme", "first")
@@ -703,7 +703,7 @@ struct FileOpsFixCommands {
     // MARK: F17
 
     @Test
-    func pasteIsOfferedWhileFilesAreOnTheClipboard() throws {
+    internal func pasteIsOfferedWhileFilesAreOnTheClipboard() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -722,7 +722,7 @@ struct FileOpsFixCommands {
     }
 
     @Test
-    func theToolbarAsksWithoutBuildingTheListOfOperands() throws {
+    internal func theToolbarAsksWithoutBuildingTheListOfOperands() throws {
         let box = try Sandbox()
         for index in 0..<2_000 { try box.file("A/f\(index).txt", "x") }
         try box.folder("B")
@@ -753,7 +753,7 @@ struct FileOpsFixCommands {
     // MARK: F18
 
     @Test
-    func savingDetailsKeepsTheOldFileUntilTheNewOneIsThereAndNeverRemovesAFolder() throws {
+    internal func savingDetailsKeepsTheOldFileUntilTheNewOneIsThereAndNeverRemovesAFolder() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("A/details.txt")
@@ -782,7 +782,7 @@ struct FileOpsFixCommands {
     // MARK: F19
 
     @Test
-    func theTestRecordsOfTheMacPluginStayBounded() throws {
+    internal func theTestRecordsOfTheMacPluginStayBounded() throws {
         let box = try Sandbox()
         try box.file("A/notes.txt", "n")
         try box.folder("B")
@@ -807,7 +807,7 @@ struct FileOpsFixCommands {
     // MARK: F2
 
     @Test
-    func changingOnlyTheDateOfAFolderLeavesThePermissionsBelowAlone() throws {
+    internal func changingOnlyTheDateOfAFolderLeavesThePermissionsBelowAlone() throws {
         let box = try Sandbox()
         let inner = try box.file("A/docs/in.txt", "inside")
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: inner.path)
@@ -838,7 +838,7 @@ struct FileOpsFixCommands {
     }
 
     @Test
-    func pressingOKOnALockedFileDoesNotUnlockIt() throws {
+    internal func pressingOKOnALockedFileDoesNotUnlockIt() throws {
         let box = try Sandbox()
         let file = try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -857,7 +857,7 @@ struct FileOpsFixCommands {
     }
 
     @Test
-    func permissionsTypedOrLoadedAreStillApplied() throws {
+    internal func permissionsTypedOrLoadedAreStillApplied() throws {
         let box = try Sandbox()
         let file = try box.file("A/one.txt", "1")
         try box.file("B/other.txt", "2")
@@ -879,7 +879,7 @@ struct FileOpsFixCommands {
     // MARK: F16
 
     @Test
-    func aCommentFileThatCannotBeReadIsNeverOverwritten() throws {
+    internal func aCommentFileThatCannotBeReadIsNeverOverwritten() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         let fileSystems = FileSystemRegistry()
@@ -915,7 +915,7 @@ struct FileOpsFixCommands {
     }
 
     @Test
-    func anOversizedCommentFileIsNotOverwritten() throws {
+    internal func anOversizedCommentFileIsNotOverwritten() throws {
         let memory = MemoryFileSystem()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
@@ -930,7 +930,7 @@ struct FileOpsFixCommands {
     // MARK: F12
 
     @Test
-    func theAllocatedSizeIsOnlyAskedForWhenItIsWanted() throws {
+    internal func theAllocatedSizeIsOnlyAskedForWhenItIsWanted() throws {
         let box = try Sandbox()
         let file = try box.file("A/small.txt", "x")
         let fileSystems = FileSystemRegistry()

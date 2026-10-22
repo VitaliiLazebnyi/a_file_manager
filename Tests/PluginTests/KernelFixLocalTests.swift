@@ -11,8 +11,8 @@ import Testing
 @testable import ViewOptionsPlugin
 
 @Suite
-struct LocalDiskFixes {
-    let local = LocalFileSystem()
+internal struct LocalDiskFixes {
+    internal let local = LocalFileSystem()
 
     private func flags(_ url: URL) -> UInt32 {
         var st = stat()
@@ -20,7 +20,7 @@ struct LocalDiskFixes {
     }
 
     @Test
-    func aLockedFileIsCopiedUnderATemporaryNameAndRenamed() throws {
+    internal func aLockedFileIsCopiedUnderATemporaryNameAndRenamed() throws {
         let box = try Sandbox()
         let source = try box.file("locked.txt", "content")
         #expect(chflags(source.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -56,7 +56,7 @@ struct LocalDiskFixes {
     }
 
     @Test
-    func aFailedCopyLeavesAnExistingFileAlone() throws {
+    internal func aFailedCopyLeavesAnExistingFileAlone() throws {
         let box = try Sandbox()
         let source = try box.file("a.txt", "new")
         try box.file("b.txt", "theirs")
@@ -81,7 +81,7 @@ struct LocalDiskFixes {
     }
 
     @Test
-    func pipesAndTheLikeAreToldFromFiles() throws {
+    internal func pipesAndTheLikeAreToldFromFiles() throws {
         let box = try Sandbox()
         try box.file("plain.txt")
         try box.folder("folder")
@@ -101,7 +101,7 @@ struct LocalDiskFixes {
     }
 
     @Test
-    func aLargeFolderIsListedLikeASmallOne() throws {
+    internal func aLargeFolderIsListedLikeASmallOne() throws {
         // Enough entries for the items to be made on several threads.
         let box = try Sandbox()
         let fm = FileManager.default
@@ -130,7 +130,7 @@ struct LocalDiskFixes {
     }
 
     @Test
-    func aTreeIsMeasuredLikeItIsListed() throws {
+    internal func aTreeIsMeasuredLikeItIsListed() throws {
         let box = try Sandbox()
         for folder in 0..<12 {
             for file in 0..<20 {
@@ -157,7 +157,7 @@ struct LocalDiskFixes {
     }
 
     @Test
-    func placesAndVolumesAnswerFromWhatIsKnown() throws {
+    internal func placesAndVolumesAnswerFromWhatIsKnown() throws {
         let places = local.settledPlaces()
         #expect(places.first?.kind == .home && places.contains { $0.kind == .internalDisk && $0.url.path == "/" })
         // Asked again, the list comes from memory (`places()` only reads what is known).
@@ -187,7 +187,7 @@ struct LocalDiskFixes {
     private func box() throws -> Sandbox { try Sandbox() }
 
     @Test
-    func aWatcherThatGoesAwayWhileChangesArriveDoesNoHarm() async throws {
+    internal func aWatcherThatGoesAwayWhileChangesArriveDoesNoHarm() async throws {
         let box = try Sandbox()
         try box.folder("watched")
         for round in 0..<20 {
@@ -207,13 +207,13 @@ extension Int {
 
 @MainActor
 @Suite
-struct PluginFixes {
-    let memory = MemoryFileSystem()
+internal struct PluginFixes {
+    internal let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let bench: TestBench
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let bench: TestBench
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt", "1")
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/B/other.txt", "o")
@@ -226,7 +226,7 @@ struct PluginFixes {
     }
 
     @Test
-    func aTabFileIsReplacedInOneStepAndOnlyIfItIsAFile() {
+    internal func aTabFileIsReplacedInOneStepAndOnlyIfItIsAFile() {
         bench.commands.perform("SAVETABS", .location(memory.url("/A/my.tab")))
         let first = memory.contents("/A/my.tab")
         #expect(first?.contains("[activetabs]") == true)
@@ -248,7 +248,7 @@ struct PluginFixes {
     }
 
     @Test
-    func aFileTooLargeToBeATabFileIsNotLoaded() {
+    internal func aFileTooLargeToBeATabFileIsNotLoaded() {
         memory.addFile("/A/huge.tab", String(repeating: "x", count: FolderTabsPlugin.tabFileLimit + 10))
         let before = bench.left.tabs.count
         bench.commands.perform("OPENTABS", .location(memory.url("/A/huge.tab")))
@@ -256,7 +256,7 @@ struct PluginFixes {
     }
 
     @Test
-    func theClipboardCommandIsOfferedForAnyTextAndReadsOnlyTheFirstLine() {
+    internal func theClipboardCommandIsOfferedForAnyTextAndReadsOnlyTheFirstLine() {
         #expect(!bench.commands.isEnabled("afm_CdFromClipboard"))
         pasteboard.clearContents()
         pasteboard.setString(
@@ -269,7 +269,7 @@ struct PluginFixes {
     }
 
     @Test
-    func aLongListIsSortedInTheBackgroundAndAShortOneAtOnce() async throws {
+    internal func aLongListIsSortedInTheBackgroundAndAShortOneAtOnce() async throws {
         let model = bench.left.model
         bench.commands.perform("cm_SrcBySize")
         #expect(model.sort == ListOrder(key: .size, descending: true))

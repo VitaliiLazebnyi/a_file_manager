@@ -12,7 +12,7 @@ public final class DirectorySyncPlugin: Plugin {
     public let name = "DirectorySync"
     private let opensWindows: Bool
     /// The state behind the window; it exists from the first time the command runs.
-    private(set) var session: SyncSession?
+    internal private(set) var session: SyncSession?
     private var window: SyncWindowController?
     /// Puts the window on screen.
     ///

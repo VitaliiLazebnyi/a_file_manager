@@ -6,7 +6,7 @@ public import Foundation
 public enum TriState: Int, Codable, Sendable {
     case any, yes, no
 
-    func accepts(_ value: Bool) -> Bool {
+    internal func accepts(_ value: Bool) -> Bool {
         self == .any || (self == .yes) == value
     }
 }
@@ -186,7 +186,7 @@ public struct PreparedCriteria {
     private let notOlderCutoff: Date?
     private let olderCutoff: Date?
 
-    init(_ criteria: FileCriteria, now: Date, calendar: Calendar) {
+    internal init(_ criteria: FileCriteria, now: Date, calendar: Calendar) {
         self.criteria = criteria
         notOlderCutoff = criteria.notOlderThan?.cutoff(before: now, calendar: calendar)
         olderCutoff = criteria.olderThan?.cutoff(before: now, calendar: calendar)
@@ -277,7 +277,7 @@ public struct FieldRule: Codable, Equatable, Sendable {
     public var usesRegex: Bool { comparison == .regex || comparison == .notRegex }
 
     /// The value as a regular expression; nil when the operator is no regex one or the value is not one.
-    func compiledExpression() -> NSRegularExpression? {
+    internal func compiledExpression() -> NSRegularExpression? {
         usesRegex ? try? NSRegularExpression(pattern: value, options: .caseInsensitive) : nil
     }
 
@@ -296,7 +296,9 @@ public struct FieldRule: Codable, Equatable, Sendable {
     /// takes the expression too long, or is cancelled, finds no match.
     ///
     /// A value that is no expression never matches `regex` and always matches `!regex`.
-    func matches(_ text: String, expression: NSRegularExpression?, trip: RegexTrip?, cancelled: () -> Bool) -> Bool {
+    internal func matches(_ text: String, expression: NSRegularExpression?, trip: RegexTrip?, cancelled: () -> Bool)
+        -> Bool
+    {
         switch comparison {
         case .contains:
             return text.range(of: value, options: .caseInsensitive) != nil
@@ -360,7 +362,7 @@ public struct FieldRule: Codable, Equatable, Sendable {
         }
     }
 
-    static func number(_ text: String) -> Double? {
+    internal static func number(_ text: String) -> Double? {
         Double(text.filter { $0 != "," && $0 != " " && $0 != "\u{a0}" })
     }
 }
@@ -392,24 +394,24 @@ public struct FieldRules: Codable, Equatable, Sendable {
 
     /// The rules with their regular expressions compiled once, for testing many files from
     /// several threads.
-    func prepared(trip: RegexTrip? = nil) -> PreparedFieldRules {
+    internal func prepared(trip: RegexTrip? = nil) -> PreparedFieldRules {
         PreparedFieldRules(self, trip: trip)
     }
 }
 
 /// `FieldRules` with the expressions compiled; immutable, safe to use from several threads.
-struct PreparedFieldRules {
+internal struct PreparedFieldRules {
     private let rules: FieldRules
     private let expressions: [NSRegularExpression?]
     private let trip: RegexTrip?
 
-    init(_ rules: FieldRules, trip: RegexTrip?) {
+    internal init(_ rules: FieldRules, trip: RegexTrip?) {
         self.rules = rules
         self.trip = trip
         expressions = rules.rules.map { $0.compiledExpression() }
     }
 
-    func matches(_ item: FileItem, fields: [String: SearchField], cancelled: () -> Bool = { false }) -> Bool {
+    internal func matches(_ item: FileItem, fields: [String: SearchField], cancelled: () -> Bool = { false }) -> Bool {
         guard rules.isActive else {
             return true
         }

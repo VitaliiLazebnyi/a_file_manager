@@ -4,19 +4,19 @@ import Foundation
 /// Counts what a lenient decode had to leave out, so whoever loads can tell the user.
 ///
 /// Made for one decode and used only by the thread that runs it.
-final class DecodeReport: @unchecked Sendable {
-    static let key = CodingUserInfoKey(rawValue: "afm.places.decodeReport")!
-    var skipped = 0
+internal final class DecodeReport: @unchecked Sendable {
+    internal static let key = CodingUserInfoKey(rawValue: "afm.places.decodeReport")!
+    internal var skipped = 0
 }
 
 /// An array read element by element: an element that cannot be decoded is counted in the
 /// decoder's `DecodeReport` and skipped, the rest is kept.
-struct LenientElements<Element: Decodable>: Decodable {
+internal struct LenientElements<Element: Decodable>: Decodable {
     private struct Ignored: Decodable { init(from _: any Decoder) {} }
 
-    var elements: [Element] = []
+    internal var elements: [Element] = []
 
-    init(from decoder: any Decoder) throws {
+    internal init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         let report = decoder.userInfo[DecodeReport.key] as? DecodeReport
         while !container.isAtEnd {
@@ -32,10 +32,10 @@ struct LenientElements<Element: Decodable>: Decodable {
 
 /// Reading stored values without losing them: when what is stored cannot be read in full, a
 /// copy is kept under `<key>.unreadable` before anything else is saved over it.
-enum StoredSettings {
+internal enum StoredSettings {
     /// The value under `key`; nil when nothing is stored or none of it can be read.
     /// `problem` is called with a message when the data was damaged or partly left out.
-    static func load<Value: Decodable>(
+    internal static func load<Value: Decodable>(
         _ type: Value.Type,
         key: String,
         in settings: any SettingsStore,

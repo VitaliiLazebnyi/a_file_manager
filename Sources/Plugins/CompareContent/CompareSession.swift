@@ -2,23 +2,23 @@ import AFMContracts
 import AFMKernel
 import Foundation
 
-enum CompareSide {
+internal enum CompareSide {
     case left, right
 
-    var other: Self { self == .left ? .right : .left }
+    internal var other: Self { self == .left ? .right : .left }
 }
 
 /// The settings keys of Compare by content, all below `compareContent.`.
-enum CompareSettingsKey {
-    static let scope = "compareContent"
-    static let ignoreCase = "ignoreCase"
-    static let ignoreSpaces = "ignoreRepeatedSpaces"
-    static let ignoreLineEndings = "ignoreLineEndings"
-    static let vertical = "vertical"
-    static let bytesPerLine = "bytesPerLine"
-    static let fontName = "fontName"
-    static let fontSize = "fontSize"
-    static let bytesPerLineChoices = [8, 16, 24, 32]
+internal enum CompareSettingsKey {
+    internal static let scope = "compareContent"
+    internal static let ignoreCase = "ignoreCase"
+    internal static let ignoreSpaces = "ignoreRepeatedSpaces"
+    internal static let ignoreLineEndings = "ignoreLineEndings"
+    internal static let vertical = "vertical"
+    internal static let bytesPerLine = "bytesPerLine"
+    internal static let fontName = "fontName"
+    internal static let fontSize = "fontSize"
+    internal static let bytesPerLineChoices = [8, 16, 24, 32]
 }
 
 /// Everything a "Compare contents" window does, without the window: the two files, the
@@ -32,8 +32,8 @@ enum CompareSettingsKey {
 /// cancels the older one, whose result is then dropped. Saving runs as a job of the kernel's
 /// job service. With `runsInline` (tests) the background work runs on the calling thread.
 @MainActor
-final class CompareSession {
-    enum Phase {
+internal final class CompareSession {
+    internal enum Phase {
         case empty, working, ready
     }
 
@@ -42,31 +42,31 @@ final class CompareSession {
     /// Read only on the way of a request (a command, a click); what comes back later uses the parts
     /// taken when it began, for the kernel may have gone by then (a window closed, the end of a
     /// test).
-    unowned let kernel: Kernel
+    internal unowned let kernel: Kernel
     private let settings: any SettingsStore
     private let fileSystems: FileSystemRegistry
 
-    var leftURL: URL?
-    var rightURL: URL?
-    var options: DiffOptions
+    internal var leftURL: URL?
+    internal var rightURL: URL?
+    internal var options: DiffOptions
     /// "Binary": hex comparison also for text files.
-    var forceBinary = false
-    var bytesPerLine: Int
-    var runsInline = false
+    internal var forceBinary = false
+    internal var bytesPerLine: Int
+    internal var runsInline = false
     /// Which files are checked for being identical first, and which are too large to be shown.
-    var limits = CompareLoader.Limits.standard
+    internal var limits = CompareLoader.Limits.standard
     /// Called on the main thread whenever something the window shows has changed.
-    var onChange: () -> Void = {}
+    internal var onChange: () -> Void = {}
 
-    private(set) var phase = Phase.empty
-    private(set) var content = CompareContent.none {
+    internal private(set) var phase = Phase.empty
+    internal private(set) var content = CompareContent.none {
         didSet { inlineCache.removeAll() }
     }
-    private(set) var isIdentical = false
-    private(set) var status = ""
-    private(set) var isEditing = false
-    private(set) var modified: (left: Bool, right: Bool) = (false, false)
-    private(set) var anchors: [(left: Int, right: Int)] = []
+    internal private(set) var isIdentical = false
+    internal private(set) var status = ""
+    internal private(set) var isEditing = false
+    internal private(set) var modified: (left: Bool, right: Bool) = (false, false)
+    internal private(set) var anchors: [(left: Int, right: Int)] = []
 
     /// One change to the lines of one side: `removed` stood at `start`, and `insertedCount` lines stand there now.
     ///
@@ -100,7 +100,7 @@ final class CompareSession {
     private static let inlineRecompareBelow = 2_000
     private static let inlineRecompareWidth = 1_000
 
-    init(kernel: Kernel) {
+    internal init(kernel: Kernel) {
         self.kernel = kernel
         settings = kernel.settings.scoped(to: CompareSettingsKey.scope)
         fileSystems = kernel.fileSystems
@@ -113,10 +113,10 @@ final class CompareSession {
         bytesPerLine = CompareSettingsKey.bytesPerLineChoices[max(0, min(3, choice))]
     }
 
-    var hasUnsavedChanges: Bool { modified.left || modified.right }
-    var canUndo: Bool { !undoStack.isEmpty }
+    internal var hasUnsavedChanges: Bool { modified.left || modified.right }
+    internal var canUndo: Bool { !undoStack.isEmpty }
 
-    func displayPath(_ side: CompareSide) -> String {
+    internal func displayPath(_ side: CompareSide) -> String {
         (side == .left ? leftURL : rightURL).map(fileSystems.displayPath) ?? ""
     }
 
@@ -157,7 +157,7 @@ final class CompareSession {
     ///
     /// Identical files are announced with the message of the spec (09 › Opening and choosing the
     /// files); `completion` tells whether there is something to show.
-    func compare(completion: @escaping (_ hasContent: Bool) -> Void = { _ in }) {
+    internal func compare(completion: @escaping (_ hasContent: Bool) -> Void = { _ in }) {
         guard let leftURL, let rightURL else {
             content = .none
             phase = .empty
@@ -225,7 +225,7 @@ final class CompareSession {
     }
 
     /// Compares what is loaded again, after an option or the texts changed.
-    func recompute() {
+    internal func recompute() {
         findGeneration += 1
         switch content {
         case .none:
@@ -273,17 +273,17 @@ final class CompareSession {
     }
 
     /// Gives the edits up (the user chose not to save them).
-    func discardChanges() {
+    internal func discardChanges() {
         modified = (false, false)
     }
 
-    func cancel() {
+    internal func cancel() {
         running?.cancel()
         searching?.cancel()
     }
 
     /// The options were changed in the window: they are remembered and applied.
-    func optionsChanged() {
+    internal func optionsChanged() {
         settings.set(options.ignoreCase, forKey: CompareSettingsKey.ignoreCase)
         settings.set(options.ignoreRepeatedSpaces, forKey: CompareSettingsKey.ignoreSpaces)
         settings.set(options.ignoreLineEndings, forKey: CompareSettingsKey.ignoreLineEndings)
@@ -319,14 +319,14 @@ final class CompareSession {
 
     // MARK: Rows
 
-    var isBinary: Bool {
+    internal var isBinary: Bool {
         if case .binary = content {
             return true
         }
         return false
     }
 
-    var rowCount: Int {
+    internal var rowCount: Int {
         switch content {
         case .none:
             return 0
@@ -340,7 +340,7 @@ final class CompareSession {
     }
 
     /// The differences as ranges of rows.
-    var blocks: [Range<Int>] {
+    internal var blocks: [Range<Int>] {
         switch content {
         case .none:
             return []
@@ -354,7 +354,7 @@ final class CompareSession {
     }
 
     /// The length of the longest line in characters, for the width of the panes.
-    var width: Int {
+    internal var width: Int {
         switch content {
         case .none:
             return 0
@@ -368,7 +368,7 @@ final class CompareSession {
     }
 
     /// The difference a row belongs to, found by halving.
-    func block(containing row: Int) -> Range<Int>? {
+    internal func block(containing row: Int) -> Range<Int>? {
         let blocks = self.blocks
         var (low, high) = (0, blocks.count)
         while low < high {
@@ -378,7 +378,7 @@ final class CompareSession {
         return low < blocks.count && blocks[low].contains(row) ? blocks[low] : nil
     }
 
-    func kind(ofRow row: Int) -> DiffRow.Kind {
+    internal func kind(ofRow row: Int) -> DiffRow.Kind {
         switch content {
         case .none:
             return .equal
@@ -403,7 +403,7 @@ final class CompareSession {
     /// offset in binary mode.
     ///
     /// Empty where the side has no line.
-    func label(_ side: CompareSide, row: Int) -> String {
+    internal func label(_ side: CompareSide, row: Int) -> String {
         switch content {
         case .none:
             return ""
@@ -417,7 +417,7 @@ final class CompareSession {
     }
 
     /// The text of a row on one side; nil where the side has no line.
-    func text(_ side: CompareSide, row: Int) -> String? {
+    internal func text(_ side: CompareSide, row: Int) -> String? {
         switch content {
         case .none:
             return nil
@@ -432,7 +432,7 @@ final class CompareSession {
     }
 
     /// The parts of a row's text that differ from the other side, in UTF-16 units.
-    func highlights(_ side: CompareSide, row: Int) -> [Range<Int>] {
+    internal func highlights(_ side: CompareSide, row: Int) -> [Range<Int>] {
         switch content {
         case .none:
             return []
@@ -459,7 +459,7 @@ final class CompareSession {
     }
 
     /// The first row of the next (or previous) difference as seen from `row`.
-    func difference(from row: Int, forward: Bool) -> Int? {
+    internal func difference(from row: Int, forward: Bool) -> Int? {
         forward ? blocks.first { $0.lowerBound > row }?.lowerBound : blocks.last { $0.lowerBound < row }?.lowerBound
     }
 
@@ -467,13 +467,14 @@ final class CompareSession {
     /// goes round at the ends.
     ///
     /// Blocks: for callers that are not the window.
-    func find(_ needle: String, from row: Int, forward: Bool) -> Int? {
+    internal func find(_ needle: String, from row: Int, forward: Bool) -> Int? {
         Self.search(content, needle, from: row, forward: forward, cancellation: nil)
     }
 
     /// The same away from the main thread, so that a large file does not freeze the window; a
     /// newer search (or `cancel`) makes the older one stop and drops its answer.
-    func find(_ needle: String, from row: Int, forward: Bool, completion: @escaping @MainActor (Int?) -> Void) {
+    internal func find(_ needle: String, from row: Int, forward: Bool, completion: @escaping @MainActor (Int?) -> Void)
+    {
         findGeneration += 1
         let generation = findGeneration
         let (content, cancellation) = (self.content, CancellationFlag())
@@ -499,7 +500,7 @@ final class CompareSession {
     private var searching: CancellationFlag?
 
     /// The search behind `find`; nil when nothing is found or `cancellation` was set.
-    nonisolated static func search(
+    nonisolated internal static func search(
         _ content: CompareContent,
         _ needle: String,
         from row: Int,
@@ -546,7 +547,7 @@ final class CompareSession {
     // MARK: Resync and swap
 
     /// "Resync comparison from here": the lines of the two rows are taken to belong together.
-    func resync(leftRow: Int, rightRow: Int) {
+    internal func resync(leftRow: Int, rightRow: Int) {
         guard case .text(_, _, let diff, _) = content, diff.rows.indices.contains(leftRow),
             diff.rows.indices.contains(rightRow),
             let left = diff.rows[leftRow].left, let right = diff.rows[rightRow].right
@@ -557,7 +558,7 @@ final class CompareSession {
         recompute()
     }
 
-    func clearResync() {
+    internal func clearResync() {
         guard !anchors.isEmpty else {
             return
         }
@@ -566,7 +567,7 @@ final class CompareSession {
     }
 
     /// Swap panels (Ctrl+U): left becomes right.
-    func swap() {
+    internal func swap() {
         (leftURL, rightURL) = (rightURL, leftURL)
         loaded = (loaded.right, loaded.left)
         modified = (modified.right, modified.left)
@@ -591,7 +592,7 @@ final class CompareSession {
     // MARK: Editing
 
     /// Edit mode exists for texts only (spec 09 › Edit mode and saving).
-    func setEditing(_ editing: Bool) {
+    internal func setEditing(_ editing: Bool) {
         isEditing = editing && !isBinary
         onChange()
     }
@@ -623,7 +624,7 @@ final class CompareSession {
     }
 
     /// Replaces the text of a row's line on one side, as typed in the pane.
-    func setText(_ text: String, _ side: CompareSide, row: Int) {
+    internal func setText(_ text: String, _ side: CompareSide, row: Int) {
         edit { left, right, diff in
             guard diff.rows.indices.contains(row),
                 let index = side == .left ? diff.rows[row].left : diff.rows[row].right
@@ -644,7 +645,7 @@ final class CompareSession {
     /// Replaces the lines of the given rows on `side` with those on the other side ("Copy ->" / "Copy <-").
     ///
     /// Rows that have no line on the source side remove the target's lines.
-    func copy(rows: Range<Int>, to side: CompareSide) {
+    internal func copy(rows: Range<Int>, to side: CompareSide) {
         edit { left, right, diff in
             let rows = rows.clamped(to: 0..<diff.rows.count)
             guard !rows.isEmpty else {
@@ -689,7 +690,7 @@ final class CompareSession {
         }
     }
 
-    func undo() {
+    internal func undo() {
         guard isEditing, case .text(var left, var right, let diff, let width) = content, let last = undoStack.popLast()
         else { return }
         content = .none
@@ -722,7 +723,7 @@ final class CompareSession {
 
     /// Writes the changed files back through their file systems, as a job; `completion` tells
     /// whether everything is saved, edits made while the job ran included.
-    func save(completion: @escaping (Bool) -> Void = { _ in }) {
+    internal func save(completion: @escaping (Bool) -> Void = { _ in }) {
         guard case .text(let left, let right, _, _) = content, hasUnsavedChanges else {
             completion(true)
             return
@@ -798,7 +799,7 @@ final class CompareSession {
     /// job can no longer be waited for.
     ///
     /// Returns whether everything was saved; errors are reported.
-    func saveNow() -> Bool {
+    internal func saveNow() -> Bool {
         guard case .text(let left, let right, _, _) = content, hasUnsavedChanges else {
             return true
         }
@@ -826,8 +827,8 @@ final class CompareSession {
 ///
 /// Reading from a share that does not answer can block for as long as the server takes to give up;
 /// a handful of those must not use up the workers that everything else needs.
-enum CompareWorker {
-    static func run(_ name: String, _ body: @escaping @Sendable () -> Void) {
+internal enum CompareWorker {
+    internal static func run(_ name: String, _ body: @escaping @Sendable () -> Void) {
         let thread = Thread(block: body)
         thread.name = name
         thread.qualityOfService = .userInitiated

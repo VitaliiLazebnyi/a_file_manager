@@ -12,13 +12,13 @@ import Testing
 ///
 /// Unchecked: `port` is written by the worker before it signals `started`, and read after that;
 /// `thread` is set in `init`.
-final class ViewerAdoptWorker: @unchecked Sendable {
+internal final class ViewerAdoptWorker: @unchecked Sendable {
     private var port: mach_port_t = 0
     private let started = DispatchSemaphore(value: 0)
     private let finished = DispatchSemaphore(value: 0)
     private var thread: Thread?
 
-    init(_ body: @escaping @Sendable () -> Void) {
+    internal init(_ body: @escaping @Sendable () -> Void) {
         thread = Thread { [self] in
             port = mach_thread_self()
             started.signal()
@@ -27,13 +27,13 @@ final class ViewerAdoptWorker: @unchecked Sendable {
         }
     }
 
-    func start() {
+    internal func start() {
         thread?.start()
         _ = started.wait(timeout: .now() + Wait.ceiling)
     }
 
     /// Whether the thread is waiting on something now (a condition, a lock).
-    var isWaiting: Bool {
+    internal var isWaiting: Bool {
         var info = thread_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &info) { pointer in
@@ -45,20 +45,20 @@ final class ViewerAdoptWorker: @unchecked Sendable {
     }
 
     /// Polls until the thread waits; false after `timeout` seconds.
-    func waitUntilWaiting(timeout: TimeInterval = Wait.ceiling) -> Bool {
+    internal func waitUntilWaiting(timeout: TimeInterval = Wait.ceiling) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while !isWaiting, Date() < deadline { usleep(2_000) }
         return isWaiting
     }
 
     /// True when the body returned within `timeout` seconds.
-    func waitUntilFinished(timeout: TimeInterval = Wait.ceiling) -> Bool {
+    internal func waitUntilFinished(timeout: TimeInterval = Wait.ceiling) -> Bool {
         finished.wait(timeout: .now() + timeout) == .success
     }
 }
 
 /// Polls `condition` until it holds, for at most `seconds`.
-func viewerAdoptWait(_ seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) -> Bool {
+internal func viewerAdoptWait(_ seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) -> Bool {
     let deadline = Date().addingTimeInterval(seconds)
     while !condition(), Date() < deadline { usleep(2_000) }
     return condition()
@@ -67,13 +67,13 @@ func viewerAdoptWait(_ seconds: TimeInterval = Wait.ceiling, until condition: ()
 /// A guarded value, for results that come from threads.
 ///
 /// Unchecked: the value is guarded by `lock`.
-final class ViewerAdoptBox<Value>: @unchecked Sendable {
+internal final class ViewerAdoptBox<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Value
 
-    init(_ value: Value) { stored = value }
+    internal init(_ value: Value) { stored = value }
 
-    var value: Value {
+    internal var value: Value {
         get {
             lock.lock()
             defer { lock.unlock() }
@@ -86,7 +86,7 @@ final class ViewerAdoptBox<Value>: @unchecked Sendable {
         }
     }
 
-    func mutate(_ change: (inout Value) -> Void) {
+    internal func mutate(_ change: (inout Value) -> Void) {
         lock.lock()
         change(&stored)
         lock.unlock()
@@ -94,17 +94,17 @@ final class ViewerAdoptBox<Value>: @unchecked Sendable {
 }
 
 /// A file that is "far away": every byte that is read from it is counted.
-final class ViewerRemoteLike: ByteSource {
-    let data: Data
+internal final class ViewerRemoteLike: ByteSource {
+    internal let data: Data
     private let counter = ViewerAdoptBox((bytes: Int64(0), requests: 0))
 
-    init(_ data: Data) { self.data = data }
+    internal init(_ data: Data) { self.data = data }
 
-    var length: Int64 { Int64(data.count) }
-    var fetched: Int64 { counter.value.bytes }
-    var requests: Int { counter.value.requests }
+    internal var length: Int64 { Int64(data.count) }
+    internal var fetched: Int64 { counter.value.bytes }
+    internal var requests: Int { counter.value.requests }
 
-    func read(at offset: Int64, count: Int) -> Data {
+    internal func read(at offset: Int64, count: Int) -> Data {
         let lower = Int(max(0, min(offset, length)))
         let upper = min(data.count, lower + max(0, count))
         counter.mutate {
@@ -116,7 +116,7 @@ final class ViewerRemoteLike: ByteSource {
 
     /// Text of lines of 10 to 150 characters, some with tabs and some with accents: the sort of
     /// file whose layout depends on the width of the window.
-    static func text(megabytes: Int, seed: UInt64 = 1) -> Data {
+    internal static func text(megabytes: Int, seed: UInt64 = 1) -> Data {
         var state = seed &* 0x9E37_79B9_7F4A_7C15 | 1
         func next() -> Int {
             state ^= state << 13
@@ -147,11 +147,11 @@ final class ViewerRemoteLike: ByteSource {
 
 /// Reading remote files without reading them again, and ending reads that wait.
 @Suite
-struct ViewerAdoptSource {
+internal struct ViewerAdoptSource {
     // MARK: Disk cache
 
     @Test
-    func blocksAreKeptOnDiskAndGivenBack() {
+    internal func blocksAreKeptOnDiskAndGivenBack() {
         let cache = DiskBlockCache(blockSize: 1_000, length: 4_500)
         #expect(!cache.isOpen && cache.read(0) == nil && !cache.contains(0))
         let first = Data((0..<1_000).map { UInt8($0 % 251) })
@@ -175,7 +175,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aCacheStopsAtItsLimit() {
+    internal func aCacheStopsAtItsLimit() {
         let cache = DiskBlockCache(blockSize: 1_000, length: 10_000, limit: 3_000)
         for block in 0..<10 { cache.store(Int64(block), Data(repeating: UInt8(block), count: 1_000)) }
         #expect(cache.storedBytes == 3_000)
@@ -184,7 +184,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aBigFileOfASlowSourceIsNotFetchedAgainWhenItIsLaidOutAgain() throws {
+    internal func aBigFileOfASlowSourceIsNotFetchedAgainWhenItIsLaidOutAgain() throws {
         let data = ViewerRemoteLike.text(megabytes: 24)
         let remote = ViewerRemoteLike(data)
         let cached = CachedByteSource(
@@ -235,7 +235,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aSearchOfAFileThatIsOnDiskAsksTheServerForNothing() throws {
+    internal func aSearchOfAFileThatIsOnDiskAsksTheServerForNothing() throws {
         let data = ViewerRemoteLike.text(megabytes: 6)
         let remote = ViewerRemoteLike(data)
         let cached = CachedByteSource(
@@ -287,7 +287,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aSourceWhoseDiskIsFullGoesOnWithoutIt() throws {
+    internal func aSourceWhoseDiskIsFullGoesOnWithoutIt() throws {
         let data = ViewerRemoteLike.text(megabytes: 2)
         let remote = ViewerRemoteLike(data)
         let cached = CachedByteSource(
@@ -314,7 +314,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aReadThatWaitsForTheServerEndsWhenItsFlagIsSet() throws {
+    internal func aReadThatWaitsForTheServerEndsWhenItsFlagIsSet() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 100_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
@@ -341,7 +341,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aFlagOnlyEndsTheReadsItWasGiven() throws {
+    internal func aFlagOnlyEndsTheReadsItWasGiven() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 50_000)
         let source = CachedByteSource(
@@ -359,7 +359,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func indexingAFileThatNeverAnswersStopsWhenTheDocumentIsDropped() throws {
+    internal func indexingAFileThatNeverAnswersStopsWhenTheDocumentIsDropped() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 400_000)
         let source = CachedByteSource(try ProviderByteSource.open(url, fileSystems: registry))
@@ -378,7 +378,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func fetchingRowsFromAFileThatNeverAnswersEndsWhenTheFetchIsOvertaken() throws {
+    internal func fetchingRowsFromAFileThatNeverAnswersEndsWhenTheFetchIsOvertaken() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 100_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
@@ -416,7 +416,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aSearchThroughAFileThatNeverAnswersEndsWithItsFlag() throws {
+    internal func aSearchThroughAFileThatNeverAnswersEndsWithItsFlag() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 300_000)
         let source = CachedByteSource(try ProviderByteSource.open(url, fileSystems: registry))
@@ -452,7 +452,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aCopyOfAFileThatNeverAnswersEndsWithItsFlagAndLeavesNothingBehind() throws {
+    internal func aCopyOfAFileThatNeverAnswersEndsWithItsFlagAndLeavesNothingBehind() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 200_000)
         memory.stallsReads = true
@@ -487,7 +487,7 @@ struct ViewerAdoptSource {
     }
 
     @Test
-    func aLinkedFlagFollowsItsParentsAndLetsGoWhenReleased() {
+    internal func aLinkedFlagFollowsItsParentsAndLetsGoWhenReleased() {
         let first = CancellationFlag()
         let second = CancellationFlag()
         var linked: LinkedCancellation? = LinkedCancellation(first, second)

@@ -10,15 +10,15 @@ import Testing
 /// The tree cache when its files cannot be written as asked: a write that comes late, a tree
 /// too big for a file, a temporary file that is in the way, a disk that refuses the data.
 @Suite(.serialized)
-struct CoveragePlacesCacheFiles {
-    let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
-    let other = URL(fileURLWithPath: "/Volumes/Other", isDirectory: true)
+internal struct CoveragePlacesCacheFiles {
+    internal let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
+    internal let other = URL(fileURLWithPath: "/Volumes/Other", isDirectory: true)
 
     /// Where the cache writes the file of `root` before it takes the file's place.
-    func temporary(of file: URL) -> String { file.path + ".tmp\(getpid())" }
+    internal func temporary(of file: URL) -> String { file.path + ".tmp\(getpid())" }
 
     /// Reads everything from the FIFO at `path` until the writer closes it.
-    func drain(_ descriptor: Int32) -> Data {
+    internal func drain(_ descriptor: Int32) -> Data {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 65_536)
         while true {
@@ -31,13 +31,13 @@ struct CoveragePlacesCacheFiles {
     }
 
     /// Paths that make a file of about `megabytes` megabytes.
-    func bulky(_ megabytes: Int, prefix: String = "p") -> [String] {
+    internal func bulky(_ megabytes: Int, prefix: String = "p") -> [String] {
         let tail = String(repeating: "x", count: 1_000)
         return (0..<(megabytes * 1_040)).map { "\(prefix)\($0)/\(tail)" }
     }
 
     @Test
-    func aWriteThatWasOvertakenIsNotMade() throws {
+    internal func aWriteThatWasOvertakenIsNotMade() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["warm-up"], for: root)
@@ -75,7 +75,7 @@ struct CoveragePlacesCacheFiles {
     }
 
     @Test
-    func aTreeTooBigForAFileRemovesTheOldFile() throws {
+    internal func aTreeTooBigForAFileRemovesTheOldFile() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["small"], for: root)
@@ -91,7 +91,7 @@ struct CoveragePlacesCacheFiles {
     }
 
     @Test
-    func aLinkInThePlaceOfTheTemporaryFileIsNotFollowed() throws {
+    internal func aLinkInThePlaceOfTheTemporaryFileIsNotFollowed() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["old"], for: root)
@@ -105,7 +105,7 @@ struct CoveragePlacesCacheFiles {
     }
 
     @Test
-    func aFileThatCannotBeReplacedIsLeftAndTheTemporaryOneGoes() throws {
+    internal func aFileThatCannotBeReplacedIsLeftAndTheTemporaryOneGoes() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let file = try #require(cache.fileURL(for: root))
@@ -121,7 +121,7 @@ struct CoveragePlacesCacheFiles {
 
     @MainActor
     @Test
-    func aWriteTheDiskRefusesLeavesTheFileAlone() throws {
+    internal func aWriteTheDiskRefusesLeavesTheFileAlone() throws {
         // A kernel makes a write to a closed pipe fail instead of ending the program.
         _ = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         let box = try Sandbox()
@@ -146,7 +146,7 @@ struct CoveragePlacesCacheFiles {
     }
 
     @Test
-    func aPathOfSlashesNotesNothing() throws {
+    internal func aPathOfSlashesNotesNothing() throws {
         let cache = TreeCache(directory: nil)
         cache.store(["a"], for: root)
         cache.noteFolder("//", below: root)
@@ -155,7 +155,7 @@ struct CoveragePlacesCacheFiles {
     }
 
     @Test
-    func aLongTreeStillKnowsItsFoldersAfterAWrite() throws {
+    internal func aLongTreeStillKnowsItsFoldersAfterAWrite() throws {
         let cache = TreeCache(directory: nil)
         let paths = (0...100_000).map { "f\($0)" }
         cache.store(paths, for: root)
@@ -172,9 +172,9 @@ struct CoveragePlacesCacheFiles {
 
 /// The scanner on file systems that do not tell the type of an entry, and when cancelled.
 @Suite
-struct CoveragePlacesScanner {
+internal struct CoveragePlacesScanner {
     @Test
-    func entriesOfUnknownTypeAreAskedForTheirType() throws {
+    internal func entriesOfUnknownTypeAreAskedForTheirType() throws {
         // The descriptor file system lists every entry with an unknown type; a descriptor of a
         // folder is a folder.
         let box = try Sandbox()
@@ -202,13 +202,13 @@ struct CoveragePlacesScanner {
         }
     }
 
-    func isFolder(descriptor: Int32) -> Bool {
+    internal func isFolder(descriptor: Int32) -> Bool {
         var info = stat()
         return fstat(descriptor, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
     }
 
     @Test
-    func aCancelledScannerReadsNoFolder() throws {
+    internal func aCancelledScannerReadsNoFolder() throws {
         let box = try Sandbox()
         try box.folder("a")
         let scanner = TreeScanner(root: box.root, provider: LocalFileSystem())
@@ -217,7 +217,7 @@ struct CoveragePlacesScanner {
     }
 
     @Test
-    func aHiddenFolderIsLeftOutByItsFlag() throws {
+    internal func aHiddenFolderIsLeftOutByItsFlag() throws {
         let box = try Sandbox()
         try box.folder("flagged")
         try box.folder("plain")
@@ -229,7 +229,7 @@ struct CoveragePlacesScanner {
     }
 
     @Test
-    func aScanStoppedBetweenFoldersOfALevelKeepsWhatItFoundUnread() {
+    internal func aScanStoppedBetweenFoldersOfALevelKeepsWhatItFoundUnread() {
         let memory = MemoryFileSystem()
         memory.addDirectory("/R/a/a1")
         memory.addDirectory("/R/b/b1")

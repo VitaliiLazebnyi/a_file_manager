@@ -4,19 +4,19 @@ import Foundation
 ///
 /// The name may differ from the name on disk: after "next step" the computed names stand in for the
 /// old ones (spec 09 › Result list).
-struct RenameSubject {
-    var name: String
-    var isFolder: Bool
-    var size: Int64
-    var modified: Date
+internal struct RenameSubject {
+    internal var name: String
+    internal var isFolder: Bool
+    internal var size: Int64
+    internal var modified: Date
     /// The folder the item is in, as the user reads it, without a trailing slash.
-    var directoryPath: String
+    internal var directoryPath: String
     /// The names of the folders above the item, from the top down.
-    var folders: [String]
+    internal var folders: [String]
     /// Where the item is; only handed to `RenameContext.contentDate`.
-    var url: URL?
+    internal var url: URL?
 
-    init(
+    internal init(
         name: String,
         isFolder: Bool = false,
         size: Int64 = 0,
@@ -35,45 +35,45 @@ struct RenameSubject {
         self.url = url
     }
 
-    var fullPath: String { directoryPath.hasSuffix("/") ? directoryPath + name : directoryPath + "/" + name }
+    internal var fullPath: String { directoryPath.hasSuffix("/") ? directoryPath + name : directoryPath + "/" + name }
 }
 
 /// The fields of "Define counter" (spec 09 › Define counter).
-struct CounterDefinition: Codable, Equatable {
-    var start = 1
-    var step = 1
+internal struct CounterDefinition: Codable, Equatable {
+    internal var start = 1
+    internal var step = 1
     /// The least number of digits; 0 stands for `a`, the width of the number of items.
-    var digits = 1
+    internal var digits = 1
 }
 
 /// Everything a mask needs besides the item itself.
 ///
 /// A value, so that a preview computed on several threads works on one fixed state.
-struct RenameContext {
+internal struct RenameContext {
     /// The number of items in the list, for `[c]` and automatic counter widths.
-    var count = 1
-    var counter = CounterDefinition()
+    internal var count = 1
+    internal var counter = CounterDefinition()
     /// `[T2]`: when the tool was opened.
-    var opened = Date()
+    internal var opened = Date()
     /// `[T3]`: when the rename options were last changed.
-    var changed = Date()
+    internal var changed = Date()
     /// `[X]`: the text on the clipboard, nil when there is none.
-    var clipboard: String?
+    internal var clipboard: String?
     /// `[X]` when `clipboard` is not set: asked only if a mask uses it, on the thread that
     /// works out the names, and answered from the clipboard as it was when the preview began.
-    var clipboardLoader: (@Sendable () -> String?)?
-    var environment: [String: String] = [:]
-    var titleRule = TitleCaseRule.standard
-    var locale = Locale.current
-    var timeZone = TimeZone.current
+    internal var clipboardLoader: (@Sendable () -> String?)?
+    internal var environment: [String: String] = [:]
+    internal var titleRule = TitleCaseRule.standard
+    internal var locale = Locale.current
+    internal var timeZone = TimeZone.current
     /// `[T4]`: the date recorded inside a picture.
     ///
     /// Called on the preview threads, several at once.
-    var contentDate: (@Sendable (RenameSubject) -> Date?)?
+    internal var contentDate: (@Sendable (RenameSubject) -> Date?)?
 }
 
 /// Why a mask gives no name for an item; the preview then shows `<Error!>` (spec 09 › Rename pipeline).
-enum RenameMaskError: Error, Equatable {
+internal enum RenameMaskError: Error, Equatable {
     case invalidPlaceholder(String)
     case emptyClipboard
     case noContentDate
@@ -83,8 +83,8 @@ enum RenameMaskError: Error, Equatable {
 }
 
 /// A part of a text by character positions (spec 18 › Range forms): `2-5`, `2,5`, `-8-5`, `02-9`.
-struct CharacterRange: Equatable {
-    enum End: Equatable {
+internal struct CharacterRange: Equatable {
+    internal enum End: Equatable {
         /// One character.
         case single
         case toEnd
@@ -94,12 +94,12 @@ struct CharacterRange: Equatable {
     }
 
     /// `0` or a space: the result is left-filled to the width the range asks for.
-    var pad: Character?
+    internal var pad: Character?
     /// 1 is the first character, -1 the last.
-    var first: Int
-    var end: End
+    internal var first: Int
+    internal var end: End
 
-    func apply(to text: String) -> String {
+    internal func apply(to text: String) -> String {
         let characters = Array(text)
         let count = characters.count
         func index(_ position: Int) -> Int { position < 0 ? count + position : position - 1 }
@@ -140,23 +140,23 @@ struct CharacterRange: Equatable {
 /// (spec 18 › Counter).
 ///
 /// It ignores the Define-counter fields.
-struct InlineCounter: Equatable {
-    var start = 1
+internal struct InlineCounter: Equatable {
+    internal var start = 1
     /// The start of an alphabetic counter (`aa`); its length is the width.
-    var letters: String?
-    var step = 1
+    internal var letters: String?
+    internal var step = 1
     /// The counter moves on only every so many items.
-    var divisor = 1
+    internal var divisor = 1
     /// nil is the automatic width `a`.
-    var digits: Int? = 1
+    internal var digits: Int? = 1
 }
 
 /// A parsed rename mask (spec 18 › Rename and new-folder placeholders).
 ///
 /// Parsing never fails: what cannot be read becomes an `invalid` token, and the mask then gives
 /// `<Error!>` for every item.
-struct RenameMask {
-    enum Source: Equatable {
+internal struct RenameMask {
+    internal enum Source: Equatable {
         case name, ext, nameWithExt, fullPath, parent, grandparent
         case folderFromRight(Int)
         case folderFromLeft(Int)
@@ -164,7 +164,7 @@ struct RenameMask {
         case environment(String, EnvironmentForm)
     }
 
-    enum EnvironmentForm: Equatable {
+    internal enum EnvironmentForm: Equatable {
         case whole
         /// `[%VAR%\]`: only the last part of a path.
         case lastPart
@@ -172,7 +172,7 @@ struct RenameMask {
         case separator(Character)
     }
 
-    enum DateField: Character {
+    internal enum DateField: Character {
         case year4 = "Y"
         case year2 = "y"
         case month = "M"
@@ -188,9 +188,9 @@ struct RenameMask {
         case amPmShort = "I"
     }
 
-    struct TimeOffset: Equatable {
-        var value: Int
-        var unit: Calendar.Component
+    internal struct TimeOffset: Equatable {
+        internal var value: Int
+        internal var unit: Calendar.Component
     }
 
     /// The units of a time offset: `[T1+5h]` is five hours later.
@@ -198,7 +198,7 @@ struct RenameMask {
         "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
     ]
 
-    enum Token: Equatable {
+    internal enum Token: Equatable {
         case literal(String)
         case text(Source, CharacterRange?)
         case size
@@ -214,9 +214,9 @@ struct RenameMask {
         case invalid(RenameMaskError)
     }
 
-    let tokens: [Token]
+    internal let tokens: [Token]
 
-    init(_ text: String) {
+    internal init(_ text: String) {
         var tokens: [Token] = []
         var literal = ""
         let characters = Array(text)
@@ -253,7 +253,7 @@ struct RenameMask {
     }
 
     /// The first thing that is wrong with the mask, for a hint next to the field.
-    var error: RenameMaskError? {
+    internal var error: RenameMaskError? {
         for case .invalid(let error) in tokens { return error }
         return nil
     }
@@ -505,10 +505,10 @@ struct RenameMask {
 
 /// What carries over from the name mask to the extension mask: the folder-dot switch and the
 /// time source apply "from this position on" (spec 18 › Name and path parts, Date and time).
-struct MaskState {
-    var foldersHaveNoExtension = false
-    var timeSource = 1
-    var timeOffset: RenameMask.TimeOffset?
+internal struct MaskState {
+    internal var foldersHaveNoExtension = false
+    internal var timeSource = 1
+    internal var timeOffset: RenameMask.TimeOffset?
 }
 
 /// The date and time formats one preview uses.
@@ -517,12 +517,12 @@ struct MaskState {
 /// several threads).
 ///
 /// Unchecked `Sendable`: nothing changes after `init`, and the formatters are only used to format.
-final class RenameFormats: @unchecked Sendable {
-    let calendar: Calendar
-    let date: DateFormatter
-    let time: DateFormatter
+internal final class RenameFormats: @unchecked Sendable {
+    internal let calendar: Calendar
+    internal let date: DateFormatter
+    internal let time: DateFormatter
 
-    init(locale: Locale, timeZone: TimeZone) {
+    internal init(locale: Locale, timeZone: TimeZone) {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         self.calendar = calendar
@@ -566,7 +566,7 @@ extension RenameMask {
     /// The text the mask gives for one item.
     ///
     /// `index` is the item's place in the list, from 0. Safe to call from several threads at once.
-    func evaluate(
+    internal func evaluate(
         _ subject: RenameSubject,
         index: Int,
         context: RenameContext,
@@ -719,7 +719,7 @@ extension RenameMask {
 
     /// Name and extension as the masks see them: split at the last dot, also for folders
     /// unless `[I]` is on.
-    static func parts(of subject: RenameSubject, _ state: MaskState) -> (name: String, ext: String) {
+    internal static func parts(of subject: RenameSubject, _ state: MaskState) -> (name: String, ext: String) {
         if subject.isFolder, state.foldersHaveNoExtension {
             return (subject.name, "")
         }
@@ -799,7 +799,7 @@ extension RenameMask {
     }
 
     /// The widest fill that is ever written: names do not get longer than this.
-    static let widestFill = 255
+    internal static let widestFill = 255
 
     private static func width(_ digits: Int?, _ context: RenameContext) -> Int {
         guard let digits, digits > 0 else {
@@ -808,7 +808,7 @@ extension RenameMask {
         return min(digits, widestFill)
     }
 
-    static func padded(_ value: Int, digits: Int) -> String {
+    internal static func padded(_ value: Int, digits: Int) -> String {
         let text = value == Int.min ? String(value.magnitude) : String(abs(value))
         return (value < 0 ? "-" : "") + String(repeating: "0", count: max(0, min(digits, widestFill) - text.count))
             + text
@@ -816,7 +816,7 @@ extension RenameMask {
 
     /// `start + step * times`; a result beyond the range of numbers is an error of the mask
     /// (`<Error!>`), not a crash.
-    static func number(_ start: Int, plus step: Int, times: Int) throws -> Int {
+    internal static func number(_ start: Int, plus step: Int, times: Int) throws -> Int {
         let (distance, overflowed) = step.multipliedReportingOverflow(by: times)
         let (sum, overflowedAgain) = start.addingReportingOverflow(distance)
         guard !overflowed, !overflowedAgain else { throw RenameMaskError.numberTooLarge }
@@ -841,7 +841,7 @@ extension RenameMask {
     /// as the start text and in its case.
     ///
     /// Letters that make a number too large for the counter are an error of the mask.
-    static func alphabetic(_ start: String, advancedBy steps: Int) throws -> String {
+    internal static func alphabetic(_ start: String, advancedBy steps: Int) throws -> String {
         let isUpper = start.first?.isUppercase ?? false
         let base = UInt8(ascii: isUpper ? "A" : "a")
         var value = 0

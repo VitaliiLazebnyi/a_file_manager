@@ -12,13 +12,13 @@ import Testing
 /// Hostile file names against the shell that runs a command line: the argv the shell builds
 /// must be exactly the names, in every quoting context.
 @Suite
-struct ConfigPlacesFixExpansion {
-    static let hostile = [
+internal struct ConfigPlacesFixExpansion {
+    internal static let hostile = [
         "x'; touch pwned; '.txt", "a\"b$HOME`id`\\c.txt", "two words.txt", "line\nbreak.txt", "-rf", "!bang.txt",
         "$(id)"
     ]
 
-    func context(name: String?) -> ExpansionContext {
+    internal func context(name: String?) -> ExpansionContext {
         ExpansionContext(
             left: PanelSnapshot(path: "/tmp/A dir/", cursorName: name, selection: []),
             right: PanelSnapshot(path: "/B/", cursorName: nil),
@@ -29,7 +29,7 @@ struct ConfigPlacesFixExpansion {
     }
 
     /// The words /bin/zsh makes of `printf '%s\n' <line>`, separated by NUL for printing.
-    func argv(_ line: String) throws -> [String] {
+    internal func argv(_ line: String) throws -> [String] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = ["-c", "cd /tmp && printf '%s\\0' " + line]
@@ -42,12 +42,12 @@ struct ConfigPlacesFixExpansion {
             .map(String.init)
     }
 
-    func expand(_ text: String, name: String?) -> ExpandedParameters {
+    internal func expand(_ text: String, name: String?) -> ExpandedParameters {
         ParameterExpander(context: context(name: name)).expand(text)
     }
 
     @Test
-    func unquotedPlaceholderIsOneWord() throws {
+    internal func unquotedPlaceholderIsOneWord() throws {
         for name in Self.hostile {
             let expanded = expand("%N", name: name).text
             let words = try argv(expanded)
@@ -58,7 +58,7 @@ struct ConfigPlacesFixExpansion {
     }
 
     @Test
-    func insideDoubleQuotes() throws {
+    internal func insideDoubleQuotes() throws {
         for name in Self.hostile {
             let expanded = expand("\"%N\"", name: name).text
             #expect(try argv(expanded) == [name.hasPrefix("-") ? "./" + name : name], "\(name) -> \(expanded)")
@@ -67,7 +67,7 @@ struct ConfigPlacesFixExpansion {
     }
 
     @Test
-    func insideSingleQuotes() throws {
+    internal func insideSingleQuotes() throws {
         for name in Self.hostile {
             let expanded = expand("'%N'", name: name).text
             #expect(try argv(expanded) == [name.hasPrefix("-") ? "./" + name : name], "\(name) -> \(expanded)")
@@ -79,7 +79,7 @@ struct ConfigPlacesFixExpansion {
     }
 
     @Test
-    func environmentValuesAreQuotedToo() throws {
+    internal func environmentValuesAreQuotedToo() throws {
         #expect(try argv(expand("%|EVIL|", name: nil).text) == ["e'v\"il $x `y`"])
         #expect(try argv(expand("'%|EVIL|'", name: nil).text) == ["e'v\"il $x `y`"])
         #expect(try argv(expand("\"%|EVIL|\"", name: nil).text) == ["e'v\"il $x `y`"])
@@ -91,7 +91,7 @@ struct ConfigPlacesFixExpansion {
     }
 
     @Test
-    func selectedNamesAreSeparateWords() throws {
+    internal func selectedNamesAreSeparateWords() throws {
         var context = context(name: nil)
         context.left.selection = ["-n", "b c", "d'e"]
         let text = ParameterExpander(context: context).expand("%S").text
@@ -99,7 +99,7 @@ struct ConfigPlacesFixExpansion {
     }
 
     @Test
-    func aMissingNameIsReported() {
+    internal func aMissingNameIsReported() {
         #expect(expand("rm -rf %P%N", name: nil).missingName)
         #expect(
             expand("echo %V", name: nil).missingName && expand("%O.%E", name: nil).missingName
@@ -112,14 +112,16 @@ struct ConfigPlacesFixExpansion {
 /// Stored configuration read leniently.
 @MainActor
 @Suite
-struct ConfigPlacesFixStore {
-    func store(_ json: String, in settings: MemorySettings = MemorySettings()) -> (ConfigurationStore, MemorySettings) {
+internal struct ConfigPlacesFixStore {
+    internal func store(_ json: String, in settings: MemorySettings = MemorySettings()) -> (
+        ConfigurationStore, MemorySettings
+    ) {
         settings.set(Data(json.utf8) as Data?, forKey: "configuration.userCommands")
         return (ConfigurationStore(settings: settings), settings)
     }
 
     @Test
-    func missingAndUnknownKeysAndABadElement() async {
+    internal func missingAndUnknownKeysAndABadElement() async {
         let json = """
             [{"name":"em_a","title":"A","action":{"command":"ls"}},
              {"name":"em_b","future":{"x":1},"action":{"command":"ls","parameters":"p","startPath":"/","more":true}},
@@ -142,7 +144,7 @@ struct ConfigPlacesFixStore {
     }
 
     @Test
-    func unreadableDataIsKept() async {
+    internal func unreadableDataIsKept() async {
         let (store, settings) = store("not json at all")
         var told: [String] = []
         store.onProblem = { told.append($0) }
@@ -157,7 +159,7 @@ struct ConfigPlacesFixStore {
     }
 
     @Test
-    func theDecodedListIsCachedUntilItIsReplaced() {
+    internal func theDecodedListIsCachedUntilItIsReplaced() {
         let (store, settings) = store(#"[{"name":"em_a"}]"#)
         #expect(store.userCommands.map(\.name) == ["em_a"])
         settings.set(Data(#"[{"name":"em_b"}]"#.utf8) as Data?, forKey: "configuration.userCommands")
@@ -167,7 +169,7 @@ struct ConfigPlacesFixStore {
     }
 
     @Test
-    func anImportIsCheckedBeforeItIsWritten() throws {
+    internal func anImportIsCheckedBeforeItIsWritten() throws {
         var archive = SettingsArchive()
         archive.values["configuration.userCommands"] = Data(#"[{"name":"em_a"},{"nope":1}]"#.utf8)
         #expect(throws: SettingsArchive.ArchiveError.self) { try archive.validate(keyBindingsKey: "keyBindings") }
@@ -182,13 +184,13 @@ struct ConfigPlacesFixStore {
 /// The runner: names that are not there, real paths of virtual listings, key bindings of deleted commands.
 @MainActor
 @Suite
-struct ConfigPlacesFixRunner {
-    let box: Sandbox
-    let settings = MemorySettings()
-    let plugin: ConfigurationPlugin
-    let bench: TestBench
+internal struct ConfigPlacesFixRunner {
+    internal let box: Sandbox
+    internal let settings = MemorySettings()
+    internal let plugin: ConfigurationPlugin
+    internal let bench: TestBench
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt")
         try box.folder("B")
@@ -207,10 +209,10 @@ struct ConfigPlacesFixRunner {
         )
     }
 
-    var center: ConfigurationCenter { plugin.center! }
+    internal var center: ConfigurationCenter { plugin.center! }
 
     @Test
-    func aCommandWithANameCodeDoesNotRunWithoutAName() {
+    internal func aCommandWithANameCodeDoesNotRunWithoutAName() {
         center.save(
             UserCommand(name: "em_rm", title: "", action: CommandAction(command: "rm -rf", parameters: "%P%N"))
         )
@@ -226,7 +228,7 @@ struct ConfigPlacesFixRunner {
     }
 
     @Test
-    func aDeletedUserCommandLeavesNoKeyBehind() {
+    internal func aDeletedUserCommandLeavesNoKeyBehind() {
         center.save(UserCommand(name: "em_k", title: "", action: CommandAction(command: "ls")))
         #expect(center.setShortcut("ctrl+shift+k", for: CommandID("em_k")))
         #expect(settings.value([String: [String]].self, forKey: KeyBindings.settingsKey)?["em_k"] == ["ctrl+shift+k"])
@@ -235,7 +237,7 @@ struct ConfigPlacesFixRunner {
     }
 
     @Test
-    func theKeyboardEditorKeepsBindingsStoredElsewhere() {
+    internal func theKeyboardEditorKeepsBindingsStoredElsewhere() {
         let editor = KeyBindingEditor(kernel: bench.kernel)
         editor.set([Shortcut(.character("j"), [.control])], for: CommandID("cm_SelectAll"))
         // The Start menu stores a key while the Keyboard page has an edit pending.
@@ -251,12 +253,12 @@ struct ConfigPlacesFixRunner {
 /// Programs are started by the runner itself, not through the command line's job.
 @MainActor
 @Suite
-struct ConfigPlacesFixLaunching {
-    let box: Sandbox
-    let plugin: ConfigurationPlugin
-    let bench: TestBench
+internal struct ConfigPlacesFixLaunching {
+    internal let box: Sandbox
+    internal let plugin: ConfigurationPlugin
+    internal let bench: TestBench
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt")
         try box.folder("B")
@@ -275,13 +277,13 @@ struct ConfigPlacesFixLaunching {
     }
 
     /// Lets the main actor run, so what the runner hands back to the main thread arrives.
-    func wait(until done: () -> Bool) async {
+    internal func wait(until done: () -> Bool) async {
         let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 50_000_000) }
     }
 
     @Test
-    func aChainWaitsForTheProgramBeforeItsNextStep() async {
+    internal func aChainWaitsForTheProgramBeforeItsNextStep() async {
         let marker = box.url("marker").path
         let center = plugin.center!
         center.save(
@@ -301,7 +303,7 @@ struct ConfigPlacesFixLaunching {
     }
 
     @Test
-    func aLaunchIsNoJobAndNoHistoryEntry() async {
+    internal func aLaunchIsNoJobAndNoHistoryEntry() async {
         let marker = box.url("marker2").path
         plugin.center!
             .save(
@@ -315,7 +317,7 @@ struct ConfigPlacesFixLaunching {
     }
 
     @Test
-    func aLaunchThatCannotStartIsReported() async {
+    internal func aLaunchThatCannotStartIsReported() async {
         plugin.center!
             .save(
                 UserCommand(

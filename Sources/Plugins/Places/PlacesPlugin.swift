@@ -28,18 +28,18 @@ extension CommandID {
 public final class PlacesPlugin: Plugin {
     public let name = "Places"
 
-    enum Keys {
-        static let hotlist = "hotlist"
-        static let favorites = "places.hotlist.favorites"
-        static let thinning = "places.history.thinning"
-        static let saveHistory = "places.history.save"
-        static let historyShown = "places.history.shown"
-        static let showFrequent = "places.history.showFrequent"
-        static let frequentShown = "places.history.frequentShown"
+    internal enum Keys {
+        internal static let hotlist = "hotlist"
+        internal static let favorites = "places.hotlist.favorites"
+        internal static let thinning = "places.history.thinning"
+        internal static let saveHistory = "places.history.save"
+        internal static let historyShown = "places.history.shown"
+        internal static let showFrequent = "places.history.showFrequent"
+        internal static let frequentShown = "places.history.frequentShown"
     }
 
     /// Set when the plugin starts; safe to use from any thread.
-    private(set) var treeCache = TreeCache(directory: nil)
+    internal private(set) var treeCache = TreeCache(directory: nil)
     private let treeCacheDirectory: URL?
     private let keepsTreesOnDisk: Bool
     private let favorites: [HotlistEntry]
@@ -49,7 +49,7 @@ public final class PlacesPlugin: Plugin {
     private var tracker: DirectoryHistoryTracker?
     private var subscription: AnyObject?
     /// The Directory Tree window, once it was opened; it is kept for the next time.
-    private(set) var treeWindow: DirectoryTreeWindowController?
+    internal private(set) var treeWindow: DirectoryTreeWindowController?
     /// Puts the tree window on screen.
     ///
     /// Tests replace it, so that no window shows in the session they run in, and look at what it
@@ -61,7 +61,7 @@ public final class PlacesPlugin: Plugin {
     /// Shows the hotlist editor and returns the changed list, or nil on Cancel.
     ///
     /// Tests put a script here; without one the editor window is used.
-    var editHotlist: ((Hotlist) -> Hotlist?)?
+    internal var editHotlist: ((Hotlist) -> Hotlist?)?
 
     /// Directory trees are cached in `treeCacheDirectory`; without one they go to the program's
     /// folder in Application Support, or stay in memory only when `keepsTreesOnDisk` is off.
@@ -206,7 +206,7 @@ public final class PlacesPlugin: Plugin {
     }
 
     /// Writes the history changes that are waiting for their delay to end.
-    func flushHistory() { tracker?.flush() }
+    internal func flushHistory() { tracker?.flush() }
 
     /// Tells the user, once, that stored data was damaged.
     ///
@@ -504,7 +504,7 @@ public final class PlacesPlugin: Plugin {
 /// Hands a block to the main thread through the run loop (all modes that count), not through the
 /// main dispatch queue: a block that asks the user something runs a modal dialog, and a dialog
 /// started from inside a block of the main queue keeps every later block of the queue waiting.
-func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
+internal func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
     // The main run loop runs its blocks on the main thread.
     RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(block) }
     CFRunLoopWakeUp(CFRunLoopGetMain())

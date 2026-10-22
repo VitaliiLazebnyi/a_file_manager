@@ -46,12 +46,12 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
 /// and a refusal brings the panels back.
 @MainActor
 @Suite
-struct VolumeEjectionTests {
-    let box: Sandbox
-    let stick: URL
-    let home = FileManager.default.homeDirectoryForCurrentUser
+internal struct VolumeEjectionTests {
+    internal let box: Sandbox
+    internal let stick: URL
+    internal let home = FileManager.default.homeDirectoryForCurrentUser
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -68,7 +68,7 @@ struct VolumeEjectionTests {
     }
 
     @Test
-    func thePanelsGoBackToWhereTheyCameFromAndTheUserIsTold() {
+    internal func thePanelsGoBackToWhereTheyCameFromAndTheUserIsTold() {
         let drive = StandInDrive(stick)
         let (bench, tools) = bench(drive)
         var released: [URL] = []
@@ -90,7 +90,7 @@ struct VolumeEjectionTests {
     }
 
     @Test
-    func theDriveOfAGivenLocationIsEjectedWhicheverPanelIsActive() {
+    internal func theDriveOfAGivenLocationIsEjectedWhicheverPanelIsActive() {
         let drive = StandInDrive(stick)
         let (bench, _) = bench(drive)
         bench.right.show(stick)
@@ -99,7 +99,7 @@ struct VolumeEjectionTests {
     }
 
     @Test
-    func aDriveInUseIsNotEjectedAndThePanelsComeBack() {
+    internal func aDriveInUseIsNotEjectedAndThePanelsComeBack() {
         let drive = StandInDrive(stick, refusals: [EjectRefusal(program: "Preview", reason: "The volume is in use.")])
         let (bench, tools) = bench(drive)
         bench.left.show(box.url("Stick/photos"))
@@ -111,7 +111,7 @@ struct VolumeEjectionTests {
     }
 
     @Test
-    func whatThisProgramLetGoOfIsGivenAMoment() {
+    internal func whatThisProgramLetGoOfIsGivenAMoment() {
         let drive = StandInDrive(
             stick,
             refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")]
@@ -123,7 +123,7 @@ struct VolumeEjectionTests {
     }
 
     @Test
-    func aWriteThatFailsKeepsTheDrive() {
+    internal func aWriteThatFailsKeepsTheDrive() {
         struct Unwritable: Error {}
         let drive = StandInDrive(stick)
         let (bench, _) = bench(drive)
@@ -136,7 +136,7 @@ struct VolumeEjectionTests {
     }
 
     @Test
-    func theSystemDiskIsNotEjected() {
+    internal func theSystemDiskIsNotEjected() {
         let drive = StandInDrive(stick)
         let (bench, _) = bench(drive)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
@@ -145,7 +145,7 @@ struct VolumeEjectionTests {
     }
 
     @Test
-    func onlyDrivesThatLeaveTheMacCanBeEjected() {
+    internal func onlyDrivesThatLeaveTheMacCanBeEjected() {
         func ejectable(
             _ path: String,
             root: Bool? = false,
@@ -175,7 +175,7 @@ struct VolumeEjectionTests {
     }
 
     @Test
-    func theHistoryKnowsWhereThePanelWasBeforeTheDrive() {
+    internal func theHistoryKnowsWhereThePanelWasBeforeTheDrive() {
         let (bench, _) = bench(StandInDrive(stick))
         #expect(bench.left.model.lastVisited { _ in true } == nil)
         for folder in ["B", "Stick", "Stick/photos"] { bench.left.show(box.url(folder)) }

@@ -61,11 +61,11 @@ private final class ProgressCoalescer: @unchecked Sendable {
 
 /// The queues the work for one document runs on, so that a read that never returns (a share that
 /// stopped answering) holds up that document only, not the next file shown.
-final class DocumentQueues: Sendable {
+internal final class DocumentQueues: Sendable {
     /// Row fetches: a newer one replaces an older one that is still waiting.
-    let rows = DispatchQueue(label: "viewer.rows", qos: .userInitiated)
+    internal let rows = DispatchQueue(label: "viewer.rows", qos: .userInitiated)
     /// Looks for a place or a line, and for the text cursor.
-    let lookups = DispatchQueue(label: "viewer.lookups", qos: .userInitiated)
+    internal let lookups = DispatchQueue(label: "viewer.lookups", qos: .userInitiated)
 }
 
 /// Shows a `TextDocument` row by row: only the rows on screen (and a page around them) are
@@ -75,32 +75,32 @@ final class DocumentQueues: Sendable {
 /// the index of a text is built on a background queue, both through the document, which is
 /// thread-safe. A request that was overtaken by a newer one is dropped before it runs, or when it
 /// returns.
-final class TextPagerView: NSView {
+internal final class TextPagerView: NSView {
     /// How the cursor keys move (spec 10 › Text modes).
-    enum Motion {
+    internal enum Motion {
         case left, right, up, down, pageUp, pageDown, rowStart, rowEnd, fileStart, fileEnd, wordLeft, wordRight
     }
 
-    private(set) var document: TextDocument?
+    internal private(set) var document: TextDocument?
     /// The selected bytes; what Copy copies.
-    private(set) var selection: Range<Int64>?
+    internal private(set) var selection: Range<Int64>?
     /// Called when the position, the selection or the indexing state changed.
-    var onStatusChange: () -> Void = {}
+    internal var onStatusChange: () -> Void = {}
     /// Called when the view was resized, so a text wrapped at the window's edge can be cut anew.
-    var onResize: () -> Void = {}
+    internal var onResize: () -> Void = {}
     /// Asked for the context menu at a click; nil shows none.
-    var contextMenu: () -> NSMenu? = { nil }
+    internal var contextMenu: () -> NSMenu? = { nil }
     /// Ctrl+wheel: the font is to grow (+1) or shrink (-1).
-    var onZoom: (Int) -> Void = { _ in }
+    internal var onZoom: (Int) -> Void = { _ in }
     /// The text cursor (spec 10 › Text modes, F6): with it the cursor keys move the cursor and
     /// Shift selects; without it they scroll.
-    var showsCaret = true { didSet { needsDisplay = true } }
+    internal var showsCaret = true { didSet { needsDisplay = true } }
     /// A found text is shown this many rows below the top (the specification's `SearchGoBack`).
-    var searchGoBack = 3
+    internal var searchGoBack = 3
     /// Where the index of a text is built: the gate shared by every pager, or one of a test's.
     internal var indexGate = ViewerWorkGate.indexBuilds
 
-    var font: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular) {
+    internal var font: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular) {
         didSet {
             measureFont()
             lines.removeAll()
@@ -111,7 +111,7 @@ final class TextPagerView: NSView {
     private let inset: CGFloat = 5
     private var lineHeight: CGFloat = 15
     private var ascent: CGFloat = 12
-    private(set) var characterWidth: CGFloat = 7
+    internal private(set) var characterWidth: CGFloat = 7
     private var topRow = 0
     private var horizontalOffset: CGFloat = 0
     private var widestLine: CGFloat = 0
@@ -129,7 +129,7 @@ final class TextPagerView: NSView {
     private var fetchRequest: LinkedCancellation?
     private var afterLoad: [(TextPagerView) -> Void] = []
     /// The queues of the document shown (tests wait for what was handed to them).
-    private(set) var queues = DocumentQueues()
+    internal private(set) var queues = DocumentQueues()
     private let progress = ProgressCoalescer()
     /// The offset of the top row when it was last on screen: where a new layout starts if the
     /// top row is not loaded just now.
@@ -164,7 +164,7 @@ final class TextPagerView: NSView {
     private let verticalScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 15, height: 100))
     private let horizontalScroller = NSScroller(frame: NSRect(x: 0, y: 0, width: 100, height: 15))
 
-    override init(frame: NSRect) {
+    override internal init(frame: NSRect) {
         super.init(frame: frame)
         for scroller in [verticalScroller, horizontalScroller] {
             scroller.scrollerStyle = .legacy
@@ -179,7 +179,7 @@ final class TextPagerView: NSView {
     }
 
     /// Made in code only: an archive gives none.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
     deinit {
         document?.cancellation.cancel()
@@ -188,9 +188,9 @@ final class TextPagerView: NSView {
         revealRequest?.flag.cancel()
     }
 
-    override var isFlipped: Bool { true }
-    override var acceptsFirstResponder: Bool { true }
-    override var isOpaque: Bool { true }
+    override internal var isFlipped: Bool { true }
+    override internal var acceptsFirstResponder: Bool { true }
+    override internal var isOpaque: Bool { true }
 
     // MARK: Documents
 
@@ -200,7 +200,7 @@ final class TextPagerView: NSView {
     /// The text's rows are indexed in the background, on all cores with `parallel`; until the
     /// wanted row is known the view keeps what it showed before. `keepingSelection` is for the same
     /// bytes laid out anew: the selection stays.
-    func show(
+    internal func show(
         _ document: TextDocument,
         at offset: Int64 = 0,
         select: Range<Int64>? = nil,
@@ -328,7 +328,7 @@ final class TextPagerView: NSView {
 
     /// Stops the reading of the shown text and of the one that is to replace it, which are
     /// blocked on a slow file system perhaps; what is shown stays.
-    func stopReading() {
+    internal func stopReading() {
         pending?.document.cancellation.cancel()
         document?.cancellation.cancel()
         fetchRequest?.flag.cancel()
@@ -336,7 +336,7 @@ final class TextPagerView: NSView {
     }
 
     /// Stops everything and shows nothing.
-    func clear() {
+    internal func clear() {
         stopReading()
         pending = nil
         document = nil
@@ -355,17 +355,17 @@ final class TextPagerView: NSView {
     }
 
     /// True while a text's rows are still being found.
-    var isIndexing: Bool {
+    internal var isIndexing: Bool {
         // A text whose reading was stopped is not being indexed any more.
         pending != nil || !(document.map { $0.isIndexComplete || $0.cancellation.isCancelled } ?? true)
     }
 
     /// The layout of the text shown, or of the one that is to replace it: what a new layout is
     /// compared with.
-    var shownLayout: ViewerLayout? { (pending?.document ?? document)?.layout }
+    internal var shownLayout: ViewerLayout? { (pending?.document ?? document)?.layout }
 
     /// How far the indexing is, 0…1.
-    var indexingProgress: Double {
+    internal var indexingProgress: Double {
         guard let document = pending?.document ?? document, document.length > 0 else {
             return 1
         }
@@ -410,9 +410,9 @@ final class TextPagerView: NSView {
 
     /// How many characters of the fixed-width font fit in a row: where a text is wrapped when
     /// it is wrapped at the window's edge.
-    var columnsThatFit: Int { max(20, Int((textArea.width - 2 * inset) / characterWidth)) }
+    internal var columnsThatFit: Int { max(20, Int((textArea.width - 2 * inset) / characterWidth)) }
 
-    override func layout() {
+    override internal func layout() {
         super.layout()
         placeScrollers()
     }
@@ -433,7 +433,7 @@ final class TextPagerView: NSView {
         )
     }
 
-    override func setFrameSize(_ newSize: NSSize) {
+    override internal func setFrameSize(_ newSize: NSSize) {
         let changed = newSize != frame.size
         super.setFrameSize(newSize)
         placeScrollers()
@@ -622,7 +622,7 @@ final class TextPagerView: NSView {
         )
     }
 
-    override func scrollWheel(with event: NSEvent) {
+    override internal func scrollWheel(with event: NSEvent) {
         if event.modifierFlags.contains(.control) {
             // A trackpad sends dozens of small deltas for one gesture: a step is a line's worth.
             zoomRemainder += event.scrollingDeltaY
@@ -649,11 +649,13 @@ final class TextPagerView: NSView {
     // MARK: Position
 
     /// The byte offset of the row at the top: what stays in place when the text is laid out anew.
-    var topOffset: Int64 { row(topRow)?.range.lowerBound ?? knownTopOffset ?? document?.content.lowerBound ?? 0 }
+    internal var topOffset: Int64 {
+        row(topRow)?.range.lowerBound ?? knownTopOffset ?? document?.content.lowerBound ?? 0
+    }
 
     /// The end of the last visible row as a percentage of the file (spec 10 › Position and
     /// zoom item).
-    var percent: Double {
+    internal var percent: Double {
         guard let document, document.length > 0 else {
             return 100
         }
@@ -665,7 +667,7 @@ final class TextPagerView: NSView {
     }
 
     /// The line and the offset the status line names: those of the text cursor, else of the top row.
-    var position: (line: Int, offset: Int64)? {
+    internal var position: (line: Int, offset: Int64)? {
         if let caret, let row = row(caret.row) {
             return (row.line, caret.offset)
         }
@@ -676,7 +678,7 @@ final class TextPagerView: NSView {
     /// the text cursor, else at the top of the view.
     ///
     /// Backwards it is the place to end before.
-    func searchStart(backwards: Bool) -> Int64 {
+    internal func searchStart(backwards: Bool) -> Int64 {
         let unit = Int64(document?.encoding.unitSize ?? 1)
         if let selection {
             return backwards ? selection.lowerBound : selection.lowerBound + unit
@@ -685,7 +687,8 @@ final class TextPagerView: NSView {
     }
 
     /// Scrolls to the row that holds a byte offset; the row is looked up in the background.
-    func reveal(offset: Int64, select: Range<Int64>? = nil, rowsAbove: Int = 0, keepingSelection: Bool = false) {
+    internal func reveal(offset: Int64, select: Range<Int64>? = nil, rowsAbove: Int = 0, keepingSelection: Bool = false)
+    {
         guard let document else {
             return
         }
@@ -752,7 +755,7 @@ final class TextPagerView: NSView {
         }
     }
 
-    func scroll(toPercent percent: Double) {
+    internal func scroll(toPercent percent: Double) {
         guard let document else {
             return
         }
@@ -765,7 +768,7 @@ final class TextPagerView: NSView {
     }
 
     /// Scrolls to a line (counted from 1); false is handed to `completion` when there is none.
-    func scroll(toLine line: Int, completion: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
+    internal func scroll(toLine line: Int, completion: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
         guard let document else {
             return
         }
@@ -803,7 +806,7 @@ final class TextPagerView: NSView {
 
     // MARK: Selection
 
-    func selectAll() {
+    internal func selectAll() {
         guard let document else {
             return
         }
@@ -813,7 +816,7 @@ final class TextPagerView: NSView {
         onStatusChange()
     }
 
-    func clearSelection() {
+    internal func clearSelection() {
         selection = nil
         needsDisplay = true
         onStatusChange()
@@ -838,7 +841,7 @@ final class TextPagerView: NSView {
     // MARK: Keys
 
     /// Moves the text cursor, or scrolls when it is not shown (spec 10 › Text modes).
-    func perform(_ motion: Motion, extending: Bool = false) {
+    internal func perform(_ motion: Motion, extending: Bool = false) {
         guard let document, rowCount > 0 else {
             return
         }
@@ -975,7 +978,7 @@ final class TextPagerView: NSView {
         Unicode.Scalar(unit).map { CharacterSet.alphanumerics.contains($0) || $0 == "_" } ?? true
     }
 
-    static func wordStart(after index: Int, in text: String) -> Int {
+    internal static func wordStart(after index: Int, in text: String) -> Int {
         let units = Array(text.utf16)
         var index = index
         while index < units.count, isWordUnit(units[index]) { index += 1 }
@@ -983,7 +986,7 @@ final class TextPagerView: NSView {
         return index
     }
 
-    static func wordStart(before index: Int, in text: String) -> Int {
+    internal static func wordStart(before index: Int, in text: String) -> Int {
         let units = Array(text.utf16)
         var index = min(index, units.count)
         while index > 0, !isWordUnit(units[index - 1]) { index -= 1 }
@@ -992,7 +995,7 @@ final class TextPagerView: NSView {
     }
 
     /// The word around a place in a text, for a double click.
-    static func wordRange(around index: Int, in text: String) -> Range<Int> {
+    internal static func wordRange(around index: Int, in text: String) -> Range<Int> {
         let units = Array(text.utf16)
         guard index < units.count, isWordUnit(units[index]) else {
             return index..<min(units.count, index + 1)
@@ -1037,7 +1040,7 @@ final class TextPagerView: NSView {
         return (row, textIndex(in: row, atX: point.x - inset + horizontalOffset))
     }
 
-    override func mouseDown(with event: NSEvent) {
+    override internal func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         guard let document, let hit = hit(convert(event.locationInWindow, from: nil)) else {
             return
@@ -1064,7 +1067,7 @@ final class TextPagerView: NSView {
         }
     }
 
-    override func mouseDragged(with event: NSEvent) {
+    override internal func mouseDragged(with event: NSEvent) {
         guard let document else {
             return
         }
@@ -1077,17 +1080,17 @@ final class TextPagerView: NSView {
         setCaret(document.byteOffset(in: hit.row, at: hit.index), row: hit.row.index, extending: true)
     }
 
-    override func menu(for _: NSEvent) -> NSMenu? { contextMenu() }
+    override internal func menu(for _: NSEvent) -> NSMenu? { contextMenu() }
 
     /// The text of the row under a point of the window, and the place in it: for the context
     /// menu, which looks for a link there (spec 10 › Context menu rules).
-    func text(at windowPoint: NSPoint) -> (text: String, index: Int)? {
+    internal func text(at windowPoint: NSPoint) -> (text: String, index: Int)? {
         hit(convert(windowPoint, from: nil)).map { ($0.row.text, $0.index) }
     }
 
     // MARK: Drawing
 
-    override func draw(_: NSRect) {
+    override internal func draw(_: NSRect) {
         NSColor.textBackgroundColor.setFill()
         bounds.fill()
         guard let document, let context = NSGraphicsContext.current?.cgContext else {
@@ -1138,12 +1141,12 @@ final class TextPagerView: NSView {
         }
     }
 
-    override func becomeFirstResponder() -> Bool {
+    override internal func becomeFirstResponder() -> Bool {
         needsDisplay = true
         return true
     }
 
-    override func resignFirstResponder() -> Bool {
+    override internal func resignFirstResponder() -> Bool {
         needsDisplay = true
         return true
     }

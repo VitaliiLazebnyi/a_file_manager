@@ -7,7 +7,7 @@ import AppKit
 ///
 /// What the user changes on it is pending until `commit`.
 @MainActor
-protocol OptionsPage: AnyObject {
+internal protocol OptionsPage: AnyObject {
     var title: String { get }
     var view: NSView { get }
     var isChanged: Bool { get }
@@ -36,13 +36,13 @@ private func note(_ text: String) -> NSTextField {
 }
 
 /// A page a plugin registered: one control per preference (spec 13 › The dialog framework).
-final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
+internal final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
     private let model: PreferencePageModel
     private var controls: [(preference: Preference, control: NSControl)] = []
-    let view = NSView()
-    var onEdit: (() -> Void)?
+    internal let view = NSView()
+    internal var onEdit: (() -> Void)?
 
-    init(model: PreferencePageModel) {
+    internal init(model: PreferencePageModel) {
         self.model = model
         super.init()
         let rows: [[NSView]] = model.page.preferences.map { preference in
@@ -89,8 +89,8 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
         show()
     }
 
-    var title: String { model.title }
-    var isChanged: Bool { model.isChanged }
+    internal var title: String { model.title }
+    internal var isChanged: Bool { model.isChanged }
 
     @objc
     private func changed() {
@@ -111,7 +111,7 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
         onEdit?()
     }
 
-    func controlTextDidChange(_: Notification) { changed() }
+    internal func controlTextDidChange(_: Notification) { changed() }
 
     private func show() {
         for (preference, control) in controls {
@@ -128,9 +128,9 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
         }
     }
 
-    func commit() { model.commit() }
+    internal func commit() { model.commit() }
 
-    func discard() {
+    internal func discard() {
         model.discard()
         show()
     }
@@ -138,7 +138,7 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
 
 /// Redefine hotkeys (spec 14 › Redefining hotkeys and aliases; 06 › Redefining keys): every
 /// command with its keys; a new key is chosen by pressing it.
-final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
+internal final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     private unowned let center: ConfigurationCenter
     private var editor: KeyBindingEditor
     private var rows: [CommandRow] = []
@@ -146,8 +146,8 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
     private let filter = NSSearchField()
     private let status = NSTextField(labelWithString: "")
     private var monitor: Any?
-    let title = "Keyboard"
-    private(set) lazy var view: NSView = {
+    internal let title = "Keyboard"
+    internal private(set) lazy var view: NSView = {
         filter.placeholderString = "Filter by command, name or key"
         filter.delegate = self
         let buttons = [
@@ -171,16 +171,16 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
             vertical: true
         )
     }()
-    var onEdit: (() -> Void)?
+    internal var onEdit: (() -> Void)?
 
-    init(center: ConfigurationCenter) {
+    internal init(center: ConfigurationCenter) {
         self.center = center
         editor = KeyBindingEditor(kernel: center.kernel)
         super.init()
         center.keysCommitted = { [weak self] in self?.bindingsStoredElsewhere() }
     }
 
-    var isChanged: Bool { editor.isChanged }
+    internal var isChanged: Bool { editor.isChanged }
 
     private func reload() {
         let kernel = center.kernel
@@ -210,7 +210,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
         edited()
     }
 
-    func controlTextDidChange(_: Notification) { reload() }
+    internal func controlTextDidChange(_: Notification) { reload() }
 
     private func stopRecording() {
         if let monitor { center.effects.removeKeyMonitor(monitor) }
@@ -257,7 +257,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
         if editor.assign(shortcut, to: id, adding: adding, asking: center.kernel.interaction) { edited() }
     }
 
-    func commit() {
+    internal func commit() {
         stopRecording()
         guard editor.isChanged else {
             return
@@ -267,7 +267,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
         discard()
     }
 
-    func discard() {
+    internal func discard() {
         stopRecording()
         editor = KeyBindingEditor(kernel: center.kernel)
         reload()
@@ -275,7 +275,7 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
 
     /// Bindings were stored elsewhere (the Start menu, a command's shortcut field, an import):
     /// this page's editor starts from them, with its own unapplied edits kept on top.
-    func bindingsStoredElsewhere() {
+    internal func bindingsStoredElsewhere() {
         editor.rebase(kernel: center.kernel)
         reload()
         onEdit?()
@@ -283,12 +283,12 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
 }
 
 /// The button-bar editor (spec 14 › The Change button bar dialog), as a list.
-final class ButtonBarPage: NSObject, OptionsPage {
+internal final class ButtonBarPage: NSObject, OptionsPage {
     private unowned let center: ConfigurationCenter
     private let editor: ToolbarEditor
     private let table = RowsTable(columns: [("Button", 250), ("Command", 200)])
-    let title = "Button Bar"
-    private(set) lazy var view: NSView = editorView(
+    internal let title = "Button Bar"
+    internal private(set) lazy var view: NSView = editorView(
         table,
         buttons: [
             ActionButton("Add Command…") { [unowned self] in
@@ -325,15 +325,15 @@ final class ButtonBarPage: NSObject, OptionsPage {
             )
         ]
     )
-    var onEdit: (() -> Void)?
+    internal var onEdit: (() -> Void)?
 
-    init(center: ConfigurationCenter) {
+    internal init(center: ConfigurationCenter) {
         self.center = center
         editor = ToolbarEditor(toolbar: center.kernel.toolbar, settings: center.kernel.settings, store: center.store)
         super.init()
     }
 
-    var isChanged: Bool { editor.isChanged }
+    internal var isChanged: Bool { editor.isChanged }
 
     private func reload(selecting row: Int? = nil) {
         let commands = center.kernel.commands
@@ -395,22 +395,22 @@ final class ButtonBarPage: NSObject, OptionsPage {
         edited(selecting: row)
     }
 
-    func commit() { editor.commit() }
+    internal func commit() { editor.commit() }
 
-    func discard() {
+    internal func discard() {
         editor.discard()
         reload()
     }
 }
 
 /// The Start-menu editor (spec 14 › The Change start menu dialog).
-final class StartMenuPage: NSObject, OptionsPage {
+internal final class StartMenuPage: NSObject, OptionsPage {
     private unowned let center: ConfigurationCenter
     private var stored = StartMenuDraft()
     private var draft = StartMenuDraft()
     private let table = RowsTable(columns: [("Nr.", 34), ("Title", 170), ("Command", 190), ("Key", 80)])
-    let title = "Start Menu"
-    private(set) lazy var view: NSView = editorView(
+    internal let title = "Start Menu"
+    internal private(set) lazy var view: NSView = editorView(
         table,
         buttons: [
             ActionButton("Add Item…") { [unowned self] in add(center.editStartMenuRow(nil)) },
@@ -445,15 +445,15 @@ final class StartMenuPage: NSObject, OptionsPage {
             )
         ]
     )
-    var onEdit: (() -> Void)?
+    internal var onEdit: (() -> Void)?
 
-    init(center: ConfigurationCenter) {
+    internal init(center: ConfigurationCenter) {
         self.center = center
         super.init()
         table.onActivate = { [unowned self] in change() }
     }
 
-    var isChanged: Bool { draft != stored }
+    internal var isChanged: Bool { draft != stored }
 
     private func reload(selecting row: Int? = nil) {
         table.show(
@@ -503,7 +503,7 @@ final class StartMenuPage: NSObject, OptionsPage {
         edited(selecting: draft.move(row, by: offset))
     }
 
-    func commit() {
+    internal func commit() {
         guard isChanged else {
             return
         }
@@ -511,7 +511,7 @@ final class StartMenuPage: NSObject, OptionsPage {
         discard()
     }
 
-    func discard() {
+    internal func discard() {
         stored = center.startMenuDraft()
         draft = stored
         reload()
@@ -520,13 +520,13 @@ final class StartMenuPage: NSObject, OptionsPage {
 
 /// Export, import and reset of the settings as a whole (spec 19 › What is saved when, adapted:
 /// the Mac keeps settings in the preferences system, not in a file the user can copy).
-final class SettingsFilePage: NSObject, OptionsPage {
-    let title = "Settings File"
-    let view: NSView
-    let isChanged = false
-    var onEdit: (() -> Void)?
+internal final class SettingsFilePage: NSObject, OptionsPage {
+    internal let title = "Settings File"
+    internal let view: NSView
+    internal let isChanged = false
+    internal var onEdit: (() -> Void)?
 
-    init(center: ConfigurationCenter) {
+    internal init(center: ConfigurationCenter) {
         let commands = center.kernel.commands
         let buttons = filledStack(
             [
@@ -560,8 +560,8 @@ final class SettingsFilePage: NSObject, OptionsPage {
         super.init()
     }
 
-    func commit() {}
-    func discard() {}
+    internal func commit() {}
+    internal func discard() {}
 }
 
 /// The Options window (spec 13 › The dialog framework): the pages on the left, the selected
@@ -571,8 +571,8 @@ final class SettingsFilePage: NSObject, OptionsPage {
 ///
 /// Unlike Total Commander's dialog it is not modal, as is usual on the Mac; what is pending on
 /// its pages reaches the program only with Apply or OK.
-final class OptionsWindowController: NSWindowController, NSWindowDelegate {
-    enum Section {
+internal final class OptionsWindowController: NSWindowController, NSWindowDelegate {
+    internal enum Section {
         case first, keyboard, buttonBar, startMenu, settingsFile
     }
 
@@ -584,7 +584,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     private let container = NSView()
     private var applyButton = NSButton()
 
-    init(center: ConfigurationCenter) {
+    internal init(center: ConfigurationCenter) {
         self.center = center
         let registered: [any OptionsPage] = center.kernel.preferences.pages.filter { !$0.preferences.isEmpty }
             .map {
@@ -613,7 +613,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @available(*, unavailable)
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    internal required init?(coder _: NSCoder) { fatalError("not used") }
 
     private func buildContent(in window: NSWindow) {
         pageList.onSelect = { [weak self] in self?.showSelectedPage() }
@@ -642,16 +642,16 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     /// Opens the window on a page.
     ///
     /// A window that was closed shows what is stored now.
-    func show(_ section: Section) {
+    internal func show(_ section: Section) {
         prepare(section)
         center.effects.present(self)
     }
 
-    var pageTitles: [String] { pages.map(\.title) }
-    var shownPage: String { caption.stringValue }
+    internal var pageTitles: [String] { pages.map(\.title) }
+    internal var shownPage: String { caption.stringValue }
 
     /// Everything `show` does short of putting the window on screen.
-    func prepare(_ section: Section) {
+    internal func prepare(_ section: Section) {
         if window?.isVisible != true {
             pages.forEach { $0.discard() }
             pageList.show(pages.map { [$0.title] })
@@ -709,7 +709,7 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Closing by Cancel, Esc or the close button drops what was not applied.
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         pages.forEach { $0.discard() }
     }
 }

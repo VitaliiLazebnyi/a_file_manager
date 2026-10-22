@@ -5,8 +5,8 @@ import Foundation
 /// Text that came from outside (a file name, a path, a stored value) made fit for a message, a
 /// log line or a dialog: line breaks and control characters cannot draw a second line or hide
 /// what follows, and a very long text is cut.
-enum DisplayText {
-    static func oneLine(_ text: String, limit: Int = 200) -> String {
+internal enum DisplayText {
+    internal static func oneLine(_ text: String, limit: Int = 200) -> String {
         var result = String.UnicodeScalarView()
         var count = 0
         for scalar in text.unicodeScalars {

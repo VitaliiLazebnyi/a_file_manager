@@ -22,20 +22,20 @@ private func fixDigest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) 
 
 /// The fixes of the file tools: decoding, in-place outputs, safe overwrites, BLAKE3, checksum files.
 @Suite
-struct FileToolsFixes {
-    let box: Sandbox
-    let fileSystems = FileSystemRegistry()
-    var run: ToolRun { ToolRun(fileSystems: fileSystems) }
+internal struct FileToolsFixes {
+    internal let box: Sandbox
+    internal let fileSystems = FileSystemRegistry()
+    internal var run: ToolRun { ToolRun(fileSystems: fileSystems) }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         fileSystems.register(LocalFileSystem())
     }
 
-    func item(_ path: String) -> FileItem { fileSystems.item(at: box.url(path))! }
+    internal func item(_ path: String) -> FileItem { fileSystems.item(at: box.url(path))! }
 
     @Test
-    func decodingOneNumberedFileDoesNotRunIntoTheNext() throws {
+    internal func decodingOneNumberedFileDoesNotRunIntoTheNext() throws {
         // 57 bytes encode without padding, so only the file's own end tells it is over.
         let first = Data((0..<57).map { UInt8($0) })
         let second = Data((0..<114).map { UInt8(255 - $0) })
@@ -55,7 +55,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func partsOfOneFileStillJoin() throws {
+    internal func partsOfOneFileStillJoin() throws {
         let data = fixPattern(5_000)
         try box.folder("out")
         try data.write(to: box.url("big.bin"))
@@ -68,7 +68,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func base64EndsAtItsPadding() throws {
+    internal func base64EndsAtItsPadding() throws {
         // Two independent encodings in one file: each ends where its padding does.
         let text =
             "MIME-Version: 1.0\r\nContent-Disposition: attachment; filename=\"one.bin\"\r\nContent-Transfer-Encoding: base64\r\n\r\nYWJj\r\nZA==\r\n"
@@ -82,7 +82,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func splitAndEncodeRefuseToReplaceTheirSource() throws {
+    internal func splitAndEncodeRefuseToReplaceTheirSource() throws {
         let data = fixPattern(3_000)
         try data.write(to: box.url("data.001"))
         #expect(throws: ToolError.self) {
@@ -108,7 +108,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func unreadableSourceCostsNoOutput() throws {
+    internal func unreadableSourceCostsNoOutput() throws {
         try box.folder("out")
         let gone = FileItem(url: box.url("missing.bin"), name: "missing.bin", stat: .init(size: 10, modified: Date()))
         #expect(throws: (any Error).self) { try Splitter.split(gone, into: box.url("out"), partSize: 5, run: run) }
@@ -117,7 +117,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func overwriteKeepsTheOldFileUntilTheNewOneIsDone() throws {
+    internal func overwriteKeepsTheOldFileUntilTheNewOneIsDone() throws {
         try Data("old".utf8).write(to: box.url("target.txt"))
         let output = try #require(try run.create(box.url("target.txt")))
         try output.write(Data("new".utf8))
@@ -146,7 +146,7 @@ struct FileToolsFixes {
         (1_048_577, "2f053cd7472cf0cd2f9adaf45c1180255b91b9a865404a63671a0ee5f792ed33"),
         (9_000_007, "5719b9667d3fee9292ca79e9aac4d4668a0738cb3b2ef7ee60258adf5aa9e9cf")
     ])
-    func blake3Vectors(count: Int, expected: String) {
+    internal func blake3Vectors(count: Int, expected: String) {
         let data = fixPattern(count)
         // Whole (the large inputs are hashed on all cores), in megabyte blocks, and in odd pieces.
         #expect(fixDigest(.blake3, data) == expected)
@@ -155,7 +155,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func sha3FallbackAgreesWithTheSelectedImplementation() {
+    internal func sha3FallbackAgreesWithTheSelectedImplementation() {
         let data = fixPattern(100_000)
         for length in [32, 48, 64] {
             let fallback = SHA3Hasher(digestLength: length)
@@ -166,7 +166,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func checksumLinesInOtherForms() {
+    internal func checksumLinesInOtherForms() {
         let md5 = "d41d8cd98f00b204e9800998ecf8427e"
         let sha224 = String(repeating: "ab", count: 28)
         let sha384 = String(repeating: "cd", count: 48)
@@ -179,7 +179,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func aChecksumFileAmongTheOperandsIsNotHashed() throws {
+    internal func aChecksumFileAmongTheOperandsIsNotHashed() throws {
         try Data("one".utf8).write(to: box.url("a.txt"))
         try Data("0".utf8).write(to: box.url("dir.sfv"))
         var options = ChecksumRun.CreateOptions()
@@ -196,7 +196,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func filesOutsideTheTargetFolderKeepTheirFullPath() throws {
+    internal func filesOutsideTheTargetFolderKeepTheirFullPath() throws {
         try box.folder("sub")
         try Data("one".utf8).write(to: box.url("a.txt"))
         try Data("two".utf8).write(to: box.url("sub/b.txt"))
@@ -211,7 +211,7 @@ struct FileToolsFixes {
     }
 
     @Test
-    func verifyHashesTheLikelyMethodFirstAndFindsTheOthers() throws {
+    internal func verifyHashesTheLikelyMethodFirstAndFindsTheOthers() throws {
         let data = fixPattern(70_000)
         try data.write(to: box.url("f.bin"))
         let blake = fixDigest(.blake3, data)
@@ -231,22 +231,22 @@ struct FileToolsFixes {
 
 /// The fixes of the directory comparison and its session.
 @Suite
-struct DirectorySyncFixes {
-    let fileSystems = FileSystemRegistry()
-    let memory = MemoryFileSystem()
-    let early = Date(timeIntervalSince1970: 1_000_000)
+internal struct DirectorySyncFixes {
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
+    internal let early = Date(timeIntervalSince1970: 1_000_000)
 
-    init() {
+    internal init() {
         fileSystems.register(LocalFileSystem())
         fileSystems.register(memory)
     }
 
-    func file(_ name: String) -> FileItem {
+    internal func file(_ name: String) -> FileItem {
         FileItem(url: memory.url("/" + name), name: name, stat: .init(size: 1, modified: early))
     }
 
     @Test
-    func caseInsensitivePairingKeepsItsOrderAndIsFast() {
+    internal func caseInsensitivePairingKeepsItsOrderAndIsFast() {
         // Several names that fold alike pair in order; the rest stays alone.
         let left = ["ab", "AB", "c"].map(file)
         let right = ["Ab", "aB", "d"].map(file)
@@ -259,7 +259,7 @@ struct DirectorySyncFixes {
     }
 
     @Test
-    func subSecondDifferencesAreNotDifferences() {
+    internal func subSecondDifferencesAreNotDifferences() {
         var options = SyncOptions()
         options.toleranceSeconds = 0
         let apfs = FileItem(
@@ -278,7 +278,7 @@ struct DirectorySyncFixes {
     }
 
     @Test
-    func aLinkFacingAFileIsNeverActedOn() throws {
+    internal func aLinkFacingAFileIsNeverActedOn() throws {
         let box = try Sandbox()
         try box.folder("L")
         try box.folder("R")
@@ -303,9 +303,9 @@ struct DirectorySyncFixes {
 
 /// The fixes of Compare by content.
 @Suite
-struct CompareContentFixes {
+internal struct CompareContentFixes {
     @Test
-    func savingKeepsTheLinkAndTheTags() throws {
+    internal func savingKeepsTheLinkAndTheTags() throws {
         let box = try Sandbox()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
@@ -324,7 +324,7 @@ struct CompareContentFixes {
     }
 
     @Test
-    func hashedKeysFindTheSameDifferencesAsBefore() {
+    internal func hashedKeysFindTheSameDifferencesAsBefore() {
         let options = DiffOptions()
         let left = ["Hello  World", "same", "tab\tx", "ÄÖ", "end"].map { TextLine($0) }
         let right = ["hello world", "same", "tab x", "äö", "END!"].map { TextLine($0) }
@@ -336,13 +336,13 @@ struct CompareContentFixes {
     }
 
     @Test
-    func insideALineTheCommonEndsAreTrimmed() {
+    internal func insideALineTheCommonEndsAreTrimmed() {
         let ranges = TextDiff.inline("prefix-OLD-suffix", "prefix-NEWER-suffix")
         #expect(ranges.left == [7..<10] && ranges.right == [7..<12])
     }
 
     @Test
-    func binaryRowText() {
+    internal func binaryRowText() {
         let diff = BinaryDiff.compute(left: Data(), right: Data(), bytesPerLine: 8)
         #expect(
             diff.text(of: Data([0x41, 0x00, 0xFF]), row: 0) == "41 00 FF"
@@ -354,13 +354,13 @@ struct CompareContentFixes {
 /// The session of Synchronize directories: cheap toggling and the phase while the job runs.
 @MainActor
 @Suite
-struct DirectorySyncSessionFixes {
-    let memory = MemoryFileSystem()
-    let plugin = DirectorySyncPlugin(opensWindows: false)
-    let bench: TestBench
-    let early = Date(timeIntervalSince1970: 1_000_000)
+internal struct DirectorySyncSessionFixes {
+    internal let memory = MemoryFileSystem()
+    internal let plugin = DirectorySyncPlugin(opensWindows: false)
+    internal let bench: TestBench
+    internal let early = Date(timeIntervalSince1970: 1_000_000)
 
-    init() {
+    internal init() {
         memory.addFile("/A/new.txt", "from the left", modified: early.addingTimeInterval(500))
         memory.addFile("/B/sub/arrives.txt", "from the right", modified: early)
         memory.addFile("/A/same.txt", "same", modified: early)
@@ -374,7 +374,7 @@ struct DirectorySyncSessionFixes {
         )
     }
 
-    func opened() -> SyncSession {
+    internal func opened() -> SyncSession {
         bench.commands.perform(.synchronizeDirectories)
         let session = plugin.session!
         session.compare()
@@ -382,7 +382,7 @@ struct DirectorySyncSessionFixes {
     }
 
     @Test
-    func togglingTouchesOnlyItsRowsAndKeepsTheCount() {
+    internal func togglingTouchesOnlyItsRowsAndKeepsTheCount() {
         let session = opened()
         #expect(session.canSynchronize)
         var touched: [[Int]] = []
@@ -400,7 +400,7 @@ struct DirectorySyncSessionFixes {
     }
 
     @Test
-    func neitherSynchronizeNorCompareStartsWhileTheJobRuns() {
+    internal func neitherSynchronizeNorCompareStartsWhileTheJobRuns() {
         let session = opened()
         var phases: [SyncSession.Phase] = []
         session.onChange = { [weak session] in

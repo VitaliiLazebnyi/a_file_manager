@@ -13,17 +13,17 @@ import Testing
 /// to the next, loops end, and what cannot run says so.
 @MainActor
 @Suite
-struct Review2ConfigARunner {
-    let box: Sandbox
-    let settings = MemorySettings()
+internal struct Review2ConfigARunner {
+    internal let box: Sandbox
+    internal let settings = MemorySettings()
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt")
         try box.folder("B")
     }
 
-    func bench(launches: Bool = false) -> (plugin: ConfigurationPlugin, bench: TestBench) {
+    internal func bench(launches: Bool = false) -> (plugin: ConfigurationPlugin, bench: TestBench) {
         let plugin = ConfigurationPlugin(
             launchesApplications: launches,
             background: nil,
@@ -40,7 +40,7 @@ struct Review2ConfigARunner {
         return (plugin, bench)
     }
 
-    func define(_ plugin: ConfigurationPlugin, _ name: String, _ command: String, _ parameters: String = "") {
+    internal func define(_ plugin: ConfigurationPlugin, _ name: String, _ command: String, _ parameters: String = "") {
         plugin.center!
             .save(
                 UserCommand(name: name, title: "", action: CommandAction(command: command, parameters: parameters))
@@ -51,12 +51,12 @@ struct Review2ConfigARunner {
     ///
     /// Only a hang ends the wait without it: on a busy machine other tests may hold the main thread
     /// for a long time, so no shorter limit is set.
-    func wait(until done: () -> Bool) async {
+    internal func wait(until done: () -> Bool) async {
         #expect(await RunLoopWait.until(done))
     }
 
     @Test
-    func commandsThatCallEachOtherAcrossAWaitAreStopped() async {
+    internal func commandsThatCallEachOtherAcrossAWaitAreStopped() async {
         let (plugin, bench) = bench()
         define(plugin, "em_a", "cm_wait 1, em_b")
         define(plugin, "em_b", "cm_wait 1, em_a")
@@ -69,7 +69,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func aStartMenuEntryThatCallsItselfIsStoppedToo() async {
+    internal func aStartMenuEntryThatCallsItselfIsStoppedToo() async {
         let (plugin, bench) = bench()
         var draft = plugin.center!.startMenuDraft()
         draft.insert(
@@ -85,7 +85,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func aRunHasABoundedNumberOfSteps() {
+    internal func aRunHasABoundedNumberOfSteps() {
         let (plugin, bench) = bench()
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
@@ -103,7 +103,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func aWaitingChainCanBeStopped() async {
+    internal func aWaitingChainCanBeStopped() async {
         let (plugin, bench) = bench()
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
@@ -122,7 +122,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func aNameHandedFromOneCommandToTheNextStaysAName() throws {
+    internal func aNameHandedFromOneCommandToTheNextStaysAName() throws {
         let hostile = "%Q$(touch M) %N;x"
         try box.file("A/" + hostile)
         let (plugin, bench) = bench()
@@ -138,7 +138,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func aLineThatCannotTakeANameSafelyIsNotRun() {
+    internal func aLineThatCannotTakeANameSafelyIsNotRun() {
         let (plugin, bench) = bench()
         define(plugin, "em_tick", "echo", "`basename %N`")
         define(plugin, "em_ansi", "echo", "$'%N'")
@@ -163,7 +163,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func theMarkedNamesOfALongListAreGatheredInTheBackground() async {
+    internal func theMarkedNamesOfALongListAreGatheredInTheBackground() async {
         let memory = MemoryFileSystem()
         let count = CommandRunner.backgroundSelectionThreshold + 3
         for number in 0..<count { memory.addFile("/Big/f\(number) x.txt") }
@@ -206,7 +206,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func theSelectionIsGatheredOnlyForATextThatAsksForIt() {
+    internal func theSelectionIsGatheredOnlyForATextThatAsksForIt() {
         #expect(ParameterExpander.usesSelection([.text("%S")]) && ParameterExpander.usesSelection([.text("a %P%s")]))
         #expect(
             ParameterExpander.usesSelection([.text("%L")]) && ParameterExpander.usesSelection([.text("%C1")])
@@ -219,7 +219,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func anApplicationPathWithASpaceIsOneWord() throws {
+    internal func anApplicationPathWithASpaceIsOneWord() throws {
         let app = try box.folder("Apps/My App.app")
         let line: [ExpandedPiece] = [.text("\"\(app.path)\" --flag "), .value("a b")]
         let opened = try #require(CommandRunner.applicationLine(for: line))
@@ -236,7 +236,7 @@ struct Review2ConfigARunner {
     }
 
     @Test
-    func listFilesOfARunThatQuitsAreKeptWhileAProgramMayReadThem() throws {
+    internal func listFilesOfARunThatQuitsAreKeptWhileAProgramMayReadThem() throws {
         let made = bench()
         let runner = CommandRunner(
             kernel: made.bench.kernel,
@@ -265,12 +265,12 @@ struct Review2ConfigARunner {
 /// The runner with real programs: a login shell is started, as in the program.
 @MainActor
 @Suite
-struct Review2ConfigALaunching {
-    let box: Sandbox
-    let plugin: ConfigurationPlugin
-    let bench: TestBench
+internal struct Review2ConfigALaunching {
+    internal let box: Sandbox
+    internal let plugin: ConfigurationPlugin
+    internal let bench: TestBench
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.folder("A")
         try box.folder("B")
@@ -292,12 +292,12 @@ struct Review2ConfigALaunching {
     ///
     /// Only a hang ends the wait without it: on a busy machine other tests may hold the main thread
     /// for a long time, so no shorter limit is set.
-    func wait(until done: () -> Bool) async {
+    internal func wait(until done: () -> Bool) async {
         #expect(await RunLoopWait.until(done))
     }
 
     @Test
-    func aHostileFileNameReachesTheProgramAsItIsAndRunsNothing() async throws {
+    internal func aHostileFileNameReachesTheProgramAsItIsAndRunsNothing() async throws {
         // The names that ran `touch` before: a quote and a backtick that carry a combining mark.
         let names = ["a\"\u{301};touch PWNED1;\"\u{301}", "`\u{301};touch PWNED2;`\u{301}", "$(touch PWNED3);x", "-n"]
         for name in names { try box.file("A/" + name) }
@@ -340,7 +340,7 @@ struct Review2ConfigALaunching {
     }
 
     @Test
-    func aProgramTheShellDoesNotFindIsReported() async {
+    internal func aProgramTheShellDoesNotFindIsReported() async {
         plugin.center!
             .save(
                 UserCommand(
@@ -355,7 +355,7 @@ struct Review2ConfigALaunching {
     }
 
     @Test
-    func aChainStopsWhenItsProgramCouldNotBeStarted() async {
+    internal func aChainStopsWhenItsProgramCouldNotBeStarted() async {
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
         let center = plugin.center!

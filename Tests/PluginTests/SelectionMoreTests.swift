@@ -10,15 +10,15 @@ import Testing
 /// The pure parts of the Mark menu: masks, selection types, selection files and the
 /// comparison of two lists.
 @Suite
-struct SelectionMoreRules {
-    func matching(_ mask: String, _ names: [String], folders: Set<String> = []) -> [String] {
+internal struct SelectionMoreRules {
+    internal func matching(_ mask: String, _ names: [String], folders: Set<String> = []) -> [String] {
         let mask = SelectionMask(mask)
         return zip(names, mask.selected(names.map { MaskEntry(name: $0, isFolder: folders.contains($0)) })).filter(\.1)
             .map(\.0)
     }
 
     @Test
-    func wildcardsIncludesAndExcludes() {
+    internal func wildcardsIncludesAndExcludes() {
         let names = ["win.ini", "Write.exe", "notes.bak", "w.old", "README", "long name.txt", ".cvs", "src"]
         let folders: Set = [".cvs", "src"]
         #expect(matching("*.*", names, folders: folders) == names)
@@ -37,7 +37,7 @@ struct SelectionMoreRules {
     }
 
     @Test
-    func regularExpressions() {
+    internal func regularExpressions() {
         let names = ["alpha.txt", "Beta.txt", "gamma.md"]
         #expect(matching("<^(a|b)", names) == ["alpha.txt", "Beta.txt"])
         #expect(matching("<\\.md$", names) == ["gamma.md"])
@@ -45,7 +45,7 @@ struct SelectionMoreRules {
     }
 
     @Test
-    func relatedFiles() {
+    internal func relatedFiles() {
         let names = ["IMG_1057.JPG", "IMG_1057.CR2", "CRW_1057.CR2", "IMG_2000.CR2", "notes.txt"]
         #expect(matching("*.jpg>*.cr2", names) == ["IMG_1057.JPG", "IMG_1057.CR2"])
         #expect(matching("*.jpg>crw*.cr2", names) == ["IMG_1057.JPG", "CRW_1057.CR2"])
@@ -63,7 +63,7 @@ struct SelectionMoreRules {
     }
 
     @Test
-    func pathLimitedMasks() {
+    internal func pathLimitedMasks() {
         func matches(_ mask: String, _ name: String, in directory: [String]) -> Bool {
             SelectionMask(mask).matches(MaskEntry(name: name, directory: directory))
         }
@@ -85,7 +85,7 @@ struct SelectionMoreRules {
     }
 
     @Test
-    func rulesReadPathsRelativeToTheListsDirectory() {
+    internal func rulesReadPathsRelativeToTheListsDirectory() {
         let base = URL(string: "mem:///work")!
         func item(_ path: String) -> FileItem {
             let url = URL(string: "mem:///work/" + path)!
@@ -100,7 +100,7 @@ struct SelectionMoreRules {
     }
 
     @Test
-    func selectionTypes() {
+    internal func selectionTypes() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         func file(_ name: String, size: Int64, daysOld: Double, hidden: Bool = false, folder: Bool = false) -> FileItem
         {
@@ -161,7 +161,7 @@ struct SelectionMoreRules {
     }
 
     @Test
-    func selectionFiles() {
+    internal func selectionFiles() {
         let items = [
             FileItem(url: URL(fileURLWithPath: "/x/dir1"), name: "dir1", kind: .directory),
             FileItem(url: URL(fileURLWithPath: "/x/ro.txt"), name: "ro.txt"),
@@ -185,7 +185,7 @@ struct SelectionMoreRules {
     }
 
     @Test
-    func comparingTwoLists() {
+    internal func comparingTwoLists() {
         func file(_ name: String, _ size: Int64, _ time: TimeInterval) -> FileItem {
             FileItem(
                 url: URL(fileURLWithPath: "/x/" + name),
@@ -247,15 +247,15 @@ struct SelectionMoreRules {
 /// The Mark commands driven through a kernel with fake panels and an in-memory file system.
 @MainActor
 @Suite
-struct SelectionMoreCommands {
-    typealias Ids = SelectionCommands
+internal struct SelectionMoreCommands {
+    internal typealias Ids = SelectionCommands
 
-    let memory = MemoryFileSystem()
+    internal let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let settings = MemorySettings()
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let settings = MemorySettings()
 
-    init() {
+    internal init() {
         let (old, new) = (Date(timeIntervalSince1970: 1_000_000), Date(timeIntervalSince1970: 2_000_000))
         memory.addFile("/A/docs/in.txt")
         memory.addDirectory("/A/shared")
@@ -272,7 +272,7 @@ struct SelectionMoreCommands {
         memory.addFile("/B/only_b.txt", "b", modified: old)
     }
 
-    func makeBench() -> TestBench {
+    internal func makeBench() -> TestBench {
         TestBench(
             plugins: [SelectionPlugin(pasteboard: pasteboard, background: false)],
             fileSystems: [LocalFileSystem(), memory],
@@ -282,7 +282,7 @@ struct SelectionMoreCommands {
         )
     }
 
-    func data(_ path: String) -> Data {
+    internal func data(_ path: String) -> Data {
         guard let reader = try? memory.read(memory.url(path)) else {
             return Data()
         }
@@ -290,7 +290,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func registration() {
+    internal func registration() {
         let bench = makeBench()
         let keys = bench.kernel.keyBindings
         #expect(bench.kernel.keyClashes.isEmpty)
@@ -311,7 +311,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func groupsByMask() {
+    internal func groupsByMask() {
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
         commands.perform(.selectGroup, .text("*.txt *.md | two.*"))
@@ -347,7 +347,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func foldersAsConfigured() {
+    internal func foldersAsConfigured() {
         settings.set(false, forKey: "selection.markDirectories")
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
@@ -375,7 +375,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func everyNthLineAndSteps() {
+    internal func everyNthLineAndSteps() {
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
         let files = left.names.filter { !["docs", "shared"].contains($0) }
@@ -397,7 +397,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func likeTheItemUnderTheCursor() {
+    internal func likeTheItemUnderTheCursor() {
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
         left.moveCursor(toName: "two.md")
@@ -423,7 +423,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func historyAndSelectionTypes() {
+    internal func historyAndSelectionTypes() {
         let bench = makeBench()
         let (commands, left, ui) = (bench.commands, bench.left, bench.interaction)
         commands.perform(Ids.selectFromList)
@@ -487,7 +487,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func savingAndLoadingSelectionFiles() {
+    internal func savingAndLoadingSelectionFiles() {
         let bench = makeBench()
         let (commands, left, ui) = (bench.commands, bench.left, bench.interaction)
         commands.perform(.selectGroup, .text("docs *.md"))
@@ -538,7 +538,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func selectionFilesOnTheLocalDisk() throws {
+    internal func selectionFilesOnTheLocalDisk() throws {
         let box = try Sandbox()
         try box.file("A/alpha.txt")
         try box.file("A/beta.txt")
@@ -557,7 +557,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func loadingFromTheClipboard() {
+    internal func loadingFromTheClipboard() {
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
         pasteboard.clearContents()
@@ -570,7 +570,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func comparingDirectories() {
+    internal func comparingDirectories() {
         let bench = makeBench()
         let (commands, left, right) = (bench.commands, bench.left, bench.right)
         // The previous selection is replaced on both sides.
@@ -598,7 +598,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func markNewerHideSame() {
+    internal func markNewerHideSame() {
         let bench = makeBench()
         let (commands, left, right) = (bench.commands, bench.left, bench.right)
         commands.perform(Ids.markNewerHideSame)
@@ -630,7 +630,7 @@ struct SelectionMoreCommands {
     }
 
     @Test
-    func aLargeListIsSelectedWithFewAnnouncements() {
+    internal func aLargeListIsSelectedWithFewAnnouncements() {
         for index in 0..<3_000 { memory.addFile("/big/file\(index).\(index % 2 == 0 ? "txt" : "md")") }
         let bench = makeBench()
         bench.left.show(memory.url("/big"))

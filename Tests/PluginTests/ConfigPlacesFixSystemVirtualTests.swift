@@ -8,9 +8,9 @@ import Testing
 @testable import VirtualFoldersPlugin
 
 @Suite
-struct ConfigPlacesFixSystemTools {
+internal struct ConfigPlacesFixSystemTools {
     @Test
-    func aProgramOnThePathBeatsAnApplicationOfTheSameName() throws {
+    internal func aProgramOnThePathBeatsAnApplicationOfTheSameName() throws {
         let box = try Sandbox()
         try box.folder("Apps/mail.app")
         try box.folder("Apps/afmnotaprogram.app")
@@ -36,7 +36,7 @@ struct ConfigPlacesFixSystemTools {
     }
 
     @Test
-    func cancellingEndsAChildThatIgnoresTerminate() {
+    internal func cancellingEndsAChildThatIgnoresTerminate() {
         let flag = CancellationFlag()
         let runner = ProcessRunner(
             executable: URL(fileURLWithPath: "/bin/sh"),
@@ -54,12 +54,12 @@ struct ConfigPlacesFixSystemTools {
 }
 
 @Suite
-struct ConfigPlacesFixVirtual {
-    let fileSystems = FileSystemRegistry()
-    let memory = MemoryFileSystem()
-    let virtual: VirtualFileSystem
+internal struct ConfigPlacesFixVirtual {
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
+    internal let virtual: VirtualFileSystem
 
-    init() {
+    internal init() {
         fileSystems.register(LocalFileSystem())
         fileSystems.register(memory)
         virtual = VirtualFileSystem(fileSystems: fileSystems)
@@ -67,7 +67,7 @@ struct ConfigPlacesFixVirtual {
     }
 
     @Test
-    func listIdsAreNotSmallNumbersAndMustMatchTheirLocation() throws {
+    internal func listIdsAreNotSmallNumbersAndMustMatchTheirLocation() throws {
         let url = virtual.register(files: [memory.url("/A/one.txt")], title: "Found", origin: memory.url("/A"))
         guard case .list(let id, _, _)? = VirtualLocation(url) else {
             Issue.record("not a list")
@@ -83,7 +83,7 @@ struct ConfigPlacesFixVirtual {
     }
 
     @Test
-    func evictionSparesAListThatIsShown() {
+    internal func evictionSparesAListThatIsShown() {
         let watchable = WatchedSystem()
         fileSystems.register(watchable)
         let first = virtual.register(files: [watchable.url("/d/f")], title: "First", origin: nil)
@@ -101,7 +101,7 @@ struct ConfigPlacesFixVirtual {
 
     @MainActor
     @Test
-    func manyReportsBecomeFewWalks() async throws {
+    internal func manyReportsBecomeFewWalks() async throws {
         let watchable = WatchedSystem()
         let registry = FileSystemRegistry()
         registry.register(watchable)
@@ -125,7 +125,7 @@ struct ConfigPlacesFixVirtual {
     }
 
     @Test
-    func aWalkListsEveryFileOnceAndSkipsMountFolders() throws {
+    internal func aWalkListsEveryFileOnceAndSkipsMountFolders() throws {
         let box = try Sandbox()
         try box.file("a/one.txt")
         try box.file("a/b/two.txt")

@@ -12,12 +12,12 @@ import UniformTypeIdentifiers
 /// provides its text only when asked can take as long as it likes). Main thread; its snapshots are
 /// safe to use from several threads.
 @MainActor
-final class ClipboardSource {
+internal final class ClipboardSource {
     /// One reading of the clipboard.
     ///
     /// Unchecked `Sendable`: the state is guarded by `condition`; `read` and `queue` do not change
     /// after `init`.
-    final class Snapshot: @unchecked Sendable {
+    internal final class Snapshot: @unchecked Sendable {
         private let condition = NSCondition()
         private var text: String?
         private var isRead = false
@@ -26,11 +26,11 @@ final class ClipboardSource {
         private let read: @Sendable () -> String?
         private let queue: DispatchQueue
         /// The longest text taken: a name holds a line of it at the most.
-        static let longest = 1 << 16
+        internal static let longest = 1 << 16
         /// How long a mask waits for a program that does not answer.
-        static let patience: TimeInterval = 2
+        internal static let patience: TimeInterval = 2
         /// For this long after giving up, nobody waits again.
-        static let grace: TimeInterval = 10
+        internal static let grace: TimeInterval = 10
 
         fileprivate init(read: @escaping @Sendable () -> String?, queue: DispatchQueue) {
             self.read = read
@@ -38,7 +38,7 @@ final class ClipboardSource {
         }
 
         /// The text, or nil when there is none or the clipboard does not answer in time.
-        func value() -> String? {
+        internal func value() -> String? {
             condition.lock()
             if !isRequested {
                 isRequested = true
@@ -68,7 +68,7 @@ final class ClipboardSource {
     private var last: (count: Int, snapshot: Snapshot)?
 
     /// Without `changeCount` the clipboard is read again for every preview.
-    init(read: @escaping @Sendable () -> String?, changeCount: (@MainActor () -> Int)? = nil) {
+    internal init(read: @escaping @Sendable () -> String?, changeCount: (@MainActor () -> Int)? = nil) {
         self.read = read
         self.changeCount = changeCount
     }
@@ -77,7 +77,7 @@ final class ClipboardSource {
     ///
     /// Cheap: nothing is read until the snapshot is asked for its value, and a clipboard that has
     /// not changed since the last call gives the same snapshot.
-    func snapshot() -> Snapshot {
+    internal func snapshot() -> Snapshot {
         guard let changeCount else {
             return Snapshot(read: read, queue: queue)
         }
@@ -104,21 +104,21 @@ final class ClipboardSource {
 /// are kept in an array of their own, the preview hands back the counts, and the clipboard is
 /// read, in the background, only when a mask uses it.
 @MainActor
-final class MultiRenameSession {
-    struct Row {
-        var entry: RenameEntry
+internal final class MultiRenameSession {
+    internal struct Row {
+        internal var entry: RenameEntry
         /// Nil is `<Error!>`.
-        var newName: String?
-        var status: RenameStatus
+        internal var newName: String?
+        internal var status: RenameStatus
     }
 
-    enum SortKey {
+    internal enum SortKey {
         case name, ext, size, date
     }
 
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
-    let store: RenameStore
+    internal let store: RenameStore
     private let logDirectory: URL
     private let previewsInBackground: Bool
     private let clipboard: ClipboardSource
@@ -141,29 +141,29 @@ final class MultiRenameSession {
     private var refreshRequest = 0
 
     /// The pause between the last change of a field and the preview it starts.
-    static let typingPause: TimeInterval = 0.1
+    internal static let typingPause: TimeInterval = 0.1
 
     /// The entries of the list, their new names and how they stand: parallel arrays, so that a
     /// preview is taken in by assigning two of them.
-    private(set) var entries: [RenameEntry]
+    internal private(set) var entries: [RenameEntry]
     private var newNames: [String?]
     private var statuses: [RenameStatus]
     private var givenNamesStorage: [String]?
     /// Names loaded from a file or typed by the user; they take the place of the masks.
-    var givenNames: [String]? { givenNamesStorage }
+    internal var givenNames: [String]? { givenNamesStorage }
     /// What is wrong with the masks or the expression, if anything.
-    private(set) var problem: any Error?
-    private(set) var isComputing = false
+    internal private(set) var problem: any Error?
+    internal private(set) var isComputing = false
     /// A run or an Undo is under way: the list stays as it is until it is over.
-    private(set) var isBusy = false
+    internal private(set) var isBusy = false
     /// The renames of the last run of this session, for the result list.
-    private(set) var lastRun: [RenamedItem] = []
+    internal private(set) var lastRun: [RenamedItem] = []
     /// How the items stand; worked out with the preview.
-    private(set) var counts: (changing: Int, conflicts: Int, errors: Int) = (0, 0, 0)
+    internal private(set) var counts: (changing: Int, conflicts: Int, errors: Int) = (0, 0, 0)
     /// Called on the main thread whenever rows, preview or buttons may look different.
-    var onChange: (() -> Void)?
+    internal var onChange: (() -> Void)?
 
-    var settings: RenameSettings {
+    internal var settings: RenameSettings {
         didSet {
             guard settings != oldValue else {
                 return
@@ -173,7 +173,7 @@ final class MultiRenameSession {
         }
     }
 
-    init(
+    internal init(
         kernel: Kernel,
         items: [FileItem],
         store: RenameStore,
@@ -201,10 +201,10 @@ final class MultiRenameSession {
     /// The rows as the list shows them.
     ///
     /// Made on each call: ask for one row with `row(at:)`.
-    var rows: [Row] { entries.indices.map(row(at:)) }
-    var rowCount: Int { entries.count }
+    internal var rows: [Row] { entries.indices.map(row(at:)) }
+    internal var rowCount: Int { entries.count }
 
-    func row(at index: Int) -> Row {
+    internal func row(at index: Int) -> Row {
         Row(entry: entries[index], newName: newNames[index], status: statuses[index])
     }
 
@@ -248,7 +248,7 @@ final class MultiRenameSession {
     /// Computes the preview again.
     ///
     /// With a window, in the background; `onChange` follows.
-    func refresh() {
+    internal func refresh() {
         refreshRequest += 1
         previewCancellation.cancel()
         let cancellation = CancellationFlag()
@@ -302,10 +302,10 @@ final class MultiRenameSession {
     }
 
     /// The new names as they stand, the old one where there is none.
-    var targetNames: [String] { entries.indices.map { newNames[$0] ?? entries[$0].name } }
+    internal var targetNames: [String] { entries.indices.map { newNames[$0] ?? entries[$0].name } }
 
     /// The window was closed: the preview under way, and one waiting out the pause, are not wanted.
-    func close() {
+    internal func close() {
         previewCancellation.cancel()
         refreshRequest += 1
         isComputing = false
@@ -334,7 +334,7 @@ final class MultiRenameSession {
     /// The keys are worked out once per row, and a long list is sorted in the background (the list
     /// shows the new order when it is ready; a change of the list in the meantime drops the result,
     /// and of two sorts asked for in a row, the second wins).
-    func sort(by key: SortKey, ascending: Bool) {
+    internal func sort(by key: SortKey, ascending: Bool) {
         guard !isBusy else {
             return
         }
@@ -427,7 +427,7 @@ final class MultiRenameSession {
 
     /// Moves the rows one place up (-1) or down (+1) and returns where they are now.
     @discardableResult
-    func move(_ indexes: IndexSet, by offset: Int) -> IndexSet {
+    internal func move(_ indexes: IndexSet, by offset: Int) -> IndexSet {
         guard !isBusy, offset == 1 || offset == -1, let first = indexes.first, let last = indexes.last,
             offset < 0 ? first > 0 : last < entries.count - 1
         else { return indexes }
@@ -442,7 +442,7 @@ final class MultiRenameSession {
 
     /// Moves rows in front of the row that is at `destination` now (drag and drop).
     @discardableResult
-    func move(_ indexes: IndexSet, to destination: Int) -> IndexSet {
+    internal func move(_ indexes: IndexSet, to destination: Int) -> IndexSet {
         guard !isBusy else {
             return indexes
         }
@@ -459,7 +459,7 @@ final class MultiRenameSession {
     }
 
     /// Takes rows out of the rename set.
-    func remove(_ indexes: IndexSet) {
+    internal func remove(_ indexes: IndexSet) {
         guard !isBusy else {
             return
         }
@@ -472,7 +472,7 @@ final class MultiRenameSession {
     /// rules can be applied on top; the fields go back to "no change".
     ///
     /// Nothing is renamed yet.
-    func nextStep() {
+    internal func nextStep() {
         guard !isBusy else {
             return
         }
@@ -523,7 +523,7 @@ final class MultiRenameSession {
     }
 
     /// Takes the new names from a text, one per line, in list order.
-    func loadNames(fromText text: String) {
+    internal func loadNames(fromText text: String) {
         guard !isBusy else {
             return
         }
@@ -537,7 +537,7 @@ final class MultiRenameSession {
 
     /// Reads a list of names from a file on any file system, off the main thread; the text is
     /// split into lines there too.
-    func loadNames(from url: URL, completion: (@MainActor @Sendable () -> Void)? = nil) {
+    internal func loadNames(from url: URL, completion: (@MainActor @Sendable () -> Void)? = nil) {
         guard !isBusy else {
             return
         }
@@ -581,7 +581,7 @@ final class MultiRenameSession {
     }
 
     /// "Edit names": the new names as text, one per line, for the user to change.
-    func editNames() {
+    internal func editNames() {
         guard !isBusy else {
             return
         }
@@ -622,7 +622,7 @@ final class MultiRenameSession {
     }
 
     /// Back to names made by the masks.
-    func clearGivenNames() {
+    internal func clearGivenNames() {
         guard !isBusy else {
             return
         }
@@ -632,7 +632,7 @@ final class MultiRenameSession {
 
     // MARK: Saved settings
 
-    func save(as name: String) {
+    internal func save(as name: String) {
         let name = String(name.trimmingCharacters(in: .whitespaces).prefix(252))
         guard !name.isEmpty else {
             return
@@ -643,7 +643,7 @@ final class MultiRenameSession {
 
     /// False when there are no settings of that name.
     @discardableResult
-    func load(_ name: String) -> Bool {
+    internal func load(_ name: String) -> Bool {
         guard let saved = store.saved[name] else {
             return false
         }
@@ -651,7 +651,7 @@ final class MultiRenameSession {
         return true
     }
 
-    func deleteSaved(_ name: String) {
+    internal func deleteSaved(_ name: String) {
         store.saved[name] = nil
         onChange?()
     }
@@ -681,16 +681,16 @@ final class MultiRenameSession {
         var renamed: [Bool] = []
     }
 
-    var logURL: URL { logDirectory.appendingPathComponent(RenameLog.fileName) }
-    var canUndo: Bool { !isBusy && store.undoLimit > 0 && store.undoCount > 0 }
-    var hasResultList: Bool { !lastRun.isEmpty }
+    internal var logURL: URL { logDirectory.appendingPathComponent(RenameLog.fileName) }
+    internal var canUndo: Bool { !isBusy && store.undoLimit > 0 && store.undoCount > 0 }
+    internal var hasResultList: Bool { !lastRun.isEmpty }
 
     /// Renames the items in list order, as a job with progress.
     ///
     /// The names are computed afresh on the job's thread, so what happens is what the fields say,
     /// whatever the preview has caught up with; the job ends when it is cancelled, also in the
     /// middle of a regular expression. `completion` runs on the main thread.
-    func start(completion: (@MainActor (RenameRunResult) -> Void)? = nil) {
+    internal func start(completion: (@MainActor (RenameRunResult) -> Void)? = nil) {
         guard !entries.isEmpty, !isBusy else {
             return
         }
@@ -888,7 +888,7 @@ final class MultiRenameSession {
 
     /// Undoes the last run after asking, last renamed first. `completion` runs on the main
     /// thread with what could not be put back; it is not called when the user says no.
-    func undo(completion: (@MainActor ([RenamedItem]) -> Void)? = nil) {
+    internal func undo(completion: (@MainActor ([RenamedItem]) -> Void)? = nil) {
         guard canUndo else {
             return
         }
@@ -997,7 +997,7 @@ final class MultiRenameSession {
     }
 
     /// Shows the log of the last run in the viewer.
-    func showResultList() {
+    internal func showResultList() {
         guard hasResultList else {
             return
         }
@@ -1017,7 +1017,7 @@ final class MultiRenameSession {
 }
 
 extension RenameStatus {
-    var isInvalid: Bool {
+    internal var isInvalid: Bool {
         if case .invalid = self {
             return true
         }
@@ -1032,8 +1032,8 @@ extension RenameStatus {
 /// picture type that are on this disk are opened: a FIFO in the list would hold a preview thread
 /// for good, a stub of a file in the cloud would be downloaded, and the decoders of ImageIO are not
 /// pointed at what is not a picture.
-enum ContentDate {
-    static func read(_ url: URL) -> Date? {
+internal enum ContentDate {
+    internal static func read(_ url: URL) -> Date? {
         guard url.isFileURL, isPicture(url), isPlainFileHere(url),
             let source = CGImageSourceCreateWithURL(url as CFURL, nil),
             let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
@@ -1050,7 +1050,7 @@ enum ContentDate {
     }
 
     /// Whether the name is that of a picture (or a camera's raw file).
-    static func isPicture(_ url: URL) -> Bool {
+    internal static func isPicture(_ url: URL) -> Bool {
         let ext = url.pathExtension
         guard !ext.isEmpty, let type = UTType(filenameExtension: ext) else {
             return false
@@ -1059,7 +1059,7 @@ enum ContentDate {
     }
 
     /// A regular file whose contents are on this disk.
-    static func isPlainFileHere(_ url: URL) -> Bool {
+    internal static func isPlainFileHere(_ url: URL) -> Bool {
         var info = stat()
         // SF_DATALESS: the contents are in the cloud.
         return stat(url.path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG && info.st_flags & 0x4000_0000 == 0
@@ -1077,7 +1077,7 @@ enum ContentDate {
 /// Hands a block to the main thread through the run loop (all modes that count), not through the
 /// main dispatch queue: a block that asks the user something runs a modal dialog, and a dialog
 /// started from inside a block of the main queue keeps every later block of the queue waiting.
-func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
+internal func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
     // The main run loop runs its blocks on the main thread.
     RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(block) }
     CFRunLoopWakeUp(CFRunLoopGetMain())

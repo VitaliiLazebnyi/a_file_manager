@@ -5,20 +5,20 @@ import Foundation
 ///
 /// The specification leaves the heuristics open ("a clone must choose its own"); these are the
 /// viewer's. Pure functions on a sample of the file.
-enum ViewerDetection {
+internal enum ViewerDetection {
     /// How many bytes from the start of a file are looked at.
-    static let sampleSize = 64 * 1_024
+    internal static let sampleSize = 64 * 1_024
 
-    struct TextGuess: Equatable {
-        var encoding: ViewerEncoding
+    internal struct TextGuess: Equatable {
+        internal var encoding: ViewerEncoding
         /// The length of a byte-order mark at the start; it is not part of the text.
-        var bomLength = 0
+        internal var bomLength = 0
         /// The sample does not look like text in any encoding.
-        var isBinary = false
+        internal var isBinary = false
     }
 
     /// A byte-order mark names the encoding outright.
-    static func byteOrderMark(_ sample: Data) -> (encoding: ViewerEncoding, length: Int)? {
+    internal static func byteOrderMark(_ sample: Data) -> (encoding: ViewerEncoding, length: Int)? {
         let bytes = [UInt8](sample.prefix(3))
         if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
             return (.utf8, 3)
@@ -38,7 +38,7 @@ enum ViewerDetection {
     /// it); binary data (NUL bytes, many control characters); valid UTF-8; and for the rest the
     /// choice between the Windows and the DOS code page. `isWholeFile` says that the sample is not
     /// cut off, so a UTF-8 sequence may not end in the middle.
-    static func guessText(_ sample: Data, isWholeFile: Bool) -> TextGuess {
+    internal static func guessText(_ sample: Data, isWholeFile: Bool) -> TextGuess {
         if let mark = byteOrderMark(sample) {
             return TextGuess(encoding: mark.encoding, bomLength: mark.length)
         }
@@ -65,7 +65,7 @@ enum ViewerDetection {
 
     /// UTF-16 without a mark: in text of mostly Latin letters one byte of each pair is zero,
     /// always on the same side.
-    static func guessUTF16(_ bytes: [UInt8]) -> ViewerEncoding? {
+    internal static func guessUTF16(_ bytes: [UInt8]) -> ViewerEncoding? {
         let pairs = bytes.count / 2
         guard pairs >= 2 else {
             return nil
@@ -87,7 +87,7 @@ enum ViewerDetection {
 
     /// Binary: any NUL byte, or more than one control character in twenty that text has no
     /// use for.
-    static func looksBinary(_ bytes: [UInt8]) -> Bool {
+    internal static func looksBinary(_ bytes: [UInt8]) -> Bool {
         var controls = 0
         for byte in bytes {
             if byte == 0 {
@@ -99,11 +99,11 @@ enum ViewerDetection {
         return controls * 20 > bytes.count
     }
 
-    enum UTF8Validity {
+    internal enum UTF8Validity {
         case ascii, multiByte, invalid
     }
 
-    static func utf8Validity(_ bytes: [UInt8], mayBeCutOff: Bool) -> UTF8Validity {
+    internal static func utf8Validity(_ bytes: [UInt8], mayBeCutOff: Bool) -> UTF8Validity {
         var text = DecodedText()
         let used = ViewerEncoding.utf8.decode(bytes, final: false, into: &text)
         // A sequence that only lacks its end is fine when the sample was cut off there.
@@ -129,7 +129,7 @@ enum ViewerDetection {
     /// Points for DOS: box-drawing bytes next to each other (frames and lines), and bytes 0x80–0x9F
     /// inside words (DOS has letters there, Windows punctuation or nothing). Points for Windows:
     /// bytes from 0xC0 up inside words, where Windows has its accented letters.
-    static func looksLikeDOS(_ bytes: [UInt8]) -> Bool {
+    internal static func looksLikeDOS(_ bytes: [UInt8]) -> Bool {
         func isLetter(_ byte: UInt8) -> Bool { (0x41...0x5A).contains(byte) || (0x61...0x7A).contains(byte) }
         func isBox(_ byte: UInt8) -> Bool { (0xB0...0xDF).contains(byte) }
         var dos = 0
@@ -150,23 +150,28 @@ enum ViewerDetection {
     }
 
     /// What a file is, beyond text and binary, by its name and its first bytes.
-    enum Content: Equatable {
+    internal enum Content: Equatable {
         case image, media, pdf, html, rtf, other
     }
 
-    static let imageExtensions: Set<String> = [
+    internal static let imageExtensions: Set<String> = [
         "png", "jpg", "jpeg", "jpe", "jfif", "gif", "bmp", "dib", "tif", "tiff", "heic", "heif", "webp",
         "icns", "ico", "cur", "psd", "tga", "jp2", "j2k", "avif", "dng", "cr2", "nef", "arw", "raf", "orf"
     ]
-    static let mediaExtensions: Set<String> = [
+    internal static let mediaExtensions: Set<String> = [
         "mp3", "m4a", "aac", "wav", "aif", "aiff", "aifc", "caf", "flac", "mp4", "m4v", "mov", "mpg",
         "mpeg", "avi", "3gp", "m4b", "mp2", "au", "snd", "ac3", "amr"
     ]
-    static let htmlExtensions: Set<String> = ["html", "htm", "xhtml", "shtml"]
+    internal static let htmlExtensions: Set<String> = ["html", "htm", "xhtml", "shtml"]
 
     /// `additionalMedia` and `vetoed` are lists of extensions from the configuration
     /// (spec 10 › Type lists and vetoes).
-    static func content(name: String, sample: Data, additionalMedia: Set<String> = [], vetoed: Set<String> = [])
+    internal static func content(
+        name: String,
+        sample: Data,
+        additionalMedia: Set<String> = [],
+        vetoed: Set<String> = []
+    )
         -> Content
     {
         let ext = (name as NSString).pathExtension.lowercased()
@@ -206,7 +211,7 @@ enum ViewerDetection {
     }
 
     /// The extensions in a list such as `*.mkv *.wmv` or `mkv, wmv`.
-    static func extensions(in list: String) -> Set<String> {
+    internal static func extensions(in list: String) -> Set<String> {
         Set(
             list.lowercased().split(whereSeparator: { " ,;|".contains($0) })
                 .map {
@@ -218,7 +223,7 @@ enum ViewerDetection {
 
     /// The character set an HTML file names in its head (`<meta charset=…>`, or the
     /// `http-equiv` form), if any (spec 10 › HTML text).
-    static func htmlCharset(_ sample: Data) -> ViewerEncoding? {
+    internal static func htmlCharset(_ sample: Data) -> ViewerEncoding? {
         let head = String(decoding: sample.prefix(4_096), as: UTF8.self).lowercased()
         guard let range = head.range(of: "charset=") else {
             return nil

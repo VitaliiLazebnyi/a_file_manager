@@ -9,10 +9,10 @@ import Testing
 /// version, preferences that are no number, lists of names in odd encodings.
 @MainActor
 @Suite
-struct CoverageRenameStore {
+internal struct CoverageRenameStore {
     /// One of the saved settings lacks a field (written by another version): the others still load.
     @Test
-    func aDamagedSavedSettingLeavesTheOthers() throws {
+    internal func aDamagedSavedSettingLeavesTheOthers() throws {
         let settings = MemorySettings()
         SettingsJSON.store(
             #"""
@@ -33,7 +33,7 @@ struct CoverageRenameStore {
 
     /// A stored value that is no object at all gives no saved settings.
     @Test
-    func savedSettingsThatAreNoObjectAreNone() {
+    internal func savedSettingsThatAreNoObjectAreNone() {
         let settings = MemorySettings()
         SettingsJSON.store("[1, 2]", forKey: "multirename.saved", in: settings)
         #expect(RenameStore(settings: settings).saved.isEmpty)
@@ -41,7 +41,7 @@ struct CoverageRenameStore {
 
     /// The undo length is read as typed: spaces are allowed, text and negative numbers are not.
     @Test
-    func theUndoLengthReadsWhatWasTyped() {
+    internal func theUndoLengthReadsWhatWasTyped() {
         let settings = MemorySettings()
         let store = RenameStore(settings: settings)
         #expect(store.undoLimit == 20)
@@ -55,7 +55,7 @@ struct CoverageRenameStore {
 
     /// Asking for the undo history again once it is in memory answers at once.
     @Test
-    func loadingTheUndoHistoryTwiceAnswersAtOnce() {
+    internal func loadingTheUndoHistoryTwiceAnswersAtOnce() {
         let store = RenameStore(settings: MemorySettings())
         store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/a"), to: URL(fileURLWithPath: "/b"))])
         var answered = false
@@ -66,7 +66,7 @@ struct CoverageRenameStore {
     /// The history is decoded in the background when it is asked for first; the completion runs
     /// on the main thread with the runs in memory.
     @Test
-    func theUndoHistoryIsDecodedInTheBackground() async {
+    internal func theUndoHistoryIsDecodedInTheBackground() async {
         let settings = MemorySettings()
         let writer = RenameStore(settings: settings)
         writer.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/a"), to: URL(fileURLWithPath: "/b"))])
@@ -82,7 +82,7 @@ struct CoverageRenameStore {
 
     /// Writing the history now is nothing to do while it was never read.
     @Test
-    func flushingAnUnreadHistoryWritesNothing() {
+    internal func flushingAnUnreadHistoryWritesNothing() {
         let settings = MemorySettings()
         RenameStore(settings: settings).flush()
         #expect(
@@ -92,14 +92,14 @@ struct CoverageRenameStore {
 
     /// UTF-16 with a byte-order mark and half a character pair is no text.
     @Test
-    func aBrokenUTF16ListIsEmpty() {
+    internal func aBrokenUTF16ListIsEmpty() {
         #expect(RenameNameList.text(from: Data([0xFF, 0xFE, 0x00, 0xD8])).isEmpty)
         #expect(RenameNameList.text(from: Data([0xFF, 0xFE, 0x41, 0x00])) == "A")
     }
 
     /// Bytes that are neither UTF-8 nor the Western code page are read as far as they go.
     @Test
-    func undecodableBytesAreReadAsFarAsTheyGo() {
+    internal func undecodableBytesAreReadAsFarAsTheyGo() {
         let text = RenameNameList.text(from: Data([0x61, 0x81, 0x62]))
         #expect(text.hasPrefix("a") && text.hasSuffix("b"))
     }

@@ -151,9 +151,9 @@ public enum SpotlightQuery {
 ///
 /// `completion` and `isStopped` are guarded by `lock`. The metadata query is set up in `init`
 /// and started on the main thread; after that only `queue` touches it.
-final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
+internal final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     /// The most paths read out of one answer.
-    static let resultLimit = 1_000_000
+    internal static let resultLimit = 1_000_000
 
     private let metadataQuery = NSMetadataQuery()
     private let queue: OperationQueue
@@ -162,13 +162,13 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     private var isStopped = false
 
     /// The most paths read out of this answer.
-    let limit: Int
+    internal let limit: Int
 
     /// `string` is a question in Spotlight's language, as `SpotlightQuery.string` makes it (the
     /// system stops the program at one it cannot read).
     ///
     /// The answer is read on `queue` (tests hold it, to choose what comes first).
-    init(
+    internal init(
         _ string: String,
         scopes: [URL],
         limit: Int = SpotlightSearch.resultLimit,
@@ -189,7 +189,7 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     /// `completion` gets the paths and whether the answer was cut at `resultLimit`.
     ///
     /// A question that was stopped is not started again.
-    func start(completion: @escaping @MainActor @Sendable ([String], Bool) -> Void) {
+    internal func start(completion: @escaping @MainActor @Sendable ([String], Bool) -> Void) {
         lock.lock()
         self.completion = completion
         lock.unlock()
@@ -206,7 +206,7 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     ///
     /// May be called from the main thread while the paths are being read: the reading notices at
     /// its next piece.
-    func stop() {
+    internal func stop() {
         lock.lock()
         isStopped = true
         completion = nil

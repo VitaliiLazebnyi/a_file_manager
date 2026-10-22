@@ -17,12 +17,13 @@ public protocol PasswordStore: AnyObject, Sendable {
 public final class KeychainPasswords: PasswordStore {
     /// The four calls of the Security framework this class makes; tests put a recording
     /// stand-in in their place, so the order of the calls is tested without a Keychain.
-    struct Calls {
-        var copy: @Sendable (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus =
+    internal struct Calls {
+        internal var copy: @Sendable (_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus =
             SecItemCopyMatching
-        var update: @Sendable (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = SecItemUpdate
-        var add: @Sendable (_ item: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus = SecItemAdd
-        var delete: @Sendable (_ query: CFDictionary) -> OSStatus = SecItemDelete
+        internal var update: @Sendable (_ query: CFDictionary, _ changes: CFDictionary) -> OSStatus = SecItemUpdate
+        internal var add: @Sendable (_ item: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus =
+            SecItemAdd
+        internal var delete: @Sendable (_ query: CFDictionary) -> OSStatus = SecItemDelete
     }
 
     private let service: String
@@ -32,7 +33,7 @@ public final class KeychainPasswords: PasswordStore {
         self.init(service: service, calls: Calls())
     }
 
-    init(service: String, calls: Calls) {
+    internal init(service: String, calls: Calls) {
         self.service = service
         self.calls = calls
     }
@@ -438,7 +439,7 @@ public struct SavedConnection: Codable, Equatable, Sendable {
     }
 
     /// Stores `port`, unless it is the one the protocol uses anyway.
-    mutating func setPort(_ port: Int) {
+    internal mutating func setPort(_ port: Int) {
         self.port = port == kind.defaultPort ? nil : port
     }
 }

@@ -6,11 +6,11 @@ import Testing
 
 /// What the local file system keeps when it copies, and what it tells about its surroundings.
 @Suite
-struct LocalDiskExtras {
-    let local = LocalFileSystem()
+internal struct LocalDiskExtras {
+    internal let local = LocalFileSystem()
 
     @Test
-    func aCopyKeepsCreationDateExtendedAttributesAndFlags() throws {
+    internal func aCopyKeepsCreationDateExtendedAttributesAndFlags() throws {
         let box = try Sandbox()
         var source = try box.file("a.txt", "content", modified: Date(timeIntervalSince1970: 1_700_000_000))
         var values = URLResourceValues()
@@ -33,7 +33,7 @@ struct LocalDiskExtras {
     }
 
     @Test
-    func makingALockedFileWritableUnlocksIt() throws {
+    internal func makingALockedFileWritableUnlocksIt() throws {
         let box = try Sandbox()
         let file = try box.file("locked.txt", "l")
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: file.path)
@@ -49,7 +49,7 @@ struct LocalDiskExtras {
     }
 
     @Test
-    func volumesAreFoundAlsoForPlacesThatDoNotExistYet() throws {
+    internal func volumesAreFoundAlsoForPlacesThatDoNotExistYet() throws {
         let box = try Sandbox()
         let here = try #require(local.volume(of: box.root))
         #expect(
@@ -64,7 +64,7 @@ struct LocalDiskExtras {
     }
 
     @Test
-    func placesListTheUsualFoldersAndTheVolumes() {
+    internal func placesListTheUsualFoldersAndTheVolumes() {
         let places = local.settledPlaces()
         #expect(places.first?.kind == .home && places.first?.name == "Home")
         let names = places.map(\.name)

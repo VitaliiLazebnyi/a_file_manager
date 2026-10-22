@@ -5,7 +5,7 @@ import Foundation
 /// child process.
 ///
 /// A stream belongs to the thread that reads it.
-protocol ByteStream: AnyObject {
+internal protocol ByteStream: AnyObject {
     /// The next block, never empty; nil at the end.
     func read(upToCount count: Int) throws -> Data?
     /// Passes over bytes without looking at them.
@@ -14,7 +14,7 @@ protocol ByteStream: AnyObject {
 }
 
 extension ByteStream {
-    func skip(_ count: UInt64) throws {
+    internal func skip(_ count: UInt64) throws {
         var left = count
         while left > 0 {
             guard let block = try read(upToCount: Int(min(left, 1 << 18))) else {
@@ -25,7 +25,7 @@ extension ByteStream {
     }
 
     /// Exactly `count` bytes, or fewer at the end of the stream.
-    func readFully(_ count: Int) throws -> Data {
+    internal func readFully(_ count: Int) throws -> Data {
         var data = Data()
         while data.count < count, let block = try read(upToCount: count - data.count) { data.append(block) }
         return data
@@ -34,7 +34,7 @@ extension ByteStream {
 
 /// Makes a system call that reads or writes, again for as long as a signal interrupts it
 /// (`EINTR`); the count it returns, or -1 with `errno` set.
-func retryingInterrupted(_ call: () -> Int) -> Int {
+internal func retryingInterrupted(_ call: () -> Int) -> Int {
     var result: Int
     repeat {
         result = call()
@@ -42,7 +42,7 @@ func retryingInterrupted(_ call: () -> Int) -> Int {
     return result
 }
 
-func posixError(_ code: Int32, _ path: String) -> any Error {
+internal func posixError(_ code: Int32, _ path: String) -> any Error {
     NSError(
         domain: NSPOSIXErrorDomain,
         code: Int(code),
@@ -55,17 +55,17 @@ func posixError(_ code: Int32, _ path: String) -> any Error {
 ///
 /// The file stays readable for as long as this object lives, even when it is replaced or deleted
 /// meanwhile.
-final class RandomAccessFile: Sendable {
-    let size: UInt64
-    let path: String
+internal final class RandomAccessFile: Sendable {
+    internal let size: UInt64
+    internal let path: String
     /// What the open file is, taken from the descriptor: a file that has since been replaced
     /// under the same path has another.
-    let signature: FileSignature
+    internal let signature: FileSignature
     private let descriptor: Int32
 
     /// `shownAs` names the file in messages and to child processes when it is opened under a
     /// temporary name that it is about to lose.
-    init(_ url: URL, shownAs: String? = nil) throws {
+    internal init(_ url: URL, shownAs: String? = nil) throws {
         path = shownAs ?? url.path
         descriptor = open(url.path, O_RDONLY)
         var status = stat()
@@ -83,10 +83,10 @@ final class RandomAccessFile: Sendable {
 
     /// False when another file lies at the path now: a child process that opens the path
     /// would read that one.
-    var isStillAtItsPath: Bool { FileSignature.of(path) == signature }
+    internal var isStillAtItsPath: Bool { FileSignature.of(path) == signature }
 
     /// Up to `count` bytes; fewer only at the end of the file.
-    func read(at offset: UInt64, count: Int) throws -> Data {
+    internal func read(at offset: UInt64, count: Int) throws -> Data {
         guard count > 0, offset < size else {
             return Data()
         }
@@ -119,18 +119,18 @@ final class RandomAccessFile: Sendable {
 ///
 /// Set from any thread; the streams that can take long look at it and throw, and a child process is
 /// stopped by it. All state is guarded by `lock`.
-final class StreamInterrupt: @unchecked Sendable {
+internal final class StreamInterrupt: @unchecked Sendable {
     private let lock = NSLock()
     private var isRaised = false
     private var handlers: [@Sendable () -> Void] = []
 
-    var isSet: Bool {
+    internal var isSet: Bool {
         lock.lock()
         defer { lock.unlock() }
         return isRaised
     }
 
-    func set() {
+    internal func set() {
         lock.lock()
         let waiting = isRaised ? [] : handlers
         isRaised = true
@@ -139,14 +139,14 @@ final class StreamInterrupt: @unchecked Sendable {
         for handler in waiting { handler() }
     }
 
-    func check() throws {
+    internal func check() throws {
         if isSet { throw ArchiveError.cancelled }
     }
 
     /// Runs `handler` when the request is set, at once if it is already.
     ///
     /// Holds on to what it touches weakly.
-    func onSet(_ handler: @escaping @Sendable () -> Void) {
+    internal func onSet(_ handler: @escaping @Sendable () -> Void) {
         lock.lock()
         guard isRaised else {
             handlers.append(handler)
@@ -158,7 +158,7 @@ final class StreamInterrupt: @unchecked Sendable {
     }
 
     /// Set when `flag` is, for as long as the returned object is held.
-    func following(_ flag: CancellationFlag?) -> AnyObject? {
+    internal func following(_ flag: CancellationFlag?) -> AnyObject? {
         flag?.onCancel { [weak self] in self?.set() }
     }
 }
@@ -169,18 +169,18 @@ final class StreamInterrupt: @unchecked Sendable {
 /// A stream that is kept for the next reader (see `OpenArchive.park`) is let go of at `release()`,
 /// so that a request that comes later cannot end somebody else's read. All state is guarded by
 /// `lock`.
-final class InterruptSlot: @unchecked Sendable {
+internal final class InterruptSlot: @unchecked Sendable {
     private let lock = NSLock()
     private var interrupted = false
     private var current: StreamInterrupt?
 
-    var isInterrupted: Bool {
+    internal var isInterrupted: Bool {
         lock.lock()
         defer { lock.unlock() }
         return interrupted
     }
 
-    func interrupt() {
+    internal func interrupt() {
         lock.lock()
         interrupted = true
         // Under the lock: `release()` either comes before and this misses the chain, or after.
@@ -188,14 +188,14 @@ final class InterruptSlot: @unchecked Sendable {
         lock.unlock()
     }
 
-    func use(_ control: StreamInterrupt?) {
+    internal func use(_ control: StreamInterrupt?) {
         lock.lock()
         current = control
         if interrupted { control?.set() }
         lock.unlock()
     }
 
-    func release() {
+    internal func release() {
         lock.lock()
         current = nil
         lock.unlock()
@@ -203,20 +203,20 @@ final class InterruptSlot: @unchecked Sendable {
 }
 
 /// A stream that can continue at any position without reading what lies between.
-protocol SeekableStream: ByteStream {
+internal protocol SeekableStream: ByteStream {
     /// `offset` counts from the first byte of the stream; past the end means the end.
     func seek(to offset: UInt64)
 }
 
 /// A stretch of a file as a stream; skipping costs nothing.
-final class FileRangeStream: SeekableStream {
+internal final class FileRangeStream: SeekableStream {
     private let file: RandomAccessFile
     private let start: UInt64
     private var position: UInt64
     private let end: UInt64
 
     /// A stretch that reaches past the end of the file (a damaged directory) ends with the file.
-    init(_ file: RandomAccessFile, offset: UInt64 = 0, length: UInt64? = nil) {
+    internal init(_ file: RandomAccessFile, offset: UInt64 = 0, length: UInt64? = nil) {
         self.file = file
         let first = min(offset, file.size)
         start = first
@@ -224,11 +224,11 @@ final class FileRangeStream: SeekableStream {
         end = length.map { min(file.size, first.plusClamped($0)) } ?? file.size
     }
 
-    func seek(to offset: UInt64) {
+    internal func seek(to offset: UInt64) {
         position = min(end, start.plusClamped(offset))
     }
 
-    func read(upToCount count: Int) throws -> Data? {
+    internal func read(upToCount count: Int) throws -> Data? {
         guard position < end else {
             return nil
         }
@@ -240,25 +240,25 @@ final class FileRangeStream: SeekableStream {
         return data
     }
 
-    func skip(_ count: UInt64) throws {
+    internal func skip(_ count: UInt64) throws {
         guard end - position >= count else { throw ArchiveError.damaged("unexpected end of data") }
         position += count
     }
 
-    func close() {}
+    internal func close() {}
 }
 
 /// A stream that holds a few bytes in memory.
-final class DataStream: SeekableStream {
+internal final class DataStream: SeekableStream {
     private let all: Data
     private var data: Data
 
-    init(_ data: Data) {
+    internal init(_ data: Data) {
         all = data
         self.data = data
     }
 
-    func read(upToCount count: Int) -> Data? {
+    internal func read(upToCount count: Int) -> Data? {
         guard !data.isEmpty else {
             return nil
         }
@@ -267,16 +267,16 @@ final class DataStream: SeekableStream {
         return Data(block)
     }
 
-    func seek(to offset: UInt64) {
+    internal func seek(to offset: UInt64) {
         data = all.dropFirst(Int(min(offset, UInt64(all.count))))
     }
 
-    func close() {}
+    internal func close() {}
 }
 
 extension UInt64 {
     /// The sum, or the largest number when it does not fit: sizes read from a file may be anything.
-    func plusClamped(_ other: UInt64) -> UInt64 {
+    internal func plusClamped(_ other: UInt64) -> UInt64 {
         let (sum, overflow) = addingReportingOverflow(other)
         return overflow ? .max : sum
     }
@@ -286,18 +286,18 @@ extension UInt64 {
 ///
 /// A member that unpacks to more than its directory entry declares is damaged or made to fill the
 /// disk; it is stopped at the first byte too many instead of after the last.
-final class SizeGuardStream: ByteStream {
+internal final class SizeGuardStream: ByteStream {
     private let source: any ByteStream
     private var left: UInt64
     private let name: String
 
-    init(_ source: any ByteStream, limit: UInt64, name: String) {
+    internal init(_ source: any ByteStream, limit: UInt64, name: String) {
         self.source = source
         left = limit
         self.name = name
     }
 
-    func read(upToCount count: Int) throws -> Data? {
+    internal func read(upToCount count: Int) throws -> Data? {
         guard let block = try source.read(upToCount: count) else {
             return nil
         }
@@ -308,30 +308,30 @@ final class SizeGuardStream: ByteStream {
         return block
     }
 
-    func close() { source.close() }
+    internal func close() { source.close() }
 }
 
 /// Passes a stream on and keeps a copy of what was read in a file, for as long as the copy
 /// stays below `limit` (and the disk takes it).
 ///
 /// Used by one thread.
-final class TeeStream: ByteStream {
+internal final class TeeStream: ByteStream {
     private let source: any ByteStream
     private let output: OutputFile
     private let limit: UInt64
     /// False once the copy was given up; what the file holds is then worthless.
-    private(set) var isComplete = true
+    internal private(set) var isComplete = true
 
     private let room: SpaceWatch?
 
-    init(_ source: any ByteStream, to output: OutputFile, limit: UInt64, room: SpaceWatch? = nil) {
+    internal init(_ source: any ByteStream, to output: OutputFile, limit: UInt64, room: SpaceWatch? = nil) {
         self.source = source
         self.output = output
         self.limit = limit
         self.room = room
     }
 
-    func read(upToCount count: Int) throws -> Data? {
+    internal func read(upToCount count: Int) throws -> Data? {
         guard let block = try source.read(upToCount: count) else {
             return nil
         }
@@ -347,15 +347,15 @@ final class TeeStream: ByteStream {
         return block
     }
 
-    func close() { source.close() }
+    internal func close() { source.close() }
 }
 
 /// A new file on the local disk, written from front to back, with the possibility to go back
 /// and correct a header.
 ///
 /// Used by one thread.
-final class OutputFile {
-    let url: URL
+internal final class OutputFile {
+    internal let url: URL
     private let descriptor: Int32
     private var buffer = Data()
     private var flushed: UInt64 = 0
@@ -365,7 +365,7 @@ final class OutputFile {
     ///
     /// It is the user's alone until whoever writes it says otherwise (`setMode`): a half-written
     /// archive is nobody else's to read.
-    init(creating url: URL, mode: mode_t = 0o600) throws {
+    internal init(creating url: URL, mode: mode_t = 0o600) throws {
         self.url = url
         descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode)
         guard descriptor >= 0 else {
@@ -374,18 +374,18 @@ final class OutputFile {
     }
 
     /// The rights of the file, whatever the process's mask says.
-    func setMode(_ mode: mode_t) {
+    internal func setMode(_ mode: mode_t) {
         if !isClosed { fchmod(descriptor, mode & 0o7777) }
     }
 
     /// Gives up what was written: the room it took is free at once, not when the file goes.
-    func discard() {
+    internal func discard() {
         buffer.removeAll()
         if !isClosed { ftruncate(descriptor, 0) }
     }
 
     /// Continues an existing file at `offset`; what the file held from there on is cut off.
-    init(extending url: URL, from offset: UInt64) throws {
+    internal init(extending url: URL, from offset: UInt64) throws {
         self.url = url
         // Opened without waiting and through no link, and looked at before anything is written:
         // whatever has taken the file's name meanwhile (a pipe, which would hold the open for
@@ -413,9 +413,9 @@ final class OutputFile {
     }
 
     /// Where the next byte goes.
-    var position: UInt64 { flushed + UInt64(buffer.count) }
+    internal var position: UInt64 { flushed + UInt64(buffer.count) }
 
-    func write(_ data: Data) throws {
+    internal func write(_ data: Data) throws {
         if data.count >= 1 << 16 {
             try flush()
             try writeOut(data, at: nil)
@@ -427,7 +427,7 @@ final class OutputFile {
     }
 
     /// Replaces bytes that were written before.
-    func rewrite(_ data: Data, at offset: UInt64) throws {
+    internal func rewrite(_ data: Data, at offset: UInt64) throws {
         try flush()
         try writeOut(data, at: offset)
     }
@@ -459,7 +459,7 @@ final class OutputFile {
 
     /// `durably` returns only when the disk holds the data: for a file that is about to take
     /// the place of another, which a rename after a loss of power must not leave half-written.
-    func close(durably: Bool = false) throws {
+    internal func close(durably: Bool = false) throws {
         guard !isClosed else {
             return
         }
@@ -476,13 +476,13 @@ final class OutputFile {
 }
 
 /// Makes writes last through a loss of power.
-enum Durable {
+internal enum Durable {
     /// Waits until the file's data is on the disk, in order (`F_BARRIERFSYNC`: what the file
     /// system needs to keep a rename behind it honest, without emptying the drive's cache as
     /// `F_FULLFSYNC` does).
     ///
     /// File systems that do not know it get a plain `fsync`.
-    static func sync(_ descriptor: Int32) -> Bool {
+    internal static func sync(_ descriptor: Int32) -> Bool {
         if fcntl(descriptor, F_BARRIERFSYNC) == 0 {
             return true
         }
@@ -490,7 +490,7 @@ enum Durable {
     }
 
     /// After a rename: the folder's entry is what makes the new file the file.
-    static func syncFolder(of url: URL) {
+    internal static func syncFolder(of url: URL) {
         let descriptor = open(url.deletingLastPathComponent().path, O_RDONLY)
         guard descriptor >= 0 else {
             return
@@ -501,7 +501,7 @@ enum Durable {
 
     /// Where a path leads once every symbolic link in it is followed: an archive that is
     /// reached through a link is rewritten where it really lies, and the link stays a link.
-    static func realFile(_ url: URL) -> URL {
+    internal static func realFile(_ url: URL) -> URL {
         guard let real = realpath(url.path, nil) else {
             return url
         }
@@ -513,17 +513,17 @@ enum Durable {
 /// Little-endian numbers in a block of bytes, as ZIP stores them.
 ///
 /// Reading past the end gives zero instead of a crash: the callers check signatures and lengths.
-struct ByteReader {
-    let data: Data
-    var position = 0
+internal struct ByteReader {
+    internal let data: Data
+    internal var position = 0
 
-    init(_ data: Data) {
+    internal init(_ data: Data) {
         self.data = data
     }
 
-    var remaining: Int { data.count - position }
+    internal var remaining: Int { data.count - position }
 
-    mutating func u8() -> UInt8 {
+    internal mutating func u8() -> UInt8 {
         guard remaining >= 1 else {
             position = data.count
             return 0
@@ -532,11 +532,11 @@ struct ByteReader {
         return data[data.startIndex + position]
     }
 
-    mutating func u16() -> UInt16 { UInt16(u8()) | UInt16(u8()) << 8 }
-    mutating func u32() -> UInt32 { UInt32(u16()) | UInt32(u16()) << 16 }
-    mutating func u64() -> UInt64 { UInt64(u32()) | UInt64(u32()) << 32 }
+    internal mutating func u16() -> UInt16 { UInt16(u8()) | UInt16(u8()) << 8 }
+    internal mutating func u32() -> UInt32 { UInt32(u16()) | UInt32(u16()) << 16 }
+    internal mutating func u64() -> UInt64 { UInt64(u32()) | UInt64(u32()) << 32 }
 
-    mutating func bytes(_ count: Int) -> Data {
+    internal mutating func bytes(_ count: Int) -> Data {
         let taken = max(0, min(count, remaining))
         defer { position += taken }
         return data.subdata(in: (data.startIndex + position)..<(data.startIndex + position + taken))
@@ -544,12 +544,12 @@ struct ByteReader {
 }
 
 extension Data {
-    mutating func appendLE(_ value: UInt16) { append(contentsOf: [UInt8(value & 0xFF), UInt8(value >> 8)]) }
-    mutating func appendLE(_ value: UInt32) {
+    internal mutating func appendLE(_ value: UInt16) { append(contentsOf: [UInt8(value & 0xFF), UInt8(value >> 8)]) }
+    internal mutating func appendLE(_ value: UInt32) {
         appendLE(UInt16(value & 0xFFFF))
         appendLE(UInt16(value >> 16))
     }
-    mutating func appendLE(_ value: UInt64) {
+    internal mutating func appendLE(_ value: UInt64) {
         appendLE(UInt32(value & 0xFFFF_FFFF))
         appendLE(UInt32(value >> 32))
     }
@@ -559,7 +559,7 @@ extension Data {
 /// block, it looks at the volume once per `step` bytes.
 ///
 /// Used by one thread.
-final class SpaceWatch {
+internal final class SpaceWatch {
     private let folder: URL
     private let reserve: UInt64
     private let hasRoom: (UInt64, URL) -> Bool
@@ -568,7 +568,7 @@ final class SpaceWatch {
     private var full = false
 
     /// `reserve` bytes stay free whatever is written.
-    init(folder: URL, reserve: UInt64, step: UInt64 = 32 << 20, hasRoom: @escaping (UInt64, URL) -> Bool) {
+    internal init(folder: URL, reserve: UInt64, step: UInt64 = 32 << 20, hasRoom: @escaping (UInt64, URL) -> Bool) {
         self.folder = folder
         self.reserve = reserve
         self.hasRoom = hasRoom
@@ -577,7 +577,7 @@ final class SpaceWatch {
     }
 
     /// False once writing `count` more bytes would eat into the reserve.
-    func allows(_ count: UInt64) -> Bool {
+    internal func allows(_ count: UInt64) -> Bool {
         guard !full else {
             return false
         }
@@ -603,10 +603,10 @@ final class SpaceWatch {
 ///
 /// Unchecked: what changes, here and in the table of all folders, is guarded by the static
 /// `lock`.
-final class ScratchFolder: @unchecked Sendable {
-    let url: URL
+internal final class ScratchFolder: @unchecked Sendable {
+    internal let url: URL
 
-    static let prefix = "afm-archives-"
+    internal static let prefix = "afm-archives-"
     private static let keptMark = "kept-unsaved-changes"
     private static let lock = NSLock()
     /// Guarded by `lock`.
@@ -634,7 +634,7 @@ final class ScratchFolder: @unchecked Sendable {
         }
     }()
 
-    init(in parent: URL = FileManager.default.temporaryDirectory) {
+    internal init(in parent: URL = FileManager.default.temporaryDirectory) {
         url = parent.appendingPathComponent(
             "\(Self.prefix)\(getpid())-\(UUID().uuidString)",
             isDirectory: true
@@ -665,13 +665,13 @@ final class ScratchFolder: @unchecked Sendable {
         Self.lock.unlock()
     }
 
-    func newFile(_ suffix: String = "tmp") throws -> URL {
+    internal func newFile(_ suffix: String = "tmp") throws -> URL {
         try prepare()
         return url.appendingPathComponent(UUID().uuidString + "." + suffix, isDirectory: false)
     }
 
     /// The names temporary things get outside the folder; nothing else is ever removed there.
-    static func isOwnExternalName(_ name: String) -> Bool {
+    internal static func isOwnExternalName(_ name: String) -> Bool {
         name.hasPrefix(".")
             && (name.hasSuffix(".afm-zip.tmp") || name.hasSuffix(".afm-pack.tmp") || name.hasPrefix(".afm-spool-"))
     }
@@ -687,7 +687,7 @@ final class ScratchFolder: @unchecked Sendable {
     ///
     /// It is removed with the folder if it is still there then, and by the next start if the
     /// program dies before.
-    func noteExternal(_ url: URL) {
+    internal func noteExternal(_ url: URL) {
         guard Self.isOwnExternalName(url.lastPathComponent) else {
             return
         }
@@ -706,7 +706,7 @@ final class ScratchFolder: @unchecked Sendable {
         Darwin.close(descriptor)
     }
 
-    func removeAll() {
+    internal func removeAll() {
         Self.lock.lock()
         let (stays, outside) = (isKept, externals)
         if !stays {
@@ -724,7 +724,7 @@ final class ScratchFolder: @unchecked Sendable {
 
     /// Leaves the folder on the disk, also when the program exits and when a later start
     /// clears away what crashes left: it holds data that could not be written where it belongs.
-    func keep() {
+    internal func keep() {
         Self.lock.lock()
         isKept = true
         Self.folders.removeValue(forKey: url.path)
@@ -746,7 +746,7 @@ final class ScratchFolder: @unchecked Sendable {
     ///
     /// Folders that were kept on purpose stay. Touches the disk; meant for a background thread,
     /// once at the start.
-    static func sweepLeftovers(in parent: URL = FileManager.default.temporaryDirectory) {
+    internal static func sweepLeftovers(in parent: URL = FileManager.default.temporaryDirectory) {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else {
             return
         }
@@ -772,17 +772,17 @@ final class ScratchFolder: @unchecked Sendable {
 
 /// A temporary file that disappears with the last object that refers to it. `kept` is
 /// guarded by `lock`.
-final class TemporaryFile: @unchecked Sendable {
-    let url: URL
+internal final class TemporaryFile: @unchecked Sendable {
+    internal let url: URL
     private let lock = NSLock()
     private var kept = false
 
-    init(_ url: URL) {
+    internal init(_ url: URL) {
         self.url = url
     }
 
     /// The file stays on the disk after all.
-    func keep() {
+    internal func keep() {
         lock.lock()
         kept = true
         lock.unlock()

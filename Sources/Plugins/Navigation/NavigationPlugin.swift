@@ -5,19 +5,19 @@ public import AppKit
 extension CommandID {
     /// Ctrl+← / Ctrl+→: shows the folder under the cursor in the left / right panel
     /// (spec 03 › Moving between directories).
-    static let transferLeft: CommandID = "cm_TransferLeft"
-    static let transferRight: CommandID = "cm_TransferRight"
-    static let nextVolume: CommandID = "cm_GoToNextDrive"
-    static let previousVolume: CommandID = "cm_GoToPreviousDrive"
+    internal static let transferLeft: CommandID = "cm_TransferLeft"
+    internal static let transferRight: CommandID = "cm_TransferRight"
+    internal static let nextVolume: CommandID = "cm_GoToNextDrive"
+    internal static let previousVolume: CommandID = "cm_GoToPreviousDrive"
     /// The reverse of Target = Source: the source panel shows the target panel's directory.
-    static let sourceEqualsTarget: CommandID = "afm_MatchTrg"
-    static let changeDirectoryFromClipboard: CommandID = "afm_CdFromClipboard"
-    static let goToDesktop: CommandID = "afm_GoDesktop"
-    static let goToDocuments: CommandID = "afm_GoDocuments"
-    static let goToDownloads: CommandID = "afm_GoDownloads"
-    static let goToApplications: CommandID = "afm_GoApplications"
-    static let goToVolumes: CommandID = "afm_GoVolumes"
-    static let goToTrash: CommandID = "afm_GoTrash"
+    internal static let sourceEqualsTarget: CommandID = "afm_MatchTrg"
+    internal static let changeDirectoryFromClipboard: CommandID = "afm_CdFromClipboard"
+    internal static let goToDesktop: CommandID = "afm_GoDesktop"
+    internal static let goToDocuments: CommandID = "afm_GoDocuments"
+    internal static let goToDownloads: CommandID = "afm_GoDownloads"
+    internal static let goToApplications: CommandID = "afm_GoApplications"
+    internal static let goToVolumes: CommandID = "afm_GoVolumes"
+    internal static let goToTrash: CommandID = "afm_GoTrash"
 }
 
 /// Moving through the directory structure (spec 03 › Navigation, 06 › Navigation).
@@ -39,7 +39,7 @@ public final class NavigationPlugin: Plugin {
     /// (wrapping around): the disks when there are several, otherwise every place.
     ///
     /// Nil when there is nowhere else to go. Works on the locations alone.
-    nonisolated static func neighbourPlace(of directory: URL, in places: [Place], delta: Int) -> Place? {
+    nonisolated internal static func neighbourPlace(of directory: URL, in places: [Place], delta: Int) -> Place? {
         let disks = places.filter { $0.kind == .internalDisk || $0.kind == .externalDisk }
         let candidates = disks.count > 1 ? disks : places
         guard candidates.count > 1 else {
@@ -62,7 +62,7 @@ public final class NavigationPlugin: Plugin {
     /// path copied from a terminal or a document tends to come with.
     ///
     /// Nil when nothing is left.
-    nonisolated static func path(fromClipboard text: String) -> String? {
+    nonisolated internal static func path(fromClipboard text: String) -> String? {
         // Only the first line that has anything on it is looked at, however long the text is: the
         // first 8 KB of it (a path is not longer), cut at a byte, which only touches the last character.
         let head = text.utf8.count > 8_192 ? String(decoding: text.utf8.prefix(8_192), as: UTF8.self) : text

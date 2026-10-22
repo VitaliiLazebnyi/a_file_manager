@@ -6,9 +6,9 @@ import Testing
 
 /// The names of new folders and files: lists, placeholders, counters (spec 07 › New folder, 18 › Placeholders).
 @Suite
-struct NameTemplates {
+internal struct NameTemplates {
     /// 2026-10-12 14:03:07.250 UTC, cursor on `Holiday pics.jpeg` in /Volumes/Data/Photos.
-    var context: NameTemplate.Context {
+    internal var context: NameTemplate.Context {
         var context = NameTemplate.Context()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
@@ -23,12 +23,12 @@ struct NameTemplates {
         return context
     }
 
-    func names(_ text: String, quoted: Bool = false) throws -> [String] {
+    internal func names(_ text: String, quoted: Bool = false) throws -> [String] {
         try NameTemplate.names(from: text, context: context, quotedLists: quoted)
     }
 
     @Test
-    func plainNamesListsAndNesting() throws {
+    internal func plainNamesListsAndNesting() throws {
         #expect(try names("docs") == ["docs"])
         #expect(try names(" made/inner | other ||") == ["made/inner", "other"])
         #expect(try names("p|q/s") == ["p", "q/s"])
@@ -40,7 +40,7 @@ struct NameTemplates {
     }
 
     @Test
-    func dateAndTime() throws {
+    internal func dateAndTime() throws {
         #expect(try names("<[Y]-[M]-[D] downloads") == ["2026-10-12 downloads"])
         #expect(try names("<[YMD]_[hms]") == ["20261012_140307"])
         #expect(try names("<[y][M] [Y-M-D] [h.m.s] [v]") == ["2610 2026-10-12 14.03.07 250"])
@@ -51,7 +51,7 @@ struct NameTemplates {
     }
 
     @Test
-    func partsOfTheNameUnderTheCursor() throws {
+    internal func partsOfTheNameUnderTheCursor() throws {
         #expect(try names("<Copy of [N]") == ["Copy of Holiday pics"])
         #expect(
             try names("<[A] ([E]) in [P] of [G], [S] bytes") == [
@@ -71,7 +71,7 @@ struct NameTemplates {
     }
 
     @Test
-    func caseSwitchesEnvironmentClipboardAndBrackets() throws {
+    internal func caseSwitchesEnvironmentClipboardAndBrackets() throws {
         #expect(try names("<[U][N] [L]LOUD [n][E]") == ["HOLIDAY PICS loud jpeg"])
         #expect(try names("<[F]the lord of the rings") == ["The Lord Of The Rings"])
         #expect(try names("<[f]the lord of the rings") == ["The Lord of the Rings"])
@@ -85,7 +85,7 @@ struct NameTemplates {
     }
 
     @Test
-    func counterRanges() throws {
+    internal func counterRanges() throws {
         // The examples of spec 07 › Counter ranges and optional digit.
         #expect(try names("<1-10>[C]") == ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"])
         #expect(try names("<1-3>[C]") == ["1", "2", "3"])
@@ -103,7 +103,7 @@ struct NameTemplates {
     }
 
     @Test
-    func theOptionalDigitFindsTheFirstFreeName() throws {
+    internal func theOptionalDigitFindsTheFirstFreeName() throws {
         var taken = context
         taken.exists = { ["test", "test2", "new", "new (2)", "new (3)"].contains($0) }
         #expect(try NameTemplate.names(from: "<test[C]", context: taken) == ["test3"])
@@ -118,9 +118,9 @@ struct NameTemplates {
 
 /// "Only files of this type" (spec 07 › Only files of this type).
 @Suite
-struct CopyFilters {
+internal struct CopyFilters {
     /// The relative paths of a small tree that the filter lets through; folders end in `/`.
-    func admitted(_ text: String) -> [String] {
+    internal func admitted(_ text: String) -> [String] {
         let filter = CopyFilter(text)
         let tree: [(String, [String])] = [
             ("", ["a.txt", "b.bak", "c.jpg"]), ("docs/", ["d.txt", "e.old"]), ("docs/build/", ["f.txt"]),
@@ -143,14 +143,14 @@ struct CopyFilters {
     }
 
     @Test
-    func emptyAndEverything() {
+    internal func emptyAndEverything() {
         #expect(CopyFilter("").isEmpty && CopyFilter("*.*").isEmpty && CopyFilter(" * ").isEmpty)
         #expect(!CopyFilter("*.txt").isEmpty && !CopyFilter("*.* | *.bak").isEmpty && !CopyFilter("| **/").isEmpty)
         #expect(admitted("").count == 9)
     }
 
     @Test
-    func includeAndExcludeMasks() {
+    internal func includeAndExcludeMasks() {
         #expect(
             admitted("*.txt *.JPG") == [
                 "a.txt", "c.jpg", "docs/d.txt", "docs/build/f.txt", "src/g.txt", "src/docs/h.txt",
@@ -163,7 +163,7 @@ struct CopyFilters {
     }
 
     @Test
-    func folderPatterns() {
+    internal func folderPatterns() {
         #expect(admitted("*.txt | build/ src/") == ["a.txt", "docs/d.txt"])
         // Anchored to the base folder: only its direct subfolder docs is left out.
         #expect(admitted("*.txt | /docs/") == ["a.txt", "src/g.txt", "src/docs/h.txt", "src/docs/deep/i.txt"])
@@ -182,9 +182,9 @@ struct CopyFilters {
 }
 
 @Suite
-struct Switches {
+internal struct Switches {
     @Test
-    func commandOptionsAreRead() {
+    internal func commandOptionsAreRead() {
         // The example of spec 17 › Commands with parameters.
         let switches = CommandSwitches.parse("/V0H1T=\"c:\\test\\\"W=\"\"\"a test.*\"\" test2.*\"")
         #expect(switches == ["V": "0", "H": "1", "T": "c:\\test\\", "W": "\"a test.*\" test2.*"])
@@ -196,11 +196,11 @@ struct Switches {
 
 /// The operation log (spec 13 › Operation › Log file).
 @Suite
-struct OperationLogs {
-    let box: Sandbox
-    var configuration = OperationLog.Configuration()
+internal struct OperationLogs {
+    internal let box: Sandbox
+    internal var configuration = OperationLog.Configuration()
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         configuration.isEnabled = true
         configuration.file = box.url("logs/operations.log")
@@ -209,12 +209,12 @@ struct OperationLogs {
     /// A clock the test moves.
     ///
     /// Unchecked: the test moves it only while no line is being written.
-    final class Clock: @unchecked Sendable {
-        var now = Date(timeIntervalSince1970: 1_791_813_787)
+    internal final class Clock: @unchecked Sendable {
+        internal var now = Date(timeIntervalSince1970: 1_791_813_787)
     }
 
     @Test
-    func linesAreWrittenInOrderOffTheCallingThread() {
+    internal func linesAreWrittenInOrderOffTheCallingThread() {
         let clock = Clock()
         let log = OperationLog(configuration, now: { clock.now })
         log.write(OperationRecord(.copy, source: "/a/one.txt", target: "/b/one.txt"))
@@ -238,7 +238,7 @@ struct OperationLogs {
     }
 
     @Test
-    func manyThreadsCanWriteAtOnce() {
+    internal func manyThreadsCanWriteAtOnce() {
         let log = OperationLog(configuration)
         DispatchQueue.concurrentPerform(iterations: 200) { index in
             log.write(OperationRecord(.copy, source: "/a/\(index)", target: "/b/\(index)"))
@@ -249,7 +249,7 @@ struct OperationLogs {
     }
 
     @Test
-    func onlyWhatIsWantedIsLogged() {
+    internal func onlyWhatIsWantedIsLogged() {
         var quiet = configuration
         quiet.logsDeletes = false
         quiet.logsSkipped = false
@@ -278,7 +278,7 @@ struct OperationLogs {
     }
 
     @Test
-    func rotationBySizeKeepsALimitedNumberOfCopies() {
+    internal func rotationBySizeKeepsALimitedNumberOfCopies() {
         var rotating = configuration
         rotating.rotation = .size(200)
         rotating.keepCount = 2
@@ -296,7 +296,7 @@ struct OperationLogs {
     }
 
     @Test
-    func dailyRotationStartsANewFileAfterMidnight() throws {
+    internal func dailyRotationStartsANewFileAfterMidnight() throws {
         var rotating = configuration
         rotating.rotation = .daily
         let clock = Clock()

@@ -16,13 +16,13 @@ import Testing
 /// host there and take that question away without being asked.
 @MainActor
 @Suite
-struct Review2IntegrationSettings {
-    let box: Sandbox
-    let settings = MemorySettings()
-    let plugin: ConfigurationPlugin
-    let bench: TestBench
+internal struct Review2IntegrationSettings {
+    internal let box: Sandbox
+    internal let settings = MemorySettings()
+    internal let plugin: ConfigurationPlugin
+    internal let bench: TestBench
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.folder("A")
         try box.folder("B")
@@ -50,7 +50,7 @@ struct Review2IntegrationSettings {
     }
 
     @Test
-    func aKeyItsPluginCallsTrustIsImportedOnlyWhenTheUserTicksIt() throws {
+    internal func aKeyItsPluginCallsTrustIsImportedOnlyWhenTheUserTicksIt() throws {
         let url = box.url("in.json")
         let entries =
             #""network.unprotectedPasswordHosts":["evil.example"],"network.passiveMode":false,"viewer.helper":["/tmp/evil","-x"]"#
@@ -88,7 +88,7 @@ struct Review2IntegrationSettings {
     }
 
     @Test
-    func itIsLeftOutOfAnExportLikeTheOtherConnectionData() {
+    internal func itIsLeftOutOfAnExportLikeTheOtherConnectionData() {
         var schema = plugin.center!.settingsSchema()
         #expect(schema.group(of: "network.unprotectedPasswordHosts", value: ["a"]) == .trust)
         #expect(schema.isConnectionData("network.unprotectedPasswordHosts"))
@@ -101,7 +101,7 @@ struct Review2IntegrationSettings {
     /// The schema's copy of the declarations answers on any thread exactly as the registry
     /// does on the main thread: the key itself first, else the longest family it belongs to.
     @Test
-    func theSchemaAnswersAsTheRegistryDoesOnAnyThread() async {
+    internal func theSchemaAnswersAsTheRegistryDoesOnAnyThread() async {
         let keys = bench.kernel.settingsKeys
         keys.declare(prefix: "findFiles.", kind: .ordinary)
         keys.declare(prefix: "findFiles.history.", kind: .history)

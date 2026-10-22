@@ -55,36 +55,38 @@ private func quarantine(of url: URL) -> String? {
 
 /// The defects found in review of the archives, each held down by a test.
 @Suite
-struct ArchiveFixes {
-    let bench: ArchiveBench
-    var box: Sandbox { bench.box }
+internal struct ArchiveFixes {
+    internal let bench: ArchiveBench
+    internal var box: Sandbox { bench.box }
 
-    init() throws {
+    internal init() throws {
         bench = try ArchiveBench()
     }
 
-    func makeZip(_ name: String = "tree.zip") throws -> URL {
+    internal func makeZip(_ name: String = "tree.zip") throws -> URL {
         try bench.makeTree()
         #expect(runTool("/usr/bin/zip", ["-qr", name, "tree"], in: box.root).status == 0)
         return box.url(name)
     }
 
-    func write(_ text: String, to url: URL) throws {
+    internal func write(_ text: String, to url: URL) throws {
         let writer = try bench.fileSystems.provider(for: url).write(url)
         try writer.write(Data(text.utf8))
         try writer.close(attributes: FileAttributes())
     }
 
-    func listed(_ archive: URL) -> [String] {
+    internal func listed(_ archive: URL) -> [String] {
         runTool("/usr/bin/unzip", ["-Z1", archive.path]).output.split(separator: "\n").map(String.init)
     }
 
-    func isSound(_ archive: URL) -> Bool {
+    internal func isSound(_ archive: URL) -> Bool {
         runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0
     }
 
     /// A ZIP written record by record, for directories no packer would write.
-    func writeZip(_ name: String, limits: ZipLimits = .standard, _ fill: (ZipWriter) throws -> Void) throws -> URL {
+    internal func writeZip(_ name: String, limits: ZipLimits = .standard, _ fill: (ZipWriter) throws -> Void) throws
+        -> URL
+    {
         let url = box.url(name)
         let output = try OutputFile(creating: url)
         let writer = ZipWriter(output, limits: limits)
@@ -97,7 +99,7 @@ struct ArchiveFixes {
     // MARK: A1 – nothing is lost when a write fails
 
     @Test
-    func aFailedWriteKeepsEveryChangeForTheNextAttempt() throws {
+    internal func aFailedWriteKeepsEveryChangeForTheNextAttempt() throws {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         try write("precious", to: tree.appending(name: "new.txt"))
@@ -120,7 +122,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func aCopiedFileIsInTheArchiveFileBeforeTheJobIsDone() throws {
+    internal func aCopiedFileIsInTheArchiveFileBeforeTheJobIsDone() throws {
         let archive = try makeZip()
         try box.file("in/one.txt", "one")
         try box.file("in/two.txt", String(repeating: "two ", count: 100_000))
@@ -139,7 +141,7 @@ struct ArchiveFixes {
     }
 
     @Test(arguments: [true, false])
-    func manyThreadsBringFilesInAtOnce(clones: Bool) throws {
+    internal func manyThreadsBringFilesInAtOnce(clones: Bool) throws {
         bench.environment.clonesArchives = clones
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
@@ -174,7 +176,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func aMoveKeepsItsSourceWhenTheArchiveCannotTakeTheFile() throws {
+    internal func aMoveKeepsItsSourceWhenTheArchiveCannotTakeTheFile() throws {
         let archive = try makeZip()
         try box.file("in/one.txt", "one")
         // The disk is full: the member is refused when its writer closes.
@@ -212,7 +214,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func aFailedUploadIsRepeated() throws {
+    internal func aFailedUploadIsRepeated() throws {
         let tree = try bench.makeTree()
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
@@ -232,7 +234,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func membersThatCannotBeWrittenAreSavedInAnArchiveOfTheirOwn() throws {
+    internal func membersThatCannotBeWrittenAreSavedInAnArchiveOfTheirOwn() throws {
         let archive = try makeZip()
         try write("only copy", to: bench.inside(archive, "tree/rescued.txt"))
         let opened = try bench.store.archive(at: archive)
@@ -255,7 +257,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func newMembersSurviveAChangeFromOutside() throws {
+    internal func newMembersSurviveAChangeFromOutside() throws {
         let archive = try makeZip()
         try write("ours", to: bench.inside(archive, "tree/readme.txt.new"))
         try write("ours too", to: bench.inside(archive, "tree/sub/.hidden2"))
@@ -280,7 +282,7 @@ struct ArchiveFixes {
     // MARK: A2 – crafted archives are refused, not crashed on
 
     @Test
-    func aDirectoryWithImpossibleOffsetsIsDamaged() throws {
+    internal func aDirectoryWithImpossibleOffsetsIsDamaged() throws {
         func archive(offset: UInt64, stub: Int) throws -> URL {
             var central = Data()
             central.appendLE(UInt32(0x0201_4B50))
@@ -316,7 +318,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func tarHeadersWithImpossibleSizesAreDamaged() throws {
+    internal func tarHeadersWithImpossibleSizesAreDamaged() throws {
         // GNU's binary size field with every bit set.
         var data = tarBlock(name: "huge.bin") { block in
             block[124] = 0x80
@@ -350,7 +352,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func paxRecordsShorterThanTheirOwnLengthEndTheList() {
+    internal func paxRecordsShorterThanTheirOwnLengthEndTheList() {
         for text in ["1 ", "01 ", "0000002 a", "3 a", "0 ", "-5 x=y\n", "99999999999999999999999 a=b\n", " ", "5", ""] {
             #expect(TarHeader.paxRecords(Data(text.utf8)).isEmpty, "\(text)")
         }
@@ -372,7 +374,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func sizesThatSumPastTheLargestNumberAreOnlyNumbers() throws {
+    internal func sizesThatSumPastTheLargestNumberAreOnlyNumbers() throws {
         #expect(Int64.max.addingSaturated(5) == Int64.max)
         #expect(Int64(3).addingSaturated(4) == 7)
         #expect(UInt64.max.plusClamped(1) == UInt64.max)
@@ -398,7 +400,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func extraFieldsThatFillAnEntryMakeWayInsteadOfOverflowing() throws {
+    internal func extraFieldsThatFillAnEntryMakeWayInsteadOfOverflowing() throws {
         // One field of nearly 64 KB, as the largest an entry can carry.
         var extra = Data()
         extra.appendLE(UInt16(0xCAFE))
@@ -439,7 +441,7 @@ struct ArchiveFixes {
     // MARK: A3 – an archive that is being written to is not let go
 
     @Test
-    func anArchiveWithAnOpenWriterStaysInTheStore() throws {
+    internal func anArchiveWithAnOpenWriterStaysInTheStore() throws {
         let first = try makeZip("first.zip")
         let opened = try bench.store.archive(at: first)
         let writer = try bench.zip.write(bench.inside(first, "tree/slow.txt"))
@@ -460,7 +462,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func pendingChangesKeepAnArchiveAliveUntilTheyAreWritten() throws {
+    internal func pendingChangesKeepAnArchiveAliveUntilTheyAreWritten() throws {
         let archive = try makeZip()
         bench.environment.flushDelay = 0.05
         // (The urgent timer follows the patient one closely: see `changesAreWrittenShortlyAfterTheLastOne`.)
@@ -487,7 +489,7 @@ struct ArchiveFixes {
     // MARK: A4 – a reader that was opened before the archive was rewritten
 
     @Test(arguments: [true, false])
-    func anOpenReaderSurvivesTheRewriteOfItsArchive(clones: Bool) throws {
+    internal func anOpenReaderSurvivesTheRewriteOfItsArchive(clones: Bool) throws {
         bench.environment.clonesArchives = clones
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
@@ -515,7 +517,7 @@ struct ArchiveFixes {
     // MARK: A5 – the time of an encrypted member
 
     @Test
-    func changingTheTimeOfAnEncryptedMemberKeepsItReadable() throws {
+    internal func changingTheTimeOfAnEncryptedMemberKeepsItReadable() throws {
         let tree = try bench.makeTree()
         let archive = box.url("secret.zip")
         // The old encryption, whose check byte is the time; `unzip` reads no other.
@@ -538,7 +540,7 @@ struct ArchiveFixes {
     // MARK: A6 – changes are appended
 
     @Test
-    func addingRenamingAndDatingLeaveTheOldMembersWhereTheyAre() throws {
+    internal func addingRenamingAndDatingLeaveTheOldMembersWhereTheyAre() throws {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         let original = try Data(contentsOf: archive)
@@ -606,7 +608,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func manyRenamesEndInOneRewriteInsteadOfAnArchiveFullOfHoles() throws {
+    internal func manyRenamesEndInOneRewriteInsteadOfAnArchiveFullOfHoles() throws {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         let size = try Data(contentsOf: archive).count
@@ -628,7 +630,7 @@ struct ArchiveFixes {
     }
 
     @Test(arguments: [true, false])
-    func aSelfExtractingArchiveKeepsItsProgram(clones: Bool) throws {
+    internal func aSelfExtractingArchiveKeepsItsProgram(clones: Bool) throws {
         bench.environment.clonesArchives = clones
         let plain = try makeZip("plain.zip")
         let stub =
@@ -652,7 +654,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func anArchiveThatListsANameTwiceIsNotChanged() throws {
+    internal func anArchiveThatListsANameTwiceIsNotChanged() throws {
         let archive = try writeZip("twice.zip") { writer in
             for _ in 0..<2 {
                 try writer.copyMember(.new(name: "same.txt", isDirectory: false, modified: Date(), permissions: 0o644))
@@ -678,7 +680,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func packingIntoAnExistingArchiveAddsToItAndTestsOnlyWhatIsNew() throws {
+    internal func packingIntoAnExistingArchiveAddsToItAndTestsOnlyWhatIsNew() throws {
         let archive = try makeZip()
         let original = try Data(contentsOf: archive)
         let directory = try ZipDirectory.read(RandomAccessFile(archive)).directoryOffset
@@ -711,7 +713,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func aMemberWrittenThroughTheFileSystemIsCompressedInPieces() throws {
+    internal func aMemberWrittenThroughTheFileSystemIsCompressedInPieces() throws {
         let archive = try makeZip()
         // Larger than one window of pieces on any machine, with a tail that is no whole piece.
         var data = Data()
@@ -752,7 +754,7 @@ struct ArchiveFixes {
     // MARK: A7 – sizes without unpacking, one pass for many members
 
     @Test
-    func theSizeOfACompressedFileIsReadFromItsEnd() throws {
+    internal func theSizeOfACompressedFileIsReadFromItsEnd() throws {
         let tree = try bench.makeTree()
         let source = tree.appendingPathComponent("big.log")
         let size = try Data(contentsOf: source).count
@@ -795,7 +797,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func membersOfAStreamReadOneAfterTheOtherCostOnePass() throws {
+    internal func membersOfAStreamReadOneAfterTheOtherCostOnePass() throws {
         let tree = try bench.makeTree()
         let archive = box.url("tree.tar.gz")
         try bench.pack([tree], to: archive) { $0.format = .compressedTar(.gzip) }
@@ -825,7 +827,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func aMemberThatLiesInAFileIsReadAtAnyPlace() throws {
+    internal func aMemberThatLiesInAFileIsReadAtAnyPlace() throws {
         let tree = try bench.makeTree()
         let archive = box.url("tree.tar")
         try bench.pack([tree], to: archive) { $0.format = .tar }
@@ -843,7 +845,7 @@ struct ArchiveFixes {
     // MARK: A8 – what comes out of an archive
 
     @Test
-    func unpackedFilesCarryTheArchivesQuarantine() throws {
+    internal func unpackedFilesCarryTheArchivesQuarantine() throws {
         let archive = try makeZip()
         let mark = "0083;65f0a1b2;Safari;F643CD5F-6071-46AB-83AB-390BA944DEC5"
         #expect(mark.withCString { setxattr(archive.path, "com.apple.quarantine", $0, strlen($0), 0, 0) } == 0)
@@ -871,7 +873,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func unpackedProgramsDoNotRunAsTheirOwner() throws {
+    internal func unpackedProgramsDoNotRunAsTheirOwner() throws {
         try box.file("tree/tool", "#!/bin/sh\n")
         try box.file("tree/plain", "plain")
         #expect(chmod(box.url("tree/tool").path, 0o4755) == 0 && chmod(box.url("tree/plain").path, 0o640) == 0)
@@ -901,7 +903,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func aMemberThatUnpacksToMoreThanItSaysIsStopped() throws {
+    internal func aMemberThatUnpacksToMoreThanItSaysIsStopped() throws {
         let contents = Data(repeating: 0, count: 50 << 20)
         let packed = try Deflater.piece(contents, level: 6, final: true)
         let archive = box.url("bomb.zip")
@@ -930,7 +932,7 @@ struct ArchiveFixes {
     // MARK: A9 – the same results, faster
 
     @Test
-    func theTreeKeepsItsOrderAndItsFolders() {
+    internal func theTreeKeepsItsOrderAndItsFolders() {
         var tree = ArchiveTree()
         let paths = ["a/b/c/one.txt", "a/b/c/two.txt", "a/b/three.txt", "x.txt", "a/b/c/d/e/four.txt", "a/z.txt"]
         for path in paths { tree.insert(ArchiveEntry(path: path, isDirectory: false)) }
@@ -958,7 +960,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func encryptionWorksInPlaceAndBothWays() {
+    internal func encryptionWorksInPlaceAndBothWays() {
         var data = Data((0..<100_000).map { UInt8(truncatingIfNeeded: $0 &* 31) })
         let plain = data
         var (encrypting, decrypting) = (ZipCrypto(password: "pässword"), ZipCrypto(password: "pässword"))
@@ -979,7 +981,7 @@ struct ArchiveFixes {
     // MARK: A10 – TAR
 
     @Test
-    func hardLinksAreFilesOfTheirOwnWhereverTheirTargetStands() throws {
+    internal func hardLinksAreFilesOfTheirOwnWhereverTheirTargetStands() throws {
         // A link to a member that comes later, a link to a link, and a link to nothing.
         var data = tarBlock(name: "early-link", type: 49, link: "dir/real.txt")
         data.append(tarBlock(name: "second-link", type: 49, link: "early-link"))
@@ -1014,7 +1016,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func oldGnuHeadersHaveNoPathPrefix() throws {
+    internal func oldGnuHeadersHaveNoPathPrefix() throws {
         // GNU tar's old format keeps times where POSIX has the prefix of a long path.
         var data = tarBlock(name: "gnu.txt", size: 3, magic: Array("ustar  \u{0}".utf8)) { block in
             for (index, byte) in "14000000000\u{0}14000000001\u{0}".utf8.enumerated() { block[345 + index] = byte }
@@ -1040,7 +1042,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func sparseFilesAreShownAndRefused() throws {
+    internal func sparseFilesAreShownAndRefused() throws {
         // The old GNU form: type S, the real size in the header, the list of pieces going on
         // in a block of its own.
         var data = tarBlock(name: "holes.img", type: 83, size: 512, magic: Array("ustar  \u{0}".utf8)) { block in
@@ -1086,7 +1088,7 @@ struct ArchiveFixes {
     // MARK: A11
 
     @Test
-    func filesThatWouldShareANameAreNotPackedOverEachOther() throws {
+    internal func filesThatWouldShareANameAreNotPackedOverEachOther() throws {
         try box.file("src/a/same.txt", "first")
         try box.file("src/b/same.txt", "second")
         for format in [ArchiveFormat.zip, .tar] {
@@ -1108,7 +1110,7 @@ struct ArchiveFixes {
     }
 
     @Test
-    func aWrongPasswordThatPassesTheCheckByteIsNotKept() throws {
+    internal func aWrongPasswordThatPassesTheCheckByteIsNotKept() throws {
         let tree = try bench.makeTree()
         let archive = box.url("secret.zip")
         try bench.pack([tree.appendingPathComponent("readme.txt")], to: archive) {

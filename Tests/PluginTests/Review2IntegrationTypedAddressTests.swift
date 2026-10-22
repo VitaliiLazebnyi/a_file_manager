@@ -10,20 +10,20 @@ import Testing
 // asked "Connect to X?".
 
 /// Notes what it is told the user chose.
-final class IntegrationConsent: ServerConsentService {
-    private(set) var chosen: [URL] = []
-    func userChose(_ location: URL) { chosen.append(location) }
+internal final class IntegrationConsent: ServerConsentService {
+    internal private(set) var chosen: [URL] = []
+    internal func userChose(_ location: URL) { chosen.append(location) }
 }
 
 @MainActor
 @Suite
-struct Review2IntegrationTypedAddresses {
-    let memory = MemoryFileSystem()
-    let server = MemoryFileSystem(scheme: "srv")
-    let consent = IntegrationConsent()
-    let bench: TestBench
+internal struct Review2IntegrationTypedAddresses {
+    internal let memory = MemoryFileSystem()
+    internal let server = MemoryFileSystem(scheme: "srv")
+    internal let consent = IntegrationConsent()
+    internal let bench: TestBench
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt", "one")
         memory.addDirectory("/B")
         server.addDirectory("/in")
@@ -37,7 +37,7 @@ struct Review2IntegrationTypedAddresses {
     }
 
     @Test
-    func onlyTextWithAnAddressThatWasNotTheProposalIsReported() {
+    internal func onlyTextWithAnAddressThatWasNotTheProposalIsReported() {
         let base = memory.url("/A")
         // An ordinary path, relative or not, is no address.
         bench.kernel.userTyped(location: "sub/folder", relativeTo: base)
@@ -51,7 +51,7 @@ struct Review2IntegrationTypedAddresses {
     }
 
     @Test
-    func aTargetTypedIntoTheCopyDialogIsTheUsersOwnChoice() {
+    internal func aTargetTypedIntoTheCopyDialogIsTheUsersOwnChoice() {
         bench.left.moveCursor(toName: "one.txt")
         bench.interaction.promptAnswers = [.text("srv://in/")]
         bench.commands.perform(.copy)
@@ -60,7 +60,7 @@ struct Review2IntegrationTypedAddresses {
     }
 
     @Test
-    func aProposedTargetThatIsLeftAsItIsWasNotTyped() {
+    internal func aProposedTargetThatIsLeftAsItIsWasNotTyped() {
         // The other panel shows a place on the server (say, a tab that a file restored).
         bench.right.show(server.url("/in"))
         bench.left.moveCursor(toName: "one.txt")
@@ -76,9 +76,9 @@ struct Review2IntegrationTypedAddresses {
 // withheld there, and Delete is not.
 @MainActor
 @Suite
-struct Review2IntegrationLists {
+internal struct Review2IntegrationLists {
     @Test
-    func nothingNewIsOfferedInAListOfFilesAndDeleteIs() {
+    internal func nothingNewIsOfferedInAListOfFilesAndDeleteIs() {
         let memory = MemoryFileSystem()
         memory.addFile("/A/one.txt", "one")
         memory.addFile("/A/two.txt", "two")

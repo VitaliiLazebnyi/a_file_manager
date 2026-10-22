@@ -7,24 +7,24 @@ import Foundation
 /// the rest of the names answer at once (`<Error!>`) instead of costing the budget each.
 ///
 /// Unchecked `Sendable`: `timeouts` is guarded by `lock`.
-final class RenameRegexGuard: @unchecked Sendable {
+internal final class RenameRegexGuard: @unchecked Sendable {
     private let lock = NSLock()
     private var timeouts = 0
     private let limit = 3
 
-    func recordTimeout() {
+    internal func recordTimeout() {
         lock.lock()
         timeouts += 1
         lock.unlock()
     }
 
-    var hasTimedOut: Bool {
+    internal var hasTimedOut: Bool {
         lock.lock()
         defer { lock.unlock() }
         return timeouts > 0
     }
 
-    var isTripped: Bool {
+    internal var isTripped: Bool {
         lock.lock()
         defer { lock.unlock() }
         return timeouts >= limit
@@ -36,13 +36,13 @@ final class RenameRegexGuard: @unchecked Sendable {
 /// Such an expression can take time that grows with every character of the name (`(a*)*b`), so it
 /// is never run with `matches(in:)` or `firstMatch`: the matching is stopped from the progress
 /// block of `enumerateMatches` once the budget has passed or the work was cancelled.
-enum RenameRegex {
+internal enum RenameRegex {
     /// What one name may take.
-    static let budget: TimeInterval = 0.1
+    internal static let budget: TimeInterval = 0.1
 
     /// The matches in `text` (only the first with `firstOnly`); nil when the expression took too
     /// long or the work was cancelled.
-    static func matches(
+    internal static func matches(
         _ regex: NSRegularExpression,
         in text: String,
         firstOnly: Bool,
@@ -87,7 +87,7 @@ enum RenameRegex {
 /// A run is as short as possible, except at the end of the text searched for, where it takes
 /// the rest of the name. A `*` at the start anchors the match at the beginning of the name.
 /// Neither a `*` nor a `?` stands for a line break, as the `.` of a regular expression does not.
-struct WildcardMatcher {
+internal struct WildcardMatcher {
     /// A `*`, or a character or `?`.
     private struct Piece {
         var isStar = false
@@ -99,7 +99,7 @@ struct WildcardMatcher {
     private let isAnchored: Bool
     private let caseSensitive: Bool
 
-    init(_ search: String, caseSensitive: Bool) {
+    internal init(_ search: String, caseSensitive: Bool) {
         self.caseSensitive = caseSensitive
         var pieces: [Piece] = []
         for scalar in search.unicodeScalars {
@@ -119,7 +119,7 @@ struct WildcardMatcher {
         self.pieces = pieces
     }
 
-    static func folded(_ scalar: Unicode.Scalar) -> UInt32 {
+    internal static func folded(_ scalar: Unicode.Scalar) -> UInt32 {
         if scalar.isASCII {
             return scalar.value >= 0x41 && scalar.value <= 0x5A ? scalar.value + 32 : scalar.value
         }
@@ -145,20 +145,22 @@ struct WildcardMatcher {
     /// What one name may take, in the thread's own processor time, as for a regular
     /// expression (`RenameRegex.budget`): a search of many stars in a name of thousands of
     /// characters is still the name times the search for every place it can begin at.
-    static let budget: TimeInterval = RenameRegex.budget
+    internal static let budget: TimeInterval = RenameRegex.budget
 
     /// The matches in `text`, as ranges in UTF-16 units, found one after the other as
     /// `NSRegularExpression.matches(in:)` finds them: the next search starts where a match ended
     /// (an empty match is allowed there, unless it is the one just found), or one place on after an
     /// empty match. `firstOnly` stops at the first.
-    func matches(in text: String, firstOnly: Bool) -> [NSRange] {
+    internal func matches(in text: String, firstOnly: Bool) -> [NSRange] {
         scan(text, firstOnly: firstOnly, budget: .infinity, cancelled: { false }).ranges
     }
 
     /// The same within `budget` seconds of work: nil when that was not enough or the work was
     /// cancelled, as `RenameRegex.matches` answers for a regular expression (a timeout is
     /// counted in `guardian`, and a search given up three times is not tried again).
-    func matches(in text: String, firstOnly: Bool, guardian: RenameRegexGuard, cancelled: () -> Bool) -> [NSRange]? {
+    internal func matches(in text: String, firstOnly: Bool, guardian: RenameRegexGuard, cancelled: () -> Bool)
+        -> [NSRange]?
+    {
         if guardian.isTripped || cancelled() {
             return nil
         }

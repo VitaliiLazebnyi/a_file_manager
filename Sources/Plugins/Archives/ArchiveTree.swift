@@ -2,9 +2,9 @@ import AFMKernel
 import Foundation
 
 /// One file or folder inside an archive, whatever the archive's format.
-struct ArchiveEntry {
+internal struct ArchiveEntry {
     /// Where the bytes of a member come from.
-    enum Content {
+    internal enum Content {
         /// Nothing to read: folders, empty files.
         case none
         /// A ZIP member, with everything its directory says.
@@ -22,29 +22,29 @@ struct ArchiveEntry {
     }
 
     /// The path inside the archive: names joined by `/`, none at either end.
-    var path: String
-    var isDirectory: Bool
+    internal var path: String
+    internal var isDirectory: Bool
     /// A folder the archive has no entry for; it exists because something lies inside it.
-    var isImplicit = false
-    var isSymbolicLink = false
+    internal var isImplicit = false
+    internal var isSymbolicLink = false
     /// A device, a pipe or a socket in the archive's own terms (`FileItem.isSpecial`).
-    var isSpecial = false
+    internal var isSpecial = false
     /// Unpacked size.
-    var size: Int64 = 0
+    internal var size: Int64 = 0
     /// False when the size is only what the file claims in a place that cannot be trusted
     /// (the last bytes of a large `.gz`): it is shown, and nothing is checked against it.
-    var sizeIsExact = true
-    var packedSize: Int64 = 0
-    var modified = Date(timeIntervalSince1970: 0)
-    var permissions: UInt16 = 0o644
-    var isEncrypted = false
+    internal var sizeIsExact = true
+    internal var packedSize: Int64 = 0
+    internal var modified = Date(timeIntervalSince1970: 0)
+    internal var permissions: UInt16 = 0o644
+    internal var isEncrypted = false
     /// The position in the archive; members are unpacked and rewritten in this order.
-    var order = 0
-    var content = Content.none
+    internal var order = 0
+    internal var content = Content.none
 
-    var name: String { ArchiveTree.name(of: path) }
+    internal var name: String { ArchiveTree.name(of: path) }
 
-    func item(at url: URL) -> FileItem {
+    internal func item(at url: URL) -> FileItem {
         FileItem(
             url: url,
             name: name,
@@ -69,16 +69,16 @@ struct ArchiveEntry {
 /// followed by a combining mark is one character to Swift and still a separator to the disk.
 /// `normalized` lets through only paths in which the two views agree, so everything that
 /// handles them afterwards may use either.
-struct ArchiveTree {
+internal struct ArchiveTree {
     /// A member's path may not be longer than this, in bytes (what the system takes as a path).
-    static let maxPathBytes = 4_096
+    internal static let maxPathBytes = 4_096
     /// …nor have more names than this: every name is a folder that has to be kept.
-    static let maxDepth = 256
+    internal static let maxDepth = 256
     /// The paths of the folders that were made up may take this many bytes together.
     ///
     /// Every folder above a member is kept under its whole path, so deep paths cost the square of
     /// their length; an archive made of them is refused rather than allowed to fill the memory.
-    static let maxImplicitBytes = 48 << 20
+    internal static let maxImplicitBytes = 48 << 20
 
     /// The entries, each in a place of its own that it keeps for as long as it is in the
     /// tree; a place that was given up is used again.
@@ -98,29 +98,29 @@ struct ArchiveTree {
     /// Nil until it is first asked for.
     private var sequence: [Int32]?
     /// The bytes of the paths of the folders that were made up.
-    private(set) var implicitBytes = 0
+    internal private(set) var implicitBytes = 0
 
     /// The place of the top folder, which has no entry.
     private static let top: Int32 = -1
 
-    var count: Int { index.count }
+    internal var count: Int { index.count }
 
     /// Every entry, in no order.
-    var unordered: [ArchiveEntry] { slots.compactMap { $0 } }
+    internal var unordered: [ArchiveEntry] { slots.compactMap { $0 } }
 
-    func contains(where matches: (ArchiveEntry) -> Bool) -> Bool {
+    internal func contains(where matches: (ArchiveEntry) -> Bool) -> Bool {
         slots.contains { $0.map(matches) == true }
     }
 
     /// Makes room for this many entries at once, when their number is known beforehand, and
     /// for some folders that have to be made up besides: room that is found too small is
     /// doubled, which for a large archive is a lot of memory for a few more entries.
-    mutating func reserve(_ count: Int) {
+    internal mutating func reserve(_ count: Int) {
         slots.reserveCapacity(count + count / 16 + 256)
         index.reserveCapacity(count)
     }
 
-    static func name(of path: String) -> String {
+    internal static func name(of path: String) -> String {
         let bytes = path.utf8
         guard let slash = bytes.lastIndex(of: 0x2F) else {
             return path
@@ -128,7 +128,7 @@ struct ArchiveTree {
         return String(decoding: bytes[bytes.index(after: slash)...], as: UTF8.self)
     }
 
-    static func parent(of path: String) -> String {
+    internal static func parent(of path: String) -> String {
         let bytes = path.utf8
         guard let slash = bytes.lastIndex(of: 0x2F) else {
             return ""
@@ -136,19 +136,19 @@ struct ArchiveTree {
         return String(decoding: bytes[..<slash], as: UTF8.self)
     }
 
-    static func join(_ folder: String, _ name: String) -> String {
+    internal static func join(_ folder: String, _ name: String) -> String {
         folder.isEmpty ? name : folder + "/" + name
     }
 
     /// The names of a path, cut at the byte `/`.
-    static func names(of path: String) -> [String] {
+    internal static func names(of path: String) -> [String] {
         path.utf8.split(separator: 0x2F, omittingEmptySubsequences: true).map { String(decoding: $0, as: UTF8.self) }
     }
 
     /// The part of `path` below `folder`; nil when it does not lie below it.
     ///
     /// Compared byte by byte: two paths that look alike but are written differently are two paths.
-    static func relative(_ path: String, to folder: String) -> String? {
+    internal static func relative(_ path: String, to folder: String) -> String? {
         if folder.isEmpty {
             return path
         }
@@ -168,7 +168,7 @@ struct ArchiveTree {
     /// as a character of its own (one followed by a combining mark, or preceded by a character that
     /// binds what follows): no member can then name a place outside the folder an archive is
     /// unpacked into, whichever way its path is taken apart.
-    static func normalized(_ raw: String) -> String? {
+    internal static func normalized(_ raw: String) -> String? {
         let bytes = raw.utf8
         var parts: [Substring.UTF8View.SubSequence] = []
         var (total, isASCII) = (0, true)
@@ -213,25 +213,25 @@ struct ArchiveTree {
         path.isEmpty ? Self.top : index[path]
     }
 
-    func entry(_ path: String) -> ArchiveEntry? {
+    internal func entry(_ path: String) -> ArchiveEntry? {
         index[path].flatMap { slots[Int($0)] }
     }
 
-    func isDirectory(_ path: String) -> Bool {
+    internal func isDirectory(_ path: String) -> Bool {
         path.isEmpty || entry(path)?.isDirectory == true
     }
 
     /// The entries directly inside a folder; nil when the path is not a folder.
     ///
     /// Every folder has a list of its own (`insert` makes it), the top folder from the start.
-    func children(of path: String) -> [ArchiveEntry]? {
+    internal func children(of path: String) -> [ArchiveEntry]? {
         guard isDirectory(path), let folder = slot(of: path), let places = children[folder] else {
             return nil
         }
         return places.compactMap { slots[Int($0)] }
     }
 
-    func hasChildren(_ path: String) -> Bool {
+    internal func hasChildren(_ path: String) -> Bool {
         guard let folder = slot(of: path) else {
             return false
         }
@@ -239,7 +239,7 @@ struct ArchiveTree {
     }
 
     /// Everything below a folder, at any depth.
-    func descendants(of path: String) -> [ArchiveEntry] {
+    internal func descendants(of path: String) -> [ArchiveEntry] {
         guard isDirectory(path), let start = slot(of: path) else {
             return []
         }
@@ -279,14 +279,14 @@ struct ArchiveTree {
     ///
     /// Sorted once; after that the order is kept up as entries come and go, so a write that follows
     /// a change does not sort the whole archive again.
-    var ordered: [ArchiveEntry] {
+    internal var ordered: [ArchiveEntry] {
         mutating get {
             sort().compactMap { slots[Int($0)] }
         }
     }
 
     /// The path of the entry that has this position in the archive; nil when none has.
-    mutating func path(atOrder order: Int) -> String? {
+    internal mutating func path(atOrder order: Int) -> String? {
         let listed = sort()
         let place = self.place(of: order, in: listed)
         guard place < listed.count, let entry = slots[Int(listed[place])], entry.order == order else {
@@ -348,7 +348,7 @@ struct ArchiveTree {
     /// Changes an entry where it is.
     ///
     /// Path, kind and position are not to be changed this way.
-    mutating func update(_ path: String, _ change: (inout ArchiveEntry) -> Void) {
+    internal mutating func update(_ path: String, _ change: (inout ArchiveEntry) -> Void) {
         guard let place = index[path], slots[Int(place)] != nil else {
             return
         }
@@ -359,7 +359,7 @@ struct ArchiveTree {
     /// up.
     ///
     /// With `keepingOrder` the entry keeps the position it carries.
-    mutating func insert(_ entry: ArchiveEntry, keepingOrder: Bool = false) {
+    internal mutating func insert(_ entry: ArchiveEntry, keepingOrder: Bool = false) {
         var entry = entry
         let taken = index[entry.path]
         let existing = taken.flatMap { slots[Int($0)] }
@@ -419,7 +419,7 @@ struct ArchiveTree {
     ///
     /// What lies below it stays; the callers remove only files and empty folders.
     @discardableResult
-    mutating func remove(_ path: String) -> ArchiveEntry? {
+    internal mutating func remove(_ path: String) -> ArchiveEntry? {
         guard let place = index[path], let entry = slots[Int(place)] else {
             return nil
         }
@@ -443,14 +443,16 @@ struct ArchiveTree {
 ///
 /// Unchecked: used by one thread at a time, as `FileReader` allows; `interrupt` touches only
 /// `slot`, which is safe from any thread.
-final class ArchiveMemberReader: FileReader, @unchecked Sendable {
+internal final class ArchiveMemberReader: FileReader, @unchecked Sendable {
     private let open: (InterruptSlot) throws -> any ByteStream
     private let slot = InterruptSlot()
     private var stream: any ByteStream?
     private var position: UInt64 = 0
 
     /// `cancellation` ends the opening (and only that) once it is set.
-    init(cancellation: CancellationFlag? = nil, _ open: @escaping (InterruptSlot) throws -> any ByteStream) throws {
+    internal init(cancellation: CancellationFlag? = nil, _ open: @escaping (InterruptSlot) throws -> any ByteStream)
+        throws
+    {
         self.open = open
         let slot = self.slot
         let registration = cancellation?.onCancel { [weak slot] in slot?.interrupt() }
@@ -467,11 +469,11 @@ final class ArchiveMemberReader: FileReader, @unchecked Sendable {
         if slot.isInterrupted { throw ArchiveError.cancelled }
     }
 
-    func interrupt() {
+    internal func interrupt() {
         slot.interrupt()
     }
 
-    func read(upToCount count: Int) throws -> Data? {
+    internal func read(upToCount count: Int) throws -> Data? {
         try checkInterrupted()
         if stream == nil { stream = try open(slot) }
         guard let block = try stream?.read(upToCount: count) else {
@@ -481,7 +483,7 @@ final class ArchiveMemberReader: FileReader, @unchecked Sendable {
         return block
     }
 
-    func seek(to offset: UInt64) throws {
+    internal func seek(to offset: UInt64) throws {
         try checkInterrupted()
         if stream == nil {
             stream = try open(slot)
@@ -505,7 +507,7 @@ final class ArchiveMemberReader: FileReader, @unchecked Sendable {
         }
     }
 
-    func close() {
+    internal func close() {
         closeStream()
     }
 

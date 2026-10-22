@@ -14,20 +14,20 @@ import Testing
 /// it cooperates with (Enter, F5, F7, F8, rename), in panels without a window.
 @MainActor
 @Suite
-struct ArchiveCommandsInPanels {
-    let box: Sandbox
-    let memory = MemoryFileSystem()
-    let mac = MacIntegrationPlugin(launchesApplications: false)
-    let archives = ArchivesPlugin(flushDelay: nil, launchesApplications: false)
-    let settings = MemorySettings()
-    let bench: TestBench
+internal struct ArchiveCommandsInPanels {
+    internal let box: Sandbox
+    internal let memory = MemoryFileSystem()
+    internal let mac = MacIntegrationPlugin(launchesApplications: false)
+    internal let archives = ArchivesPlugin(flushDelay: nil, launchesApplications: false)
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file(
             "A/tree/readme.txt",
@@ -50,25 +50,25 @@ struct ArchiveCommandsInPanels {
     }
 
     /// Enter on an item of the left panel.
-    func enter(_ name: String, in panel: FakePanel? = nil) {
+    internal func enter(_ name: String, in panel: FakePanel? = nil) {
         let panel = panel ?? left
         panel.focus()
         panel.moveCursor(toName: name)
         commands.perform(.open)
     }
 
-    func unzipList(_ path: String) -> [String] {
+    internal func unzipList(_ path: String) -> [String] {
         runTool("/usr/bin/unzip", ["-Z1", box.url(path).path]).output.split(separator: "\n").map(String.init).sorted()
     }
 
-    func isSound(_ path: String) -> Bool {
+    internal func isSound(_ path: String) -> Bool {
         runTool("/usr/bin/unzip", ["-tq", box.url(path).path]).status == 0
     }
 
     // MARK: Registration
 
     @Test
-    func thePluginRegistersItsParts() {
+    internal func thePluginRegistersItsParts() {
         let kernel = bench.kernel
         #expect(kernel.fileSystems.all.map(\.scheme) == ["file", "mem", "zip", "archive"])
         #expect(kernel.keyClashes.isEmpty)
@@ -103,7 +103,7 @@ struct ArchiveCommandsInPanels {
     // MARK: Archives as folders
 
     @Test
-    func enterGoesIntoAnArchiveAndTheParentRowLeavesIt() {
+    internal func enterGoesIntoAnArchiveAndTheParentRowLeavesIt() {
         enter("tree.zip")
         #expect(left.failures.isEmpty && left.model.directory.scheme == "zip" && left.names == ["tree"])
         #expect(
@@ -132,7 +132,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func whichFilesOpenAsArchivesIsASetting() throws {
+    internal func whichFilesOpenAsArchivesIsASetting() throws {
         // Other files go to their applications as before.
         enter("notes.txt")
         #expect(mac.opened.map(\.lastPathComponent) == ["notes.txt"] && left.model.directory.isFileURL)
@@ -169,7 +169,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func enterOnAMemberShowsWhatTheArchiveKnows() {
+    internal func enterOnAMemberShowsWhatTheArchiveKnows() {
         enter("tree.zip")
         enter("tree")
         ui.choiceAnswers = [1]
@@ -186,7 +186,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func readOnlyArchivesWithholdTheCommandsThatChange() {
+    internal func readOnlyArchivesWithholdTheCommandsThatChange() {
         #expect(runTool("/usr/bin/tar", ["-czf", "tree.tgz", "tree"], in: box.url("A")).status == 0)
         left.reload()
         enter("tree.tgz")
@@ -204,7 +204,7 @@ struct ArchiveCommandsInPanels {
     // MARK: File operations inside an archive
 
     @Test
-    func copyOutOfAnArchiveWithTheCopyCommand() {
+    internal func copyOutOfAnArchiveWithTheCopyCommand() {
         enter("tree.zip")
         enter("tree")
         // One file to the target panel's folder, as the dialog proposes it.
@@ -225,7 +225,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func copyIntoAnArchiveWithTheCopyCommand() {
+    internal func copyIntoAnArchiveWithTheCopyCommand() {
         enter("tree.zip", in: left)
         enter("tree", in: left)
         enter("sub", in: left)
@@ -262,7 +262,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func newFolderRenameAndDeleteInsideAnArchive() {
+    internal func newFolderRenameAndDeleteInsideAnArchive() {
         enter("tree.zip")
         enter("tree")
         ui.promptAnswers = [.text("made/deeper")]
@@ -311,7 +311,7 @@ struct ArchiveCommandsInPanels {
     // MARK: Pack
 
     @Test
-    func packIntoTheTargetPanel() throws {
+    internal func packIntoTheTargetPanel() throws {
         left.moveCursor(toName: "tree")
         ui.formAnswers = [.accept]
         commands.perform(.packFiles)
@@ -360,7 +360,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func packOptions() {
+    internal func packOptions() {
         // Without path names everything is stored flat; without recursion only the files directly inside.
         left.moveCursor(toName: "tree")
         ui.formAnswers = [.values(["paths": .flag(false), "archive": .text(box.url("B/flat.zip").path)])]
@@ -408,7 +408,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func packEncryptedAndIntoAnExistingArchive() throws {
+    internal func packEncryptedAndIntoAnExistingArchive() throws {
         left.moveCursor(toName: "notes.txt")
         // The password is asked for twice; a mismatch asks again.
         ui.formAnswers = [
@@ -456,7 +456,7 @@ struct ArchiveCommandsInPanels {
     // MARK: Unpack and test
 
     @Test
-    func unpackArchivesIntoTheTargetPanel() throws {
+    internal func unpackArchivesIntoTheTargetPanel() throws {
         left.moveCursor(toName: "tree.zip")
         ui.formAnswers = [.accept]
         commands.perform(.unpackFiles)
@@ -520,7 +520,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func unpackFromInsideAnArchive() {
+    internal func unpackFromInsideAnArchive() {
         enter("tree.zip")
         enter("tree")
         // The marked entries, folders with everything in them, relative to the folder shown.
@@ -543,7 +543,7 @@ struct ArchiveCommandsInPanels {
     }
 
     @Test
-    func testArchivesReportsWhatIsDamaged() throws {
+    internal func testArchivesReportsWhatIsDamaged() throws {
         #expect(runTool("/usr/bin/zip", ["-qr0", "stored.zip", "tree"], in: box.url("A")).status == 0)
         #expect(runTool("/usr/bin/tar", ["-czf", "tree.tgz", "tree"], in: box.url("A")).status == 0)
         left.reload()
@@ -567,7 +567,7 @@ struct ArchiveCommandsInPanels {
     // MARK: Other file systems
 
     @Test
-    func archivesOnAnotherFileSystemOpenTheSameWay() throws {
+    internal func archivesOnAnotherFileSystemOpenTheSameWay() throws {
         let bytes = try Data(contentsOf: box.url("A/tree.zip"))
         let writer = try memory.write(memory.addDirectory("/store").appending(name: "tree.zip"))
         try writer.write(bytes)

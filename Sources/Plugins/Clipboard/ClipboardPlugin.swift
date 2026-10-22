@@ -57,12 +57,12 @@ public final class ClipboardPlugin: Plugin {
     public static let pastesContentsKey = "clipboard.pasteContents"
 
     /// Selections up to this size go to the pasteboard as one object per file.
-    static let eagerLimit = 1_000
+    internal static let eagerLimit = 1_000
     /// Name lists of more items than this are put together off the main thread.
-    static let listedAtOnce = 2_000
+    internal static let listedAtOnce = 2_000
     /// The list of paths as one property list, which the system derives from the files on
     /// the pasteboard: all of them in one read.
-    static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+    internal static let fileNamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
 
     private let pasteboard: NSPasteboard
     /// The pasteboard state after the last Cut; while it is unchanged, Paste moves the files.
@@ -76,7 +76,7 @@ public final class ClipboardPlugin: Plugin {
     /// Counts the name lists asked for, so that a slow one does not overwrite a later one.
     private var listRequest = 0
     /// Lists of more files than this from another program are read in slices.
-    static let readAtOnce = 256
+    internal static let readAtOnce = 256
     /// The state of the pasteboard in which a text or picture was last found on it.
     private var contentFoundAt: Int?
 
@@ -221,7 +221,7 @@ public final class ClipboardPlugin: Plugin {
     // MARK: Files
 
     /// How many operands a snapshot stands for, without making the list of them.
-    static func count(of operands: PanelModel.Operands) -> Int {
+    internal static func count(of operands: PanelModel.Operands) -> Int {
         operands.markedCount > 0 ? operands.markedCount : (operands.cursorItem == nil ? 0 : 1)
     }
 
@@ -641,14 +641,14 @@ public final class ClipboardPlugin: Plugin {
 /// them asks, and then the whole list in one piece.
 ///
 /// **Threading.** The pasteboard calls on the main thread; the list never changes.
-final class FileListProvider: NSObject, NSPasteboardItemDataProvider {
+internal final class FileListProvider: NSObject, NSPasteboardItemDataProvider {
     private let urls: [URL]
 
-    init(_ urls: [URL]) {
+    internal init(_ urls: [URL]) {
         self.urls = urls
     }
 
-    func pasteboard(
+    internal func pasteboard(
         _: NSPasteboard?,
         item: NSPasteboardItem,
         provideDataForType type: NSPasteboard.PasteboardType
@@ -670,15 +670,15 @@ final class FileListProvider: NSObject, NSPasteboardItemDataProvider {
 ///
 /// Unchecked: the counters are guarded by `lock`; the items and the pasteboard are only
 /// touched on the main thread.
-final class FileListReading: @unchecked Sendable {
-    enum Outcome: Equatable {
+internal final class FileListReading: @unchecked Sendable {
+    internal enum Outcome: Equatable {
         case read([URL])
         /// Cancelled, or the pasteboard got other contents while it was read.
         case abandoned
     }
 
     /// How long one slice may take before the main thread gets its turn again.
-    static let sliceTime: UInt64 = 6_000_000
+    internal static let sliceTime: UInt64 = 6_000_000
 
     private let items: [NSPasteboardItem]
     private let pasteboard: NSPasteboard
@@ -691,10 +691,10 @@ final class FileListReading: @unchecked Sendable {
     private let finished = DispatchSemaphore(value: 0)
     private var sliceCount = 0
     /// How many slices the reading took; for tests.
-    var slices: Int { lock.withLock { sliceCount } }
+    internal var slices: Int { lock.withLock { sliceCount } }
 
     /// Main thread: the pasteboard's state is noted here.
-    init(_ items: [NSPasteboardItem], on pasteboard: NSPasteboard) {
+    internal init(_ items: [NSPasteboardItem], on pasteboard: NSPasteboard) {
         self.items = items
         self.pasteboard = pasteboard
         changeCount = pasteboard.changeCount
@@ -702,7 +702,7 @@ final class FileListReading: @unchecked Sendable {
 
     /// Blocks until the list is read. `progress` (done, total) is called on the calling
     /// thread about ten times a second while it waits.
-    func run(cancellation: CancellationFlag, progress: (Int, Int) -> Void) -> Outcome {
+    internal func run(cancellation: CancellationFlag, progress: (Int, Int) -> Void) -> Outcome {
         if Thread.isMainThread {
             step(cancellation, sliced: false)
         } else {
@@ -752,7 +752,7 @@ final class FileListReading: @unchecked Sendable {
     }
 
     /// The file an item stands for, if it is one.
-    static func fileURL(of item: NSPasteboardItem) -> URL? {
+    internal static func fileURL(of item: NSPasteboardItem) -> URL? {
         guard let text = item.string(forType: .fileURL), let url = URL(string: text), url.isFileURL else {
             return nil
         }

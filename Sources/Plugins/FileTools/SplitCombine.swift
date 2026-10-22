@@ -3,23 +3,23 @@ import Foundation
 
 /// The `.crc` file Split writes next to the parts (spec 08 › The `.crc` file): the original
 /// name, size and CRC32 in three lines that end in CRLF.
-struct SplitInfo: Equatable {
-    var name: String
-    var size: Int64
-    var crc: UInt32
+internal struct SplitInfo: Equatable {
+    internal var name: String
+    internal var size: Int64
+    internal var crc: UInt32
 
-    var text: String {
+    internal var text: String {
         "filename=\(name)\r\nsize=\(size)\r\ncrc32=\(String(format: "%08X", crc))\r\n"
     }
 
-    init(name: String, size: Int64, crc: UInt32) {
+    internal init(name: String, size: Int64, crc: UInt32) {
         self.name = name
         self.size = size
         self.crc = crc
     }
 
     /// Nil when a line is missing or unreadable.
-    init?(text: String) {
+    internal init?(text: String) {
         var values: [String: String] = [:]
         for line in text.split(whereSeparator: \.isNewline) {
             guard let equals = line.firstIndex(of: "=") else { continue }
@@ -33,22 +33,22 @@ struct SplitInfo: Equatable {
 }
 
 /// Split File (spec 08 › Split file).
-enum Splitter {
+internal enum Splitter {
     /// The sizes of the "Bytes per file" list. 360 k is the usable capacity of the floppy as
     /// the spec records it; the other floppy sizes follow the same rule, the larger media
     /// are taken at their nominal size.
-    static let presets: [(title: String, bytes: Int64)] = [
+    internal static let presets: [(title: String, bytes: Int64)] = [
         ("Automatic", 1_457_664), ("1.44 MB (3.5\")", 1_457_664), ("1.2 MB (5.25\")", 1_213_952),
         ("720 k (3.5\")", 730_112),
         ("360 k (5.25\")", 362_496), ("100 MB (ZIP)", 100 << 20), ("250 MB (ZIP)", 250 << 20),
         ("650 MB (CD-R)", 650 << 20),
         ("700 MB (CD-R)", 700 << 20)
     ]
-    static let maximumParts = 999
+    internal static let maximumParts = 999
 
     /// Reads a typed size: bytes, or a number with `k`, `M` or `G` (1 k = 1024 bytes), or the
     /// caption of a preset.
-    static func size(from text: String) -> Int64? {
+    internal static func size(from text: String) -> Int64? {
         let text = text.trimmingCharacters(in: .whitespaces)
         if let preset = presets.first(where: { $0.title.caseInsensitiveCompare(text) == .orderedSame }) {
             return preset.bytes
@@ -66,7 +66,7 @@ enum Splitter {
         return bytes > 0 ? bytes : nil
     }
 
-    static func partName(_ base: String, _ number: Int) -> String {
+    internal static func partName(_ base: String, _ number: Int) -> String {
         base + String(format: ".%03d", number)
     }
 
@@ -76,7 +76,7 @@ enum Splitter {
     /// there before is never touched: parts that replace one are written aside and take its place
     /// only when all are done.
     @discardableResult
-    static func split(_ source: FileItem, into directory: URL, partSize: Int64, run: ToolRun) throws -> [URL] {
+    internal static func split(_ source: FileItem, into directory: URL, partSize: Int64, run: ToolRun) throws -> [URL] {
         guard partSize > 0 else { throw ToolError.failed("The size of the parts is not valid.") }
         run.carriesOrigin = true
         // (A size typed by the user, or one a server says: neither may overflow the sum.)
@@ -150,7 +150,7 @@ enum Splitter {
 /// A row of files with an ascending counter in their names (spec 08 › Combine files): a
 /// numeric extension (`file.001`), a number inside the name (`name.00000.zip.part`) or the
 /// letters of Unix `split` (`fileaa`, `fileab`).
-enum PartSeries {
+internal enum PartSeries {
     private enum Counter {
         case digits(Range<String.Index>)
         case letters(Range<String.Index>)
@@ -184,7 +184,7 @@ enum PartSeries {
     /// letters a…z with carry (`az` → `ba`).
     ///
     /// Nil when the name has no counter or it is at its end.
-    static func next(after name: String) -> String? {
+    internal static func next(after name: String) -> String? {
         switch counter(in: name) {
         case .digits(let range):
             let digits = name[range]
@@ -219,7 +219,7 @@ enum PartSeries {
     }
 
     /// The name of the whole when no `.crc` file tells it: the part's name without its counter.
-    static func combinedName(forPart name: String) -> String {
+    internal static func combinedName(forPart name: String) -> String {
         guard let counter = counter(in: name) else {
             return name
         }
@@ -237,7 +237,7 @@ enum PartSeries {
     }
 
     /// `first` and the files that follow it in its folder, until a name is missing.
-    static func parts(
+    internal static func parts(
         startingAt first: FileItem,
         provider: any FileSystemProvider,
         cancellation: CancellationFlag = CancellationFlag()
@@ -256,19 +256,19 @@ enum PartSeries {
 }
 
 /// Combine Files (spec 08 › Combine files).
-enum Combiner {
-    struct Outcome: Equatable {
-        var output: URL
-        var parts: Int
+internal enum Combiner {
+    internal struct Outcome: Equatable {
+        internal var output: URL
+        internal var parts: Int
         /// Whether size and CRC32 match the `.crc` file; nil when there is none.
-        var verified: Bool?
+        internal var verified: Bool?
     }
 
     /// What is to be combined when the cursor is on `item`: the row of parts and what the
     /// `.crc` file says.
     ///
     /// The cursor may be on the first part or on the `.crc` file itself.
-    static func plan(for item: FileItem, run: ToolRun) throws -> (parts: [FileItem], info: SplitInfo?) {
+    internal static func plan(for item: FileItem, run: ToolRun) throws -> (parts: [FileItem], info: SplitInfo?) {
         let provider = try run.provider(for: item.url)
         let directory = item.url.deletingLastPathComponent()
         var first = item
@@ -296,14 +296,16 @@ enum Combiner {
     /// The name a `.crc` file gives to the whole, as a name inside the target folder: what stands
     /// after the last `/` or `\\` (found on the bytes, so that a slash with a combining mark
     /// after it is a slash all the same), never empty, `.` or `..`.
-    static func storedName(_ name: String) -> String? {
+    internal static func storedName(_ name: String) -> String? {
         guard let name = Decoder.safeName(name, replacingColon: false) else {
             return nil
         }
         return name
     }
 
-    static func combine(_ parts: [FileItem], info: SplitInfo?, into directory: URL, run: ToolRun) throws -> Outcome {
+    internal static func combine(_ parts: [FileItem], info: SplitInfo?, into directory: URL, run: ToolRun) throws
+        -> Outcome
+    {
         guard let first = parts.first else { throw ToolError.failed("No files selected!") }
         run.carriesOrigin = true
         // A stored name is only a name: it never leads out of the target folder.

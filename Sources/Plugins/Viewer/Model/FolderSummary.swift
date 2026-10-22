@@ -4,20 +4,20 @@ import Foundation
 
 /// What a folder holds, for the quick-view pane (spec 03 › Quick View: "on a folder,
 /// information about its occupied space").
-struct FolderSummary: Equatable {
-    var files = 0
-    var folders = 0
-    var bytes: Int64 = 0
+internal struct FolderSummary: Equatable {
+    internal var files = 0
+    internal var folders = 0
+    internal var bytes: Int64 = 0
     /// Counting stopped at its limit: the numbers are a part of the whole.
-    var isPartial = false
+    internal var isPartial = false
 
-    var text: String {
+    internal var text: String {
         (isPartial ? "At least " : "")
             + "\(Format.bytes(Int64(files))) file\(files == 1 ? "" : "s"), \(Format.bytes(Int64(folders))) folder\(folders == 1 ? "" : "s"), "
             + "\(Format.bytes(bytes)) bytes (\(Format.shortSize(bytes)))"
     }
 
-    static func + (left: Self, right: Self) -> Self {
+    internal static func + (left: Self, right: Self) -> Self {
         Self(
             files: left.files + right.files,
             folders: left.folders + right.folders,
@@ -33,7 +33,7 @@ struct FolderSummary: Equatable {
     /// cancellable, so a server that does not answer does not keep the threads). Links are counted,
     /// not followed. With `limit`, counting stops after that many entries, as it does for a tree on
     /// a server, where every folder is a trip; `isPartial` is then set.
-    static func measure(
+    internal static func measure(
         _ directory: URL,
         provider: any FileSystemProvider,
         cancellation: CancellationFlag,

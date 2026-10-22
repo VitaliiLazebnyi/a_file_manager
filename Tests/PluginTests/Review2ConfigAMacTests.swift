@@ -15,18 +15,18 @@ import Testing
 /// keeps short lines.
 @MainActor
 @Suite
-struct Review2ConfigAMac {
-    let box: Sandbox
+internal struct Review2ConfigAMac {
+    internal let box: Sandbox
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let mac: MacIntegrationPlugin
-    let bench: TestBench
-    let count: Int
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let mac: MacIntegrationPlugin
+    internal let bench: TestBench
+    internal let count: Int
 
-    var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         count = MacIntegrationPlugin.backgroundListThreshold + 10
         let folder = try box.folder("A")
@@ -46,13 +46,13 @@ struct Review2ConfigAMac {
         )
     }
 
-    func wait(until done: () -> Bool) async {
+    internal func wait(until done: () -> Bool) async {
         let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 20_000_000) }
     }
 
     @Test
-    func theMarkedItemsOfALongListArePickedOutInTheBackground() async {
+    internal func theMarkedItemsOfALongListArePickedOutInTheBackground() async {
         commands.perform(.selectAll)
         #expect(bench.left.model.selectionCount == count)
         commands.perform(MacIntegrationPlugin.copyAsPathname)
@@ -77,7 +77,7 @@ struct Review2ConfigAMac {
     }
 
     @Test
-    func aFewMarkedItemsOfALongListAreStillAllOfThem() async {
+    internal func aFewMarkedItemsOfALongListAreStillAllOfThem() async {
         bench.left.model.setSelected(true, names: ["f7.txt", "f3.txt"])
         commands.perform(MacIntegrationPlugin.copyAsPathname)
         await wait { pasteboard.string(forType: .string) != nil }
@@ -94,7 +94,7 @@ struct Review2ConfigAMac {
     }
 
     @Test
-    func withoutMarksNothingWaits() {
+    internal func withoutMarksNothingWaits() {
         bench.left.moveCursor(toName: "f1.txt")
         commands.perform(MacIntegrationPlugin.copyAsPathname)
         #expect(pasteboard.string(forType: .string) == bench.left.model.directory.path + "/f1.txt")
@@ -103,7 +103,7 @@ struct Review2ConfigAMac {
     }
 
     @Test
-    func aNameWithALineBreakMakesOneLogLine() {
+    internal func aNameWithALineBreakMakesOneLogLine() {
         bench.left.show(box.url("S"))
         bench.left.moveCursor(toName: "line\nbreak.txt")
         commands.perform(.edit)

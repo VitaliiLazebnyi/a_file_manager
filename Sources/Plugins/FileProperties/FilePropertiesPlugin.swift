@@ -4,12 +4,12 @@ public import Foundation
 
 /// Commands only this plugin provides (spec 17 › Command catalogue).
 extension CommandID {
-    static let editComment: CommandID = "cm_EditComment"
-    static let createShortcut: CommandID = "cm_CreateShortcut"
+    internal static let editComment: CommandID = "cm_EditComment"
+    internal static let createShortcut: CommandID = "cm_CreateShortcut"
     /// Calculates the size of every folder of the source panel (Alt+Shift+Enter).
-    static let countDirectoryContents: CommandID = "cm_CountDirContent"
-    static let showLinkTarget: CommandID = "afm_ShowLinkTarget"
-    static let finderInfo: CommandID = "afm_FinderInfo"
+    internal static let countDirectoryContents: CommandID = "cm_CountDirContent"
+    internal static let showLinkTarget: CommandID = "afm_ShowLinkTarget"
+    internal static let finderInfo: CommandID = "afm_FinderInfo"
 }
 
 /// Attributes, properties, occupied space, comments and links (spec 07 › Change attributes,
@@ -24,11 +24,11 @@ public final class FilePropertiesPlugin: Plugin {
     public private(set) var finderInfoRequests: [URL] = []
     private static let finderInfoRequestLimit = 64
 
-    enum Settings {
-        static let linkKind = "fileProperties.linkKind"
-        static let relativeLinks = "fileProperties.relativeLinks"
-        static let selectMeasured = "fileProperties.selectMeasuredFolders"
-        static let hideCommentFile = "fileProperties.hideCommentFile"
+    internal enum Settings {
+        internal static let linkKind = "fileProperties.linkKind"
+        internal static let relativeLinks = "fileProperties.relativeLinks"
+        internal static let selectMeasured = "fileProperties.selectMeasuredFolders"
+        internal static let hideCommentFile = "fileProperties.hideCommentFile"
     }
 
     /// Tests turn `launchesApplications` off, so they do not start other applications.
@@ -37,7 +37,7 @@ public final class FilePropertiesPlugin: Plugin {
     }
 
     /// A plugin that hands its AppleScript to `runScript`.
-    init(runScript: (@Sendable ([String]) -> Void)?) {
+    internal init(runScript: (@Sendable ([String]) -> Void)?) {
         self.runScript = runScript
     }
 
@@ -213,13 +213,13 @@ public final class FilePropertiesPlugin: Plugin {
 /// runs inside a job on the job's thread; the completion returns to the main thread to show
 /// the result and refresh the panels.
 @MainActor
-final class PropertyActions {
+internal final class PropertyActions {
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let comments: CommentStore
-    let showFinderInfo: ([URL]) -> Void
+    internal let showFinderInfo: ([URL]) -> Void
 
-    init(_ kernel: Kernel, comments: CommentStore, showFinderInfo: @escaping ([URL]) -> Void) {
+    internal init(_ kernel: Kernel, comments: CommentStore, showFinderInfo: @escaping ([URL]) -> Void) {
         self.kernel = kernel
         self.comments = comments
         self.showFinderInfo = showFinderInfo
@@ -242,7 +242,7 @@ final class PropertyActions {
 
     /// The first failures of an operation as the text of a message: a message is laid out
     /// whole, and one line per item of a large selection would be megabytes of it.
-    static func summary(of failures: [String], total: Int? = nil, limit: Int = 20) -> String {
+    internal static func summary(of failures: [String], total: Int? = nil, limit: Int = 20) -> String {
         let count = total ?? failures.count
         let shown = failures.prefix(limit)
         return shown.joined(separator: "\n") + (count > shown.count ? "\n… and \(count - shown.count) more" : "")
@@ -251,7 +251,7 @@ final class PropertyActions {
     // MARK: Change attributes
 
     /// `.text`: parameters as `AttributeChange.parse` reads them; without, the dialog.
-    func changeAttributes(_ argument: CommandArgument) {
+    internal func changeAttributes(_ argument: CommandArgument) {
         let model = source.model
         // What is marked is noted here at no cost; the list of it is made on the job's thread
         // (for a selection of several hundred thousand that is time the main thread does not have).
@@ -376,7 +376,7 @@ final class PropertyActions {
 
     /// The item under the cursor, the selection when it holds several items, or on `[..]` the
     /// folder the panel shows.
-    func showProperties() {
+    internal func showProperties() {
         let model = source.model
         let directory = model.directory
         // (The list of a long selection is made on the job's thread.)
@@ -434,7 +434,7 @@ final class PropertyActions {
 
     // MARK: Occupied space
 
-    func calculateOccupiedSpace() {
+    internal func calculateOccupiedSpace() {
         let model = source.model
         // The list of the operands is made on the job's thread, and so is everything that
         // grows with it: the sum, which folders were measured, whether all of it is local.
@@ -508,7 +508,7 @@ final class PropertyActions {
 
     /// The size of every folder of the source panel, shown in the Size column
     /// (spec 03 › Counting rules, `cm_CountDirContent`).
-    func countDirectoryContents() {
+    internal func countDirectoryContents() {
         let model = source.model
         let directory = model.directory
         // The list is looked through on the job's thread: it may be a million entries long.
@@ -543,7 +543,11 @@ final class PropertyActions {
     /// They were written into a copy of the list on the job's thread (`prepared`), which the model
     /// takes in one step; if its list is no longer the one the copy was made of, the sizes are set
     /// by name instead. Main thread.
-    static func show(_ sizes: [(name: String, size: Int64)], prepared: PanelModel.Prepared?, in model: PanelModel) {
+    internal static func show(
+        _ sizes: [(name: String, size: Int64)],
+        prepared: PanelModel.Prepared?,
+        in model: PanelModel
+    ) {
         guard !sizes.isEmpty else {
             return
         }
@@ -557,7 +561,7 @@ final class PropertyActions {
 
     /// Edits the comment of the item under the cursor; on `[..]`, of the folder the panel
     /// shows, whose comment is kept in the folder above (spec 07 › File comments).
-    func editComment() {
+    internal func editComment() {
         let model = source.model
         // Offered on an item, or on `[..]` of a folder that has a parent to keep its comment.
         let subject = model.cursorItem?.url ?? model.directory
@@ -648,7 +652,7 @@ final class PropertyActions {
 
     /// Creates links to the operands, by default in the target panel's folder
     /// (spec 07 › Create shortcut).
-    func createLinks() {
+    internal func createLinks() {
         let model = source.model
         // The dialog needs how many items there are and, for one, its name; the list of a
         // long selection is made on the job's thread.
@@ -739,7 +743,7 @@ final class PropertyActions {
     }
 
     /// Goes to the item the link `item` (under the cursor) leads to, with the cursor on it.
-    func showLinkTarget(_ item: FileItem) {
+    internal func showLinkTarget(_ item: FileItem) {
         let panel = source
         let directory = panel.model.directory
         kernel.jobs.run(
@@ -765,15 +769,15 @@ final class PropertyActions {
 
 /// What the Change Attributes dialog holds while the user works on it: the texts as typed, so
 /// that a mistake can be corrected without starting over.
-struct AttributeDraft {
-    struct Problem: Error {
-        let message: String
+internal struct AttributeDraft {
+    internal struct Problem: Error {
+        internal let message: String
     }
 
     private static let flagOptions = ["Unchanged", "Set", "Clear"]
 
-    var recurse = false
-    var permissions = ""
+    internal var recurse = false
+    internal var permissions = ""
     /// What the permissions field was filled with.
     ///
     /// A field left as it was asks for no change: otherwise a change of the date alone would also
@@ -781,7 +785,7 @@ struct AttributeDraft {
     private var prefilledPermissions: String?
 
     /// The permissions as they were pre-filled, while the field still shows them.
-    var untouchedPermissions: String? {
+    internal var untouchedPermissions: String? {
         guard let prefilled = prefilledPermissions, !prefilled.isEmpty,
             permissions.trimmingCharacters(in: .whitespaces) == prefilled
         else { return nil }
@@ -789,21 +793,21 @@ struct AttributeDraft {
     }
 
     /// What the field shows is meant after all (the user said so).
-    mutating func confirmPermissions() {
+    internal mutating func confirmPermissions() {
         prefilledPermissions = nil
     }
     /// 0 unchanged, 1 set, 2 clear.
-    var hidden = 0
-    var locked = 0
-    var owner = ""
-    var group = ""
-    var changesDate = false
-    var usesCurrentTime = false
-    var date = "yyyy-mm-dd"
-    var time = "hh:mm:ss"
+    internal var hidden = 0
+    internal var locked = 0
+    internal var owner = ""
+    internal var group = ""
+    internal var changesDate = false
+    internal var usesCurrentTime = false
+    internal var date = "yyyy-mm-dd"
+    internal var time = "hh:mm:ss"
 
     /// One item shows its own permissions and date; several start with everything unchanged.
-    init(items: [FileItem]) {
+    internal init(items: [FileItem]) {
         guard items.count == 1 else {
             return
         }
@@ -814,7 +818,7 @@ struct AttributeDraft {
 
     /// Takes the permissions and the date of another file (Load from file under cursor); what
     /// is loaded is meant to be applied.
-    mutating func load(from item: FileItem) {
+    internal mutating func load(from item: FileItem) {
         permissions = PropertyText.octal(item.permissions)
         prefilledPermissions = nil
         (date, time) = TimestampChange.fieldTexts(for: item.modified)
@@ -822,7 +826,7 @@ struct AttributeDraft {
     }
 
     /// Pre-fills the dialog from command parameters.
-    mutating func take(_ change: AttributeChange) {
+    internal mutating func take(_ change: AttributeChange) {
         recurse = change.recurse
         // Whatever the parameters ask for is shown, changes like `u+x` as they were written.
         if change.permissions != .unchanged {
@@ -841,7 +845,7 @@ struct AttributeDraft {
         }
     }
 
-    func fields(isLocal: Bool, details: LocalDetails?) -> [FormField] {
+    internal func fields(isLocal: Bool, details: LocalDetails?) -> [FormField] {
         func options(_ current: Bool?) -> [String] {
             guard let current else {
                 return Self.flagOptions
@@ -876,7 +880,7 @@ struct AttributeDraft {
         return fields
     }
 
-    mutating func read(_ answer: FormValues) {
+    internal mutating func read(_ answer: FormValues) {
         recurse = answer.flag("recurse")
         permissions = answer.text("permissions")
         (hidden, locked) = (max(0, answer.index("hidden")), max(0, answer.index("locked")))
@@ -886,7 +890,7 @@ struct AttributeDraft {
     }
 
     /// The change the dialog asks for, or what is wrong with an entry.
-    func change(isLocal: Bool) -> Result<AttributeChange, Problem> {
+    internal func change(isLocal: Bool) -> Result<AttributeChange, Problem> {
         var change = AttributeChange()
         change.recurse = recurse
         let unchanged = permissions.trimmingCharacters(in: .whitespaces) == prefilledPermissions

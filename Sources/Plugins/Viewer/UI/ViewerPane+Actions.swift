@@ -9,17 +9,17 @@ import PDFKit
 ///
 /// The menus and the keyboard are both driven by the same list, so a key does exactly what its menu
 /// entry does (spec 10 › Menu bar, 10 › General keys).
-struct ViewerAction {
-    let title: String
-    var shortcuts: [Shortcut] = []
-    var isEnabled = true
-    var isChecked = false
-    let run: () -> Void
+internal struct ViewerAction {
+    internal let title: String
+    internal var shortcuts: [Shortcut] = []
+    internal var isEnabled = true
+    internal var isChecked = false
+    internal let run: () -> Void
 }
 
 extension Shortcut {
     /// The shortcut as a menu shows it: `⌃⇧C`, `F7`, `Num +`.
-    var displayText: String {
+    internal var displayText: String {
         var text = ""
         if modifiers.contains(.control) { text += "⌃" }
         if modifiers.contains(.option) { text += "⌥" }
@@ -66,7 +66,7 @@ extension ViewerPane {
     // MARK: The menus
 
     /// The entries of one menu of the strip; nil is a separator.
-    func menuEntries(_ menu: String) -> [ViewerAction?] {
+    internal func menuEntries(_ menu: String) -> [ViewerAction?] {
         func key(_ character: String, _ modifiers: KeyModifiers = []) -> Shortcut {
             Shortcut(.character(character), modifiers)
         }
@@ -319,7 +319,7 @@ extension ViewerPane {
     }
 
     /// Fills a menu of the strip, or the context menu, with entries.
-    func fill(_ menu: NSMenu, with entries: [ViewerAction?]) {
+    internal func fill(_ menu: NSMenu, with entries: [ViewerAction?]) {
         menu.autoenablesItems = false
         let style = NSMutableParagraphStyle()
         style.tabStops = [NSTextTab(textAlignment: .right, location: 300)]
@@ -346,7 +346,7 @@ extension ViewerPane {
     }
 
     @objc
-    func runMenuEntry(_ sender: NSMenuItem) {
+    internal func runMenuEntry(_ sender: NSMenuItem) {
         (sender.representedObject as? () -> Void)?()
         updateChrome()
     }
@@ -355,7 +355,7 @@ extension ViewerPane {
 
     /// Runs what a key stands for in the Lister; false when the key means nothing here.
     @discardableResult
-    func handleKey(_ event: NSEvent) -> Bool {
+    internal func handleKey(_ event: NSEvent) -> Bool {
         if Shortcut(.character("\u{1B}")).matches(event) || event.keyCode == 53 {
             if let activity {
                 activity.cancel.cancel()
@@ -462,7 +462,7 @@ extension ViewerPane {
 
     // MARK: Options
 
-    func setFontSlot(_ slot: FontSlot) {
+    internal func setFontSlot(_ slot: FontSlot) {
         fontSlot = slot
         codePage = nil
         if mode == .html {
@@ -475,7 +475,7 @@ extension ViewerPane {
     }
 
     /// The Encoding menu: a code page for text mode, or one of the Unicode modes.
-    func setEncoding(_ encoding: ViewerEncoding?) {
+    internal func setEncoding(_ encoding: ViewerEncoding?) {
         guard loaded != nil else {
             return
         }
@@ -497,7 +497,7 @@ extension ViewerPane {
 
     /// "Other (enter code page manually)": a number is used for now, `Name (number)` is also
     /// added to the menu (spec 10 › Encoding menu).
-    func askForCodePage() {
+    internal func askForCodePage() {
         guard
             let answer = kernel.interaction.prompt(
                 "Code page",
@@ -540,7 +540,7 @@ extension ViewerPane {
     /// "Go to position (in %)": decimals with `.` or `,` (spec 10 › Position and zoom item).
     ///
     /// In image mode the same item sets the zoom factor.
-    func goToPercent() {
+    internal func goToPercent() {
         let isImage = imageView != nil
         guard isImage || showsText,
             let answer = kernel.interaction.prompt(
@@ -553,7 +553,7 @@ extension ViewerPane {
     }
 
     /// A number as the user types it: `50.5`, `20,7`, `50 %`.
-    static func number(in text: String) -> Double? {
+    internal static func number(in text: String) -> Double? {
         Double(
             text.replacingOccurrences(of: ",", with: ".").replacingOccurrences(of: "%", with: "")
                 .trimmingCharacters(
@@ -563,7 +563,7 @@ extension ViewerPane {
     }
 
     /// A byte offset as the user types it: decimal, or hexadecimal with `0x` or `$`.
-    static func offset(in text: String) -> Int64? {
+    internal static func offset(in text: String) -> Int64? {
         let text = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "").lowercased()
         if text.hasPrefix("0x") {
             return Int64(text.dropFirst(2), radix: 16)
@@ -574,7 +574,7 @@ extension ViewerPane {
         return Int64(text)
     }
 
-    func goToOffset() {
+    internal func goToOffset() {
         guard let document = pager.document,
             let answer = kernel.interaction.prompt(
                 "Go to offset",
@@ -586,7 +586,7 @@ extension ViewerPane {
         pager.reveal(offset: min(max(0, offset), max(0, document.length - 1)))
     }
 
-    func goToLine() {
+    internal func goToLine() {
         guard showsText, let answer = kernel.interaction.prompt("Go to line", value: ""),
             let line = Int(answer.trimmingCharacters(in: .whitespaces))
         else { return }
@@ -603,12 +603,12 @@ extension ViewerPane {
 
     // MARK: Search
 
-    enum SearchDirection {
+    internal enum SearchDirection {
         case same, backwards, reversed
     }
 
     /// The Find dialog (spec 10 › Find dialog).
-    func find() {
+    internal func find() {
         guard showsText else {
             return
         }
@@ -647,7 +647,7 @@ extension ViewerPane {
     }
 
     /// F3 / Shift+F3 / Ctrl+F3 (spec 10 › Result and repeating).
-    func findAgain(_ direction: SearchDirection) {
+    internal func findAgain(_ direction: SearchDirection) {
         guard let lastSearch else {
             find()
             return
@@ -666,7 +666,7 @@ extension ViewerPane {
 
     /// Searches the whole file from the current place on, off the main thread, with progress
     /// in the status line; Esc or Cancel stops it.
-    func search(backwards: Bool) {
+    internal func search(backwards: Bool) {
         guard let lastSearch, let document = pager.document, let loaded, activity == nil else {
             return
         }
@@ -718,7 +718,7 @@ extension ViewerPane {
     }
 
     /// Shows what a search found; nothing when the file or the search changed meanwhile.
-    func searchFinished(
+    internal func searchFinished(
         _ result: Result<Range<Int64>?, any Error>,
         for text: String,
         in document: TextDocument,
@@ -745,13 +745,13 @@ extension ViewerPane {
 
     /// The most that is copied to the clipboard at once (the string goes to the pasteboard on
     /// the main thread; hex is half of this).
-    static let copyLimit: Int64 = 16 << 20
+    internal static let copyLimit: Int64 = 16 << 20
 
     /// Copies the selection as text or as hexadecimal values (spec 10 › Selection and
     /// clipboard).
     ///
     /// The bytes are read in the background.
-    func copySelection(asHex: Bool, completion: @escaping @MainActor @Sendable () -> Void = {}) {
+    internal func copySelection(asHex: Bool, completion: @escaping @MainActor @Sendable () -> Void = {}) {
         guard let document = pager.document, let selection = pager.selection else {
             return
         }
@@ -783,7 +783,7 @@ extension ViewerPane {
 
     /// The context menu (spec 10 › Context menu rules): with a selection, the copy commands
     /// and what can be done with a link; without one, only on a link.
-    func makeContextMenu() -> NSMenu? {
+    internal func makeContextMenu() -> NSMenu? {
         guard showsText, let window else {
             return nil
         }
@@ -841,7 +841,7 @@ extension ViewerPane {
     }
 
     /// The link in `text` around UTF-16 index `index`: the word there, when it is a link.
-    static func link(in text: String, at index: Int) -> URL? {
+    internal static func link(in text: String, at index: Int) -> URL? {
         let units = Array(text.utf16)
         var lower = min(index, units.count)
         var upper = lower
@@ -901,7 +901,9 @@ extension ViewerPane {
 
     /// The work of Save as: `source` written to `target`, with its progress; the error, unless
     /// the user stopped it.
-    nonisolated static func save(_ source: any ByteSource, to target: URL, monitor: any JobMonitor) -> (any Error)? {
+    nonisolated internal static func save(_ source: any ByteSource, to target: URL, monitor: any JobMonitor) -> (
+        any Error
+    )? {
         do {
             try ViewerSave.save(source, to: target, cancellation: monitor.cancellation) { offset in
                 monitor.report(
@@ -939,7 +941,7 @@ extension ViewerPane {
     // MARK: Printing
 
     /// The most pages of text that are printed; a longer text is cut there, and the user is told.
-    nonisolated static let printPageLimit = 2_000
+    nonisolated internal static let printPageLimit = 2_000
 
     private func printInfo() -> NSPrintInfo {
         var attributes: [NSPrintInfo.AttributeKey: Any] = [:]
@@ -958,7 +960,7 @@ extension ViewerPane {
     }
 
     /// File › Page Setup (the specification's Print setup): paper and margins.
-    func pageSetup() {
+    internal func pageSetup() {
         let info = printInfo()
         guard dialogs.pageLayout(info) else {
             return
@@ -974,7 +976,7 @@ extension ViewerPane {
     /// The print panel is a sheet of the window the user printed from, taken now: a text is
     /// prepared first, and the pane may have left that window by the time it is ready. A pane in
     /// no window has nothing to print from.
-    func printContent() {
+    internal func printContent() {
         guard let window else {
             return
         }
@@ -1065,7 +1067,7 @@ extension ViewerPane {
     /// when there are more).
     ///
     /// Blocks.
-    nonisolated static func printableText(
+    nonisolated internal static func printableText(
         of document: TextDocument,
         in range: Range<Int64>,
         maxRows: Int = printPageLimit * 60,
@@ -1094,18 +1096,18 @@ extension ViewerPane {
 }
 
 /// The rows chosen for printing.
-struct PrintableText {
-    var lines: [String]
-    var truncated: Bool
+internal struct PrintableText {
+    internal var lines: [String]
+    internal var truncated: Bool
     /// The rows, each ended by a line end.
-    var text: String { lines.map { $0 + "\n" }.joined() }
+    internal var text: String { lines.map { $0 + "\n" }.joined() }
 }
 
 /// The pages of a text for printing: the rows are drawn page by page as the print operation asks
 /// for them, so nothing is laid out beforehand (a text view would lay out all of it on the main
 /// thread before the first page could come out).
-final class TextPrintView: NSView {
-    let lines: [String]
+internal final class TextPrintView: NSView {
+    internal let lines: [String]
     private let font: NSFont
     private let lineHeight: CGFloat
     private let linesPerPage: Int
@@ -1113,20 +1115,22 @@ final class TextPrintView: NSView {
     private let attributes: [NSAttributedString.Key: Any]
 
     /// The area of a page the text goes on.
-    static func pageSize(for info: NSPrintInfo) -> NSSize {
+    internal static func pageSize(for info: NSPrintInfo) -> NSSize {
         NSSize(
             width: max(100, info.paperSize.width - info.leftMargin - info.rightMargin),
             height: max(100, info.paperSize.height - info.topMargin - info.bottomMargin)
         )
     }
 
-    static func lineHeight(of font: NSFont) -> CGFloat { max(1, ceil(font.ascender - font.descender + font.leading)) }
+    internal static func lineHeight(of font: NSFont) -> CGFloat {
+        max(1, ceil(font.ascender - font.descender + font.leading))
+    }
 
-    static func linesPerPage(font: NSFont, pageHeight: CGFloat) -> Int {
+    internal static func linesPerPage(font: NSFont, pageHeight: CGFloat) -> Int {
         max(1, Int(pageHeight / lineHeight(of: font)))
     }
 
-    init(lines: [String], font: NSFont, pageSize: NSSize) {
+    internal init(lines: [String], font: NSFont, pageSize: NSSize) {
         self.lines = lines
         self.font = font
         self.pageSize = pageSize
@@ -1148,18 +1152,18 @@ final class TextPrintView: NSView {
     }
 
     /// Made in code only: an archive gives none.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
-    var pageCount: Int { max(1, (lines.count + linesPerPage - 1) / linesPerPage) }
+    internal var pageCount: Int { max(1, (lines.count + linesPerPage - 1) / linesPerPage) }
 
-    override var isFlipped: Bool { true }
+    override internal var isFlipped: Bool { true }
 
-    override func knowsPageRange(_ range: NSRangePointer) -> Bool {
+    override internal func knowsPageRange(_ range: NSRangePointer) -> Bool {
         range.pointee = NSRange(location: 1, length: pageCount)
         return true
     }
 
-    override func rectForPage(_ page: Int) -> NSRect {
+    override internal func rectForPage(_ page: Int) -> NSRect {
         NSRect(
             x: 0,
             y: CGFloat((page - 1) * linesPerPage) * lineHeight,
@@ -1168,7 +1172,7 @@ final class TextPrintView: NSView {
         )
     }
 
-    override func draw(_ dirtyRect: NSRect) {
+    override internal func draw(_ dirtyRect: NSRect) {
         guard !lines.isEmpty else {
             return
         }

@@ -8,8 +8,8 @@ import Testing
 /// Stored hotlists and histories with keys left out, more than is kept, and passwords.
 @MainActor
 @Suite
-struct CoveragePlacesStoredData {
-    func load<Value: Decodable>(_ type: Value.Type, _ json: String) -> (Value?, [String]) {
+internal struct CoveragePlacesStoredData {
+    internal func load<Value: Decodable>(_ type: Value.Type, _ json: String) -> (Value?, [String]) {
         let settings = MemorySettings()
         settings.set(Data(json.utf8) as Data?, forKey: "key")
         var told: [String] = []
@@ -18,7 +18,7 @@ struct CoveragePlacesStoredData {
     }
 
     @Test
-    func entriesAndListsWithoutTheirKeysTakeTheDefaults() {
+    internal func entriesAndListsWithoutTheirKeysTakeTheDefaults() {
         let (list, told) = load(Hotlist.self, #"{"hidesMarked":true}"#)
         #expect(list == Hotlist(entries: [], hideCharacter: "?", hidesMarked: true) && told.isEmpty)
         let (withEntry, _) = load(Hotlist.self, #"{"entries":[{"kind":"item","command":"cd /a"}]}"#)
@@ -26,13 +26,13 @@ struct CoveragePlacesStoredData {
     }
 
     @Test
-    func historiesAndCountsWithoutTheirKeysAreEmpty() {
+    internal func historiesAndCountsWithoutTheirKeysAreEmpty() {
         #expect(load(DirectoryHistory.self, "{}").0 == DirectoryHistory())
         #expect(load(FrequentFolders.self, "{}").0 == FrequentFolders())
     }
 
     @Test
-    func onlyTheMostVisitedOfTooManyStoredCountsAreKept() throws {
+    internal func onlyTheMostVisitedOfTooManyStoredCountsAreKept() throws {
         let counts = (0..<(FrequentFolders.storedLimit + 5)).map { "\"file:///f\($0)\": \($0 - 2)" }
         let (frequent, _) = load(FrequentFolders.self, #"{"counts":{"# + counts.joined(separator: ",") + "}}")
         let kept = try #require(frequent).counts
@@ -44,13 +44,13 @@ struct CoveragePlacesStoredData {
     }
 
     @Test
-    func aVisitWithoutALocationKeyHasAnEmptyKey() {
+    internal func aVisitWithoutALocationKeyHasAnEmptyKey() {
         let visit = DirectoryHistory.Visit(location: "", isVisible: true)
         #expect(visit.key.isEmpty && visit.location.isEmpty)
     }
 
     @Test
-    func storedLocationsLeaveThePasswordOut() throws {
+    internal func storedLocationsLeaveThePasswordOut() throws {
         let remote = try #require(URL(string: "sftp://user:secret@host.example/home/me/"))
         #expect(DirectoryHistory.stored(remote) == "sftp://user@host.example/home/me/")
         let empty = try #require(URL(string: "smb://user:@host/share"))
@@ -62,7 +62,7 @@ struct CoveragePlacesStoredData {
     }
 
     @Test
-    func aTrackerWithoutAProblemHandlerStillKeepsTheDamagedDataAside() {
+    internal func aTrackerWithoutAProblemHandlerStillKeepsTheDamagedDataAside() {
         let settings = MemorySettings()
         settings.set(Data("{broken".utf8) as Data?, forKey: "history.left")
         let tracker = DirectoryHistoryTracker(settings: settings)
@@ -76,15 +76,15 @@ struct CoveragePlacesStoredData {
 
 /// The hotlist value: levels that do not exist, trimming, damaged lists and quoting.
 @Suite
-struct CoveragePlacesHotlist {
-    let sample = Hotlist(entries: [
+internal struct CoveragePlacesHotlist {
+    internal let sample = Hotlist(entries: [
         .item("A", command: "cd /a"),
         .submenu("S", [.item("In", command: "cd /in"), .item("In2", command: "cd /in2")]),
         .item("B", command: "cd /b")
     ])
 
     @Test
-    func aLevelThatDoesNotExistIsEmptyAndCannotBeChanged() {
+    internal func aLevelThatDoesNotExistIsEmptyAndCannotBeChanged() {
         var list = sample
         #expect(list.children(of: [7]).isEmpty && list.children(of: [0, 3]).isEmpty)
         #expect(list.remove(at: []) == nil && list.remove(at: [9, 0]) == nil)
@@ -94,7 +94,7 @@ struct CoveragePlacesHotlist {
     }
 
     @Test
-    func trimmingCountsWhatIsCutOffWithEverythingInside() {
+    internal func trimmingCountsWhatIsCutOffWithEverythingInside() {
         var entries: [HotlistEntry] = [
             .item("kept", command: ""),
             .submenu("cut", [.submenu("inner", [.item("deep", command: "")]), .separator])
@@ -105,7 +105,7 @@ struct CoveragePlacesHotlist {
     }
 
     @Test
-    func aMoveThatGoesNowhereLeavesTheListAlone() {
+    internal func aMoveThatGoesNowhereLeavesTheListAlone() {
         var list = sample
         #expect(list.move(at: [0], by: 0) == [0] && list.move(at: [], by: 1) == [])
         #expect(list.move(at: [0], by: -1) == [0] && list.move(at: [9], by: 1) == [9])
@@ -114,7 +114,7 @@ struct CoveragePlacesHotlist {
     }
 
     @Test
-    func entriesMoveIntoAndOutOfSubmenusAsInAFlatList() {
+    internal func entriesMoveIntoAndOutOfSubmenusAsInAFlatList() {
         var list = sample
         #expect(list.move(at: [0], by: 1) == [0, 0])
         #expect(list.entries[0].children.map(\.title) == ["A", "In", "In2"])
@@ -125,7 +125,7 @@ struct CoveragePlacesHotlist {
     }
 
     @Test
-    func anEntryInsideADamagedItemIsTakenOutNotDoubled() {
+    internal func anEntryInsideADamagedItemIsTakenOutNotDoubled() {
         // Read from damaged data: an item holding entries. The editor lists them; a move takes
         // the entry out to the level of the item, once.
         var list = Hotlist(entries: [
@@ -137,7 +137,7 @@ struct CoveragePlacesHotlist {
     }
 
     @Test
-    func withoutAHideCharacterNothingIsMarked() {
+    internal func withoutAHideCharacterNothingIsMarked() {
         var list = sample
         list.hideCharacter = ""
         list.toggleHideMark(at: [0])
@@ -145,19 +145,19 @@ struct CoveragePlacesHotlist {
     }
 
     @Test
-    func anEmptyPathNeedsNoQuotes() {
+    internal func anEmptyPathNeedsNoQuotes() {
         #expect(HotlistAction.changeDirectoryCommand(to: "") == "cd ")
     }
 }
 
 /// The tree model: names that come twice, linking from the middle, levels and searches.
 @Suite
-struct CoveragePlacesTree {
-    let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
-    var many: [String] { ["a", "a"] + (0..<10).map { "n\($0)" } }
+internal struct CoveragePlacesTree {
+    internal let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
+    internal var many: [String] { ["a", "a"] + (0..<10).map { "n\($0)" } }
 
     @Test
-    func aNameGivenTwiceInOrderIsFoundAsTheFirst() throws {
+    internal func aNameGivenTwiceInOrderIsFoundAsTheFirst() throws {
         let tree = DirectoryTree(rootURL: root)
         let node = try #require(tree.setChildren(many, ofPath: "", sorted: true))
         #expect(node.children.count == 12)
@@ -174,7 +174,7 @@ struct CoveragePlacesTree {
     }
 
     @Test
-    func linkingThatStartsInTheMiddleTakesTheRest() {
+    internal func linkingThatStartsInTheMiddleTakesTheRest() {
         let tree = DirectoryTree(rootURL: root)
         let nodes = DirectoryTree.makeNodes(["x", "y", "z"], sorted: true)
         #expect(tree.attach(nodes, ofPath: "", from: 1) == 3)
@@ -182,14 +182,14 @@ struct CoveragePlacesTree {
     }
 
     @Test
-    func levelsAreEqualByWhatTheyList() {
+    internal func levelsAreEqualByWhatTheyList() {
         let one = TreeScanner.Level(path: "a", children: ["b"], isSorted: true)
         #expect(one == TreeScanner.Level(path: "a", children: ["b"], isSorted: true))
         #expect(one != TreeScanner.Level(path: "a", children: ["b"]))
     }
 
     @Test
-    func aSearchWithTimeToSpareGoesOnPastEachClockCheck() {
+    internal func aSearchWithTimeToSpareGoesOnPastEachClockCheck() {
         let tree = DirectoryTree(rootURL: root)
         tree.setChildren((0..<2_000).map { "folder\($0)" }, ofPath: "")
         let result = tree.search("nothing", from: nil, timeBudget: 3_600)
@@ -201,13 +201,13 @@ struct CoveragePlacesTree {
     }
 
     @Test
-    func aFolderThatCannotBeAskedIsNoMountPoint() {
+    internal func aFolderThatCannotBeAskedIsNoMountPoint() {
         #expect(!TreeScanner.isMountPoint("/nowhere/\(UUID().uuidString)"))
         #expect(TreeScanner.isMountPoint("/") && !TreeScanner.isMountPoint(NSTemporaryDirectory()))
     }
 
     @Test
-    func aSearchWithoutTimeLeftSaysWhereItStopped() {
+    internal func aSearchWithoutTimeLeftSaysWhereItStopped() {
         let tree = DirectoryTree(rootURL: root)
         tree.setChildren((0..<2_000).map { "folder\($0)" }, ofPath: "")
         let result = tree.search("nothing", from: nil, timeBudget: 0)
@@ -219,7 +219,7 @@ struct CoveragePlacesTree {
     }
 
     @Test
-    func aScanStopsAtItsFolderLimit() {
+    internal func aScanStopsAtItsFolderLimit() {
         let memory = MemoryFileSystem()
         memory.addDirectory("/R/a/a1")
         memory.addDirectory("/R/b")

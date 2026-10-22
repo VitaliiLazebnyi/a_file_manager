@@ -21,7 +21,7 @@ public final class ConnectionCenter: @unchecked Sendable {
     private var saved: [ConnectionProfile] = []
     private var lastPaths: [ServerKey: String] = [:]
     /// Builds the session for a profile; the plugin sets it for the protocols it speaks.
-    var makeSession: @Sendable (ConnectionProfile, SessionEnvironment) -> (any RemoteSession)? {
+    internal var makeSession: @Sendable (ConnectionProfile, SessionEnvironment) -> (any RemoteSession)? {
         get { lock.withLock { sessionMaker } }
         set { lock.withLock { sessionMaker = newValue } }
     }
@@ -135,7 +135,7 @@ public final class ConnectionCenter: @unchecked Sendable {
         return profile
     }
 
-    func session(for key: ServerKey) throws -> any RemoteSession {
+    internal func session(for key: ServerKey) throws -> any RemoteSession {
         lock.lock()
         if let session = sessions[key] {
             lock.unlock()
@@ -157,7 +157,7 @@ public final class ConnectionCenter: @unchecked Sendable {
     }
 
     /// The session of a server when there is one.
-    func existingSession(for key: ServerKey) -> any RemoteSession? {
+    internal func existingSession(for key: ServerKey) -> any RemoteSession? {
         lock.lock()
         defer { lock.unlock() }
         return sessions[key]
@@ -210,7 +210,7 @@ public final class ConnectionCenter: @unchecked Sendable {
         all.forEach { $0.disconnect() }
     }
 
-    func noteVisited(_ path: String, on key: ServerKey) {
+    internal func noteVisited(_ path: String, on key: ServerKey) {
         lock.lock()
         lastPaths[key] = path
         lock.unlock()
@@ -457,7 +457,7 @@ public final class RemoteFileSystem: FileSystemProvider {
     }
 
     /// A file system whose remembered listings age by `clock`.
-    init(scheme: String, center: ConnectionCenter, clock: @escaping @Sendable () -> Date) {
+    internal init(scheme: String, center: ConnectionCenter, clock: @escaping @Sendable () -> Date) {
         self.scheme = scheme
         self.center = center
         cache = EntryCache(now: clock)
@@ -892,7 +892,7 @@ public final class RemoteFileSystem: FileSystemProvider {
     }
 
     /// A name next to `name` for the file that is being replaced, one that nothing else has.
-    static func asideName(for name: String) -> String {
+    internal static func asideName(for name: String) -> String {
         let mark = String(UInt32.random(in: 0...UInt32.max), radix: 16)
         // Short enough for servers with a limit of 255 bytes for a name.
         let kept = String(decoding: name.utf8.prefix(180), as: UTF8.self)
@@ -976,7 +976,7 @@ public final class RemoteFileSystem: FileSystemProvider {
 
     /// `flags;time;agent;event`: downloaded (`0083`, what browsers write), the time in
     /// hexadecimal seconds, the program that fetched it, and no event of the download database.
-    static func quarantineMark(agent: String, at date: Date = Date()) -> Data {
+    internal static func quarantineMark(agent: String, at date: Date = Date()) -> Data {
         let name = agent.replacingOccurrences(of: ";", with: " ")
         return Data("0083;\(String(Int(max(0, date.timeIntervalSince1970)), radix: 16));\(name);".utf8)
     }

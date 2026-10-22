@@ -9,9 +9,9 @@ import Testing
 /// Stored hotlists and histories survive missing keys, unknown keys and bad elements.
 @MainActor
 @Suite
-struct ConfigPlacesFixStoredData {
+internal struct ConfigPlacesFixStoredData {
     @Test
-    func aHotlistReadsLeniently() {
+    internal func aHotlistReadsLeniently() {
         let settings = MemorySettings()
         let json = """
             {"entries":[{"kind":"item","title":"A","command":"cd /a","future":1},
@@ -31,7 +31,7 @@ struct ConfigPlacesFixStoredData {
     }
 
     @Test
-    func unreadableDataIsNotLostBySavingOver() {
+    internal func unreadableDataIsNotLostBySavingOver() {
         let settings = MemorySettings()
         settings.set(Data("{broken".utf8) as Data?, forKey: "hotlist")
         var told = 0
@@ -42,7 +42,7 @@ struct ConfigPlacesFixStoredData {
     }
 
     @Test
-    func aCleanHotlistRaisesNoComplaint() {
+    internal func aCleanHotlistRaisesNoComplaint() {
         let settings = MemorySettings()
         settings.set(Hotlist(entries: [.item("x", command: "cd /x"), .separator]), forKey: "hotlist")
         var told = 0
@@ -51,7 +51,7 @@ struct ConfigPlacesFixStoredData {
     }
 
     @Test
-    func historiesReadLeniently() {
+    internal func historiesReadLeniently() {
         let settings = MemorySettings()
         settings.set(
             Data(
@@ -71,7 +71,7 @@ struct ConfigPlacesFixStoredData {
     }
 
     @Test
-    func hotlistEntriesRunUserCommands() {
+    internal func hotlistEntriesRunUserCommands() {
         #expect(HotlistAction("em_build") == .command("em_build", .nothing))
         #expect(HotlistAction("em_open some words") == .command("em_open", .text("some words")))
         #expect(HotlistAction("emotion") == .changeDirectory(path: "emotion", focusingOnIt: false))
@@ -80,11 +80,11 @@ struct ConfigPlacesFixStoredData {
 
 /// The tree: neighbours in constant time, a name index, folded names, failed prefixes.
 @Suite
-struct ConfigPlacesFixTreeModel {
-    let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
+internal struct ConfigPlacesFixTreeModel {
+    internal let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
 
     @Test
-    func steppingThroughAWideFolderIsLinear() {
+    internal func steppingThroughAWideFolderIsLinear() {
         let names = (0..<20_000).map { "folder\($0)" }
         let tree = DirectoryTree(rootURL: root)
         tree.setChildren(names, ofPath: "")
@@ -102,7 +102,7 @@ struct ConfigPlacesFixTreeModel {
     }
 
     @Test
-    func indexesStayRightAfterInsertsAndRewrites() {
+    internal func indexesStayRightAfterInsertsAndRewrites() {
         let tree = DirectoryTree(rootURL: root, paths: ["b", "d", "f"])
         _ = tree.node(at: "c", creating: true)
         _ = tree.node(at: "a", creating: true)
@@ -121,7 +121,7 @@ struct ConfigPlacesFixTreeModel {
     }
 
     @Test
-    func aWideFolderResolvesNamesQuickly() {
+    internal func aWideFolderResolvesNamesQuickly() {
         let names = (0..<30_000).map { "n\($0)" }
         let tree = DirectoryTree(rootURL: root)
         tree.setChildren(names, ofPath: "", sorted: true)
@@ -134,7 +134,7 @@ struct ConfigPlacesFixTreeModel {
     }
 
     @Test
-    func unscannedFoldersStayUnscannedFromTheCache() {
+    internal func unscannedFoldersStayUnscannedFromTheCache() {
         let tree = DirectoryTree(rootURL: root, paths: ["a", "a/b", "Volumes"], unscanned: ["Volumes"])
         #expect(tree.node(at: "Volumes")?.isScanned == false && tree.node(at: "a")?.isScanned == true)
     }
@@ -146,11 +146,11 @@ extension TreeNode {
 
 /// The cache: keyed by the hidden flag, partial trees, unscanned folders, debounced writes.
 @Suite
-struct ConfigPlacesFixCache {
-    let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
+internal struct ConfigPlacesFixCache {
+    internal let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
 
     @Test
-    func hiddenAndVisibleTreesAreSeparate() throws {
+    internal func hiddenAndVisibleTreesAreSeparate() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["a"], for: root)
@@ -166,7 +166,7 @@ struct ConfigPlacesFixCache {
     }
 
     @Test
-    func unscannedAndPartialSurviveTheFile() throws {
+    internal func unscannedAndPartialSurviveTheFile() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["a", "a/b", "Volumes"], unscanned: ["Volumes", "a/b"], isComplete: false, for: root)
@@ -179,7 +179,7 @@ struct ConfigPlacesFixCache {
     }
 
     @Test
-    func notedFoldersAreWrittenOnceAfterABurst() throws {
+    internal func notedFoldersAreWrittenOnceAfterABurst() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["base"], for: root)
@@ -196,9 +196,9 @@ struct ConfigPlacesFixCache {
 
 /// A scan with the lean reader on the real disk, and its paths.
 @Suite
-struct ConfigPlacesFixScanning {
+internal struct ConfigPlacesFixScanning {
     @Test
-    func theLeanReaderHonoursHiddenFoldersPackagesAndLinks() throws {
+    internal func theLeanReaderHonoursHiddenFoldersPackagesAndLinks() throws {
         let box = try Sandbox()
         try box.folder("b/inner")
         try box.folder("a")
@@ -222,7 +222,7 @@ struct ConfigPlacesFixScanning {
     }
 
     @Test
-    func excludedAndUnreachedFoldersAreRecorded() {
+    internal func excludedAndUnreachedFoldersAreRecorded() {
         let memory = MemoryFileSystem()
         memory.addDirectory("/V/Volumes/Other")
         memory.addDirectory("/V/keep/inner")

@@ -8,29 +8,29 @@ import AppKit
 ///
 /// Main thread only.
 @MainActor
-final class ConfigurationCenter {
-    unowned let kernel: Kernel
-    let store: ConfigurationStore
-    let runner: CommandRunner
+internal final class ConfigurationCenter {
+    internal unowned let kernel: Kernel
+    internal let store: ConfigurationStore
+    internal let runner: CommandRunner
     private let enumeratedKeys: () -> [String]
     private var slotCount = 0
     /// The windows, made when they are first asked for.
-    var optionsWindow: OptionsWindowController?
-    var browserWindow: CommandBrowserController?
-    var textWindows: [String: TextWindowController] = [:]
+    internal var optionsWindow: OptionsWindowController?
+    internal var browserWindow: CommandBrowserController?
+    internal var textWindows: [String: TextWindowController] = [:]
     /// Told when key bindings were stored from outside the Keyboard page, which then takes them over.
-    var keysCommitted: (() -> Void)?
+    internal var keysCommitted: (() -> Void)?
     /// The beep, the modal run of the command picker and the settings file panel.
-    var effects: ConfigurationEffects
+    internal var effects: ConfigurationEffects
     private lazy var startMenuTarget = StartMenuTarget(kernel: kernel)
 
-    static let startMenuHint = """
+    internal static let startMenuHint = """
         ? as the first parameter: asks for the parameters before the command runs
         %P source path   %T target path   %N name under the cursor   %S selected names
         %L a file listing the selected names with their paths   %% the percent sign
         """
 
-    init(
+    internal init(
         kernel: Kernel,
         runner: CommandRunner,
         effects: ConfigurationEffects,
@@ -58,7 +58,7 @@ final class ConfigurationCenter {
 
     // MARK: User commands
 
-    func userCommand(named name: String) -> UserCommand? {
+    internal func userCommand(named name: String) -> UserCommand? {
         store.userCommand(named: name)
     }
 
@@ -66,7 +66,7 @@ final class ConfigurationCenter {
     ///
     /// It looks its definition up when it runs, so a later change takes effect at once; its title
     /// in menus is the one it started with.
-    func register(_ command: UserCommand) {
+    internal func register(_ command: UserCommand) {
         let name = command.name
         guard kernel.commands[command.id] == nil else {
             return
@@ -85,7 +85,7 @@ final class ConfigurationCenter {
     }
 
     /// Stores a new or changed user command; `oldName` is the one it replaces when it was renamed.
-    func save(_ command: UserCommand, replacing oldName: String? = nil) {
+    internal func save(_ command: UserCommand, replacing oldName: String? = nil) {
         var commands = store.userCommands
         if let index = commands.firstIndex(where: { $0.name == oldName ?? command.name }) {
             commands[index] = command
@@ -98,7 +98,7 @@ final class ConfigurationCenter {
         if let oldName, oldName != command.name { pruneDeadKeys() }
     }
 
-    func removeUserCommand(named name: String) {
+    internal func removeUserCommand(named name: String) {
         store.userCommands = store.userCommands.filter { $0.name != name }
         pruneDeadKeys()
     }
@@ -128,7 +128,9 @@ final class ConfigurationCenter {
     /// The definition dialog of a user command (spec 14 › Defining).
     ///
     /// Nil when the user gave up or the name cannot be used.
-    func editUserCommand(_ existing: UserCommand?, proposing action: CommandAction = CommandAction()) -> UserCommand? {
+    internal func editUserCommand(_ existing: UserCommand?, proposing action: CommandAction = CommandAction())
+        -> UserCommand?
+    {
         let action = existing?.action ?? action
         let keys = existing.map { kernel.keyBindings.shortcuts(for: $0.id) } ?? []
         let fields: [FormField] = [
@@ -187,7 +189,7 @@ final class ConfigurationCenter {
     // MARK: Start menu
 
     /// The Start menu with the keys its entries have now.
-    func startMenuDraft() -> StartMenuDraft {
+    internal func startMenuDraft() -> StartMenuDraft {
         StartMenuDraft(
             rows: store.startMenu.enumerated()
                 .map { index, entry in
@@ -204,7 +206,7 @@ final class ConfigurationCenter {
     /// specification names (17 › User).
     ///
     /// A command runs whatever entry is at its position now.
-    func ensureSlots(_ count: Int) {
+    internal func ensureSlots(_ count: Int) {
         let entries = store.startMenu
         while slotCount < max(10, min(count, ConfigurationStore.startMenuLimit)) {
             let index = slotCount
@@ -240,7 +242,7 @@ final class ConfigurationCenter {
 
     /// The entries as the menu registry takes them at start-up: one section per run of entries
     /// between separators.
-    func startMenuSections() -> [[CommandID]] {
+    internal func startMenuSections() -> [[CommandID]] {
         var sections: [[CommandID]] = [[]]
         for (index, entry) in store.startMenu.enumerated() {
             if entry.isSeparator {
@@ -253,7 +255,7 @@ final class ConfigurationCenter {
     }
 
     /// Stores the edited Start menu with its keys and shows it in the menu bar.
-    func commit(_ draft: StartMenuDraft) {
+    internal func commit(_ draft: StartMenuDraft) {
         let oldCount = store.startMenu.count
         store.startMenu = draft.rows.map(\.entry)
         ensureSlots(draft.rows.count)
@@ -268,7 +270,7 @@ final class ConfigurationCenter {
     }
 
     /// The dialog of one Start-menu entry (spec 14 › The Change start menu dialog).
-    func editStartMenuRow(
+    internal func editStartMenuRow(
         _ row: StartMenuDraft.Row?,
         proposing action: CommandAction = CommandAction(),
         title: String = ""
@@ -318,7 +320,7 @@ final class ConfigurationCenter {
     ///
     /// Returns false when the text is not a shortcut or the user left the key with its owner.
     @discardableResult
-    func setShortcut(_ text: String, for command: CommandID) -> Bool {
+    internal func setShortcut(_ text: String, for command: CommandID) -> Bool {
         let editor = KeyBindingEditor(kernel: kernel)
         let text = text.trimmingCharacters(in: .whitespaces)
         if text.isEmpty {
@@ -346,7 +348,7 @@ final class ConfigurationCenter {
     /// Brings the menu bar in line with the key bindings and the Start menu.
     ///
     /// The shell builds its menus once; this changes the items in place.
-    func refreshMenus() {
+    internal func refreshMenus() {
         guard let menu = effects.mainMenu() else {
             return
         }
@@ -358,7 +360,7 @@ final class ConfigurationCenter {
 
     /// Every settings key that can be known: the preferences of all pages, the key bindings,
     /// the button bar, the panels' tabs, this plugin's own, and whatever the store can list.
-    func settingsKeys() -> [String] {
+    internal func settingsKeys() -> [String] {
         var keys = kernel.preferences.pages.flatMap { $0.preferences.map(\.key) }
         keys += [
             KeyBindings.settingsKey, ToolbarRegistry.settingsKey, ListingCache.settingsKey, "listingCache.readAhead",
@@ -370,7 +372,7 @@ final class ConfigurationCenter {
     }
 
     /// What is known about the settings now, for import and export.
-    func settingsSchema() -> SettingsSchema {
+    internal func settingsSchema() -> SettingsSchema {
         var schema = SettingsSchema()
         for preference in kernel.preferences.pages.flatMap(\.preferences) {
             schema.preferences[preference.key] = preference.kind
@@ -394,7 +396,7 @@ final class ConfigurationCenter {
     /// Asks what an export is to hold besides the settings themselves.
     ///
     /// Nil when the user gave up.
-    func askExportOptions() -> SettingsExportOptions? {
+    internal func askExportOptions() -> SettingsExportOptions? {
         let fields: [FormField] = [
             .note(
                 "The file holds the options of all pages, the key bindings, the button bar, the user commands, the Start menu, the directory "
@@ -417,7 +419,7 @@ final class ConfigurationCenter {
     ///
     /// What the user did rather than set up (histories), and the servers the user connects to, are
     /// in it only when `options` says so.
-    func exportSettings(
+    internal func exportSettings(
         to url: URL,
         options: SettingsExportOptions = SettingsExportOptions(),
         tellsWhatIsIncluded: Bool = true
@@ -455,7 +457,7 @@ final class ConfigurationCenter {
     ///
     /// What can run programs, rebind keys or change whom the program trusts is stored only when the
     /// user ticks it. Nothing is ever imported without this question, whoever asked for the import.
-    func importSettings(from url: URL) {
+    internal func importSettings(from url: URL) {
         let schema = settingsSchema()
         let knownKeys = settingsKeys()
         // Weak: the file is read and checked off the main thread, and the plugin may be gone when
@@ -524,7 +526,7 @@ final class ConfigurationCenter {
 
     /// Removes every known setting after asking; returns whether it did.
     @discardableResult
-    func resetSettings() -> Bool {
+    internal func resetSettings() -> Bool {
         let answer = kernel.interaction.choose(
             "Reset all settings?",
             detail: "Options, key bindings, the button bar, user commands and the Start menu "
@@ -542,7 +544,7 @@ final class ConfigurationCenter {
 
     /// Makes the running program follow settings that were replaced as a whole, as far as that
     /// is possible without a restart.
-    func applyStoredSettings() {
+    internal func applyStoredSettings() {
         store.invalidate()
         kernel.listingCache.isEnabled = kernel.settings.flag(ListingCache.settingsKey, default: true)
         store.userCommands.forEach(register)
@@ -556,7 +558,7 @@ final class ConfigurationCenter {
     }
 
     /// The pictures the user chose replace the plugins' (spec 14 › Button bars).
-    func applySymbols() {
+    internal func applySymbols() {
         for command in store.userCommands where !command.symbol.isEmpty {
             kernel.toolbar.setSymbol(command.symbol, for: command.id)
         }
@@ -567,13 +569,13 @@ final class ConfigurationCenter {
     /// directories (spec 19 › Save Position, Save Settings).
     ///
     /// Everything else is stored the moment it changes.
-    func saveSettingsNow() {
+    internal func saveSettingsNow() {
         kernel.settings.set(kernel.panels.left.tabs.state, forKey: "left.tabs")
         kernel.settings.set(kernel.panels.right.tabs.state, forKey: "right.tabs")
         savePosition()
     }
 
-    func savePosition() {
+    internal func savePosition() {
         for window in effects.windows() where !window.frameAutosaveName.isEmpty {
             window.saveFrame(usingName: window.frameAutosaveName)
         }
@@ -583,7 +585,7 @@ final class ConfigurationCenter {
 
     // MARK: Command list
 
-    func commandRows() -> [CommandRow] {
+    internal func commandRows() -> [CommandRow] {
         CommandCatalog.rows(
             commands: kernel.commands.all,
             menus: kernel.menus.menus,

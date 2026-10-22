@@ -7,15 +7,15 @@ import Testing
 @testable import FolderTabsPlugin
 
 @Suite
-struct TabFiles {
-    let memory = MemoryFileSystem()
+internal struct TabFiles {
+    internal let memory = MemoryFileSystem()
 
-    func read(_ text: String) -> TabFile? {
+    internal func read(_ text: String) -> TabFile? {
         TabFile(text: text) { memory.location(from: $0) }
     }
 
     @Test
-    func writesAndReadsBothSides() {
+    internal func writesAndReadsBothSides() {
         let active = PanelTabs.State(
             tabs: [
                 .init(location: memory.url("/A"), title: "Work", locked: true),
@@ -51,7 +51,7 @@ struct TabFiles {
     }
 
     @Test
-    func readsHandWrittenAndDamagedFiles() throws {
+    internal func readsHandWrittenAndDamagedFiles() throws {
         let file = try #require(
             read(
                 "; my tabs\r\n[ActiveTabs]\r\n3_path=mem:/C\r\n1_path=mem:/A\r\n2_path=elsewhere\r\nactivetab=3\r\nunknown=1\r\n"
@@ -70,17 +70,17 @@ struct TabFiles {
 
 @MainActor
 @Suite
-struct FolderTabCommands {
-    let memory = MemoryFileSystem()
-    let settings = MemorySettings()
-    let bench: TestBench
+internal struct FolderTabCommands {
+    internal let memory = MemoryFileSystem()
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt", "1")
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/A/pics/cat.jpg", "meow")
@@ -94,10 +94,10 @@ struct FolderTabCommands {
         )
     }
 
-    func paths(_ panel: FakePanel) -> [String] { panel.tabs.tabs.map(\.directory.path) }
+    internal func paths(_ panel: FakePanel) -> [String] { panel.tabs.tabs.map(\.directory.path) }
 
     @Test
-    func registersTheSpecificationsKeysAndAPreferencePage() {
+    internal func registersTheSpecificationsKeysAndAPreferencePage() {
         let keys = bench.kernel.keyBindings
         #expect(keys.command(for: Shortcut(.character("t"), .control)) == .newTab)
         #expect(keys.command(for: Shortcut(.character("t"), [.control, .shift])) == "cm_OpenNewTabBg")
@@ -115,7 +115,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func opensTabsInTheBackgroundAndInTheOtherPanel() {
+    internal func opensTabsInTheBackgroundAndInTheOtherPanel() {
         commands.perform("cm_OpenNewTabBg")
         #expect(paths(left) == ["/A", "/A"] && left.tabs.activeIndex == 0)
         left.moveCursor(toName: "docs")
@@ -132,7 +132,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func optionsDecideWhereAndHowNewTabsOpen() {
+    internal func optionsDecideWhereAndHowNewTabsOpen() {
         left.moveCursor(toName: "docs")
         commands.perform(.openInNewTab)
         commands.perform(.openInNewTab)
@@ -151,7 +151,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func closesAllOtherTabsAfterAsking() {
+    internal func closesAllOtherTabsAfterAsking() {
         for folder in ["docs", "pics"] { left.tabs.openTab(showing: memory.url("/A/" + folder), activate: false) }
         left.tabs.tabs[2].isLocked = true
         left.tabs.openTab(showing: memory.url("/B"), activate: true)
@@ -172,7 +172,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func closesDuplicatesKeepingTheActiveTab() {
+    internal func closesDuplicatesKeepingTheActiveTab() {
         for path in ["/A/docs", "/A", "/A/docs", "/A/docs/", "/B"] {
             left.tabs.openTab(showing: memory.url(path), activate: false)
         }
@@ -182,7 +182,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func reopensClosedTabsWhereTheyWere() {
+    internal func reopensClosedTabsWhereTheyWere() {
         #expect(!commands.isEnabled("afm_ReopenClosedTab"))
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: false)
         left.tabs.openTab(showing: memory.url("/A/pics"), activate: false)
@@ -207,7 +207,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func renamesAndLocksTabs() {
+    internal func renamesAndLocksTabs() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         ui.formAnswers = [.values(["name": .text("Papers"), "locked": .flag(true)])]
         commands.perform("cm_RenameTab")
@@ -237,7 +237,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func activatesTabsByNumberAndFromTheList() {
+    internal func activatesTabsByNumberAndFromTheList() {
         for folder in ["docs", "pics"] { left.tabs.openTab(showing: memory.url("/A/" + folder), activate: false) }
         commands.perform("cm_SrcActivateTab3")
         #expect(left.tabs.activeIndex == 2 && left.names == ["cat.jpg"])
@@ -264,7 +264,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func movesTabsWithinAndBetweenThePanels() {
+    internal func movesTabsWithinAndBetweenThePanels() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         left.model.customTitle = "Papers"
         commands.perform("cm_MoveTabLeft")
@@ -293,7 +293,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func exchangesThePanelsWithAllTheirTabs() {
+    internal func exchangesThePanelsWithAllTheirTabs() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         left.model.isLocked = true
         left.tabs.tabs[0].setSort(ListOrder(key: .size, descending: true))
@@ -307,7 +307,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func savesAndLoadsTabFiles() throws {
+    internal func savesAndLoadsTabFiles() throws {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         left.model.customTitle = "Papers"
         ui.promptAnswers = [.text("mem:/B/mine")]
@@ -348,7 +348,7 @@ struct FolderTabCommands {
     }
 
     @Test
-    func aMissingOrEmptyTabFileIsReported() {
+    internal func aMissingOrEmptyTabFileIsReported() {
         commands.perform("OPENTABS", .location(memory.url("/B/none.tab")))
         #expect(ui.log.last == "inform: The tabs could not be loaded." && left.tabs.count == 1)
         commands.perform("OPENTABS", .location(memory.url("/B/other.txt")))

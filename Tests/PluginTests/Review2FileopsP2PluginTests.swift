@@ -19,29 +19,35 @@ import Testing
 
 /// Shows no dialogs: keeps every question with the button Return would press, and answers
 /// the way `answer` says (by default: Return).
-final class P2RecordingUI: UserInteraction {
-    struct Question {
-        let message: String
-        let buttons: [String]
+internal final class P2RecordingUI: UserInteraction {
+    internal struct Question {
+        internal let message: String
+        internal let buttons: [String]
         /// The button Return presses; -1 when the question was asked without saying so.
-        let defaultButton: Int?
+        internal let defaultButton: Int?
     }
 
-    private(set) var questions: [Question] = []
-    private(set) var messages: [String] = []
-    private(set) var forms: [String] = []
+    internal private(set) var questions: [Question] = []
+    internal private(set) var messages: [String] = []
+    internal private(set) var forms: [String] = []
     /// The index of the chosen button; nil presses Return.
-    var answer: (Question) -> Int? = { _ in nil }
-    var formAnswer: ([FormField]) -> FormValues? = { _ in nil }
-    var promptAnswer: (String) -> String? = { _ in nil }
+    internal var answer: (Question) -> Int? = { _ in nil }
+    internal var formAnswer: ([FormField]) -> FormValues? = { _ in nil }
+    internal var promptAnswer: (String) -> String? = { _ in nil }
 
-    func prompt(_: String, value: String, detail _: String) -> String? { promptAnswer(value) }
-    func choose(_ message: String, detail _: String, buttons: [String], style _: QuestionStyle) -> Int {
+    internal func prompt(_: String, value: String, detail _: String) -> String? { promptAnswer(value) }
+    internal func choose(_ message: String, detail _: String, buttons: [String], style _: QuestionStyle) -> Int {
         let question = Question(message: message, buttons: buttons, defaultButton: -1)
         questions.append(question)
         return answer(question) ?? 0
     }
-    func choose(_ message: String, detail _: String, buttons: [String], style _: QuestionStyle, defaultButton: Int?)
+    internal func choose(
+        _ message: String,
+        detail _: String,
+        buttons: [String],
+        style _: QuestionStyle,
+        defaultButton: Int?
+    )
         -> Int
     {
         let question = Question(message: message, buttons: buttons, defaultButton: defaultButton)
@@ -49,8 +55,8 @@ final class P2RecordingUI: UserInteraction {
         // Return presses the default button; without one, nothing happens until Esc: the last.
         return answer(question) ?? defaultButton ?? buttons.count - 1
     }
-    func inform(_ message: String, detail _: String, style _: QuestionStyle) { messages.append(message) }
-    func form(_ title: String, detail _: String, fields: [FormField], buttons _: [String]) -> FormValues? {
+    internal func inform(_ message: String, detail _: String, style _: QuestionStyle) { messages.append(message) }
+    internal func form(_ title: String, detail _: String, fields: [FormField], buttons _: [String]) -> FormValues? {
         forms.append(title)
         return formAnswer(fields)
     }
@@ -58,23 +64,23 @@ final class P2RecordingUI: UserInteraction {
 
 /// Runs the work of a job at once, on the calling thread, and keeps its completion until
 /// `deliver()`: the time in which the user goes on working while a job is under way.
-final class P2DeferredJobs: JobService {
-    private(set) var isBusy = false
+internal final class P2DeferredJobs: JobService {
+    internal private(set) var isBusy = false
     private var pending: [() -> Void] = []
-    private(set) var titles: [String] = []
+    internal private(set) var titles: [String] = []
     /// Called after each job's work, before its completion is kept.
-    var afterWork: (() -> Void)?
+    internal var afterWork: (() -> Void)?
 
-    final class Monitor: JobMonitor, Sendable {
-        let cancellation = CancellationFlag()
-        func report(_: JobProgress) {}
-        func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
+    internal final class Monitor: JobMonitor, Sendable {
+        internal let cancellation = CancellationFlag()
+        internal func report(_: JobProgress) {}
+        internal func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
             // The work runs on the calling thread, the main one.
             MainActor.assumeIsolated(question)
         }
     }
 
-    func run<Result: Sendable>(
+    internal func run<Result: Sendable>(
         title: String,
         work: @escaping @Sendable (any JobMonitor) -> Result,
         completion: @escaping @MainActor (Result) -> Void
@@ -86,24 +92,24 @@ final class P2DeferredJobs: JobService {
     }
 
     /// Runs the completions that wait, and those they start.
-    func deliver() {
+    internal func deliver() {
         while !pending.isEmpty { pending.removeFirst()() }
     }
 }
 
 /// A kernel with fake panels, like `TestBench`, with the user interface and the job service
 /// a test brings.
-final class P2Bench: ShellServices {
-    let kernel: Kernel
-    let panelSet: FakePanelSet
-    let jobs: any JobService
+internal final class P2Bench: ShellServices {
+    internal let kernel: Kernel
+    internal let panelSet: FakePanelSet
+    internal let jobs: any JobService
 
-    var panels: any PanelSet { panelSet }
-    var left: FakePanel { panelSet.leftPanel }
-    var right: FakePanel { panelSet.rightPanel }
-    var commands: CommandRegistry { kernel.commands }
+    internal var panels: any PanelSet { panelSet }
+    internal var left: FakePanel { panelSet.leftPanel }
+    internal var right: FakePanel { panelSet.rightPanel }
+    internal var commands: CommandRegistry { kernel.commands }
 
-    init(
+    internal init(
         plugins: [any Plugin],
         fileSystems: [any FileSystemProvider],
         left: URL,
@@ -128,12 +134,12 @@ final class P2Bench: ShellServices {
 
 @MainActor
 @Suite
-struct Review2FileopsP2Commands {
-    let box: Sandbox
-    let memory = MemoryFileSystem()
-    let ui = P2RecordingUI()
+internal struct Review2FileopsP2Commands {
+    internal let box: Sandbox
+    internal let memory = MemoryFileSystem()
+    internal let ui = P2RecordingUI()
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         memory.addFile("/A/one.txt", "1")
         memory.addFile("/A/two.txt", "2")
@@ -160,7 +166,7 @@ struct Review2FileopsP2Commands {
 
     // F055: Return must not delete for good.
     @Test
-    func returnDoesNotConfirmADeletionThatCannotBeUndone() throws {
+    internal func returnDoesNotConfirmADeletionThatCannotBeUndone() throws {
         let bench = bench()
         bench.left.moveCursor(toName: "one.txt")
         // Nobody chooses a button: Return.
@@ -176,7 +182,7 @@ struct Review2FileopsP2Commands {
     }
 
     @Test
-    func whatGoesToTheTrashIsStillConfirmedWithReturn() throws {
+    internal func whatGoesToTheTrashIsStillConfirmedWithReturn() throws {
         try box.file("d/keep.txt", "kept")
         let bench = bench(left: box.url("d"))
         bench.left.moveCursor(toName: "keep.txt")
@@ -188,7 +194,7 @@ struct Review2FileopsP2Commands {
     }
 
     @Test
-    func theQuestionsOfAJobThatDestroySomethingDefaultToSkip() {
+    internal func theQuestionsOfAJobThatDestroySomethingDefaultToSkip() {
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
         let bridge = JobBridge(monitor: P2DeferredJobs.Monitor(), ui: ui, fileSystems: fileSystems)
@@ -224,7 +230,7 @@ struct Review2FileopsP2Commands {
 
     // F008, F025: what a command works on, and what it takes the marks off with.
     @Test
-    func theOperandsAreCountedWithoutMakingTheListOfThem() throws {
+    internal func theOperandsAreCountedWithoutMakingTheListOfThem() throws {
         let bench = bench()
         let model = bench.left.model
         model.moveCursor(to: try #require(model.row(ofName: "two.txt")))
@@ -255,7 +261,7 @@ struct Review2FileopsP2Commands {
     }
 
     @Test
-    func theMarksOfWhatWasProcessedComeOffAndTheOthersStay() {
+    internal func theMarksOfWhatWasProcessedComeOffAndTheOthersStay() {
         let bench = bench()
         let model = bench.left.model
         model.selectAll()
@@ -280,7 +286,7 @@ struct Review2FileopsP2Commands {
     }
 
     @Test
-    func afterACopyOnlyTheCopiedItemsLoseTheirMark() {
+    internal func afterACopyOnlyTheCopiedItemsLoseTheirMark() {
         let bench = bench()
         memory.addDirectory("/B/two.txt")  // a folder in the way of one of the three
         bench.right.reload()
@@ -294,7 +300,7 @@ struct Review2FileopsP2Commands {
 
     // F009
     @Test
-    func deleteAsksWhatTheFolderCanDoOnceNotPerItem() {
+    internal func deleteAsksWhatTheFolderCanDoOnceNotPerItem() {
         for index in 0..<60 { memory.addFile("/many/f\(index).txt") }
         let bench = bench(left: memory.url("/many"))
         bench.left.model.selectAll()
@@ -312,7 +318,7 @@ struct Review2FileopsP2Commands {
 
     // F027: the log's last lines at the end of the program.
     @Test
-    func theLogIsWrittenWhileTheProgramPreparesToQuit() async {
+    internal func theLogIsWrittenWhileTheProgramPreparesToQuit() async {
         let settings = MemorySettings()
         settings.set(true, forKey: OperationSettings.logEnabled)
         settings.set(box.url("logs/operations.log").path, forKey: OperationSettings.logFile)
@@ -334,7 +340,7 @@ struct Review2FileopsP2Commands {
     }
 
     @Test
-    func aLogThatCannotBeWrittenHoldsUpNeitherTheQuitNorItsCaller() async {
+    internal func aLogThatCannotBeWrittenHoldsUpNeitherTheQuitNorItsCaller() async {
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
         configuration.file = box.url("logs/operations.log")
@@ -370,7 +376,7 @@ struct Review2FileopsP2Commands {
     }
 
     @Test
-    func aPipeWhereTheLogShouldBeIsNotOpened() throws {
+    internal func aPipeWhereTheLogShouldBeIsNotOpened() throws {
         try box.folder("logs")
         #expect(mkfifo(box.url("logs/operations.log").path, 0o600) == 0)
         var configuration = OperationLog.Configuration()
@@ -384,7 +390,7 @@ struct Review2FileopsP2Commands {
 
     // New folders are made exclusively, and a job that is cancelled makes none.
     @Test
-    func aNewFolderIsNotTakenForOneThatAppearedMeanwhile() {
+    internal func aNewFolderIsNotTakenForOneThatAppearedMeanwhile() {
         let bench = bench()
         #expect(bench.commands.perform(.makeDirectory, .text("fresh|fresh/inner|one.txt")))
         #expect(memory.exists("/A/fresh/inner"))
@@ -399,16 +405,16 @@ struct Review2FileopsP2Commands {
 
 @MainActor
 @Suite
-struct Review2FileopsP2Clipboard {
-    let box: Sandbox
+internal struct Review2FileopsP2Clipboard {
+    internal let box: Sandbox
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let probe = P2ProbeFileSystem()
-    let bench: TestBench
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let probe = P2ProbeFileSystem()
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
+    internal var commands: CommandRegistry { bench.commands }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.folder("t")
         probe.base.addFile("/A/one.txt")
@@ -436,7 +442,7 @@ struct Review2FileopsP2Clipboard {
 
     // F003
     @Test
-    func aLongListOfNamesIsMadeInTheBackgroundAndTheLatestRequestWins() async {
+    internal func aLongListOfNamesIsMadeInTheBackgroundAndTheLatestRequestWins() async {
         let count = ClipboardPlugin.listedAtOnce + 50
         for index in 0..<count { probe.base.addFile("/long/f\(index).txt") }
         bench.left.show(probe.base.url("/long"))
@@ -472,7 +478,7 @@ struct Review2FileopsP2Clipboard {
 
     // F039
     @Test
-    func aLongListOfFilesFromAnotherProgramIsReadInSlices() async throws {
+    internal func aLongListOfFilesFromAnotherProgramIsReadInSlices() async throws {
         let urls = (0..<3_000).map { box.url("src/f\($0).txt") }
         writeAsAnotherProgram(urls)
         let items = try #require(pasteboard.pasteboardItems)
@@ -504,7 +510,7 @@ struct Review2FileopsP2Clipboard {
     }
 
     @Test
-    func aSliceIsShortAndOnlyFileLocationsAreTaken() {
+    internal func aSliceIsShortAndOnlyFileLocationsAreTaken() {
         // A slice may take a few thousandths of a second, so that the main thread gets its
         // turn between two of them.
         #expect(FileListReading.sliceTime <= 10_000_000)
@@ -520,7 +526,7 @@ struct Review2FileopsP2Clipboard {
     }
 
     @Test
-    func aLongListFromAnotherProgramIsPastedWhole() throws {
+    internal func aLongListFromAnotherProgramIsPastedWhole() throws {
         let count = ClipboardPlugin.readAtOnce + 44
         var urls: [URL] = []
         for index in 0..<count { urls.append(try box.file("src/f\(index).txt", "\(index)")) }
@@ -542,7 +548,7 @@ struct Review2FileopsP2Clipboard {
 
     // F040: the failure path.
     @Test
-    func aTextThatCannotBeWrittenLeavesNoDraftBehind() {
+    internal func aTextThatCannotBeWrittenLeavesNoDraftBehind() {
         struct DiskFull: LocalizedError {
             var errorDescription: String? { "The disk is full." }
         }
@@ -563,7 +569,7 @@ struct Review2FileopsP2Clipboard {
     }
 
     @Test
-    func whetherThereIsSomethingToPasteIsAskedOncePerStateOfTheClipboard() {
+    internal func whetherThereIsSomethingToPasteIsAskedOncePerStateOfTheClipboard() {
         pasteboard.clearContents()
         pasteboard.setString("text", forType: .string)
         #expect(commands.isEnabled(.pasteFromClipboard) && commands.isEnabled(.pasteFromClipboard))
@@ -580,13 +586,13 @@ struct Review2FileopsP2Clipboard {
 // MARK: - File properties
 
 @Suite
-struct Review2FileopsP2Properties {
-    let box: Sandbox
-    let fileSystems = FileSystemRegistry()
-    let memory = MemoryFileSystem()
-    let probe = P2ProbeFileSystem()
+internal struct Review2FileopsP2Properties {
+    internal let box: Sandbox
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
+    internal let probe = P2ProbeFileSystem()
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         fileSystems.register(LocalFileSystem())
         fileSystems.register(memory)
@@ -595,7 +601,7 @@ struct Review2FileopsP2Properties {
 
     // V070, T024
     @Test
-    func measuringAFolderOnAServerThatStoppedAnsweringEndsWithTheJob() throws {
+    internal func measuringAFolderOnAServerThatStoppedAnsweringEndsWithTheJob() throws {
         memory.addFile("/s/dir/sub/f.txt", "12345")
         memory.addFile("/s/file.txt", "123")
         let items = try memory.list(memory.url("/s"), showHidden: true)
@@ -614,7 +620,7 @@ struct Review2FileopsP2Properties {
 
     // V070, T024, T047
     @Test
-    func changingAttributesBelowAFolderThatStoppedAnsweringEndsWithTheJob() throws {
+    internal func changingAttributesBelowAFolderThatStoppedAnsweringEndsWithTheJob() throws {
         memory.addFile("/s/dir/sub/f.txt")
         let items = try memory.list(memory.url("/s"), showHidden: true)
         memory.stallsListings = true
@@ -633,7 +639,7 @@ struct Review2FileopsP2Properties {
     }
 
     @Test
-    func aTreeIsChangedOnAllCoresWithNothingLeftOut() throws {
+    internal func aTreeIsChangedOnAllCoresWithNothingLeftOut() throws {
         // Folders in folders, each with files: the calls for them are made from inside calls.
         var files = 0
         var folders = 1
@@ -662,7 +668,7 @@ struct Review2FileopsP2Properties {
 
     // V070: the comment column's threads.
     @Test
-    func nobodyWaitsForEverForACommentFileThatIsNotComing() {
+    internal func nobodyWaitsForEverForACommentFileThatIsNotComing() {
         probe.base.addFile("/A/descript.ion", "a.txt the comment\r\n")
         probe.base.addFile("/A/a.txt")
         let store = CommentStore(fileSystems: fileSystems)
@@ -712,7 +718,7 @@ struct Review2FileopsP2Properties {
     }
 
     @Test
-    func aCommentThatIsBeingSavedIsNotWrittenFromAReadingThatWasStopped() throws {
+    internal func aCommentThatIsBeingSavedIsNotWrittenFromAReadingThatWasStopped() throws {
         memory.addFile("/A/descript.ion", "a.txt old\r\nb.txt other\r\n")
         let store = CommentStore(fileSystems: fileSystems)
         let flag = CancellationFlag()
@@ -728,7 +734,7 @@ struct Review2FileopsP2Properties {
 
     // G002: the six reproducers the fuzzer kept, through the checks that failed.
     @Test
-    func theCommentFilesThatWereMisreadOrLostAreReadAndRewrittenWhole() throws {
+    internal func theCommentFilesThatWereMisreadOrLostAreReadAndRewrittenWhole() throws {
         func bytes(_ name: String) throws -> [UInt8] {
             let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
                 .appendingPathComponent("Fuzz/repro/misc/\(name)")
@@ -783,13 +789,13 @@ struct Review2FileopsP2Properties {
 
 @MainActor
 @Suite
-struct Review2FileopsP2PropertyCommands {
-    let box: Sandbox
-    let ui = ScriptedInteraction()
-    let jobs = P2DeferredJobs()
-    let bench: P2Bench
+internal struct Review2FileopsP2PropertyCommands {
+    internal let box: Sandbox
+    internal let ui = ScriptedInteraction()
+    internal let jobs = P2DeferredJobs()
+    internal let bench: P2Bench
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("d/a.txt", "a")
         try box.file("d/b.txt", "b")
@@ -809,7 +815,7 @@ struct Review2FileopsP2PropertyCommands {
 
     // F037: a dialog about what the panel showed when the command was given.
     @Test
-    func aDialogIsNotShownOnceThePanelShowsAnotherFolder() throws {
+    internal func aDialogIsNotShownOnceThePanelShowsAnotherFolder() throws {
         bench.left.moveCursor(toName: "a.txt")
         for command in [CommandID.setAttributes, .editComment] {
             #expect(bench.commands.perform(command))
@@ -845,7 +851,7 @@ struct Review2FileopsP2PropertyCommands {
 
     // F038: the names of owner and group are asked for in the job.
     @Test
-    func ownerAndGroupAreLookedUpBeforeTheDialogNotWhileItIsMade() throws {
+    internal func ownerAndGroupAreLookedUpBeforeTheDialogNotWhileItIsMade() throws {
         bench.left.moveCursor(toName: "a.txt")
         var afterWork = -1
         jobs.afterWork = { afterWork = LocalInfo.nameLookups }
@@ -862,7 +868,7 @@ struct Review2FileopsP2PropertyCommands {
 
     // F070
     @Test
-    func allFolderSizesAreOfferedOnlyWhereThereAreFolders() {
+    internal func allFolderSizesAreOfferedOnlyWhereThereAreFolders() {
         #expect(bench.commands.isEnabled(.countDirectoryContents))
         bench.left.show(box.url("files"))
         #expect(!bench.commands.isEnabled(.countDirectoryContents))
@@ -878,7 +884,7 @@ struct Review2FileopsP2PropertyCommands {
     }
 
     @Test
-    func theSizesAreShownAlsoWhenTheListChangedWhileTheyWereWorkedOut() throws {
+    internal func theSizesAreShownAlsoWhenTheListChangedWhileTheyWereWorkedOut() throws {
         #expect(bench.commands.perform(.countDirectoryContents))
         // The same folder, another list: a file was added while the job ran.
         try box.file("d/zz-new.txt", "new")
@@ -889,7 +895,7 @@ struct Review2FileopsP2PropertyCommands {
 
     // F010, and the sizes and marks after Calculate Occupied Space.
     @Test
-    func whatACommandChangedIsShownInThePanelAfterwards() {
+    internal func whatACommandChangedIsShownInThePanelAfterwards() {
         bench.left.moveCursor(toName: "a.txt")
         #expect(bench.commands.perform(.setAttributes, .text("= +m600")))
         jobs.deliver()

@@ -3,31 +3,31 @@ import AFMKernel
 import Foundation
 
 /// A line of the result list as it is shown: the grey caption of a subdirectory, or a row.
-enum SyncListEntry: Equatable {
+internal enum SyncListEntry: Equatable {
     case header(String)
     /// The index into `SyncSession.rows`.
     case row(Int)
 }
 
-enum SyncSortKey: Int, Codable {
+internal enum SyncSortKey: Int, Codable {
     case name, size, date
 }
 
-enum SyncSide {
+internal enum SyncSide {
     case left, right
 }
 
 /// The settings keys of Synchronize directories, all below `directorySync.`.
-enum SyncSettingsKey {
-    static let scope = "directorySync"
-    static let options = "options"
-    static let show = "show"
-    static let sets = "sets"
-    static let recompare = "recompareAfterSync"
-    static let confirmOverwrites = "confirmOverwrites"
-    static let useTrash = "useTrash"
-    static let changeSourceDates = "changeSourceDates"
-    static let warnReadErrors = "warnReadErrors"
+internal enum SyncSettingsKey {
+    internal static let scope = "directorySync"
+    internal static let options = "options"
+    internal static let show = "show"
+    internal static let sets = "sets"
+    internal static let recompare = "recompareAfterSync"
+    internal static let confirmOverwrites = "confirmOverwrites"
+    internal static let useTrash = "useTrash"
+    internal static let changeSourceDates = "changeSourceDates"
+    internal static let warnReadErrors = "warnReadErrors"
 }
 
 /// Everything the Synchronize directories window does, without the window: the two paths, the
@@ -42,50 +42,50 @@ enum SyncSettingsKey {
 /// service, with the progress window. With `runsInline` (tests) the comparison runs on the
 /// calling thread instead.
 @MainActor
-final class SyncSession {
-    enum Phase {
+internal final class SyncSession {
+    internal enum Phase {
         /// `synchronizing`: the job that carries out the plan runs; neither Compare nor Synchronize may start.
         case idle, comparing, compared, synchronizing
     }
 
     /// Unowned: the kernel owns the plugin, and through it this.
-    unowned let kernel: Kernel
+    internal unowned let kernel: Kernel
     private let settings: any SettingsStore
 
-    var leftPath = ""
-    var rightPath = ""
-    var options: SyncOptions
-    var show: SyncShow { didSet { rebuild(rowsChanged: false) } }
-    var sort: (key: SyncSortKey, side: SyncSide, ascending: Bool) = (.name, .left, true) {
+    internal var leftPath = ""
+    internal var rightPath = ""
+    internal var options: SyncOptions
+    internal var show: SyncShow { didSet { rebuild(rowsChanged: false) } }
+    internal var sort: (key: SyncSortKey, side: SyncSide, ascending: Bool) = (.name, .left, true) {
         didSet { rebuild(rowsChanged: false) }
     }
     /// "Only selected (in main window)".
-    var onlySelected = false
+    internal var onlySelected = false
     /// The names that were selected in the two panels when the window was opened.
-    private(set) var selectedNames: [String] = []
-    var runsInline = false
+    internal private(set) var selectedNames: [String] = []
+    internal var runsInline = false
     /// Called on the main thread whenever something the window shows has changed.
-    var onChange: () -> Void = {}
+    internal var onChange: () -> Void = {}
     /// Called instead of `onChange` when only the actions of these rows (indexes into `rows`)
     /// changed, so that the window redraws just them.
-    var onRowsChange: (([Int]) -> Void)?
+    internal var onRowsChange: (([Int]) -> Void)?
 
-    private(set) var rows: [SyncRow] = []
-    private(set) var entries: [SyncListEntry] = []
+    internal private(set) var rows: [SyncRow] = []
+    internal private(set) var entries: [SyncListEntry] = []
     /// The position in `entries` of each row, -1 for a row that is not shown.
-    private(set) var positions: [Int] = []
+    internal private(set) var positions: [Int] = []
     /// The positions of the captions in `entries`, in order.
     private var headerPositions: [Int] = []
     /// How many of the shown rows have an action that the plan would carry out.
     private var actionableCount = 0
-    private(set) var phase = Phase.idle
-    private(set) var status = "Please press 'Compare' to start"
+    internal private(set) var phase = Phase.idle
+    internal private(set) var status = "Please press 'Compare' to start"
     /// 0…1 while files are compared by content.
-    private(set) var fraction: Double?
+    internal private(set) var fraction: Double?
     /// The files picked with "Select for comparison", one per side.
-    private(set) var picked: (left: URL?, right: URL?) = (nil, nil)
+    internal private(set) var picked: (left: URL?, right: URL?) = (nil, nil)
 
-    private(set) var base = URL(fileURLWithPath: "/")
+    internal private(set) var base = URL(fileURLWithPath: "/")
     /// The two directories of the last finished comparison; what they are counts only once it
     /// has finished (`phase` is `.compared` or `.synchronizing`).
     private var roots = (left: URL(fileURLWithPath: "/"), right: URL(fileURLWithPath: "/"))
@@ -93,33 +93,35 @@ final class SyncSession {
     /// What the last finished comparison used and found, for what is done with its rows.
     private var compared = (offsetHours: 0, toleranceSeconds: 3)
     /// The comparison was stopped: its rows are right but not all of them.
-    private(set) var isPartial = false
+    internal private(set) var isPartial = false
     /// The left directory, the source of a mirror, listed as empty while the right one is not: an unmounted
     /// share or a wrong path looks like this, and mirroring it would delete the whole right side.
-    private(set) var sourceLooksEmpty = false
+    internal private(set) var sourceLooksEmpty = false
     /// The summary line of the rows, and the layout of the list, made by `layout` (off the main thread for large lists).
     private var summary = SyncSummary([])
     private var layoutGeneration = 0
     private var actionEpoch = 0
     /// Rows from this many on are laid out and planned away from the main thread.
-    static let backgroundFrom = 20_000
+    internal static let backgroundFrom = 20_000
     /// The same for this session (tests make it small).
-    var worksInBackgroundFrom = SyncSession.backgroundFrom
+    internal var worksInBackgroundFrom = SyncSession.backgroundFrom
     /// The least time between two progress reports of a comparison, in seconds (tests: none).
-    var progressInterval: TimeInterval = 0.1
+    internal var progressInterval: TimeInterval = 0.1
     /// Starts the work of a comparison, a list or a plan away from the main thread (tests keep
     /// it, to run it when they choose).
-    var startWorker: (_ name: String, _ work: @escaping @Sendable () -> Void) -> Void = { SyncWorker.run($0, $1) }
+    internal var startWorker: (_ name: String, _ work: @escaping @Sendable () -> Void) -> Void = {
+        SyncWorker.run($0, $1)
+    }
     private var isPlanning = false
     /// Counts the calls of `adopt`: a long selection read in the background is dropped when another began.
     private var selectionEpoch = 0
 
     /// The sorted names of the marked entries of the panels the snapshots were taken of.
-    nonisolated static func names(of snapshots: [PanelModel.Operands]) -> [String] {
+    nonisolated internal static func names(of snapshots: [PanelModel.Operands]) -> [String] {
         snapshots.flatMap { $0.markedItems().map(\.name) }.sorted()
     }
 
-    init(kernel: Kernel) {
+    internal init(kernel: Kernel) {
         self.kernel = kernel
         settings = kernel.settings.scoped(to: SyncSettingsKey.scope)
         options = settings.value(SyncOptions.self, forKey: SyncSettingsKey.options) ?? SyncOptions()
@@ -130,7 +132,7 @@ final class SyncSession {
     }
 
     /// Presets the window with the directories and the selection of the two panels.
-    func adopt(
+    internal func adopt(
         left: PanelModel,
         right: PanelModel,
         includeHidden: Bool,
@@ -178,7 +180,7 @@ final class SyncSession {
 
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
-    func location(_ side: SyncSide) -> URL {
+    internal func location(_ side: SyncSide) -> URL {
         fileSystems.location(from: side == .left ? leftPath : rightPath, relativeTo: base)
     }
 
@@ -201,7 +203,7 @@ final class SyncSession {
 
     // MARK: Comparing
 
-    func compare() {
+    internal func compare() {
         guard phase != .comparing, phase != .synchronizing, !isPlanning else {
             return
         }
@@ -251,7 +253,7 @@ final class SyncSession {
     }
 
     /// Stops a running comparison; what was found so far is shown.
-    func cancelComparison() {
+    internal func cancelComparison() {
         running?.cancellation.cancel()
     }
 
@@ -306,7 +308,7 @@ final class SyncSession {
 
     // MARK: The list
 
-    var visibleRows: [Int] {
+    internal var visibleRows: [Int] {
         entries.compactMap { entry in
             if case .row(let index) = entry {
                 return index
@@ -321,16 +323,16 @@ final class SyncSession {
     }
 
     /// The list as it is shown, worked out from the rows alone (so it can be made on any thread).
-    struct Layout {
-        var entries: [SyncListEntry] = []
-        var positions: [Int] = []
-        var headerPositions: [Int] = []
-        var actionableCount = 0
-        var summary = SyncSummary([])
+    internal struct Layout {
+        internal var entries: [SyncListEntry] = []
+        internal var positions: [Int] = []
+        internal var headerPositions: [Int] = []
+        internal var actionableCount = 0
+        internal var summary = SyncSummary([])
     }
 
     /// Filters by the Show buttons, sorts inside each subdirectory and puts the captions in.
-    nonisolated static func layout(
+    nonisolated internal static func layout(
         rows: [SyncRow],
         show: SyncShow,
         sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
@@ -465,7 +467,7 @@ final class SyncSession {
 
     /// The subdirectory indicator next to the Show buttons: `6/9 dups/sub`
     /// (spec 09 › Result list).
-    func groupIndicator(atEntry position: Int) -> String {
+    internal func groupIndicator(atEntry position: Int) -> String {
         guard !headerPositions.isEmpty else {
             return ""
         }
@@ -483,33 +485,33 @@ final class SyncSession {
     }
 
     /// The entry of the next or previous subdirectory caption, for Ctrl+PgDn / Ctrl+PgUp.
-    func header(after position: Int, forward: Bool) -> Int? {
+    internal func header(after position: Int, forward: Bool) -> Int? {
         forward ? headerPositions.first { $0 > position } : headerPositions.last { $0 < position }
     }
 
     // MARK: Actions of rows
 
     /// Sets the action of every given row that can take it.
-    func setAction(_ action: SyncAction, rows indexes: [Int]) {
+    internal func setAction(_ action: SyncAction, rows indexes: [Int]) {
         change(indexes) { $0.accepts(action) ? action : $0.action }
     }
 
     /// "Mark for copying (default direction)".
-    func markDefault(rows indexes: [Int]) {
+    internal func markDefault(rows indexes: [Int]) {
         change(indexes) { $0.defaultAction }
     }
 
-    func reverse(rows indexes: [Int]) {
+    internal func reverse(rows indexes: [Int]) {
         change(indexes) { $0.reversedAction }
     }
 
     /// Space: switches each row between its default action and none.
-    func toggle(rows indexes: [Int]) {
+    internal func toggle(rows indexes: [Int]) {
         change(indexes) { $0.action == .none ? $0.defaultAction : .none }
     }
 
     /// A click on the middle column.
-    func cycle(row index: Int) {
+    internal func cycle(row index: Int) {
         change([index]) { $0.nextAction }
     }
 
@@ -535,14 +537,14 @@ final class SyncSession {
 
     // MARK: Files of rows
 
-    func url(_ side: SyncSide, row index: Int) -> URL? {
+    internal func url(_ side: SyncSide, row index: Int) -> URL? {
         guard rows.indices.contains(index), !rows[index].isDirectory else {
             return nil
         }
         return side == .left ? rows[index].left?.url : rows[index].right?.url
     }
 
-    func view(_ side: SyncSide, row index: Int, command: CommandID = .view) {
+    internal func view(_ side: SyncSide, row index: Int, command: CommandID = .view) {
         guard let url = url(side, row: index) else {
             return
         }
@@ -550,7 +552,7 @@ final class SyncSession {
     }
 
     /// "Select for comparison": remembers a file of one side for "Compare left & right".
-    func pick(_ side: SyncSide, row index: Int) {
+    internal func pick(_ side: SyncSide, row index: Int) {
         guard let url = url(side, row: index) else {
             return
         }
@@ -563,7 +565,7 @@ final class SyncSession {
     ///
     /// The comparison tool is another plugin's command; it is handed the two locations as two lines
     /// of text.
-    func compareContents(row index: Int?) {
+    internal func compareContents(row index: Int?) {
         var files = (left: picked.left, right: picked.right)
         if files.left == nil || files.right == nil {
             guard let index else {
@@ -589,18 +591,18 @@ final class SyncSession {
     // MARK: Synchronizing
 
     /// What Synchronize would do now: only the rows that are shown take part.
-    func plan() -> SyncPlan {
+    internal func plan() -> SyncPlan {
         SyncPlan(rows: visibleRows.map { rows[$0] }, timeOffsetHours: compared.offsetHours)
     }
 
     /// The time tolerance the run uses: the one the comparison found necessary.
     private var runTolerance: Int { compared.toleranceSeconds }
 
-    var canSynchronize: Bool { phase == .compared && actionableCount > 0 && !isPartial && !isPlanning }
+    internal var canSynchronize: Bool { phase == .compared && actionableCount > 0 && !isPartial && !isPlanning }
 
     /// Shows the Synchronize dialog and runs what the user confirmed
     /// (spec 09 › The "Synchronize" dialog and the run).
-    func synchronize() {
+    internal func synchronize() {
         guard phase == .compared, !isPlanning else {
             return
         }
@@ -801,7 +803,7 @@ final class SyncSession {
 
     /// Says what did not go well: failures (also those after "Skip All", which asked no more), a
     /// write that could not be made durable (the deletions were then not done), a run that was stopped.
-    func report(_ outcome: SyncOutcome) {
+    internal func report(_ outcome: SyncOutcome) {
         guard !outcome.errors.isEmpty || outcome.commitFailed || outcome.wasCancelled else {
             return
         }
@@ -835,25 +837,25 @@ final class SyncSession {
     /// The saved sets, sorted by name (spec 09 › Saved sync sets).
     ///
     /// A set that cannot be read is left out; the others stay.
-    var savedSets: [SyncSet] {
+    internal var savedSets: [SyncSet] {
         (settings.value([StoredElement<SyncSet>].self, forKey: SyncSettingsKey.sets) ?? []).compactMap(\.value)
             .sorted { Sorter.compare($0.name, $1.name, numeric: true) == .orderedAscending }
     }
 
     /// "Add current directories and settings to list"; a set of the same name is replaced.
-    func saveSet(named name: String) {
+    internal func saveSet(named name: String) {
         var saved = options
         saved.onlyNames = nil
         let set = SyncSet(name: name, left: leftPath, right: rightPath, options: saved, show: show)
         settings.set(savedSets.filter { $0.name != name } + [set], forKey: SyncSettingsKey.sets)
     }
 
-    func removeSet(named name: String) {
+    internal func removeSet(named name: String) {
         settings.set(savedSets.filter { $0.name != name }, forKey: SyncSettingsKey.sets)
     }
 
     @discardableResult
-    func loadSet(named name: String) -> Bool {
+    internal func loadSet(named name: String) -> Bool {
         guard phase != .synchronizing, let set = savedSets.first(where: { $0.name == name }) else {
             return false
         }
@@ -871,8 +873,8 @@ final class SyncSession {
 
 /// Where the session's comparison, list and plan are made: a thread of their own for each, not a worker
 /// of the shared pool (see `SyncSession.compare`).
-enum SyncWorker {
-    static func run(_ name: String, _ body: @escaping @Sendable () -> Void) {
+internal enum SyncWorker {
+    internal static func run(_ name: String, _ body: @escaping @Sendable () -> Void) {
         let thread = Thread(block: body)
         thread.name = name
         thread.qualityOfService = .userInitiated

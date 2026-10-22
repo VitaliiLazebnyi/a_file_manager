@@ -9,24 +9,24 @@ import Testing
 /// A monitor for packing and unpacking outside a job service.
 ///
 /// Unchecked: the reports are guarded by `lock`.
-final class QuietMonitor: JobMonitor, @unchecked Sendable {
-    let cancellation = CancellationFlag()
+internal final class QuietMonitor: JobMonitor, @unchecked Sendable {
+    internal let cancellation = CancellationFlag()
     private let lock = NSLock()
     private var all: [JobProgress] = []
 
-    var reports: [JobProgress] {
+    internal var reports: [JobProgress] {
         lock.lock()
         defer { lock.unlock() }
         return all
     }
 
-    func report(_ progress: JobProgress) {
+    internal func report(_ progress: JobProgress) {
         lock.lock()
         all.append(progress)
         lock.unlock()
     }
 
-    func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
+    internal func ask<Answer: Sendable>(_ question: @MainActor @Sendable () -> Answer) -> Answer {
         Thread.isMainThread ? MainActor.assumeIsolated(question) : DispatchQueue.main.sync { question() }
     }
 }
@@ -35,38 +35,38 @@ final class QuietMonitor: JobMonitor, @unchecked Sendable {
 ///
 /// Unchecked: its parts are file systems and stores, which are safe from any thread; the
 /// environment is set up before use.
-final class ArchiveBench: @unchecked Sendable {
-    let box: Sandbox
-    let environment = ArchiveEnvironment()
-    let store: ArchiveStore
-    let fileSystems = FileSystemRegistry()
-    let memory = MemoryFileSystem()
-    let zip: ArchiveFileSystem
-    let readOnly: ArchiveFileSystem
-    let monitor = QuietMonitor()
-    let passwords = Passwords()
+internal final class ArchiveBench: @unchecked Sendable {
+    internal let box: Sandbox
+    internal let environment = ArchiveEnvironment()
+    internal let store: ArchiveStore
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
+    internal let zip: ArchiveFileSystem
+    internal let readOnly: ArchiveFileSystem
+    internal let monitor = QuietMonitor()
+    internal let passwords = Passwords()
 
     /// The answers to password questions, and how often one was asked.
     ///
     /// Unchecked: the state is guarded by `lock`.
-    final class Passwords: @unchecked Sendable {
+    internal final class Passwords: @unchecked Sendable {
         private let lock = NSLock()
         private var answers: [String?] = []
         private var count = 0
 
-        func set(_ answers: [String?]) {
+        internal func set(_ answers: [String?]) {
             lock.lock()
             self.answers = answers
             lock.unlock()
         }
 
-        var asked: Int {
+        internal var asked: Int {
             lock.lock()
             defer { lock.unlock() }
             return count
         }
 
-        func next() -> String? {
+        internal func next() -> String? {
             lock.lock()
             defer { lock.unlock() }
             count += 1
@@ -74,7 +74,7 @@ final class ArchiveBench: @unchecked Sendable {
         }
     }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         environment.flushDelay = nil
         store = ArchiveStore(environment: environment)
@@ -89,7 +89,7 @@ final class ArchiveBench: @unchecked Sendable {
 
     /// A small tree with text, binary data, an empty file, an empty folder and odd names.
     @discardableResult
-    func makeTree(_ name: String = "tree") throws -> URL {
+    internal func makeTree(_ name: String = "tree") throws -> URL {
         try box.file(
             "\(name)/readme.txt",
             String(repeating: "All work and no play makes Jack a dull boy.\n", count: 400)
@@ -116,12 +116,12 @@ final class ArchiveBench: @unchecked Sendable {
         return box.url(name)
     }
 
-    func item(_ url: URL) throws -> FileItem {
+    internal func item(_ url: URL) throws -> FileItem {
         try #require(fileSystems.item(at: url))
     }
 
     @discardableResult
-    func pack(
+    internal func pack(
         _ sources: [URL],
         to archive: URL,
         innerFolder: String = "",
@@ -137,7 +137,7 @@ final class ArchiveBench: @unchecked Sendable {
     }
 
     @discardableResult
-    func unpack(_ archive: URL, to target: URL, _ configure: (inout UnpackOptions) -> Void = { _ in }) throws
+    internal func unpack(_ archive: URL, to target: URL, _ configure: (inout UnpackOptions) -> Void = { _ in }) throws
         -> UnpackResult
     {
         var options = UnpackOptions()
@@ -147,11 +147,11 @@ final class ArchiveBench: @unchecked Sendable {
     }
 
     /// The location of a path inside an archive file.
-    func inside(_ archive: URL, _ path: String = "", scheme: String = ArchiveURL.writableScheme) -> URL {
+    internal func inside(_ archive: URL, _ path: String = "", scheme: String = ArchiveURL.writableScheme) -> URL {
         ArchiveURL.make(scheme: scheme, archive: archive, innerPath: path)
     }
 
-    func read(_ url: URL) throws -> Data {
+    internal func read(_ url: URL) throws -> Data {
         let reader = try fileSystems.provider(for: url).read(url)
         defer { reader.close() }
         var data = Data()
@@ -159,14 +159,16 @@ final class ArchiveBench: @unchecked Sendable {
         return data
     }
 
-    func names(_ url: URL, showHidden: Bool = true) throws -> [String] {
+    internal func names(_ url: URL, showHidden: Bool = true) throws -> [String] {
         try fileSystems.provider(for: url).list(url, showHidden: showHidden).map(\.name).sorted()
     }
 }
 
 /// Runs a program of the system and returns its exit status and output.
 @discardableResult
-func runTool(_ path: String, _ arguments: [String], in directory: URL? = nil) -> (status: Int32, output: String) {
+internal func runTool(_ path: String, _ arguments: [String], in directory: URL? = nil) -> (
+    status: Int32, output: String
+) {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: path)
     process.arguments = arguments
@@ -182,7 +184,7 @@ func runTool(_ path: String, _ arguments: [String], in directory: URL? = nil) ->
 }
 
 /// Every regular file below a folder with its contents, by relative path; empty folders as nil.
-func snapshot(_ folder: URL) -> [String: Data?] {
+internal func snapshot(_ folder: URL) -> [String: Data?] {
     var found: [String: Data?] = [:]
     let base = folder.resolvingSymlinksInPath().path
     guard let walker = FileManager.default.enumerator(atPath: base) else {
@@ -203,18 +205,18 @@ func snapshot(_ folder: URL) -> [String: Data?] {
 }
 
 @Suite
-struct ArchiveFormats {
-    let bench: ArchiveBench
-    var box: Sandbox { bench.box }
+internal struct ArchiveFormats {
+    internal let bench: ArchiveBench
+    internal var box: Sandbox { bench.box }
 
-    init() throws {
+    internal init() throws {
         bench = try ArchiveBench()
     }
 
     // MARK: Round trips
 
     @Test(arguments: [ArchiveFormat.zip, .tar, .compressedTar(.gzip), .compressedTar(.bzip2), .compressedTar(.xz)])
-    func packListUnpackGivesTheSameBytes(format: ArchiveFormat) throws {
+    internal func packListUnpackGivesTheSameBytes(format: ArchiveFormat) throws {
         let tree = try bench.makeTree()
         let archive = box.url("out/tree." + format.defaultExtension)
         let result = try bench.pack([tree], to: archive) { $0.format = format }
@@ -258,7 +260,7 @@ struct ArchiveFormats {
     }
 
     @Test(arguments: [ArchiveFormat.Codec.gzip, .bzip2, .xz])
-    func singleCompressedFilesRoundTrip(codec: ArchiveFormat.Codec) throws {
+    internal func singleCompressedFilesRoundTrip(codec: ArchiveFormat.Codec) throws {
         let tree = try bench.makeTree()
         let source = tree.appendingPathComponent("big.log")
         let format = ArchiveFormat.compressedFile(codec)
@@ -283,7 +285,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func aLargeArchiveIsStreamedInsteadOfUnpackedToATemporaryFile() throws {
+    internal func aLargeArchiveIsStreamedInsteadOfUnpackedToATemporaryFile() throws {
         let tree = try bench.makeTree()
         let archive = box.url("tree.tar.gz")
         try bench.pack([tree], to: archive) { $0.format = .compressedTar(.gzip) }
@@ -316,7 +318,7 @@ struct ArchiveFormats {
     // MARK: The system's tools
 
     @Test
-    func systemToolsReadWhatIsWritten() throws {
+    internal func systemToolsReadWhatIsWritten() throws {
         let tree = try bench.makeTree()
         let expected = snapshot(tree)
 
@@ -353,7 +355,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func archivesOfTheSystemToolsAreRead() throws {
+    internal func archivesOfTheSystemToolsAreRead() throws {
         let tree = try bench.makeTree()
         try FileManager.default.createSymbolicLink(
             atPath: tree.appendingPathComponent("link").path,
@@ -434,7 +436,7 @@ struct ArchiveFormats {
     // MARK: ZIP details
 
     @Test
-    func zip64IsUsedExactlyWhereTheClassicFieldsEnd() throws {
+    internal func zip64IsUsedExactlyWhereTheClassicFieldsEnd() throws {
         // The rule itself, at the real limits.
         let limits = ZipLimits.standard
         #expect(limits.maxField == 0xFFFF_FFFE && limits.maxEntries == 0xFFFE)
@@ -490,7 +492,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func aHugeNumberOfEntriesIsListedFromTheDirectoryAlone() throws {
+    internal func aHugeNumberOfEntriesIsListedFromTheDirectoryAlone() throws {
         // More members than the classic end record can count: a real ZIP64 archive.
         let count = 70_000
         let url = box.url("many.zip")
@@ -526,7 +528,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func encryptedZipsAskForThePassword() throws {
+    internal func encryptedZipsAskForThePassword() throws {
         let tree = try bench.makeTree()
         #expect(runTool("/usr/bin/zip", ["-qr", "-P", "sesame", "locked.zip", "tree"], in: box.root).status == 0)
         let locked = box.url("locked.zip")
@@ -578,7 +580,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func aDamagedMemberIsFoundByTheTest() throws {
+    internal func aDamagedMemberIsFoundByTheTest() throws {
         let tree = try bench.makeTree()
         let archive = box.url("tree.zip")
         try bench.pack([tree], to: archive) { $0.level = 0 }
@@ -625,7 +627,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func namesDatesAndAttributesOfForeignZips() throws {
+    internal func namesDatesAndAttributesOfForeignZips() throws {
         // A ZIP as a DOS program writes it: backslashes, DOS attributes, a code-page name.
         let url = box.url("dos.zip")
         let output = try OutputFile(creating: url)
@@ -663,7 +665,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func tarHeadersCarryLongNamesAndLargeSizes() throws {
+    internal func tarHeadersCarryLongNamesAndLargeSizes() throws {
         var header = TarHeader(
             path: "short.txt",
             size: 5,
@@ -696,7 +698,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func parallelCompressionGivesOneValidStream() throws {
+    internal func parallelCompressionGivesOneValidStream() throws {
         // Enough data for several pieces per window, ending exactly on a piece boundary.
         var data = Data()
         var line = 0
@@ -737,7 +739,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func aFileLargerThanOneWindowOfPiecesIsPackedInSeveralRounds() throws {
+    internal func aFileLargerThanOneWindowOfPiecesIsPackedInSeveralRounds() throws {
         // More than the compressors hold before they write: the member stays open across rounds.
         let megabytes = ProcessInfo.processInfo.activeProcessorCount * 2 + 3
         var block = Data()
@@ -780,7 +782,7 @@ struct ArchiveFormats {
     }
 
     @Test
-    func aChildProcessIsStoppedWhenItsStreamIsClosed() throws {
+    internal func aChildProcessIsStoppedWhenItsStreamIsClosed() throws {
         let tree = try bench.makeTree()
         try bench.pack([tree], to: box.url("tree.tar.bz2")) { $0.format = .compressedTar(.bzip2) }
         let stream = try ProcessStream(Tool.bzip2, ["-dc", "--", box.url("tree.tar.bz2").path])

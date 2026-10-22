@@ -12,16 +12,16 @@ import Testing
 /// name means, and jobs that end when they are cancelled.
 @MainActor
 @Suite
-struct Review2ConfigASystemTools {
-    let tools = SystemToolsPlugin(launchesApplications: false)
-    let settings = MemorySettings()
-    let bench: TestBench
-    let box: Sandbox
+internal struct Review2ConfigASystemTools {
+    internal let tools = SystemToolsPlugin(launchesApplications: false)
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
+    internal let box: Sandbox
 
-    var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("A/sub")
@@ -35,10 +35,10 @@ struct Review2ConfigASystemTools {
         )
     }
 
-    var history: [String]? { settings.value([String].self, forKey: "systemTools.history") }
+    internal var history: [String]? { settings.value([String].self, forKey: "systemTools.history") }
 
     @Test
-    func aLineTypedWithABlankInFrontIsNotRemembered() {
+    internal func aLineTypedWithABlankInFrontIsNotRemembered() {
         ui.formAnswers = Array(repeating: .accept, count: 8)
         commands.perform(.runCommandLine, .text("echo one"))
         commands.perform(.runCommandLine, .text(" echo secret"))
@@ -56,7 +56,7 @@ struct Review2ConfigASystemTools {
     }
 
     @Test
-    func printIsOfferedForFilesWithoutMakingTheListOfThem() {
+    internal func printIsOfferedForFilesWithoutMakingTheListOfThem() {
         bench.left.moveCursor(toName: "one.txt")
         #expect(commands.isEnabled(SystemToolsCommands.printFile))
         bench.left.moveCursor(toName: "sub")
@@ -68,7 +68,7 @@ struct Review2ConfigASystemTools {
     }
 
     @Test
-    func anInstalledApplicationComesBeforeOneOfTheSameNameInThePanelsFolder() throws {
+    internal func anInstalledApplicationComesBeforeOneOfTheSameNameInThePanelsFolder() throws {
         let installed = try box.folder("Apps/Tool.app")
         let planted = try box.folder("Here/Tool.app")
         let only = try box.folder("Here/Only.app")
@@ -87,7 +87,7 @@ struct Review2ConfigASystemTools {
     }
 
     @Test
-    func whetherABareNameIsAProgramIsDecidedByThePathItIsGiven() throws {
+    internal func whetherABareNameIsAProgramIsDecidedByThePathItIsGiven() throws {
         try box.folder("Apps/mytool.app")
         let program = try box.file("bin/mytool", "#!/bin/sh\n")
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: program.path)
@@ -108,7 +108,7 @@ struct Review2ConfigASystemTools {
     }
 
     @Test
-    func systemInformationEndsWhenItIsCancelled() {
+    internal func systemInformationEndsWhenItIsCancelled() {
         let cancelled = CancellationFlag()
         cancelled.cancel()
         #expect(SystemInformation.gather(displays: [], cancellation: cancelled, asking: .system) == nil)
@@ -124,7 +124,7 @@ struct Review2ConfigASystemTools {
     }
 
     @Test
-    func aCancelledListWithSubfoldersEntersNoFolder() throws {
+    internal func aCancelledListWithSubfoldersEntersNoFolder() throws {
         try box.file("A/sub/deep/far.txt")
         let fileSystems = bench.kernel.fileSystems
         let items = try fileSystems.provider(for: box.url("A")).list(box.url("A"), showHidden: false)
@@ -149,7 +149,7 @@ struct Review2ConfigASystemTools {
     }
 
     @Test
-    func logLinesStayOneLineAndTheLogIsBounded() {
+    internal func logLinesStayOneLineAndTheLogIsBounded() {
         commands.perform(.runCommandLine, .text("make 'a\nb'"))
         #expect(tools.log == ["skipped: make 'a\\nb'"])
         for number in 0..<1_200 { commands.perform(.runCommandLine, .text(" make \(number)")) }
@@ -158,7 +158,7 @@ struct Review2ConfigASystemTools {
     }
 
     @Test
-    func theShellIsAlwaysAPosixShell() {
+    internal func theShellIsAlwaysAPosixShell() {
         #expect(LoginShell.posix.executable == "/bin/zsh" && LoginShell.posix.options.last == "-c")
         #expect(
             !LoginShell.usersShell(environment: ProcessInfo.processInfo.environment, account: LoginShell.accountShell())

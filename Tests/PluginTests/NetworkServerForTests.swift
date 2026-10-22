@@ -8,54 +8,54 @@ import TestSupport
 /// believable server, and can be made to behave like the awkward ones (no MLSD, DOS listings, no
 /// EPSV, a password, dropped connections). Unchecked: what changes is guarded by `lock`; the rest
 /// is set in `init`.
-final class TestFTPServer: @unchecked Sendable {
-    struct Options {
-        var offersMLSD = true
-        var offersFeatures = true
-        var offersEPSV = true
-        var offersSize = true
-        var dosListing = false
+internal final class TestFTPServer: @unchecked Sendable {
+    internal struct Options {
+        internal var offersMLSD = true
+        internal var offersFeatures = true
+        internal var offersEPSV = true
+        internal var offersSize = true
+        internal var dosListing = false
         /// Nil: anyone may log in.
-        var user: String?
-        var password = ""
+        internal var user: String?
+        internal var password = ""
         /// A pause before every listing, to make listings overlap.
-        var listDelay: TimeInterval = 0
+        internal var listDelay: TimeInterval = 0
         /// Lines added to the end of every listing as they are, e.g. names a server must not be believed.
-        var injectedLines: [String] = []
+        internal var injectedLines: [String] = []
         /// The first connections are answered with 421 (too many from this address) and closed.
-        var busyGreetings = 0
+        internal var busyGreetings = 0
         /// This command is carried out, but its reply is never sent: the connection is cut instead.
-        var dropReplyFor: String?
+        internal var dropReplyFor: String?
         /// RETR opens the data connection and then sends nothing at all.
-        var stallRETR = false
+        internal var stallRETR = false
         /// RETR sends this many bytes and then resets the data connection.
-        var resetRETRAfter: Int?
+        internal var resetRETRAfter: Int?
         /// STOR opens the data connection and then reads nothing at all.
-        var stallSTOR = false
+        internal var stallSTOR = false
         /// FEAT does not list REST.
-        var offersREST = true
+        internal var offersREST = true
         /// RNTO is refused when something has the new name, as on servers whose rename does not replace.
-        var renameKeepsExisting = false
+        internal var renameKeepsExisting = false
         /// RNTO is refused for a source whose path ends like this (`*` refuses every rename).
-        var refusesRenameOf: String?
+        internal var refusesRenameOf: String?
         /// DELE is refused.
-        var refusesDelete = false
+        internal var refusesDelete = false
         /// APPE starts the file anew, as a server does that takes it for STOR.
-        var appendStartsAnew = false
+        internal var appendStartsAnew = false
         /// Of an upload only this many bytes are kept, and the server says 226 all the same.
-        var keepsOfUploads: Int?
+        internal var keepsOfUploads: Int?
         /// What a listing sends instead of the folder's lines, byte for byte.
-        var rawListing: Data?
+        internal var rawListing: Data?
         /// The reply to this command never ends: lines of it are sent for as long as the client listens.
-        var endlessReplyTo: String?
+        internal var endlessReplyTo: String?
         /// The reply to this command is one line of this many bytes without a line end.
-        var longLineReplyTo: (verb: String, bytes: Int)?
+        internal var longLineReplyTo: (verb: String, bytes: Int)?
         /// A pause before the greeting.
-        var greetingDelay: TimeInterval = 0
+        internal var greetingDelay: TimeInterval = 0
         /// In active mode the data connection is never opened: after the 150 comes a 425, after this long.
-        var activeNeverConnects: TimeInterval?
+        internal var activeNeverConnects: TimeInterval?
         /// A transfer is announced twice (`125`, and `150` once the data is through), as some servers do.
-        var announcesTwice = false
+        internal var announcesTwice = false
     }
 
     /// The listening socket and the thread that accepts on it.
@@ -108,8 +108,8 @@ final class TestFTPServer: @unchecked Sendable {
         }
     }
 
-    let root: URL
-    let port: Int
+    internal let root: URL
+    internal let port: Int
     private let acceptor: Acceptor
     private let lock = NSLock()
     private var currentOptions: Options
@@ -122,7 +122,7 @@ final class TestFTPServer: @unchecked Sendable {
     private var peak = 0
     private var busy = 0
 
-    init(root: URL, options: Options = Options()) throws {
+    internal init(root: URL, options: Options = Options()) throws {
         self.root = root
         currentOptions = options
         let listener = try Self.listen()
@@ -149,7 +149,7 @@ final class TestFTPServer: @unchecked Sendable {
 
     deinit { stop() }
 
-    var options: Options {
+    internal var options: Options {
         get {
             lock.lock()
             defer { lock.unlock() }
@@ -163,41 +163,41 @@ final class TestFTPServer: @unchecked Sendable {
     }
 
     /// Every command line received, in order.
-    var commands: [String] {
+    internal var commands: [String] {
         lock.lock()
         defer { lock.unlock() }
         return commandLog
     }
     /// How many control connections were ever opened.
-    var connectionsOpened: Int {
+    internal var connectionsOpened: Int {
         lock.lock()
         defer { lock.unlock() }
         return opened
     }
-    var openConnections: Int {
+    internal var openConnections: Int {
         lock.lock()
         defer { lock.unlock() }
         return clients.count
     }
     /// The most control connections that were open at the same moment.
-    var mostConnectionsAtOnce: Int {
+    internal var mostConnectionsAtOnce: Int {
         lock.lock()
         defer { lock.unlock() }
         return peak
     }
-    var isStopped: Bool {
+    internal var isStopped: Bool {
         lock.lock()
         defer { lock.unlock() }
         return stopped
     }
     /// The largest number of listings that ran at the same moment.
-    var mostListingsAtOnce: Int {
+    internal var mostListingsAtOnce: Int {
         lock.lock()
         defer { lock.unlock() }
         return mostListing
     }
 
-    func stop() {
+    internal func stop() {
         lock.lock()
         let wasStopped = stopped
         stopped = true
@@ -210,7 +210,7 @@ final class TestFTPServer: @unchecked Sendable {
     }
 
     /// Cuts every control connection, like a server that timed its clients out.
-    func dropConnections() {
+    internal func dropConnections() {
         // Under the lock: a session takes its socket out of the list, under the same lock,
         // before it closes it, so no descriptor is shut down here that is somebody else's by now.
         lock.lock()
@@ -260,7 +260,7 @@ final class TestFTPServer: @unchecked Sendable {
 
     // MARK: Sockets
 
-    static func listen() throws -> Int32 {
+    internal static func listen() throws -> Int32 {
         let descriptor = socket(AF_INET, SOCK_STREAM, 0)
         guard descriptor >= 0 else { throw POSIXError(.ENOTSOCK) }
         var yes: Int32 = 1
@@ -281,7 +281,7 @@ final class TestFTPServer: @unchecked Sendable {
         return descriptor
     }
 
-    static func port(of descriptor: Int32) -> Int {
+    internal static func port(of descriptor: Int32) -> Int {
         var address = sockaddr_in()
         var length = socklen_t(MemoryLayout<sockaddr_in>.size)
         _ = withUnsafeMutablePointer(to: &address) {

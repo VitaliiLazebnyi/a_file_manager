@@ -6,18 +6,18 @@ import Testing
 @testable import NetworkPlugin
 
 /// The SFTP server that comes with macOS.
-let systemSFTPServer = "/usr/libexec/sftp-server"
+internal let systemSFTPServer = "/usr/libexec/sftp-server"
 
 /// The SFTP client against the system's own `sftp-server`, run directly as a child process on
 /// a sandbox folder: the same protocol as through `ssh`, without a network or a login.
 @Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer)))
-struct NetworkSFTP {
-    let box: Sandbox
-    let center: ConnectionCenter
-    let fileSystem: RemoteFileSystem
-    let key = ServerKey(scheme: "sftp", host: "test.invalid")
+internal struct NetworkSFTP {
+    internal let box: Sandbox
+    internal let center: ConnectionCenter
+    internal let fileSystem: RemoteFileSystem
+    internal let key = ServerKey(scheme: "sftp", host: "test.invalid")
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         let environment = SessionEnvironment()
         var values = NetworkOptions.Values()
@@ -35,10 +35,10 @@ struct NetworkSFTP {
     }
 
     /// The location of a path inside the sandbox, as the server sees it.
-    func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
+    internal func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
 
     @Test
-    func listsAndDescribes() throws {
+    internal func listsAndDescribes() throws {
         let stamp = Date(timeIntervalSince1970: 1_500_000_000)
         try box.file("a.txt", "hello", modified: stamp)
         try box.file(".hidden", "h")
@@ -64,7 +64,7 @@ struct NetworkSFTP {
     }
 
     @Test
-    func readsWritesAndSeeks() throws {
+    internal func readsWritesAndSeeks() throws {
         let content = Data((0..<700_000).map { UInt8(truncatingIfNeeded: $0 &* 13 &+ $0 / 251) })
         let writer = try fileSystem.write(url("big.bin"))
         // In pieces like the copy job's, larger than one round of requests.
@@ -94,7 +94,7 @@ struct NetworkSFTP {
     }
 
     @Test
-    func changes() throws {
+    internal func changes() throws {
         try box.file("a.txt", "a")
         try box.file("b.txt", "b")
         try fileSystem.createDirectory(at: url("x/y/z"))
@@ -116,7 +116,7 @@ struct NetworkSFTP {
     }
 
     @Test
-    func manyThreadsShareOneChannel() throws {
+    internal func manyThreadsShareOneChannel() throws {
         for index in 0..<12 { try box.file("d\(index)/f\(index).txt", String(repeating: "x", count: index * 1_000)) }
         let results = Parallel.map(Array(0..<12)) { index -> Int in
             let names = (try? fileSystem.list(url("d\(index)"), showHidden: true).map(\.name)) ?? []
@@ -136,7 +136,7 @@ struct NetworkSFTP {
     }
 
     @Test
-    func reconnectsAfterDisconnect() throws {
+    internal func reconnectsAfterDisconnect() throws {
         try box.file("a.txt", "a")
         #expect(try fileSystem.list(url(""), showHidden: true).count == 1)
         center.disconnect(key)
@@ -145,7 +145,7 @@ struct NetworkSFTP {
     }
 
     @Test
-    func aTransportThatIsNotSFTPFails() throws {
+    internal func aTransportThatIsNotSFTPFails() throws {
         center.makeSession = { profile, environment in
             SFTPSession(
                 profile: profile,
@@ -158,7 +158,7 @@ struct NetworkSFTP {
     }
 
     @Test
-    func sshArguments() {
+    internal func sshArguments() {
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (20, 45)
         let profile = ConnectionProfile(
@@ -173,7 +173,7 @@ struct NetworkSFTP {
 
     /// The helper `ssh` calls for its questions, driven here by a shell that calls it the same way.
     @Test
-    func askpassCarriesQuestionAndAnswer() throws {
+    internal func askpassCarriesQuestionAndAnswer() throws {
         let helper = try AskpassHelper()
         let process = Process()
         let output = Pipe()
@@ -208,7 +208,7 @@ struct NetworkSFTP {
     /// The host is unknown and the key has a passphrase, so both of ssh's questions come through
     /// the helper. Nothing of the user's own ssh setup is read or written.
     @Test(.enabled(if: LocalSSHServer.isAvailable))
-    func logsInThroughSSH() throws {
+    internal func logsInThroughSSH() throws {
         let server = try LocalSSHServer(box: box, passphrase: "open sesame")
         defer { server.stop() }
         try box.file("srv/hello.txt", "over ssh")
@@ -246,20 +246,20 @@ struct NetworkSFTP {
 
 /// `/usr/sbin/sshd` as a child process of the test, on a free port of 127.0.0.1, with a host
 /// key, a user key and an `authorized_keys` file that exist only in the sandbox.
-final class LocalSSHServer {
-    static var isAvailable: Bool {
+internal final class LocalSSHServer {
+    internal static var isAvailable: Bool {
         ["/usr/sbin/sshd", "/usr/bin/ssh", "/usr/bin/ssh-keygen", systemSFTPServer]
             .allSatisfy(
                 FileManager.default.isExecutableFile
             )
     }
 
-    let port: Int
-    let clientArguments: [String]
+    internal let port: Int
+    internal let clientArguments: [String]
     private let process = Process()
 
     /// `banner`: a text the server shows before the login, as any server may.
-    init(box: Sandbox, passphrase: String, banner: String? = nil) throws {
+    internal init(box: Sandbox, passphrase: String, banner: String? = nil) throws {
         let folder = try box.folder("ssh")
         func run(_ tool: String, _ arguments: [String]) throws {
             let process = Process()
@@ -330,7 +330,7 @@ final class LocalSSHServer {
         }
     }
 
-    func stop() {
+    internal func stop() {
         process.terminate()
     }
 }

@@ -24,14 +24,14 @@ import Testing
 
 @MainActor
 @Suite
-struct Review2PluginsA2Selection {
-    typealias Ids = SelectionCommands
+internal struct Review2PluginsA2Selection {
+    internal typealias Ids = SelectionCommands
 
-    let memory = MemoryFileSystem()
+    internal let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
 
-    func makeBench(background: Bool) -> TestBench {
+    internal func makeBench(background: Bool) -> TestBench {
         TestBench(
             plugins: [SelectionPlugin(pasteboard: pasteboard, background: background)],
             fileSystems: [LocalFileSystem(), memory],
@@ -40,13 +40,13 @@ struct Review2PluginsA2Selection {
         )
     }
 
-    func settle(_ condition: () -> Bool) async {
+    internal func settle(_ condition: () -> Bool) async {
         let patience = Date(timeIntervalSinceNow: Wait.ceiling)
         while !condition(), Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
     @Test
-    func theByteMatcherGivesTheAnswersOfTheCharacterMatcher() {
+    internal func theByteMatcherGivesTheAnswersOfTheCharacterMatcher() {
         let patterns = ["*.txt", "*.*", "a*", "a?c", "*", "name.", "name.*", "?", "*a*b*", "ab", "A*Z", "é*", "*\r*"]
         let names = [
             "a.txt", "A.TXT", "abc", "ABC", "name", "name.", "name.x", "x", "", "ab", "aXb", "Az", "é", "éa", "a\r\nb",
@@ -73,7 +73,7 @@ struct Review2PluginsA2Selection {
     }
 
     @Test
-    func aListThatChangesWhileAMaskIsWorkedOutGetsTheMaskAfterwards() async {
+    internal func aListThatChangesWhileAMaskIsWorkedOutGetsTheMaskAfterwards() async {
         memory.addFile("/A/alpha.txt")
         let bench = makeBench(background: true)
         bench.left.show(memory.url("/A"), focus: nil, history: .keep, completion: nil)
@@ -86,7 +86,7 @@ struct Review2PluginsA2Selection {
     }
 
     @Test
-    func aPanelThatGoesToAnotherFolderMeanwhileDropsTheResult() async {
+    internal func aPanelThatGoesToAnotherFolderMeanwhileDropsTheResult() async {
         memory.addFile("/A/alpha.txt")
         memory.addFile("/B/alpha.txt")
         let bench = makeBench(background: true)
@@ -98,7 +98,7 @@ struct Review2PluginsA2Selection {
     }
 
     @Test
-    func selectingFilesOnlyAndInvertingThemLeavesTheFoldersAlone() {
+    internal func selectingFilesOnlyAndInvertingThemLeavesTheFoldersAlone() {
         for name in ["a.txt", "b.txt", "c.txt"] { memory.addFile("/A/" + name) }
         memory.addDirectory("/A/dir1")
         memory.addDirectory("/A/dir2")
@@ -117,7 +117,7 @@ struct Review2PluginsA2Selection {
     }
 
     @Test
-    func aStepSelectsEveryNthLineFromTheCursor() {
+    internal func aStepSelectsEveryNthLineFromTheCursor() {
         for name in ["a", "b", "c", "d", "e", "f"] { memory.addFile("/A/\(name).txt") }
         let bench = makeBench(background: false)
         let model = bench.left.model
@@ -131,7 +131,7 @@ struct Review2PluginsA2Selection {
     }
 
     @Test
-    func aLongListIsMarkedByTheModelsBulkCallsWithoutBlocking() async {
+    internal func aLongListIsMarkedByTheModelsBulkCallsWithoutBlocking() async {
         for index in 0..<(Selections.longList + 100) { memory.addFile("/A/f\(index).txt") }
         for index in 0..<50 { memory.addFile("/A/g\(index).md") }
         let bench = makeBench(background: true)
@@ -159,7 +159,7 @@ struct Review2PluginsA2Selection {
     }
 
     @Test
-    func theEntryWrittenLikeALineIsTheOneThatIsMarked() async {
+    internal func theEntryWrittenLikeALineIsTheOneThatIsMarked() async {
         let composed = "\u{E9}.txt"
         let decomposed = "e\u{301}.txt"
         memory.addFile("/A/" + composed)
@@ -175,7 +175,7 @@ struct Review2PluginsA2Selection {
     }
 
     @Test
-    func theIndexedComparisonIsTheComparisonByName() {
+    internal func theIndexedComparisonIsTheComparisonByName() {
         func file(_ name: String, size: Int64 = 1, seconds: TimeInterval = 0, folder: Bool = false) -> FileItem {
             FileItem(
                 url: URL(fileURLWithPath: "/x/" + name),
@@ -220,7 +220,7 @@ struct Review2PluginsA2Selection {
     }
 
     @Test
-    func markNewerLeavesTheSameFilesOutAndMarksTheRest() async {
+    internal func markNewerLeavesTheSameFilesOutAndMarksTheRest() async {
         memory.addFile("/A/same.txt", "1", modified: Date(timeIntervalSince1970: 10))
         memory.addFile("/B/same.txt", "1", modified: Date(timeIntervalSince1970: 10))
         memory.addFile("/A/newer.txt", "1", modified: Date(timeIntervalSince1970: 500))
@@ -250,35 +250,35 @@ struct Review2PluginsA2Selection {
 
 @MainActor
 @Suite
-struct Review2PluginsA2ViewOptions {
+internal struct Review2PluginsA2ViewOptions {
     /// Unchecked: used on the main thread only; the plugin hands its steps over there and the
     /// test runs them there.
-    final class Steps: @unchecked Sendable {
-        var background: [@Sendable () -> Void] = []
-        var main: [@MainActor @Sendable () -> Void] = []
+    internal final class Steps: @unchecked Sendable {
+        internal var background: [@Sendable () -> Void] = []
+        internal var main: [@MainActor @Sendable () -> Void] = []
 
-        func runBackground() {
+        internal func runBackground() {
             let work = background
             background = []
             work.forEach { $0() }
         }
 
         @MainActor
-        func runMain() {
+        internal func runMain() {
             let work = main
             main = []
             work.forEach { $0() }
         }
     }
 
-    let memory = MemoryFileSystem()
-    let plugin = ViewOptionsPlugin()
-    let steps = Steps()
-    let bench: TestBench
+    internal let memory = MemoryFileSystem()
+    internal let plugin = ViewOptionsPlugin()
+    internal let steps = Steps()
+    internal let bench: TestBench
 
-    var model: PanelModel { bench.left.model }
+    internal var model: PanelModel { bench.left.model }
 
-    init() {
+    internal init() {
         for number in 0..<ViewOptionsPlugin.backgroundSortThreshold {
             memory.addFile("/Big/f\(number).txt", String(repeating: "x", count: number % 7))
         }
@@ -289,7 +289,7 @@ struct Review2PluginsA2ViewOptions {
     }
 
     @Test
-    func aFolderThatChangesWhileItIsSortedGetsTheOrderWithItsReading() {
+    internal func aFolderThatChangesWhileItIsSortedGetsTheOrderWithItsReading() {
         bench.commands.perform(.sortBySize)
         // The wish is the model's; the list is sorted in the background.
         #expect(steps.background.count == 1 && model.sort.key == .name && model.requestedSort?.key == .size)
@@ -313,7 +313,7 @@ struct Review2PluginsA2ViewOptions {
     }
 
     @Test
-    func aChangeThatBringsNoListLeavesTheSortToTheBackgroundAgain() {
+    internal func aChangeThatBringsNoListLeavesTheSortToTheBackgroundAgain() {
         bench.commands.perform(.sortBySize)
         // Another filter while the list is sorted: the result is stale, and no reading brought the order.
         model.setFilter(.mask("*.txt"))
@@ -333,7 +333,7 @@ struct Review2PluginsA2ViewOptions {
     }
 
     @Test
-    func aWishForAnOrderSurvivesAListThatArrivesBeforeItIsMet() {
+    internal func aWishForAnOrderSurvivesAListThatArrivesBeforeItIsMet() {
         bench.commands.perform(.sortByTime)
         bench.commands.perform(.reversedOrder)
         // The second command starts from the order that was asked for, not from the one the panel has.
@@ -349,7 +349,7 @@ struct Review2PluginsA2ViewOptions {
     }
 
     @Test
-    func unsortedAfterAnotherKeyReadsTheFolderAgain() {
+    internal func unsortedAfterAnotherKeyReadsTheFolderAgain() {
         let small = MemoryFileSystem()
         small.addFile("/S/zebra.txt")
         small.addFile("/S/apple.txt")
@@ -369,7 +369,7 @@ struct Review2PluginsA2ViewOptions {
     }
 
     @Test
-    func onlySelectedFilesTakesTheNamesInTheBackground() {
+    internal func onlySelectedFilesTakesTheNamesInTheBackground() {
         model.setSelected(true, names: ["f1.txt", "f3.txt"])
         bench.commands.perform(ViewOptionsPlugin.onlySelected)
         #expect(steps.background.count == 1 && model.filter == nil)
@@ -382,8 +382,8 @@ struct Review2PluginsA2ViewOptions {
 // MARK: Configuration, SystemTools
 
 @Suite
-struct Review2PluginsA2Configuration {
-    let context = ExpansionContext(
+internal struct Review2PluginsA2Configuration {
+    internal let context = ExpansionContext(
         left: PanelSnapshot(path: "/A dir/", cursorName: "my file.txt", selection: ["a.txt", "b\u{2028}c.txt"]),
         right: PanelSnapshot(path: "/B/", cursorName: "other.md"),
         listFolder: URL(fileURLWithPath: "/tmp/lists"),
@@ -391,7 +391,7 @@ struct Review2PluginsA2Configuration {
     )
 
     @Test
-    func aSubstringOfTheLargestLengthDoesNotTrap() {
+    internal func aSubstringOfTheLargestLengthDoesNotTrap() {
         // The reproducer of the fuzzer (`pexpand-substring-length-overflow.bin`) and the same words by hand.
         let repro = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Fuzz/repro/misc/pexpand-substring-length-overflow.bin")
@@ -411,14 +411,14 @@ struct Review2PluginsA2Configuration {
     }
 
     @Test
-    func aNameWithAnyKindOfLineEndIsNotPassedInAListFile() {
+    internal func aNameWithAnyKindOfLineEndIsNotPassedInAListFile() {
         // U+2028 ends a line for the programs that read the list with `splitlines`.
         let expanded = ParameterExpander(context: context).expand("%L")
         #expect(expanded.problem != nil)
     }
 
     @Test
-    func aUserCommandIsFoundByNameWithoutSearching() {
+    internal func aUserCommandIsFoundByNameWithoutSearching() {
         let settings = MemorySettings()
         let store = ConfigurationStore(settings: settings)
         var commands: [UserCommand] = []
@@ -443,9 +443,9 @@ struct Review2PluginsA2Configuration {
 
 @MainActor
 @Suite
-struct Review2PluginsA2SystemTools {
+internal struct Review2PluginsA2SystemTools {
     @Test
-    func theLongestLineIsMeasuredWithoutCuttingEveryLineIntoCharacters() {
+    internal func theLongestLineIsMeasuredWithoutCuttingEveryLineIntoCharacters() {
         let pages = [[String(repeating: "e\u{301}", count: 40), "short"], ["x"]]
         let view = PagePrintView(pages: pages, linesPerPage: 60, printInfo: NSPrintInfo())
         var range = NSRange()
@@ -456,12 +456,12 @@ struct Review2PluginsA2SystemTools {
 // MARK: Places
 
 @Suite
-struct Review2PluginsA2Places {
-    let box = try! Sandbox()
-    let root = URL(fileURLWithPath: "/tmp/tree-root/", isDirectory: true)
+internal struct Review2PluginsA2Places {
+    internal let box = try! Sandbox()
+    internal let root = URL(fileURLWithPath: "/tmp/tree-root/", isDirectory: true)
 
     @Test
-    func theHotlistLimitHoldsForWhatIsStored() throws {
+    internal func theHotlistLimitHoldsForWhatIsStored() throws {
         var hotlist = Hotlist()
         for index in 0..<(Hotlist.limit + 25) { hotlist.entries.append(.item("t\(index)", command: "cd /x\(index)")) }
         let data = try JSONEncoder().encode(hotlist)
@@ -485,7 +485,7 @@ struct Review2PluginsA2Places {
     }
 
     @Test
-    func aFolderNotedLaterShowsAsNotReadYet() {
+    internal func aFolderNotedLaterShowsAsNotReadYet() {
         let cache = TreeCache(directory: nil)
         cache.store(["a", "b"], for: root)
         cache.noteFolder("a/new/deeper", below: root)
@@ -498,7 +498,7 @@ struct Review2PluginsA2Places {
     }
 
     @Test
-    func namesThatBeginWithACombiningMarkComeBackFromTheFile() {
+    internal func namesThatBeginWithACombiningMarkComeBackFromTheFile() {
         let paths = ["\u{301}start", "dir", "dir/\u{301}inside", "dir/\u{0300}\u{0301}x", "plain"]
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(paths, unscanned: ["\u{301}start"], for: root)
@@ -514,7 +514,7 @@ struct Review2PluginsA2Places {
     }
 
     @Test
-    func aTreeOfManyFoldersIsWrittenInPiecesForTheUserAlone() throws {
+    internal func aTreeOfManyFoldersIsWrittenInPiecesForTheUserAlone() throws {
         let paths = (0..<300_000).map { "folder-\($0)" }
         let cache = TreeCache(directory: box.url("big"))
         cache.store(paths, for: root)
@@ -526,7 +526,7 @@ struct Review2PluginsA2Places {
     }
 
     @Test
-    func aHugeSetOfTreesInMemoryIsTrimmedByTheNumberOfFolders() {
+    internal func aHugeSetOfTreesInMemoryIsTrimmedByTheNumberOfFolders() {
         let cache = TreeCache(directory: box.url("many"))
         for index in 0..<4 {
             cache.store(
@@ -541,7 +541,7 @@ struct Review2PluginsA2Places {
     }
 
     @Test
-    func aFolderMadeMeanwhileIsNotLinkedTwiceAndKeepsItsNode() throws {
+    internal func aFolderMadeMeanwhileIsNotLinkedTwiceAndKeepsItsNode() throws {
         let tree = DirectoryTree(rootURL: root)
         let names = (0..<100).map { "a\($0)" }
         let nodes = DirectoryTree.makeNodes(names)
@@ -570,7 +570,7 @@ struct Review2PluginsA2Places {
     }
 
     @Test
-    func aFolderThatHadChildrenIsRebuiltInTurnsOfLimitedSize() throws {
+    internal func aFolderThatHadChildrenIsRebuiltInTurnsOfLimitedSize() throws {
         let tree = DirectoryTree(rootURL: root)
         // The way to the folder the window opened is made beforehand, with a stale child.
         let chain = try #require(tree.node(at: "mid/x", creating: true))
@@ -597,15 +597,15 @@ struct Review2PluginsA2Places {
 }
 
 extension TreeNode {
-    var indexInParentForTests: Int { parent?.children.firstIndex { $0 === self } ?? -1 }
+    internal var indexInParentForTests: Int { parent?.children.firstIndex { $0 === self } ?? -1 }
 }
 
 // MARK: Navigation, VirtualFolders
 
 @Suite
-struct Review2PluginsA2Lists {
+internal struct Review2PluginsA2Lists {
     @Test
-    func aPathIsTakenFromTheStartOfAVeryLongClipboardLine() {
+    internal func aPathIsTakenFromTheStartOfAVeryLongClipboardLine() {
         let long = "/Users/me/Documents" + String(repeating: "x", count: 5_000_000)
         let path = NavigationPlugin.path(fromClipboard: long)
         #expect(path?.hasPrefix("/Users/me/Documents") == true && (path?.utf8.count ?? .max) <= 8_192)
@@ -613,7 +613,7 @@ struct Review2PluginsA2Lists {
     }
 
     @Test
-    func aListThatIsKnownToBeUniqueIsNotLookedThroughForDoubles() {
+    internal func aListThatIsKnownToBeUniqueIsNotLookedThroughForDoubles() {
         let fileSystems = FileSystemRegistry()
         let memory = MemoryFileSystem()
         fileSystems.register(memory)
@@ -629,9 +629,9 @@ struct Review2PluginsA2Lists {
 // MARK: Find Files
 
 @Suite
-struct Review2PluginsA2Find {
+internal struct Review2PluginsA2Find {
     @Test
-    func aFolderOfManyFilesReportsItsFirstHitBeforeTheListingEnds() {
+    internal func aFolderOfManyFilesReportsItsFirstHitBeforeTheListingEnds() {
         let (fileSystems, memory) = makeFileSystems()
         for index in 0..<60 { memory.addFile(String(format: "/huge/f%02d.txt", index)) }
         memory.listBatchSize = 10
@@ -665,7 +665,7 @@ struct Review2PluginsA2Find {
     }
 
     @Test
-    func aFolderListedInPartsStillGivesEveryHitOfTheTestsInOrderOfParts() {
+    internal func aFolderListedInPartsStillGivesEveryHitOfTheTestsInOrderOfParts() {
         let (fileSystems, memory) = makeFileSystems()
         for index in 0..<45 { memory.addFile(String(format: "/parts/%@%02d.txt", index % 2 == 0 ? "a" : "b", index)) }
         memory.listBatchSize = 7
@@ -681,7 +681,7 @@ struct Review2PluginsA2Find {
     }
 
     @Test
-    func oneShareMountedTwiceIsOnePlace() {
+    internal func oneShareMountedTwiceIsOnePlace() {
         let first = DuplicateFinder.Mount(from: "smbfs://me@server/share", on: "/Volumes/share")
         let second = DuplicateFinder.Mount(from: "smbfs://me@server/share", on: "/Volumes/share-1")
         #expect(first.place(of: "/Volumes/share/docs/a.txt") == second.place(of: "/Volumes/share-1/docs/a.txt"))
@@ -694,9 +694,9 @@ struct Review2PluginsA2Find {
 // MARK: Multi-Rename
 
 @Suite
-struct Review2PluginsA2Rename {
+internal struct Review2PluginsA2Rename {
     @Test
-    func aPlanThatIsCancelledIsCutShort() {
+    internal func aPlanThatIsCancelledIsCutShort() {
         let sources = (0..<40_000).map { URL(fileURLWithPath: "/x/f\($0).txt") }
         let targets: [URL?] = (0..<40_000).map { URL(fileURLWithPath: "/x/g\($0).txt") }
         let planner = RenamePlanner()
@@ -715,7 +715,7 @@ struct Review2PluginsA2Rename {
     }
 
     @Test
-    func aRingOfRenamesIsStillOpenedWithATemporaryName() {
+    internal func aRingOfRenamesIsStillOpenedWithATemporaryName() {
         let sources = ["1", "2", "3"].map { URL(fileURLWithPath: "/x/\($0).txt") }
         let targets: [URL?] = ["2", "3", "1"].map { URL(fileURLWithPath: "/x/\($0).txt") }
         let steps = RenamePlanner().steps(sources: sources, targets: targets)
@@ -726,7 +726,7 @@ struct Review2PluginsA2Rename {
     }
 
     @Test
-    func theFuzzerReproducersOfTheRenameMasksEnd() {
+    internal func theFuzzerReproducersOfTheRenameMasksEnd() {
         // `renamemask-wildcard-backtracking.bin` and `renameregex-catastrophic.bin`: the text after the
         // choice bytes is name mask, extension mask, search, replacement and the name, one to a line.
         let directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -766,7 +766,7 @@ struct Review2PluginsA2Rename {
     }
 
     @Test
-    func twoFilesAreTheSameFileOnlyWhenNothingElseCouldBeMeant() throws {
+    internal func twoFilesAreTheSameFileOnlyWhenNothingElseCouldBeMeant() throws {
         let box = try Sandbox()
         let one = try box.file("one.txt")
         let other = try box.file("other.txt")

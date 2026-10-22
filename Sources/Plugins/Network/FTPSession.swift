@@ -19,7 +19,7 @@ import Foundation
 ///
 /// The pool's state, `returnGrace` and `stallLimit` included, is guarded by `condition`, and the
 /// link observer by `observerLock`.
-final class FTPSession: RemoteSession, @unchecked Sendable {
+internal final class FTPSession: RemoteSession, @unchecked Sendable {
     /// What a connection is held for while a file is open.
     fileprivate enum TransferKind { case read, write }
 
@@ -79,7 +79,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// the one coming back is there sooner than a new login.
     ///
     /// Tests lengthen it.
-    var returnGrace: TimeInterval {
+    internal var returnGrace: TimeInterval {
         get { condition.withLock { grace } }
         set { condition.withLock { grace = newValue } }
     }
@@ -118,7 +118,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// moves on any connection of the session and no question is open.
     ///
     /// Tests shorten it.
-    var stallLimit: TimeInterval? {
+    internal var stallLimit: TimeInterval? {
         get { condition.withLock { stallTime } }
         set { condition.withLock { stallTime = newValue } }
     }
@@ -126,40 +126,40 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     /// Called with the lock held.
     private var patience: TimeInterval { stallTime ?? max(60, 2 * environment.options.values.timeout) }
 
-    init(profile: ConnectionProfile, environment: SessionEnvironment) {
+    internal init(profile: ConnectionProfile, environment: SessionEnvironment) {
         currentProfile = profile
         self.environment = environment
     }
 
     deinit { keepAlive?.cancel() }
 
-    var profile: ConnectionProfile {
+    internal var profile: ConnectionProfile {
         condition.lock()
         defer { condition.unlock() }
         return currentProfile
     }
 
-    var isConnected: Bool {
+    internal var isConnected: Bool {
         condition.lock()
         defer { condition.unlock() }
         return hasConnected && !isClosed
     }
 
-    var isConnecting: Bool {
+    internal var isConnecting: Bool {
         condition.lock()
         defer { condition.unlock() }
         return loggingIn > 0 && !isClosed
     }
 
     /// How many connections are open, for tests.
-    var connectionCount: Int {
+    internal var connectionCount: Int {
         condition.lock()
         defer { condition.unlock() }
         return total
     }
 
     /// How many threads wait for a connection to run a command on, for tests.
-    var waitingCommands: Int { condition.withLock { commandWaiters } }
+    internal var waitingCommands: Int { condition.withLock { commandWaiters } }
 
     /// How often the link resolver found no connection it may use (none free, or one that would ask the user
     /// something to log in) and put its links back, for tests.
@@ -265,7 +265,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     }
 
     /// True for an address of this machine: nothing sent there crosses a network.
-    static func isLoopback(_ host: String) -> Bool {
+    internal static func isLoopback(_ host: String) -> Bool {
         let host = host.lowercased()
         return host == "localhost" || host == "::1" || host.hasPrefix("127.")
     }
@@ -757,7 +757,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     // MARK: RemoteSession
 
-    func connect(cancellation: CancellationFlag?) throws -> String {
+    internal func connect(cancellation: CancellationFlag?) throws -> String {
         _ = try perform(cancellation: cancellation) { _ in }
         condition.lock()
         defer { condition.unlock() }
@@ -766,7 +766,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     /// Returns at once: the connections in use are cut, every wait of the session ends, and
     /// the goodbye to the server on the idle ones is said in the background.
-    func disconnect() {
+    internal func disconnect() {
         condition.lock()
         isClosed = true
         let (resting, busy, tested) = (idle, Array(inUse.values), pinged)
@@ -783,7 +783,12 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         if !resting.isEmpty { Background.run(lane: self) { resting.forEach { $0.close() } } }
     }
 
-    func list(_ path: String, showHidden: Bool, cancellation: CancellationFlag?, receive: ([RemoteEntry]) -> Bool)
+    internal func list(
+        _ path: String,
+        showHidden: Bool,
+        cancellation: CancellationFlag?,
+        receive: ([RemoteEntry]) -> Bool
+    )
         throws
     {
         var delivered = false
@@ -798,7 +803,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         if !unresolved.isEmpty, cancellation?.isCancelled != true { resolveLinksLater(unresolved) }
     }
 
-    func onLinkResolved(_ handler: @escaping @Sendable (String, Bool) -> Void) {
+    internal func onLinkResolved(_ handler: @escaping @Sendable (String, Bool) -> Void) {
         observerLock.withLock { linkObserver = handler }
     }
 
@@ -867,7 +872,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    func entry(at path: String, cancellation: CancellationFlag?) throws -> RemoteEntry? {
+    internal func entry(at path: String, cancellation: CancellationFlag?) throws -> RemoteEntry? {
         let path = RemotePath.normalized(path)
         guard let parent = RemotePath.parent(of: path) else {
             return RemoteEntry(name: "/", isDirectory: true)
@@ -902,13 +907,13 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     // The four calls that change something end on the caller's flag, on `closing` when the
     // session is disconnected, and by the limits of `acquire`.
 
-    func makeDirectory(_ path: String, cancellation: CancellationFlag?) throws {
+    internal func makeDirectory(_ path: String, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
             try command(repeatable: false, cancellation: closing) { try $0.makeDirectory(path, cancellation: closing) }
         }
     }
 
-    func remove(_ path: String, isDirectory: Bool?, cancellation: CancellationFlag?) throws {
+    internal func remove(_ path: String, isDirectory: Bool?, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in try remove(path, isDirectory: isDirectory, ending: closing) }
     }
 
@@ -932,7 +937,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     }
 
     /// FTP has one rename, and what it does to an existing destination is the server's choice.
-    func rename(_ source: String, to destination: String, replacing _: Bool, cancellation: CancellationFlag?) throws {
+    internal func rename(_ source: String, to destination: String, replacing _: Bool, cancellation: CancellationFlag?)
+        throws
+    {
         try withEither(closing, cancellation) { closing in
             try command(repeatable: false, cancellation: closing) {
                 try $0.rename(source, to: destination, cancellation: closing)
@@ -940,7 +947,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    func setAttributes(_ attributes: FileAttributes, of path: String, cancellation: CancellationFlag?) throws {
+    internal func setAttributes(_ attributes: FileAttributes, of path: String, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
             try command(cancellation: closing) { connection in
                 if let modified = attributes.modified {
@@ -953,7 +960,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    func openRead(_ path: String, cancellation: CancellationFlag?) throws -> any FileReader {
+    internal func openRead(_ path: String, cancellation: CancellationFlag?) throws -> any FileReader {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
         return FTPReader(
             session: self,
@@ -962,7 +969,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         )
     }
 
-    func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> any FileWriter {
+    internal func openWrite(_ path: String, cancellation: CancellationFlag?) throws -> any FileWriter {
         let path = RemotePath.normalized(path)
         let asText = environment.options.transfersAsText(RemotePath.name(of: path))
         let (stream, connection) = try perform(transfer: .write, cancellation: cancellation) {
@@ -972,7 +979,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     }
 
     /// Continuing needs a transfer in binary, so that the offsets are those of the file on the server.
-    func canAppend(_ path: String) -> Bool {
+    internal func canAppend(_ path: String) -> Bool {
         guard !environment.options.transfersAsText(RemotePath.name(of: path)) else {
             return false
         }
@@ -985,7 +992,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     ///
     /// A server does not cut a file there, and one that does not know `APPE` may start the file
     /// anew, so the length is checked when the file is closed, as after every upload.
-    func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
+    internal func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
         writer: any FileWriter, size: Int64
     ) {
         let path = RemotePath.normalized(path)
@@ -1062,7 +1069,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     }
 
     /// False for a server without MLST, where one question costs several commands and a listing.
-    var singleLookupsAreCheap: Bool {
+    internal var singleLookupsAreCheap: Bool {
         condition.lock()
         defer { condition.unlock() }
         return knowsMLST

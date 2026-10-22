@@ -10,15 +10,15 @@ import Testing
 // the sums they make of sizes cannot trap.
 
 @Suite
-struct Review2IntegrationTools {
+internal struct Review2IntegrationTools {
     /// A "server": every file on it carries the mark of coming from elsewhere.
-    let server = MemoryFileSystem(scheme: "srv")
+    internal let server = MemoryFileSystem(scheme: "srv")
     /// A place that keeps the marks it is given and gives none of its own.
-    let target = MemoryFileSystem(scheme: "disk")
-    let registry = FileSystemRegistry()
-    let mark = Data("0081;from the server".utf8)
+    internal let target = MemoryFileSystem(scheme: "disk")
+    internal let registry = FileSystemRegistry()
+    internal let mark = Data("0081;from the server".utf8)
 
-    init() {
+    internal init() {
         server.quarantineValue = mark
         registry.register(server)
         registry.register(target)
@@ -30,7 +30,7 @@ struct Review2IntegrationTools {
     private func item(_ url: URL) throws -> FileItem { try #require(registry.item(at: url)) }
 
     @Test
-    func thePartsOfAFileFromAServerAndTheFilePutTogetherAgainCarryItsMark() throws {
+    internal func thePartsOfAFileFromAServerAndTheFilePutTogetherAgainCarryItsMark() throws {
         let source = server.addFile("/in/program.bin", String(repeating: "0123456789", count: 500))
         let parts = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2_000, run: run())
         #expect(parts.count == 4)
@@ -51,7 +51,7 @@ struct Review2IntegrationTools {
     }
 
     @Test
-    func anEncodedFileAndWhatIsDecodedFromItCarryTheMarkOfTheirSource() throws {
+    internal func anEncodedFileAndWhatIsDecodedFromItCarryTheMarkOfTheirSource() throws {
         let source = server.addFile("/in/tool.sh", "#!/bin/sh\necho harmless\n")
         let encoded = try Encoder.encode(try item(source), into: target.url("/out"), method: .mime, run: run())
         #expect(encoded.count == 1 && target.quarantineMarks["/out/tool.b64"] == mark)
@@ -68,14 +68,14 @@ struct Review2IntegrationTools {
     }
 
     @Test
-    func aSourceWithoutAMarkLeavesItsOutputsWithoutOne() throws {
+    internal func aSourceWithoutAMarkLeavesItsOutputsWithoutOne() throws {
         let source = target.addFile("/plain/data.bin", String(repeating: "x", count: 3_000))
         _ = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2_000, run: run())
         #expect(target.contents("/out/data.002") != nil && target.quarantineMarks.isEmpty)
     }
 
     @Test
-    func sizesNobodyCanMeanAreRefusedAndTrapNothing() throws {
+    internal func sizesNobodyCanMeanAreRefusedAndTrapNothing() throws {
         let source = server.addFile("/in/small.bin", "small")
         // The largest size a field can hold, typed as the size of a part.
         let parts = try Splitter.split(try item(source), into: target.url("/out"), partSize: .max, run: run())

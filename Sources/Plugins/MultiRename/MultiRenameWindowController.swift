@@ -7,7 +7,7 @@ import AppKit
 ///
 /// It only shows a `MultiRenameSession` and passes on what the user does; everything it does is on
 /// the main thread, and the session keeps the work off it.
-final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
+internal final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
     NSTableViewDelegate,
     NSTextFieldDelegate, NSComboBoxDelegate
 {
@@ -38,24 +38,25 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     /// The window, which this controller keeps for as long as it lives.
     private let toolWindow: Window
     /// Called when the window has closed, so that its owner can let go of it.
-    var onClose: (() -> Void)?
+    internal var onClose: (() -> Void)?
     /// Shows an open panel as a sheet of the window and hands on the button and the locations
     /// chosen.
     ///
     /// The program shows the real panel; a test answers in its place. Opens a menu under a button.
     /// The program shows the real menu; a test records it.
-    var popUpMenu: (NSMenu, NSView) -> Void = { menu, view in
+    internal var popUpMenu: (NSMenu, NSView) -> Void = { menu, view in
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 2), in: view)
     }
     /// Opens the menu of a pull-down button, as a click on it does.
     ///
     /// A test records it instead.
-    var clickPopUp: (NSPopUpButton) -> Void = { $0.performClick(nil) }
-    var presentOpenPanel: (NSOpenPanel, NSWindow, @escaping (NSApplication.ModalResponse, [URL]) -> Void) -> Void = {
-        panel,
-        window,
-        done in panel.beginSheetModal(for: window) { done($0, panel.urls) }
-    }
+    internal var clickPopUp: (NSPopUpButton) -> Void = { $0.performClick(nil) }
+    internal var presentOpenPanel:
+        (NSOpenPanel, NSWindow, @escaping (NSApplication.ModalResponse, [URL]) -> Void) -> Void = {
+            panel,
+            window,
+            done in panel.beginSheetModal(for: window) { done($0, panel.urls) }
+        }
     /// What the histories and menus were last built from; they are built again only when it changes.
     private var shownRevision = -1
     private var shownGivenNames: Bool?
@@ -98,7 +99,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         return formatter
     }()
 
-    init(kernel: Kernel, session: MultiRenameSession) {
+    internal init(kernel: Kernel, session: MultiRenameSession) {
         self.kernel = kernel
         self.session = session
         let window = Window(
@@ -122,7 +123,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     }
 
     /// The window is made in code, never from an archive.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
     // MARK: Layout
 
@@ -338,11 +339,11 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         update()
     }
 
-    func controlTextDidChange(_: Notification) {
+    internal func controlTextDidChange(_: Notification) {
         fieldsChanged()
     }
 
-    func comboBoxSelectionDidChange(_ notification: Notification) {
+    internal func comboBoxSelectionDidChange(_ notification: Notification) {
         // The box holds the chosen text only after this notification.
         guard let combo = notification.object as? NSComboBox, combo.indexOfSelectedItem >= 0,
             let text = combo.itemObjectValue(at: combo.indexOfSelectedItem) as? String
@@ -406,7 +407,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     }
 
     /// What the status line says about a problem of the settings.
-    static func describe(_ problem: any Error) -> String {
+    internal static func describe(_ problem: any Error) -> String {
         switch problem {
         case RenameMaskError.invalidPlaceholder(let text):
             return "Invalid placeholder: \(text)"
@@ -657,7 +658,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     }
 
     /// The file chosen with "Load names from file"; nil when the user chose none.
-    func namesFileChosen(_ url: URL?) {
+    internal func namesFileChosen(_ url: URL?) {
         if let url { session.loadNames(from: url) }
     }
 
@@ -745,9 +746,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
     // MARK: The list
 
-    func numberOfRows(in _: NSTableView) -> Int { session.rowCount }
+    internal func numberOfRows(in _: NSTableView) -> Int { session.rowCount }
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    internal func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let column = tableColumn?.identifier, row >= 0, row < session.rowCount else {
             return nil
         }
@@ -809,7 +810,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     }
 
     /// A click on a header sorts by that column; a second click turns the order.
-    func tableView(_ tableView: NSTableView, didClick tableColumn: NSTableColumn) {
+    internal func tableView(_ tableView: NSTableView, didClick tableColumn: NSTableColumn) {
         let keys: [String: MultiRenameSession.SortKey] = ["old": .name, "ext": .ext, "size": .size, "date": .date]
         guard let key = keys[tableColumn.identifier.rawValue] else {
             return
@@ -824,13 +825,13 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         session.sort(by: key, ascending: sortAscending)
     }
 
-    func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> any NSPasteboardWriting? {
+    internal func tableView(_: NSTableView, pasteboardWriterForRow row: Int) -> any NSPasteboardWriting? {
         let item = NSPasteboardItem()
         item.setString(String(row), forType: Self.rowType)
         return item
     }
 
-    func tableView(
+    internal func tableView(
         _: NSTableView,
         validateDrop info: any NSDraggingInfo,
         proposedRow _: Int,
@@ -839,7 +840,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         (info.draggingSource as? NSTableView) === table && dropOperation == .above ? .move : []
     }
 
-    func tableView(
+    internal func tableView(
         _ tableView: NSTableView,
         acceptDrop info: any NSDraggingInfo,
         row: Int,
@@ -862,7 +863,7 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         return true
     }
 
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         // The preview under way, and one that waits out the pause, are not wanted any more.
         session.close()
         // A closed tool is not opened again: its list asks nothing more of the session or the kernel

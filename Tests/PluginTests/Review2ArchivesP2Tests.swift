@@ -91,32 +91,32 @@ private final class Collected<Value>: @unchecked Sendable {
 /// branches of the quit, members that wait next to an archive on another volume).
 @MainActor
 @Suite
-struct Review2ArchivesP2 {
-    let bench: ArchiveBench
-    var box: Sandbox { bench.box }
+internal struct Review2ArchivesP2 {
+    internal let bench: ArchiveBench
+    internal var box: Sandbox { bench.box }
 
-    init() throws {
+    internal init() throws {
         bench = try ArchiveBench()
     }
 
-    func makeZip(_ name: String = "tree.zip") throws -> URL {
+    internal func makeZip(_ name: String = "tree.zip") throws -> URL {
         try bench.makeTree()
         #expect(runTool("/usr/bin/zip", ["-qr", name, "tree"], in: box.root).status == 0)
         return box.url(name)
     }
 
-    func write(_ text: String, to url: URL) throws {
+    internal func write(_ text: String, to url: URL) throws {
         let writer = try bench.fileSystems.provider(for: url).write(url)
         try writer.write(Data(text.utf8))
         try writer.close(attributes: FileAttributes())
     }
 
-    func listed(_ archive: URL) -> [String] {
+    internal func listed(_ archive: URL) -> [String] {
         runTool("/usr/bin/unzip", ["-Z1", archive.path]).output.split(separator: "\n").map(String.init)
     }
 
     /// A ZIP written record by record, for names and rights no packer would write.
-    func writeZip(_ name: String, members: [(name: String, permissions: UInt16)]) throws -> URL {
+    internal func writeZip(_ name: String, members: [(name: String, permissions: UInt16)]) throws -> URL {
         let url = box.url(name)
         let output = try OutputFile(creating: url)
         let writer = ZipWriter(output)
@@ -135,12 +135,12 @@ struct Review2ArchivesP2 {
         return url
     }
 
-    func mode(_ url: URL) -> Int {
+    internal func mode(_ url: URL) -> Int {
         var status = stat()
         return lstat(url.path, &status) == 0 ? Int(status.st_mode & 0o7777) : -1
     }
 
-    func isLink(_ url: URL) -> Bool {
+    internal func isLink(_ url: URL) -> Bool {
         var status = stat()
         return lstat(url.path, &status) == 0 && status.st_mode & S_IFMT == S_IFLNK
     }
@@ -148,7 +148,7 @@ struct Review2ArchivesP2 {
     // MARK: The compact directory (A051, A076)
 
     @Test
-    func theTreeBehavesLikeAPlainTableWhilePlacesAreUsedAgain() {
+    internal func theTreeBehavesLikeAPlainTableWhilePlacesAreUsedAgain() {
         var tree = ArchiveTree()
         var model: [String: Bool] = [:]  // path → is a folder
         var generator = SystemRandomNumberGenerator()
@@ -210,7 +210,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func aRecordKeepsItsNameAsItWasWritten() throws {
+    internal func aRecordKeepsItsNameAsItWasWritten() throws {
         var record = ZipRecord()
         // Valid text: kept as text, read back byte for byte.
         record.nameBytes = Data("dir/übung – 日本.txt".utf8)
@@ -263,7 +263,7 @@ struct Review2ArchivesP2 {
     // MARK: Unpacking from the folder's descriptor (L043), absolute paths
 
     @Test
-    func aLinkPutInPlaceWhileAMemberIsUnpackedDoesNotLeadItAway() throws {
+    internal func aLinkPutInPlaceWhileAMemberIsUnpackedDoesNotLeadItAway() throws {
         let outside = try box.folder("outside")
         let target = try box.folder("target")
         let archive = try writeZip(
@@ -309,7 +309,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func noLinkOnTheWayIsGoneThroughWhoeverMadeIt() throws {
+    internal func noLinkOnTheWayIsGoneThroughWhoeverMadeIt() throws {
         let outside = try box.folder("outside")
         let target = try box.folder("target")
         // A link two folders down, left there before.
@@ -346,7 +346,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func membersWithAbsolutePathsLandBelowTheFolderThatIsUnpackedInto() throws {
+    internal func membersWithAbsolutePathsLandBelowTheFolderThatIsUnpackedInto() throws {
         // Where the members claim to belong: a folder of the test, so a member that got
         // there would be seen (and would harm nothing).
         let claimed = try box.folder("claimed")
@@ -393,7 +393,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func unpackedFilesGetNoRightsBeyondWhatNewFilesGet() throws {
+    internal func unpackedFilesGetNoRightsBeyondWhatNewFilesGet() throws {
         let zip = try writeZip(
             "open.zip",
             members: [("everyone.txt", 0o666), ("tool", 0o777), ("mine.txt", 0o600)]
@@ -428,7 +428,7 @@ struct Review2ArchivesP2 {
     // MARK: The kernel's hooks (A041, A044, quitting)
 
     @Test
-    func membersOfAStreamArchiveAreReadInTheOrderTheyLieInIt() throws {
+    internal func membersOfAStreamArchiveAreReadInTheOrderTheyLieInIt() throws {
         try bench.makeTree()
         for index in 0..<12 { try box.file("tree/many/file\(index).txt", "contents of \(index)") }
         try bench.pack([box.url("tree")], to: box.url("stream.tar.gz")) { $0.format = .compressedTar(.gzip) }
@@ -461,7 +461,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func aStreamThatEndsBeforeEveryMemberCameIsAnError() throws {
+    internal func aStreamThatEndsBeforeEveryMemberCameIsAnError() throws {
         // (A090.) The archive is listed, then cut short where it lies: a pass that is to
         // deliver members the stream no longer holds must say so, not return as if done.
         try bench.makeTree()
@@ -495,7 +495,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func aFileIsBroughtUpToDateBeforeSomebodyElseUsesIt() throws {
+    internal func aFileIsBroughtUpToDateBeforeSomebodyElseUsesIt() throws {
         let archive = try makeZip()
         let store = bench.store
         bench.fileSystems.addFlusher { url, cancellation in try store.bringUpToDate(url, cancellation: cancellation) }
@@ -531,7 +531,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func changesAreWrittenBeforeTheProgramQuits() throws {
+    internal func changesAreWrittenBeforeTheProgramQuits() throws {
         let archive = try makeZip()
         let plugin = ArchivesPlugin(flushDelay: nil, launchesApplications: false)
         defer { plugin.store.close() }
@@ -553,7 +553,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func aQuitTheUserDoesNotWaitForKeepsWhatWasNotWritten() throws {
+    internal func aQuitTheUserDoesNotWaitForKeepsWhatWasNotWritten() throws {
         let archive = try makeZip()
         let plugin = ArchivesPlugin(flushDelay: nil, launchesApplications: false)
         let reports = Collected<String>()
@@ -604,7 +604,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func aQuitThatRunsOutOfTimeEndsTheWritesAndSaysWhereTheDataIs() throws {
+    internal func aQuitThatRunsOutOfTimeEndsTheWritesAndSaysWhereTheDataIs() throws {
         // First branch: the writes can be ended. Second: one cannot (it waits for something
         // that never answers), and the program quits all the same, deleting nothing.
         for endable in [true, false] {
@@ -682,7 +682,7 @@ struct Review2ArchivesP2 {
     // MARK: The clock of the delayed writes (A043, A045)
 
     @Test
-    func aWriteThatIsDueIsDoneByWhicheverOfItsTwoTimersComesFirst() throws {
+    internal func aWriteThatIsDueIsDoneByWhicheverOfItsTwoTimersComesFirst() throws {
         let archive = try makeZip()
         let clock = HandClock()
         bench.environment.schedule = { clock.schedule($0, $1, $2) }
@@ -723,7 +723,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func aWriteThatFailsIsTriedAgainEachTimeAfterTwiceAsLong() throws {
+    internal func aWriteThatFailsIsTriedAgainEachTimeAfterTwiceAsLong() throws {
         try bench.makeTree()
         try box.folder("locked")
         #expect(runTool("/usr/bin/zip", ["-qr", "locked/tree.zip", "tree"], in: box.root).status == 0)
@@ -778,7 +778,7 @@ struct Review2ArchivesP2 {
     // MARK: New members next to an archive on another volume (A046), and the lock (A104)
 
     @Test
-    func newMembersOfAnArchiveOnAnotherVolumeWaitNextToIt() throws {
+    internal func newMembersOfAnArchiveOnAnotherVolumeWaitNextToIt() throws {
         let archive = try makeZip()
         let scratch = bench.environment.scratch.url
         // "Another volume": everything outside the temporary folder's own.
@@ -840,7 +840,7 @@ struct Review2ArchivesP2 {
     }
 
     @Test
-    func aChangeAsksTheDiskBeforeItTakesTheLockOfTheDirectory() throws {
+    internal func aChangeAsksTheDiskBeforeItTakesTheLockOfTheDirectory() throws {
         // An archive that cannot be written says so, as before…
         let archive = try makeZip()
         #expect(chmod(archive.path, 0o444) == 0)

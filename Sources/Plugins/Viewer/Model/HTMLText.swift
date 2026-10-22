@@ -5,7 +5,7 @@ import Foundation
 /// the targets of links are written behind their text, in braces when asked for.
 ///
 /// A pure function; nothing is loaded and no script runs.
-enum HTMLText {
+internal enum HTMLText {
     private static let blockTags: Set<String> = [
         "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
         "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"
@@ -24,13 +24,13 @@ enum HTMLText {
         "lsquo": "‘", "rsquo": "’", "ldquo": "“", "rdquo": "”", "deg": "°", "times": "×"
     ]
 
-    struct Result: Equatable {
-        var text: String
+    internal struct Result: Equatable {
+        internal var text: String
         /// The targets of the links, in the order they appear.
-        var links: [String]
+        internal var links: [String]
     }
 
-    static func plainText(from html: String, linkBraces: Bool = true) -> Result {
+    internal static func plainText(from html: String, linkBraces: Bool = true) -> Result {
         convert(Array(html.utf16), linkBraces: linkBraces, cancellation: nil).result
     }
 
@@ -146,7 +146,7 @@ enum HTMLText {
     ///
     /// The attributes are walked one by one, so `data-href`, and a value that holds the text
     /// `href=` (`title='a href="x"'`), are no `href`. The first one counts.
-    static func attributeRange(_ name: [UInt16], in tag: UnsafeBufferPointer<UInt16>) -> Range<Int>? {
+    internal static func attributeRange(_ name: [UInt16], in tag: UnsafeBufferPointer<UInt16>) -> Range<Int>? {
         let count = tag.count
         var index = 0
         while index < count {
@@ -262,7 +262,7 @@ enum HTMLText {
     /// second).
     ///
     /// Nil when `cancellation` was set.
-    static func plainText(units html: [UInt16], linkBraces: Bool = true, cancellation: CancellationFlag? = nil)
+    internal static func plainText(units html: [UInt16], linkBraces: Bool = true, cancellation: CancellationFlag? = nil)
         -> Result?
     {
         let converted = convert(html, linkBraces: linkBraces, cancellation: cancellation)
@@ -510,7 +510,7 @@ enum HTMLText {
     }
 
     /// The value of an attribute of a tag: `href="x"`, `href='x'` or `href=x`.
-    static func attribute(_ name: String, in tag: Substring) -> String? {
+    internal static func attribute(_ name: String, in tag: Substring) -> String? {
         let units = Array(tag.utf16)
         let wanted = name.utf16.map { $0 >= 0x41 && $0 <= 0x5A ? $0 | 0x20 : $0 }
         return units.withUnsafeBufferPointer { buffer in
@@ -519,7 +519,7 @@ enum HTMLText {
     }
 
     /// The text an entity name (without `&` and `;`) stands for; nil when it is not known.
-    static func decodeEntity(_ name: String) -> String? {
+    internal static func decodeEntity(_ name: String) -> String? {
         if name.hasPrefix("#x") || name.hasPrefix("#X") {
             return UInt32(name.dropFirst(2), radix: 16).flatMap(Unicode.Scalar.init).map { String(Character($0)) }
         }
@@ -529,7 +529,7 @@ enum HTMLText {
         return entities[name]
     }
 
-    static func decodeEntities(_ text: Substring) -> String {
+    internal static func decodeEntities(_ text: Substring) -> String {
         guard text.contains("&") else {
             return String(text)
         }
@@ -558,7 +558,7 @@ enum HTMLText {
 
     /// Whether a piece of text is a link as the context menu understands it (spec 10 ›
     /// Context menu rules): it starts with `http://`, `https://` or `www.`.
-    static func url(from text: String) -> URL? {
+    internal static func url(from text: String) -> URL? {
         let trimmed = text.trimmingCharacters(
             in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "{}<>\"'()[],;"))
         )

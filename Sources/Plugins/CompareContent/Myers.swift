@@ -36,7 +36,7 @@ public enum Myers {
     /// A search that is cut off costs about the square of its rounds and is repeated about `size /
     /// rounds` times, so the bound is chosen for a total of a few hundred million steps whatever
     /// the size; real files, whose differences number thousands, never come near it.
-    static func defaultLimit(forSize size: Int) -> Int? {
+    internal static func defaultLimit(forSize size: Int) -> Int? {
         size < exactBelow ? nil : max(256, min(8_192, 250_000_000 / size))
     }
 
@@ -97,7 +97,13 @@ public enum Myers {
     /// For every element of `a` the position of its partner in `b`, or -1.
     ///
     /// The partners rise with the positions.
-    static func matching(_ a: [Int32], _ b: [Int32], kinds: Int, costLimit: Int?, cancellation: CancellationFlag?)
+    internal static func matching(
+        _ a: [Int32],
+        _ b: [Int32],
+        kinds: Int,
+        costLimit: Int?,
+        cancellation: CancellationFlag?
+    )
         -> [Int]
     {
         var inA = [Bool](repeating: false, count: kinds)
@@ -275,12 +281,12 @@ public enum Myers {
 
     /// Scratch tables for `uniqueAnchors`, made once per diff: how often each kind of element occurs
     /// in the stretch looked at (0, 1 or 2 for more) on either side, and where in the second one.
-    struct AnchorCounts {
-        var inA: [UInt8]
-        var inB: [UInt8]
-        var positionInB: [Int32]
+    internal struct AnchorCounts {
+        internal var inA: [UInt8]
+        internal var inB: [UInt8]
+        internal var positionInB: [Int32]
 
-        init(kinds: Int) {
+        internal init(kinds: Int) {
             inA = [UInt8](repeating: 0, count: kinds)
             inB = [UInt8](repeating: 0, count: kinds)
             positionInB = [Int32](repeating: 0, count: kinds)
@@ -351,7 +357,7 @@ public enum Myers {
     }
 
     /// Turns the partners into segments.
-    static func segments(of match: [Int], counts: (a: Int, b: Int)) -> [DiffSegment] {
+    internal static func segments(of match: [Int], counts: (a: Int, b: Int)) -> [DiffSegment] {
         var result: [DiffSegment] = []
         var (i, j) = (0, 0)
         while i < counts.a || j < counts.b {

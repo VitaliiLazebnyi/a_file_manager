@@ -2,40 +2,40 @@ import Foundation
 
 /// One member of a TAR archive as its header describes it (ustar, with the pax and GNU
 /// extensions for long names and large sizes).
-struct TarHeader {
-    enum Kind: Equatable {
+internal struct TarHeader {
+    internal enum Kind: Equatable {
         case file, directory, symbolicLink, hardLink
         /// Devices, pipes and other things a file panel does not show.
         case other
     }
 
-    static let blockSize = 512
+    internal static let blockSize = 512
     /// Sizes beyond this are not sizes of anything: a header that claims more is damaged.
-    static let maxSize = UInt64(Int64.max)
+    internal static let maxSize = UInt64(Int64.max)
 
     /// Two empty blocks end an archive.
-    static let endOfArchive = Data(count: 2 * blockSize)
+    internal static let endOfArchive = Data(count: 2 * blockSize)
 
-    var path: String
-    var kind: Kind = .file
-    var size: UInt64 = 0
-    var modified = Date(timeIntervalSince1970: 0)
-    var permissions: UInt16 = 0o644
-    var linkTarget = ""
+    internal var path: String
+    internal var kind: Kind = .file
+    internal var size: UInt64 = 0
+    internal var modified = Date(timeIntervalSince1970: 0)
+    internal var permissions: UInt16 = 0o644
+    internal var linkTarget = ""
     /// A file with holes as GNU tar stores it: its data is a list of pieces, not the file's
     /// contents.
     ///
     /// Such members are shown but not read.
-    var isSparse = false
+    internal var isSparse = false
     /// The size of a sparse file once its holes are restored, when the header says it.
-    var realSize: UInt64?
+    internal var realSize: UInt64?
     /// (Old GNU sparse format.)
     ///
     /// More blocks describing the pieces follow the header.
-    var hasSparseExtension = false
+    internal var hasSparseExtension = false
 
     /// Whether a block looks like a TAR header: its checksum fits.
-    static func looksLikeHeader(_ block: Data) -> Bool {
+    internal static func looksLikeHeader(_ block: Data) -> Bool {
         guard block.count >= blockSize else {
             return false
         }
@@ -74,7 +74,7 @@ struct TarHeader {
 
     /// The fixed fields of a header block; nil for a block that is not one. `typeFlag` is the
     /// raw type, which the reader needs for the extension records.
-    static func parse(_ block: Data) -> (header: Self, typeFlag: UInt8)? {
+    internal static func parse(_ block: Data) -> (header: Self, typeFlag: UInt8)? {
         guard block.count >= blockSize else {
             return nil
         }
@@ -124,7 +124,7 @@ struct TarHeader {
 
     /// A time as a date; times no calendar can show (a header may hold any number) are cut
     /// to the years 0 to 9999.
-    static func date(_ seconds: TimeInterval) -> Date {
+    internal static func date(_ seconds: TimeInterval) -> Date {
         Date(timeIntervalSince1970: seconds.isFinite ? max(-62_167_219_200, min(seconds, 253_402_300_799)) : 0)
     }
 
@@ -132,7 +132,7 @@ struct TarHeader {
     ///
     /// The length counts the whole record, its own digits included; a record that says less ends
     /// the list.
-    static func paxRecords(_ data: Data) -> [String: String] {
+    internal static func paxRecords(_ data: Data) -> [String: String] {
         var records: [String: String] = [:]
         var rest = data
         while let space = rest.firstIndex(of: 32), space - rest.startIndex <= 20,
@@ -206,13 +206,13 @@ struct TarHeader {
     }
 
     /// The zero bytes that fill a member's data up to a whole block.
-    static func padding(after size: UInt64) -> Data {
+    internal static func padding(after size: UInt64) -> Data {
         Data(count: Int((UInt64(blockSize) - size % UInt64(blockSize)) % UInt64(blockSize)))
     }
 
     /// The header blocks for this member: one ustar header, preceded by a pax record when the
     /// name, the link or the size does not fit the fixed fields.
-    func encoded() -> Data {
+    internal func encoded() -> Data {
         let storedPath = kind == .directory && !path.hasSuffix("/") ? path + "/" : path
         var extended: [(String, String)] = []
         var (name, prefix) = (storedPath, "")
@@ -269,16 +269,16 @@ struct TarHeader {
 /// After `next()` the member's data must be read to its end or skipped before the next call.
 /// `position` is where the stream stands, so a caller that reads from a file can note where each
 /// member's data lies.
-final class TarReader {
+internal final class TarReader {
     private let stream: any ByteStream
-    private(set) var position: UInt64 = 0
+    internal private(set) var position: UInt64 = 0
     private var pendingData: UInt64 = 0
     private var pendingPadding: UInt64 = 0
     /// The request that ends the reads of the stream underneath; it travels with the reader
     /// when this is kept for the next member.
-    let control: StreamInterrupt?
+    internal let control: StreamInterrupt?
 
-    init(_ stream: any ByteStream, control: StreamInterrupt? = nil) {
+    internal init(_ stream: any ByteStream, control: StreamInterrupt? = nil) {
         self.stream = stream
         self.control = control
     }
@@ -331,7 +331,7 @@ final class TarReader {
     }
 
     /// The next member; nil at the end of the archive.
-    func next() throws -> TarHeader? {
+    internal func next() throws -> TarHeader? {
         try skipData()
         var longName: String?
         var longLink: String?
@@ -389,7 +389,7 @@ final class TarReader {
     }
 
     /// The next block of the current member's data; nil at its end.
-    func readData(upToCount count: Int) throws -> Data? {
+    internal func readData(upToCount count: Int) throws -> Data? {
         guard pendingData > 0 else {
             return nil
         }
@@ -401,7 +401,7 @@ final class TarReader {
         return data
     }
 
-    func skipData() throws {
+    internal func skipData() throws {
         // Both are bounded when they are set (`maxSize`, one block), so the sum fits.
         let count = pendingData.plusClamped(pendingPadding)
         guard count > 0 else {
@@ -412,7 +412,7 @@ final class TarReader {
         (pendingData, pendingPadding) = (0, 0)
     }
 
-    func close() {
+    internal func close() {
         stream.close()
     }
 }

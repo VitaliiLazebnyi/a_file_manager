@@ -43,7 +43,7 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     }
 
     /// An IPv6 address without the brackets it wears in a URL.
-    static func bare(_ host: String) -> String {
+    internal static func bare(_ host: String) -> String {
         host.hasPrefix("[") && host.hasSuffix("]") ? String(host.dropFirst().dropLast()) : host
     }
 
@@ -51,7 +51,7 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     /// for a name with letters outside ASCII the form a URL gives back for it (the system
     /// writes `bücher.de` as `xn--bcher-kva.de`), so that the key made from an address the
     /// user typed and the key made from the panel's URL are the same server.
-    static func canonical(_ host: String) -> String {
+    internal static func canonical(_ host: String) -> String {
         let plain = bare(host).lowercased()
         guard !plain.utf8.allSatisfy({ $0 < 0x80 }) else {
             return plain
@@ -371,7 +371,7 @@ extension ServerAddress {
     /// `@` follows later, what stands between that colon and the last `@` is taken for a
     /// password, unless it starts like a port (`host:445/share/a@b`). Rather a name too many
     /// taken out of a remembered address than a password shown.
-    static func removingPassword(from text: String) -> String {
+    internal static func removingPassword(from text: String) -> String {
         let start = text.range(of: "://")?.upperBound ?? text.startIndex
         let rest = text[start...]
         let authorityEnd = rest.firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) ?? rest.endIndex

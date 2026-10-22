@@ -46,7 +46,7 @@ public struct DiffOptions: Equatable, Codable, Sendable {
     ///
     /// Equal keys have equal hashes; equal hashes are checked again with `isSameKey` where it
     /// matters.
-    func hash(_ line: TextLine) -> UInt64 {
+    internal func hash(_ line: TextLine) -> UInt64 {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         var text = line.text
         let hashed: Bool = text.withUTF8 { bytes in
@@ -86,13 +86,13 @@ public struct DiffOptions: Equatable, Codable, Sendable {
     }
 
     /// Whether two lines have the same key; the exact test behind equal hashes.
-    func isSameKey(_ first: TextLine, _ second: TextLine) -> Bool {
+    internal func isSameKey(_ first: TextLine, _ second: TextLine) -> Bool {
         (first.text == second.text && (ignoreLineEndings || first.ending == second.ending)) || key(first) == key(second)
     }
 
     /// The hashes of many lines; long files are spread over all cores, because folding case
     /// and spaces is the expensive part of preparing a comparison.
-    func hashes(_ lines: [TextLine]) -> [UInt64] {
+    internal func hashes(_ lines: [TextLine]) -> [UInt64] {
         guard lines.count >= 20_000 else {
             return lines.map(hash)
         }
@@ -155,7 +155,7 @@ public struct TextDiff: Equatable, Sendable {
 
     /// The same with the lines' hashes made by `hashes`: a test that needs two different lines with
     /// the same hash (which the real one as good as never gives) makes them.
-    static func compute(
+    internal static func compute(
         left: [TextLine],
         right: [TextLine],
         options: DiffOptions,
@@ -226,7 +226,7 @@ public struct TextDiff: Equatable, Sendable {
         return Self(rows: rows, blocks: Self.blocks(of: rows))
     }
 
-    static func blocks(of rows: [DiffRow]) -> [Range<Int>] {
+    internal static func blocks(of rows: [DiffRow]) -> [Range<Int>] {
         var blocks: [Range<Int>] = []
         var start: Int?
         for (index, row) in rows.enumerated() {

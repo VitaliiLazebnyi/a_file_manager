@@ -12,7 +12,7 @@ import Testing
 // `status/harnesses.md`, reproducers under `Tests/Fuzz/repro/new/`).
 
 @Suite
-struct Review2IntegrationFuzz {
+internal struct Review2IntegrationFuzz {
     // MARK: N1 — a yEnc part header with numbers nobody can mean
 
     private func decode(_ text: String) throws -> (outcome: Decoder.Outcome, memory: MemoryFileSystem) {
@@ -28,7 +28,7 @@ struct Review2IntegrationFuzz {
     }
 
     @Test
-    func aPartRangeThatCannotBeIsADamagedHeaderAndNoTrap() throws {
+    internal func aPartRangeThatCannotBeIsADamagedHeaderAndNoTrap() throws {
         // The reproducer, and its relatives: every pair far apart, upside down, or before the first byte.
         for range in [
             "begin=-9223372036854775808 end=0", "begin=-1 end=9223372036854775807", "begin=0 end=10", "begin=9 end=3",
@@ -67,7 +67,7 @@ struct Review2IntegrationFuzz {
     }
 
     @Test
-    func aRunOfEmptyLinesBehindALineThatReachesOverASegmentsEndMakesNoRowOfItsOwn() throws {
+    internal func aRunOfEmptyLinesBehindALineThatReachesOverASegmentsEndMakesNoRowOfItsOwn() throws {
         // The reproducer (segments of one byte): the decoding scan was right, the raw scan made a seventh row.
         let small = Data([0, 0, 10, 10, 10, 10, 10])
         let reference = try rows(small, columns: 1, segment: 1 << 22, chunk: 1 << 20, raw: false)
@@ -79,7 +79,7 @@ struct Review2IntegrationFuzz {
     }
 
     @Test
-    func theSameAtTheSizesTheProgramUses() throws {
+    internal func theSameAtTheSizesTheProgramUses() throws {
         // Lines of 8 bytes up to just before the end of the first segment of 4 MiB; then a line
         // that reaches over that end by 0 to 6 bytes; then five empty lines; then more text.
         for over in 0...6 {
@@ -107,7 +107,7 @@ struct Review2IntegrationFuzz {
     // MARK: N3 — a comment file whose code-page bytes are valid UTF-8
 
     @Test
-    func aRewriteOfACommentFileGivesEveryNameBack() {
+    internal func aRewriteOfACommentFileGivesEveryNameBack() {
         // The reproducer: read in the Windows code page (the first line is no UTF-8), one entry
         // whose name is the bytes of two byte-order marks.
         let reproducer = Data([0x20, 0xF8, 0x0A, 0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF])
@@ -135,7 +135,7 @@ struct Review2IntegrationFuzz {
     // MARK: N4 — a long plain search in a long name
 
     @Test
-    func aLongWildcardSearchInALongNameIsBoundedLikeARegularExpression() {
+    internal func aLongWildcardSearchInALongNameIsBoundedLikeARegularExpression() {
         var context = RenameContext()
         context.timeZone = TimeZone(identifier: "UTC") ?? .current
         var settings = RenameSettings()

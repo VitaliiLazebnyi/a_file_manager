@@ -6,7 +6,7 @@ import Testing
 @testable import FileToolsPlugin
 
 /// Runs a program that ships with macOS and returns what it prints.
-func systemTool(_ path: String, _ arguments: [String], in directory: URL? = nil) throws -> (
+internal func systemTool(_ path: String, _ arguments: [String], in directory: URL? = nil) throws -> (
     output: String, status: Int32
 ) {
     let process = Process()
@@ -23,14 +23,14 @@ func systemTool(_ path: String, _ arguments: [String], in directory: URL? = nil)
 }
 
 /// The test pattern of the BLAKE3 reference vectors: the bytes 0…250, repeated.
-func patternData(_ count: Int) -> Data {
+internal func patternData(_ count: Int) -> Data {
     Data((0..<count).map { UInt8($0 % 251) })
 }
 
 /// The checksum methods against reference digests and the system's tools.
 @Suite
-struct FileToolsHashes {
-    func digest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) -> String {
+internal struct FileToolsHashes {
+    internal func digest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) -> String {
         let hasher = method.makeHasher()
         let step = max(1, (data.count + pieces - 1) / pieces)
         for start in stride(from: 0, to: data.count, by: step) {
@@ -40,7 +40,7 @@ struct FileToolsHashes {
     }
 
     @Test
-    func knownDigests() {
+    internal func knownDigests() {
         let abc = Data("abc".utf8)
         #expect(digest(.crc32, Data("123456789".utf8)) == "cbf43926")
         #expect(digest(.crc32, Data()) == "00000000")
@@ -97,7 +97,7 @@ struct FileToolsHashes {
             "04ffdd636dc25b3e900d12778cacbbd5c98300786b0b83e5c34b088bd2aa201f3fc41dbe4c0e30cc6fa1c60e28354a02942b7ddf9e7a2f863ec6494472f1de47"
         )
     ])
-    func sha3(count: Int, sha224: String, sha256: String, sha384: String, sha512: String) {
+    internal func sha3(count: Int, sha224: String, sha256: String, sha384: String, sha512: String) {
         let data = patternData(count)
         for pieces in [1, 3, 7] {
             #expect(digest(.sha3_224, data, pieces: pieces) == sha224)
@@ -125,7 +125,7 @@ struct FileToolsHashes {
         (31_744, "62b6960e1a44bcc1eb1a611a8d6235b6b4b78f32e7abc4fb4c6cdcce94895c47"),
         (102_400, "bc3e3d41a1146b069abffad3c0d44860cf664390afce4d9661f7902e7943e085")
     ])
-    func blake3(count: Int, expected: String) {
+    internal func blake3(count: Int, expected: String) {
         let data = patternData(count)
         #expect(digest(.blake3, data) == expected)
         #expect(digest(.blake3, data, pieces: 5) == expected)
@@ -133,7 +133,7 @@ struct FileToolsHashes {
     }
 
     @Test
-    func agreesWithTheSystemTools() throws {
+    internal func agreesWithTheSystemTools() throws {
         let box = try Sandbox()
         let data = patternData(300_001)
         let url = box.url("data.bin")
@@ -158,7 +158,7 @@ struct FileToolsHashes {
     }
 
     @Test
-    func methodsOfTheDialog() {
+    internal func methodsOfTheDialog() {
         #expect(ChecksumMethod.allCases.map(\.rawValue) == Array(0...11))
         #expect(
             ChecksumMethod(rawValue: 3) == .sha256 && ChecksumMethod(rawValue: 7) == .sha3_256
@@ -181,7 +181,7 @@ struct FileToolsHashes {
     }
 
     @Test
-    func manyFilesAreHashedOnAllCoresInOrder() {
+    internal func manyFilesAreHashedOnAllCoresInOrder() {
         let (fileSystems, memory) = makeFileSystems()
         let files = (0..<300)
             .map {
@@ -216,7 +216,7 @@ struct FileToolsHashes {
     }
 
     @Test
-    func hashingStopsWhenCancelled() {
+    internal func hashingStopsWhenCancelled() {
         let (fileSystems, memory) = makeFileSystems()
         let run = ToolRun(fileSystems: fileSystems)
         run.cancellation.cancel()

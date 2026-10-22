@@ -12,15 +12,15 @@ import Testing
 /// empty, must say what went wrong, and must not pair names it cannot tell apart.
 @MainActor
 @Suite
-struct Review2DirectorySync {
-    let memory = MemoryFileSystem()
-    let plugin = DirectorySyncPlugin(opensWindows: false)
-    let settings = MemorySettings()
-    let bench: TestBench
-    let early = Date(timeIntervalSince1970: 1_000_000)
-    var ui: ScriptedInteraction { bench.interaction }
+internal struct Review2DirectorySync {
+    internal let memory = MemoryFileSystem()
+    internal let plugin = DirectorySyncPlugin(opensWindows: false)
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
+    internal let early = Date(timeIntervalSince1970: 1_000_000)
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() {
+    internal init() {
         memory.addDirectory("/A")
         memory.addFile("/B/one.txt", "one", modified: early)
         memory.addFile("/B/two.txt", "two", modified: early)
@@ -34,7 +34,7 @@ struct Review2DirectorySync {
         )
     }
 
-    func opened(asymmetric: Bool = true, _ configure: (SyncSession) -> Void = { _ in }) -> SyncSession {
+    internal func opened(asymmetric: Bool = true, _ configure: (SyncSession) -> Void = { _ in }) -> SyncSession {
         bench.commands.perform(.synchronizeDirectories)
         let session = plugin.session!
         session.options.asymmetric = asymmetric
@@ -43,7 +43,7 @@ struct Review2DirectorySync {
         return session
     }
 
-    func checkbox(_ key: String) -> Bool? {
+    internal func checkbox(_ key: String) -> Bool? {
         for field in ui.forms.last ?? [] where field.key == key {
             if case .checkbox(let isOn) = field.kind {
                 return isOn
@@ -53,7 +53,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func aMirrorOfAnEmptySourceWarnsAndLeavesTheDeletionUnticked() {
+    internal func aMirrorOfAnEmptySourceWarnsAndLeavesTheDeletionUnticked() {
         let session = opened()
         #expect(session.sourceLooksEmpty && ui.log.contains("inform: The left directory is empty."))
         ui.formAnswers = [.accept]
@@ -65,7 +65,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func theDeletionRunsWhenTheUserTicksIt() {
+    internal func theDeletionRunsWhenTheUserTicksIt() {
         let session = opened()
         ui.formAnswers = [.values(["deleteRight": .flag(true), "confirm": .flag(false), "direct": .flag(true)])]
         session.synchronize()
@@ -73,7 +73,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func anOrdinaryMirrorStillProposesTheDeletionTicked() {
+    internal func anOrdinaryMirrorStillProposesTheDeletionTicked() {
         memory.addFile("/A/one.txt", "one", modified: early)
         let session = opened()
         #expect(!session.sourceLooksEmpty)
@@ -83,13 +83,13 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func aTwoWaySyncOfAnEmptySideIsNotAMirror() {
+    internal func aTwoWaySyncOfAnEmptySideIsNotAMirror() {
         let session = opened(asymmetric: false)
         #expect(!session.sourceLooksEmpty)
     }
 
     @Test
-    func namesThatDifferOnlyInCaseAreNotPairedWithAnotherName() {
+    internal func namesThatDifferOnlyInCaseAreNotPairedWithAnotherName() {
         let left = ["a.txt", "A.txt"]
             .map {
                 FileItem(url: URL(fileURLWithPath: "/L/\($0)"), name: $0)
@@ -106,7 +106,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func collidingNamesAreExcludedRows() {
+    internal func collidingNamesAreExcludedRows() {
         memory.addFile("/C/a.txt", "x", modified: early)
         memory.addFile("/C/A.txt", "y", modified: early)
         memory.addFile("/D/a.txt", "x", modified: early)
@@ -122,7 +122,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func datesAreComparedExactlyOnlyWhereBothSidesKeepThemExactly() {
+    internal func datesAreComparedExactlyOnlyWhereBothSidesKeepThemExactly() {
         let a = memory.addFile("/T/a.txt", "x", modified: early)
         _ = a
         memory.addFile("/U/a.txt", "x", modified: early.addingTimeInterval(2))
@@ -139,7 +139,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func aLocalApfsPairKeepsNoTolerance() throws {
+    internal func aLocalApfsPairKeepsNoTolerance() throws {
         let box = try Sandbox()
         try box.file("L/a.txt", "x", modified: early)
         try box.file("R/a.txt", "x", modified: early.addingTimeInterval(2))
@@ -158,7 +158,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func timeOffsetsAreAppliedToTheCopiedDates() {
+    internal func timeOffsetsAreAppliedToTheCopiedDates() {
         var options = SyncOptions()
         options.timeOffsetHours = 2
         memory.addFile("/V/a.txt", "new", modified: early.addingTimeInterval(10_000))
@@ -175,7 +175,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func aFailedCommitIsSaidAndNothingIsDeleted() {
+    internal func aFailedCommitIsSaidAndNothingIsDeleted() {
         struct Refused: Error {}
         memory.capabilities = [.write, .deferredWrites]
         memory.commitFailure = Refused()
@@ -189,7 +189,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func errorsAfterSkipAllAreSummarised() {
+    internal func errorsAfterSkipAllAreSummarised() {
         memory.addFile("/A/x1.txt", "1", modified: early.addingTimeInterval(100))
         memory.addFile("/A/x2.txt", "2", modified: early.addingTimeInterval(100))
         let session = opened(asymmetric: false)
@@ -202,7 +202,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func loadingASetOrAdoptingDuringAComparisonDropsTheOldRun() {
+    internal func loadingASetOrAdoptingDuringAComparisonDropsTheOldRun() {
         let session = opened()
         session.saveSet(named: "mine")
         // The state is cleared and a running comparison would be cancelled; nothing stale arrives later.
@@ -211,7 +211,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func aNewFileOnAFileSystemThatKeepsWritesBackIsWrittenAsATemporaryFirst() {
+    internal func aNewFileOnAFileSystemThatKeepsWritesBackIsWrittenAsATemporaryFirst() {
         memory.capabilities = [.write, .deferredWrites]
         memory.refusesInternalCopy = true
         memory.addFile("/L/new.txt", "fresh", modified: early.addingTimeInterval(500))
@@ -234,7 +234,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func aCancelledCopyLeavesNoTemporaryBehind() {
+    internal func aCancelledCopyLeavesNoTemporaryBehind() {
         memory.addFile("/L/f.bin", "new content", modified: early.addingTimeInterval(500))
         memory.addFile("/R/f.bin", "old", modified: early)
         let rows = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems)
@@ -266,7 +266,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func aListingCutShortByTheCancelIsNotAnEmptyFolder() {
+    internal func aListingCutShortByTheCancelIsNotAnEmptyFolder() {
         memory.addFile("/R/keep/inside.txt", "mine")
         let flag = CancellationFlag()
         flag.cancel()
@@ -287,7 +287,7 @@ struct Review2DirectorySync {
     }
 
     @Test
-    func aLargeListIsLaidOutByKeysAndTheSameWayEveryTime() {
+    internal func aLargeListIsLaidOutByKeysAndTheSameWayEveryTime() {
         // The layout is a pure function of the rows: sorted by extracted keys, ties by position.
         var items: [SyncRow] = []
         for index in 0..<50 {

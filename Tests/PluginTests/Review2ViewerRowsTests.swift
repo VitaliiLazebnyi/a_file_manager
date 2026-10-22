@@ -8,7 +8,7 @@ import Testing
 /// Review round 2, the row index: lines longer than a segment, files that become shorter or
 /// unreadable while they are indexed, and rows that are never cut in front of a mark.
 @Suite
-struct Review2ViewerRows {
+internal struct Review2ViewerRows {
     private func document(
         _ data: Data,
         columns: Int,
@@ -29,7 +29,7 @@ struct Review2ViewerRows {
     // MARK: Segment.thin
 
     @Test
-    func aSegmentWithMoreCheckpointsThanBytesIsThinnedAndDoesNotTrap() {
+    internal func aSegmentWithMoreCheckpointsThanBytesIsThinnedAndDoesNotTrap() {
         // Direct call: five checkpoints over four bytes (the overflow of `step *= 2` of review 2).
         var list = TextRowIndex.CheckpointList()
         for number in 0..<5 { list.append(.init(offset: Int64(number), linesBefore: 0, startsLine: number == 0)) }
@@ -47,7 +47,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func theReproducerOfTheFuzzerIndexes() throws {
+    internal func theReproducerOfTheFuzzerIndexes() throws {
         // 66 bytes in one line, one column wide, segments of one byte: two checkpoints for a
         // one-byte segment (rows-thin-overflow.bin).
         let data = Data(repeating: UInt8(ascii: "q"), count: 66)
@@ -61,7 +61,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func aGiantLineKeepsFewCheckpointsAndEveryRowCanBeFound() throws {
+    internal func aGiantLineKeepsFewCheckpointsAndEveryRowCanBeFound() throws {
         // A line of 6 MB in segments of 16 KB: all its rows belong to the first segment.
         let size = 6 << 20
         var bytes = Data(count: size)
@@ -85,7 +85,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func aSegmentNeverHoldsMoreCheckpointsThanTheLimit() {
+    internal func aSegmentNeverHoldsMoreCheckpointsThanTheLimit() {
         var list = TextRowIndex.CheckpointList()
         let total = TextRowIndex.maximumCheckpoints * 4
         for number in 0..<total { list.append(.init(offset: Int64(number) * 100, linesBefore: 0, startsLine: true)) }
@@ -98,7 +98,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func aChunkedCheckpointListKeepsACopyUnchangedWhileTheOriginalGrows() {
+    internal func aChunkedCheckpointListKeepsACopyUnchangedWhileTheOriginalGrows() {
         var list = TextRowIndex.CheckpointList()
         for number in 0..<9_000 {
             list.append(.init(offset: Int64(number) * 3, linesBefore: number, startsLine: number % 2 == 0))
@@ -120,7 +120,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func thinningWhileScanningGivesTheRowsOfScanningThenThinning() throws {
+    internal func thinningWhileScanningGivesTheRowsOfScanningThenThinning() throws {
         // The checkpoints are thinned during the scan (every 2,048): rows come out the same
         // whatever the segment size, and the lines are counted right.
         var text = ""
@@ -164,7 +164,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func aFileThatBecameShorterIsReportedNotShownAsComplete() {
+    internal func aFileThatBecameShorterIsReportedNotShownAsComplete() {
         let source = Shrunk(length: 100_000, available: 30_000)
         let document = TextDocument(
             source: source,
@@ -186,7 +186,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func rowsOfAFileThatBecameShorterAreReportedAndDoNotTrap() throws {
+    internal func rowsOfAFileThatBecameShorterAreReportedAndDoNotTrap() throws {
         let data = Data(repeating: UInt8(ascii: "z"), count: 5_000)
         let full = DataByteSource(data)
         let document = TextDocument(
@@ -230,7 +230,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func rowsAreNeverReadThroughASegmentThatFailed() throws {
+    internal func rowsAreNeverReadThroughASegmentThatFailed() throws {
         // 200 lines of 20 bytes, segments of 400 bytes: the third segment (800..<1200) cannot be read.
         var text = ""
         for number in 0..<200 { text += String(format: "line %04d  xxxxxxxx\n", number) }
@@ -255,7 +255,7 @@ struct Review2ViewerRows {
     // MARK: Marks
 
     @Test
-    func aRowIsNotCutBetweenACharacterAndItsMark() throws {
+    internal func aRowIsNotCutBetweenACharacterAndItsMark() throws {
         // "aaa" and then é as e + U+0301, three columns wide: the mark stays with its letter.
         let text = "aaae\u{0301}bbb\n"
         let index = document(Data(text.utf8), columns: 4, segment: 1 << 20, chunk: 1 << 20)
@@ -264,7 +264,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func aJoinedSequenceStaysInOneRow() throws {
+    internal func aJoinedSequenceStaysInOneRow() throws {
         let family = "\u{1F469}\u{200D}\u{1F469}\u{200D}\u{1F467}"
         let text = "ab" + family + "cd\n"
         let index = document(Data(text.utf8), columns: 4, segment: 1 << 20, chunk: 1 << 20)
@@ -274,7 +274,7 @@ struct Review2ViewerRows {
     }
 
     @Test
-    func aRunOfMarksIsCutAfterAWhile() throws {
+    internal func aRunOfMarksIsCutAfterAWhile() throws {
         // No unit of this line takes a column: still no row is longer than a few times the width.
         let text = String(repeating: "\u{0301}", count: 1_000) + "\n"
         let index = document(Data(text.utf8), columns: 10, segment: 1 << 20, chunk: 1 << 20)

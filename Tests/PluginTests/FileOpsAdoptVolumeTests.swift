@@ -30,37 +30,37 @@ private func volume(_ key: String) -> URL {
 /// and per file, and lets chosen removals fail once.
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-final class LocalProbe: FileSystemProvider, @unchecked Sendable {
+internal final class LocalProbe: FileSystemProvider, @unchecked Sendable {
     private let local = LocalFileSystem()
-    var scheme: String { local.scheme }
-    var capabilities: FileSystemCapabilities { local.capabilities }
+    internal var scheme: String { local.scheme }
+    internal var capabilities: FileSystemCapabilities { local.capabilities }
     /// Names whose first removal fails.
-    var failsOnce: Set<String> = []
+    internal var failsOnce: Set<String> = []
     private let lock = NSLock()
     private var running = 0, most = 0
     private var copied: [String: Int] = [:]
     private var removalsFailed = 0
 
-    var mostCopiesAtOnce: Int { lock.withLock { most } }
-    var totalCopies: Int { lock.withLock { copied.values.reduce(0, +) } }
-    func copies(of name: String) -> Int { lock.withLock { copied[name] ?? 0 } }
-    var failedRemovals: Int { lock.withLock { removalsFailed } }
+    internal var mostCopiesAtOnce: Int { lock.withLock { most } }
+    internal var totalCopies: Int { lock.withLock { copied.values.reduce(0, +) } }
+    internal func copies(of name: String) -> Int { lock.withLock { copied[name] ?? 0 } }
+    internal var failedRemovals: Int { lock.withLock { removalsFailed } }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try local.list(directory, showHidden: showHidden)
     }
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
+    internal func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
         try local.list(directory, showHidden: showHidden, cancellation: cancellation)
     }
-    func item(at url: URL) -> FileItem? { local.item(at: url) }
-    func parent(of directory: URL) -> URL? { local.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader { try local.read(url) }
-    func createDirectory(at url: URL) throws { try local.createDirectory(at: url) }
-    func write(_ url: URL) throws -> any FileWriter { try local.write(url) }
-    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
+    internal func item(at url: URL) -> FileItem? { local.item(at: url) }
+    internal func parent(of directory: URL) -> URL? { local.parent(of: directory) }
+    internal func read(_ url: URL) throws -> any FileReader { try local.read(url) }
+    internal func createDirectory(at url: URL) throws { try local.createDirectory(at: url) }
+    internal func write(_ url: URL) throws -> any FileWriter { try local.write(url) }
+    internal func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         try local.append(to: url, at: offset, cancellation: cancellation)
     }
-    func remove(_ url: URL) throws {
+    internal func remove(_ url: URL) throws {
         let fails: Bool = lock.withLock {
             guard failsOnce.remove(url.lastPathComponent) != nil else {
                 return false
@@ -71,11 +71,11 @@ final class LocalProbe: FileSystemProvider, @unchecked Sendable {
         if fails { throw CocoaError(.fileWriteNoPermission) }
         try local.remove(url)
     }
-    func trash(_ url: URL) throws { try local.trash(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    internal func trash(_ url: URL) throws { try local.trash(url) }
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try local.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    internal func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         lock.withLock {
             running += 1
             most = max(most, running)
@@ -86,16 +86,16 @@ final class LocalProbe: FileSystemProvider, @unchecked Sendable {
         Thread.sleep(forTimeInterval: 0.03)
         try local.copy(source, to: destination, progress: progress)
     }
-    func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
+    internal func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
         try local.setAttributes(attributes, of: url)
     }
-    func copyMetadata(from source: URL, to destination: URL) throws {
+    internal func copyMetadata(from source: URL, to destination: URL) throws {
         try local.copyMetadata(from: source, to: destination)
     }
-    func quarantine(of url: URL) -> Data? { local.quarantine(of: url) }
-    func setQuarantine(_ value: Data, of url: URL) throws { try local.setQuarantine(value, of: url) }
-    func displayPath(_ url: URL) -> String { local.displayPath(url) }
-    func volume(of url: URL) -> VolumeInfo? { local.volume(of: url) }
+    internal func quarantine(of url: URL) -> Data? { local.quarantine(of: url) }
+    internal func setQuarantine(_ value: Data, of url: URL) throws { try local.setQuarantine(value, of: url) }
+    internal func displayPath(_ url: URL) -> String { local.displayPath(url) }
+    internal func volume(of url: URL) -> VolumeInfo? { local.volume(of: url) }
 }
 
 private func scratch(_ volume: URL) throws -> URL {
@@ -126,9 +126,9 @@ private func foldsCase(in folder: URL) throws -> Bool {
         "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
     )
 )
-struct FileOpsAdoptVolumes {
+internal struct FileOpsAdoptVolumes {
     @Test
-    func theThreeVolumesAreTheKindsTheseTestsNeed() throws {
+    internal func theThreeVolumesAreTheKindsTheseTestsNeed() throws {
         let (a, b, cs) = (volume("AFM_VOLUME_A"), volume("AFM_VOLUME_B"), volume("AFM_VOLUME_CS"))
         #expect(FileIdentity.device(of: a) != FileIdentity.device(of: b))
         #expect(FileIdentity.device(of: a) != FileIdentity.device(of: cs))
@@ -155,7 +155,7 @@ struct FileOpsAdoptVolumes {
     }
 
     @Test
-    func aFolderMoveBetweenVolumesCopiesInParallelAndRemovesTheSources() throws {
+    internal func aFolderMoveBetweenVolumesCopiesInParallelAndRemovesTheSources() throws {
         let (a, b) = (try scratch(volume("AFM_VOLUME_A")), try scratch(volume("AFM_VOLUME_B")))
         defer {
             try? FileManager.default.removeItem(at: a)
@@ -179,7 +179,7 @@ struct FileOpsAdoptVolumes {
     }
 
     @Test
-    func aRetryAfterAFailedSourceDeleteDoesNotCopyTheFileAgain() throws {
+    internal func aRetryAfterAFailedSourceDeleteDoesNotCopyTheFileAgain() throws {
         let (a, b) = (try scratch(volume("AFM_VOLUME_A")), try scratch(volume("AFM_VOLUME_B")))
         defer {
             try? FileManager.default.removeItem(at: a)
@@ -205,7 +205,7 @@ struct FileOpsAdoptVolumes {
 
     @MainActor
     @Test
-    func renamingToAnotherCaseNeverReplacesTheFileThatHasThatName() throws {
+    internal func renamingToAnotherCaseNeverReplacesTheFileThatHasThatName() throws {
         let cs = try scratch(volume("AFM_VOLUME_CS"))
         defer { try? FileManager.default.removeItem(at: cs) }
         try write("lower", to: cs.appendingPathComponent("readme"))
@@ -231,7 +231,7 @@ struct FileOpsAdoptVolumes {
     }
 
     @Test
-    func aMoveOntoAnotherCaseAsksAboutTheCollisionAndKeepsBothFiles() throws {
+    internal func aMoveOntoAnotherCaseAsksAboutTheCollisionAndKeepsBothFiles() throws {
         let cs = try scratch(volume("AFM_VOLUME_CS"))
         defer { try? FileManager.default.removeItem(at: cs) }
         let readme = cs.appendingPathComponent("readme")
@@ -255,7 +255,7 @@ struct FileOpsAdoptVolumes {
     // MARK: (c) Copying into oneself through another spelling
 
     @Test
-    func aCopyIntoItsOwnSubfolderThroughAnotherSpellingIsRefused() throws {
+    internal func aCopyIntoItsOwnSubfolderThroughAnotherSpellingIsRefused() throws {
         let a = try scratch(volume("AFM_VOLUME_A"))
         defer { try? FileManager.default.removeItem(at: a) }
         try write("in", to: a.appendingPathComponent("Tree/Sub/file.txt"))

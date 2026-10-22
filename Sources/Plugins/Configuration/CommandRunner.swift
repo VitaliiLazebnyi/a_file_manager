@@ -12,7 +12,7 @@ import Foundation
 /// A line for the shell never has a file name, a path or another value in its text: the
 /// values are handed to the shell as data and the line refers to them (`ShellLine.script`).
 @MainActor
-final class CommandRunner {
+internal final class CommandRunner {
     private unowned let kernel: Kernel
     private let launchesApplications: Bool
     private let background: DispatchQueue?
@@ -23,36 +23,36 @@ final class CommandRunner {
     /// and removed when it quits.
     ///
     /// Each file goes when its command has ended.
-    let listFolder: URL
+    internal let listFolder: URL
     /// How long a list file outlives the command that was given it: a program started with
     /// `open` has ended long before the application it opened has read the list.
-    static let defaultListGrace: TimeInterval = 60
+    internal static let defaultListGrace: TimeInterval = 60
     /// The same for this runner (tests make it short).
-    var listGrace = CommandRunner.defaultListGrace
+    internal var listGrace = CommandRunner.defaultListGrace
     /// How the end of a started program comes back to the main thread.
     ///
     /// Tests keep it for later, to see what comes when the runner has gone meanwhile.
-    var backToMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { MainLoop.perform($0) }
+    internal var backToMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { MainLoop.perform($0) }
     /// How deep user commands may call each other, and how many steps one run may take with
     /// everything it calls: a loop the name check does not see still ends.
-    static let depthLimit = 16
-    static let stepLimit = 1_000
+    internal static let depthLimit = 16
+    internal static let stepLimit = 1_000
     /// With this many marked, the marked names are gathered and the placeholders replaced off
     /// the main thread.
-    static let backgroundSelectionThreshold = 5_000
+    internal static let backgroundSelectionThreshold = 5_000
     /// A line of more pieces than this is checked where it is started, off the main thread.
-    static let checkedHereLimit = 4_096
-    var environment = ProcessInfo.processInfo.environment
+    internal static let checkedHereLimit = 4_096
+    internal var environment = ProcessInfo.processInfo.environment
     /// Finds the definition of a user command, so that a chain can wait for what it starts.
-    var userCommand: ((String) -> UserCommand?)?
+    internal var userCommand: ((String) -> UserCommand?)?
     /// Finds the entry of the Start menu a `cm_UserMenu<n>` runs, for the same purpose.
-    var startMenuEntry: ((String) -> StartMenuEntry?)?
+    internal var startMenuEntry: ((String) -> StartMenuEntry?)?
     /// The user commands whose steps are being performed right now, outermost first.
     ///
     /// A command started from inside them (through the command registry) continues this list.
     private var active: [String] = []
     /// The lines started without a command-line plugin, also when starting is switched off.
-    private(set) var launched: [String] = []
+    internal private(set) var launched: [String] = []
     /// Raised by `stopWaiting`: what was waiting before belongs to an older number and ends.
     private var generation = 0
     /// How many timers and programs chains are waiting for.
@@ -88,7 +88,7 @@ final class CommandRunner {
     }
 
     /// Without `background` everything runs at once on the calling thread (tests).
-    init(kernel: Kernel, launchesApplications: Bool, background: DispatchQueue?, listFolder: URL) {
+    internal init(kernel: Kernel, launchesApplications: Bool, background: DispatchQueue?, listFolder: URL) {
         self.kernel = kernel
         self.launchesApplications = launchesApplications
         self.background = background
@@ -97,7 +97,7 @@ final class CommandRunner {
     }
 
     /// Runs `work` away from the main thread and `completion` on it.
-    func offMain<Result: Sendable>(
+    internal func offMain<Result: Sendable>(
         _ work: @escaping @Sendable () -> Result,
         then completion: @escaping @MainActor @Sendable (Result) -> Void
     ) {
@@ -127,7 +127,7 @@ final class CommandRunner {
     }
 
     /// Removes the list files earlier commands left behind, off the main thread.
-    func removeListFiles() {
+    internal func removeListFiles() {
         let folder = listFolder
         onListQueue({ try? FileManager.default.removeItem(at: folder) }, then: { _ in })
     }
@@ -137,7 +137,7 @@ final class CommandRunner {
     ///
     /// A younger one stays; its folder is cleared away at the next start, when this process is
     /// gone.
-    func removeListFilesNow() {
+    internal func removeListFilesNow() {
         let fm = FileManager.default
         let files =
             (try? fm.contentsOfDirectory(at: listFolder, includingPropertiesForKeys: [.contentModificationDateKey]))
@@ -160,7 +160,7 @@ final class CommandRunner {
     /// Removes the folders of earlier runs of the program that are no longer running.
     ///
     /// Folders are named by process number; another running instance keeps its own.
-    nonisolated static func removeStaleListFolders(in parent: URL) {
+    nonisolated internal static func removeStaleListFolders(in parent: URL) {
         let fm = FileManager.default
         for url in (try? fm.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)) ?? [] {
             guard let pid = Int32(url.lastPathComponent) else { continue }
@@ -261,11 +261,11 @@ final class CommandRunner {
     // MARK: Running
 
     /// Whether a chain is waiting for a `cm_wait` or for a program to end.
-    var isWaiting: Bool { waiting > 0 }
+    internal var isWaiting: Bool { waiting > 0 }
 
     /// Ends every chain that is waiting: its remaining steps are not run, and the programs it
     /// waits for are asked to end.
-    func stopWaiting() {
+    internal func stopWaiting() {
         generation += 1
         waiting = 0
         children.terminateWaitedFor()
@@ -277,7 +277,7 @@ final class CommandRunner {
     /// `completion` is called, on the main thread, when everything it started has ended; it is
     /// not called when the command was not run because the user gave up or it was refused
     /// for another reason than calling itself.
-    func run(
+    internal func run(
         _ action: CommandAction,
         arguments: String = "",
         as name: String? = nil,
@@ -665,7 +665,7 @@ final class CommandRunner {
     ///
     /// Nil for any other line. For a bare name the shell decides: a program of that name on the
     /// user's PATH, which only the login shell knows, comes first. Asks the disk: background only.
-    nonisolated static func applicationLine(for line: [ExpandedPiece]) -> [ExpandedPiece]? {
+    nonisolated internal static func applicationLine(for line: [ExpandedPiece]) -> [ExpandedPiece]? {
         // The first word as a whole, also when it is quoted and has a space in it.
         let (word, rest) = ShellWords.firstWord(of: line)
         let first = ShellWords.unquoted(word)
@@ -699,7 +699,7 @@ final class CommandRunner {
     }
 
     /// The same for a line as text, as text; nil for a line that is no application.
-    nonisolated static func applicationLine(for line: String) -> String? {
+    nonisolated internal static func applicationLine(for line: String) -> String? {
         applicationLine(for: [.text(line)]).map(ShellLine.display)
     }
 
@@ -714,8 +714,8 @@ final class CommandRunner {
 /// the main dispatch queue: a block that asks the user something runs a modal dialog, and a
 /// dialog started from inside a block of the main queue keeps every later block of the queue
 /// (directory pieces, progress) waiting until it is closed.
-enum MainLoop {
-    static func perform(_ block: @escaping @MainActor @Sendable () -> Void) {
+internal enum MainLoop {
+    internal static func perform(_ block: @escaping @MainActor @Sendable () -> Void) {
         // The main run loop runs the block on the main thread.
         RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(block) }
         CFRunLoopWakeUp(CFRunLoopGetMain())

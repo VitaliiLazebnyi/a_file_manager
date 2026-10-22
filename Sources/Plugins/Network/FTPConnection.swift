@@ -52,7 +52,7 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
     }
 
     /// Nil for the automatic choice.
-    var encoding: String.Encoding? {
+    internal var encoding: String.Encoding? {
         func named(_ encoding: CFStringEncodings) -> String.Encoding {
             String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(encoding.rawValue)))
         }
@@ -99,15 +99,15 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
     }
 
     /// The encoding names are written in when nothing else is known of a name.
-    var sending: String.Encoding { encoding ?? .utf8 }
+    internal var sending: String.Encoding { encoding ?? .utf8 }
 
-    func decode(_ data: Data) -> String { decodeTelling(data).text }
+    internal func decode(_ data: Data) -> String { decodeTelling(data).text }
 
     /// The text of bytes from the server, and the encoding that read them.
     ///
     /// In the automatic mode bytes that are not UTF-8 are read as Western Latin 1; `NameMemory`
     /// keeps that, so the name goes back to the server as the bytes it came as.
-    func decodeTelling(_ data: Data) -> (text: String, encoding: String.Encoding) {
+    internal func decodeTelling(_ data: Data) -> (text: String, encoding: String.Encoding) {
         if let encoding {
             guard let text = String(data: data, encoding: encoding) else {
                 return (String(decoding: data, as: UTF8.self), .utf8)
@@ -128,7 +128,7 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
     /// Names are sent the way the Mac writes them when composed (servers compare bytes), except the
     /// names the server itself spelled differently, which `names` remembers. A character the
     /// encoding does not have is an error: written as `?` it would name another file.
-    func encode(_ text: String, names: NameMemory? = nil) throws -> Data {
+    internal func encode(_ text: String, names: NameMemory? = nil) throws -> Data {
         func bytes(_ piece: String, as encoding: String.Encoding) throws -> Data {
             guard let data = piece.data(using: encoding, allowLossyConversion: false) else {
                 throw FileSystemError.notSupported(
@@ -162,25 +162,25 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
 /// Each is kept, by its exact spelling, with the encoding that read it; a command that names it
 /// writes it back unchanged in that encoding. Shared by the connections of a session. Safe from any
 /// thread: all state is guarded by `lock`.
-final class NameMemory: @unchecked Sendable {
+internal final class NameMemory: @unchecked Sendable {
     private let lock = NSLock()
     private var spellings: [Data: String.Encoding] = [:]
     private static let capacity = 65_536
 
-    var isEmpty: Bool {
+    internal var isEmpty: Bool {
         lock.lock()
         defer { lock.unlock() }
         return spellings.isEmpty
     }
 
-    func encoding<Bytes: Sequence>(of name: Bytes) -> String.Encoding? where Bytes.Element == UInt8 {
+    internal func encoding<Bytes: Sequence>(of name: Bytes) -> String.Encoding? where Bytes.Element == UInt8 {
         let key = Data(name)
         lock.lock()
         defer { lock.unlock() }
         return spellings[key]
     }
 
-    func remember(_ name: String, encoding: String.Encoding) {
+    internal func remember(_ name: String, encoding: String.Encoding) {
         lock.lock()
         defer { lock.unlock() }
         if spellings.count >= Self.capacity { spellings.removeAll() }
@@ -189,7 +189,9 @@ final class NameMemory: @unchecked Sendable {
 
     /// Whether a name read with `encoding` needs to be remembered for a connection that
     /// writes names composed and in `sending`.
-    static func needsRemembering(_ name: String, readAs encoding: String.Encoding, sending: String.Encoding) -> Bool {
+    internal static func needsRemembering(_ name: String, readAs encoding: String.Encoding, sending: String.Encoding)
+        -> Bool
+    {
         if encoding != sending {
             return true
         }
@@ -260,18 +262,18 @@ public struct FTPServerConfig: Sendable {
 ///
 /// Shared by the connections of a session, so that what one found, in the background or while
 /// listing, spares the others the question. Safe from any thread: all state is guarded by `lock`.
-final class LinkMemory: @unchecked Sendable {
+internal final class LinkMemory: @unchecked Sendable {
     private let lock = NSLock()
     private var kinds: [String: Bool] = [:]
     private static let capacity = 2_048
 
-    func isDirectory(_ path: String) -> Bool? {
+    internal func isDirectory(_ path: String) -> Bool? {
         lock.lock()
         defer { lock.unlock() }
         return kinds[path]
     }
 
-    func remember(_ path: String, isDirectory: Bool) {
+    internal func remember(_ path: String, isDirectory: Bool) {
         lock.lock()
         defer { lock.unlock() }
         if kinds.count >= Self.capacity { kinds.removeAll() }
@@ -279,7 +281,7 @@ final class LinkMemory: @unchecked Sendable {
     }
 
     /// After anything changed on the server that may have changed where a link leads.
-    func forgetAll() {
+    internal func forgetAll() {
         lock.lock()
         defer { lock.unlock() }
         kinds.removeAll()
@@ -292,30 +294,30 @@ final class LinkMemory: @unchecked Sendable {
 /// **Threading.** A connection belongs to one thread at a time; `FTPSession` hands it out and
 /// takes it back. Every call blocks until the server has answered or the time is up.
 /// `interrupt`, the one call from another thread, touches only the two streams, under `streamsLock`.
-final class FTPConnection: @unchecked Sendable {
-    let config: FTPServerConfig
+internal final class FTPConnection: @unchecked Sendable {
+    internal let config: FTPServerConfig
     private let trust: CertificateTrust
     private var control: NetStream?
     private var replies = FTPReplyParser()
-    private(set) var features: [String: String] = [:]
-    private(set) var greeting = ""
-    private(set) var system = ""
+    internal private(set) var features: [String: String] = [:]
+    internal private(set) var greeting = ""
+    internal private(set) var system = ""
     /// The directory the login led to.
-    private(set) var home = "/"
-    private(set) var usesUTF8 = false
+    internal private(set) var home = "/"
+    internal private(set) var usesUTF8 = false
     private var encoding: NameEncoding
     private var protectsData = false
     private var extendedPassiveFailed = false
     private var currentType: Character?
     /// Links already found to lead to a directory or not, so a listing seen again is not asked again.
-    let knownLinks: LinkMemory
+    internal let knownLinks: LinkMemory
     /// The names of this server that are written back as they came (see `NameMemory`).
-    let knownNames: NameMemory
+    internal let knownNames: NameMemory
     /// Called whenever the server showed a sign of life on this connection, from the thread
     /// that uses it: whoever waits for a connection of the pool waits on while this is called.
-    let onActivity: (@Sendable () -> Void)?
+    internal let onActivity: (@Sendable () -> Void)?
     /// The links (full paths) the last listing left unanswered for lack of time.
-    private(set) var unresolvedLinks: [String] = []
+    internal private(set) var unresolvedLinks: [String] = []
     private var workingDirectory: String?
     /// The data connection of the transfer in progress.
     private var data: NetStream?
@@ -325,17 +327,17 @@ final class FTPConnection: @unchecked Sendable {
     ///
     /// When a connection fails in between, nobody knows whether the command took effect, so a
     /// command that must not run twice is not repeated.
-    private(set) var commandMayHaveRun = false
+    internal private(set) var commandMayHaveRun = false
     /// Guards the two stream references against `interrupt`, the one call from another thread.
     private let streamsLock = NSLock()
     /// When the connection was last used, by `clock`; the pool reads it while it holds the connection.
-    private(set) var lastUsed: Date
+    internal private(set) var lastUsed: Date
     private let clock: @Sendable () -> Date
     /// Called with every line sent and received, for the log.
-    let log: (@Sendable (String) -> Void)?
+    internal let log: (@Sendable (String) -> Void)?
 
     /// `knownLinks` and `knownNames` are the session's, shared by its connections.
-    init(
+    internal init(
         config: FTPServerConfig,
         trust: CertificateTrust,
         knownLinks: LinkMemory = LinkMemory(),
@@ -355,10 +357,10 @@ final class FTPConnection: @unchecked Sendable {
         encoding = config.encoding
     }
 
-    var isUsable: Bool { control != nil && !isBroken && data == nil }
+    internal var isUsable: Bool { control != nil && !isBroken && data == nil }
     /// A server that offers MLST also has MLSD (RFC 3659), whether or not it lists it.
-    var offersMLSD: Bool { features["MLSD"] != nil || features["MLST"] != nil }
-    func offers(_ feature: String) -> Bool { features[feature] != nil }
+    internal var offersMLSD: Bool { features["MLSD"] != nil || features["MLST"] != nil }
+    internal func offers(_ feature: String) -> Bool { features[feature] != nil }
 
     // MARK: Login
 
@@ -366,7 +368,7 @@ final class FTPConnection: @unchecked Sendable {
     ///
     /// Throws `untrustedCertificate` when the server's certificate needs the user's consent, and
     /// `loginFailed` when the user name or password is not accepted.
-    func connect(cancellation: CancellationFlag? = nil) throws {
+    internal func connect(cancellation: CancellationFlag? = nil) throws {
         // The certificates the user accepted for good are fetched here, on the connecting thread.
         if config.tls != .none { trust.prepare() }
         let settings = TLSSettings(host: config.host, trust: trust)
@@ -460,7 +462,7 @@ final class FTPConnection: @unchecked Sendable {
     }
 
     /// Says goodbye when the server still listens, and closes.
-    func close() {
+    internal func close() {
         if let control, !isBroken, data == nil {
             try? control.write(Data("QUIT\r\n".utf8), timeout: 2)
         }
@@ -478,7 +480,7 @@ final class FTPConnection: @unchecked Sendable {
 
     /// Cuts the connection from another thread (Disconnect while a transfer runs); the thread
     /// that uses it then fails at its next step.
-    func interrupt() {
+    internal func interrupt() {
         streamsLock.lock()
         let streams = [control, data]
         streamsLock.unlock()
@@ -524,7 +526,7 @@ final class FTPConnection: @unchecked Sendable {
 
     /// Sends one command and returns the server's answer, whatever it is.
     @discardableResult
-    func send(
+    internal func send(
         _ command: String,
         shown: String? = nil,
         replyWithin: TimeInterval? = nil,
@@ -560,7 +562,7 @@ final class FTPConnection: @unchecked Sendable {
 
     /// Sends a command that must succeed; any other answer is thrown as `NetworkError.refused`.
     @discardableResult
-    func perform(_ command: String, cancellation: CancellationFlag? = nil) throws -> FTPReply {
+    internal func perform(_ command: String, cancellation: CancellationFlag? = nil) throws -> FTPReply {
         let reply = try send(command, cancellation: cancellation)
         guard reply.isSuccess else { throw NetworkError.refused(reply) }
         return reply
@@ -569,14 +571,14 @@ final class FTPConnection: @unchecked Sendable {
     /// Checks that the server still answers.
     ///
     /// A connection that a router dropped silently does not answer at all, so the wait is short.
-    func isAlive(cancellation: CancellationFlag? = nil) -> Bool {
+    internal func isAlive(cancellation: CancellationFlag? = nil) -> Bool {
         guard isUsable else {
             return false
         }
         return (try? send("NOOP", replyWithin: min(config.timeout, 5), cancellation: cancellation))?.isSuccess ?? false
     }
 
-    func changeDirectory(_ path: String, cancellation: CancellationFlag? = nil) throws {
+    internal func changeDirectory(_ path: String, cancellation: CancellationFlag? = nil) throws {
         let path = RemotePath.normalized(path)
         if workingDirectory == path {
             return
@@ -596,11 +598,11 @@ final class FTPConnection: @unchecked Sendable {
 
     // MARK: Simple operations
 
-    func makeDirectory(_ path: String, cancellation: CancellationFlag? = nil) throws {
+    internal func makeDirectory(_ path: String, cancellation: CancellationFlag? = nil) throws {
         knownLinks.forgetAll()
         try perform("MKD \(path)", cancellation: cancellation)
     }
-    func removeDirectory(_ path: String, cancellation: CancellationFlag? = nil) throws {
+    internal func removeDirectory(_ path: String, cancellation: CancellationFlag? = nil) throws {
         knownLinks.forgetAll()
         // Some servers refuse to remove the directory they stand in.
         if let current = workingDirectory, current == path || current.hasPrefix(path + "/") {
@@ -608,12 +610,12 @@ final class FTPConnection: @unchecked Sendable {
         }
         try perform("RMD \(path)", cancellation: cancellation)
     }
-    func deleteFile(_ path: String, cancellation: CancellationFlag? = nil) throws {
+    internal func deleteFile(_ path: String, cancellation: CancellationFlag? = nil) throws {
         knownLinks.forgetAll()
         try perform("DELE \(path)", cancellation: cancellation)
     }
 
-    func rename(_ source: String, to destination: String, cancellation: CancellationFlag? = nil) throws {
+    internal func rename(_ source: String, to destination: String, cancellation: CancellationFlag? = nil) throws {
         knownLinks.forgetAll()
         let from = try send("RNFR \(source)", cancellation: cancellation)
         guard from.isIntermediate else { throw NetworkError.refused(from) }
@@ -622,19 +624,19 @@ final class FTPConnection: @unchecked Sendable {
     }
 
     /// The size of a file in bytes; nil when the server does not tell (a directory, or no SIZE).
-    func size(of path: String, cancellation: CancellationFlag? = nil) throws -> Int64? {
+    internal func size(of path: String, cancellation: CancellationFlag? = nil) throws -> Int64? {
         try setType("I", cancellation: cancellation)
         let reply = try send("SIZE \(path)", cancellation: cancellation)
         return reply.code == 213 ? Int64(reply.text.trimmingCharacters(in: .whitespaces)) : nil
     }
 
-    func modificationTime(of path: String, cancellation: CancellationFlag? = nil) throws -> Date? {
+    internal func modificationTime(of path: String, cancellation: CancellationFlag? = nil) throws -> Date? {
         let reply = try send("MDTM \(path)", cancellation: cancellation)
         return reply.code == 213 ? FTPSyntax.time(reply.text.trimmingCharacters(in: .whitespaces)) : nil
     }
 
     /// The entry at a path through MLST; nil when nothing is there.
-    func status(of path: String, cancellation: CancellationFlag? = nil) throws -> RemoteEntry? {
+    internal func status(of path: String, cancellation: CancellationFlag? = nil) throws -> RemoteEntry? {
         let reply = try send("MLST \(path)", cancellation: cancellation)
         guard reply.code == 250 else {
             if reply.code / 100 == 5, reply.code != 550 { throw NetworkError.refused(reply) }
@@ -644,12 +646,12 @@ final class FTPConnection: @unchecked Sendable {
     }
 
     /// Sets the time of last change with MFMT, where the server offers it.
-    func setModificationTime(_ date: Date, of path: String, cancellation: CancellationFlag? = nil) throws {
+    internal func setModificationTime(_ date: Date, of path: String, cancellation: CancellationFlag? = nil) throws {
         guard offers("MFMT") else { throw FileSystemError.notSupported("Changing the date on this server") }
         try perform("MFMT \(FTPSyntax.timeText(date)) \(path)", cancellation: cancellation)
     }
 
-    func setPermissions(_ permissions: UInt16, of path: String, cancellation: CancellationFlag? = nil) throws {
+    internal func setPermissions(_ permissions: UInt16, of path: String, cancellation: CancellationFlag? = nil) throws {
         try perform("SITE CHMOD \(String(permissions & 0o7777, radix: 8)) \(path)", cancellation: cancellation)
     }
 
@@ -728,7 +730,7 @@ final class FTPConnection: @unchecked Sendable {
     /// Starts a transfer: `RETR`, `STOR`, `LIST` and the like.
     ///
     /// The returned stream carries the data; `finishTransfer` or `abortTransfer` must follow.
-    func beginTransfer(
+    internal func beginTransfer(
         _ command: String,
         type: Character,
         restartAt offset: UInt64 = 0,
@@ -792,7 +794,7 @@ final class FTPConnection: @unchecked Sendable {
 
     /// Whether the reply is a server's complaint that a data connection did not resume the TLS
     /// session of the control connection (vsftpd `require_ssl_reuse`, ProFTPD, FileZilla Server).
-    static func requiresSessionReuse(_ reply: FTPReply) -> Bool {
+    internal static func requiresSessionReuse(_ reply: FTPReply) -> Bool {
         guard [421, 425, 426, 450, 522, 522, 550].contains(reply.code) else {
             return false
         }
@@ -805,7 +807,7 @@ final class FTPConnection: @unchecked Sendable {
     }
 
     /// Ends a transfer whose data went through completely, and reads the server's verdict.
-    func finishTransfer(cancellation: CancellationFlag? = nil) throws {
+    internal func finishTransfer(cancellation: CancellationFlag? = nil) throws {
         guard let channel = data else {
             return
         }
@@ -834,7 +836,7 @@ final class FTPConnection: @unchecked Sendable {
 
     /// Drops a transfer without asking the server about it, for a server that is not answering:
     /// the connection cannot be used again.
-    func abandonTransfer() {
+    internal func abandonTransfer() {
         guard let channel = data else {
             return
         }
@@ -847,7 +849,7 @@ final class FTPConnection: @unchecked Sendable {
     ///
     /// The server answers the broken data connection with one reply (426 or 226); when it does not,
     /// the connection is not used again.
-    func abortTransfer() {
+    internal func abortTransfer() {
         guard let channel = data else {
             return
         }
@@ -878,7 +880,7 @@ final class FTPConnection: @unchecked Sendable {
     /// Reads a directory: with MLSD where the server offers it, else with LIST (`-la` when
     /// hidden files are wanted). `receive` gets the entries piece by piece and returns false
     /// to stop.
-    func list(
+    internal func list(
         _ path: String,
         showHidden: Bool,
         cancellation: CancellationFlag? = nil,
@@ -1005,7 +1007,7 @@ final class FTPConnection: @unchecked Sendable {
     }
 
     /// Whether the link at `full` leads to a directory; nil when the connection broke meanwhile.
-    func probeLink(_ full: String, cancellation: CancellationFlag? = nil) -> Bool? {
+    internal func probeLink(_ full: String, cancellation: CancellationFlag? = nil) -> Bool? {
         var isDirectory = false
         if offers("MLST"), let target = try? status(of: full, cancellation: cancellation), !target.isSymlink {
             isDirectory = target.isDirectory

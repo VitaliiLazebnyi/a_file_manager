@@ -3,38 +3,38 @@ import Foundation
 
 /// What a button, a Start-menu item or a user command does: the three fields the editors of
 /// Total Commander share (spec 14 › The command language).
-struct CommandAction: Codable, Equatable {
+internal struct CommandAction: Codable, Equatable {
     /// A command of the program (`cm_…`, `em_…`), several of them separated by commas,
     /// `cd <path>`, or a program or shell line.
-    var command = ""
+    internal var command = ""
     /// Parameters with placeholders (spec 18 › Button and command parameters).
-    var parameters = ""
+    internal var parameters = ""
     /// The folder a program starts in; with `cd`, the folder the other panel shows.
-    var startPath = ""
+    internal var startPath = ""
 }
 
 /// A command the user defined (spec 14 › User commands (`em_`)).
 ///
 /// It is registered like any other command, so keys, the button bar, menus and the command line
 /// reach it by its name.
-struct UserCommand: Codable, Equatable {
-    static let prefix = "em_"
+internal struct UserCommand: Codable, Equatable {
+    internal static let prefix = "em_"
 
     /// The full name, `em_backup`.
-    var name: String
-    var title: String
-    var action = CommandAction()
+    internal var name: String
+    internal var title: String
+    internal var action = CommandAction()
     /// A system symbol for the button bar; empty for none.
-    var symbol = ""
+    internal var symbol = ""
 
-    var id: CommandID { CommandID(rawValue: name) }
+    internal var id: CommandID { CommandID(rawValue: name) }
     /// What menus and lists show.
-    var caption: String { title.isEmpty ? String(name.dropFirst(Self.prefix.count)) : title }
+    internal var caption: String { title.isEmpty ? String(name.dropFirst(Self.prefix.count)) : title }
 
     /// The name as it is stored: letters, digits and `_` after `em_`.
     ///
     /// Nil when nothing usable is left of what the user typed.
-    static func name(from text: String) -> String? {
+    internal static func name(from text: String) -> String? {
         var text = text.trimmingCharacters(in: .whitespaces)
         if text.lowercased().hasPrefix(prefix) { text.removeFirst(prefix.count) }
         let allowed = text.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) || $0 == "_" }
@@ -45,20 +45,20 @@ struct UserCommand: Codable, Equatable {
 /// An entry of the Start menu (spec 14 › Start menu).
 ///
 /// The n-th entry runs as `cm_UserMenu<n>`.
-struct StartMenuEntry: Codable, Equatable {
+internal struct StartMenuEntry: Codable, Equatable {
     /// A title of `-` makes a separator, as in Total Commander.
-    var title: String
-    var action = CommandAction()
+    internal var title: String
+    internal var action = CommandAction()
 
-    static let separator = Self(title: "-")
-    var isSeparator: Bool { title == "-" }
+    internal static let separator = Self(title: "-")
+    internal var isSeparator: Bool { title == "-" }
 
     /// The name of the command that runs the entry at `index` (counted from 0).
-    static func commandID(at index: Int) -> CommandID { CommandID(rawValue: "cm_UserMenu\(index + 1)") }
+    internal static func commandID(at index: Int) -> CommandID { CommandID(rawValue: "cm_UserMenu\(index + 1)") }
 }
 
 /// One thing a Command field asks for.
-enum CommandStep: Equatable {
+internal enum CommandStep: Equatable {
     /// A command of the program with what was written after its name.
     case perform(CommandID, parameter: String)
     /// `cd <path>`; an empty path stands for what the Parameters field holds.
@@ -77,17 +77,17 @@ enum CommandStep: Equatable {
 ///
 /// Not taken over from Windows: `*`/`**` (run as administrator or as another user), subbars
 /// (`.bar` files) and command numbers in place of names.
-enum CommandLanguage {
+internal enum CommandLanguage {
     private static let internalPrefixes = ["cm_", "em_", "afm_"]
 
     /// The longest pause a `cm_wait` makes: a stored number may be anything.
-    static let longestWait = 3_600_000
+    internal static let longestWait = 3_600_000
 
     /// `%NAME%` in a Command field is an environment variable (spec 14 › Rules).
     ///
     /// Its value is data: it stays apart from the text, so that a shell is handed it and never
     /// reads it.
-    static func environmentPieces(_ text: String, _ environment: [String: String]) -> [ExpandedPiece] {
+    internal static func environmentPieces(_ text: String, _ environment: [String: String]) -> [ExpandedPiece] {
         var pieces: [ExpandedPiece] = []
         var written = ""
         var rest = Substring(text)
@@ -112,7 +112,7 @@ enum CommandLanguage {
     /// whatever it holds.
     ///
     /// For commands of the program and for showing; never for a shell.
-    static func expandingEnvironment(_ text: String, _ environment: [String: String]) -> String {
+    internal static func expandingEnvironment(_ text: String, _ environment: [String: String]) -> String {
         ShellLine.display(environmentPieces(text, environment))
     }
 
@@ -121,7 +121,7 @@ enum CommandLanguage {
     /// `resolve` finds a registered command by its name, whatever its case. A field in which not
     /// every comma-separated item is a command of the program is one external line, commas
     /// included.
-    static func steps(_ command: String, environment: [String: String] = [:], resolve: (String) -> CommandID?)
+    internal static func steps(_ command: String, environment: [String: String] = [:], resolve: (String) -> CommandID?)
         -> [CommandStep]
     {
         let command = expandingEnvironment(command, environment).trimmingCharacters(in: .whitespaces)
@@ -157,7 +157,7 @@ enum CommandLanguage {
     /// What a command of the program is given when a parameter is written after its name: a
     /// number is a position (`cm_SrcActivateTab 2`), a single path a location
     /// (`cm_List /etc/hosts`), anything else text. `location` turns a path into a location.
-    static func argument(from parameter: String, location: (String) -> URL) -> CommandArgument {
+    internal static func argument(from parameter: String, location: (String) -> URL) -> CommandArgument {
         let text = parameter.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else {
             return .nothing
@@ -179,7 +179,7 @@ enum CommandLanguage {
 extension CommandAction {
     private enum Keys: String, CodingKey { case command, parameters, startPath }
 
-    init(from decoder: any Decoder) throws {
+    internal init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: Keys.self)
         command = try container.decodeIfPresent(String.self, forKey: .command) ?? ""
         parameters = try container.decodeIfPresent(String.self, forKey: .parameters) ?? ""
@@ -190,7 +190,7 @@ extension CommandAction {
 extension UserCommand {
     private enum Keys: String, CodingKey { case name, title, action, symbol }
 
-    init(from decoder: any Decoder) throws {
+    internal init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: Keys.self)
         name = try container.decode(String.self, forKey: .name)
         title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
@@ -202,7 +202,7 @@ extension UserCommand {
 extension StartMenuEntry {
     private enum Keys: String, CodingKey { case title, action }
 
-    init(from decoder: any Decoder) throws {
+    internal init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: Keys.self)
         title = try container.decode(String.self, forKey: .title)
         action = try container.decodeIfPresent(CommandAction.self, forKey: .action) ?? CommandAction()

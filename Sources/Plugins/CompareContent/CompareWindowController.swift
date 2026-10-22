@@ -8,7 +8,9 @@ import AppKit
 ///
 /// It draws a `CompareSession` and forwards clicks and keys to it; nothing here reads a file. Main
 /// thread only.
-final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
+internal final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
+    NSTableViewDelegate
+{
     private let session: CompareSession
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
@@ -64,7 +66,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
     }
 
-    init(
+    internal init(
         session: CompareSession,
         effects: CompareWindowEffects,
         onClose: @escaping (CompareWindowController) -> Void
@@ -97,10 +99,10 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         session.onChange = { [weak self] in self?.refresh() }
     }
 
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    internal required init?(coder _: NSCoder) { fatalError("not used") }
 
     /// Esc: stops a comparison that runs, and says so; false when none runs (Esc then closes the window).
-    func stopsComparison() -> Bool {
+    internal func stopsComparison() -> Bool {
         guard session.phase == .working else {
             return false
         }
@@ -108,7 +110,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         return true
     }
 
-    func show() {
+    internal func show() {
         if let url = session.leftURL ?? session.rightURL { base = url.deletingLastPathComponent() }
         pullControls()
         refresh()
@@ -351,7 +353,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     /// Called by the font panel.
     @objc
-    func changeFont(_ sender: NSFontManager?) {
+    internal func changeFont(_ sender: NSFontManager?) {
         guard let sender else {
             return
         }
@@ -465,7 +467,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         isMirroring = false
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
+    internal func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isMirroring, let changed = notification.object as? NSTableView else {
             return
         }
@@ -590,11 +592,11 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     // MARK: Tables
 
-    func numberOfRows(in _: NSTableView) -> Int { session.rowCount }
+    internal func numberOfRows(in _: NSTableView) -> Int { session.rowCount }
 
     private func side(of tableView: NSTableView) -> CompareSide { tableView === leftTable ? .left : .right }
 
-    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+    internal func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
         let identifier = NSUserInterfaceItemIdentifier("row")
         let view =
             tableView.makeView(withIdentifier: identifier, owner: nil) as? DiffRowView
@@ -619,7 +621,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         return view
     }
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    internal func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let side = side(of: tableView)
         let isNumber = tableColumn?.identifier.rawValue == "number"
         let identifier = NSUserInterfaceItemIdentifier(isNumber ? "number" : "text")
@@ -667,7 +669,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     // MARK: Window
 
-    func windowShouldClose(_: NSWindow) -> Bool {
+    internal func windowShouldClose(_: NSWindow) -> Bool {
         guard session.hasUnsavedChanges else {
             return true
         }
@@ -676,7 +678,7 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         return false
     }
 
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         NotificationCenter.default.removeObserver(self)
         if NSFontManager.shared.target === self { NSFontManager.shared.target = nil }
         session.cancel()

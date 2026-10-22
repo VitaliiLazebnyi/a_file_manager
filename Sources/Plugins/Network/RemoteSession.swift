@@ -67,7 +67,7 @@ public final class NetworkOptions: @unchecked Sendable {
     }
 
     /// Whether a file of this name is transferred as text.
-    func transfersAsText(_ name: String) -> Bool {
+    internal func transfersAsText(_ name: String) -> Bool {
         let values = self.values
         switch values.transferMode {
         case .binary:
@@ -298,7 +298,7 @@ public final class SessionEnvironment: @unchecked Sendable {
 ///
 /// **Threading.** Every method may be called from several threads at once and blocks until
 /// the server has answered.
-protocol RemoteSession: AnyObject, Sendable {
+internal protocol RemoteSession: AnyObject, Sendable {
     var profile: ConnectionProfile { get }
     /// Connects if necessary and returns the directory the login leads to.
     func connect(cancellation: CancellationFlag?) throws -> String
@@ -350,18 +350,18 @@ protocol RemoteSession: AnyObject, Sendable {
 }
 
 extension RemoteSession {
-    var singleLookupsAreCheap: Bool { true }
-    var isConnecting: Bool { false }
-    func remove(_ path: String, isDirectory: Bool?) throws {
+    internal var singleLookupsAreCheap: Bool { true }
+    internal var isConnecting: Bool { false }
+    internal func remove(_ path: String, isDirectory: Bool?) throws {
         try remove(path, isDirectory: isDirectory, cancellation: nil)
     }
-    func rename(_ source: String, to destination: String, replacing: Bool) throws {
+    internal func rename(_ source: String, to destination: String, replacing: Bool) throws {
         try rename(source, to: destination, replacing: replacing, cancellation: nil)
     }
-    func onLinkResolved(_: @escaping @Sendable (_ path: String, _ isDirectory: Bool) -> Void) {}
+    internal func onLinkResolved(_: @escaping @Sendable (_ path: String, _ isDirectory: Bool) -> Void) {}
 
-    func entry(at path: String) throws -> RemoteEntry? { try entry(at: path, cancellation: nil) }
-    func openWrite(_ path: String) throws -> any FileWriter { try openWrite(path, cancellation: nil) }
+    internal func entry(at path: String) throws -> RemoteEntry? { try entry(at: path, cancellation: nil) }
+    internal func openWrite(_ path: String) throws -> any FileWriter { try openWrite(path, cancellation: nil) }
 }
 
 /// Where the work runs that waits for a server and that nobody waits for: the clean-up of an
@@ -380,7 +380,7 @@ extension RemoteSession {
 /// lane run at the same time: a server that has stopped answering holds up the work of its
 /// own connection and never that of another server, whose connections would otherwise come
 /// back to their pool only after the dead one's time limits.
-enum Background {
+internal enum Background {
     private struct Piece {
         let lane: ObjectIdentifier
         let work: @Sendable () -> Void
@@ -397,10 +397,10 @@ enum Background {
     nonisolated(unsafe) private static var runningIn: [ObjectIdentifier: Int] = [:]
     /// Guarded by `condition`.
     nonisolated(unsafe) private static var waitingIn: [ObjectIdentifier: Int] = [:]
-    static let mostThreads = 24
-    static let mostPerLane = 3
+    internal static let mostThreads = 24
+    internal static let mostPerLane = 3
 
-    static func run(lane owner: AnyObject, _ work: @escaping @Sendable () -> Void) {
+    internal static func run(lane owner: AnyObject, _ work: @escaping @Sendable () -> Void) {
         let lane = ObjectIdentifier(owner)
         condition.lock()
         waiting.append(Piece(lane: lane, work: work))
@@ -458,7 +458,7 @@ enum Background {
 
     /// Waits until nothing of this lane is running or waiting, `timeout` seconds at most; for tests.
     @discardableResult
-    static func waitUntilIdle(lane: AnyObject, timeout: TimeInterval) -> Bool {
+    internal static func waitUntilIdle(lane: AnyObject, timeout: TimeInterval) -> Bool {
         let lane = ObjectIdentifier(lane)
         return wait(timeout) { runningIn[lane] == nil && waitingIn[lane] == nil }
     }
@@ -477,7 +477,7 @@ enum Background {
     }
 
     /// The threads that exist right now, for tests.
-    static var threadCount: Int {
+    internal static var threadCount: Int {
         condition.lock()
         defer { condition.unlock() }
         return threads
@@ -488,7 +488,7 @@ enum Background {
 /// by Disconnect) and the caller's (Cancel in the progress window).
 ///
 /// Without a caller's flag the session's own is passed as it is.
-func withEither<Result>(
+internal func withEither<Result>(
     _ own: CancellationFlag,
     _ callers: CancellationFlag?,
     _ body: (CancellationFlag) throws -> Result
@@ -507,7 +507,7 @@ func withEither<Result>(
 /// when `shouldGiveUp` says so (it returns the error to throw), and at once on the main thread,
 /// which must never wait behind a login that may be asking the user something (the question is
 /// answered on the main thread).
-func lockPatiently(_ lock: NSLock, cancellation: CancellationFlag?, shouldGiveUp: () -> any Error?) throws {
+internal func lockPatiently(_ lock: NSLock, cancellation: CancellationFlag?, shouldGiveUp: () -> any Error?) throws {
     if lock.try() {
         return
     }
@@ -521,13 +521,13 @@ func lockPatiently(_ lock: NSLock, cancellation: CancellationFlag?, shouldGiveUp
 /// Converts line ends for transfers in text mode: the network form is CR LF, the Mac's is LF.
 ///
 /// Runs between the line ends are copied as blocks.
-struct LineEndConverter {
+internal struct LineEndConverter {
     private var pendingCR = false
 
     /// Network to Mac.
     ///
     /// A CR at the end of a block waits for the next block.
-    mutating func toLocal(_ data: Data) -> Data {
+    internal mutating func toLocal(_ data: Data) -> Data {
         var result = Data(capacity: data.count)
         data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
             guard let base = bytes.baseAddress, !bytes.isEmpty else {
@@ -560,13 +560,13 @@ struct LineEndConverter {
     }
 
     /// What is left when the data ends on a CR.
-    mutating func finishLocal() -> Data {
+    internal mutating func finishLocal() -> Data {
         defer { pendingCR = false }
         return pendingCR ? Data([0x0D]) : Data()
     }
 
     /// Mac to network: every LF that does not already follow a CR gets one.
-    mutating func toNetwork(_ data: Data) -> Data {
+    internal mutating func toNetwork(_ data: Data) -> Data {
         var result = Data(capacity: data.count + data.count / 32)
         data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
             guard let base = bytes.baseAddress, !bytes.isEmpty else {

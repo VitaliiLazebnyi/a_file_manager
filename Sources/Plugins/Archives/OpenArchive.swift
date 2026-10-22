@@ -4,13 +4,13 @@ import Foundation
 /// The options of the Packer page as the working threads see them.
 ///
 /// The settings store belongs to the main thread; this copy is refreshed there and read anywhere.
-struct ArchiveOptions {
-    var compressionLevel = 6
-    var opensAsFolders = true
-    var entersAnyFile = true
-    var extensions: Set<String> = []
-    var verifiesAfterPacking = true
-    var datesArchiveByNewest = false
+internal struct ArchiveOptions {
+    internal var compressionLevel = 6
+    internal var opensAsFolders = true
+    internal var entersAnyFile = true
+    internal var extensions: Set<String> = []
+    internal var verifiesAfterPacking = true
+    internal var datesArchiveByNewest = false
 }
 
 /// What archives need from their surroundings.
@@ -22,27 +22,27 @@ struct ArchiveOptions {
 /// Unchecked: the settings, `options` and `isStopping` are guarded by `lock` (tests change
 /// settings while archives are open); the rest is fixed in `init`.
 @dynamicMemberLookup
-final class ArchiveEnvironment: @unchecked Sendable {
-    let scratch = ScratchFolder()
+internal final class ArchiveEnvironment: @unchecked Sendable {
+    internal let scratch = ScratchFolder()
     /// Set when quitting has waited long enough: ends the writes that are still under way.
-    let quitting = CancellationFlag()
+    internal let quitting = CancellationFlag()
     private let lock = NSLock()
     private var settings = Settings()
     private var current = ArchiveOptions()
     private var stopping = false
 
-    subscript<Value>(dynamicMember keyPath: WritableKeyPath<Settings, Value>) -> Value {
+    internal subscript<Value>(dynamicMember keyPath: WritableKeyPath<Settings, Value>) -> Value {
         get { lock.withLock { settings[keyPath: keyPath] } }
         set { lock.withLock { settings[keyPath: keyPath] = newValue } }
     }
 
-    typealias Scheduler =
+    internal typealias Scheduler =
         @Sendable (_ delay: TimeInterval, _ priority: QualityOfService, _ work: @escaping @Sendable () -> Void) -> Void
 
     /// The same clock as the delayed writes' (see `Settings.schedule`) for the plugin's
     /// housekeeping (closing readers nobody came back for), which is not the delayed writes'
     /// business and not a test clock's either.
-    static func later(
+    internal static func later(
         _ delay: TimeInterval,
         _ priority: QualityOfService,
         name: String,
@@ -57,54 +57,54 @@ final class ArchiveEnvironment: @unchecked Sendable {
     }
     private static let clock = DispatchQueue(label: "afm.archives.clock", qos: .userInitiated)
 
-    struct Settings {
+    internal struct Settings {
         /// The file systems of the program, for archives that lie on something other than the disk.
-        var fileSystems: @Sendable () -> FileSystemRegistry? = { nil }
+        internal var fileSystems: @Sendable () -> FileSystemRegistry? = { nil }
         /// Asks for the password of an archive; `retry` after a wrong one.
         ///
         /// Nil gives up.
-        var askPassword: @Sendable (_ archiveName: String, _ retry: Bool) -> String? = { _, _ in nil }
+        internal var askPassword: @Sendable (_ archiveName: String, _ retry: Bool) -> String? = { _, _ in nil }
         /// Tells the user that changes could not be written into an archive.
         ///
         /// Must not wait for the user: it is called on the thread that writes.
-        var reportFailure: @Sendable (_ error: any Error, _ archiveName: String) -> Void = { _, _ in }
+        internal var reportFailure: @Sendable (_ error: any Error, _ archiveName: String) -> Void = { _, _ in }
         /// The directories whose contents changed behind the panels' backs.
-        var contentsChanged: @Sendable (_ archive: URL) -> Void = { _ in }
+        internal var contentsChanged: @Sendable (_ archive: URL) -> Void = { _ in }
 
         /// Archives up to this size that cannot be read at any position (compressed TAR, 7z, …)
         /// are unpacked once into a temporary TAR, so that reading single members is fast.
-        var materializeLimit: UInt64 = 256 << 20
+        internal var materializeLimit: UInt64 = 256 << 20
         /// The temporary copy may not grow beyond this.
-        var unpackedLimit: UInt64 = 4 << 30
+        internal var unpackedLimit: UInt64 = 4 << 30
         /// This much stays free on the volume of the temporary folder, whatever is unpacked or
         /// fetched into it: a copy that would eat into it is not made (or given up half-way).
-        var scratchReserve: UInt64 = 2 << 30
+        internal var scratchReserve: UInt64 = 2 << 30
         /// The temporary copies of the archives that are open but not in use may take this much
         /// together; beyond it the least recently used are let go.
-        var scratchBudget: UInt64 = 8 << 30
+        internal var scratchBudget: UInt64 = 8 << 30
         /// An archive may hold this many entries; one that lists more is refused with a clear
         /// message instead of filling the memory.
         ///
         /// An entry of a ZIP costs about 400 bytes (measured: 396 with a 45-byte path and the extra
         /// fields the `zip` program writes), so the directory of the largest archive that is opened
         /// takes about 800 MB.
-        var maxEntries = 2_000_000
+        internal var maxEntries = 2_000_000
         /// Archives may lie inside archives this deep.
-        var maxNesting = 6
+        internal var maxNesting = 6
         /// How long after the last change pending changes are written into a ZIP; nil never
         /// writes by itself.
-        var flushDelay: TimeInterval? = 1
+        internal var flushDelay: TimeInterval? = 1
         /// How long after a failed write the next attempt is made; doubled with every further
         /// failure, up to `maxRetryDelay`.
         ///
         /// A change to the archive brings the next attempt at once.
-        var retryDelay: TimeInterval = 30
-        var maxRetryDelay: TimeInterval = 3_600
+        internal var retryDelay: TimeInterval = 30
+        internal var maxRetryDelay: TimeInterval = 3_600
         /// The delayed write runs with low priority.
         ///
         /// When all cores are busy that may not run for minutes; this long after it was due it runs
         /// with the priority of the user's own work.
-        var escalationDelay: TimeInterval = 5
+        internal var escalationDelay: TimeInterval = 5
         /// Runs `work` after `delay` on a thread of its own with the given priority.
         ///
         /// The delayed writes are started this way and not on the system's shared queues: those
@@ -112,17 +112,17 @@ final class ArchiveEnvironment: @unchecked Sendable {
         /// that is due would wait behind them for as long as that lasts. The clock itself is a
         /// queue of the plugin's own, on which nothing ever runs but the starting of these threads.
         /// (Tests put a clock of their own here.).
-        var schedule: Scheduler = { delay, priority, work in
+        internal var schedule: Scheduler = { delay, priority, work in
             ArchiveEnvironment.later(delay, priority, name: "Archive write", work)
         }
         /// How long a reader of an archive that can only be read front to back waits behind
         /// the member it delivered for someone to read on; then it is closed.
-        var readerParkTime: TimeInterval = 10
+        internal var readerParkTime: TimeInterval = 10
         /// Runs the housekeeping (closing the readers nobody came back for) as `schedule` runs
         /// the delayed writes.
         ///
         /// (Tests put a clock of their own here.).
-        var housekeeping: Scheduler = { delay, priority, work in
+        internal var housekeeping: Scheduler = { delay, priority, work in
             ArchiveEnvironment.later(delay, priority, name: "Archive readers", work)
         }
         /// A file that a job has just given its final name inside a ZIP is written into the
@@ -130,31 +130,31 @@ final class ArchiveEnvironment: @unchecked Sendable {
         /// many bytes besides the file itself (or no more than is waiting anyway).
         ///
         /// Zero leaves every write to the delay.
-        var immediateWriteLimit: UInt64 = 256 << 10
+        internal var immediateWriteLimit: UInt64 = 256 << 10
         /// Off, archives are never cloned and every change writes the whole archive anew, as on
         /// a file system that cannot clone (tests).
-        var clonesArchives = true
+        internal var clonesArchives = true
         /// Whether `needed` bytes can be written into `folder`.
-        var hasRoom: @Sendable (_ needed: UInt64, _ folder: URL) -> Bool = { Volume.hasRoom(for: $0, at: $1) }
+        internal var hasRoom: @Sendable (_ needed: UInt64, _ folder: URL) -> Bool = { Volume.hasRoom(for: $0, at: $1) }
         /// The volume a path lies on, as a number (tests: an archive "on another disk").
-        var volume: @Sendable (_ path: String) -> dev_t? = { Volume.device(of: $0) }
+        internal var volume: @Sendable (_ path: String) -> dev_t? = { Volume.device(of: $0) }
         /// Where new members are saved when they can be written neither into their archive nor
         /// next to it; nil keeps them in the temporary folder.
-        var recoveryFolder: URL?
+        internal var recoveryFolder: URL?
         /// After the user declined to give a password (or gave three wrong ones), members of that
         /// archive fail without a question for this long: a job that reads a thousand encrypted
         /// members asks once, not a thousand times.
-        var passwordRefusalMemory: TimeInterval = 0
+        internal var passwordRefusalMemory: TimeInterval = 0
         /// How long quitting waits for the changes to be written before it gives up, keeps the
         /// new members in the temporary folder and says so.
-        var quitTimeout: TimeInterval = 120
-        var limits = ZipLimits.standard
+        internal var quitTimeout: TimeInterval = 120
+        internal var limits = ZipLimits.standard
         /// Called by a write when the new archive file is complete and before it takes the old
         /// one's place, on the writing thread (tests: what changes while a write is under way).
-        var whileWriting: (@Sendable () -> Void)?
+        internal var whileWriting: (@Sendable () -> Void)?
     }
 
-    var options: ArchiveOptions {
+    internal var options: ArchiveOptions {
         get {
             lock.lock()
             defer { lock.unlock() }
@@ -169,7 +169,7 @@ final class ArchiveEnvironment: @unchecked Sendable {
 
     /// True from the moment the plugin stops: the delayed writes start nothing more, because
     /// the stop writes everything itself and then removes the temporary files.
-    var isStopping: Bool {
+    internal var isStopping: Bool {
         get {
             lock.lock()
             defer { lock.unlock() }
@@ -183,8 +183,8 @@ final class ArchiveEnvironment: @unchecked Sendable {
     }
 }
 
-enum Volume {
-    static func hasRoom(for needed: UInt64, at folder: URL) -> Bool {
+internal enum Volume {
+    internal static func hasRoom(for needed: UInt64, at folder: URL) -> Bool {
         var info = statfs()
         guard statfs(folder.path, &info) == 0 else {
             return true
@@ -204,7 +204,7 @@ enum Volume {
     }
 
     /// The volume a path lies on, as a number; nil when the path cannot be asked.
-    static func device(of path: String) -> dev_t? {
+    internal static func device(of path: String) -> dev_t? {
         var status = stat()
         return stat(path, &status) == 0 ? status.st_dev : nil
     }
@@ -242,7 +242,7 @@ enum Volume {
     /// of mounts alone.
     ///
     /// Asking such a path about itself does not hang on a server that is gone.
-    static func isOnLocalVolume(_ path: String) -> Bool {
+    internal static func isOnLocalVolume(_ path: String) -> Bool {
         let bytes = Array(path.utf8)
         guard bytes.first == 0x2F else {
             return false
@@ -262,7 +262,7 @@ enum Volume {
         return found
     }
 
-    enum PathKind {
+    internal enum PathKind {
         case regularFile, directory, other, missing
         /// On a volume that may not answer (a server): it was not asked.
         case unasked
@@ -273,7 +273,7 @@ enum Volume {
     /// walk stops with `.unasked` where it would leave the local disks.
     ///
     /// Fast, and safe on the main thread.
-    static func kind(ofLocalPath path: String) -> PathKind {
+    internal static func kind(ofLocalPath path: String) -> PathKind {
         var current = path
         var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
         for _ in 0..<16 {
@@ -318,20 +318,20 @@ enum Volume {
 }
 
 /// What identifies the state of a file on disk: when any of it changes, the file was rewritten.
-struct FileSignature: Equatable {
-    let size: Int64
-    let seconds: Int
-    let nanoseconds: Int
-    let inode: UInt64
+internal struct FileSignature: Equatable {
+    internal let size: Int64
+    internal let seconds: Int
+    internal let nanoseconds: Int
+    internal let inode: UInt64
 
-    init(_ status: stat) {
+    internal init(_ status: stat) {
         size = Int64(status.st_size)
         seconds = status.st_mtimespec.tv_sec
         nanoseconds = status.st_mtimespec.tv_nsec
         inode = UInt64(status.st_ino)
     }
 
-    static func of(_ path: String) -> Self? {
+    internal static func of(_ path: String) -> Self? {
         var status = stat()
         guard stat(path, &status) == 0 else {
             return nil
@@ -339,7 +339,7 @@ struct FileSignature: Equatable {
         return Self(status)
     }
 
-    var modified: Date {
+    internal var modified: Date {
         Date(timeIntervalSince1970: TimeInterval(seconds) + TimeInterval(nanoseconds) / 1_000_000_000)
     }
 }
@@ -456,7 +456,7 @@ internal final class FlushGate: @unchecked Sendable {
 }
 
 /// What became of changes that could not be written into their archive.
-enum RescueOutcome {
+internal enum RescueOutcome {
     /// Nothing was waiting that exists nowhere else (renames, deletions).
     case nothingToSave
     /// The new members were written into this archive of their own.
@@ -515,13 +515,13 @@ enum RescueOutcome {
 /// one question run at a time), except `publishedEditable` (`stateLock`); `file` and
 /// `signature` are replaced only by the holder of the gate, under `lock`. The rest is fixed
 /// in `init`, or touched in `init` and `deinit` only.
-final class OpenArchive: @unchecked Sendable {
+internal final class OpenArchive: @unchecked Sendable {
     /// The archive file as its own file system names it.
-    let archiveURL: URL
-    let name: String
+    internal let archiveURL: URL
+    internal let name: String
     /// The mark the system puts on files from the internet, when the archive carries it:
     /// what is unpacked from the archive gets it too.
-    let quarantine: Data?
+    internal let quarantine: Data?
     private let environment: ArchiveEnvironment
     /// The archive on the local disk: the file itself (where it really lies, when it was
     /// reached through a symbolic link), or a copy fetched from elsewhere.
@@ -539,7 +539,7 @@ final class OpenArchive: @unchecked Sendable {
     private let instance = UUID().uuidString
 
     private var file: RandomAccessFile
-    let format: ArchiveFormat
+    internal let format: ArchiveFormat
     private var tree = ArchiveTree()
     /// A stream archive unpacked into a temporary TAR (or a compressed file into its content).
     private var unpacked: (file: RandomAccessFile, temporary: TemporaryFile)?
@@ -623,7 +623,7 @@ final class OpenArchive: @unchecked Sendable {
 
     /// With a `cancellation`, opening ends with `ArchiveError.cancelled` soon after it is set:
     /// the child processes started for it are stopped and its temporary files are removed.
-    init(
+    internal init(
         archiveURL: URL,
         localURL: URL,
         fetchedCopy: TemporaryFile?,
@@ -1030,42 +1030,42 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// The entry at a path; the top folder has none.
-    func entry(_ path: String) -> ArchiveEntry? {
+    internal func entry(_ path: String) -> ArchiveEntry? {
         locked { tree.entry(path) }
     }
 
     /// The entries directly inside a folder; nil when the path is not a folder.
-    func children(of path: String) -> [ArchiveEntry]? {
+    internal func children(of path: String) -> [ArchiveEntry]? {
         locked { tree.children(of: path) }
     }
 
     /// Everything below a folder, in archive order.
-    func descendants(of path: String) -> [ArchiveEntry] {
+    internal func descendants(of path: String) -> [ArchiveEntry] {
         locked { tree.descendants(of: path) }.sorted { $0.order < $1.order }
     }
 
     /// Every entry, in archive order.
-    var entries: [ArchiveEntry] {
+    internal var entries: [ArchiveEntry] {
         locked { tree.ordered }
     }
 
-    var hasEncryptedMembers: Bool {
+    internal var hasEncryptedMembers: Bool {
         locked { tree.contains(where: \.isEncrypted) }
     }
 
     /// The date of the archive file itself.
-    var modified: Date {
+    internal var modified: Date {
         locked { signature.modified }
     }
 
     /// How often a stream archive was read from its beginning for a member.
-    var streamStarts: Int {
+    internal var streamStarts: Int {
         locked { starts }
     }
 
     /// The room this archive takes in the temporary folder: its unpacked copy, and the copy
     /// of an archive that was fetched from elsewhere.
-    var scratchBytes: UInt64 {
+    internal var scratchBytes: UInt64 {
         locked { (unpacked?.file.size ?? 0).plusClamped(fetchedCopy == nil ? 0 : file.size) }
     }
 
@@ -1079,7 +1079,7 @@ final class OpenArchive: @unchecked Sendable {
     ///
     /// The disk is asked without the lock; a server, which costs a round trip, at most once a
     /// second, and with a `cancellation` that wait ends when it is set.
-    func isCurrent(cancellation: CancellationFlag? = nil) -> Bool {
+    internal func isCurrent(cancellation: CancellationFlag? = nil) -> Bool {
         lock.lock()
         if retired {
             lock.unlock()
@@ -1126,7 +1126,7 @@ final class OpenArchive: @unchecked Sendable {
     /// Lets the archive go, unless it is in use: see the class comment.
     ///
     /// True when it is retired.
-    func retireIfIdle() -> Bool {
+    internal func retireIfIdle() -> Bool {
         locked {
             if retired {
                 return true
@@ -1148,7 +1148,7 @@ final class OpenArchive: @unchecked Sendable {
     /// that was looked up before the archive was rewritten still reads the right bytes. Through a
     /// `slot` the reading ends early, with an error, when its owner interrupts: where the member
     /// lies behind a long stretch of decompression, opening itself is that long.
-    func open(_ entry: ArchiveEntry, slot: InterruptSlot? = nil) throws -> any ByteStream {
+    internal func open(_ entry: ArchiveEntry, slot: InterruptSlot? = nil) throws -> any ByteStream {
         let (file, unpacked, source, format) = locked { (self.file, self.unpacked?.file, memberSource, self.format) }
         switch entry.content {
         case .none:
@@ -1276,7 +1276,7 @@ final class OpenArchive: @unchecked Sendable {
     /// `throughTheEnd`, the pass reads the archive's stream from the file to its end, also when its
     /// members are read from a copy or none is wanted: only there are the checks of the compressed
     /// stream itself (the checksum at the end of a GZIP file) made, on the file as it is now.
-    func readInOnePass(
+    internal func readInOnePass(
         _ wanted: [ArchiveEntry],
         cancellation: CancellationFlag? = nil,
         throughTheEnd: Bool,
@@ -1320,13 +1320,13 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// Whether members can be read independently of each other, on several threads.
-    var allowsParallelReads: Bool {
+    internal var allowsParallelReads: Bool {
         locked { memberSource == nil || unpacked != nil }
     }
 
     /// Whether the archive is one compressed stream (a compressed TAR, or another format read
     /// through the system's tool), whose checks are made only by reading it to its end.
-    var isOneStream: Bool {
+    internal var isOneStream: Bool {
         locked { memberSource != nil }
     }
 
@@ -1492,7 +1492,7 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// Sets the password to try first, for callers that already know it; nil forgets them all.
-    func usePassword(_ text: String?) {
+    internal func usePassword(_ text: String?) {
         locked {
             guard let text else {
                 passwords = []
@@ -1505,7 +1505,7 @@ final class OpenArchive: @unchecked Sendable {
 
     /// One operation of the user (unpack, test): inside it the user is asked for a password
     /// until one fits or they decline, and then no more.
-    func withPasswordScope<T>(_ body: () throws -> T) rethrows -> T {
+    internal func withPasswordScope<T>(_ body: () throws -> T) rethrows -> T {
         locked { passwordScopes += 1 }
         defer {
             locked {
@@ -1596,7 +1596,7 @@ final class OpenArchive: @unchecked Sendable {
     /// Writes are kept back (`.deferredWrites`): whoever is about to destroy the only other copy of
     /// what it wrote calls `commit` first. Answers at once, on any thread: it waits for no lock
     /// that is held while a file is read, written or asked about.
-    var capabilities: FileSystemCapabilities {
+    internal var capabilities: FileSystemCapabilities {
         stateLock.lock()
         let editable = publishedEditable
         stateLock.unlock()
@@ -1738,7 +1738,7 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// The name a job gives a file while it brings it in (`.afm-<UUID>.tmp`).
-    static func isTransferName(_ name: String) -> Bool {
+    internal static func isTransferName(_ name: String) -> Bool {
         name.utf8.count == 45 && name.hasPrefix(".afm-") && name.hasSuffix(".tmp")
     }
 
@@ -1771,7 +1771,7 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// Creates a folder and the folders above it.
-    func makeDirectory(_ path: String) throws {
+    internal func makeDirectory(_ path: String) throws {
         try requireWritable()
         try locked {
             try requireEditable()
@@ -1841,7 +1841,7 @@ final class OpenArchive: @unchecked Sendable {
     /// Its data is compressed into a temporary file while it is written and joins the archive's
     /// directory when the writer is closed. `level` overrides the compression rate of the settings;
     /// with a `password` the member is encrypted (AES-256).
-    func write(_ path: String, level: Int? = nil, password: String? = nil) throws -> any FileWriter {
+    internal func write(_ path: String, level: Int? = nil, password: String? = nil) throws -> any FileWriter {
         try requireWritable()
         try locked {
             try requireEditable()
@@ -1919,7 +1919,7 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// Removes a file or an empty folder.
-    func remove(_ path: String) throws {
+    internal func remove(_ path: String) throws {
         try requireWritable()
         try locked {
             try requireEditable()
@@ -1989,7 +1989,7 @@ final class OpenArchive: @unchecked Sendable {
     /// for each of them, what these writes cost between two rests is held to the limit plus
     /// the bytes that arrived meanwhile (the data pays for its own overhead); past that the
     /// timer or the commit writes.
-    func move(_ source: String, to destination: String, replacing: Bool) throws {
+    internal func move(_ source: String, to destination: String, replacing: Bool) throws {
         var replaced: ArchiveEntry?
         var loaded = 0
         try requireWritable()
@@ -2067,7 +2067,7 @@ final class OpenArchive: @unchecked Sendable {
     /// A second member with the same contents under another name.
     ///
     /// The compressed data is shared until the archive is written, and copied as it is then.
-    func duplicate(_ source: String, to destination: String) throws -> Int64 {
+    internal func duplicate(_ source: String, to destination: String) throws -> Int64 {
         try requireWritable()
         return try locked {
             try requireEditable()
@@ -2086,7 +2086,7 @@ final class OpenArchive: @unchecked Sendable {
         }
     }
 
-    func setAttributes(_ attributes: FileAttributes, of path: String) throws {
+    internal func setAttributes(_ attributes: FileAttributes, of path: String) throws {
         try requireWritable()
         try locked {
             try requireEditable()
@@ -2106,13 +2106,13 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// True when changes are waiting to be written.
-    var hasPendingChanges: Bool {
+    internal var hasPendingChanges: Bool {
         locked { hasPendingLocked }
     }
 
     /// True while the archive may not be let go: changes are waiting, a member is being
     /// written, or one is on its way under a temporary name.
-    var isBusy: Bool {
+    internal var isBusy: Bool {
         locked { isBusyLocked }
     }
 
@@ -2161,7 +2161,7 @@ final class OpenArchive: @unchecked Sendable {
     /// `progress` is asked between the members that are written and between the blocks that
     /// are sent to a server, with the bytes written so far and those expected; it may take
     /// its time (a job that is paused waits in it), and false ends the write like a cancel.
-    func flush(
+    internal func flush(
         leavingOutArrivals: Bool = false,
         cancellation: CancellationFlag? = nil,
         progress: (Int64, Int64) -> Bool = { _, _ in true }
@@ -2223,7 +2223,9 @@ final class OpenArchive: @unchecked Sendable {
     /// then the caller's to report: the delay does not report the same one again.
     ///
     /// `progress`: see `flush`; with it a commit that takes long can be shown, held and ended.
-    func commit(cancellation: CancellationFlag? = nil, progress: (Int64, Int64) -> Bool = { _, _ in true }) throws {
+    internal func commit(cancellation: CancellationFlag? = nil, progress: (Int64, Int64) -> Bool = { _, _ in true })
+        throws
+    {
         do {
             try flush(cancellation: cancellation, progress: progress)
         } catch {
@@ -2241,7 +2243,7 @@ final class OpenArchive: @unchecked Sendable {
     /// been written: for whoever rewrites the archive file itself (Pack). `body` gets a check
     /// to call right before it puts its new file in the archive's place, which throws when
     /// the file is no longer the one that was there when `body` began.
-    func whileHoldingFile<T>(
+    internal func whileHoldingFile<T>(
         cancellation: CancellationFlag?,
         _ body: (_ stillUnchanged: () throws -> Void) throws -> T
     ) throws -> T {
@@ -2682,7 +2684,7 @@ final class OpenArchive: @unchecked Sendable {
     /// are not saved: their job did not finish them, and its source is where it was.
     ///
     /// Waits for a write that is under way no longer than until `deadline`; then the data is kept as it is.
-    func rescue(quickly: Bool = false, before deadline: Date = .distantFuture) -> RescueOutcome {
+    internal func rescue(quickly: Bool = false, before deadline: Date = .distantFuture) -> RescueOutcome {
         let holdsGate = gate.lock(long: true, before: deadline)
         defer { if holdsGate { gate.unlock() } }
         let fresh = locked {
@@ -2742,7 +2744,7 @@ final class OpenArchive: @unchecked Sendable {
 
 extension ZipWriter {
     /// `copyMember`, ended early (with `ArchiveError.cancelled`) when the flag is set.
-    func copyMember(_ record: ZipRecord, cancellation: CancellationFlag?) throws -> UInt64 {
+    internal func copyMember(_ record: ZipRecord, cancellation: CancellationFlag?) throws -> UInt64 {
         try copyMember(record) { if cancellation?.isCancelled == true { throw ArchiveError.cancelled } }
     }
 }
@@ -2872,11 +2874,11 @@ private final class ZipMemberWriter: FileWriter, @unchecked Sendable {
 }
 
 /// The optional parts of a GZIP header: the original file name and time.
-struct GzipHeader {
-    var name: String?
-    var modified: Date?
+internal struct GzipHeader {
+    internal var name: String?
+    internal var modified: Date?
 
-    init?(_ data: Data) {
+    internal init?(_ data: Data) {
         let bytes = [UInt8](data)
         guard bytes.count >= 10, bytes[0] == 0x1F, bytes[1] == 0x8B else {
             return nil

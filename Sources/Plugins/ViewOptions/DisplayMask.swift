@@ -7,13 +7,13 @@ import Foundation
 /// The masks before the `|` say which files are shown, the ones after it which are left out; an
 /// exclusion that ends in a slash is about folders. Folders are shown unless such an exclusion
 /// names them. Pure, safe on any thread.
-struct DisplayMask: Sendable {
-    let text: String
+internal struct DisplayMask: Sendable {
+    internal let text: String
     private let includes: FileMask?
     private let excludes: FileMask?
     private let folderExcludes: FileMask?
 
-    init(_ text: String) {
+    internal init(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespaces)
         self.text = text
         let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
@@ -34,11 +34,11 @@ struct DisplayMask: Sendable {
     }
 
     /// True for `*.*`, `*` and nothing at all: every entry is shown, which is no filter.
-    var showsEverything: Bool {
+    internal var showsEverything: Bool {
         excludes == nil && folderExcludes == nil && (includes == nil || ["*", "*.*"].contains(text))
     }
 
-    func matches(_ item: FileItem) -> Bool {
+    internal func matches(_ item: FileItem) -> Bool {
         if item.isFolder {
             return !(folderExcludes?.matches(item.name) ?? false)
         }
@@ -46,7 +46,7 @@ struct DisplayMask: Sendable {
     }
 
     /// The filter for a panel; nil when the specification shows everything.
-    var filter: PanelFilter? {
+    internal var filter: PanelFilter? {
         showsEverything ? nil : PanelFilter(title: text) { [self] in matches($0) }
     }
 }

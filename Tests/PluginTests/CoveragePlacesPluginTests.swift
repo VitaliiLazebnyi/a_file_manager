@@ -11,18 +11,18 @@ import Testing
 /// Favorites, rows that lead nowhere, and settings that are not numbers.
 @MainActor
 @Suite
-struct CoveragePlacesPlugin {
-    let memory = MemoryFileSystem()
-    let settings = MemorySettings()
-    let plugin = PlacesPlugin(keepsTreesOnDisk: false, favorites: [.item("Desktop", command: "cd mem:/C")])
+internal struct CoveragePlacesPlugin {
+    internal let memory = MemoryFileSystem()
+    internal let settings = MemorySettings()
+    internal let plugin = PlacesPlugin(keepsTreesOnDisk: false, favorites: [.item("Desktop", command: "cd mem:/C")])
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt")
         memory.addFile("/B/two.txt")
         memory.addDirectory("/C")
     }
 
-    func bench(left: String = "/A") -> TestBench {
+    internal func bench(left: String = "/A") -> TestBench {
         TestBench(
             plugins: [plugin],
             fileSystems: [memory],
@@ -32,22 +32,22 @@ struct CoveragePlacesPlugin {
         )
     }
 
-    func pick(_ row: Int, button: Int = 0) -> ScriptedInteraction.FormAnswer {
+    internal func pick(_ row: Int, button: Int = 0) -> ScriptedInteraction.FormAnswer {
         .values(["row": .index(row)], button: button)
     }
 
-    func store(_ list: Hotlist) {
+    internal func store(_ list: Hotlist) {
         settings.scoped(to: "places").set(list, forKey: PlacesPlugin.Keys.hotlist)
     }
 
-    var hotlist: Hotlist {
+    internal var hotlist: Hotlist {
         settings.scoped(to: "places").value(Hotlist.self, forKey: PlacesPlugin.Keys.hotlist) ?? Hotlist()
     }
 
-    func informs(_ bench: TestBench) -> [String] { bench.interaction.log.filter { $0.hasPrefix("inform:") } }
+    internal func informs(_ bench: TestBench) -> [String] { bench.interaction.log.filter { $0.hasPrefix("inform:") } }
 
     @Test
-    func damagedStoredDataIsReportedOncePerMessage() async {
+    internal func damagedStoredDataIsReportedOncePerMessage() async {
         settings.set(Data("{broken".utf8) as Data?, forKey: "places.history.left")
         settings.set(Data("{broken".utf8) as Data?, forKey: "places.hotlist")
         let bench = bench()
@@ -65,7 +65,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func quittingWritesTheHistoryAndTheTreesAwayFromTheMainThread() async {
+    internal func quittingWritesTheHistoryAndTheTreesAwayFromTheMainThread() async {
         let bench = bench()
         bench.left.show(memory.url("/C"))
         bench.kernel.panelEvents.post(.locationChanged, from: bench.left)
@@ -78,7 +78,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func withoutSavingTheHistoryIsNotWrittenOnQuit() {
+    internal func withoutSavingTheHistoryIsNotWrittenOnQuit() {
         settings.set(false, forKey: PlacesPlugin.Keys.saveHistory)
         let bench = bench()
         bench.kernel.panelEvents.post(.locationChanged, from: bench.right)
@@ -87,7 +87,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func treesGoToTheProgramsOwnFolderByDefault() {
+    internal func treesGoToTheProgramsOwnFolderByDefault() {
         let plugin = PlacesPlugin()
         _ = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
         let file = plugin.treeCache.fileURL(for: memory.url("/"))
@@ -95,7 +95,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func aFullListTakesNoMoreAndSaysSo() {
+    internal func aFullListTakesNoMoreAndSaysSo() {
         store(Hotlist(entries: (0..<Hotlist.limit).map { .item("e\($0)", command: "cd mem:/e\($0)") }))
         let bench = bench()
         bench.commands.perform(.toggleHotlistEntry)
@@ -103,7 +103,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func theRootIsAddedUnderItsWholePath() {
+    internal func theRootIsAddedUnderItsWholePath() {
         let bench = bench(left: "/")
         bench.commands.perform(.toggleHotlistEntry)
         let path = bench.kernel.fileSystems.displayPath(memory.url("/"))
@@ -111,7 +111,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func cancelInTheFavoritesLeadsBackToTheList() {
+    internal func cancelInTheFavoritesLeadsBackToTheList() {
         let bench = bench()
         bench.interaction.formAnswers = [pick(0), .cancel, pick(1)]
         bench.commands.perform(.directoryHotlist)
@@ -125,7 +125,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func anEntryWithoutACommandOnlyMovesTheOtherPanel() {
+    internal func anEntryWithoutACommandOnlyMovesTheOtherPanel() {
         store(Hotlist(entries: [.item("Target only", command: "", target: "cd mem:/C")]))
         let bench = bench()
         bench.interaction.formAnswers = [pick(0)]
@@ -134,7 +134,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func theSeparatorOfTheHistoryLeadsNowhere() {
+    internal func theSeparatorOfTheHistoryLeadsNowhere() {
         let bench = bench()
         bench.interaction.formAnswers = [pick(1), .cancel]
         bench.commands.perform(.directoryHistory)
@@ -142,7 +142,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func aMaximumThatIsNoNumberTakesTheDefault() {
+    internal func aMaximumThatIsNoNumberTakesTheDefault() {
         settings.set("lots", forKey: PlacesPlugin.Keys.historyShown)
         let bench = bench()
         for path in ["/B", "/C", "/A"] {
@@ -162,7 +162,7 @@ struct CoveragePlacesPlugin {
     }
 
     @Test
-    func theTreeCommandOpensOneWindowAndReusesIt() {
+    internal func theTreeCommandOpensOneWindowAndReusesIt() {
         _ = NSApplication.shared
         let bench = bench()
         let presenter = StabilityPresenter()

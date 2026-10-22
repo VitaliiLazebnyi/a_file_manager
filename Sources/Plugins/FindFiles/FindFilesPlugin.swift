@@ -5,9 +5,9 @@ import AppKit
 extension CommandID {
     /// A further Find Files window that searches on its own, so several searches can run side
     /// by side (the spec's "separate process", 09 › Window and modes).
-    static let searchStandalone: CommandID = "cm_SearchStandalone"
+    internal static let searchStandalone: CommandID = "cm_SearchStandalone"
     /// Find Files starting in the folder under the cursor.
-    static let searchInCursorDirectory: CommandID = "cm_SearchForInCurDir"
+    internal static let searchInCursorDirectory: CommandID = "cm_SearchForInCurDir"
 }
 
 /// Find Files (spec 09 › Find Files).
@@ -107,7 +107,7 @@ public final class FindFilesPlugin: Plugin {
     }
 
     /// The one window of `cm_SearchFor`; it keeps its fields and results between uses.
-    func mainWindow(in kernel: Kernel) -> FindFilesWindowController {
+    internal func mainWindow(in kernel: Kernel) -> FindFilesWindowController {
         let controller = window ?? FindFilesWindowController(kernel: kernel)
         controller.present = present
         window = controller

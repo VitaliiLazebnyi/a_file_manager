@@ -8,21 +8,21 @@ import Testing
 /// Fixes found in review: the walk, special files, files seen twice, the name masks and numbers
 /// that used to trap.
 @Suite
-struct FindFilesFixes {
-    let fileSystems: FileSystemRegistry
+internal struct FindFilesFixes {
+    internal let fileSystems: FileSystemRegistry
 
-    init() {
+    internal init() {
         (fileSystems, _) = makeFileSystems()
     }
 
-    func find(_ query: SearchQuery) -> [String] {
+    internal func find(_ query: SearchQuery) -> [String] {
         var found: [String] = []
         FileSearch(query, fileSystems: fileSystems).run { found.append($0.url.path) }
         return found
     }
 
     /// Runs `work` on another thread and fails instead of hanging if it does not end.
-    func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
+    internal func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -33,7 +33,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func masksUseCharactersNotBytesOrBrackets() {
+    internal func masksUseCharactersNotBytesOrBrackets() {
         #expect(SearchMask("file[1].txt").matches("file[1].txt"))
         #expect(!SearchMask("file[1].txt").matches("file1.txt"))
         // Typed composed, named decomposed.
@@ -47,13 +47,13 @@ struct FindFilesFixes {
     }
 
     @Test
-    func aLongWildcardIsNotSlow() {
+    internal func aLongWildcardIsNotSlow() {
         let mask = SearchMask(String(repeating: "a*", count: 40) + "b")
         #expect(finishes { _ = mask.matches(String(repeating: "a", count: 5_000)) })
     }
 
     @Test
-    func textSearchSkipsPipesAndDevices() throws {
+    internal func textSearchSkipsPipesAndDevices() throws {
         let box = try Sandbox()
         try box.file("real.txt", "needle")
         #expect(mkfifo(box.url("pipe.txt").path, 0o644) == 0)
@@ -73,7 +73,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func duplicatesIgnorePipesHardLinksAndRepeatedRoots() throws {
+    internal func duplicatesIgnorePipesHardLinksAndRepeatedRoots() throws {
         let box = try Sandbox()
         try box.file("a/one.txt", "same bytes")
         try box.file("b/two.txt", "same bytes")
@@ -100,7 +100,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func overlappingStartDirectoriesAreSearchedOnce() throws {
+    internal func overlappingStartDirectoriesAreSearchedOnce() throws {
         let box = try Sandbox()
         try box.file("docs/a.txt")
         try box.file("docs/sub/b.txt")
@@ -118,7 +118,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func aFolderReachedBySymlinkedParentIsNotSearchedTwice() throws {
+    internal func aFolderReachedBySymlinkedParentIsNotSearchedTwice() throws {
         let box = try Sandbox()
         try box.file("real/x.txt")
         try FileManager.default.createSymbolicLink(at: box.url("alias"), withDestinationURL: box.url("real"))
@@ -128,7 +128,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func manyFoldersAreReportedInPathOrder() throws {
+    internal func manyFoldersAreReportedInPathOrder() throws {
         let box = try Sandbox()
         var expected: [String] = []
         for folder in 0..<40 {
@@ -155,7 +155,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func cancelledSearchEndsEarly() throws {
+    internal func cancelledSearchEndsEarly() throws {
         let box = try Sandbox()
         for folder in 0..<20 { try box.file("d\(folder)/f.txt", "needle") }
         let search = FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems)
@@ -167,7 +167,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func nameIsTestedBeforeTheCriteria() throws {
+    internal func nameIsTestedBeforeTheCriteria() throws {
         let box = try Sandbox()
         try box.file("keep.log", "12345")
         try box.file("skip.txt", "12345")
@@ -177,7 +177,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func absurdNumbersDoNotTrap() {
+    internal func absurdNumbersDoNotTrap() {
         for value in [1e20, -1e20, Double.nan, Double.infinity, 1e300] {
             for comparison in [SizeRule.Comparison.equal, .greater, .less] {
                 _ = SizeRule(comparison, value, .gigabytes).matches(1_000)
@@ -199,7 +199,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func preparedCriteriaAgreeWithTheDirectOnes() {
+    internal func preparedCriteriaAgreeWithTheDirectOnes() {
         let now = Date()
         var criteria = FileCriteria()
         criteria.notOlderThan = Age(3, .days)
@@ -221,7 +221,7 @@ struct FindFilesFixes {
     }
 
     @Test
-    func regexTextSearchReadsLinesInBlocks() {
+    internal func regexTextSearchReadsLinesInBlocks() {
         let pattern = try? TextPattern(
             "^beta$",
             caseSensitive: true,

@@ -15,7 +15,7 @@ import UniformTypeIdentifiers
 /// the limit on index builds, EUC-JP and GB 18030, printing, links, the pixel limit and a FIFO
 /// that takes the place of a file.
 @Suite
-struct Review2PluginsBP2Viewer {
+internal struct Review2PluginsBP2Viewer {
     private func document(
         _ data: Data,
         encoding: ViewerEncoding = .utf8,
@@ -42,7 +42,7 @@ struct Review2PluginsBP2Viewer {
     // MARK: East Asian width (V035)
 
     @Test
-    func theEastAsianWidthTableKnowsWideAndNarrowCharacters() {
+    internal func theEastAsianWidthTableKnowsWideAndNarrowCharacters() {
         for scalar: UInt32 in [
             0x1100, 0x3042, 0x4E00, 0xAC00, 0xFF21, 0xFFE0, 0x1F600, 0x20000, 0x2FFFD, 0x3000, 0x231A
         ] {
@@ -58,7 +58,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func wideCharactersTakeTwoColumnsInTheRows() throws {
+    internal func wideCharactersTakeTwoColumnsInTheRows() throws {
         let data = Data("日本語日本語日本語\n".utf8)
         // Six columns hold three wide characters.
         #expect(try rows(document(data, columns: 6)) == ["日本語", "日本語", "日本語"])
@@ -72,7 +72,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func characterOutsideTheBasicPlaneAreMeasuredAsOneCharacter() throws {
+    internal func characterOutsideTheBasicPlaneAreMeasuredAsOneCharacter() throws {
         // Emoji and U+20000 are wide; a mathematical letter is not.
         #expect(try rows(document(Data("😀😀😀\n".utf8), columns: 4)) == ["😀😀", "😀"])
         #expect(
@@ -91,7 +91,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func wideCharactersInUTF16AreCutLikeThoseInUTF8() throws {
+    internal func wideCharactersInUTF16AreCutLikeThoseInUTF8() throws {
         // Four units, eight columns: the raw scan of a short line must not take it for one row of six.
         let text = "日本語日\n"
         let data = try #require(text.data(using: .utf16LittleEndian))
@@ -101,7 +101,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func theFastScanAndTheDecodingScanAgreeOnWideText() throws {
+    internal func theFastScanAndTheDecodingScanAgreeOnWideText() throws {
         let pieces = ["a", "日", "😀", "\u{301}", "漢字", " ", "x", "é", "ｱ", "\t", "한", "𝐀"]
         var state: UInt64 = 0x1234_5678
         func next() -> Int {
@@ -165,7 +165,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func aSequentialScanDoesNotReadAGiantLineTwice() throws {
+    internal func aSequentialScanDoesNotReadAGiantLineTwice() throws {
         var data = Data(repeating: UInt8(ascii: "a"), count: 400_000)
         data.append(Data("\nsecond line\nthird\n".utf8))
         let source = CountingSource(DataByteSource(data))
@@ -185,7 +185,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func sequentialAndParallelScansGiveTheSameRowsWhateverTheLinesAndSegments() throws {
+    internal func sequentialAndParallelScansGiveTheSameRowsWhateverTheLinesAndSegments() throws {
         var state: UInt64 = 99
         func next() -> Int {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -259,7 +259,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func theGateRunsFewJobsAtOnceAndDropsWhatWasCancelledBeforeItsTurn() {
+    internal func theGateRunsFewJobsAtOnceAndDropsWhatWasCancelledBeforeItsTurn() {
         let gate = ViewerWorkGate(live: 2, stuck: 4)
         let latch = Latch()
         let flags = (1...5).map { _ in CancellationFlag() }
@@ -284,7 +284,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func whenTooManyCancelledJobsAreStuckANewOneIsRefused() {
+    internal func whenTooManyCancelledJobsAreStuckANewOneIsRefused() {
         let gate = ViewerWorkGate(live: 1, stuck: 2)
         let latch = Latch()
         var flags: [CancellationFlag] = []
@@ -317,7 +317,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func theSharedGateIsBoundedAndNeverBlocksItsCaller() {
+    internal func theSharedGateIsBoundedAndNeverBlocksItsCaller() {
         let gate = ViewerWorkGate.indexBuilds
         #expect(gate.live >= 2 && gate.live <= 4 && gate.stuck >= gate.live)
     }
@@ -336,7 +336,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func eucJPAndGB18030AreOffered() throws {
+    internal func eucJPAndGB18030AreOffered() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         #expect(euc.kind == .doubleByte && euc.shape == .eucJP && gb.kind == .doubleByte && gb.shape == .gb18030)
@@ -349,7 +349,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func eucJPTextIsDecodedWithItsOffsets() throws {
+    internal func eucJPTextIsDecodedWithItsOffsets() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let characters = ["日", "本", "語", "a", "ｱ", "ｲ", "テ", "キ", "ス", "ト", "、", " ", "b", "\n", "漢", "字"]
         let (data, starts) = try encode(characters, euc)
@@ -369,7 +369,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func gb18030TextIsDecodedWithItsOffsets() throws {
+    internal func gb18030TextIsDecodedWithItsOffsets() throws {
         let gb = try #require(ViewerEncoding.codePage(54_936))
         // Two-byte characters, ASCII, four-byte ones in and beyond the Basic Multilingual Plane.
         let characters = ["中", "文", "a", "1", "\u{80}", "\u{FFFF}", "\u{20000}", "😀", "€", "龙", "9", "\n", "b"]
@@ -391,7 +391,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func textDecodedInPiecesEqualsTextDecodedWhole() throws {
+    internal func textDecodedInPiecesEqualsTextDecodedWhole() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         let eucData =
@@ -428,7 +428,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func characterBoundariesAreExactInEUCJPAndGB18030() throws {
+    internal func characterBoundariesAreExactInEUCJPAndGB18030() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         // Long runs without a byte that stands by itself: the boundary cannot be guessed from the neighbours.
@@ -460,7 +460,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func aSearchInEUCJPAndGB18030FindsWholeCharactersWhateverTheChunkSize() throws {
+    internal func aSearchInEUCJPAndGB18030FindsWholeCharactersWhateverTheChunkSize() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         for (encoding, characters, needle) in [
@@ -505,7 +505,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func aTextDocumentInGB18030AndEUCJPShowsItsRows() throws {
+    internal func aTextDocumentInGB18030AndEUCJPShowsItsRows() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         let eucText = "日本語のテキスト\nｱｲｳ abc\n漢字\n"
@@ -520,7 +520,7 @@ struct Review2PluginsBP2Viewer {
     // MARK: Printing (the whole text, to a page limit)
 
     @Test
-    func printingCoversALongTextInFull() {
+    internal func printingCoversALongTextInFull() {
         // 40,000 lines of 50 bytes: 2 MB, which the old limit of 512 KB cut at a quarter.
         let line = String(repeating: "x", count: 49)
         let text = (1...40_000).map { _ in line }.joined(separator: "\n") + "\n"
@@ -539,7 +539,7 @@ struct Review2PluginsBP2Viewer {
 
     @MainActor
     @Test
-    func theTextForPrintingIsDrawnPageByPage() throws {
+    internal func theTextForPrintingIsDrawnPageByPage() throws {
         let lines = (1...130).map { "line \($0)" }
         let font = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
         let page = NSSize(width: 400, height: 300)
@@ -566,7 +566,7 @@ struct Review2PluginsBP2Viewer {
 
     @MainActor
     @Test
-    func onlyWebAndMailLinksAreOpenedFromRTFAndPDF() {
+    internal func onlyWebAndMailLinksAreOpenedFromRTFAndPDF() {
         let links = CoverageViewerLinks()
         let gate = LinkGate(opener: links)
         let textView = NSTextView()
@@ -596,7 +596,7 @@ struct Review2PluginsBP2Viewer {
 
     @MainActor
     @Test
-    func theRichViewsAreGivenTheGateAsTheirDelegate() {
+    internal func theRichViewsAreGivenTheGateAsTheirDelegate() {
         let (_, text) = RichViews.textView(NSAttributedString(string: "link"))
         #expect(text.delegate is LinkGate)
         #expect(RichViews.pdfView(PDFDocument()).delegate is LinkGate)
@@ -628,7 +628,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func anImageThatClaimsMorePixelsThanTheLimitIsNotDecoded() throws {
+    internal func anImageThatClaimsMorePixelsThanTheLimitIsNotDecoded() throws {
         let file = try png(64, 32)
         #expect(ImageDecoder.pixelLimit == 400_000_000)
         #expect(ImageDecoder.decode(file) != nil)
@@ -665,7 +665,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func aLinkWhoseTargetSizeIsKnownIsNotReadToMeasureIt() throws {
+    internal func aLinkWhoseTargetSizeIsKnownIsNotReadToMeasureIt() throws {
         let url = URL(string: "link:///current.log")!
         let entry = FileItem(
             url: url,
@@ -683,7 +683,7 @@ struct Review2PluginsBP2Viewer {
     // MARK: Closing at the end
 
     @Test
-    func theTemporaryCopiesAreDeletedInTheBackgroundWhenTheProgramQuits() {
+    internal func theTemporaryCopiesAreDeletedInTheBackgroundWhenTheProgramQuits() {
         let copies = TemporaryCopies()
         let memory = MemoryFileSystem()
         memory.addFile("/remote/clip.mov", String(repeating: "m", count: 5_000))
@@ -721,7 +721,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func aFileSwappedForAFIFOAfterItWasOpenedDoesNotHoldUpTheRead() throws {
+    internal func aFileSwappedForAFIFOAfterItWasOpenedDoesNotHoldUpTheRead() throws {
         let folder = try scratch()
         defer { try? FileManager.default.removeItem(at: folder) }
         let url = folder.appendingPathComponent("f.txt")
@@ -754,7 +754,7 @@ struct Review2PluginsBP2Viewer {
     }
 
     @Test
-    func aFIFOIsRefusedWhenOpeningAndWhenReadingDirectly() throws {
+    internal func aFIFOIsRefusedWhenOpeningAndWhenReadingDirectly() throws {
         let folder = try scratch()
         defer { try? FileManager.default.removeItem(at: folder) }
         let url = folder.appendingPathComponent("pipe")

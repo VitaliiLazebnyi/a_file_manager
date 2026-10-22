@@ -8,23 +8,23 @@ import Foundation
 /// costing the budget each.
 ///
 /// All state is guarded by `lock`.
-final class SelectionRegexTrip: @unchecked Sendable {
+internal final class SelectionRegexTrip: @unchecked Sendable {
     private let lock = NSLock()
     private var timeouts = 0
 
-    func recordTimeout() {
+    internal func recordTimeout() {
         lock.lock()
         timeouts += 1
         lock.unlock()
     }
 
-    var hasTimedOut: Bool {
+    internal var hasTimedOut: Bool {
         lock.lock()
         defer { lock.unlock() }
         return timeouts > 0
     }
 
-    var isTripped: Bool {
+    internal var isTripped: Bool {
         lock.lock()
         defer { lock.unlock() }
         return timeouts >= 3
@@ -36,11 +36,16 @@ final class SelectionRegexTrip: @unchecked Sendable {
 /// Such an expression can take time that grows with every character of the name (`<(a+)+$`), so it
 /// is never run with the plain `firstMatch`: the matching is stopped from the progress block of
 /// `enumerateMatches` once the budget has passed or the work was cancelled.
-enum SelectionRegex {
+internal enum SelectionRegex {
     /// What one name may take.
-    static let budget: TimeInterval = 0.25
+    internal static let budget: TimeInterval = 0.25
 
-    static func matches(_ regex: NSRegularExpression, _ name: String, trip: SelectionRegexTrip, cancelled: () -> Bool)
+    internal static func matches(
+        _ regex: NSRegularExpression,
+        _ name: String,
+        trip: SelectionRegexTrip,
+        cancelled: () -> Bool
+    )
         -> Bool
     {
         if trip.isTripped || cancelled() {

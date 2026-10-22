@@ -15,19 +15,19 @@ public final class ViewOptionsPlugin: Plugin {
 
     /// The display filters of the Show menu. `cm_SrcUserDef` takes the specification as its
     /// `.text` argument; without one it asks.
-    static let allFiles: CommandID = "cm_SrcAllFiles"
-    static let programs: CommandID = "cm_SrcExecs"
-    static let lastCustomFilter: CommandID = "cm_SrcUserSpec"
-    static let customFilter: CommandID = "cm_SrcUserDef"
-    static let onlySelected: CommandID = "cm_ShowOnlySelected"
+    internal static let allFiles: CommandID = "cm_SrcAllFiles"
+    internal static let programs: CommandID = "cm_SrcExecs"
+    internal static let lastCustomFilter: CommandID = "cm_SrcUserSpec"
+    internal static let customFilter: CommandID = "cm_SrcUserDef"
+    internal static let onlySelected: CommandID = "cm_ShowOnlySelected"
     /// The dialog that chooses the plugin columns of the source panel.
-    static let customColumns: CommandID = "cm_CustomColumnConfig"
+    internal static let customColumns: CommandID = "cm_CustomColumnConfig"
 
-    static let hiddenInBothPanelsKey = "viewOptions.hiddenInBothPanels"
-    static let programMasksKey = "viewOptions.programMasks"
-    static let columnsSwitchToFullKey = "viewOptions.columnsSwitchToFull"
-    static let lastMaskKey = "viewOptions.lastMask"
-    static let defaultProgramMasks = "*.app *.command *.sh *.workflow"
+    internal static let hiddenInBothPanelsKey = "viewOptions.hiddenInBothPanels"
+    internal static let programMasksKey = "viewOptions.programMasks"
+    internal static let columnsSwitchToFullKey = "viewOptions.columnsSwitchToFull"
+    internal static let lastMaskKey = "viewOptions.lastMask"
+    internal static let defaultProgramMasks = "*.app *.command *.sh *.workflow"
 
     /// Which of the Show menu's filters a tab has.
     private enum FilterKind {
@@ -50,10 +50,10 @@ public final class ViewOptionsPlugin: Plugin {
     /// thread.
     ///
     /// Tests put their own in, to say when each happens.
-    var background: @Sendable (@escaping @Sendable () -> Void) -> Void = {
+    internal var background: @Sendable (@escaping @Sendable () -> Void) -> Void = {
         DispatchQueue.global(qos: .userInitiated).async(execute: $0)
     }
-    var onMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { work in
+    internal var onMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { work in
         // The main queue runs its blocks on the main thread.
         DispatchQueue.main.async { MainActor.assumeIsolated { work() } }
     }
@@ -240,11 +240,11 @@ public final class ViewOptionsPlugin: Plugin {
     }
 
     /// Lists from this length on are filtered in the background.
-    static let backgroundFilterThreshold = 20_000
+    internal static let backgroundFilterThreshold = 20_000
     /// How often a result that the list outgrew (a folder that changes while the work is
     /// done) is worked out again in the background before the main thread does it: it is
     /// one pass on all cores, and the user gets the filter or the order they asked for.
-    static let staleTries = 3
+    internal static let staleTries = 3
     /// The number of the filter each panel was given last: a result that comes back for an
     /// older one is dropped.
     ///
@@ -330,7 +330,7 @@ public final class ViewOptionsPlugin: Plugin {
     /// files the user's masks name (the Windows list is `*.exe *.com *.bat`).
     ///
     /// Folders stay.
-    nonisolated static func isProgram(_ item: FileItem, masks: FileMask) -> Bool {
+    nonisolated internal static func isProgram(_ item: FileItem, masks: FileMask) -> Bool {
         if item.isFolder {
             return true
         }
@@ -343,7 +343,7 @@ public final class ViewOptionsPlugin: Plugin {
     // MARK: Sorting
 
     /// Lists from this length on are sorted in the background.
-    static let backgroundSortThreshold = 20_000
+    internal static let backgroundSortThreshold = 20_000
     /// The order each panel was last asked for and has not got yet.
     ///
     /// It stays the wish until it is met: every sort that goes stale starts again from the list as

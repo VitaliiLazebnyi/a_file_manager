@@ -10,8 +10,8 @@ import Foundation
 /// (`lstat`, `readlink`, `listxattr`, resource values) and keeps no state; the comment column
 /// goes through `CommentStore`, which guards its own. Columns that need the Mac's file system
 /// are empty for items elsewhere.
-enum PropertyColumns {
-    static func register(in columns: ColumnRegistry, comments: CommentStore) {
+internal enum PropertyColumns {
+    internal static func register(in columns: ColumnRegistry, comments: CommentStore) {
         @Sendable
         func local(_ item: FileItem, _ text: (LocalDetails) -> String) -> String {
             LocalInfo.details(item.url).map(text) ?? ""
@@ -78,26 +78,26 @@ enum PropertyColumns {
     }
 }
 
-enum PropertyText {
+internal enum PropertyText {
     /// A name as messages show it: line breaks, direction overrides and characters without
     /// width are written out (`<U+202E>`), so a name cannot make a message say something else.
-    static func shown(_ text: String) -> String {
+    internal static func shown(_ text: String) -> String {
         Format.displayName(text)
     }
 
     /// `755`; with set-user-ID, set-group-ID or sticky, four digits.
-    static func octal(_ mode: UInt16) -> String {
+    internal static func octal(_ mode: UInt16) -> String {
         let text = String(mode & 0o7777, radix: 8)
         return String(repeating: "0", count: max(0, 3 - text.count)) + text
     }
 
     /// `1,234 bytes (1.21 k)`.
-    static func size(_ bytes: Int64) -> String {
+    internal static func size(_ bytes: Int64) -> String {
         "\(Format.bytes(bytes)) bytes" + (bytes >= 1_024 ? " (\(Format.shortSize(bytes)))" : "")
     }
 
     /// "Sunday, October 11, 2026 at 1:19:22 AM", as a property sheet writes dates.
-    static func longDate(_ date: Date) -> String {
+    internal static func longDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .full
         formatter.timeStyle = .medium
@@ -106,11 +106,11 @@ enum PropertyText {
 }
 
 /// One line of the Properties dialog.
-struct PropertyRow: Equatable {
-    let label: String
-    let value: String
+internal struct PropertyRow: Equatable {
+    internal let label: String
+    internal let value: String
 
-    init(_ label: String, _ value: String) {
+    internal init(_ label: String, _ value: String) {
         self.label = label
         self.value = value
     }
@@ -121,17 +121,17 @@ struct PropertyRow: Equatable {
 ///
 /// **Threading.** Everything blocks on the file system and runs on a job's thread; a folder's
 /// contents are counted on all cores by `SpaceCalculator`.
-struct PropertySheet {
-    let fileSystems: FileSystemRegistry
-    let comments: CommentStore
-    var cancellation = CancellationFlag()
-    var meter: ProgressMeter?
+internal struct PropertySheet {
+    internal let fileSystems: FileSystemRegistry
+    internal let comments: CommentStore
+    internal var cancellation = CancellationFlag()
+    internal var meter: ProgressMeter?
 
     private var calculator: SpaceCalculator {
         SpaceCalculator(fileSystems: fileSystems, cancellation: cancellation, meter: meter)
     }
 
-    func rows(for item: FileItem) -> [PropertyRow] {
+    internal func rows(for item: FileItem) -> [PropertyRow] {
         let url = item.url
         let details = LocalInfo.details(url)
         let parent = url.deletingLastPathComponent()
@@ -194,7 +194,7 @@ struct PropertySheet {
     }
 
     /// The summary for several items: what they are and what they add up to.
-    func rows(forSeveral items: [FileItem]) -> [PropertyRow] {
+    internal func rows(forSeveral items: [FileItem]) -> [PropertyRow] {
         let totals = calculator.measure(items).reduce(SpaceTotals(), +)
         let isLocal = items.allSatisfy { $0.url.isFileURL }
         var rows = [
@@ -252,10 +252,10 @@ struct PropertySheet {
 
 /// The kinds of link Create Link makes (spec 07 › Create shortcut; a `.lnk` shortcut is a
 /// symbolic link or a Finder alias on the Mac).
-enum LinkKind: Int, CaseIterable {
+internal enum LinkKind: Int, CaseIterable {
     case symbolic, alias, hard
 
-    var title: String {
+    internal var title: String {
         switch self {
         case .symbolic:
             return "Symbolic link"
@@ -272,12 +272,12 @@ enum LinkKind: Int, CaseIterable {
 /// Creates links on the Mac's own file system.
 ///
 /// Blocks; for a job's thread.
-enum LinkMaker {
+internal enum LinkMaker {
     /// Creates a link at `destination` that leads to `source`.
     ///
     /// An existing item at the destination is never replaced. `relative` writes a symbolic link's
     /// target relative to the link's own folder, so the pair can be moved together.
-    static func create(_ kind: LinkKind, to source: URL, at destination: URL, relative: Bool) throws {
+    internal static func create(_ kind: LinkKind, to source: URL, at destination: URL, relative: Bool) throws {
         guard source.isFileURL, destination.isFileURL else { throw FileSystemError.notSupported("Creating links") }
         var existing = stat()
         if lstat(destination.path, &existing) == 0 { throw FileSystemError.alreadyExists(destination.path) }
@@ -301,7 +301,7 @@ enum LinkMaker {
     }
 
     /// The path that leads from `directory` to `target`: `../B/file.txt`.
-    static func relativePath(from directory: URL, to target: URL) -> String {
+    internal static func relativePath(from directory: URL, to target: URL) -> String {
         let from = directory.standardizedFileURL.pathComponents
         let to = target.standardizedFileURL.pathComponents
         var common = 0

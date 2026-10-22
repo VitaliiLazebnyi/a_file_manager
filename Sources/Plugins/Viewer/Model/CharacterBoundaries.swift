@@ -14,7 +14,7 @@ import Foundation
 /// `spacing` bytes is kept once found, so a search through a long run reads each part of it
 /// once. Safe to use from several threads: `known` is guarded by `lock`, and the rest is
 /// immutable.
-final class CharacterBoundaries: @unchecked Sendable {
+internal final class CharacterBoundaries: @unchecked Sendable {
     private let source: any ByteSource
     private let content: Range<Int64>
     private let table: CodeTable
@@ -24,7 +24,7 @@ final class CharacterBoundaries: @unchecked Sendable {
     private var known: [Int64: Int64] = [:]
     private let computing = NSLock()
 
-    init(source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, spacing: Int = 16 << 10) {
+    internal init(source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, spacing: Int = 16 << 10) {
         self.source = source
         self.content = content
         table = CodeTable.table(for: encoding)
@@ -33,7 +33,7 @@ final class CharacterBoundaries: @unchecked Sendable {
     }
 
     /// How many blocks have a boundary now (for tests).
-    var blockCount: Int {
+    internal var blockCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return known.count
@@ -52,7 +52,7 @@ final class CharacterBoundaries: @unchecked Sendable {
     ///
     /// A search that comes back to a block that was let go finds it again from the nearest one that
     /// is kept.
-    static let keptLimit = 1 << 16
+    internal static let keptLimit = 1 << 16
 
     private func remember(_ block: Int64, _ boundary: Int64) {
         lock.lock()
@@ -77,7 +77,7 @@ final class CharacterBoundaries: @unchecked Sendable {
     /// character begins there.
     ///
     /// Reads at most one block, plus what finding the block's boundary needs the first time.
-    func characterStart(atOrBefore offset: Int64, cancellation: CancellationFlag? = nil) throws -> Int64 {
+    internal func characterStart(atOrBefore offset: Int64, cancellation: CancellationFlag? = nil) throws -> Int64 {
         let offset = min(max(offset, content.lowerBound), content.upperBound)
         let block = (offset - content.lowerBound) / spacing
         let from = try boundary(ofBlock: block, cancellation)

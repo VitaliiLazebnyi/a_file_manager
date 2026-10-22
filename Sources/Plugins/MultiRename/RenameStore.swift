@@ -6,25 +6,25 @@ import Foundation
 ///
 /// Main thread only, like the settings store behind it.
 @MainActor
-final class RenameStore {
+internal final class RenameStore {
     /// The fields that keep a history.
-    enum History: String {
+    internal enum History: String {
         case nameMask = "history.nameMask"
         case search = "history.search"
         case replacement = "history.replacement"
     }
 
-    static let scope = "multirename"
-    static let historyLimit = 20
+    internal static let scope = "multirename"
+    internal static let historyLimit = 20
     /// The runs kept for Undo are saved up to this many renamed files in all, newest first; a
     /// run that alone is longer is kept in memory for this session only and is not saved (a
     /// hundred thousand names are tens of megabytes of settings, which the program would read
     /// at every start).
-    static let persistedItemLimit = 50_000
+    internal static let persistedItemLimit = 50_000
     /// The full keys of the preferences, as the configuration page stores them.
-    static let undoLimitKey = scope + ".undoHistoryLength"
-    static let startupSettingsKey = scope + ".loadSettings"
-    static let lowercaseWordsKey = scope + ".lowercaseWords"
+    internal static let undoLimitKey = scope + ".undoHistoryLength"
+    internal static let startupSettingsKey = scope + ".loadSettings"
+    internal static let lowercaseWordsKey = scope + ".lowercaseWords"
 
     /// What the stores made on one settings object share.
     ///
@@ -69,7 +69,7 @@ final class RenameStore {
     private let own: any SettingsStore
     private let memory: Memory
 
-    init(settings: any SettingsStore) {
+    internal init(settings: any SettingsStore) {
         all = settings
         own = settings.scoped(to: Self.scope)
         memory = Self.memory(for: settings)
@@ -78,21 +78,21 @@ final class RenameStore {
     // MARK: Preferences
 
     /// How many runs can be undone; 0 turns Undo off (`MultiRenameUndoHistoryLen`).
-    var undoLimit: Int {
+    internal var undoLimit: Int {
         max(0, Int(all.text(Self.undoLimitKey, default: "20").trimmingCharacters(in: .whitespaces)) ?? 20)
     }
 
     /// The saved settings the tool opens with; empty for the last used ones (`MultiRenameLoadSettings`).
-    var startupSettingsName: String { all.text(Self.startupSettingsKey, default: "") }
+    internal var startupSettingsName: String { all.text(Self.startupSettingsKey, default: "") }
 
-    var titleRule: TitleCaseRule {
+    internal var titleRule: TitleCaseRule {
         TitleCaseRule(setting: all.text(Self.lowercaseWordsKey, default: TitleCaseRule.defaultSetting))
     }
 
     // MARK: Saved settings
 
     /// Settings that cannot be read are left out; the others stay.
-    var saved: [String: RenameSettings] {
+    internal var saved: [String: RenameSettings] {
         get {
             if let known = memory.saved {
                 return known
@@ -109,15 +109,15 @@ final class RenameStore {
         }
     }
 
-    var savedNames: [String] { saved.keys.sorted { Sorter.compare($0, $1) == .orderedAscending } }
+    internal var savedNames: [String] { saved.keys.sorted { Sorter.compare($0, $1) == .orderedAscending } }
 
     /// Changes whenever a history or the saved settings change; a window that shows them
     /// need not rebuild them while it stays the same.
-    var revision: Int { memory.revision }
+    internal var revision: Int { memory.revision }
 
     // MARK: Histories
 
-    func history(_ history: History) -> [String] {
+    internal func history(_ history: History) -> [String] {
         if let known = memory.histories[history] {
             return known
         }
@@ -135,7 +135,7 @@ final class RenameStore {
     /// Puts a text at the top of a history.
     ///
     /// Leading and trailing spaces are kept: they matter in Search & Replace.
-    func remember(_ text: String, in history: History) {
+    internal func remember(_ text: String, in history: History) {
         guard !text.isEmpty else {
             return
         }
@@ -144,7 +144,7 @@ final class RenameStore {
         setHistory(Array(entries.prefix(Self.historyLimit)), history)
     }
 
-    func forget(_ text: String, in history: History) {
+    internal func forget(_ text: String, in history: History) {
         setHistory(self.history(history).filter { $0 != text }, history)
     }
 
@@ -153,7 +153,7 @@ final class RenameStore {
     /// The runs that can be undone, the latest last.
     ///
     /// Kept in the settings, so Undo works after the tool, and the program, were closed.
-    var undoHistory: [[RenamedItem]] {
+    internal var undoHistory: [[RenamedItem]] {
         get {
             if let known = memory.undo {
                 return known
@@ -172,7 +172,7 @@ final class RenameStore {
     }
 
     /// The number of runs that can be undone; cheap, unlike decoding them: it is kept beside them.
-    var undoCount: Int {
+    internal var undoCount: Int {
         if let loaded = memory.undo {
             return loaded.count
         }
@@ -183,13 +183,13 @@ final class RenameStore {
         return own.largeData(forKey: "undo") == nil ? 0 : 1
     }
 
-    var lastUndo: [RenamedItem]? { undoHistory.last }
+    internal var lastUndo: [RenamedItem]? { undoHistory.last }
 
     /// Brings the undo history into memory, decoding it off the main thread; `completion` runs
     /// on the main thread.
     ///
     /// Asking for the history before this has finished decodes it where it is asked.
-    func loadUndo(completion: @escaping @MainActor @Sendable () -> Void = {}) {
+    internal func loadUndo(completion: @escaping @MainActor @Sendable () -> Void = {}) {
         guard memory.undo == nil else {
             completion()
             return
@@ -206,7 +206,7 @@ final class RenameStore {
     }
 
     /// Adds a run as the newest, as far as Undo is on.
-    func appendUndo(_ run: [RenamedItem]) {
+    internal func appendUndo(_ run: [RenamedItem]) {
         guard undoLimit > 0 else {
             return
         }
@@ -216,7 +216,7 @@ final class RenameStore {
     }
 
     /// After an Undo: the newest run is replaced by what of it is still to be undone.
-    func replaceLastUndo(with remainder: [RenamedItem]) {
+    internal func replaceLastUndo(with remainder: [RenamedItem]) {
         var history = undoHistory
         if !history.isEmpty { history.removeLast() }
         if !remainder.isEmpty { history.append(remainder) }
@@ -262,7 +262,7 @@ final class RenameStore {
 
     /// Writes the undo history now, e.g. when the program ends before the background write
     /// has been handed in.
-    func flush() {
+    internal func flush() {
         guard let runs = memory.undo else {
             return
         }
@@ -275,8 +275,8 @@ final class RenameStore {
 
 /// Reads a list of names from a text file (spec 09 › Name-list menu): UTF-8 with or without
 /// a byte-order mark, UTF-16, or the Western code page; Windows or Unix line ends.
-enum RenameNameList {
-    static func text(from data: Data) -> String {
+internal enum RenameNameList {
+    internal static func text(from data: Data) -> String {
         if data.starts(with: [0xEF, 0xBB, 0xBF]) {
             return String(decoding: data.dropFirst(3), as: UTF8.self)
         }
@@ -294,7 +294,7 @@ enum RenameNameList {
     }
 
     /// One name per line; empty lines at the end do not count.
-    static func names(in text: String) -> [String] {
+    internal static func names(in text: String) -> [String] {
         var lines = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
             .split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         while lines.last?.isEmpty == true { lines.removeLast() }

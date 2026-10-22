@@ -16,20 +16,20 @@ import Testing
 /// short).
 @MainActor
 @Suite
-struct Review2PluginsBP2Tools {
-    let box: Sandbox
-    let registry = FileSystemRegistry()
+internal struct Review2PluginsBP2Tools {
+    internal let box: Sandbox
+    internal let registry = FileSystemRegistry()
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         registry.register(LocalFileSystem())
     }
 
-    func item(_ path: String) throws -> FileItem {
+    internal func item(_ path: String) throws -> FileItem {
         try #require(registry.item(at: box.url(path)))
     }
 
-    nonisolated func run() -> ToolRun {
+    nonisolated internal func run() -> ToolRun {
         ToolRun(
             fileSystems: registry,
             cancellation: CancellationFlag(),
@@ -39,12 +39,12 @@ struct Review2PluginsBP2Tools {
     }
 
     /// A reproducer the fuzzer left; nil where the tree has no `Tests/Fuzz`.
-    func reproducer(_ name: String) -> Data? {
+    internal func reproducer(_ name: String) -> Data? {
         let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         return try? Data(contentsOf: tests.appendingPathComponent("Fuzz/repro/tools/" + name))
     }
 
-    func waitOnMain(_ seconds: Double = Wait.ceiling, until condition: () -> Bool) async -> Bool {
+    internal func waitOnMain(_ seconds: Double = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline { try? await Task.sleep(nanoseconds: 3_000_000) }
         return condition()
@@ -53,7 +53,7 @@ struct Review2PluginsBP2Tools {
     // MARK: T050, BLAKE3 beside many files
 
     @Test
-    func blake3SpreadsOverTheCoresOnlyWhileCoresAreLeftOver() {
+    internal func blake3SpreadsOverTheCoresOnlyWhileCoresAreLeftOver() {
         #expect(
             ChecksumRun.spreadsBLAKE3(filesInProgress: 0, cores: 8)
                 && ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 8)
@@ -67,7 +67,7 @@ struct Review2PluginsBP2Tools {
     }
 
     @Test
-    func feedingBLAKE3InSmallPiecesGivesTheSameDigest() {
+    internal func feedingBLAKE3InSmallPiecesGivesTheSameDigest() {
         // The piece is smaller than what BLAKE3 spreads over threads (16 chunks of 1 KB).
         #expect(ChecksumRun.serialPiece < 16 * 1_024)
         for size in [0, 1, 1_023, 1_024, 8_191, 8_192, 8_193, 100_000, (1 << 20) + 7, 3 << 20] {
@@ -98,7 +98,7 @@ struct Review2PluginsBP2Tools {
 
     /// Off the main thread: making and hashing 40 files takes seconds, which other tests waited for when it ran there.
     @Test
-    nonisolated func manyFilesAreHashedToTheSameDigestsAsOneByOne() throws {
+    nonisolated internal func manyFilesAreHashedToTheSameDigestsAsOneByOne() throws {
         // More files than cores, and a few larger than the blocks BLAKE3 spreads.
         var files: [(url: URL, methods: [ChecksumMethod])] = []
         var expected: [[[UInt8]]] = []
@@ -125,7 +125,7 @@ struct Review2PluginsBP2Tools {
     // MARK: The reproducers of the fuzzer
 
     @Test
-    func theChecksumFileWithAnEmptyNameYieldsNoEntryWithoutAName() {
+    internal func theChecksumFileWithAnEmptyNameYieldsNoEntryWithoutAName() {
         guard let data = reproducer("checksum-empty-name.md5") else {
             return
         }
@@ -138,7 +138,7 @@ struct Review2PluginsBP2Tools {
     }
 
     @Test
-    func aStoredNameWithASlashAndACombiningMarkDoesNotLeadOutOfTheTargetFolder() throws {
+    internal func aStoredNameWithASlashAndACombiningMarkDoesNotLeadOutOfTheTargetFolder() throws {
         guard let data = reproducer("combine-containment-slash-combining-mark.crc") else {
             return
         }
@@ -159,7 +159,7 @@ struct Review2PluginsBP2Tools {
     }
 
     @Test
-    func aDecodedNameWithASlashAndACombiningMarkStaysInTheTargetFolder() throws {
+    internal func aDecodedNameWithASlashAndACombiningMarkStaysInTheTargetFolder() throws {
         guard let data = reproducer("decode-containment-slash-combining-mark.bin") else {
             return
         }
@@ -186,7 +186,7 @@ struct Review2PluginsBP2Tools {
     }
 
     @Test
-    func theLastWordOnADecodedNameIsTheKernelsCheck() {
+    internal func theLastWordOnADecodedNameIsTheKernelsCheck() {
         let folder = box.url("target")
         #expect(folder.appending(safeName: "a.txt")?.lastPathComponent == "a.txt")
         for bad in ["", ".", "..", "a/b", "a\0b"] { #expect(folder.appending(safeName: bad) == nil, "\(bad)") }
@@ -195,7 +195,7 @@ struct Review2PluginsBP2Tools {
     // MARK: T029, a compare that was superseded and then cancelled
 
     @Test
-    func aCancelledCompareOverEditedContentLeavesRowsThatMatchTheTexts() async throws {
+    internal func aCancelledCompareOverEditedContentLeavesRowsThatMatchTheTexts() async throws {
         let lines = (1...3_000).map { "line \($0)" }
         try box.file("A/big.txt", lines.joined(separator: "\n") + "\n")
         try box.file(
@@ -237,7 +237,7 @@ struct Review2PluginsBP2Tools {
     // MARK: T040, a listing the cancel cut short, with the flag unset when it began
 
     @Test
-    func aListingThatTheCancelEndsWhileItRunsIsNotAnEmptyFolder() {
+    internal func aListingThatTheCancelEndsWhileItRunsIsNotAnEmptyFolder() {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -273,7 +273,7 @@ struct Review2PluginsBP2Tools {
 
     // MARK: R024, the marks of a long selection
 
-    func benchOf(_ memory: MemoryFileSystem, plugins: [any Plugin] = []) -> TestBench {
+    internal func benchOf(_ memory: MemoryFileSystem, plugins: [any Plugin] = []) -> TestBench {
         TestBench(
             plugins: plugins,
             fileSystems: [LocalFileSystem(), memory],
@@ -284,7 +284,7 @@ struct Review2PluginsBP2Tools {
     }
 
     @Test
-    func theNamesToSynchronizeAreReadFromTheMarksOnly() async {
+    internal func theNamesToSynchronizeAreReadFromTheMarksOnly() async {
         let memory = MemoryFileSystem()
         for name in ["b.txt", "a.txt", "c.txt"] { memory.addFile("/A/" + name, name) }
         for name in ["z.txt", "a.txt"] { memory.addFile("/B/" + name, name) }
@@ -309,7 +309,7 @@ struct Review2PluginsBP2Tools {
     }
 
     @Test
-    func aSelectionReadInTheBackgroundIsDroppedWhenAnotherWindowIsOpened() async {
+    internal func aSelectionReadInTheBackgroundIsDroppedWhenAnotherWindowIsOpened() async {
         let memory = MemoryFileSystem()
         for name in ["a", "b", "c", "d"] { memory.addFile("/A/" + name, name) }
         memory.addDirectory("/B")
@@ -325,7 +325,7 @@ struct Review2PluginsBP2Tools {
     }
 
     @Test
-    func theFilesToCompareAreFoundWithoutLookingAtEveryMark() {
+    internal func theFilesToCompareAreFoundWithoutLookingAtEveryMark() {
         let memory = MemoryFileSystem()
         for number in 0..<3_000 { memory.addFile(String(format: "/A/f%04d.txt", number), "x") }
         memory.addDirectory("/A/dir")

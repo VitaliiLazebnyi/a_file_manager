@@ -8,15 +8,15 @@ import Foundation
 /// of the tags made for every one.
 ///
 /// What the fast one must give exactly.
-enum HTMLReference {
-    static let blockTags: Set<String> = [
+internal enum HTMLReference {
+    internal static let blockTags: Set<String> = [
         "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
         "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"
     ]
-    static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
+    internal static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
 
     @inline(__always)
-    static func referenceIsWhitespace(_ unit: UInt16) -> Bool {
+    internal static func referenceIsWhitespace(_ unit: UInt16) -> Bool {
         switch unit {
         case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000:
             return true
@@ -26,7 +26,7 @@ enum HTMLReference {
         }
     }
 
-    static func plainText(units html: [UInt16], linkBraces: Bool = true) -> HTMLText.Result? {
+    internal static func plainText(units html: [UInt16], linkBraces: Bool = true) -> HTMLText.Result? {
         var text: [UInt16] = []
         text.reserveCapacity(html.count / 2 + 16)
         var links: [String] = []

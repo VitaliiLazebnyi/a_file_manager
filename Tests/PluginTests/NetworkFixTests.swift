@@ -9,9 +9,9 @@ import Testing
 /// Names from a server are one path component, whatever the server says (a name with a slash
 /// would put a downloaded file outside the folder the user chose).
 @Suite
-struct NetworkFixNames {
+internal struct NetworkFixNames {
     @Test
-    func theSharedCheck() {
+    internal func theSharedCheck() {
         #expect(RemoteEntry.isSafeName("report.txt"))
         #expect(RemoteEntry.isSafeName("..."))
         #expect(RemoteEntry.isSafeName(".hidden"))
@@ -23,7 +23,7 @@ struct NetworkFixNames {
     }
 
     @Test
-    func mlsdAndMlstDropThem() {
+    internal func mlsdAndMlstDropThem() {
         #expect(FTPListParser.mlsd("type=file;size=1; ../../x.plist") == nil)
         #expect(FTPListParser.mlsd("type=file;size=1; sub/x") == nil)
         #expect(FTPListParser.mlsd("type=file;size=1; nul\0x") == nil)
@@ -34,7 +34,7 @@ struct NetworkFixNames {
     }
 
     @Test
-    func listDropsThemInEveryFormat() {
+    internal func listDropsThemInEveryFormat() {
         let unix = "-rw-r--r--   1 owner    group          12 Jan 31  2024 "
         #expect(FTPListParser.list(unix + "../../Library/x.plist") == nil)
         #expect(FTPListParser.list(unix + "a/b") == nil)
@@ -60,7 +60,7 @@ struct NetworkFixNames {
     }
 
     @Test(arguments: [true, false])
-    func aListingFromAServerKeepsOnlyTheSafeNames(mlsd: Bool) throws {
+    internal func aListingFromAServerKeepsOnlyTheSafeNames(mlsd: Bool) throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = mlsd
         options.injectedLines =
@@ -79,7 +79,7 @@ struct NetworkFixNames {
     }
 
     @Test
-    func theSFTPListingCheckIsTheSameFunction() {
+    internal func theSFTPListingCheckIsTheSameFunction() {
         // The SFTP loop filters with `RemoteEntry.isSafeName`; the system's server cannot
         // be made to send such a name, so the rule itself is what is tested above.
         #expect(!RemoteEntry.isSafeName("../x") && !RemoteEntry.isSafeName("a/b"))
@@ -88,9 +88,9 @@ struct NetworkFixNames {
 
 /// Addresses and prompts that carry secrets.
 @Suite
-struct NetworkFixSecrets {
+internal struct NetworkFixSecrets {
     @Test
-    func aPasswordIsNotRemembered() {
+    internal func aPasswordIsNotRemembered() {
         #expect(
             ServerAddress.removingPassword(from: "smb://alice:s3cret@files.example.com/share")
                 == "smb://alice@files.example.com/share"
@@ -113,7 +113,7 @@ struct NetworkFixSecrets {
     }
 
     @Test
-    func theStoredPasswordAnswersOnlyThisServersPrompt() {
+    internal func theStoredPasswordAnswersOnlyThisServersPrompt() {
         let profile = ConnectionProfile(
             key: ServerKey(scheme: "sftp", host: "Files.Example.com"),
             user: "alice",
@@ -143,7 +143,7 @@ struct NetworkFixSecrets {
 
 /// Text-mode conversion in blocks, against the plain byte-by-byte rule.
 @Suite
-struct NetworkFixLineEnds {
+internal struct NetworkFixLineEnds {
     private struct Reference {
         var pendingCR = false
         mutating func toLocal(_ data: Data) -> Data {
@@ -173,7 +173,7 @@ struct NetworkFixLineEnds {
     }
 
     @Test
-    func agreesWithTheByteByByteRule() {
+    internal func agreesWithTheByteByByteRule() {
         var generator = SystemRandomNumberGenerator()
         let alphabet: [UInt8] = [0x0D, 0x0A, 0x41, 0x0D, 0x0A, 0x20]
         for _ in 0..<300 {
@@ -214,13 +214,13 @@ struct NetworkFixLineEnds {
 
 /// The directory cache keeps up with what this program does, and the cost of a copy stays linear.
 @Suite
-struct NetworkFixCache {
+internal struct NetworkFixCache {
     private func lists(_ fixture: FTPFixture) -> Int {
         fixture.server.commands.filter { $0 == "LIST -la" || $0 == "LIST" }.count
     }
 
     @Test
-    func manyUploadsToAServerWithoutMLSTListTheFolderOnce() throws {
+    internal func manyUploadsToAServerWithoutMLSTListTheFolderOnce() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options)
@@ -246,7 +246,7 @@ struct NetworkFixCache {
     }
 
     @Test
-    func removingFromAListedFolderAsksNoQuestions() throws {
+    internal func removingFromAListedFolderAsksNoQuestions() throws {
         let fixture = try FTPFixture()
         for index in 0..<6 { try fixture.box.file("srv/d/f\(index).txt", "x") }
         try fixture.box.folder("srv/d/sub")
@@ -264,7 +264,7 @@ struct NetworkFixCache {
     }
 
     @Test
-    func aRenameIsEnteredIntoTheListings() throws {
+    internal func aRenameIsEnteredIntoTheListings() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options)
@@ -283,7 +283,7 @@ struct NetworkFixCache {
     }
 
     @Test
-    func aFolderMadeIsKnownAtOnce() throws {
+    internal func aFolderMadeIsKnownAtOnce() throws {
         let fixture = try FTPFixture()
         _ = try fixture.names("/")
         try fixture.fileSystem.createDirectory(at: fixture.url("/new"))
@@ -296,7 +296,7 @@ struct NetworkFixCache {
     }
 
     @Test
-    func anAbandonedUploadMakesTheFolderBeReadAgain() throws {
+    internal func anAbandonedUploadMakesTheFolderBeReadAgain() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options)
@@ -314,9 +314,9 @@ struct NetworkFixCache {
 
 /// The connections to an FTP server and what runs on them.
 @Suite
-struct NetworkFixConnections {
+internal struct NetworkFixConnections {
     @Test
-    func downloadsAndCopiesStayWithinTheConnectionLimit() throws {
+    internal func downloadsAndCopiesStayWithinTheConnectionLimit() throws {
         let fixture = try FTPFixture { $0.parallelConnections = 2 }
         let content = Data((0..<200_000).map { UInt8(truncatingIfNeeded: $0 &* 7) })
         for index in 0..<8 { try content.write(to: fixture.box.url("srv/f\(index).bin")) }
@@ -343,7 +343,7 @@ struct NetworkFixConnections {
     }
 
     @Test
-    func manyDownloadsAtOnceWaitForAFreeConnection() throws {
+    internal func manyDownloadsAtOnceWaitForAFreeConnection() throws {
         let fixture = try FTPFixture { $0.parallelConnections = 2 }
         let content = Data((0..<300_000).map { UInt8(truncatingIfNeeded: $0) })
         for index in 0..<10 { try content.write(to: fixture.box.url("srv/f\(index).bin")) }
@@ -361,7 +361,7 @@ struct NetworkFixConnections {
     }
 
     @Test
-    func aBusyServerIsAskedAgain() throws {
+    internal func aBusyServerIsAskedAgain() throws {
         let fixture = try FTPFixture { $0.parallelConnections = 3 }
         try fixture.box.file("srv/a.txt", "a")
         try fixture.box.file("srv/big.bin", String(repeating: "x", count: 100_000))
@@ -376,7 +376,7 @@ struct NetworkFixConnections {
     }
 
     @Test
-    func aCommandWhoseReplyIsLostIsNotRepeated() throws {
+    internal func aCommandWhoseReplyIsLostIsNotRepeated() throws {
         let fixture = try FTPFixture()
         _ = try fixture.names("/")
         let session = try fixture.center.session(for: fixture.key)
@@ -391,7 +391,7 @@ struct NetworkFixConnections {
     }
 
     @Test
-    func closingAReaderEndsAReadThatWaitsForTheServer() throws {
+    internal func closingAReaderEndsAReadThatWaitsForTheServer() throws {
         let fixture = try FTPFixture { $0.timeout = 600 }
         try fixture.box.file("srv/f.bin", String(repeating: "z", count: 1_000))
         fixture.server.options.stallRETR = true
@@ -423,7 +423,7 @@ struct NetworkFixConnections {
     }
 
     @Test
-    func aDataConnectionThatBreaksIsAnErrorNotAnEnd() throws {
+    internal func aDataConnectionThatBreaksIsAnErrorNotAnEnd() throws {
         let fixture = try FTPFixture()
         try Data(repeating: 7, count: 300_000).write(to: fixture.box.url("srv/f.bin"))
         fixture.server.options.resetRETRAfter = 100_000
@@ -431,7 +431,7 @@ struct NetworkFixConnections {
     }
 
     @Test
-    func theDataConnectionGoesToTheControlConnectionsAddress() throws {
+    internal func theDataConnectionGoesToTheControlConnectionsAddress() throws {
         let fixture = try FTPFixture()
         let stream = NetStream(host: "localhost", port: fixture.server.port)
         stream.start()
@@ -441,7 +441,7 @@ struct NetworkFixConnections {
     }
 
     @Test
-    func linkTargetsAreAskedOnceAndNotAgain() throws {
+    internal func linkTargetsAreAskedOnceAndNotAgain() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options)
@@ -470,15 +470,15 @@ struct NetworkFixConnections {
 }
 
 /// Collects strings from several threads.
-final class FailureBox: @unchecked Sendable {
+internal final class FailureBox: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String] = []
-    func add(_ value: String) {
+    internal func add(_ value: String) {
         lock.lock()
         values.append(value)
         lock.unlock()
     }
-    var all: [String] {
+    internal var all: [String] {
         lock.lock()
         defer { lock.unlock() }
         return values
@@ -487,9 +487,9 @@ final class FailureBox: @unchecked Sendable {
 
 /// TLS: the data connections must be protected, and a certificate must be good for an address.
 @Suite(.enabled(if: TLSServer.isAvailable))
-struct NetworkFixTLS {
+internal struct NetworkFixTLS {
     @Test
-    func aServerThatRefusesToProtectItsDataIsNotUsed() throws {
+    internal func aServerThatRefusesToProtectItsDataIsNotUsed() throws {
         let box = try Sandbox()
         try box.file("srv/hello.txt", "hello")
         let server = try TLSServer(mode: .explicit, box: box, refusesProtection: true)
@@ -555,7 +555,7 @@ struct NetworkFixTLS {
     }
 
     @Test
-    func anAddressMustBeAmongTheCertificatesAddresses() throws {
+    internal func anAddressMustBeAmongTheCertificatesAddresses() throws {
         let box = try Sandbox()
         let certificate = try certificate(altNames: "IP:127.0.0.1,DNS:named.example", in: box)
 

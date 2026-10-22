@@ -4,14 +4,14 @@ public import Foundation
 
 extension CommandID {
     /// Branch view of the selected folders only (spec 03 › Selected branch).
-    static let branchViewSelected: CommandID = "cm_DirBranchSel"
-    static let leftBranchView: CommandID = "cm_LeftDirBranch"
-    static let rightBranchView: CommandID = "cm_RightDirBranch"
-    static let leftBranchViewSelected: CommandID = "cm_LeftDirBranchSel"
-    static let rightBranchViewSelected: CommandID = "cm_RightDirBranchSel"
+    internal static let branchViewSelected: CommandID = "cm_DirBranchSel"
+    internal static let leftBranchView: CommandID = "cm_LeftDirBranch"
+    internal static let rightBranchView: CommandID = "cm_RightDirBranch"
+    internal static let leftBranchViewSelected: CommandID = "cm_LeftDirBranchSel"
+    internal static let rightBranchViewSelected: CommandID = "cm_RightDirBranchSel"
     /// `.location` or `.text`: a text file with one path per line, shown like a search result
     /// (spec 09 › Feed to listbox, `LOADLIST`); without, the user is asked for the file.
-    static let loadFileList: CommandID = "LOADLIST"
+    internal static let loadFileList: CommandID = "LOADLIST"
 }
 
 /// Branch view and file lists shown as folders (spec 03 › Branch view, 09 › Feed to listbox).
@@ -22,8 +22,8 @@ extension CommandID {
 /// the file system, on the panel's background threads.
 public final class VirtualFoldersPlugin: Plugin, FileListService {
     public let name = "VirtualFolders"
-    static let listsFoldersKey = "virtualFolders.listsFolders"
-    static let entersPackagesKey = "virtualFolders.entersPackages"
+    internal static let listsFoldersKey = "virtualFolders.listsFolders"
+    internal static let entersPackagesKey = "virtualFolders.entersPackages"
 
     /// The file system this plugin provides; nil until the plugin has started.
     public private(set) var fileSystem: VirtualFileSystem?
@@ -316,7 +316,7 @@ public enum FileListFile {
 
     /// The name a quoted line stands for; nil when the line is not quoted, or holds an escape
     /// that is none of ours (then it is an old, unquoted line).
-    static func unquoted(_ line: String) -> String? {
+    internal static func unquoted(_ line: String) -> String? {
         guard line.unicodeScalars.count >= 2, line.unicodeScalars.first == "\"", line.unicodeScalars.last == "\"" else {
             return nil
         }
@@ -446,7 +446,7 @@ public enum FileListFile {
 
     /// Whether a file named by a list file may be listed: a local file, or one on the very
     /// server (scheme, host, port) the list file itself was read from.
-    static func isTrusted(_ url: URL, listedIn file: URL) -> Bool {
+    internal static func isTrusted(_ url: URL, listedIn file: URL) -> Bool {
         if url.isFileURL {
             return true
         }

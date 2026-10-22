@@ -11,8 +11,8 @@ import Testing
 /// the planner's cost, Undo and the store.
 @MainActor
 @Suite
-struct MultiRenameFixes {
-    var context: RenameContext = {
+internal struct MultiRenameFixes {
+    internal var context: RenameContext = {
         var context = RenameContext()
         context.count = 3
         context.timeZone = TimeZone(identifier: "UTC") ?? .current
@@ -20,7 +20,7 @@ struct MultiRenameFixes {
         return context
     }()
 
-    func name(
+    internal func name(
         _ mask: String,
         ext: String = "[E]",
         subject: String = "a.txt",
@@ -37,7 +37,7 @@ struct MultiRenameFixes {
     // MARK: Masks
 
     @Test
-    func aTrailingDotBelongsToTheName() {
+    internal func aTrailingDotBelongsToTheName() {
         #expect(name("[N]", subject: "Acme Inc.") == "Acme Inc.")
         #expect(name("[N]-x", subject: "Acme Inc.") == "Acme Inc.-x")
         #expect(name("[E]", ext: "[E]", subject: "Acme Inc.") == "")
@@ -46,7 +46,7 @@ struct MultiRenameFixes {
     }
 
     @Test
-    func hugeCountersGiveTheErrorMarker() {
+    internal func hugeCountersGiveTheErrorMarker() {
         let big = CounterDefinition(start: Int.max - 1, step: 1, digits: 1)
         #expect(name("[C]", counter: big, index: 0) == "9223372036854775806.txt")
         #expect(name("[C]", counter: big, index: 5) == nil)
@@ -59,7 +59,7 @@ struct MultiRenameFixes {
     }
 
     @Test
-    func hugeWidthsAreCapped() {
+    internal func hugeWidthsAreCapped() {
         let counted = name("[C:999999999]")
         #expect(counted?.count == 255 + 4)
         #expect(name("[N01,999999999]", subject: "abc.txt")?.count == 255 + 4)
@@ -68,10 +68,10 @@ struct MultiRenameFixes {
 
     // MARK: Planner
 
-    func url(_ name: String, in folder: String = "/d") -> URL { URL(fileURLWithPath: folder + "/" + name) }
+    internal func url(_ name: String, in folder: String = "/d") -> URL { URL(fileURLWithPath: folder + "/" + name) }
 
     @Test
-    func autoRenameCountsOnInsteadOfStartingOver() {
+    internal func autoRenameCountsOnInsteadOfStartingOver() {
         let planner = RenamePlanner()
         let sources = (0..<2_000).map { url("s\($0).txt") }
         let targets = sources.map { _ in Optional(url("same.txt")) }
@@ -101,7 +101,7 @@ struct MultiRenameFixes {
     }
 
     @Test
-    func skippingFollowsTheChainOnce() {
+    internal func skippingFollowsTheChainOnce() {
         let planner = RenamePlanner()
         // 1 -> 2 -> 3 -> ... -> n, and n wants a file that is not in the list.
         let n = 3_000
@@ -123,7 +123,7 @@ struct MultiRenameFixes {
     }
 
     @Test
-    func caseIsFoldedPerFolder() {
+    internal func caseIsFoldedPerFolder() {
         let planner = RenamePlanner(foldedFolders: [url("x", in: "/mac").deletingLastPathComponent().locationKey])
         #expect(planner.key(url("Name.TXT", in: "/mac")) == planner.key(url("name.txt", in: "/mac")))
         #expect(planner.key(url("Name.TXT", in: "/linux")) != planner.key(url("name.txt", in: "/linux")))
@@ -135,7 +135,7 @@ struct MultiRenameFixes {
     }
 
     @Test
-    func aReplacingMoveNeverOverwritesAnotherFile() throws {
+    internal func aReplacingMoveNeverOverwritesAnotherFile() throws {
         let box = try Sandbox()
         try box.file("a.txt", "first")
         try box.file("b.txt", "second")
@@ -159,7 +159,7 @@ struct MultiRenameFixes {
 
     @MainActor
     @Test
-    func itemsNamedByPathAreRenamedWhereTheyAre() throws {
+    internal func itemsNamedByPathAreRenamedWhereTheyAre() throws {
         let box = try Sandbox()
         try box.file("sub/a.txt", "a")
         try box.file("sub/deep/b.txt", "b")
@@ -206,7 +206,7 @@ struct MultiRenameFixes {
     // MARK: Cache
 
     @Test
-    func aCachedPreviewGivesTheSameAnswer() throws {
+    internal func aCachedPreviewGivesTheSameAnswer() throws {
         let box = try Sandbox()
         for name in ["a.txt", "b.txt", "c.txt"] { try box.file(name) }
         let registry = FileSystemRegistry()
@@ -254,7 +254,7 @@ struct MultiRenameFixes {
 
     @MainActor
     @Test
-    func undoHistoryLivesInMemoryAndIsSaved() {
+    internal func undoHistoryLivesInMemoryAndIsSaved() {
         let settings = MemorySettings()
         let store = RenameStore(settings: settings)
         let run = (0..<5_000)
@@ -279,7 +279,7 @@ struct MultiRenameFixes {
     }
 
     @Test
-    func persistedUndoIsCapped() async {
+    internal func persistedUndoIsCapped() async {
         let settings = MemorySettings()
         let store = await MainActor.run { RenameStore(settings: settings) }
         let big = (0..<(RenameStore.persistedItemLimit - 10))
@@ -299,14 +299,14 @@ struct MultiRenameFixes {
 /// Undo that cannot finish, and sorting, through a session on a file system in memory.
 @MainActor
 @Suite
-struct MultiRenameFixSessions {
-    let memory = MemoryFileSystem()
-    let settings = MemorySettings()
-    let plugin: MultiRenamePlugin
-    let bench: TestBench
-    let box: Sandbox
+internal struct MultiRenameFixSessions {
+    internal let memory = MemoryFileSystem()
+    internal let settings = MemorySettings()
+    internal let plugin: MultiRenamePlugin
+    internal let bench: TestBench
+    internal let box: Sandbox
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         for name in ["b.txt", "a.jpg", "c.txt", "a.txt"] { memory.addFile("/d/" + name, name) }
         memory.addDirectory("/other")
@@ -320,7 +320,7 @@ struct MultiRenameFixSessions {
         )
     }
 
-    func open(_ pattern: String) -> MultiRenameSession {
+    internal func open(_ pattern: String) -> MultiRenameSession {
         bench.left.model.clearSelection()
         bench.left.model.select(mask: pattern)
         #expect(bench.commands.perform(.multiRename))
@@ -328,7 +328,7 @@ struct MultiRenameFixSessions {
     }
 
     @Test
-    func sortingByExtensionKeepsEqualItemsInOrder() {
+    internal func sortingByExtensionKeepsEqualItemsInOrder() {
         let session = open("*")
         session.sort(by: .ext, ascending: true)
         #expect(session.rows.map(\.entry.name) == ["a.jpg", "a.txt", "b.txt", "c.txt"])
@@ -339,7 +339,7 @@ struct MultiRenameFixSessions {
     }
 
     @Test
-    func aRunThatCanNeverBeUndoneDoesNotBlockEarlierOnes() {
+    internal func aRunThatCanNeverBeUndoneDoesNotBlockEarlierOnes() {
         var session = open("a.*")
         session.settings.nameMask = "first[C]"
         session.start()

@@ -3,12 +3,12 @@ import Foundation
 
 /// What a mask is asked about: one entry of a list, with the folders that lead to it from the
 /// directory the list belongs to (empty for an entry of that directory itself).
-struct MaskEntry {
-    let name: String
-    let isFolder: Bool
-    let directory: [String]
+internal struct MaskEntry {
+    internal let name: String
+    internal let isFolder: Bool
+    internal let directory: [String]
 
-    init(name: String, isFolder: Bool = false, directory: [String] = []) {
+    internal init(name: String, isFolder: Bool = false, directory: [String] = []) {
         self.name = name
         self.isFolder = isFolder
         self.directory = directory
@@ -24,7 +24,7 @@ struct MaskEntry {
 /// Names are compared without regard to case.
 ///
 /// A value type without shared state: it may be used from any thread.
-struct SelectionMask {
+internal struct SelectionMask {
     /// One mask: an optional chain of folder patterns and the pattern of the name itself.
     private struct Token {
         /// Patterns of the folders leading to the entry; `**` stands for any number of levels.
@@ -113,7 +113,7 @@ struct SelectionMask {
         }
     }
 
-    let text: String
+    internal let text: String
     private var includes: [Token] = []
     private var excludes: [Token] = []
     private var expression: NSRegularExpression?
@@ -123,9 +123,9 @@ struct SelectionMask {
     /// the file that belongs to it.
     private var related: String?
     /// False for a regular expression that cannot be read; such a mask matches nothing.
-    private(set) var isValid = true
+    internal private(set) var isValid = true
 
-    init(_ text: String) {
+    internal init(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespaces)
         self.text = text
         if text.hasPrefix("<") {
@@ -141,24 +141,24 @@ struct SelectionMask {
     }
 
     /// Whether the folders leading to an entry matter; when not, callers need not work them out.
-    var needsDirectories: Bool {
+    internal var needsDirectories: Bool {
         related != nil || includes.contains(where: \.usesPath) || excludes.contains(where: \.usesPath)
     }
 
     /// Whether the mask is a regular expression, which can take any time on a name.
-    var isRegex: Bool { expression != nil }
+    internal var isRegex: Bool { expression != nil }
 
     /// Whether the mask takes the files that belong to the matching ones (`A>B`): its answer
     /// for an entry then depends on the other entries of the list.
-    var pairsRelatedFiles: Bool { related != nil }
+    internal var pairsRelatedFiles: Bool { related != nil }
 
     /// Whether a regular expression of the mask ran out of time on some name: those were taken
     /// as not matching, and the mask's answer is not to be trusted.
-    var timedOut: Bool { trip.hasTimedOut }
+    internal var timedOut: Bool { trip.hasTimedOut }
 
     /// Whether the entry matches the mask itself; related files (`A>B`) are found by `selected`.
     /// `cancelled` ends a regular expression that is still working.
-    func matches(_ entry: MaskEntry, cancelled: () -> Bool = { false }) -> Bool {
+    internal func matches(_ entry: MaskEntry, cancelled: () -> Bool = { false }) -> Bool {
         if let expression {
             return SelectionRegex.matches(expression, entry.name, trip: trip, cancelled: cancelled)
         }
@@ -195,13 +195,13 @@ struct SelectionMask {
         } ?? nil
     }
 
-    func matches(_ name: String, isFolder: Bool = false) -> Bool {
+    internal func matches(_ name: String, isFolder: Bool = false) -> Bool {
         matches(MaskEntry(name: name, isFolder: isFolder))
     }
 
     /// For every entry, whether the mask selects it: the entries that match, and with `A>B`
     /// the entries of the same folder whose names derive from them.
-    func selected(_ entries: [MaskEntry], cancelled: () -> Bool = { false }) -> [Bool] {
+    internal func selected(_ entries: [MaskEntry], cancelled: () -> Bool = { false }) -> [Bool] {
         var result: [Bool] = []
         result.reserveCapacity(entries.count)
         for entry in entries {
@@ -259,10 +259,10 @@ struct SelectionMask {
 }
 
 /// `*` and `?` matching as file masks use it (spec 18 › Core syntax).
-enum Wildcard {
+internal enum Wildcard {
     /// Both sides are expected in lower case. `*.*` matches every name, `name.*` and `name.`
     /// also match `name` without an extension, as they do under DOS.
-    static func matches(_ pattern: [Character], _ name: [Character]) -> Bool {
+    internal static func matches(_ pattern: [Character], _ name: [Character]) -> Bool {
         let (whole, wholeName) = (pattern[pattern.indices], name[name.indices])
         if glob(whole, wholeName) {
             return true
@@ -280,7 +280,7 @@ enum Wildcard {
     }
 
     /// The same for a plain ASCII pattern in lower case and a plain ASCII name (of any case).
-    static func matches(ascii pattern: [UInt8], _ name: UnsafeBufferPointer<UInt8>) -> Bool {
+    internal static func matches(ascii pattern: [UInt8], _ name: UnsafeBufferPointer<UInt8>) -> Bool {
         if glob(pattern[pattern.indices], name) {
             return true
         }
@@ -351,7 +351,7 @@ enum Wildcard {
     /// Applies a rename mask to a name, part by part (name and extension): a letter replaces
     /// the letter at its place, `?` keeps it and `*` keeps the rest. `*.cr2` turns
     /// `IMG_1057.JPG` into `IMG_1057.cr2`, `crw*.cr2` into `crw_1057.cr2`, `*.` into `IMG_1057`.
-    static func rename(_ name: String, with mask: String) -> String {
+    internal static func rename(_ name: String, with mask: String) -> String {
         func apply(_ mask: String, to source: String) -> String {
             let source = Array(source)
             var result = ""

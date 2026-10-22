@@ -7,20 +7,21 @@ import AppKit
 /// It only holds controls: `settings` reads them out as a `SearchSettings` and writes one back, and
 /// that is all the rest of the window knows of them. Main thread only.
 @MainActor
-final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
-    let tabView = NSTabView()
-    let searchForField = NSComboBox()
+internal final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+    internal let tabView = NSTabView()
+    internal let searchForField = NSComboBox()
     /// Enter in one of the text fields.
-    var onSubmit: (() -> Void)?
+    internal var onSubmit: (() -> Void)?
     /// Shows an open panel as a sheet of the window and hands on the button and the locations
     /// chosen.
     ///
     /// The program shows the real panel; a test answers in its place.
-    var presentOpenPanel: (NSOpenPanel, NSWindow, @escaping (NSApplication.ModalResponse, [URL]) -> Void) -> Void = {
-        panel,
-        window,
-        done in panel.beginSheetModal(for: window) { done($0, panel.urls) }
-    }
+    internal var presentOpenPanel:
+        (NSOpenPanel, NSWindow, @escaping (NSApplication.ModalResponse, [URL]) -> Void) -> Void = {
+            panel,
+            window,
+            done in panel.beginSheetModal(for: window) { done($0, panel.urls) }
+        }
 
     private let fields: [SearchField]
     private let store: SearchStore
@@ -30,7 +31,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     private let searchInField = NSComboBox()
     /// What the program put into "Search in" last (the panel's folder, a saved search): a
     /// field that says something else was typed, or picked, by the user.
-    private(set) var placedSearchIn: String?
+    internal private(set) var placedSearchIn: String?
     private let namesRegexBox = SearchForm.box("RegEx")
     private let selectedBox = SearchForm.box("Only search in selected directories/files")
     private let archivesBox = SearchForm.box("Search archives")
@@ -96,7 +97,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         NSButton(checkboxWithTitle: title, target: nil, action: nil)
     }
 
-    init(fields: [SearchField], store: SearchStore, ui: any UserInteraction) {
+    internal init(fields: [SearchField], store: SearchStore, ui: any UserInteraction) {
         self.fields = fields
         self.store = store
         self.ui = ui
@@ -323,14 +324,14 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     }
 
     /// Whether the panel has marked items, which "Only search in selected" needs.
-    func setSelectionAvailable(_ available: Bool) {
+    internal func setSelectionAvailable(_ available: Bool) {
         selectedBox.isEnabled = available
         if !available { selectedBox.state = .off }
     }
 
     // MARK: Values
 
-    var settings: SearchSettings {
+    internal var settings: SearchSettings {
         get {
             func isOn(_ box: NSButton) -> Bool { box.state == .on }
             func tri(_ box: NSButton) -> TriState {
@@ -476,7 +477,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     }
 
     /// Adds what the fields hold to their histories (spec 09 › "Search for").
-    func rememberHistory(limit: Int) {
+    internal func rememberHistory(limit: Int) {
         store.remember(searchForField.stringValue, in: .searchFor, limit: limit)
         store.remember(searchInField.stringValue, in: .searchIn, limit: limit)
         if findTextBox.state == .on { store.remember(textField.stringValue, in: .text, limit: limit) }
@@ -561,9 +562,9 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         reloadSaved()
     }
 
-    func numberOfRows(in _: NSTableView) -> Int { saved.count }
+    internal func numberOfRows(in _: NSTableView) -> Int { saved.count }
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    internal func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let identifier = tableColumn?.identifier ?? NSUserInterfaceItemIdentifier("name")
         let cell =
             tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
@@ -577,7 +578,7 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         return cell
     }
 
-    func tableViewSelectionDidChange(_: Notification) {
+    internal func tableViewSelectionDidChange(_: Notification) {
         updateEnabled()
     }
 }

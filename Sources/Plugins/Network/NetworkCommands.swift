@@ -10,7 +10,7 @@ import Foundation
 /// background queue; the questions connections ask in the middle (a password, a certificate)
 /// come back to the main thread through `Kernel.askUser`.
 @MainActor
-final class NetworkCommands {
+internal final class NetworkCommands {
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let center: ConnectionCenter
@@ -20,7 +20,7 @@ final class NetworkCommands {
     private var lastLocal: [ObjectIdentifier: URL] = [:]
     private var panelSubscription: AnyObject?
 
-    init(kernel: Kernel, center: ConnectionCenter, store: ConnectionStore, mounter: any VolumeMounter?) {
+    internal init(kernel: Kernel, center: ConnectionCenter, store: ConnectionStore, mounter: any VolumeMounter?) {
         self.kernel = kernel
         self.center = center
         self.store = store
@@ -35,7 +35,7 @@ final class NetworkCommands {
 
     private var ui: any UserInteraction { kernel.interaction }
     private var source: any PanelHandle { kernel.panels.source }
-    var canEject: Bool { mounter != nil }
+    internal var canEject: Bool { mounter != nil }
 
     // MARK: Questions asked by connections
 
@@ -47,7 +47,7 @@ final class NetworkCommands {
     ///
     /// The questions handed to `askUser` are marked `@Sendable`: they hold only values that are
     /// safe on any thread, and without the mark the compiler cannot check them.
-    func connectQuestions() {
+    internal func connectQuestions() {
         // The questions are kept by the environment, which the kernel keeps through the plugin:
         // they must keep neither. A connection may still ask when the kernel has gone (a test
         // that ended): weak, and the question is refused then.
@@ -254,7 +254,7 @@ final class NetworkCommands {
     /// Opens the connection in the source panel (spec 11 › Connecting).
     ///
     /// The login runs as a job with a Cancel button; the panel follows when it succeeded.
-    func connect(
+    internal func connect(
         _ profile: ConnectionProfile,
         path: String? = nil,
         localDirectory: String? = nil,
@@ -308,7 +308,7 @@ final class NetworkCommands {
     }
 
     /// `FTPOPEN session` and `FTPOPEN session|/subdir`.
-    func open(saved text: String) {
+    internal func open(saved text: String) {
         let parts = text.split(separator: "|", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
         guard let name = parts.first, let connection = store.connection(named: name) else {
             ui.inform("There is no saved connection named \(text).", detail: "", style: .warning)
@@ -320,7 +320,7 @@ final class NetworkCommands {
     }
 
     /// Ctrl+N: quick connect by host or URL (spec 11 › Quick connect).
-    func quickConnect() {
+    internal func quickConnect() {
         let history = store.history
         var fields: [FormField] = [.text("address", "Connect to (host or URL):", history.first ?? "")]
         if history.count > 1 { fields.append(.choice("recent", "Recent:", ["—"] + history)) }
@@ -363,7 +363,7 @@ final class NetworkCommands {
     // MARK: The list of saved connections
 
     /// Ctrl+F: the saved connections (spec 11 › "Connect to ftp server" dialog).
-    func showConnections() {
+    internal func showConnections() {
         var selected = store.connections.firstIndex { $0.id == store.lastUsed } ?? 0
         dialog: while true {
             let connections = store.connections
@@ -435,7 +435,7 @@ final class NetworkCommands {
     /// empty (the one a quick connection was made with); `passwordOf` names the connection
     /// whose stored password this one takes over (the original of a copy).
     @discardableResult
-    func edit(
+    internal func edit(
         _ original: SavedConnection,
         isNew: Bool,
         offered: String? = nil,
@@ -538,7 +538,7 @@ final class NetworkCommands {
     /// Ctrl+Shift+F (spec 11 › Disconnecting): closes the connection of the source panel, or
     /// of the other panel, or the one the user picks, and returns the panels that showed it to
     /// the local folder they came from.
-    func disconnect() {
+    internal func disconnect() {
         let connected = center.connected
         guard !connected.isEmpty else {
             return
@@ -603,7 +603,7 @@ final class NetworkCommands {
 
     // MARK: Options of the session
 
-    func toggleHiddenFiles() {
+    internal func toggleHiddenFiles() {
         if kernel.commands[.showHidden] != nil {
             kernel.commands.perform(.showHidden)
         } else {
@@ -613,7 +613,7 @@ final class NetworkCommands {
     }
 
     /// Ctrl+Shift+M (spec 11 › Transfer modes).
-    func selectTransferMode() {
+    internal func selectTransferMode() {
         let current = kernel.settings.index(NetworkSettings.transferMode, default: 0)
         guard
             let answer = ui.form(
@@ -651,7 +651,7 @@ final class NetworkCommands {
     ///
     /// A list is a small text; a file that is no plain file, or larger than
     /// `DownloadList.largestFile`, is not read.
-    nonisolated static func readList(_ list: URL) throws -> String {
+    nonisolated internal static func readList(_ list: URL) throws -> String {
         let values = try list.resourceValues(forKeys: [.isRegularFileKey])
         guard values.isRegularFile == true else { throw VolumeError(message: "\(list.path) is not a file.") }
         let limit = DownloadList.largestFile
@@ -673,7 +673,7 @@ final class NetworkCommands {
     ///
     /// The lines are made in the job, not here: with very many files that is work the main thread
     /// must not do.
-    func addToDownloadList() {
+    internal func addToDownloadList() {
         let items = source.model.operands()
         guard !items.isEmpty, let list = askForList("File name of download list:") else {
             return
@@ -738,7 +738,7 @@ final class NetworkCommands {
     ///
     /// A list file may come from anybody and says what is copied where, so nothing runs
     /// before the user has seen what the list would do and agreed (`ListPlan.preview`).
-    func downloadFromList() {
+    internal func downloadFromList() {
         guard let list = askForList("File name of download list:") else {
             return
         }
@@ -789,7 +789,7 @@ final class NetworkCommands {
     /// Connect to Server (spec 11 › Map a network drive, adapted): an address of a file server
     /// is mounted by the system and shown in the source panel; an FTP or SFTP address opens a
     /// connection of this program.
-    func connectToServer(_ given: String?) {
+    internal func connectToServer(_ given: String?) {
         // An address stored by an older version may still carry a password; it is not shown again.
         let proposal = ServerAddress.removingPassword(
             from: kernel.settings.text(NetworkSettings.lastServer, default: "smb://")
@@ -856,7 +856,7 @@ final class NetworkCommands {
     }
 
     /// Ejects the volume the source panel shows; the panels leave it first.
-    func ejectVolume() {
+    internal func ejectVolume() {
         guard let mounter, let volume = ServerSchemes.mountedVolume(of: source.model.directory) else {
             return
         }
@@ -890,27 +890,27 @@ final class NetworkCommands {
 /// between two locations, and the lines that are not carried out.
 ///
 /// Main thread; it only reads text (no server and no disk is asked).
-struct ListPlan {
-    enum Kind { case download, copy, move }
+internal struct ListPlan {
+    internal enum Kind { case download, copy, move }
 
-    struct Step {
-        let kind: Kind
-        let from: URL
-        let to: URL
+    internal struct Step {
+        internal let kind: Kind
+        internal let from: URL
+        internal let to: URL
         /// As the user is shown it.
-        let text: String
+        internal let text: String
     }
 
-    enum Item {
+    internal enum Item {
         case transfer(Step)
         case pause(TimeInterval)
     }
 
-    private(set) var items: [Item] = []
+    internal private(set) var items: [Item] = []
     /// The lines that are not carried out, each with the reason.
-    private(set) var skipped: [String] = []
+    internal private(set) var skipped: [String] = []
 
-    var steps: [Step] {
+    internal var steps: [Step] {
         items.compactMap { item in
             if case .transfer(let step) = item {
                 return step
@@ -921,9 +921,9 @@ struct ListPlan {
 
     /// True when a line sends away, moves or copies a file that is on this Mac: more than a
     /// download list is expected to do.
-    var touchesLocalFiles: Bool { steps.contains { $0.kind != .download } }
+    internal var touchesLocalFiles: Bool { steps.contains { $0.kind != .download } }
 
-    init(actions: [DownloadList.Action], base: URL, fileSystems: FileSystemRegistry) {
+    internal init(actions: [DownloadList.Action], base: URL, fileSystems: FileSystemRegistry) {
         for action in actions {
             let (kind, source, target): (Kind, String, String?)
             switch action {
@@ -975,9 +975,9 @@ struct ListPlan {
     }
 
     /// At most this many lines are shown in a message; a list may have a hundred thousand.
-    static let shownLines = 20
+    internal static let shownLines = 20
 
-    static func shortened(_ lines: [String]) -> String {
+    internal static func shortened(_ lines: [String]) -> String {
         let shown = lines.prefix(shownLines).map { $0.count > 300 ? String($0.prefix(300)) + "…" : $0 }
         return (shown + (lines.count > shownLines ? ["… and \(lines.count - shownLines) more"] : []))
             .joined(
@@ -986,7 +986,7 @@ struct ListPlan {
     }
 
     /// What the user is asked to agree to before the list runs.
-    func preview(of list: URL) -> (message: String, detail: String) {
+    internal func preview(of list: URL) -> (message: String, detail: String) {
         let steps = steps
         let downloads = steps.filter { $0.kind == .download }.count
         let moves = steps.filter { $0.kind == .move }.count

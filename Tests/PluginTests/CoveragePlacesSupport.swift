@@ -5,9 +5,9 @@ import TestSupport
 /// Lets the main thread work while a test waits: blocks of the main queue run while the test is
 /// suspended, blocks of the main run loop and events in between.
 @MainActor
-enum CoveragePlacesLoop {
+internal enum CoveragePlacesLoop {
     /// Waits until `condition` holds; false when it still does not after `seconds` (a hang).
-    static func spin(seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
+    internal static func spin(seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let end = Date(timeIntervalSinceNow: seconds)
         while !condition() {
             if Date() > end {
@@ -20,7 +20,7 @@ enum CoveragePlacesLoop {
     }
 
     /// Lets the main thread go round a few times, for what has nothing to wait for.
-    static func settle() async {
+    internal static func settle() async {
         for _ in 0..<5 {
             turn()
             try? await Task.sleep(nanoseconds: 2_000_000)
@@ -33,7 +33,7 @@ enum CoveragePlacesLoop {
     }
 
     /// The views of `type` inside `view`, in the order they are laid out.
-    static func views<View: NSView>(_ type: View.Type, in view: NSView?) -> [View] {
+    internal static func views<View: NSView>(_ type: View.Type, in view: NSView?) -> [View] {
         var found: [View] = []
         for subview in view?.subviews ?? [] {
             if let match = subview as? View { found.append(match) }
@@ -43,12 +43,12 @@ enum CoveragePlacesLoop {
     }
 
     /// The button titled `title` inside `view`.
-    static func button(_ title: String, in view: NSView?) -> NSButton? {
+    internal static func button(_ title: String, in view: NSView?) -> NSButton? {
         views(NSButton.self, in: view).first { $0.title == title }
     }
 
     /// A key press as AppKit hands it to a view.
-    static func key(
+    internal static func key(
         _ characters: String,
         code: UInt16 = 0,
         modifiers: NSEvent.ModifierFlags = [],

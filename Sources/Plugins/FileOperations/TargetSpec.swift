@@ -25,7 +25,7 @@ public enum TargetMask {
         return (String(text[..<dot]), String(text[text.index(after: dot)...]))
     }
 
-    static func expand(_ source: String, mask: String) -> String {
+    internal static func expand(_ source: String, mask: String) -> String {
         let src = Array(source)
         let mask = Array(mask)
         var out = ""
@@ -136,7 +136,9 @@ public enum UniqueName {
     }
 
     /// What is at a location, asked so that the question ends with `cancellation` when there is one.
-    static func item(at url: URL, in fileSystems: FileSystemRegistry, _ cancellation: CancellationFlag?) -> FileItem? {
+    internal static func item(at url: URL, in fileSystems: FileSystemRegistry, _ cancellation: CancellationFlag?)
+        -> FileItem?
+    {
         guard let cancellation else {
             return fileSystems.item(at: url)
         }

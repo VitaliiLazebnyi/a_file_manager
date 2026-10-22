@@ -7,11 +7,11 @@ import Testing
 /// The placeholder language, Search & Replace, the case conversions and the planner of the
 /// Multi-Rename Tool, without any file system.
 @Suite
-struct MultiRenameEngine {
+internal struct MultiRenameEngine {
     /// 2025-12-01 10:05:09.250 UTC.
-    static let date = Date(timeIntervalSince1970: 1_764_583_509.25)
+    internal static let date = Date(timeIntervalSince1970: 1_764_583_509.25)
 
-    var context: RenameContext = {
+    internal var context: RenameContext = {
         var context = RenameContext()
         context.count = 12
         context.timeZone = TimeZone(identifier: "UTC") ?? .current
@@ -22,14 +22,14 @@ struct MultiRenameEngine {
         return context
     }()
 
-    let photo = RenameSubject(
+    internal let photo = RenameSubject(
         name: "IMG_1001.jpg",
         size: 4_711,
         modified: Self.date,
         directoryPath: "/Users/ada/work/photos"
     )
 
-    func name(
+    internal func name(
         _ mask: String,
         ext: String = "[E]",
         _ subject: RenameSubject? = nil,
@@ -45,7 +45,8 @@ struct MultiRenameEngine {
     }
 
     /// The name mask alone, without an extension.
-    func part(_ mask: String, _ subject: RenameSubject? = nil, index: Int = 0, context: RenameContext? = nil) -> String?
+    internal func part(_ mask: String, _ subject: RenameSubject? = nil, index: Int = 0, context: RenameContext? = nil)
+        -> String?
     {
         name(mask, ext: "", subject, index: index, context: context)
     }
@@ -53,7 +54,7 @@ struct MultiRenameEngine {
     // MARK: Masks
 
     @Test
-    func literalsAndBrackets() {
+    internal func literalsAndBrackets() {
         #expect(name("[N]") == "IMG_1001.jpg")
         #expect(part("Photo") == "Photo")
         #expect(part("a[[]b[]]c") == "a[b]c")
@@ -65,7 +66,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func invalidPlaceholdersGiveAnError() {
+    internal func invalidPlaceholdersGiveAnError() {
         #expect(part("[Q]") == nil)
         #expect(part("[N") == nil)
         #expect(part("[]") == nil)
@@ -82,12 +83,12 @@ struct MultiRenameEngine {
         ("[N-8,5]", "bcdef"), ("[N-8-5]", "bcde"), ("[N2--5]", "bcde"), ("[N-5-]", "efghi"), ("[N20-]", ""),
         ("[N7-20]", "ghi"), ("[N-20-2]", "abcdefgh")
     ])
-    func ranges(mask: String, expected: String) {
+    internal func ranges(mask: String, expected: String) {
         #expect(part(mask, RenameSubject(name: "abcdefghi.txt")) == expected)
     }
 
     @Test
-    func rangePadding() {
+    internal func rangePadding() {
         let short = RenameSubject(name: "abc.txt")
         #expect(part("[N02-9]", short) == "000000bc")
         #expect(part("[N 2-9]", short) == "      bc")
@@ -97,12 +98,12 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func rangesCountCharactersNotBytes() {
+    internal func rangesCountCharactersNotBytes() {
         #expect(part("[N2-3]", RenameSubject(name: "a😀éz.txt")) == "😀é")
     }
 
     @Test
-    func pathParts() {
+    internal func pathParts() {
         #expect(part("[P]") == "photos")
         #expect(part("[G]") == "work")
         #expect(part("[P1-3]") == "pho")
@@ -114,7 +115,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func foldersAndTheFolderDotSwitch() {
+    internal func foldersAndTheFolderDotSwitch() {
         let folder = RenameSubject(name: "release.v2", isFolder: true)
         #expect(name("[N]", ext: "[E]", folder) == "release.v2")
         #expect(name("[N]_x", ext: "[E]", folder) == "release_x.v2")
@@ -126,7 +127,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func counters() {
+    internal func counters() {
         #expect((0..<3).map { part("[C]", index: $0) } == ["1", "2", "3"])
         #expect((0..<3).map { part("[C10+5:3]", index: $0) } == ["010", "015", "020"])
         #expect(part("[C10]", index: 2) == "12")
@@ -142,7 +143,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func definedCounter() {
+    internal func definedCounter() {
         func counted(_ mask: String, _ counter: CounterDefinition, index: Int) -> String? {
             name(mask, ext: "", index: index) { $0.counter = counter }
         }
@@ -162,7 +163,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func dateAndTime() {
+    internal func dateAndTime() {
         #expect(part("[YMD]_[hms]") == "20251201_100509")
         #expect(part("[Y]-[M]-[D] [h].[m].[s].[v]") == "2025-12-01 10.05.09.250")
         #expect(part("[y][H][i][i1]") == "2510ama")
@@ -174,7 +175,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func timeSourcesAndOffsets() {
+    internal func timeSourcesAndOffsets() {
         #expect(part("[T2][Y]") == "1971")
         #expect(part("[Y][T3][Y][T1][Y]") == "202519722025")
         #expect(part("[T1+60m][hms]") == "110509")
@@ -190,7 +191,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func caseSwitches() {
+    internal func caseSwitches() {
         let subject = RenameSubject(name: "my Holiday PICS.JPG")
         #expect(part("[U][N]", subject) == "MY HOLIDAY PICS")
         #expect(part("[L][N]", subject) == "my holiday pics")
@@ -207,7 +208,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func environmentAndClipboard() {
+    internal func environmentAndClipboard() {
         #expect(part("[%USER%]") == "ada")
         #expect(part("[%USER%1-2]") == "ad")
         #expect(part("[%WORK%/]") == "Work:Files")
@@ -224,7 +225,7 @@ struct MultiRenameEngine {
 
     // MARK: Search & Replace
 
-    func replaced(
+    internal func replaced(
         _ name: String,
         _ search: String,
         _ replacement: String,
@@ -238,7 +239,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func plainSearchAndReplace() {
+    internal func plainSearchAndReplace() {
         #expect(replaced("Holiday holiday.txt", "HOLIDAY", "trip") == "trip trip.txt")
         #expect(replaced("Holiday holiday.txt", "holiday", "trip") { $0.caseSensitive = true } == "Holiday trip.txt")
         #expect(replaced("Holiday holiday.txt", "holiday", "trip") { $0.firstOnly = true } == "trip holiday.txt")
@@ -250,7 +251,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func severalPairsAndWildcards() {
+    internal func severalPairsAndWildcards() {
         #expect(replaced("Bär Öl über.txt", "ä|ö|ü", "ae|oe|ue") == "Baer oel ueber.txt")
         #expect(replaced("Bär Öl.txt", "ä|Ö", "ae|OE") { $0.caseSensitive = true } == "Baer OEl.txt")
         #expect(replaced("a-b_c.txt", "-|_", " ") == "a bc.txt")
@@ -261,7 +262,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func regularExpressions() {
+    internal func regularExpressions() {
         func regex(
             _ name: String,
             _ search: String,
@@ -288,7 +289,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func regularExpressionSubstitutionAndDialect() {
+    internal func regularExpressionSubstitutionAndDialect() {
         func subst(_ name: String, _ search: String, _ replacement: String, ext: Bool = true) -> String? {
             replaced(name, search, replacement) { settings in
                 settings.regularExpression = true
@@ -314,7 +315,7 @@ struct MultiRenameEngine {
     // MARK: Case conversion and the pipeline
 
     @Test
-    func letterCases() {
+    internal func letterCases() {
         let rule = TitleCaseRule.standard
         #expect(LetterCase.unchanged.apply(to: "aB c.TXT") == "aB c.TXT")
         #expect(LetterCase.lower.apply(to: "aB c.TXT") == "ab c.txt")
@@ -333,7 +334,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func pipelineOrderAndGivenNames() {
+    internal func pipelineOrderAndGivenNames() {
         // Masks, then Search & Replace, then the case conversion over the whole name.
         #expect(
             name("[N]_new", ext: "[E]") {
@@ -355,7 +356,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func invalidNames() {
+    internal func invalidNames() {
         #expect(RenameEngine.invalidity(of: "") != nil)
         #expect(RenameEngine.invalidity(of: "a//b") != nil)
         #expect(RenameEngine.invalidity(of: "sub/../x") != nil)
@@ -367,7 +368,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func nameLists() {
+    internal func nameLists() {
         #expect(RenameNameList.names(in: "a.txt\r\nb.txt\n\nc.txt\n\n") == ["a.txt", "b.txt", "", "c.txt"])
         #expect(RenameNameList.text(from: Data([0xEF, 0xBB, 0xBF] + Array("ä\n".utf8))) == "ä\n")
         #expect(RenameNameList.text(from: "ä b".data(using: .utf16) ?? Data()) == "ä b")
@@ -376,7 +377,7 @@ struct MultiRenameEngine {
     }
 
     @Test
-    func manyNamesOnAllCoresKeepTheirOrder() {
+    internal func manyNamesOnAllCoresKeepTheirOrder() {
         let registry = FileSystemRegistry()
         let entries = (0..<5_000)
             .map {
@@ -404,13 +405,13 @@ struct MultiRenameEngine {
 
 /// Collisions and the order of a set of renames.
 @Suite
-struct MultiRenamePlanning {
-    func url(_ name: String) -> URL { URL(fileURLWithPath: "/d/" + name) }
-    func urls(_ names: [String?]) -> [URL?] { names.map { $0.map(url) } }
+internal struct MultiRenamePlanning {
+    internal func url(_ name: String) -> URL { URL(fileURLWithPath: "/d/" + name) }
+    internal func urls(_ names: [String?]) -> [URL?] { names.map { $0.map(url) } }
 
     /// Carries the steps out on a set of names and returns what is there afterwards; a step
     /// onto a taken name or from a missing one fails the test.
-    func simulate(_ names: [String], _ steps: [RenameStep], foldsCase: Bool = false) -> [String] {
+    internal func simulate(_ names: [String], _ steps: [RenameStep], foldsCase: Bool = false) -> [String] {
         func fold(_ name: String) -> String { foldsCase ? name.lowercased() : name }
         var present = names
         for step in steps {
@@ -427,7 +428,7 @@ struct MultiRenamePlanning {
         return present
     }
 
-    func plan(_ renames: [(String, String?)], foldsCase: Bool = false) -> [RenameStep] {
+    internal func plan(_ renames: [(String, String?)], foldsCase: Bool = false) -> [RenameStep] {
         RenamePlanner(foldsCase: foldsCase)
             .steps(
                 sources: renames.map { url($0.0) },
@@ -437,14 +438,14 @@ struct MultiRenamePlanning {
     }
 
     @Test
-    func plainRenamesKeepListOrder() {
+    internal func plainRenamesKeepListOrder() {
         let steps = plan([("a", "x"), ("b", "b"), ("c", nil), ("d", "y")])
         #expect(steps.map(\.item) == [0, 3] && steps.allSatisfy { $0.kind == .direct && !$0.ontoItself })
         #expect(simulate(["a", "b", "c", "d"], steps) == ["x", "b", "c", "y"])
     }
 
     @Test
-    func chainsWaitForTheirPlace() {
+    internal func chainsWaitForTheirPlace() {
         // 1 → 2 → 3 → 4: the last has to move first.
         let steps = plan([("1", "2"), ("2", "3"), ("3", "4")])
         #expect(steps.map(\.item) == [2, 1, 0] && steps.allSatisfy { $0.kind == .direct })
@@ -454,7 +455,7 @@ struct MultiRenamePlanning {
     }
 
     @Test
-    func swapsAndRingsGoThroughATemporaryName() {
+    internal func swapsAndRingsGoThroughATemporaryName() {
         let swap = plan([("1.txt", "2.txt"), ("2.txt", "1.txt")])
         #expect(swap.map(\.kind) == [.park, .direct, .unpark])
         #expect(swap.map(\.item) == [0, 1, 0] && swap[0].to.lastPathComponent == "tmp0")
@@ -475,7 +476,7 @@ struct MultiRenamePlanning {
     }
 
     @Test
-    func aLongChainNeedsNoRecursion() {
+    internal func aLongChainNeedsNoRecursion() {
         let count = 20_000
         let renames = (0..<count).map { (String($0), Optional(String($0 + 1))) }
         let steps = plan(renames)
@@ -483,7 +484,7 @@ struct MultiRenamePlanning {
     }
 
     @Test
-    func caseOnlyRenames() {
+    internal func caseOnlyRenames() {
         // Where case is not told apart the rename lands on the file itself…
         let folded = plan([("readme.TXT", "README.txt")], foldsCase: true)
         #expect(folded.count == 1 && folded[0].ontoItself)
@@ -497,7 +498,9 @@ struct MultiRenamePlanning {
         #expect(simulate(["A", "B"], swap, foldsCase: true) == ["b", "a"])
     }
 
-    func conflicts(_ renames: [(String, String?)], existing: [String], foldsCase: Bool = false) -> [Int: RenameStatus] {
+    internal func conflicts(_ renames: [(String, String?)], existing: [String], foldsCase: Bool = false) -> [Int:
+        RenameStatus]
+    {
         let planner = RenamePlanner(foldsCase: foldsCase)
         return planner.conflicts(
             sources: renames.map { url($0.0) },
@@ -507,7 +510,7 @@ struct MultiRenamePlanning {
     }
 
     @Test
-    func conflictDetection() {
+    internal func conflictDetection() {
         #expect(
             conflicts([("a", "x"), ("b", "x"), ("c", "y")], existing: ["a", "b", "c"]) == [
                 0: .duplicate, 1: .duplicate
@@ -523,7 +526,7 @@ struct MultiRenamePlanning {
     }
 
     @Test
-    func conflictsAndLetterCase() {
+    internal func conflictsAndLetterCase() {
         #expect(conflicts([("a", "A")], existing: ["a"], foldsCase: true).isEmpty)
         #expect(
             conflicts([("a", "X"), ("b", "x")], existing: ["a", "b"], foldsCase: true) == [
@@ -536,7 +539,7 @@ struct MultiRenamePlanning {
     }
 
     @Test
-    func autoRename() {
+    internal func autoRename() {
         let planner = RenamePlanner()
         func resolved(_ renames: [(String, String?)], existing: [String], folders: Set<Int> = []) -> [String?] {
             planner.autoRenamed(

@@ -66,9 +66,9 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
 }
 
 @Suite
-struct Review2ConfigBVirtualFileSystem {
+internal struct Review2ConfigBVirtualFileSystem {
     @Test
-    func theRegistryGoesWithTheFileSystemsInIt() {
+    internal func theRegistryGoesWithTheFileSystemsInIt() {
         weak var gone: FileSystemRegistry?
         do {
             let registry = FileSystemRegistry()
@@ -79,7 +79,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func watcherReportsReachTheCallerOnTheMainThreadWhicheverThreadFiresThem() async {
+    internal func watcherReportsReachTheCallerOnTheMainThreadWhicheverThreadFiresThem() async {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -102,7 +102,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func aReportAfterTheWatcherWasReleasedGoesNowhere() async throws {
+    internal func aReportAfterTheWatcherWasReleasedGoesNowhere() async throws {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -123,7 +123,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func aHugeListIsRegisteredWithoutWorkOnTheCallerAndWatchedByAtMostTheLimit() {
+    internal func aHugeListIsRegisteredWithoutWorkOnTheCallerAndWatchedByAtMostTheLimit() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -140,7 +140,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func filesThatDifferOnlyInUnicodeNormalisationAreTwoFilesInAList() throws {
+    internal func filesThatDifferOnlyInUnicodeNormalisationAreTwoFilesInAList() throws {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -155,7 +155,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func namesInASelectedBranchNeverClash() {
+    internal func namesInASelectedBranchNeverClash() {
         let items = [
             FileItem(url: URL(fileURLWithPath: "/a/x.txt"), name: "x.txt"),
             FileItem(url: URL(fileURLWithPath: "/b/x.txt"), name: "x.txt"),
@@ -170,7 +170,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func leastRecentlyUsedUnwatchedListGoesFirst() {
+    internal func leastRecentlyUsedUnwatchedListGoesFirst() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -187,7 +187,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func capabilitiesWithoutALocationClaimNothingAnyShownFolderCannotDo() throws {
+    internal func capabilitiesWithoutALocationClaimNothingAnyShownFolderCannotDo() throws {
         let box = try Sandbox()
         try box.file("a/one.txt")
         let registry = FileSystemRegistry()
@@ -203,7 +203,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func realLocationOfABranchItemIsTheRealFile() {
+    internal func realLocationOfABranchItemIsTheRealFile() {
         let registry = FileSystemRegistry()
         let virtual = VirtualFileSystem(fileSystems: registry)
         let real = URL(fileURLWithPath: "/Users/x/dir/a.txt")
@@ -213,7 +213,7 @@ struct Review2ConfigBVirtualFileSystem {
     }
 
     @Test
-    func aTypedListNoteNeedsTheListsOwnTitle() {
+    internal func aTypedListNoteNeedsTheListsOwnTitle() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -226,9 +226,9 @@ struct Review2ConfigBVirtualFileSystem {
 }
 
 @Suite
-struct Review2ConfigBVirtualLocation {
+internal struct Review2ConfigBVirtualLocation {
     @Test
-    func aPasswordIsNeverWrittenIntoALocation() throws {
+    internal func aPasswordIsNeverWrittenIntoALocation() throws {
         let server = try #require(URL(string: "ftp://someone:s3cret@files.example.org/pub"))
         let url = VirtualLocation.branch(of: server).url
         #expect(!url.absoluteString.contains("s3cret"))
@@ -248,7 +248,7 @@ struct Review2ConfigBVirtualLocation {
     }
 
     @Test
-    func aPathWithDotsInItIsMadePlain() throws {
+    internal func aPathWithDotsInItIsMadePlain() throws {
         let hand = try #require(URL(string: "vfolder://branch.h66696c653a2f2f/a/../../etc"))
         guard case .branch(let real)? = VirtualLocation(hand) else {
             Issue.record("not a branch")
@@ -260,9 +260,9 @@ struct Review2ConfigBVirtualLocation {
 }
 
 @Suite
-struct Review2ConfigBListFiles {
+internal struct Review2ConfigBListFiles {
     @Test
-    func namesWithLineBreaksSurviveAListFile() {
+    internal func namesWithLineBreaksSurviveAListFile() {
         let names = [
             "/tmp/plain.txt", "/tmp/with\nbreak.txt", "/tmp/with\r\nboth", "/tmp/tab\there", " /tmp/leading",
             "/tmp/trailing ", "\"/quoted\"",
@@ -274,7 +274,7 @@ struct Review2ConfigBListFiles {
     }
 
     @Test
-    func oldListFilesAreReadAsTheyWere() {
+    internal func oldListFilesAreReadAsTheyWere() {
         let old = "/a/b.txt\r\nC:\\dir\\file.txt\n  /spaced/path  \n\"half\n\\n/not/an/escape\n\"/with\\q\"\n"
         #expect(
             FileListFile.lines(in: Data(old.utf8)) == [
@@ -284,7 +284,7 @@ struct Review2ConfigBListFiles {
     }
 
     @Test
-    func aHugeListFileIsRefused() throws {
+    internal func aHugeListFileIsRefused() throws {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -304,9 +304,9 @@ struct Review2ConfigBListFiles {
 }
 
 @Suite
-struct Review2ConfigBPlaces {
+internal struct Review2ConfigBPlaces {
     @Test
-    func frequentCountsSaturateAndArePassedThroughAnImportOfTheMaximum() throws {
+    internal func frequentCountsSaturateAndArePassedThroughAnImportOfTheMaximum() throws {
         let json = #"{"counts":{"file:///Users/x/dir":9223372036854775807,"file:///neg":-5}}"#
         var frequent = try JSONDecoder().decode(FrequentFolders.self, from: Data(json.utf8))
         #expect(frequent.counts["file:///neg"] == 0)
@@ -315,7 +315,7 @@ struct Review2ConfigBPlaces {
     }
 
     @Test
-    func aStoredHistoryHoldsNoMoreThanItKeeps() throws {
+    internal func aStoredHistoryHoldsNoMoreThanItKeeps() throws {
         let visits = (0..<1_000).map { #"{"location":"file:///d\#($0)","isVisible":true}"# }.joined(separator: ",")
         let history = try JSONDecoder().decode(DirectoryHistory.self, from: Data(#"{"visits":[\#(visits)]}"#.utf8))
         #expect(history.visits.count == DirectoryHistory.storedLimit && history.current?.path == "/d999")
@@ -328,7 +328,7 @@ struct Review2ConfigBPlaces {
     }
 
     @Test
-    func aPasswordInALocationIsNotStoredInTheHistory() throws {
+    internal func aPasswordInALocationIsNotStoredInTheHistory() throws {
         var history = DirectoryHistory()
         history.record(try #require(URL(string: "ftp://u:secret@host/dir")), stayedInPrevious: false)
         #expect(history.visits.first?.location.contains("secret") == false)
@@ -338,7 +338,7 @@ struct Review2ConfigBPlaces {
     }
 
     @Test
-    func hotlistEntriesForAwkwardFoldersLeadBackToThem() {
+    internal func hotlistEntriesForAwkwardFoldersLeadBackToThem() {
         for path in ["/x/trailing ", " /x/leading", "/x/:", "/x/a:", "/x/\"q\"", "/x/plain"] {
             let command = HotlistAction.changeDirectoryCommand(to: path)
             #expect(HotlistAction(command) == .changeDirectory(path: path, focusingOnIt: false), "\(path)")
@@ -347,7 +347,7 @@ struct Review2ConfigBPlaces {
     }
 
     @Test
-    func treeCacheFilesAreMode0600InAFolderOf0700AndNeverGoBackToAnOlderState() throws {
+    internal func treeCacheFilesAreMode0600InAFolderOf0700AndNeverGoBackToAnOlderState() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let root = URL(fileURLWithPath: "/Volumes/R2")
@@ -369,7 +369,7 @@ struct Review2ConfigBPlaces {
     }
 
     @Test
-    func treeCachePathsWithLineBreaksAreLeftOutAndTheTreeCountsAsPartial() throws {
+    internal func treeCachePathsWithLineBreaksAreLeftOutAndTheTreeCountsAsPartial() throws {
         let root = URL(fileURLWithPath: "/Volumes/R2")
         let text = TreeCache.format(TreeCache.Entry(paths: ["ok", "bad\n[injected]", "fine"]), root: root)
         let entry = try #require(TreeCache.parseEntry(text, root: root))
@@ -377,7 +377,7 @@ struct Review2ConfigBPlaces {
     }
 
     @Test
-    func treeCacheFileOverTheLimitIsNotRead() throws {
+    internal func treeCacheFileOverTheLimitIsNotRead() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let root = URL(fileURLWithPath: "/Volumes/R2")
@@ -395,9 +395,9 @@ struct Review2ConfigBPlaces {
 }
 
 @Suite
-struct Review2ConfigBTree {
+internal struct Review2ConfigBTree {
     @Test
-    func aScanLeavesProtectedAndCloudFoldersUnreadButAUserOpenedOneIsRead() throws {
+    internal func aScanLeavesProtectedAndCloudFoldersUnreadButAUserOpenedOneIsRead() throws {
         let box = try Sandbox()
         try box.folder("plain/inner")
         let protected = URL(fileURLWithPath: NSHomeDirectory() + "/Library/CloudStorage")
@@ -413,7 +413,7 @@ struct Review2ConfigBTree {
     }
 
     @Test
-    func aScanStopsAtItsFolderLimitAndCountsAsIncomplete() throws {
+    internal func aScanStopsAtItsFolderLimitAndCountsAsIncomplete() throws {
         let box = try Sandbox()
         for index in 0..<20 { try box.folder("d\(index)/sub") }
         let scanner = TreeScanner(root: box.root, provider: LocalFileSystem(), batchSize: 4)
@@ -427,7 +427,7 @@ struct Review2ConfigBTree {
     }
 
     @Test
-    func gentleScanRestoresTheThreadsPriorities() {
+    internal func gentleScanRestoresTheThreadsPriorities() {
         // On a thread of its own (a pool thread of Dispatch does not take a policy of its own).
         let seen = Mutex<[Int32]>([])
         let done = DispatchSemaphore(value: 0)
@@ -444,7 +444,7 @@ struct Review2ConfigBTree {
     }
 
     @Test
-    func quickSearchWorksInSlicesAndMatchesTheBlockingSearch() {
+    internal func quickSearchWorksInSlicesAndMatchesTheBlockingSearch() {
         let root = URL(fileURLWithPath: "/Volumes/R2", isDirectory: true)
         let tree = DirectoryTree(rootURL: root, paths: (0..<5_000).map { "dir\($0)" } + ["needle"])
         let blocking = tree.find("needle", from: nil)
@@ -469,13 +469,13 @@ struct Review2ConfigBTree {
 }
 
 @Suite
-struct Review2ConfigBTabs {
-    let memory = MemoryFileSystem()
+internal struct Review2ConfigBTabs {
+    internal let memory = MemoryFileSystem()
 
-    func read(_ text: String) -> TabFile? { TabFile(text: text) { memory.location(from: $0) } }
+    internal func read(_ text: String) -> TabFile? { TabFile(text: text) { memory.location(from: $0) } }
 
     @Test
-    func pathsAndCaptionsWithLineBreaksRoundTripWithoutInjectingLines() throws {
+    internal func pathsAndCaptionsWithLineBreaksRoundTripWithoutInjectingLines() throws {
         let awkward = memory.url("/tmp/a\n1_path=sftp://evil.example/x")
         let tab = PanelTabState(location: awkward, title: "t\n1_path=/etc")
         let file = TabFile(
@@ -502,7 +502,7 @@ struct Review2ConfigBTabs {
     }
 
     @Test
-    func aByteOrderMarkAndUTF16FilesAreRead() throws {
+    internal func aByteOrderMarkAndUTF16FilesAreRead() throws {
         #expect(read("\u{FEFF}[activetabs]\n0_path=mem:/A\n")?.active.tabs.count == 1)
         let utf16 = try #require("[activetabs]\r\n0_path=mem:/A\r\n".data(using: .utf16))
         #expect(read(TabFile.text(decoding: utf16))?.active.tabs.count == 1)
@@ -511,13 +511,13 @@ struct Review2ConfigBTabs {
     }
 
     @Test
-    func oldTabFilesWithBackslashesAreReadAsTheyStand() {
+    internal func oldTabFilesWithBackslashesAreReadAsTheyStand() {
         let file = read("[activetabs]\n0_path=mem:/C:\\dir\n0_caption=C:\\Work\n")
         #expect(file?.active.tabs.first?.title == "C:\\Work")
     }
 
     @Test
-    func aTabFileOpensNoMoreThanTheLimit() throws {
+    internal func aTabFileOpensNoMoreThanTheLimit() throws {
         let lines = (0..<5_000).map { "\($0)_path=mem:/d\($0)" }.joined(separator: "\n")
         let file = try #require(read("[activetabs]\n" + lines + "\n"))
         #expect(file.active.tabs.count == TabFile.tabLimit)
@@ -528,11 +528,11 @@ struct Review2ConfigBTabs {
 
 @MainActor
 @Suite
-struct Review2ConfigBTabLoading {
-    let memory = MemoryFileSystem()
-    let bench: TestBench
+internal struct Review2ConfigBTabLoading {
+    internal let memory = MemoryFileSystem()
+    internal let bench: TestBench
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt")
         memory.addFile("/B/other.txt")
         bench = TestBench(
@@ -544,7 +544,7 @@ struct Review2ConfigBTabLoading {
     }
 
     @Test
-    func loadingAFileNeverMakesAServerTabTheShownOne() {
+    internal func loadingAFileNeverMakesAServerTabTheShownOne() {
         memory.addFile(
             "/B/tabs.tab",
             "[activetabs]\n0_path=mem:/A\n1_path=sftp://evil.example/x\n2_path=mem:/B\nactivetab=1\n"
@@ -557,7 +557,7 @@ struct Review2ConfigBTabLoading {
     }
 
     @Test
-    func aFileWhoseTabsAllConnectLeavesTheShownTabAlone() {
+    internal func aFileWhoseTabsAllConnectLeavesTheShownTabAlone() {
         memory.addFile(
             "/B/tabs.tab",
             "[activetabs]\n0_path=sftp://evil.example/x\n1_path=ftp://other.example/y\nactivetab=0\n"
@@ -569,7 +569,7 @@ struct Review2ConfigBTabLoading {
     }
 
     @Test
-    func loadingManyTabsTellsTheListenerOncePerPanel() {
+    internal func loadingManyTabsTellsTheListenerOncePerPanel() {
         let lines = (0..<100).map { "\($0)_path=mem:/A/d\($0)" }.joined(separator: "\n")
         memory.addFile("/B/many.tab", "[activetabs]\n" + lines + "\nactivetab=3\n")
         var changes = 0
@@ -579,7 +579,7 @@ struct Review2ConfigBTabLoading {
     }
 
     @Test
-    func aFileWithThousandsOfTabsOpensTheLimit() {
+    internal func aFileWithThousandsOfTabsOpensTheLimit() {
         let lines = (0..<3_000).map { "\($0)_path=mem:/A/d\($0)" }.joined(separator: "\n")
         memory.addFile("/B/huge.tab", "[activetabs]\n" + lines + "\n")
         bench.commands.perform("APPENDTABS", .location(memory.url("/B/huge.tab")))
@@ -589,13 +589,13 @@ struct Review2ConfigBTabLoading {
 
 @MainActor
 @Suite
-struct Review2ConfigBNavigation {
-    let memory = MemoryFileSystem()
+internal struct Review2ConfigBNavigation {
+    internal let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let bench: TestBench
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let bench: TestBench
 
-    init() {
+    internal init() {
         memory.addFile("/A/docs/in.txt")
         memory.addFile("/B/other.txt")
         bench = TestBench(
@@ -607,14 +607,14 @@ struct Review2ConfigBNavigation {
     }
 
     @Test
-    func goingToANeighbourVolumeAsksTheDisksInAJob() {
+    internal func goingToANeighbourVolumeAsksTheDisksInAJob() {
         bench.commands.perform("cm_GoToNextDrive")
         #expect(bench.jobService.titles == ["Go to volume"])
         #expect(bench.left.model.directory == memory.url("/"))
     }
 
     @Test
-    func theClipboardIsAskedOnlyWhenItsChangeCountChanged() {
+    internal func theClipboardIsAskedOnlyWhenItsChangeCountChanged() {
         pasteboard.clearContents()
         #expect(!bench.commands.isEnabled("afm_CdFromClipboard"))
         // Without a change the answer stays, whatever the menus ask.

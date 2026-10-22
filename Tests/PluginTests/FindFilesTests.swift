@@ -6,15 +6,15 @@ import Testing
 @testable import FindFilesPlugin
 
 @Suite
-struct Searching {
-    let fileSystems: FileSystemRegistry
-    let memory: MemoryFileSystem
+internal struct Searching {
+    internal let fileSystems: FileSystemRegistry
+    internal let memory: MemoryFileSystem
 
-    init() {
+    internal init() {
         (fileSystems, memory) = makeFileSystems()
     }
 
-    func find(_ query: SearchQuery) -> [String] {
+    internal func find(_ query: SearchQuery) -> [String] {
         var found: [String] = []
         FileSearch(query, fileSystems: fileSystems)
             .run {
@@ -23,7 +23,7 @@ struct Searching {
         return found
     }
 
-    func makeTree() throws -> Sandbox {
+    internal func makeTree() throws -> Sandbox {
         let box = try Sandbox()
         try box.file("notes.md", "Meeting with Mr. Smith")
         try box.file("Letter to Mr. Smith.doc", "Dear Sir")
@@ -35,7 +35,7 @@ struct Searching {
     }
 
     @Test
-    func searchMasks() {
+    internal func searchMasks() {
         #expect(SearchMask("Smith").matches("Letter to Mr. Smith.doc"))
         #expect(!SearchMask(".ini").matches("win.ini"))
         #expect(SearchMask("win.ini").matches("WIN.INI"))
@@ -45,7 +45,7 @@ struct Searching {
     }
 
     @Test
-    func findsByNameInPathOrder() throws {
+    internal func findsByNameInPathOrder() throws {
         let box = try makeTree()
         #expect(
             find(SearchQuery(directory: box.root, names: "report")) == [
@@ -60,14 +60,14 @@ struct Searching {
     }
 
     @Test
-    func depthLimit() throws {
+    internal func depthLimit() throws {
         let box = try makeTree()
         #expect(find(SearchQuery(directory: box.root, names: "*.txt", maxDepth: 0)).isEmpty)
         #expect(find(SearchQuery(directory: box.root, names: "*.txt", maxDepth: 1)) == ["docs/report_01.txt"])
     }
 
     @Test
-    func findsText() throws {
+    internal func findsText() throws {
         let box = try makeTree()
         #expect(find(SearchQuery(directory: box.root, text: "report")) == ["docs/report_01.txt"])
         #expect(find(SearchQuery(directory: box.root, text: "report", caseSensitive: true)).isEmpty)
@@ -75,7 +75,7 @@ struct Searching {
     }
 
     @Test
-    func findsTextAcrossBlockBorders() throws {
+    internal func findsTextAcrossBlockBorders() throws {
         let box = try Sandbox()
         try box.file(
             "big.txt",
@@ -85,7 +85,7 @@ struct Searching {
     }
 
     @Test
-    func textIsSearchedOnAllCoresAndReportedInOrder() throws {
+    internal func textIsSearchedOnAllCoresAndReportedInOrder() throws {
         let box = try Sandbox()
         for index in 0..<200 {
             try box.file(
@@ -98,7 +98,7 @@ struct Searching {
     }
 
     @Test
-    func cancelledSearchFindsNothing() throws {
+    internal func cancelledSearchFindsNothing() throws {
         let box = try makeTree()
         let search = FileSearch(SearchQuery(directory: box.root), fileSystems: fileSystems)
         search.cancel()
@@ -108,7 +108,7 @@ struct Searching {
     }
 
     @Test
-    func searchesAnyFileSystem() {
+    internal func searchesAnyFileSystem() {
         memory.addFile("/mail/inbox/offer.txt", "special REPORT inside")
         memory.addFile("/mail/inbox/photo.jpg", "binary")
         memory.addFile("/mail/sent/report.txt", "plain")

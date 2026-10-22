@@ -119,11 +119,11 @@ private final class DeadVolume: @unchecked Sendable {
 /// Review 2, second pass: what the local file system says about its entries, and its changes
 /// for callers that hold a cancellation flag.
 @Suite
-struct Review2KernelP2LocalItems {
-    let local = LocalFileSystem()
+internal struct Review2KernelP2LocalItems {
+    internal let local = LocalFileSystem()
 
     @Test
-    func aLinkToAFileSaysHowLargeThatFileIs() throws {
+    internal func aLinkToAFileSaysHowLargeThatFileIs() throws {
         let box = try Sandbox()
         try box.file("big.bin", "12345")
         try box.folder("folder")
@@ -153,7 +153,7 @@ struct Review2KernelP2LocalItems {
     }
 
     @Test
-    func theTopOfEveryLocalLocationIsKnownWithoutGoingUp() {
+    internal func theTopOfEveryLocalLocationIsKnownWithoutGoingUp() {
         let deep = URL(fileURLWithPath: "/" + (0..<300).map { "d\($0)" }.joined(separator: "/"))
         #expect(local.root(of: deep).path == "/" && local.root(of: URL(fileURLWithPath: "/")).path == "/")
         // What going up gives, which is what the kernel did before.
@@ -164,13 +164,13 @@ struct Review2KernelP2LocalItems {
 }
 
 @Suite
-struct Review2KernelP2LocalChanges {
-    let local = LocalFileSystem()
+internal struct Review2KernelP2LocalChanges {
+    internal let local = LocalFileSystem()
 
     // MARK: L029 — a folder that must be new
 
     @Test
-    func aFolderThatMustBeNewIsMadeOnlyWhereNothingHasItsName() throws {
+    internal func aFolderThatMustBeNewIsMadeOnlyWhereNothingHasItsName() throws {
         let box = try Sandbox()
         // Missing parents are made as usual; the last name must be free.
         try local.createDirectory(at: box.url("a/b/new"), exclusive: true)
@@ -199,7 +199,7 @@ struct Review2KernelP2LocalChanges {
     }
 
     @Test
-    func aFolderThatMayBeThereIsMadeAsBefore() throws {
+    internal func aFolderThatMayBeThereIsMadeAsBefore() throws {
         let box = try Sandbox()
         // The plain call keeps its contract: an existing folder, or a link to one, is success.
         try local.createDirectory(at: box.url("x/y/z"))
@@ -227,7 +227,7 @@ struct Review2KernelP2LocalChanges {
     }
 
     @Test
-    func manyThreadsMakeTheSameFoldersAtOnce() throws {
+    internal func manyThreadsMakeTheSameFoldersAtOnce() throws {
         let box = try Sandbox()
         let failures = Locked(0)
         DispatchQueue.concurrentPerform(iterations: 32) { index in
@@ -254,7 +254,7 @@ struct Review2KernelP2LocalChanges {
     // MARK: F043 — deleting inside a tree whose folders may be swapped for links
 
     @Test
-    func anItemOfATreeIsRemovedOnlyWhereTheTreeReallyIs() throws {
+    internal func anItemOfATreeIsRemovedOnlyWhereTheTreeReallyIs() throws {
         let box = try Sandbox()
         try box.file("tree/sub/deep/a.txt")
         try box.file("tree/sub/b.txt")
@@ -312,7 +312,7 @@ struct Review2KernelP2LocalChanges {
     // MARK: L023 — the changing calls with a flag, on a disk of this Mac
 
     @Test
-    func theChangingCallsWorkWithAFlagAsWithout() throws {
+    internal func theChangingCallsWorkWithAFlagAsWithout() throws {
         let box = try Sandbox()
         let flag = CancellationFlag()
         try local.createDirectory(at: box.url("made/inner"), cancellation: flag)
@@ -369,7 +369,7 @@ struct Review2KernelP2LocalChanges {
     }
 
     @Test
-    func aFlagThatIsSetKeepsEveryChangeFromBeingBegun() throws {
+    internal func aFlagThatIsSetKeepsEveryChangeFromBeingBegun() throws {
         let box = try Sandbox()
         try box.file("a.txt", "abc")
         let before = try #require(local.item(at: box.url("a.txt")))
@@ -412,7 +412,7 @@ struct Review2KernelP2LocalChanges {
     }
 
     @Test
-    func aLockThatWasTakenOffForAChangeIsPutBackWhenTheChangeIsStopped() throws {
+    internal func aLockThatWasTakenOffForAChangeIsPutBackWhenTheChangeIsStopped() throws {
         let box = try Sandbox()
         let file = try box.file("locked.txt")
         #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -449,7 +449,7 @@ struct Review2KernelP2LocalChanges {
     }
 
     @Test
-    func aCopyIsStoppedBetweenTheStepsTheSystemReports() throws {
+    internal func aCopyIsStoppedBetweenTheStepsTheSystemReports() throws {
         let box = try Sandbox()
         // Large enough for the system to report progress where it copies block by block.
         let source = box.url("source.bin")
@@ -478,9 +478,9 @@ struct Review2KernelP2LocalChanges {
 
 /// A share whose server has gone, stood in for by a folder whose questions do not come back.
 @Suite
-struct Review2KernelP2DeadVolume {
+internal struct Review2KernelP2DeadVolume {
     @Test
-    func aChangeOnAVolumeThatDoesNotAnswerIsLeftBehindWhenItsFlagIsSet() throws {
+    internal func aChangeOnAVolumeThatDoesNotAnswerIsLeftBehindWhenItsFlagIsSet() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("share/a.txt", "a")
@@ -510,7 +510,7 @@ struct Review2KernelP2DeadVolume {
     }
 
     @Test
-    func aVolumeWithSeveralCallsLeftBehindIsNotAskedAgainUntilOneReturns() throws {
+    internal func aVolumeWithSeveralCallsLeftBehindIsNotAskedAgainUntilOneReturns() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         let local = dead.fileSystem(patienceAfterCancel: 0.05)
@@ -547,7 +547,7 @@ struct Review2KernelP2DeadVolume {
     }
 
     @Test
-    func aChangeThatComesBackInTimeIsNotLeftBehind() throws {
+    internal func aChangeThatComesBackInTimeIsNotLeftBehind() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("share/a.txt", "a")
@@ -569,7 +569,7 @@ struct Review2KernelP2DeadVolume {
     }
 
     @Test
-    func aCopyOntoAVolumeThatDoesNotAnswerLeavesNothingAndReportsToNobodyAfterItWasLeft() throws {
+    internal func aCopyOntoAVolumeThatDoesNotAnswerLeavesNothingAndReportsToNobodyAfterItWasLeft() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("here/a.txt", "abc")
@@ -591,7 +591,7 @@ struct Review2KernelP2DeadVolume {
     }
 
     @Test
-    func theVolumeIsAskedOnceAndAnsweredFromMemoryWhileItIsSilent() async throws {
+    internal func theVolumeIsAskedOnceAndAnsweredFromMemoryWhileItIsSilent() async throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("share/a.txt")
@@ -670,7 +670,7 @@ struct Review2KernelP2DeadVolume {
     /// pointed at a dead share again and again costs one thread per question, the caller
     /// leaves with its flag, and the folders on healthy disks load meanwhile.
     @Test
-    func aFolderOnADeadShareIsTriedAgainAndAgainWithoutCostingAThreadEachTime() throws {
+    internal func aFolderOnADeadShareIsTriedAgainAndAgainWithoutCostingAThreadEachTime() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("share/sub/a.txt")

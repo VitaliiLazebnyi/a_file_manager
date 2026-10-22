@@ -8,7 +8,7 @@ import Testing
 /// Searches that must give the answer of decoding the whole file: texts in double-byte code
 /// pages with long runs of two-byte characters, and ASCII words in the raw bytes.
 @Suite
-struct ViewerAdoptSearch {
+internal struct ViewerAdoptSearch {
     /// Every place `needle` is in `data` when all of it is decoded at once: the reference.
     private func occurrences(
         of needle: String,
@@ -93,7 +93,7 @@ struct ViewerAdoptSearch {
     }
 
     @Test(arguments: [936, 932, 950, 949])
-    func aLongRunOfTwoByteCharactersIsFoundExactlyForwardAndBackward(
+    internal func aLongRunOfTwoByteCharactersIsFoundExactlyForwardAndBackward(
         codePage: Int
     ) throws {
         let encoding = try #require(ViewerEncoding.codePage(codePage))
@@ -161,7 +161,7 @@ struct ViewerAdoptSearch {
     }
 
     @Test
-    func characterBoundariesAreExactAndAreReadOnce() throws {
+    internal func characterBoundariesAreExactAndAreReadOnce() throws {
         final class Counting: ByteSource {
             let data: Data
             private let counter = ViewerAdoptBox(Int64(0))
@@ -218,7 +218,7 @@ struct ViewerAdoptSearch {
     }
 
     @Test
-    func aSearchThroughAClusterOfLineEndsKeepsTheCharactersInStep() throws {
+    internal func aSearchThroughAClusterOfLineEndsKeepsTheCharactersInStep() throws {
         // The usual case: line ends are in reach, and the answer is the same as ever.
         let sjis = try #require(ViewerEncoding.codePage(932))
         let line = "日本語のテキスト、ｶﾀｶﾅと ASCII 12345\n"
@@ -259,7 +259,7 @@ struct ViewerAdoptSearch {
     }
 
     @Test
-    func rawByteSearchGivesTheAnswerOfTheDecodedSearch() throws {
+    internal func rawByteSearchGivesTheAnswerOfTheDecodedSearch() throws {
         let latin = try #require(ViewerEncoding.codePage(1_252))
         let dos = try #require(ViewerEncoding.codePage(437))
         let koi = try #require(ViewerEncoding.codePage(20_866))
@@ -333,7 +333,7 @@ struct ViewerAdoptSearch {
     }
 
     @Test
-    func everyOccurrenceOfAWholeWordIsFoundInOrderInTheRawBytes() throws {
+    internal func everyOccurrenceOfAWholeWordIsFoundInOrderInTheRawBytes() throws {
         let text =
             String(repeating: "The Quick brown FOX; quick? quickly, QUICK_x _quick QUICK\n", count: 400)
             + "ünquick quickü quick"
@@ -360,7 +360,7 @@ struct ViewerAdoptSearch {
     }
 
     @Test
-    func aSearchNeverChangesAnswerWhenTheTextHasCharactersThatFoldToLetters() throws {
+    internal func aSearchNeverChangesAnswerWhenTheTextHasCharactersThatFoldToLetters() throws {
         // ß for ss, the Kelvin sign for k, the long s: found by the decoded search, so the raw one steps aside.
         let data = Data("Straße, \u{212A}elvin, \u{17F}tar, \u{FB01}nd".utf8)
         for needle in ["strasse", "kelvin", "star", "find"] {

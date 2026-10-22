@@ -18,24 +18,24 @@ public final class ConfigurationPlugin: Plugin {
     private let sweepsStaleFolders: Bool
     private static let listsParent = FileManager.default.temporaryDirectory.appendingPathComponent("AFileManager-lists")
     private let settingsKeys: (() -> [String])?
-    private(set) var center: ConfigurationCenter?
+    internal private(set) var center: ConfigurationCenter?
 
     // Commands only this plugin has (spec 17 › Configuration, Help, User).
-    static let redefineHotkeys: CommandID = "cm_Confirmation"
-    static let buttonBarConfig: CommandID = "cm_ButtonConfig"
-    static let changeStartMenu: CommandID = "cm_ChangeStartMenu"
-    static let commandBrowser: CommandID = "cm_CommandBrowser"
-    static let userCommands: CommandID = "afm_UserCommands"
-    static let newUserCommand: CommandID = "afm_NewUserCommand"
-    static let savePosition: CommandID = "cm_ConfigSavePos"
-    static let saveSettings: CommandID = "cm_ConfigSaveSettings"
-    static let exportSettings: CommandID = "afm_ExportSettings"
-    static let importSettings: CommandID = "afm_ImportSettings"
-    static let resetSettings: CommandID = "afm_ResetSettings"
-    static let stopUserCommands: CommandID = "afm_StopUserCommands"
-    static let keyboardHelp: CommandID = "cm_Keyboard"
-    static let helpIndex: CommandID = "cm_HelpIndex"
-    static let about: CommandID = "cm_About"
+    internal static let redefineHotkeys: CommandID = "cm_Confirmation"
+    internal static let buttonBarConfig: CommandID = "cm_ButtonConfig"
+    internal static let changeStartMenu: CommandID = "cm_ChangeStartMenu"
+    internal static let commandBrowser: CommandID = "cm_CommandBrowser"
+    internal static let userCommands: CommandID = "afm_UserCommands"
+    internal static let newUserCommand: CommandID = "afm_NewUserCommand"
+    internal static let savePosition: CommandID = "cm_ConfigSavePos"
+    internal static let saveSettings: CommandID = "cm_ConfigSaveSettings"
+    internal static let exportSettings: CommandID = "afm_ExportSettings"
+    internal static let importSettings: CommandID = "afm_ImportSettings"
+    internal static let resetSettings: CommandID = "afm_ResetSettings"
+    internal static let stopUserCommands: CommandID = "afm_StopUserCommands"
+    internal static let keyboardHelp: CommandID = "cm_Keyboard"
+    internal static let helpIndex: CommandID = "cm_HelpIndex"
+    internal static let about: CommandID = "cm_About"
 
     /// Tests turn `launchesApplications` off and pass no `background` queue, so nothing is
     /// started, nothing sounds or asks for a file (`ConfigurationEffects.silent`), and
@@ -62,7 +62,7 @@ public final class ConfigurationPlugin: Plugin {
     /// The keys of the values the program itself stored in the macOS preferences.
     ///
     /// Only the real settings store is listed this way; any other store has no list of its keys.
-    static func storedKeys(of settings: any SettingsStore) -> [String] {
+    internal static func storedKeys(of settings: any SettingsStore) -> [String] {
         storedKeys(of: settings, domain: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName)
     }
 
@@ -76,7 +76,7 @@ public final class ConfigurationPlugin: Plugin {
     }
 
     /// The keys of a preferences domain whose values the program stored.
-    static func storedKeys(in values: [String: Any]) -> [String] {
+    internal static func storedKeys(in values: [String: Any]) -> [String] {
         // The program stores every value as JSON text. Whether it is one is told by how it
         // begins: reading a large value through would hold up the main thread.
         let beginnings = Set("{[\"-0123456789tfn".utf8)

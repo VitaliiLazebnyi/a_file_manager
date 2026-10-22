@@ -3,20 +3,20 @@ import AFMKernel
 import Foundation
 
 /// What a set of files and folders adds up to (spec 07 › Calculate occupied space).
-struct SpaceTotals: Equatable {
+internal struct SpaceTotals: Equatable {
     /// The sum of the file sizes.
-    var bytes: Int64 = 0
+    internal var bytes: Int64 = 0
     /// The space really taken on the source volume; equal to `bytes` where that is not known.
-    var allocated: Int64 = 0
+    internal var allocated: Int64 = 0
     /// The file sizes rounded up to the allocation unit of the target volume: the space a
     /// copy needs there.
-    var rounded: Int64 = 0
-    var files = 0
-    var folders = 0
+    internal var rounded: Int64 = 0
+    internal var files = 0
+    internal var folders = 0
     /// Folders that could not be read; their contents are missing from the figures.
-    var unreadable = 0
+    internal var unreadable = 0
 
-    static func + (left: Self, right: Self) -> Self {
+    internal static func + (left: Self, right: Self) -> Self {
         Self(
             bytes: left.bytes.addingSaturated(right.bytes),
             allocated: left.allocated.addingSaturated(right.allocated),
@@ -37,7 +37,7 @@ struct SpaceTotals: Equatable {
 /// is for.
 ///
 /// All state is guarded by `lock`.
-final class ProgressMeter: @unchecked Sendable {
+internal final class ProgressMeter: @unchecked Sendable {
     private let monitor: any JobMonitor
     private let title: String
     private let total: Int
@@ -46,13 +46,13 @@ final class ProgressMeter: @unchecked Sendable {
     private var lastReport = Date.distantPast
 
     /// `total` is 0 when the number of items is not known in advance.
-    init(_ monitor: any JobMonitor, title: String, total: Int = 0) {
+    internal init(_ monitor: any JobMonitor, title: String, total: Int = 0) {
         self.monitor = monitor
         self.title = title
         self.total = total
     }
 
-    func add(_ count: Int, at location: @autoclosure () -> String) {
+    internal func add(_ count: Int, at location: @autoclosure () -> String) {
         lock.lock()
         defer { lock.unlock() }
         done += count
@@ -71,20 +71,20 @@ final class ProgressMeter: @unchecked Sendable {
 /// folder are measured on all cores at once (`Parallel.map`); each branch adds up its own
 /// figures and hands them back, so nothing is shared between the threads but the cancellation
 /// flag and the progress meter, which protect themselves.
-struct SpaceCalculator {
-    let fileSystems: FileSystemRegistry
-    var cancellation = CancellationFlag()
+internal struct SpaceCalculator {
+    internal let fileSystems: FileSystemRegistry
+    internal var cancellation = CancellationFlag()
     /// The allocation unit of the volume a copy would go to; nil rounds nothing.
-    var targetCluster: Int64?
-    var meter: ProgressMeter?
+    internal var targetCluster: Int64?
+    internal var meter: ProgressMeter?
     /// Whether the space really taken on the disk is asked for, which costs one more call per
     /// file; "Calculate all folder sizes" shows sizes only.
-    var measuresAllocated = true
+    internal var measuresAllocated = true
 
     /// One figure per item, in the same order.
     ///
     /// A folder counts itself and everything below.
-    func measure(_ items: [FileItem]) -> [SpaceTotals] {
+    internal func measure(_ items: [FileItem]) -> [SpaceTotals] {
         Parallel.map(items) { item in
             item.isRealDirectory ? measure(directory: item.url) + SpaceTotals(folders: 1) : measure(file: item)
         }
@@ -102,7 +102,7 @@ struct SpaceCalculator {
         )
     }
 
-    static func round(_ size: Int64, to cluster: Int64?) -> Int64 {
+    internal static func round(_ size: Int64, to cluster: Int64?) -> Int64 {
         guard let cluster, cluster > 1 else {
             return size
         }
@@ -112,7 +112,7 @@ struct SpaceCalculator {
     /// Everything below a directory, not counting the directory itself.
     ///
     /// Links are counted as the links they are and never followed.
-    func measure(directory: URL) -> SpaceTotals {
+    internal func measure(directory: URL) -> SpaceTotals {
         guard !cancellation.isCancelled else {
             return SpaceTotals()
         }
@@ -148,8 +148,8 @@ struct SpaceCalculator {
 }
 
 /// The wording of the result box of Calculate Occupied Space.
-enum SpaceReport {
-    static func text(
+internal enum SpaceReport {
+    internal static func text(
         _ totals: SpaceTotals,
         sourceIsLocal: Bool,
         targetCluster: Int64?,

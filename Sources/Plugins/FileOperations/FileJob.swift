@@ -265,9 +265,9 @@ public final class FileJob: @unchecked Sendable {
     public static let smallFileLimit: Int64 = 4 << 20
     /// Folders nested deeper than this are not entered; the walk goes one call deeper per
     /// level, on a thread of its own whose stack has room for exactly this many.
-    static let depthLimit = 1_024
+    internal static let depthLimit = 1_024
     /// The limit this job goes by; tests set a small one.
-    var depthLimit = FileJob.depthLimit
+    internal var depthLimit = FileJob.depthLimit
     private static let stackSize = 64 << 20
     /// Top-level sources on a server are remembered from the first count up to this many, so
     /// that each is asked about once and not three times.
@@ -318,7 +318,7 @@ public final class FileJob: @unchecked Sendable {
     /// ones are the many that would otherwise crowd out the big ones that a later rename asks for.
     private let remembered = NSLock()
     private var measures: [Int: Measure] = [:]
-    var rememberedLimit = 50_000
+    internal var rememberedLimit = 50_000
     private static let worthKeepingPastLimit = 64
     /// Sources (folders of a move) that the first count took for a plain rename and counted as
     /// one item.
@@ -349,7 +349,7 @@ public final class FileJob: @unchecked Sendable {
     /// The keys of those sources and of every folder above.
     private var kept: Set<String> = []
     /// This many waiting removals are committed and carried out without waiting for the end.
-    var deferredBatchSize = 10_000
+    internal var deferredBatchSize = 10_000
 
     private struct DeferredRemoval {
         let url: URL
@@ -549,7 +549,7 @@ public final class FileJob: @unchecked Sendable {
 
     /// How long a file system on a server is given to tidy up after a step that failed or was
     /// stopped (to take a temporary file away again) before the job goes on without it.
-    var cleanupPatience: TimeInterval = 10
+    internal var cleanupPatience: TimeInterval = 10
 
     /// The flag for a call that tidies up.
     ///
@@ -1480,7 +1480,7 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// `.afm-<UUID>.tmp`, the name every unfinished copy carries.
-    static func isTemporaryName(_ name: String) -> Bool {
+    internal static func isTemporaryName(_ name: String) -> Bool {
         name.utf8.count == 45 && name.hasPrefix(".afm-") && name.hasSuffix(".tmp")
             && UUID(uuidString: String(name.dropFirst(5).dropLast(4))) != nil
     }
@@ -1489,14 +1489,14 @@ public final class FileJob: @unchecked Sendable {
     private static let swept = Guarded(Set<String>())
 
     /// How old an unfinished copy must be before it counts as left behind.
-    static let staleTemporaryAge: TimeInterval = 24 * 60 * 60
+    internal static let staleTemporaryAge: TimeInterval = 24 * 60 * 60
 
     /// Removes the unfinished copies that a crash or a failed clean-up left in the target
     /// folder long ago: plain files under the job's own temporary name that nobody has
     /// touched for a day.
     ///
     /// Local folders only.
-    static func sweepStaleTemporaries(in directory: URL, now: Date = Date()) {
+    internal static func sweepStaleTemporaries(in directory: URL, now: Date = Date()) {
         guard directory.isFileURL, let stream = opendir(directory.path) else {
             return
         }
@@ -2313,7 +2313,7 @@ public final class FileJob: @unchecked Sendable {
 
     /// What the system answers when a place has no Trash at all, as opposed to a failure of
     /// this one item (no permission, the item vanished), which is the user's to deal with.
-    static func isNoTrash(_ error: any Error) -> Bool {
+    internal static func isNoTrash(_ error: any Error) -> Bool {
         if case .notSupported? = error as? FileSystemError {
             return true
         }
@@ -2568,7 +2568,7 @@ public final class FileJob: @unchecked Sendable {
 
     /// "Operation not permitted": what the system answers for a locked item, as opposed to a
     /// folder one has no right to change.
-    static func isRefusedAsLocked(_ error: any Error) -> Bool {
+    internal static func isRefusedAsLocked(_ error: any Error) -> Bool {
         let error = error as NSError
         if error.domain == NSPOSIXErrorDomain {
             return error.code == Int(EPERM)
@@ -2783,13 +2783,13 @@ public final class FileJob: @unchecked Sendable {
     /// A name that stands for one entry of its folder: not empty, not `.` or `..`, no `/`, no NUL.
     ///
     /// The kernel's rule (`PathSafety`), byte for byte.
-    static func isSafeName(_ name: String) -> Bool {
+    internal static func isSafeName(_ name: String) -> Bool {
         PathSafety.isSafeName(name)
     }
 
     /// How a target name is compared for "is it taken": a volume may fold letter case and the
     /// forms of an accented letter, and then two names that look different are one place.
-    static func claimKey(_ url: URL) -> String {
+    internal static func claimKey(_ url: URL) -> String {
         url.locationKey.precomposedStringWithCanonicalMapping.lowercased()
     }
 
@@ -2797,7 +2797,7 @@ public final class FileJob: @unchecked Sendable {
     ///
     /// Two targets that fold to one place have one number; two that do not may share one, once in a
     /// blue moon, and are then taken for one place, which errs on the careful side.
-    static func claimHash(_ url: URL) -> Int {
+    internal static func claimHash(_ url: URL) -> Int {
         claimKey(url).hashValue
     }
 
@@ -2942,7 +2942,7 @@ public final class FileJob: @unchecked Sendable {
 /// two files.
 ///
 /// Anything that is not a local path has no identity and compares as different.
-enum FileIdentity {
+internal enum FileIdentity {
     private static func status(_ path: String, followingLinks: Bool) -> stat? {
         var info = stat()
         return (followingLinks ? stat(path, &info) : lstat(path, &info)) == 0 ? info : nil
@@ -2961,12 +2961,12 @@ enum FileIdentity {
     }
 
     /// The flags of the entry itself (the Finder's lock among them); nil when it cannot be asked.
-    static func flags(of url: URL) -> UInt32? {
+    internal static func flags(of url: URL) -> UInt32? {
         status(url, followingLinks: false)?.st_flags
     }
 
     /// Gives an entry back the flags it had.
-    static func restoreFlags(_ flags: UInt32, of url: URL) {
+    internal static func restoreFlags(_ flags: UInt32, of url: URL) {
         guard url.isFileURL, let now = status(url, followingLinks: false), now.st_flags != flags else {
             return
         }
@@ -2974,12 +2974,12 @@ enum FileIdentity {
     }
 
     /// The volume the entry is on.
-    static func device(of url: URL) -> dev_t? {
+    internal static func device(of url: URL) -> dev_t? {
         status(url, followingLinks: true)?.st_dev
     }
 
     /// The volume of `url`, or of the nearest folder above it that exists.
-    static func device(ofNearest url: URL) -> dev_t? {
+    internal static func device(ofNearest url: URL) -> dev_t? {
         guard url.isFileURL else {
             return nil
         }
@@ -2995,7 +2995,7 @@ enum FileIdentity {
     /// the names differing at most in letter case or in the form of an accented letter.
     ///
     /// Two hard links to one file are not.
-    static func sameEntry(_ a: URL, _ b: URL) -> Bool {
+    internal static func sameEntry(_ a: URL, _ b: URL) -> Bool {
         guard a.isFileURL, b.isFileURL,
             a.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased()
                 == b.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased(),
@@ -3012,7 +3012,7 @@ enum FileIdentity {
     /// links it leads.
     ///
     /// Looks at the folders above `destination` that exist.
-    static func isInside(_ destination: URL, folder: URL) -> Bool {
+    internal static func isInside(_ destination: URL, folder: URL) -> Bool {
         guard destination.isFileURL, let own = status(folder, followingLinks: false) else {
             return false
         }
@@ -3031,11 +3031,11 @@ enum FileIdentity {
 /// A value behind a lock.
 ///
 /// Unchecked `Sendable`: `value` is guarded by `lock`.
-final class Guarded<Value: Sendable>: @unchecked Sendable {
+internal final class Guarded<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Value
-    init(_ value: Value) { self.value = value }
-    func withLock<Result>(_ body: (inout Value) -> Result) -> Result {
+    internal init(_ value: Value) { self.value = value }
+    internal func withLock<Result>(_ body: (inout Value) -> Result) -> Result {
         lock.lock()
         defer { lock.unlock() }
         return body(&value)

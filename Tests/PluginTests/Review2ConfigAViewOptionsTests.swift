@@ -13,38 +13,38 @@ import Testing
 /// The test says when the background work and its return happen.
 @MainActor
 @Suite
-struct Review2ConfigAViewOptions {
+internal struct Review2ConfigAViewOptions {
     /// Holds what the plugin hands to the background and back, until the test runs it.
     ///
     /// Unchecked: used on the main thread only; the plugin hands its steps over there and the test
     /// runs them there.
-    final class Steps: @unchecked Sendable {
-        var background: [@Sendable () -> Void] = []
-        var main: [@MainActor @Sendable () -> Void] = []
+    internal final class Steps: @unchecked Sendable {
+        internal var background: [@Sendable () -> Void] = []
+        internal var main: [@MainActor @Sendable () -> Void] = []
 
-        func runBackground() {
+        internal func runBackground() {
             let work = background
             background = []
             work.forEach { $0() }
         }
 
         @MainActor
-        func runMain() {
+        internal func runMain() {
             let work = main
             main = []
             work.forEach { $0() }
         }
     }
 
-    let memory = MemoryFileSystem()
-    let plugin = ViewOptionsPlugin()
-    let steps = Steps()
-    let bench: TestBench
+    internal let memory = MemoryFileSystem()
+    internal let plugin = ViewOptionsPlugin()
+    internal let steps = Steps()
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var model: PanelModel { bench.left.model }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var model: PanelModel { bench.left.model }
 
-    init() {
+    internal init() {
         for number in 0..<ViewOptionsPlugin.backgroundSortThreshold {
             memory.addFile("/Big/f\(number).txt", String(repeating: "x", count: number % 7))
         }
@@ -58,7 +58,7 @@ struct Review2ConfigAViewOptions {
     /// (Before the model kept the wish, `PanelModel.requestSort`, the stale result sent the
     /// new list to the background a second time; now the reading brings the order with it.)
     @Test
-    func aListThatChangedWhileItWasSortedArrivesInTheOrderThatWasAskedFor() {
+    internal func aListThatChangedWhileItWasSortedArrivesInTheOrderThatWasAskedFor() {
         #expect(model.sort.key == .name && model.listedItems.count > ViewOptionsPlugin.backgroundSortThreshold)
         commands.perform(.sortBySize)
         #expect(steps.background.count == 1 && model.sort.key == .name)
@@ -76,7 +76,7 @@ struct Review2ConfigAViewOptions {
     }
 
     @Test
-    func anOrderSetByAnotherRouteMeanwhileIsNotOverwritten() {
+    internal func anOrderSetByAnotherRouteMeanwhileIsNotOverwritten() {
         commands.perform(.sortBySize)
         // A click on a column sets the order directly.
         model.setSort(ListOrder(key: .ext, descending: false))
@@ -91,7 +91,7 @@ struct Review2ConfigAViewOptions {
     }
 
     @Test
-    func aLaterSortCommandTakesOver() {
+    internal func aLaterSortCommandTakesOver() {
         commands.perform(.sortBySize)
         commands.perform(.sortByTime)
         #expect(steps.background.count == 2)
@@ -101,7 +101,7 @@ struct Review2ConfigAViewOptions {
     }
 
     @Test
-    func aLongListIsFilteredInTheBackground() {
+    internal func aLongListIsFilteredInTheBackground() {
         let all = model.items.count
         commands.perform(ViewOptionsPlugin.programs)
         #expect(steps.background.count == 1 && model.filter == nil && model.items.count == all)
@@ -125,7 +125,7 @@ struct Review2ConfigAViewOptions {
     }
 
     @Test
-    func onlySelectedIsOfferedByTheNumberOfMarks() {
+    internal func onlySelectedIsOfferedByTheNumberOfMarks() {
         #expect(!commands.isEnabled(ViewOptionsPlugin.onlySelected))
         model.setSelected(true, names: ["tool", "f1.txt"])
         #expect(commands.isEnabled(ViewOptionsPlugin.onlySelected))

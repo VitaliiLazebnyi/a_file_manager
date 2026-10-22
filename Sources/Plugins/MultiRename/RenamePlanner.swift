@@ -2,7 +2,7 @@ import AFMKernel
 import Foundation
 
 /// How an item of the rename list stands (spec 09 › Start!, collisions, Undo, Result list).
-enum RenameStatus: Equatable {
+internal enum RenameStatus: Equatable {
     /// The new name is the old one.
     case unchanged
     case ready
@@ -15,12 +15,12 @@ enum RenameStatus: Equatable {
     /// A file that is not being renamed away already has the name.
     case exists
 
-    var isConflict: Bool { self == .duplicate || self == .exists }
+    internal var isConflict: Bool { self == .duplicate || self == .exists }
 }
 
 /// One rename the file system is asked for.
-struct RenameStep: Equatable {
-    enum Kind: Equatable {
+internal struct RenameStep: Equatable {
+    internal enum Kind: Equatable {
         case direct
         /// Out of the way, to a temporary name, because the item's own new name is still taken
         /// by another item of the list.
@@ -30,13 +30,13 @@ struct RenameStep: Equatable {
     }
 
     /// The index of the item in the list the plan was made for.
-    let item: Int
-    let from: URL
-    let to: URL
-    let kind: Kind
+    internal let item: Int
+    internal let from: URL
+    internal let to: URL
+    internal let kind: Kind
     /// The new name differs from the old one only in what the file system does not tell
     /// apart (letter case): the rename lands on the file itself.
-    let ontoItself: Bool
+    internal let ontoItself: Bool
 }
 
 /// Works out what a set of renames collides with and in which order it can be carried out
@@ -46,25 +46,25 @@ struct RenameStep: Equatable {
 ///
 /// Everywhere, `sources[i]` is where item i is, and `targets[i]` where it is to go: nil when
 /// the item stays (no name, skipped), the source itself when the name does not change.
-struct RenamePlanner {
+internal struct RenamePlanner {
     /// Whether the file system takes `A.txt` and `a.txt` for the same name: in every folder,
     /// or only in the folders in `foldedFolders` (their `locationKey`s), as on a list whose
     /// items lie on several volumes.
-    let foldsCase: Bool
+    internal let foldsCase: Bool
     private let foldedFolders: Set<String>
 
-    init(foldsCase: Bool = false) {
+    internal init(foldsCase: Bool = false) {
         self.foldsCase = foldsCase
         foldedFolders = []
     }
 
-    init(foldedFolders: Set<String>) {
+    internal init(foldedFolders: Set<String>) {
         foldsCase = false
         self.foldedFolders = foldedFolders
     }
 
     /// A location in the form in which the file system tells names apart.
-    func key(_ url: URL) -> String {
+    internal func key(_ url: URL) -> String {
         let plain = url.locationKey
         guard
             foldsCase || (!foldedFolders.isEmpty && foldedFolders.contains(url.deletingLastPathComponent().locationKey))
@@ -86,7 +86,7 @@ struct RenamePlanner {
     /// The items whose new name collides: with each other, with an item that stays, or with a
     /// file outside the list. `existing` holds the keys of what is in the target folders now,
     /// the sources included.
-    func conflicts(sources: [URL], targets: [URL?], existing: Set<String>) -> [Int: RenameStatus] {
+    internal func conflicts(sources: [URL], targets: [URL?], existing: Set<String>) -> [Int: RenameStatus] {
         // The keys are most of the work; they are made on all cores.
         let finalKeys = Parallel.map(Array(sources.indices), serialBelow: 512) { key(targets[$0] ?? sources[$0]) }
         // The names that more than one item ends up with.
@@ -108,7 +108,7 @@ struct RenamePlanner {
 
     /// The targets with every collision renamed away to `name (2).ext`, `name (3).ext`, …
     /// Of several items that want the same free name, the first in the list gets it.
-    func autoRenamed(sources: [URL], targets: [URL?], isFolder: [Bool], existing: Set<String>) -> [URL?] {
+    internal func autoRenamed(sources: [URL], targets: [URL?], isFolder: [Bool], existing: Set<String>) -> [URL?] {
         var targets = targets
         let moving = sources.indices.compactMap { index in
             targets[index].flatMap { moves(sources[index], $0) ? (index: index, target: $0) : nil }
@@ -150,7 +150,7 @@ struct RenamePlanner {
     ///
     /// An item that stays keeps its name, which another item may want: such an item is skipped as
     /// well, and so on along a chain. Works through a list of items to look at, once each.
-    func skippingConflicts(sources: [URL], targets: [URL?], existing: Set<String>) -> [URL?] {
+    internal func skippingConflicts(sources: [URL], targets: [URL?], existing: Set<String>) -> [URL?] {
         var targets = targets
         var wanting: [String: [Int]] = [:]
         for index in sources.indices where moves(sources[index], targets[index]) {
@@ -169,13 +169,13 @@ struct RenamePlanner {
     }
 
     /// The longest a name can be, in UTF-8 bytes.
-    static let longestName = 255
+    internal static let longestName = 255
 
     /// `report.txt` → `report (2).txt`; a folder keeps its dots.
     ///
     /// A name that the number would make too long for the file system is shortened at its base,
     /// between two characters.
-    static func numbered(_ url: URL, _ number: Int, isFolder: Bool) -> URL {
+    internal static func numbered(_ url: URL, _ number: Int, isFolder: Bool) -> URL {
         let name = url.lastPathComponent
         let (base, ext) = isFolder ? (name, "") : FileItem.split(name)
         let tail = " (\(number))" + (ext.isEmpty ? "" : "." + ext)
@@ -245,7 +245,7 @@ struct RenamePlanner {
     ///
     /// `cancelled` is looked at every few thousand items; a cancelled plan is cut short and must
     /// not be carried out. The keys of all items, which are most of the work, are made on all cores.
-    func steps(
+    internal func steps(
         sources: [URL],
         targets: [URL?],
         isFolder: [Bool]? = nil,

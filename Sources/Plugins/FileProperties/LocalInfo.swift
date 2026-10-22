@@ -4,21 +4,21 @@ import UniformTypeIdentifiers
 
 /// What the Mac's own file system knows about an item beyond the provider interface: owner,
 /// further dates, flags and the space it really takes.
-struct LocalDetails: Equatable {
-    var mode: UInt16
-    var ownerID: uid_t
-    var groupID: gid_t
-    var created: Date
-    var modified: Date
-    var accessed: Date
+internal struct LocalDetails: Equatable {
+    internal var mode: UInt16
+    internal var ownerID: uid_t
+    internal var groupID: gid_t
+    internal var created: Date
+    internal var modified: Date
+    internal var accessed: Date
     /// `st_flags`: `UF_HIDDEN`, `UF_IMMUTABLE` (Finder's Locked) and the rest.
-    var flags: UInt32
+    internal var flags: UInt32
     /// The bytes the item takes on its volume.
-    var allocated: Int64
-    var linkCount: Int
+    internal var allocated: Int64
+    internal var linkCount: Int
 
-    var isHidden: Bool { flags & UInt32(UF_HIDDEN) != 0 }
-    var isLocked: Bool { flags & UInt32(UF_IMMUTABLE) != 0 }
+    internal var isHidden: Bool { flags & UInt32(UF_HIDDEN) != 0 }
+    internal var isLocked: Bool { flags & UInt32(UF_IMMUTABLE) != 0 }
 }
 
 /// Questions and changes that only make sense for `file:` URLs, done with POSIX calls.
@@ -26,7 +26,7 @@ struct LocalDetails: Equatable {
 /// **Threading.** Everything here blocks on the disk and is meant for background threads; all
 /// of it may be called from several threads at once. The name caches are the only shared state
 /// and are guarded by a lock.
-enum LocalInfo {
+internal enum LocalInfo {
     private static let lock = NSLock()
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var userNames: [uid_t: String] = [:]
@@ -37,7 +37,7 @@ enum LocalInfo {
         Date(timeIntervalSince1970: TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000)
     }
 
-    static func posixError(_ code: Int32, _ url: URL) -> any Error {
+    internal static func posixError(_ code: Int32, _ url: URL) -> any Error {
         NSError(
             domain: NSPOSIXErrorDomain,
             code: Int(code),
@@ -48,7 +48,7 @@ enum LocalInfo {
     /// The item itself; a link is not followed.
     ///
     /// Nil when nothing is there.
-    static func details(_ url: URL) -> LocalDetails? {
+    internal static func details(_ url: URL) -> LocalDetails? {
         guard url.isFileURL else {
             return nil
         }
@@ -70,7 +70,7 @@ enum LocalInfo {
     }
 
     /// Whether the entry itself is a symbolic link, asked from the disk now.
-    static func isSymlink(_ url: URL) -> Bool {
+    internal static func isSymlink(_ url: URL) -> Bool {
         guard url.isFileURL else {
             return false
         }
@@ -82,7 +82,7 @@ enum LocalInfo {
     /// a socket.
     ///
     /// True for everything else, and for what is not on a local disk.
-    static func canBeRead(_ url: URL) -> Bool {
+    internal static func canBeRead(_ url: URL) -> Bool {
         guard url.isFileURL else {
             return true
         }
@@ -99,11 +99,11 @@ enum LocalInfo {
     ///
     /// For tests: they check that this happens on a job's thread and not when a dialog is put
     /// together.
-    static var nameLookups: Int { lock.withLock { lookups } }
+    internal static var nameLookups: Int { lock.withLock { lookups } }
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var lookups = 0
 
-    static func userName(_ id: uid_t) -> String {
+    internal static func userName(_ id: uid_t) -> String {
         lock.lock()
         let known = userNames[id]
         if known == nil { lookups += 1 }
@@ -123,7 +123,7 @@ enum LocalInfo {
         return name
     }
 
-    static func groupName(_ id: gid_t) -> String {
+    internal static func groupName(_ id: gid_t) -> String {
         lock.lock()
         let known = groupNames[id]
         if known == nil { lookups += 1 }
@@ -144,7 +144,7 @@ enum LocalInfo {
     }
 
     /// A user by name or number; nil when there is no such user.
-    static func userID(_ text: String) -> uid_t? {
+    internal static func userID(_ text: String) -> uid_t? {
         if let number = uid_t(text) {
             return number
         }
@@ -154,7 +154,7 @@ enum LocalInfo {
         return getpwnam_r(text, &entry, &buffer, buffer.count, &result) == 0 && result != nil ? entry.pw_uid : nil
     }
 
-    static func groupID(_ text: String) -> gid_t? {
+    internal static func groupID(_ text: String) -> gid_t? {
         if let number = gid_t(text) {
             return number
         }
@@ -165,7 +165,7 @@ enum LocalInfo {
     }
 
     /// Where a symbolic link points, as it is written in the link.
-    static func linkTarget(_ url: URL) -> String? {
+    internal static func linkTarget(_ url: URL) -> String? {
         guard url.isFileURL else {
             return nil
         }
@@ -183,7 +183,7 @@ enum LocalInfo {
     ///
     /// Nil when `url` is neither. An alias is resolved without mounting volumes and without any
     /// dialog.
-    static func resolvedLinkTarget(_ url: URL) -> URL? {
+    internal static func resolvedLinkTarget(_ url: URL) -> URL? {
         if let target = linkTarget(url) {
             return URL(fileURLWithPath: target, relativeTo: url.deletingLastPathComponent()).standardizedFileURL
         }
@@ -200,7 +200,7 @@ enum LocalInfo {
     }
 
     /// The names of the item's extended attributes; a link is not followed.
-    static func extendedAttributeNames(_ url: URL) -> [String] {
+    internal static func extendedAttributeNames(_ url: URL) -> [String] {
         guard url.isFileURL else {
             return []
         }
@@ -217,7 +217,7 @@ enum LocalInfo {
             }
     }
 
-    static func tags(_ url: URL) -> [String] {
+    internal static func tags(_ url: URL) -> [String] {
         guard url.isFileURL else {
             return []
         }
@@ -227,7 +227,7 @@ enum LocalInfo {
     /// What kind of file this is, in the user's language: "PNG image", "Folder".
     ///
     /// Local files are asked from the system; elsewhere the extension decides.
-    static func kind(of item: FileItem) -> String {
+    internal static func kind(of item: FileItem) -> String {
         if item.url.isFileURL,
             let kind = try? item.url.resourceValues(forKeys: [.localizedTypeDescriptionKey]).localizedTypeDescription
         {
@@ -247,7 +247,7 @@ enum LocalInfo {
     }
 
     /// Sets or clears a flag of `st_flags` on the item itself (a link is not followed).
-    static func setFlag(_ flag: UInt32, _ isOn: Bool, of url: URL) throws {
+    internal static func setFlag(_ flag: UInt32, _ isOn: Bool, of url: URL) throws {
         var st = stat()
         guard lstat(url.path, &st) == 0 else { throw posixError(errno, url) }
         let flags = isOn ? st.st_flags | flag : st.st_flags & ~flag
@@ -258,13 +258,13 @@ enum LocalInfo {
     }
 
     /// Changes owner and group of the item itself; nil leaves one as it is.
-    static func setOwner(_ owner: uid_t?, group: gid_t?, of url: URL) throws {
+    internal static func setOwner(_ owner: uid_t?, group: gid_t?, of url: URL) throws {
         // The all-ones value means "unchanged" to the system.
         if lchown(url.path, owner ?? uid_t.max, group ?? gid_t.max) != 0 { throw posixError(errno, url) }
     }
 
     /// The allocation unit of the volume `url` is on; sizes on disk are multiples of it.
-    static func clusterSize(at url: URL) -> Int64? {
+    internal static func clusterSize(at url: URL) -> Int64? {
         guard url.isFileURL else {
             return nil
         }

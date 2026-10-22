@@ -11,9 +11,9 @@ import Testing
 /// comes with the developer tools, with a certificate made by `/usr/bin/openssl` in the sandbox;
 /// where one of the two is missing the tests are skipped.
 @Suite(.enabled(if: TLSServer.isAvailable))
-struct NetworkTLS {
+internal struct NetworkTLS {
     @Test(arguments: [TLSMode.explicit, .implicit])
-    func connectsListsAndTransfers(mode: TLSMode) throws {
+    internal func connectsListsAndTransfers(mode: TLSMode) throws {
         let box = try Sandbox()
         try box.file("srv/hello.txt", "hello over TLS")
         let server = try TLSServer(mode: mode, box: box)
@@ -63,7 +63,7 @@ struct NetworkTLS {
     }
 
     @Test
-    func aServerWithoutTLSRefusesExplicitTLS() throws {
+    internal func aServerWithoutTLSRefusesExplicitTLS() throws {
         let fixture = try FTPFixture()
         let key = ServerKey(scheme: "ftps", host: "127.0.0.1", port: fixture.server.port)
         fixture.center.announce(ConnectionProfile(key: key, tls: .explicit, anonymous: true))
@@ -77,21 +77,21 @@ struct NetworkTLS {
 ///
 /// What goes wrong on a connection (a handshake the client gave up, among others) is written to
 /// `tls-errors.log` in the sandbox, a line each.
-final class TLSServer {
-    static let python = "/usr/bin/python3"
-    static let openssl = "/usr/bin/openssl"
-    static var isAvailable: Bool {
+internal final class TLSServer {
+    internal static let python = "/usr/bin/python3"
+    internal static let openssl = "/usr/bin/openssl"
+    internal static var isAvailable: Bool {
         FileManager.default.isExecutableFile(atPath: python) && FileManager.default.isExecutableFile(atPath: openssl)
     }
 
-    let port: Int
+    internal let port: Int
     private let process = Process()
 
     /// `refusesProtection`: the server answers PROT with an error, as one that cannot encrypt its data connections.
     /// `requiresReuse`: every data connection is refused for not resuming the control connection's TLS session.
     /// `resumesSessions`: false gives no session tickets, so every connection makes a whole handshake and has its
     /// certificate checked.
-    init(
+    internal init(
         mode: TLSMode,
         box: Sandbox,
         refusesProtection: Bool = false,
@@ -135,11 +135,11 @@ final class TLSServer {
         port = number
     }
 
-    func stop() {
+    internal func stop() {
         process.terminate()
     }
 
-    static let script = """
+    internal static let script = """
         import os, socket, ssl, sys, threading
         mode, cert, key, root = sys.argv[1:5]
         refuse_prot = "refuse-prot" in sys.argv[5:]

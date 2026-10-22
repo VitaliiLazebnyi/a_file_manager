@@ -122,7 +122,7 @@ public enum DuplicateFinder {
     /// The first path stays.
     ///
     /// `mountOf` tells the share that holds a local file, if any (`Mount.of`).
-    static func distinctFiles<Entry: Sendable>(
+    internal static func distinctFiles<Entry: Sendable>(
         _ keyed: [(key: Entry, item: FileItem)],
         mountOf: (URL) -> Mount? = Mount.of
     ) -> [(key: Entry, item: FileItem)] {
@@ -166,13 +166,13 @@ public enum DuplicateFinder {
     }
 
     /// A disk that is somebody else's: a share of a server, mounted here.
-    struct Mount {
+    internal struct Mount {
         /// What the system calls the source of the mount (`//user@host/share`), and where it is mounted.
-        let from: String
-        let on: String
+        internal let from: String
+        internal let on: String
 
         /// The mount that holds `url`, when it is not a local disk; nil otherwise.
-        static func of(_ url: URL) -> Self? {
+        internal static func of(_ url: URL) -> Self? {
             var info = statfs()
             func text<T>(_ field: T) -> String {
                 withUnsafePointer(to: field) {
@@ -186,7 +186,7 @@ public enum DuplicateFinder {
         }
 
         /// The file in the share, as the same text for every place the share is mounted at.
-        func place(of path: String) -> String {
+        internal func place(of path: String) -> String {
             let inside =
                 path.utf8.starts(with: on.utf8)
                 ? String(decoding: Array(path.utf8.dropFirst(on.utf8.count)), as: UTF8.self) : path
@@ -204,7 +204,7 @@ public enum DuplicateFinder {
 
     /// The SHA-256 of a file's contents, read in blocks; nil when it cannot be read or the
     /// work was cancelled.
-    static func digest(
+    internal static func digest(
         of url: URL,
         fileSystems: FileSystemRegistry,
         cancellation: CancellationFlag = CancellationFlag()

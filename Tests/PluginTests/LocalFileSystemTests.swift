@@ -5,11 +5,11 @@ import TestSupport
 import Testing
 
 @Suite
-struct LocalDisk {
-    let local = LocalFileSystem()
+internal struct LocalDisk {
+    internal let local = LocalFileSystem()
 
     @Test
-    func listsADirectory() throws {
+    internal func listsADirectory() throws {
         let box = try Sandbox()
         try box.file("a.txt", String(repeating: "a", count: 2_048))
         try box.folder("docs")
@@ -28,7 +28,7 @@ struct LocalDisk {
     }
 
     @Test
-    func theBulkListingAgreesWithLookingAtEachEntry() throws {
+    internal func theBulkListingAgreesWithLookingAtEachEntry() throws {
         let box = try Sandbox()
         try box.file(
             "plain.txt",
@@ -81,7 +81,7 @@ struct LocalDisk {
     }
 
     @Test
-    func aLargeFolderIsListedInPieces() throws {
+    internal func aLargeFolderIsListedInPieces() throws {
         let box = try Sandbox()
         let count = 9_000
         for index in 0..<count { FileManager.default.createFile(atPath: box.url("f\(index).dat").path, contents: nil) }
@@ -108,7 +108,7 @@ struct LocalDisk {
     }
 
     @Test
-    func itemsParentsAndRoots() throws {
+    internal func itemsParentsAndRoots() throws {
         let box = try Sandbox()
         try box.file("a.txt")
         #expect(local.item(at: box.url("a.txt"))?.name == "a.txt")
@@ -119,7 +119,7 @@ struct LocalDisk {
     }
 
     @Test
-    func readsSeeksAndWrites() throws {
+    internal func readsSeeksAndWrites() throws {
         let box = try Sandbox()
         let stamp = Date(timeIntervalSince1970: 1_700_000_000)
         let writer = try local.write(box.url("new.txt"))
@@ -139,7 +139,7 @@ struct LocalDisk {
     }
 
     @Test
-    func writingNeverOverwritesAnExistingFile() throws {
+    internal func writingNeverOverwritesAnExistingFile() throws {
         let box = try Sandbox()
         try box.file("kept.txt", "precious")
         #expect(throws: FileSystemError.self) { try local.write(box.url("kept.txt")) }
@@ -147,7 +147,7 @@ struct LocalDisk {
     }
 
     @Test
-    func movesWithAndWithoutReplacing() throws {
+    internal func movesWithAndWithoutReplacing() throws {
         let box = try Sandbox()
         try box.file("a.txt", "a")
         try box.file("b.txt", "b")
@@ -162,7 +162,7 @@ struct LocalDisk {
     }
 
     @Test
-    func removesOneItemAndNeverATree() throws {
+    internal func removesOneItemAndNeverATree() throws {
         let box = try Sandbox()
         try box.file("docs/inside.txt")
         try box.folder("empty")
@@ -179,7 +179,7 @@ struct LocalDisk {
     }
 
     @Test
-    func copyingNeverTouchesAnExistingDestination() throws {
+    internal func copyingNeverTouchesAnExistingDestination() throws {
         let box = try Sandbox()
         try box.file("a.txt", "a")
         try local.copy(box.url("a.txt"), to: box.url("b.txt")) { _ in true }
@@ -190,7 +190,7 @@ struct LocalDisk {
     }
 
     @Test
-    func offersPlacesAndVolumeInformation() {
+    internal func offersPlacesAndVolumeInformation() {
         let places = local.settledPlaces()
         #expect(places.first?.kind == .home)
         #expect(places.contains { $0.kind == .internalDisk && $0.url.path == "/" })
@@ -199,7 +199,7 @@ struct LocalDisk {
     }
 
     @Test
-    func reportsChangesInWatchedFoldersOnly() async throws {
+    internal func reportsChangesInWatchedFoldersOnly() async throws {
         let box = try Sandbox()
         try box.folder("watched/sub")
         try box.folder("other")

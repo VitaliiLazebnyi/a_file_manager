@@ -191,7 +191,7 @@ public final class OperationLog: @unchecked Sendable {
     /// Runs `work` on the log's queue, in its turn.
     ///
     /// For tests, which hold the queue up with it the way a disk that has stopped answering does.
-    func onQueue(_ work: @escaping @Sendable () -> Void) {
+    internal func onQueue(_ work: @escaping @Sendable () -> Void) {
         queue.async(execute: work)
     }
 
@@ -382,7 +382,7 @@ public final class OperationLog: @unchecked Sendable {
 
     /// `operations.2026-10-12.log`, `operations.2026-10-12-2.log` and `operations.3.log` are
     /// copies of `operations.log`.
-    static func isRotatedCopy(_ name: String, of log: String) -> Bool {
+    internal static func isRotatedCopy(_ name: String, of log: String) -> Bool {
         let url = URL(fileURLWithPath: log)
         let (base, ext) = (url.deletingPathExtension().lastPathComponent, url.pathExtension)
         let suffix = ext.isEmpty ? "" : "." + ext

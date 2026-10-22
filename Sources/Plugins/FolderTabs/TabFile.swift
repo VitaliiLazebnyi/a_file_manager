@@ -62,7 +62,7 @@ public struct TabFile: Equatable, Sendable {
     }
 
     /// A value as it stands on a line: in quotes with escapes when it would not read back the same.
-    static func value(_ text: String) -> String {
+    internal static func value(_ text: String) -> String {
         let scalars = text.unicodeScalars
         func unsafe(_ scalar: Unicode.Scalar) -> Bool {
             switch scalar.properties.generalCategory {
@@ -110,7 +110,7 @@ public struct TabFile: Equatable, Sendable {
 
     /// The text a value stands for; a value that is not in quotes, or has an escape that is
     /// not ours, is taken as it is (that is how files written by hand and by other programs read).
-    static func unquoted(_ value: String) -> String {
+    internal static func unquoted(_ value: String) -> String {
         let scalars = Array(value.unicodeScalars)
         guard scalars.count >= 2, scalars.first == "\"", scalars.last == "\"" else {
             return value

@@ -43,9 +43,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
 /// Review round 2: the diff of large files near the shortest, saving that never loses or mangles
 /// a file, and a session that does not trust a diff that is out of date.
 @Suite
-struct Review2CompareDiff {
+internal struct Review2CompareDiff {
     @Test
-    func aDeletedBlockInALargeFileCostsAboutTheBlock() {
+    internal func aDeletedBlockInALargeFileCostsAboutTheBlock() {
         let a = sourceLike(24_000, seed: 1)
         var b = a
         var random = Seeded(state: 2)
@@ -60,7 +60,7 @@ struct Review2CompareDiff {
     }
 
     @Test
-    func aMovedBlockInALargeFileCostsAboutTwiceTheBlock() {
+    internal func aMovedBlockInALargeFileCostsAboutTwiceTheBlock() {
         let a = sourceLike(24_000, seed: 3)
         var b = a
         let block = Array(b[3_000..<3_400])
@@ -76,7 +76,7 @@ struct Review2CompareDiff {
     }
 
     @Test
-    func whenTheSearchIsCutOffLinesUniqueToBothSidesHoldTheDiffTogether() {
+    internal func whenTheSearchIsCutOffLinesUniqueToBothSidesHoldTheDiffTogether() {
         // A low limit forces the cut-off at once; the lines that occur once on each side anchor the result.
         let a = Array(0..<6_000)
         var b = a
@@ -93,7 +93,7 @@ struct Review2CompareDiff {
     }
 
     @Test
-    func cutOffDiffsStayValidOnSmallRandomInputs() {
+    internal func cutOffDiffsStayValidOnSmallRandomInputs() {
         var random = Seeded(state: 6)
         for _ in 0..<400 {
             let a = (0..<Int.random(in: 0...40, using: &random)).map { _ in Int.random(in: 0..<6, using: &random) }
@@ -103,7 +103,7 @@ struct Review2CompareDiff {
     }
 
     @Test
-    func theLimitFollowsTheSizeAndStaysBounded() {
+    internal func theLimitFollowsTheSizeAndStaysBounded() {
         #expect(Myers.defaultLimit(forSize: 19_999) == nil)
         #expect(Myers.defaultLimit(forSize: 20_000) == 8_192)
         #expect((Myers.defaultLimit(forSize: 100_000) ?? 0) > 2_000)
@@ -111,7 +111,7 @@ struct Review2CompareDiff {
     }
 
     @Test
-    func insideALineOnlyTheStartOfAHugeLineIsLookedAt() {
+    internal func insideALineOnlyTheStartOfAHugeLineIsLookedAt() {
         let long = String(repeating: "abcdefghij", count: 200_000)
         let ranges = TextDiff.inline(long, long + "X")
         #expect(
@@ -123,15 +123,15 @@ struct Review2CompareDiff {
 
 @MainActor
 @Suite
-struct Review2CompareSession {
-    let box: Sandbox
-    let plugin = CompareContentPlugin(opensWindows: false)
-    let settings = MemorySettings()
-    let bench: TestBench
-    var ui: ScriptedInteraction { bench.interaction }
-    var session: CompareSession { plugin.sessions[0] }
+internal struct Review2CompareSession {
+    internal let box: Sandbox
+    internal let plugin = CompareContentPlugin(opensWindows: false)
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var session: CompareSession { plugin.sessions[0] }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("A/f.txt", "one\ntwo\nthree\nfour\n")
         try box.file("B/f.txt", "one\n2\nthree\nfour\nfive\n")
@@ -144,7 +144,7 @@ struct Review2CompareSession {
         )
     }
 
-    func open() {
+    internal func open() {
         bench.left.reload()
         bench.left.moveCursor(toName: "f.txt")
         bench.commands.perform(.compareByContent)
@@ -152,7 +152,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func undoPutsBackExactlyWhatEditsReplaced() {
+    internal func undoPutsBackExactlyWhatEditsReplaced() {
         open()
         let before = session.text(.right, row: 1)
         session.copy(rows: 1..<2, to: .right)
@@ -170,7 +170,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func aRowThatPointsOutsideTheTextsIsNeverTrusted() {
+    internal func aRowThatPointsOutsideTheTextsIsNeverTrusted() {
         open()
         // Rows far beyond the texts change nothing and do not trap.
         session.copy(rows: 100..<200, to: .right)
@@ -178,7 +178,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func quittingAsksAboutUnsavedEditsAndCanBeCalledOff() {
+    internal func quittingAsksAboutUnsavedEditsAndCanBeCalledOff() {
         open()
         session.setText("two edited", .left, row: 1)
         ui.choiceAnswers = [2]  // Cancel
@@ -194,7 +194,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func stopAsksOnceMoreForWhatIsLeft() {
+    internal func stopAsksOnceMoreForWhatIsLeft() {
         open()
         session.setText("changed", .right, row: 1)
         ui.choiceAnswers = [0]
@@ -203,7 +203,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func aSaveNeverOverwritesAFileSomeoneElseChanged() throws {
+    internal func aSaveNeverOverwritesAFileSomeoneElseChanged() throws {
         open()
         session.setText("mine", .left, row: 1)
         // Someone else writes the file after it was loaded.
@@ -215,7 +215,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func aCharacterTheEncodingCannotHoldIsRefusedNotTurnedIntoAQuestionMark() throws {
+    internal func aCharacterTheEncodingCannotHoldIsRefusedNotTurnedIntoAQuestionMark() throws {
         try Data([0x63, 0x61, 0x66, 0xE9, 0x0A]).write(to: box.url("A/latin.txt"))
         try Data([0x63, 0x61, 0x66, 0xE9, 0x0A, 0x78, 0x0A]).write(to: box.url("B/latin.txt"))
         bench.left.reload()
@@ -231,7 +231,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func theTwoSidesOfOneFileAreNotBothSaved() throws {
+    internal func theTwoSidesOfOneFileAreNotBothSaved() throws {
         try box.file("A/g.txt", "a\nb\n")
         bench.left.reload()
         bench.left.moveCursor(toName: "g.txt")
@@ -248,7 +248,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func replaceKeepsHardLinksTogetherAndRefusesAChangedFile() throws {
+    internal func replaceKeepsHardLinksTogetherAndRefusesAChangedFile() throws {
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
         try box.file("h/one.txt", "old")
@@ -269,7 +269,7 @@ struct Review2CompareSession {
     }
 
     @Test
-    func aFileThatCannotBeRenamedOverIsNotLostWhenTheSecondStepFails() throws {
+    internal func aFileThatCannotBeRenamedOverIsNotLostWhenTheSecondStepFails() throws {
         // A provider that cannot replace in one step: the old file is moved aside and comes back if the new one cannot be put in place.
         let memory = MemoryFileSystem()
         memory.addFile("/d/f.txt", "old")

@@ -7,7 +7,7 @@ import Foundation
 /// a large one) are deflated at the same time and then written in order. Deflate allows that:
 /// pieces compressed independently form one valid stream when each but the last ends on a byte
 /// boundary. Used by one thread; only the compression itself runs on the others.
-final class ZipPacker {
+internal final class ZipPacker {
     private struct Piece {
         let member: Int
         let data: Data
@@ -24,9 +24,9 @@ final class ZipPacker {
         var aes: ZipAES.Encryptor?
     }
 
-    static let pieceSize = 1 << 20
+    internal static let pieceSize = 1 << 20
 
-    let writer: ZipWriter
+    internal let writer: ZipWriter
     private let level: Int
     private let password: String?
     private let encryption: ZipEncryption
@@ -41,7 +41,7 @@ final class ZipPacker {
     ///
     /// With a password the members are encrypted: with AES-256, or the traditional way when that is
     /// asked for (spec 08 › Encryption; see `ZipEncryption` for what each is worth).
-    init(
+    internal init(
         _ output: OutputFile,
         level: Int,
         password: String? = nil,
@@ -59,7 +59,8 @@ final class ZipPacker {
     /// `next` delivers its contents in blocks of at most `pieceSize`, nil at the end; folders and
     /// empty files deliver nothing. The record carries name, time and attributes; sizes, checksum
     /// and method are filled in here.
-    func add(_ record: ZipRecord, expectedSize: UInt64, stored: Bool = false, next: () throws -> Data?) throws {
+    internal func add(_ record: ZipRecord, expectedSize: UInt64, stored: Bool = false, next: () throws -> Data?) throws
+    {
         let id = firstMember + members.count
         members.append(Member(record: record, expectedSize: expectedSize))
         let stored = stored || level == 0
@@ -144,41 +145,41 @@ final class ZipPacker {
         pendingBytes = 0
     }
 
-    func finish(comment: Data = Data()) throws {
+    internal func finish(comment: Data = Data()) throws {
         try drain()
         try writer.finish(comment: comment)
     }
 }
 
 /// How Pack is to work (spec 08 › Pack › Options).
-struct PackOptions {
-    var format = ArchiveFormat.zip
+internal struct PackOptions {
+    internal var format = ArchiveFormat.zip
     /// 0 (store) … 9.
-    var level = 6
+    internal var level = 6
     /// Folders keep their paths relative to the source folder; without, everything is stored flat.
-    var storesPaths = true
-    var recurses = true
+    internal var storesPaths = true
+    internal var recurses = true
     /// The sources are deleted after a successful pack.
-    var movesSources = false
+    internal var movesSources = false
     /// One archive per operand.
-    var separateArchives = false
+    internal var separateArchives = false
     /// With separate archives: the archive of a folder holds its contents, not the folder.
-    var skipsBaseFolder = false
-    var password: String?
+    internal var skipsBaseFolder = false
+    internal var password: String?
     /// How the members are encrypted when there is a password.
-    var encryption = ZipEncryption.aes256
-    var verifies = false
-    var datesByNewest = false
-    var limits = ZipLimits.standard
+    internal var encryption = ZipEncryption.aes256
+    internal var verifies = false
+    internal var datesByNewest = false
+    internal var limits = ZipLimits.standard
 }
 
-struct PackResult {
+internal struct PackResult {
     /// The archives that were written.
-    var archives: [URL] = []
-    var failure: any Error?
-    var cancelled = false
+    internal var archives: [URL] = []
+    internal var failure: any Error?
+    internal var cancelled = false
     /// The operands that were packed completely.
-    var completed: [URL] = []
+    internal var completed: [URL] = []
 }
 
 /// Pack (spec 08 › Pack): builds archives from files of any file system.
@@ -186,11 +187,11 @@ struct PackResult {
 /// **Threading.** `run` blocks and is meant for a job's thread. Reading the sources and
 /// writing the archive happen there; compression is spread over all cores (`ZipPacker`,
 /// `ParallelCompressor`).
-final class Packer {
+internal final class Packer {
     /// One thing to store: where it comes from and the path it gets in the archive.
-    struct Member {
-        let item: FileItem
-        let path: String
+    internal struct Member {
+        internal let item: FileItem
+        internal let path: String
     }
 
     private let fileSystems: FileSystemRegistry
@@ -207,9 +208,9 @@ final class Packer {
     /// false cancels.
     ///
     /// Called on the job's thread.
-    var confirmReplace: ((URL) -> Bool)?
+    internal var confirmReplace: ((URL) -> Bool)?
 
-    init(fileSystems: FileSystemRegistry, store: ArchiveStore, monitor: any JobMonitor, options: PackOptions) {
+    internal init(fileSystems: FileSystemRegistry, store: ArchiveStore, monitor: any JobMonitor, options: PackOptions) {
         self.fileSystems = fileSystems
         self.store = store
         self.monitor = monitor
@@ -219,7 +220,7 @@ final class Packer {
     /// Packs `sources` into the archive at `archive` (below `innerFolder` when it is an
     /// existing ZIP), or with `separateArchives` into one archive per source in the folder of
     /// `archive`.
-    func run(_ sources: [FileItem], archive: URL, innerFolder: String = "") -> PackResult {
+    internal func run(_ sources: [FileItem], archive: URL, innerFolder: String = "") -> PackResult {
         var result = PackResult()
         do {
             var plans: [(archive: URL, sources: [FileItem], members: [Member])] = []
@@ -264,7 +265,7 @@ final class Packer {
 
     /// The name of the archive made for one operand: a folder or file gives `name.zip`; the
     /// single-file compressors keep the whole name (`a.txt` → `a.txt.gz`), spec 08 › Target string.
-    static func archiveName(for source: FileItem, format: ArchiveFormat) -> String {
+    internal static func archiveName(for source: FileItem, format: ArchiveFormat) -> String {
         if case .compressedFile = format {
             return source.name + "." + format.defaultExtension
         }
@@ -470,7 +471,7 @@ final class Packer {
     /// far as every file packed into it grants them.
     ///
     /// An archive of private files is not readable by everyone on the machine.
-    static func mode(for members: [Member]) -> mode_t {
+    internal static func mode(for members: [Member]) -> mode_t {
         let shared = members.filter { !$0.item.isDirectory }.reduce(UInt16(0o044)) { $0 & $1.item.permissions }
         return mode_t(0o600 | shared) & ~processMask
     }

@@ -17,27 +17,27 @@ import Testing
 /// when a read, write, listing or commit begins, and counts the calls that matter.
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-final class ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
-    let base: MemoryFileSystem
-    var scheme: String { base.scheme }
-    var capabilities: FileSystemCapabilities { base.capabilities }
+internal final class ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
+    internal let base: MemoryFileSystem
+    internal var scheme: String { base.scheme }
+    internal var capabilities: FileSystemCapabilities { base.capabilities }
     /// Called when a read, a write, a listing or a commit is entered (before it may wait).
-    var onRead: (() -> Void)?
-    var onWrite: (() -> Void)?
-    var onList: (() -> Void)?
-    var onCommit: (() -> Void)?
+    internal var onRead: (() -> Void)?
+    internal var onWrite: (() -> Void)?
+    internal var onList: (() -> Void)?
+    internal var onCommit: (() -> Void)?
     /// Called when a move begins.
-    var onMove: (() -> Void)?
+    internal var onMove: (() -> Void)?
     /// Claimed on top of what the base can do, as a server without a session claims `.append`
     /// that its connection then cannot keep.
-    var claims: FileSystemCapabilities = []
+    internal var claims: FileSystemCapabilities = []
     private let lock = NSLock()
     private var calls: [String: Int] = [:]
 
-    init(_ base: MemoryFileSystem) { self.base = base }
+    internal init(_ base: MemoryFileSystem) { self.base = base }
 
     private func count(_ name: String) { lock.withLock { calls[name, default: 0] += 1 } }
-    func count(of name: String) -> Int { lock.withLock { calls[name] ?? 0 } }
+    internal func count(of name: String) -> Int { lock.withLock { calls[name] ?? 0 } }
 
     private final class Reader: FileReader {
         let inner: any FileReader, owner: ProbeFileSystem
@@ -62,58 +62,58 @@ final class ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
         func interrupt() { inner.interrupt() }
     }
 
-    func capabilities(for url: URL) -> FileSystemCapabilities { base.capabilities(for: url).union(claims) }
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    internal func capabilities(for url: URL) -> FileSystemCapabilities { base.capabilities(for: url).union(claims) }
+    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         count("list " + directory.path)
         return try base.list(directory, showHidden: showHidden)
     }
-    func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
+    internal func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag) throws -> [FileItem] {
         count("list " + directory.path)
         onList?()
         return try base.list(directory, showHidden: showHidden, cancellation: cancellation)
     }
-    func item(at url: URL) -> FileItem? { base.item(at: url) }
-    func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader { Reader(try base.read(url), self) }
-    func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
+    internal func item(at url: URL) -> FileItem? { base.item(at: url) }
+    internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
+    internal func read(_ url: URL) throws -> any FileReader { Reader(try base.read(url), self) }
+    internal func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         Reader(try base.read(url, cancellation: cancellation), self)
     }
-    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> any FileWriter {
+    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func write(_ url: URL) throws -> any FileWriter {
         count("write")
         return Writer(try base.write(url), self)
     }
-    func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
+    internal func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         count("write")
         return Writer(try base.write(url, cancellation: cancellation), self)
     }
-    func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
+    internal func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         count("append")
         return Writer(try base.append(to: url, at: offset, cancellation: cancellation), self)
     }
-    func remove(_ url: URL) throws { try base.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    internal func remove(_ url: URL) throws { try base.remove(url) }
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         onMove?()
         try base.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    internal func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         try base.copy(source, to: destination, progress: progress)
     }
-    func copyMetadata(from source: URL, to destination: URL) throws {
+    internal func copyMetadata(from source: URL, to destination: URL) throws {
         try base.copyMetadata(from: source, to: destination)
     }
-    func commit(_ url: URL, cancellation: CancellationFlag) throws {
+    internal func commit(_ url: URL, cancellation: CancellationFlag) throws {
         onCommit?()
         try base.commit(url, cancellation: cancellation)
     }
-    func quarantine(of url: URL) -> Data? {
+    internal func quarantine(of url: URL) -> Data? {
         count("quarantine")
         return base.quarantine(of: url)
     }
-    func setQuarantine(_ value: Data, of url: URL) throws { try base.setQuarantine(value, of: url) }
-    func displayPath(_ url: URL) -> String { base.displayPath(url) }
-    func location(from text: String) -> URL? { base.location(from: text) }
-    func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
+    internal func setQuarantine(_ value: Data, of url: URL) throws { try base.setQuarantine(value, of: url) }
+    internal func displayPath(_ url: URL) -> String { base.displayPath(url) }
+    internal func location(from text: String) -> URL? { base.location(from: text) }
+    internal func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
 }
 
 private func registry(_ providers: any FileSystemProvider...) -> FileSystemRegistry {
@@ -203,9 +203,9 @@ private func created(_ url: URL) -> Date? {
 // MARK: - Cancelling a stream that waits
 
 @Suite
-struct FileOpsAdoptCancellation {
+internal struct FileOpsAdoptCancellation {
     @Test
-    func cancelEndsAReadThatWaitsAndLeavesNoTemporaryFile() throws {
+    internal func cancelEndsAReadThatWaitsAndLeavesNoTemporaryFile() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         base.stallsReads = true
@@ -230,7 +230,7 @@ struct FileOpsAdoptCancellation {
     }
 
     @Test
-    func cancelEndsAWriteThatWaitsAndRemovesWhatArrived() throws {
+    internal func cancelEndsAWriteThatWaitsAndRemovesWhatArrived() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         base.stallsWrites = true
@@ -255,7 +255,7 @@ struct FileOpsAdoptCancellation {
     }
 
     @Test
-    func cancelEndsAVerifyingReadThatWaits() throws {
+    internal func cancelEndsAVerifyingReadThatWaits() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         let probe = ProbeFileSystem(base)
@@ -293,7 +293,7 @@ struct FileOpsAdoptCancellation {
     }
 
     @Test
-    func cancelEndsAListingThatWaits() throws {
+    internal func cancelEndsAListingThatWaits() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         base.stallsListings = true
@@ -317,7 +317,7 @@ struct FileOpsAdoptCancellation {
     }
 
     @Test
-    func aStreamThatIsNotCancelledStillCompletes() throws {
+    internal func aStreamThatIsNotCancelledStillCompletes() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         let source = base.addFile("/src/a.txt", "payload")
@@ -332,9 +332,9 @@ struct FileOpsAdoptCancellation {
 // MARK: - Metadata of folders
 
 @Suite
-struct FileOpsAdoptMetadata {
+internal struct FileOpsAdoptMetadata {
     @Test
-    func aCopiedFolderKeepsItsTagHiddenFlagAndCreationDate() throws {
+    internal func aCopiedFolderKeepsItsTagHiddenFlagAndCreationDate() throws {
         let box = try Sandbox()
         let tree = try box.folder("A/tree")
         try box.file("A/tree/in.txt", "inside")
@@ -362,7 +362,7 @@ struct FileOpsAdoptMetadata {
     }
 
     @Test
-    func foldersMadeLateBecauseOfAFilterAreFinishedLikeTheOthers() throws {
+    internal func foldersMadeLateBecauseOfAFilterAreFinishedLikeTheOthers() throws {
         let box = try Sandbox()
         let tree = try box.folder("A/tree")
         try box.file("A/tree/sub/deep.txt", "deep")
@@ -399,7 +399,7 @@ struct FileOpsAdoptMetadata {
     }
 
     @Test
-    func aFinderLockedFolderIsCopiedCompletelyAndLockedLikeTheOriginal() throws {
+    internal func aFinderLockedFolderIsCopiedCompletelyAndLockedLikeTheOriginal() throws {
         let box = try Sandbox()
         let locked = try box.folder("A/locked")
         try box.file("A/locked/one.txt", "1")
@@ -418,7 +418,7 @@ struct FileOpsAdoptMetadata {
     }
 
     @Test
-    func aFollowedLinkKeepsTheTagsOfItsTarget() throws {
+    internal func aFollowedLinkKeepsTheTagsOfItsTarget() throws {
         let box = try Sandbox()
         let real = try box.file("A/real.txt", "target contents")
         setTag(real, "linked")
@@ -436,7 +436,7 @@ struct FileOpsAdoptMetadata {
     }
 
     @Test
-    func foldersTheJobCreatedAreGivenTheirMetadataLastAndOnlyWhenAttributesAreKept() {
+    internal func foldersTheJobCreatedAreGivenTheirMetadataLastAndOnlyWhenAttributesAreKept() {
         let base = MemoryFileSystem()
         base.keepsMetadata = true
         base.addFile("/src/tree/a.txt")
@@ -477,7 +477,7 @@ struct FileOpsAdoptMetadata {
     }
 
     @Test
-    func aFileSystemThatKeepsNoMetadataDoesNotSpoilTheCopy() {
+    internal func aFileSystemThatKeepsNoMetadataDoesNotSpoilTheCopy() {
         let base = MemoryFileSystem()
         base.addFile("/src/tree/a.txt", "a")
         base.addDirectory("/dst")
@@ -495,7 +495,7 @@ struct FileOpsAdoptMetadata {
 // MARK: - Resume
 
 @Suite
-struct FileOpsAdoptResume {
+internal struct FileOpsAdoptResume {
     private func setUp(partial: String, source: String, capabilities: FileSystemCapabilities) -> (
         MemoryFileSystem, ProbeFileSystem
     ) {
@@ -521,7 +521,7 @@ struct FileOpsAdoptResume {
     }
 
     @Test
-    func aResumeContinuesThePartialFileWhereTheFileSystemCanAppend() {
+    internal func aResumeContinuesThePartialFileWhereTheFileSystemCanAppend() {
         let (base, probe) = setUp(
             partial: "hello wo",
             source: "hello world, resumed",
@@ -536,7 +536,7 @@ struct FileOpsAdoptResume {
     }
 
     @Test
-    func withoutAppendTheFileIsWrittenAnewAndSwappedIn() {
+    internal func withoutAppendTheFileIsWrittenAnewAndSwappedIn() {
         let (base, probe) = setUp(partial: "hello wo", source: "hello world, resumed", capabilities: [.write])
         let replies = resume(base, probe)
         #expect(replies.errors.isEmpty)
@@ -546,7 +546,7 @@ struct FileOpsAdoptResume {
     }
 
     @Test
-    func aFileSystemThatClaimsAppendButRefusesItFallsBackToWritingAnew() {
+    internal func aFileSystemThatClaimsAppendButRefusesItFallsBackToWritingAnew() {
         let (base, probe) = setUp(partial: "hello wo", source: "hello world, resumed", capabilities: [.write])
         probe.claims = .append
         let replies = resume(base, probe)
@@ -557,7 +557,7 @@ struct FileOpsAdoptResume {
     }
 
     @Test
-    func aPartialFileThatIsNotTheStartOfTheSourceIsNotContinued() {
+    internal func aPartialFileThatIsNotTheStartOfTheSourceIsNotContinued() {
         let (base, probe) = setUp(
             partial: "hellX wo",
             source: "hello world, resumed",
@@ -570,7 +570,7 @@ struct FileOpsAdoptResume {
     }
 
     @Test
-    func verifyComparesAllOfThePartialFileNotJustItsLastBlock() {
+    internal func verifyComparesAllOfThePartialFileNotJustItsLastBlock() {
         // A difference at the very start of a partial file of 1.5 MB is beyond the last block.
         let partial = "X" + String(repeating: "a", count: 1_500_000)
         let source = String(repeating: "a", count: 1_501_000) + "tail"
@@ -590,7 +590,7 @@ struct FileOpsAdoptResume {
     }
 
     @Test
-    func aResumeOnTheLocalDiskContinuesTheFileItself() throws {
+    internal func aResumeOnTheLocalDiskContinuesTheFileItself() throws {
         let box = try Sandbox()
         try box.file("S/f.txt", "0123456789abcdef")
         let partial = try box.file("T/f.txt", "01234567")
@@ -607,7 +607,7 @@ struct FileOpsAdoptResume {
 // MARK: - Commit before a move deletes
 
 @Suite
-struct FileOpsAdoptCommit {
+internal struct FileOpsAdoptCommit {
     private func destination(_ capabilities: FileSystemCapabilities) -> (MemoryFileSystem, ProbeFileSystem) {
         let base = MemoryFileSystem(scheme: "dst")
         base.capabilities = capabilities
@@ -616,7 +616,7 @@ struct FileOpsAdoptCommit {
     }
 
     @Test
-    func sourcesAreDeletedOnlyAfterTheOneCommitOfTheTargetFolder() throws {
+    internal func sourcesAreDeletedOnlyAfterTheOneCommitOfTheTargetFolder() throws {
         let box = try Sandbox()
         let files = try (1...3).map { try box.file("A/f\($0).txt", "content \($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
@@ -631,7 +631,7 @@ struct FileOpsAdoptCommit {
     }
 
     @Test
-    func aMovedFolderIsRemovedAfterTheCommitToo() throws {
+    internal func aMovedFolderIsRemovedAfterTheCommitToo() throws {
         let box = try Sandbox()
         let tree = try box.folder("A/tree")
         try box.file("A/tree/a.txt", "a")
@@ -647,7 +647,7 @@ struct FileOpsAdoptCommit {
     }
 
     @Test
-    func aFailedCommitKeepsEverySourceAndEndsTheJobAsFailed() throws {
+    internal func aFailedCommitKeepsEverySourceAndEndsTheJobAsFailed() throws {
         let box = try Sandbox()
         let files = try (1...3).map { try box.file("A/f\($0).txt", "content \($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
@@ -669,7 +669,7 @@ struct FileOpsAdoptCommit {
     }
 
     @Test
-    func aTargetWithoutDeferredWritesIsNotCommittedAndSourcesGoAtOnce() throws {
+    internal func aTargetWithoutDeferredWritesIsNotCommittedAndSourcesGoAtOnce() throws {
         let box = try Sandbox()
         let files = try (1...3).map { try box.file("A/f\($0).txt", "c\($0)") }
         let (base, probe) = destination([.write])
@@ -680,7 +680,7 @@ struct FileOpsAdoptCommit {
     }
 
     @Test
-    func aHugeMoveIsCommittedInBatches() throws {
+    internal func aHugeMoveIsCommittedInBatches() throws {
         let box = try Sandbox()
         let files = try (1...7).map { try box.file("A/f\($0).txt", "c\($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
@@ -701,7 +701,7 @@ struct FileOpsAdoptCommit {
     }
 
     @Test
-    func aCommitInTheMiddleOfAMoveMeetsNoFileUnderItsTemporaryName() throws {
+    internal func aCommitInTheMiddleOfAMoveMeetsNoFileUnderItsTemporaryName() throws {
         let box = try Sandbox()
         let files = try (1...16).map { try box.file("A/f\($0).txt", "c\($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
@@ -726,7 +726,7 @@ struct FileOpsAdoptCommit {
     }
 
     @Test
-    func aSourceThatCouldNotBeRemovedIsNotReportedAsMoved() throws {
+    internal func aSourceThatCouldNotBeRemovedIsNotReportedAsMoved() throws {
         let box = try Sandbox()
         let tree = try box.folder("A/tree")
         try box.file("A/tree/a.txt", "a")
@@ -749,7 +749,7 @@ struct FileOpsAdoptCommit {
 // MARK: - Origin marks
 
 @Suite
-struct FileOpsAdoptQuarantine {
+internal struct FileOpsAdoptQuarantine {
     private let mark = Data("0083;5f5e1000;Browser;".utf8)
 
     private func tree(in base: MemoryFileSystem) {
@@ -759,7 +759,7 @@ struct FileOpsAdoptQuarantine {
     }
 
     @Test
-    func filesAndFoldersFromAMarkedSourceAreMarkedBeforeTheyGetTheirNames() {
+    internal func filesAndFoldersFromAMarkedSourceAreMarkedBeforeTheyGetTheirNames() {
         let source = MemoryFileSystem(scheme: "mem")
         source.quarantineValue = mark
         tree(in: source)
@@ -784,7 +784,7 @@ struct FileOpsAdoptQuarantine {
     }
 
     @Test
-    func nothingIsMarkedWhenTheSourceHasNoMarkOrTheCopyStaysInOneFileSystem() {
+    internal func nothingIsMarkedWhenTheSourceHasNoMarkOrTheCopyStaysInOneFileSystem() {
         let source = MemoryFileSystem(scheme: "mem")
         tree(in: source)
         let target = MemoryFileSystem(scheme: "arc")
@@ -811,7 +811,7 @@ struct FileOpsAdoptQuarantine {
     }
 
     @Test
-    func aResumedFileIsMarkedToo() {
+    internal func aResumedFileIsMarkedToo() {
         for continues in [true, false] {
             let source = MemoryFileSystem(scheme: "mem")
             source.quarantineValue = mark
@@ -840,9 +840,9 @@ struct FileOpsAdoptQuarantine {
 // MARK: - The measure cache
 
 @Suite
-struct FileOpsAdoptMeasure {
+internal struct FileOpsAdoptMeasure {
     @Test
-    func aBigFolderRenamedInsideAMergeIsNotCountedAgainEvenWhenTheCacheIsFull() {
+    internal func aBigFolderRenamedInsideAMergeIsNotCountedAgainEvenWhenTheCacheIsFull() {
         let base = MemoryFileSystem()
         for index in 1...5 { base.addFile("/src/A/small\(index)/one.txt") }
         for index in 0..<70 { base.addFile("/src/A/big/f\(index).txt") }
@@ -867,9 +867,9 @@ struct FileOpsAdoptMeasure {
 
 @MainActor
 @Suite
-struct FileOpsAdoptSelection {
+internal struct FileOpsAdoptSelection {
     @Test
-    func processedItemsAreFoundByLocationWhoseNamesArePaths() {
+    internal func processedItemsAreFoundByLocationWhoseNamesArePaths() {
         let inFolder = FileItem(url: URL(fileURLWithPath: "/x/sub/a.txt"), name: "sub/a.txt")
         let alsoNamedA = FileItem(url: URL(fileURLWithPath: "/x/a.txt"), name: "a.txt")
         let other = FileItem(url: URL(fileURLWithPath: "/x/other/b.txt"), name: "other/b.txt")
@@ -884,11 +884,11 @@ struct FileOpsAdoptSelection {
 
 @MainActor
 @Suite
-struct FileOpsAdoptCapabilities {
-    let memory = MemoryFileSystem()
-    let bench: TestBench
+internal struct FileOpsAdoptCapabilities {
+    internal let memory = MemoryFileSystem()
+    internal let bench: TestBench
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt")
         memory.addFile("/B/two.txt")
         memory.addFile("/R/ro.txt")
@@ -906,7 +906,7 @@ struct FileOpsAdoptCapabilities {
     }
 
     @Test
-    func commandsFollowTheCapabilitiesOfTheFolderShown() {
+    internal func commandsFollowTheCapabilitiesOfTheFolderShown() {
         bench.left.show(memory.url("/R"))
         bench.left.moveCursor(toName: "ro.txt")
         for id in [CommandID.makeDirectory, .delete, .renameMove, .setAttributes] {
@@ -920,7 +920,7 @@ struct FileOpsAdoptCapabilities {
     }
 
     @Test
-    func theTrashIsOfferedWhereTheItemsAreNotWhereTheFileSystemSaysInGeneral() {
+    internal func theTrashIsOfferedWhereTheItemsAreNotWhereTheFileSystemSaysInGeneral() {
         bench.left.moveCursor(toName: "one.txt")
         bench.interaction.choiceAnswers = [1]
         bench.commands.perform(.delete)

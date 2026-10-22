@@ -13,9 +13,9 @@ import Foundation
 /// expression again and can run a command: `$((…))`, `((…))`, `$[…]`, the subscript of
 /// `$name[…]`, and a test (`[[ … ]]`, `[ … ]`, `test`) that compares numbers. Works on Unicode
 /// scalars, as a shell works on bytes: every character that means something to a shell is ASCII.
-struct ShellContext {
+internal struct ShellContext {
     /// Where a value stands.
-    enum Place: Equatable {
+    internal enum Place: Equatable {
         /// In a word of the line, outside every quote.
         case word
         case doubleQuoted
@@ -23,11 +23,11 @@ struct ShellContext {
     }
 
     /// Why no value can stand at a place.
-    enum Refusal: Error, Equatable {
+    internal enum Refusal: Error, Equatable {
         case ansiQuote, backtick, hereDocument, comment, backslash, dollar, arithmetic, parameterExpansion,
             caseInSubstitution
 
-        var explanation: String {
+        internal var explanation: String {
             switch self {
             case .ansiQuote:
                 return "A placeholder cannot stand inside $'…'. Use \"…\" or '…' instead."
@@ -89,7 +89,7 @@ struct ShellContext {
     /// The present word has no content so far (an opening quote is none).
     private var wordEmpty = true
     /// Set when the line can no longer be followed; every later value is refused.
-    private(set) var poisoned: Refusal?
+    internal private(set) var poisoned: Refusal?
     /// The characters before were a `$` and the letters of a name: a `[` begins its subscript.
     private var variableName = false
     /// Inside a test (`[[ … ]]`, `[ … ]`, `test …`): whether it holds a value, and whether it
@@ -99,11 +99,11 @@ struct ShellContext {
     /// arithmetic.
     ///
     /// The whole line is then refused, wherever the value stood in the test.
-    private(set) var hasArithmeticTest = false
+    internal private(set) var hasArithmeticTest = false
 
     /// Whether what is written next begins a word of the line (also right after the user's
     /// opening quote).
-    var isAtWordStart: Bool {
+    internal var isAtWordStart: Bool {
         guard wordEmpty, place != nil else {
             return false
         }
@@ -111,7 +111,7 @@ struct ShellContext {
     }
 
     /// Where a value written now would stand; nil where none can.
-    var place: Place? { try? check().get() }
+    internal var place: Place? { try? check().get() }
 
     private func check() -> Result<Place, Refusal> {
         if let poisoned {
@@ -157,7 +157,7 @@ struct ShellContext {
     ///
     /// Returns its place, or why it cannot stand here.
     @discardableResult
-    mutating func feedValue() -> Result<Place, Refusal> {
+    internal mutating func feedValue() -> Result<Place, Refusal> {
         let result = check()
         if case .success = result {
             content()
@@ -173,7 +173,7 @@ struct ShellContext {
         return result
     }
 
-    mutating func feed(_ text: String) {
+    internal mutating func feed(_ text: String) {
         for scalar in text.unicodeScalars { feed(scalar) }
     }
 
@@ -234,7 +234,7 @@ struct ShellContext {
         }
     }
 
-    mutating func feed(_ scalar: Unicode.Scalar) {
+    internal mutating func feed(_ scalar: Unicode.Scalar) {
         guard poisoned == nil else {
             return
         }
@@ -475,14 +475,14 @@ struct ShellContext {
 
 /// A command line with its data apart: the text a shell is given, in which every value is a
 /// reference to a variable, and the values themselves.
-struct ShellScript: Equatable {
+internal struct ShellScript: Equatable {
     /// The line with a reference in place of every value.
-    var line: String
-    var values: [String]
+    internal var line: String
+    internal var values: [String]
 
     /// What the shell runs: the values, handed over as arguments of the shell, are first given
     /// names of their own (so `set --`, `shift` and functions cannot move them), then the line.
-    var text: String {
+    internal var text: String {
         guard !values.isEmpty else {
             return line
         }
@@ -491,14 +491,14 @@ struct ShellScript: Equatable {
     }
 
     /// The arguments for a shell after its options: the script for `-c`, a name, and the values.
-    var arguments: [String] { [text, "afm"] + values }
+    internal var arguments: [String] { [text, "afm"] + values }
 }
 
 /// Turns an expanded text into what a shell runs and into what the user reads.
-enum ShellLine {
+internal enum ShellLine {
     private static let variablePrefix = "__afm_"
 
-    static func variable(_ index: Int) -> String { variablePrefix + String(index + 1) }
+    internal static func variable(_ index: Int) -> String { variablePrefix + String(index + 1) }
 
     /// The reference to value number `index` at a place of the line.
     private static func reference(_ index: Int, at place: ShellContext.Place) -> String {
@@ -520,7 +520,7 @@ enum ShellLine {
     ///
     /// No value becomes part of its text: each is passed as data and referred to where its
     /// placeholder stood. Fails where a reference cannot be written safely.
-    static func script(_ pieces: [ExpandedPiece]) -> Result<ShellScript, ShellContext.Refusal> {
+    internal static func script(_ pieces: [ExpandedPiece]) -> Result<ShellScript, ShellContext.Refusal> {
         var lexer = ShellContext()
         var line = ""
         var values: [String] = []
@@ -551,7 +551,7 @@ enum ShellLine {
     /// The line as one readable text, the values written into it and quoted where they stand.
     ///
     /// For showing, for commands of the program and for `cd`: never for a shell.
-    static func display(_ pieces: [ExpandedPiece]) -> String {
+    internal static func display(_ pieces: [ExpandedPiece]) -> String {
         var lexer = ShellContext()
         var line = ""
         for (index, piece) in pieces.enumerated() {
@@ -596,7 +596,7 @@ enum ShellLine {
 
     /// Whether a value may be shown, and typed over, as part of the line: it holds nothing
     /// that a shell or the placeholders give a meaning to, so as text it says what it says.
-    static func isTame(_ value: String) -> Bool {
+    internal static func isTame(_ value: String) -> Bool {
         guard let first = value.unicodeScalars.first, let last = value.unicodeScalars.last, first != " ", last != " "
         else { return false }
         return value.unicodeScalars.allSatisfy {
@@ -609,7 +609,7 @@ enum ShellLine {
     /// explained in `legend`.
     ///
     /// The user may change the line; `pieces(fromPrompt:values:)` reads it back.
-    static func prompt(_ pieces: [ExpandedPiece]) -> (text: String, values: [String], legend: String) {
+    internal static func prompt(_ pieces: [ExpandedPiece]) -> (text: String, values: [String], legend: String) {
         var lexer = ShellContext()
         var line = ""
         var values: [String] = []
@@ -640,7 +640,7 @@ enum ShellLine {
 
     /// The line the user made of a prompt: its references become the values again, everything
     /// else is text the user approved.
-    static func pieces(fromPrompt text: String, values: [String]) -> [ExpandedPiece] {
+    internal static func pieces(fromPrompt text: String, values: [String]) -> [ExpandedPiece] {
         var pieces: [ExpandedPiece] = []
         var rest = Substring(text)
         let opening = "${" + variablePrefix

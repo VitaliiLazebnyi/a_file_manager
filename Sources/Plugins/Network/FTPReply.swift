@@ -104,20 +104,20 @@ public struct FTPReplyParser {
 ///
 /// Every byte is looked at once, whatever the sizes of the blocks; a line longer than `limit` is
 /// dropped whole, so the part of a line that is waiting for its end never grows beyond the limit.
-struct LineSplitter {
-    let limit: Int
+internal struct LineSplitter {
+    internal let limit: Int
     private var partial = Data()
     /// True while the rest of a line that was too long is being skipped.
     private var isSkipping = false
     /// How many lines were dropped for their length.
-    private(set) var dropped = 0
+    internal private(set) var dropped = 0
 
-    init(limit: Int = FTPLimits.lineLength) {
+    internal init(limit: Int = FTPLimits.lineLength) {
         self.limit = limit
     }
 
     /// The lines that `block` completes, without their line ends (LF, or CR LF).
-    mutating func feed(_ block: Data) -> [Data] {
+    internal mutating func feed(_ block: Data) -> [Data] {
         var lines: [Data] = []
         var start = block.startIndex
         while start < block.endIndex {
@@ -149,7 +149,7 @@ struct LineSplitter {
     }
 
     /// What is left when the data ends without a line end.
-    mutating func finish() -> Data? {
+    internal mutating func finish() -> Data? {
         defer { (partial, isSkipping) = (Data(), false) }
         if isSkipping || partial.isEmpty {
             return nil
@@ -282,7 +282,7 @@ public enum FTPSyntax {
         return String(format: "%04d%02d%02d%02d%02d%02d", arguments: parts.map { utc.component($0, from: date) })
     }
 
-    static let utc: Calendar = {
+    internal static let utc: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .gmt
         return calendar

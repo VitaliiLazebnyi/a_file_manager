@@ -10,18 +10,18 @@ import Testing
 /// places and the clipboard.
 @MainActor
 @Suite
-struct NavigationPlaces {
-    let memory = MemoryFileSystem()
-    let other = MemoryFileSystem(scheme: "disk")
+internal struct NavigationPlaces {
+    internal let memory = MemoryFileSystem()
+    internal let other = MemoryFileSystem(scheme: "disk")
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let bench: TestBench
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
 
-    init() {
+    internal init() {
         memory.addFile("/home/Desktop/note.txt")
         memory.addFile("/home/Documents/letter.txt")
         memory.addFile("/home/Downloads/setup.dmg")
@@ -39,7 +39,7 @@ struct NavigationPlaces {
     }
 
     @Test
-    func registersTheSpecificationsKeysWithoutConflicts() {
+    internal func registersTheSpecificationsKeysWithoutConflicts() {
         let keys = bench.kernel.keyBindings
         #expect(
             keys.command(for: Shortcut(.leftArrow, .control)) == "cm_TransferLeft"
@@ -62,7 +62,7 @@ struct NavigationPlaces {
     }
 
     @Test
-    func showsTheFolderUnderTheCursorInTheOtherPanel() {
+    internal func showsTheFolderUnderTheCursorInTheOtherPanel() {
         left.moveCursor(toName: "docs")
         commands.perform("cm_TransferRight")
         #expect(right.model.directory.path == "/A/docs" && left.model.directory.path == "/A")
@@ -82,7 +82,7 @@ struct NavigationPlaces {
     }
 
     @Test
-    func mirrorsThePathEitherWay() {
+    internal func mirrorsThePathEitherWay() {
         commands.perform(.targetEqualsSource)
         #expect(right.model.directory.path == "/A")
         right.show(memory.url("/B"))
@@ -91,7 +91,7 @@ struct NavigationPlaces {
     }
 
     @Test
-    func goesToTheStandardPlaces() {
+    internal func goesToTheStandardPlaces() {
         for (command, path) in [
             ("afm_GoDesktop", "/home/Desktop"), ("afm_GoDocuments", "/home/Documents"),
             ("afm_GoDownloads", "/home/Downloads"),
@@ -109,7 +109,7 @@ struct NavigationPlaces {
     }
 
     @Test
-    func cyclesThroughTheVolumes() {
+    internal func cyclesThroughTheVolumes() {
         commands.perform("cm_GoToNextDrive")
         #expect(left.model.directory == other.url("/"))
         commands.perform("cm_GoToNextDrive")
@@ -120,7 +120,7 @@ struct NavigationPlaces {
     }
 
     @Test
-    func choosesTheNeighbourPlace() {
+    internal func choosesTheNeighbourPlace() {
         func place(_ name: String, _ path: String, _ kind: Place.Kind) -> Place {
             Place(name: name, url: URL(fileURLWithPath: path), kind: kind)
         }
@@ -149,7 +149,7 @@ struct NavigationPlaces {
     }
 
     @Test
-    func goesToThePathOnTheClipboard() {
+    internal func goesToThePathOnTheClipboard() {
         #expect(!commands.isEnabled("afm_CdFromClipboard"))
         pasteboard.clearContents()
         pasteboard.setString("  \"mem:/A/docs\"  \nsecond line", forType: .string)

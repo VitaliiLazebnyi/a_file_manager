@@ -13,10 +13,11 @@ import AppKit
 /// and checked in the background. What the end of a search or an action on the results would
 /// otherwise do to every row (counting, building the text to copy, making the list of
 /// locations) is kept up to date as rows arrive or done in the background.
-final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate
+internal final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
+    NSTableViewDelegate
 {
     /// A line of the result list (spec 09 › Running a search and the result list).
-    enum Row {
+    internal enum Row {
         /// `[6 files and 0 directories found]`, always the first line.
         case summary(String)
         case item(FileItem)
@@ -75,14 +76,14 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         }
     }
 
-    static let keepResultsKey = "findFiles.keepResults"
-    static let historyLengthKey = "findFiles.historyLength"
-    static let spotlightKey = "findFiles.spotlight"
-    static let historyLengths = [10, 20, 50, 100]
+    internal static let keepResultsKey = "findFiles.keepResults"
+    internal static let historyLengthKey = "findFiles.historyLength"
+    internal static let spotlightKey = "findFiles.spotlight"
+    internal static let historyLengths = [10, 20, 50, 100]
     /// The most hits a search of the window lists; it stops there and says so.
-    nonisolated static let resultLimit = 2_000_000
+    nonisolated internal static let resultLimit = 2_000_000
     /// The most rows handed to the list in one piece.
-    private nonisolated static let batchSize = 2_000
+    nonisolated private static let batchSize = 2_000
     /// Lists up to this many rows are worked on the main thread where that is simpler.
     private static let smallList = 20_000
 
@@ -107,15 +108,15 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         }
     }
 
-    let form: SearchForm
+    internal let form: SearchForm
     /// Called when the window was closed.
-    var onClose: (FindFilesWindowController) -> Void = { _ in }
+    internal var onClose: (FindFilesWindowController) -> Void = { _ in }
     /// Called when a search has ended, also a cancelled one.
-    var onFinished: () -> Void = {}
+    internal var onFinished: () -> Void = {}
     /// Where Cmd+C puts the list: the clipboard, or a pasteboard of a test's own.
-    var pasteboard = NSPasteboard.general
+    internal var pasteboard = NSPasteboard.general
     /// The modifier keys held down now (Shift opens a new tab); a test says which.
-    var modifierFlags: () -> NSEvent.ModifierFlags = { NSEvent.modifierFlags }
+    internal var modifierFlags: () -> NSEvent.ModifierFlags = { NSEvent.modifierFlags }
 
     private let startButton = NSButton(title: "Start search", target: nil, action: nil)
     private let cancelButton = NSButton(title: "Close", target: nil, action: nil)
@@ -146,19 +147,19 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     private static let earlierLimit = 10
 
     /// How far the window goes; what tests make small.
-    struct Limits {
+    internal struct Limits {
         /// The most hits a search of the window lists.
-        var results = FindFilesWindowController.resultLimit
+        internal var results = FindFilesWindowController.resultLimit
         /// The most paths taken from Spotlight's answer.
-        var spotlight = SpotlightSearch.resultLimit
+        internal var spotlight = SpotlightSearch.resultLimit
         /// The earlier searches are kept as far as their rows are not more than this.
-        var earlierRows = 200_000
+        internal var earlierRows = 200_000
     }
 
-    var limits = Limits()
+    internal var limits = Limits()
     private var earlierIndex = 0
     /// The search that runs now, if any.
-    private(set) var search: FileSearch?
+    internal private(set) var search: FileSearch?
     private var spotlight: (any SpotlightQuestion)?
     /// Makes the question to Spotlight from its text, the folders it looks in and the most paths
     /// it reads.
@@ -174,7 +175,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
-    init(kernel: Kernel, title: String = "Find Files") {
+    internal init(kernel: Kernel, title: String = "Find Files") {
         self.kernel = kernel
         store = SearchStore(settings: kernel.settings)
         form = SearchForm(
@@ -218,12 +219,12 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     }
 
     /// The window is made in code, never from an archive.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
     /// Shows the window with "Search in" set to `directory`.
     ///
     /// Results are viewed, edited and shown in the panel through the kernel's commands.
-    func show(startingIn directory: URL, includeHidden: Bool) {
+    internal func show(startingIn directory: URL, includeHidden: Bool) {
         prepare(startingIn: directory, includeHidden: includeHidden)
         present(self)
         window?.makeFirstResponder(form.searchForField)
@@ -233,7 +234,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     ///
     /// The names and the text stay from last time; the Advanced tab starts empty (spec 09 › What is
     /// remembered).
-    func prepare(startingIn directory: URL, includeHidden: Bool) {
+    internal func prepare(startingIn directory: URL, includeHidden: Bool) {
         // The list is drawn from this window again (closing let go of it).
         resultsTable.dataSource = self
         resultsTable.delegate = self
@@ -349,7 +350,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
 
     // MARK: Searching
 
-    var isSearching: Bool { search != nil }
+    internal var isSearching: Bool { search != nil }
 
     @objc
     private func startPressed() {
@@ -362,7 +363,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     }
 
     /// Stops the running search if it looks through `volume` (which is about to be ejected).
-    func cancelSearch(ifItReads volume: URL) {
+    internal func cancelSearch(ifItReads volume: URL) {
         guard isSearching else {
             return
         }
@@ -382,7 +383,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     }
 
     /// Stops the running search; it ends through the usual path with what it has.
-    func cancelSearch() {
+    internal func cancelSearch() {
         search?.cancel()
         if let spotlight {
             spotlight.stop()
@@ -394,7 +395,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// Starts the search the form describes.
     ///
     /// A form that cannot be searched with (a broken regular expression) is reported instead.
-    func startSearch() {
+    internal func startSearch() {
         let settings = form.settings
         // Start directories the user typed (not the ones the window was opened with or a saved
         // search brought) are the user's own choice of their servers, if they name any.
@@ -660,7 +661,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     // MARK: Results
 
     /// The files and folders in the list, in list order.
-    var resultItems: [FileItem] {
+    internal var resultItems: [FileItem] {
         rows.compactMap { row in
             if case .item(let item) = row {
                 return item
@@ -670,7 +671,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     }
 
     /// The lines of the list as they are shown and copied.
-    var lines: [String] { rows.map(text) }
+    internal var lines: [String] { rows.map(text) }
 
     private func text(of row: Row) -> String {
         switch row {
@@ -689,7 +690,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         }
     }
 
-    private nonisolated static func text(of item: FileItem, showsDuplicates: Bool, fileSystems: FileSystemRegistry)
+    nonisolated private static func text(of item: FileItem, showsDuplicates: Bool, fileSystems: FileSystemRegistry)
         -> String
     {
         guard showsDuplicates else {
@@ -747,7 +748,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
 
     /// New search: empties the list and goes back to the form.
     @objc
-    func newSearch() {
+    internal func newSearch() {
         guard !isSearching else {
             return
         }
@@ -763,7 +764,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     ///
     /// A single result is taken even when it is not the selected line.
     @objc
-    func goToFile() {
+    internal func goToFile() {
         guard let url = selectedResult ?? (resultURLs.count == 1 ? resultURLs[0] : nil) else {
             return
         }
@@ -777,7 +778,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     ///
     /// The window closes and does not keep these results.
     @objc
-    func feedToListbox() {
+    internal func feedToListbox() {
         let urls = resultURLs
         guard !isSearching, !urls.isEmpty, let lists = kernel.services.find((any FileListService).self) else {
             return
@@ -820,11 +821,11 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     }
 
     /// The list as text: one line per result, an empty line between groups of duplicates.
-    var copyText: String {
+    internal var copyText: String {
         Self.copyText(of: rows, showsDuplicates: showsDuplicates, fileSystems: kernel.fileSystems)
     }
 
-    private nonisolated static func copyText(of rows: [Row], showsDuplicates: Bool, fileSystems: FileSystemRegistry)
+    nonisolated private static func copyText(of rows: [Row], showsDuplicates: Bool, fileSystems: FileSystemRegistry)
         -> String
     {
         var lines: [String] = []
@@ -886,9 +887,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             }
     }
 
-    func numberOfRows(in _: NSTableView) -> Int { rows.count }
+    internal func numberOfRows(in _: NSTableView) -> Int { rows.count }
 
-    func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
+    internal func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("path")
         let cell =
             tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
@@ -903,7 +904,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         return cell
     }
 
-    func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
+    internal func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
         if case .separator = rows[row] {
             return false
         }
@@ -912,7 +913,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
 
     /// After a search the status line shows the size, date and permissions of the result
     /// under the cursor, which the list itself does not.
-    func tableViewSelectionDidChange(_: Notification) {
+    internal func tableViewSelectionDidChange(_: Notification) {
         updateButtons()
         guard !isSearching else {
             return
@@ -926,11 +927,11 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         }
     }
 
-    func windowDidBecomeKey(_: Notification) {
+    internal func windowDidBecomeKey(_: Notification) {
         form.setSelectionAvailable(hasSelectedItems)
     }
 
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         let wasSearching = isSearching
         search?.cancel()
         spotlight?.stop()

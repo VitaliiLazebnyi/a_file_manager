@@ -9,17 +9,17 @@ import Testing
 /// The file-operation commands with their dialogs, driven through a kernel with fake panels.
 @MainActor
 @Suite
-struct FileOperationCommands {
-    let memory = MemoryFileSystem()
-    let settings = MemorySettings()
-    let bench: TestBench
+internal struct FileOperationCommands {
+    internal let memory = MemoryFileSystem()
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt", "new")
         memory.addFile("/A/two.txt", "2")
         memory.addFile("/A/notes.bak", "b")
@@ -34,7 +34,7 @@ struct FileOperationCommands {
         )
     }
 
-    func select(_ names: String...) {
+    internal func select(_ names: String...) {
         for name in names {
             left.moveCursor(toName: name)
             left.model.toggleSelection(row: left.model.cursor)
@@ -44,7 +44,7 @@ struct FileOperationCommands {
     // MARK: Registration
 
     @Test
-    func commandsKeysPagesAndButtons() {
+    internal func commandsKeysPagesAndButtons() {
         let expected: [(CommandID, [Shortcut])] = [
             ("cm_Copy", [.f(5)]), ("cm_CopySamepanel", [.f(5, .shift)]), ("cm_CopyOtherpanel", []),
             ("cm_RenMov", [.f(6)]), ("cm_MoveOnly", []),
@@ -68,7 +68,7 @@ struct FileOperationCommands {
     // MARK: Copy and move
 
     @Test
-    func theOptionsDialogCarriesFilterAndOverwriteMode() {
+    internal func theOptionsDialogCarriesFilterAndOverwriteMode() {
         left.model.selectAll()
         ui.formAnswers = [
             .values(["filter": .text("*.txt | docs/"), "overwrite": .index(OverwriteMode.skipAll.rawValue)])
@@ -88,7 +88,7 @@ struct FileOperationCommands {
     }
 
     @Test
-    func theOptionsCanBecomeTheDefaultsAndAlwaysBeShown() {
+    internal func theOptionsCanBecomeTheDefaultsAndAlwaysBeShown() {
         left.moveCursor(toName: "two.txt")
         ui.formAnswers = [.values(["verify": .flag(true), "overwrite": .index(1)], button: 1)]
         commands.perform("afm_MoveWithOptions")
@@ -112,7 +112,7 @@ struct FileOperationCommands {
     }
 
     @Test
-    func commandSwitchesStartWithoutADialog() {
+    internal func commandSwitchesStartWithoutADialog() {
         left.model.selectAll()
         commands.perform(.copy, .text("/O2 G W=\"*.txt\" T=\"mem:/B/sub/\""))
         #expect(ui.log.isEmpty)
@@ -129,7 +129,7 @@ struct FileOperationCommands {
     }
 
     @Test
-    func copyAndMoveWithoutAsking() {
+    internal func copyAndMoveWithoutAsking() {
         left.moveCursor(toName: "two.txt")
         commands.perform("afm_CopyNoAsk")
         #expect(memory.contents("/B/two.txt") == "2" && memory.exists("/A/two.txt") && ui.log.isEmpty)
@@ -144,7 +144,7 @@ struct FileOperationCommands {
     }
 
     @Test
-    func theOverwriteDialogShowsBothFilesAndOffersEveryChoice() {
+    internal func theOverwriteDialogShowsBothFilesAndOffersEveryChoice() {
         left.moveCursor(toName: "one.txt")
         // Rename…: the new name is asked for.
         ui.promptAnswers = [.accept, .text("one copy.txt")]
@@ -183,7 +183,7 @@ struct FileOperationCommands {
     }
 
     @Test
-    func aShorterTargetCanBeResumedButAMoveCannotAppend() {
+    internal func aShorterTargetCanBeResumedButAMoveCannotAppend() {
         memory.addFile("/B/two.txt", "")
         memory.addFile("/A/long.txt", "0123456789")
         memory.addFile("/B/long.txt", "0123")
@@ -202,7 +202,7 @@ struct FileOperationCommands {
     }
 
     @Test
-    func keepingGoingOnErrorsReportsAtTheEnd() {
+    internal func keepingGoingOnErrorsReportsAtTheEnd() {
         settings.set(true, forKey: "fileOperations.keepGoingOnErrors")
         select("docs", "two.txt")
         memory.unreadable = ["/A/docs"]
@@ -215,7 +215,7 @@ struct FileOperationCommands {
     // MARK: Rename
 
     @Test
-    func severalItemsAreRenamedWithAMaskOrOneByOne() {
+    internal func severalItemsAreRenamedWithAMaskOrOneByOne() {
         select("one.txt", "two.txt")
         ui.formAnswers = [.values(["mask": .text("*.old")])]
         commands.perform(.renameOnly)
@@ -244,7 +244,7 @@ struct FileOperationCommands {
     // MARK: New folder and new file
 
     @Test
-    func newFoldersWithRangesPlaceholdersAndInTheOtherPanel() {
+    internal func newFoldersWithRangesPlaceholdersAndInTheOtherPanel() {
         left.moveCursor(toName: "docs")
         ui.promptAnswers = [.text("<1-3>part[C]")]
         commands.perform(.makeDirectory)
@@ -276,7 +276,7 @@ struct FileOperationCommands {
     }
 
     @Test
-    func newFilesSeveralAtOnce() {
+    internal func newFilesSeveralAtOnce() {
         ui.promptAnswers = [.text("\"a 1.txt\" \"a 2.txt\"|sub/a3.txt")]
         commands.perform(.newTextFile)
         #expect(
@@ -297,7 +297,7 @@ struct FileOperationCommands {
     // MARK: Delete
 
     @Test
-    func readOnlyFilesAreAskedAboutAgainWhenDeleting() {
+    internal func readOnlyFilesAreAskedAboutAgainWhenDeleting() {
         memory.addFile("/A/ro.txt", "r", permissions: 0o444)
         left.reload()
         left.moveCursor(toName: "ro.txt")
@@ -321,7 +321,7 @@ struct FileOperationCommands {
     }
 
     @Test
-    func theTrashKeyCanBeTurnedAround() throws {
+    internal func theTrashKeyCanBeTurnedAround() throws {
         let box = try Sandbox()
         try box.file("A/readme.md", "r")
         try box.folder("B")
@@ -348,7 +348,7 @@ struct FileOperationCommands {
     // MARK: Log
 
     @Test
-    func operationsAreWrittenToTheLogFile() throws {
+    internal func operationsAreWrittenToTheLogFile() throws {
         let box = try Sandbox()
         settings.set(true, forKey: "fileOperations.log.enabled")
         settings.set(box.url("log/ops.log").path, forKey: "fileOperations.log.file")

@@ -5,39 +5,39 @@ import Foundation
 /// and what an export leaves out.
 ///
 /// A plain value: made on the main thread, used on any.
-struct SettingsSchema {
+internal struct SettingsSchema {
     /// The options of the configuration pages, with their kinds.
-    var preferences: [String: Preference.Kind] = [:]
+    internal var preferences: [String: Preference.Kind] = [:]
     /// Keys the running program knows by name: its own, and those it has stored.
-    var known: Set<String> = []
-    var keyBindingsKey = KeyBindings.settingsKey
+    internal var known: Set<String> = []
+    internal var keyBindingsKey = KeyBindings.settingsKey
     /// What the plugin a key belongs to has said about it (`Kernel.settingsKeys`), nil for a
     /// key nobody declared.
     ///
     /// Asked before the names are looked at: a plugin knows what its key does, and a name gives it
     /// away only when it happens to hold the right word.
-    var declaredKind: @Sendable (String) -> SettingsKeyKind? = { _ in nil }
+    internal var declaredKind: @Sendable (String) -> SettingsKeyKind? = { _ in nil }
 
     /// The corners of the settings the parts of the program keep their values in.
     ///
     /// A key of none of them is nobody's and is not imported.
-    static let namespaces: Set<String> = [
+    internal static let namespaces: Set<String> = [
         "window", "panel", "listingCache", "toolbar", "configuration", "systemTools", "viewOptions", "macIntegration",
         "folderTabs", "clipboard",
         "virtualFolders", "findFiles", "places", "network", "selection", "multirename", "directorySync",
         "compareContent", "filetools", "viewer",
         "archives", "fileOperations", "fileProperties"
     ]
-    static let tabKeys: Set<String> = ["left.tabs", "right.tabs"]
-    static let userCommandsKey = ConfigurationStore.owner + "." + ConfigurationStore.userCommandsKey
-    static let startMenuKey = ConfigurationStore.owner + "." + ConfigurationStore.startMenuKey
-    static let symbolsKey = ConfigurationStore.owner + "." + ConfigurationStore.symbolsKey
-    static let frequentFoldersKey = "places.history.frequent"
-    static let hotlistKey = "places.hotlist"
-    static let connectionsKey = "network.connections"
-    static let lastConnectionKey = "network.lastUsed"
+    internal static let tabKeys: Set<String> = ["left.tabs", "right.tabs"]
+    internal static let userCommandsKey = ConfigurationStore.owner + "." + ConfigurationStore.userCommandsKey
+    internal static let startMenuKey = ConfigurationStore.owner + "." + ConfigurationStore.startMenuKey
+    internal static let symbolsKey = ConfigurationStore.owner + "." + ConfigurationStore.symbolsKey
+    internal static let frequentFoldersKey = "places.history.frequent"
+    internal static let hotlistKey = "places.hotlist"
+    internal static let connectionsKey = "network.connections"
+    internal static let lastConnectionKey = "network.lastUsed"
 
-    func isKnown(_ key: String) -> Bool {
+    internal func isKnown(_ key: String) -> Bool {
         if preferences[key] != nil || known.contains(key) || key == keyBindingsKey
             || Self.tabKeys.contains(key)
         {
@@ -52,13 +52,13 @@ struct SettingsSchema {
     /// The copy the program keeps of stored data it could not read.
     ///
     /// It is neither exported nor imported.
-    func isBackup(_ key: String) -> Bool { key.contains(".unreadable") }
+    internal func isBackup(_ key: String) -> Bool { key.contains(".unreadable") }
 
     // MARK: What an export leaves out unless asked
 
     /// What the user did, as opposed to what the user set up: typed command lines, visited
     /// folders, search texts, the files renamed last.
-    func isHistory(_ key: String) -> Bool {
+    internal func isHistory(_ key: String) -> Bool {
         guard preferences[key] == nil else {
             return false
         }
@@ -70,7 +70,7 @@ struct SettingsSchema {
     }
 
     /// Servers, user names and the certificates accepted for them.
-    func isConnectionData(_ key: String) -> Bool {
+    internal func isConnectionData(_ key: String) -> Bool {
         key == Self.connectionsKey || key == Self.lastConnectionKey
             || group(of: key, value: nil) == .trust
     }
@@ -81,13 +81,13 @@ struct SettingsSchema {
     /// key does, or change whom it trusts.
     ///
     /// Each is imported only when the user says so.
-    enum Group: String, CaseIterable {
+    internal enum Group: String, CaseIterable {
         case commands, keys, programs, trust, connections, hotlist, tabs
     }
 
     /// The group a key belongs to; nil for an ordinary setting. `value` is the value in the
     /// file, where the group depends on it.
-    func group(of key: String, value: Any?) -> Group? {
+    internal func group(of key: String, value: Any?) -> Group? {
         if key == Self.userCommandsKey || key == Self.startMenuKey {
             return .commands
         }
@@ -148,30 +148,30 @@ struct SettingsSchema {
 ///
 /// Unchecked: `objects` holds only JSON values (texts, numbers, lists and dictionaries, as
 /// `JSONSerialization` reads them), which nobody changes once the file is checked.
-struct CheckedSettings: @unchecked Sendable {
+internal struct CheckedSettings: @unchecked Sendable {
     /// The values that may be stored, as the JSON they are stored as.
-    var values: [String: Data] = [:]
+    internal var values: [String: Data] = [:]
     /// The same as objects, for describing them.
-    var objects: [String: Any] = [:]
+    internal var objects: [String: Any] = [:]
     /// Entries of the file whose key the program does not know; they are left out.
-    var unknown: [String] = []
+    internal var unknown: [String] = []
     /// How many numbers were out of every sensible range and were limited.
-    var limited = 0
+    internal var limited = 0
 
     /// The largest file that is read: a settings file is some hundred kilobytes.
-    static let fileLimit = 16 * 1_024 * 1_024
+    internal static let fileLimit = 16 * 1_024 * 1_024
     /// No number of a settings file may be larger: counters are counted on, sizes multiplied.
-    static let numberLimit: Double = 1_000_000_000_000
-    static let frequentCountLimit = 1_000_000
-    static let userCommandLimit = 2_000
-    static let startMenuLimit = 500
-    static let textLimit = 65_536
+    internal static let numberLimit: Double = 1_000_000_000_000
+    internal static let frequentCountLimit = 1_000_000
+    internal static let userCommandLimit = 2_000
+    internal static let startMenuLimit = 500
+    internal static let textLimit = 65_536
 
-    enum Problem: LocalizedError {
+    internal enum Problem: LocalizedError {
         case tooLarge
         case unreadable(String)
 
-        var errorDescription: String? {
+        internal var errorDescription: String? {
             switch self {
             case .tooLarge:
                 "The file is larger than \(CheckedSettings.fileLimit / 1_024 / 1_024) MB; a settings file is never that large. Nothing was imported."
@@ -183,7 +183,7 @@ struct CheckedSettings: @unchecked Sendable {
     }
 
     /// Reads at most `fileLimit` bytes of a file.
-    static func read(_ url: URL) throws -> Data {
+    internal static func read(_ url: URL) throws -> Data {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         let data = try handle.read(upToCount: fileLimit + 1) ?? Data()
@@ -196,7 +196,7 @@ struct CheckedSettings: @unchecked Sendable {
     ///
     /// Throws when a known value cannot be read, so that a damaged file is refused before it
     /// replaces working settings.
-    init(_ archive: SettingsArchive, schema: SettingsSchema) throws {
+    internal init(_ archive: SettingsArchive, schema: SettingsSchema) throws {
         for (key, data) in archive.values {
             guard schema.isKnown(key) else {
                 unknown.append(key)
@@ -316,34 +316,34 @@ struct CheckedSettings: @unchecked Sendable {
 
 /// What an import would do, worked out before anything is stored, so that the user can be
 /// shown it and asked.
-struct SettingsImportPlan {
+internal struct SettingsImportPlan {
     /// One part that needs the user's own word.
-    struct Part {
-        let group: SettingsSchema.Group
+    internal struct Part {
+        internal let group: SettingsSchema.Group
         /// What the checkbox says.
-        let title: String
+        internal let title: String
         /// What the part holds, line by line.
-        let lines: [String]
-        var keys: [String]
+        internal let lines: [String]
+        internal var keys: [String]
     }
 
     /// Ordinary settings: stored when the user confirms the import.
-    var ordinary: [String: Data] = [:]
+    internal var ordinary: [String: Data] = [:]
     /// Ordinary settings the program has and the file has not: removed, so that the import
     /// brings back the state of the export and not a mixture.
-    var removed: [String] = []
+    internal var removed: [String] = []
     /// How many of the ordinary settings differ from what is stored now, and some of their names.
-    var changed: [String] = []
-    var parts: [Part] = []
+    internal var changed: [String] = []
+    internal var parts: [Part] = []
     /// The values of the parts, already made harmless.
-    var guarded: [String: Data] = [:]
-    var unknown: [String] = []
-    var limited = 0
+    internal var guarded: [String: Data] = [:]
+    internal var unknown: [String] = []
+    internal var limited = 0
 
-    var isEmpty: Bool { changed.isEmpty && removed.isEmpty && parts.isEmpty }
+    internal var isEmpty: Bool { changed.isEmpty && removed.isEmpty && parts.isEmpty }
 
     /// `current` is what is stored now under every key of the file and of `knownKeys`.
-    init(_ checked: CheckedSettings, current: [String: Data], knownKeys: [String], schema: SettingsSchema) {
+    internal init(_ checked: CheckedSettings, current: [String: Data], knownKeys: [String], schema: SettingsSchema) {
         unknown = checked.unknown
         limited = checked.limited
         func same(_ key: String, _ object: Any) -> Bool {
@@ -430,7 +430,7 @@ struct SettingsImportPlan {
     }
 
     /// A value of the file as the type its check gave it; `empty` for anything else.
-    static func value<Value>(_ object: Any?, or empty: Value) -> Value {
+    internal static func value<Value>(_ object: Any?, or empty: Value) -> Value {
         object as? Value ?? empty
     }
 
@@ -527,7 +527,7 @@ struct SettingsImportPlan {
     }
 
     /// What the user is told before the import, apart from the parts that are asked about.
-    func summary(fileName: String) -> String {
+    internal func summary(fileName: String) -> String {
         func listed(_ keys: [String]) -> String {
             let shown = keys.prefix(12).map { DisplayText.oneLine($0, limit: 60) }.joined(separator: ", ")
             return keys.count > 12 ? shown + ", … (\(keys.count - 12) more)" : shown
@@ -561,7 +561,7 @@ struct SettingsImportPlan {
     /// Stores the plan.
     ///
     /// Of the parts, only those in `accepted`.
-    func apply(to settings: any SettingsStore, accepting accepted: Set<SettingsSchema.Group>) {
+    internal func apply(to settings: any SettingsStore, accepting accepted: Set<SettingsSchema.Group>) {
         for key in removed { settings.set(nil as Data?, forKey: key) }
         for (key, value) in ordinary { settings.set(value as Data?, forKey: key) }
         for part in parts where accepted.contains(part.group) {
@@ -571,17 +571,17 @@ struct SettingsImportPlan {
 }
 
 /// What an export holds.
-struct SettingsExportOptions: Equatable {
+internal struct SettingsExportOptions: Equatable {
     /// Typed command lines, visited folders, search texts.
-    var includesHistory = false
+    internal var includesHistory = false
     /// Saved connections (servers and user names) and the certificates trusted for them.
-    var includesConnections = false
+    internal var includesConnections = false
 
-    static let historyNote = "typed command lines, visited folders, search texts and other histories"
-    static let connectionsNote = "saved connections (servers and user names) and trusted certificates"
+    internal static let historyNote = "typed command lines, visited folders, search texts and other histories"
+    internal static let connectionsNote = "saved connections (servers and user names) and trusted certificates"
 
     /// The keys of `keys` that go into the file.
-    func included(_ keys: [String], schema: SettingsSchema) -> [String] {
+    internal func included(_ keys: [String], schema: SettingsSchema) -> [String] {
         keys.filter { key in
             if schema.isBackup(key) {
                 return false
@@ -597,7 +597,7 @@ struct SettingsExportOptions: Equatable {
     }
 
     /// What is told about the file, before or after it is written.
-    func description(count: Int) -> String {
+    internal func description(count: Int) -> String {
         var left: [String] = []
         if !includesHistory { left.append(Self.historyNote) }
         if !includesConnections { left.append(Self.connectionsNote) }
@@ -614,7 +614,7 @@ extension SettingsArchive {
     /// it: a failure leaves an earlier file whole.
     ///
     /// Blocks: not for the main thread.
-    func write(to url: URL) throws {
+    internal func write(to url: URL) throws {
         let data = try encoded()
         let temporary = url.deletingLastPathComponent()
             .appendingPathComponent(

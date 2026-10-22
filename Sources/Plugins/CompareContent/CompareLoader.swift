@@ -9,7 +9,7 @@ public enum CompareContent: Sendable {
     case text(left: TextDocument, right: TextDocument, diff: TextDiff, width: Int)
     case binary(left: Data, right: Data, diff: BinaryDiff)
 
-    var isNone: Bool {
+    internal var isNone: Bool {
         if case .none = self {
             return true
         }
@@ -175,7 +175,9 @@ public enum CompareLoader {
     }
 
     /// The whole file; throws `CancellationError` when cancelled before the end.
-    static func read(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag) throws -> Data {
+    internal static func read(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag) throws
+        -> Data
+    {
         // What a plugin still holds back for this file (an archive written after a delay) is written first.
         try fileSystems.flushPendingWrites(to: url, cancellation: cancellation)
         let reader = try fileSystems.provider(for: url).read(url, cancellation: cancellation)
@@ -340,13 +342,13 @@ public enum CompareLoader {
     // MARK: Saving
 
     /// Why a file is not saved.
-    enum SaveError: LocalizedError {
+    internal enum SaveError: LocalizedError {
         case changedOnDisk(String)
         case notRepresentable(String, TextEncoding)
         case invalidSequences(String, TextEncoding)
         case sameFile(String)
 
-        var errorDescription: String? {
+        internal var errorDescription: String? {
             switch self {
             case .changedOnDisk(let name):
                 return
@@ -367,7 +369,7 @@ public enum CompareLoader {
     }
 
     /// Whether two locations are one file: the same place, or on this Mac the same device and inode.
-    static func isSameFile(_ first: URL, _ second: URL) -> Bool {
+    internal static func isSameFile(_ first: URL, _ second: URL) -> Bool {
         first.isSameLocation(as: second) || first.isSameFile(as: second, followingLinks: true)
     }
 

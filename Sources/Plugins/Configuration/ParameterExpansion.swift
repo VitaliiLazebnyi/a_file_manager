@@ -2,45 +2,45 @@ import AFMKernel
 import Foundation
 
 /// What one panel contributes to the parameters of a command.
-struct PanelSnapshot: Equatable {
+internal struct PanelSnapshot: Equatable {
     /// The panel's directory as the user writes it, with a trailing `/`.
-    var path: String
+    internal var path: String
     /// The name under the cursor; nil on `[..]` and in an empty list.
-    var cursorName: String?
+    internal var cursorName: String?
     /// The marked names, in list order.
-    var selection: [String] = []
+    internal var selection: [String] = []
 }
 
 /// Everything the placeholders of a Parameters field can refer to
 /// (spec 18 › Button and command parameters).
-struct ExpansionContext {
-    var left: PanelSnapshot
-    var right: PanelSnapshot
+internal struct ExpansionContext {
+    internal var left: PanelSnapshot
+    internal var right: PanelSnapshot
     /// The right panel is the active one.
-    var sourceIsRight = false
-    var environment: [String: String] = [:]
+    internal var sourceIsRight = false
+    internal var environment: [String: String] = [:]
     /// The words typed after the name of a user command; the `%A` codes refer to them.
-    var arguments = ""
+    internal var arguments = ""
     /// Where a list file (`%L`, `%F` …) is to be written.
-    var listFolder = FileManager.default.temporaryDirectory
+    internal var listFolder = FileManager.default.temporaryDirectory
     /// The name of the list file without extension; unique per run.
-    var listName = UUID().uuidString
+    internal var listName = UUID().uuidString
     /// The same words when they came out of an expansion already: their values stay values.
     ///
     /// Nil stands for `arguments` as the user typed them.
-    var argumentPieces: [ExpandedPiece]?
+    internal var argumentPieces: [ExpandedPiece]?
 
-    var source: PanelSnapshot { sourceIsRight ? right : left }
-    var target: PanelSnapshot { sourceIsRight ? left : right }
+    internal var source: PanelSnapshot { sourceIsRight ? right : left }
+    internal var target: PanelSnapshot { sourceIsRight ? left : right }
 }
 
 /// A list of file names a started program reads (spec 18 › List files).
 ///
 /// The expansion only says what the file holds; whoever runs the command writes it, off the main
 /// thread.
-struct ListFile: Equatable {
-    let url: URL
-    let contents: Data
+internal struct ListFile: Equatable {
+    internal let url: URL
+    internal let contents: Data
 }
 
 /// One piece of an expanded text.
@@ -48,7 +48,7 @@ struct ListFile: Equatable {
 /// Only `text` is ever read as shell text or searched for placeholders; a `value` is data (a file
 /// name, a path, the content of a variable) and reaches a program as it is, whatever characters it
 /// holds.
-enum ExpandedPiece: Equatable {
+internal enum ExpandedPiece: Equatable {
     /// What the user wrote.
     case text(String)
     /// Data. The shell gets it in a variable, never as part of the line.
@@ -57,28 +57,28 @@ enum ExpandedPiece: Equatable {
     case raw(String)
 }
 
-struct ExpandedParameters: Equatable {
-    var pieces: [ExpandedPiece] = []
+internal struct ExpandedParameters: Equatable {
+    internal var pieces: [ExpandedPiece] = []
     /// The parameters began with `?`: the user is shown the text and may change it.
-    var asksFirst = false
-    var listFile: ListFile?
+    internal var asksFirst = false
+    internal var listFile: ListFile?
     /// An `%A` code used the arguments, so they are not appended a second time.
-    var usedArguments = false
+    internal var usedArguments = false
     /// A code for the name under the cursor met a panel with no such name (`[..]`, an empty
     /// list).
     ///
     /// The text then names the folder instead of a file (`rm -rf %P%N`), so the command must not
     /// run.
-    var missingName = false
+    internal var missingName = false
     /// Another reason why the command must not run (a name that cannot stand in a list file).
-    var problem: String?
+    internal var problem: String?
 
     /// The parameters as one readable line: the values written into it, quoted where they
     /// need it.
     ///
     /// For commands of the program, for `cd` and for showing; a shell is given `ShellLine.script`
     /// instead.
-    var text: String { ShellLine.display(pieces) }
+    internal var text: String { ShellLine.display(pieces) }
 }
 
 /// Quoting for reading and showing a command line.
@@ -86,14 +86,14 @@ struct ExpandedParameters: Equatable {
 /// Total Commander quotes names that contain a space; here everything a shell would read as
 /// something else is quoted too. Everything works on Unicode scalars: a quote followed by a
 /// combining mark is still a quote to a shell.
-enum ShellWords {
+internal enum ShellWords {
     /// What may stand in a word without quotes.
     private static let plain = CharacterSet(
         charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%+,-./:@_^"
     )
     private static let quoteSpecial = CharacterSet(charactersIn: "\"\\$`")
 
-    static func needsQuoting(_ text: String) -> Bool {
+    internal static func needsQuoting(_ text: String) -> Bool {
         text.unicodeScalars.contains { scalar in
             if scalar.isASCII {
                 return !plain.contains(scalar)
@@ -110,7 +110,7 @@ enum ShellWords {
     }
 
     /// The text as it must be written between double quotes.
-    static func escaped(_ text: String) -> String {
+    internal static func escaped(_ text: String) -> String {
         var result = String.UnicodeScalarView()
         for scalar in text.unicodeScalars {
             if quoteSpecial.contains(scalar) { result.append("\\") }
@@ -119,10 +119,10 @@ enum ShellWords {
         return String(result)
     }
 
-    static func quoted(_ text: String) -> String { "\"" + escaped(text) + "\"" }
+    internal static func quoted(_ text: String) -> String { "\"" + escaped(text) + "\"" }
 
     /// The text as it must be written between single quotes.
-    static func singleQuoteEscaped(_ text: String) -> String {
+    internal static func singleQuoteEscaped(_ text: String) -> String {
         var result = String.UnicodeScalarView()
         for scalar in text.unicodeScalars {
             if scalar == "'" { result.append(contentsOf: "'\\''".unicodeScalars) } else { result.append(scalar) }
@@ -131,7 +131,7 @@ enum ShellWords {
     }
 
     /// The words of a line; double quotes keep a word with spaces together and stay part of it.
-    static func split(_ line: String, at separator: Unicode.Scalar = " ") -> [String] {
+    internal static func split(_ line: String, at separator: Unicode.Scalar = " ") -> [String] {
         var words: [String] = []
         var current = String.UnicodeScalarView()
         var inQuotes = false
@@ -155,7 +155,7 @@ enum ShellWords {
     }
 
     /// The same for an expanded text: a value never ends a word, whatever it holds.
-    static func split(_ pieces: [ExpandedPiece]) -> [[ExpandedPiece]] {
+    internal static func split(_ pieces: [ExpandedPiece]) -> [[ExpandedPiece]] {
         var words: [[ExpandedPiece]] = []
         var current: [ExpandedPiece] = []
         var text = String.UnicodeScalarView()
@@ -194,7 +194,7 @@ enum ShellWords {
     }
 
     /// The first word of an expanded line and what follows it, blanks included.
-    static func firstWord(of pieces: [ExpandedPiece]) -> (word: [ExpandedPiece], rest: [ExpandedPiece]) {
+    internal static func firstWord(of pieces: [ExpandedPiece]) -> (word: [ExpandedPiece], rest: [ExpandedPiece]) {
         var word: [ExpandedPiece] = []
         var inQuotes = false
         var isEscaped = false
@@ -234,7 +234,7 @@ enum ShellWords {
 
     /// A word without its double quotes and their escapes: what a command inside the program
     /// is given, since no shell reads it.
-    static func unquoted(_ word: String) -> String {
+    internal static func unquoted(_ word: String) -> String {
         var result = String.UnicodeScalarView()
         var inQuotes = false
         var isEscaped = false
@@ -255,7 +255,7 @@ enum ShellWords {
     }
 
     /// The same for a word of an expanded text; its values are taken as they are.
-    static func unquoted(_ word: [ExpandedPiece]) -> String {
+    internal static func unquoted(_ word: [ExpandedPiece]) -> String {
         word.map { piece -> String in
             switch piece {
             case .text(let text):
@@ -279,16 +279,16 @@ enum ShellWords {
 ///
 /// What a placeholder stands for is data and stays apart from the text around it
 /// (`ExpandedPiece.value`): no name, however it is written, can become part of the command.
-struct ParameterExpander {
-    let context: ExpansionContext
+internal struct ParameterExpander {
+    internal let context: ExpansionContext
 
-    func expand(_ parameters: String) -> ExpandedParameters {
+    internal func expand(_ parameters: String) -> ExpandedParameters {
         expand([.text(parameters)])
     }
 
     /// Expands a text that came out of an expansion before (the parameters one user command
     /// hands to another): its text is read for placeholders, its values pass through.
-    func expand(_ parameters: [ExpandedPiece]) -> ExpandedParameters {
+    internal func expand(_ parameters: [ExpandedPiece]) -> ExpandedParameters {
         var tokens = Run.tokens(of: parameters)
         var asksFirst = false
         if case .scalar("?")? = tokens.first {
@@ -311,7 +311,7 @@ struct ParameterExpander {
     ///
     /// Making that list costs a pass over the whole panel, so it is made only for a text that asks
     /// for it.
-    static func usesSelection(_ pieces: [ExpandedPiece]) -> Bool {
+    internal static func usesSelection(_ pieces: [ExpandedPiece]) -> Bool {
         let codes = Set("SsRrCcLlDFfdUW".unicodeScalars)
         var found = false
         Run.codes(of: Run.tokens(of: pieces)) { if codes.contains($0) { found = true } }
@@ -322,7 +322,7 @@ struct ParameterExpander {
     ///
     /// Only blanks the user wrote go: a value keeps every character, a no-break space at its end
     /// included.
-    static func trimmed(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
+    internal static func trimmed(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
         var result: [ExpandedPiece] = []
         for piece in pieces {
             if case .text(let text) = piece {
@@ -1035,8 +1035,8 @@ struct ParameterExpander {
 /// Text that came from outside (a file name, a path, a stored value) made fit for a message, a
 /// log line or a dialog: line breaks and control characters cannot draw a second line or hide
 /// what follows, and a very long text is cut.
-enum DisplayText {
-    static func oneLine(_ text: String, limit: Int = 200) -> String {
+internal enum DisplayText {
+    internal static func oneLine(_ text: String, limit: Int = 200) -> String {
         var result = String.UnicodeScalarView()
         var count = 0
         for scalar in text.unicodeScalars {

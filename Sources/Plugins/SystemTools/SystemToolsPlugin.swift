@@ -211,25 +211,25 @@ public final class SystemToolsPlugin: Plugin {
 /// list of applications are used inside jobs, on the job's thread; completions return to the
 /// main thread. `log` and the settings belong to the main thread.
 @MainActor
-final class SystemTools {
-    static let printHeaderKey = "systemTools.printHeader"
-    static let printLinesKey = "systemTools.printLines"
-    static let printOutputKey = "systemTools.printOutput"
+internal final class SystemTools {
+    internal static let printHeaderKey = "systemTools.printHeader"
+    internal static let printLinesKey = "systemTools.printLines"
+    internal static let printOutputKey = "systemTools.printOutput"
     /// In a list of this length or longer, the marked items are picked out off the main thread.
-    static let backgroundSelectionThreshold = 5_000
+    internal static let backgroundSelectionThreshold = 5_000
     /// How many files one run of the printer program is given.
-    nonisolated static let filesPerPrint = 256
+    nonisolated internal static let filesPerPrint = 256
 
     /// What tests may really run: programs that only write text.
-    nonisolated static let harmlessCommands: Set<String> = ["echo", "printf", "true", "false", "pwd"]
+    nonisolated internal static let harmlessCommands: Set<String> = ["echo", "printf", "true", "false", "pwd"]
     /// Characters with which a harmless first word could still start something else.
-    private nonisolated static let shellOperators = CharacterSet(charactersIn: ";|&$`<>(){}\n\\")
+    nonisolated private static let shellOperators = CharacterSet(charactersIn: ";|&$`<>(){}\n\\")
 
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     /// What the tools do outside the program.
     private let desktop: ToolsDesktop
-    private(set) var log: [String] = []
+    internal private(set) var log: [String] = []
     /// The log keeps its newest lines; a program that runs for weeks must not grow with every command.
     private static let logLimit = 512
 
@@ -240,7 +240,7 @@ final class SystemTools {
 
     private var ejection: VolumeEjection!
 
-    init(_ kernel: Kernel, desktop: ToolsDesktop) {
+    internal init(_ kernel: Kernel, desktop: ToolsDesktop) {
         self.kernel = kernel
         self.desktop = desktop
         ejection = VolumeEjection(
@@ -260,7 +260,7 @@ final class SystemTools {
 
     private var history: [String] { CommandHistory.load(from: settings.scoped(to: "systemTools")) }
 
-    func promptAndRun() {
+    internal func promptAndRun() {
         let directory = model.directory.isFileURL ? model.directory : home
         guard
             let line = ui.prompt(
@@ -283,7 +283,7 @@ final class SystemTools {
     /// is collected and shown.
     ///
     /// The job can be cancelled, which ends the child.
-    func run(_ line: String) {
+    internal func run(_ line: String) {
         guard let typed = TypedCommand(line) else {
             return
         }
@@ -354,13 +354,13 @@ final class SystemTools {
         )
     }
 
-    nonisolated static func isHarmless(_ typed: TypedCommand) -> Bool {
+    nonisolated internal static func isHarmless(_ typed: TypedCommand) -> Bool {
         harmlessCommands.contains(typed.firstWord) && !typed.isDetached
             && typed.command.rangeOfCharacter(from: shellOperators) == nil
     }
 
     /// The arguments of a line as locations, for handing them to an application.
-    nonisolated static func files(in arguments: String, relativeTo directory: URL) -> [URL] {
+    nonisolated internal static func files(in arguments: String, relativeTo directory: URL) -> [URL] {
         var urls: [URL] = []
         var rest = arguments
         while !rest.isEmpty {
@@ -422,7 +422,7 @@ final class SystemTools {
     /// Finds an application by path, name or bundle identifier (`identified`).
     ///
     /// Asks the disk: background only.
-    nonisolated static func application(named name: String, identified: (String) -> URL?) -> URL? {
+    nonisolated internal static func application(named name: String, identified: (String) -> URL?) -> URL? {
         let fm = FileManager.default
         if name.contains("/") {
             let path = NSString(string: name).expandingTildeInPath
@@ -441,7 +441,7 @@ final class SystemTools {
 
     /// Opens a terminal window in the source panel's folder (spec 12 › Miscellaneous commands,
     /// "Open command prompt window"), with the terminal chosen in the preferences.
-    func openTerminal(in directory: URL) {
+    internal func openTerminal(in directory: URL) {
         let name = settings.text(SystemToolsPlugin.terminalKey, default: "Terminal")
         let identified = desktop.applicationWithIdentifier
         // (Looking an application up asks the disk: on a thread of the kernel's own.)
@@ -474,12 +474,12 @@ final class SystemTools {
     // MARK: System information
 
     /// A screen as the dialog shows it: its pixels, and its points and scale when they differ.
-    nonisolated static func display(_ size: NSSize, scale: CGFloat) -> String {
+    nonisolated internal static func display(_ size: NSSize, scale: CGFloat) -> String {
         let pixels = "\(Int(size.width * scale))x\(Int(size.height * scale))"
         return scale == 1 ? pixels : "\(pixels) (\(Int(size.width))x\(Int(size.height)) @\(Int(scale))x)"
     }
 
-    func showSystemInformation() {
+    internal func showSystemInformation() {
         let displays = NSScreen.screens.map { Self.display($0.frame.size, scale: $0.backingScaleFactor) }
         kernel.jobs.run(
             title: "System Information:",
@@ -527,7 +527,7 @@ final class SystemTools {
 
     /// "Set volume label" (spec 12 › Volume label): renames the volume of the source panel
     /// through the system's own interface, which asks for rights itself where it needs them.
-    func renameVolume() {
+    internal func renameVolume() {
         let directory = model.directory
         let (volumes, rename) = (desktop.volumes, desktop.renameVolume)
         kernel.jobs.run(
@@ -590,7 +590,7 @@ final class SystemTools {
     }
 
     /// Ejects the drive of `location`, or of the folder the source panel shows (`VolumeEjection`).
-    func ejectVolume(_ location: URL? = nil) {
+    internal func ejectVolume(_ location: URL? = nil) {
         ejection.eject(driveOf: location ?? model.directory)
     }
 
@@ -624,7 +624,7 @@ final class SystemTools {
     /// when the cursor is on `[..]` and nothing is selected; Brief prints names only.
     ///
     /// With subfolders, the depth and the files to include are asked first.
-    func printList(withSubfolders: Bool) {
+    internal func printList(withSubfolders: Bool) {
         let panel = kernel.panels.source
         let model = panel.model
         let directory = model.directory
@@ -821,7 +821,7 @@ final class SystemTools {
 
     /// Files › Print › File contents (spec 12 › Printing): sends the files to the default
     /// printer through the system's print service, which knows text, PDF and pictures.
-    func printFiles(_ operands: PanelModel.Operands) {
+    internal func printFiles(_ operands: PanelModel.Operands) {
         // A few files are picked out here; the marked files of a long list in a job.
         guard operands.markedCount > Self.backgroundSelectionThreshold else {
             printFiles(operands.items().filter { !$0.isDirectory })
@@ -835,7 +835,7 @@ final class SystemTools {
     }
 
     /// `files` are never empty: the command is offered only with a file among the operands.
-    func printFiles(_ files: [FileItem]) {
+    internal func printFiles(_ files: [FileItem]) {
         let what = files.count == 1 ? DisplayText.oneLine(files[0].name) : "\(files.count) files"
         guard
             ui.choose(
@@ -884,7 +884,7 @@ final class SystemTools {
     /// cursor, the usual one first.
     ///
     /// Choosing a lasting association is left to Finder.
-    func openWith(_ item: FileItem) {
+    internal func openWith(_ item: FileItem) {
         let shownName = DisplayText.oneLine(item.name)
         let applicationsToOpen = desktop.applicationsToOpen
         kernel.jobs.run(
@@ -924,12 +924,12 @@ final class SystemTools {
     // MARK: The program
 
     /// Files › Quit: always closes; the shell asks about running jobs as for the Mac's Quit.
-    func quit() {
+    internal func quit() {
         note("quit")
         desktop.quit()
     }
 
-    func minimize() {
+    internal func minimize() {
         note("minimize")
         desktop.minimize()
     }

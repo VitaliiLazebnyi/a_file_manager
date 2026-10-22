@@ -11,15 +11,15 @@ import Testing
 /// the user would; menus and sheets it opens are closed again at once.
 @MainActor
 @Suite(.serialized)
-final class CoverageRenameWindow {
-    let memory = MemoryFileSystem()
-    let box: Sandbox
-    let bench: TestBench
-    let session: MultiRenameSession
-    let controller: MultiRenameWindowController
-    let window: NSWindow
+internal final class CoverageRenameWindow {
+    internal let memory = MemoryFileSystem()
+    internal let box: Sandbox
+    internal let bench: TestBench
+    internal let session: MultiRenameSession
+    internal let controller: MultiRenameWindowController
+    internal let window: NSWindow
 
-    init() throws {
+    internal init() throws {
         _ = NSApplication.shared
         box = try Sandbox()
         memory.addFile("/w/a.txt", "a")
@@ -53,30 +53,30 @@ final class CoverageRenameWindow {
         autoreleasepool { controller.close() }
     }
 
-    var ui: ScriptedInteraction { bench.interaction }
-    var content: NSView? { window.contentView }
-    var table: NSTableView? { Controls.all(NSTableView.self, in: content).first }
-    var combos: [NSComboBox] { Controls.all(NSComboBox.self, in: content) }
-    var nameMask: NSComboBox { combos[0] }
-    var searchBox: NSComboBox { combos[1] }
-    var replaceBox: NSComboBox { combos[2] }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var content: NSView? { window.contentView }
+    internal var table: NSTableView? { Controls.all(NSTableView.self, in: content).first }
+    internal var combos: [NSComboBox] { Controls.all(NSComboBox.self, in: content) }
+    internal var nameMask: NSComboBox { combos[0] }
+    internal var searchBox: NSComboBox { combos[1] }
+    internal var replaceBox: NSComboBox { combos[2] }
 
     /// The editable fields that are not combo boxes: extension, counter start and step.
-    var fields: [NSTextField] {
+    internal var fields: [NSTextField] {
         Controls.all(NSTextField.self, in: content).filter { $0.isEditable && !($0 is NSComboBox) }
     }
 
-    var status: String {
+    internal var status: String {
         Controls.all(NSTextField.self, in: content)
             .first { !$0.isEditable && $0.lineBreakMode == .byTruncatingTail }?
             .stringValue ?? ""
     }
 
-    func popup(_ title: String) -> NSPopUpButton? {
+    internal func popup(_ title: String) -> NSPopUpButton? {
         Controls.all(NSPopUpButton.self, in: content).first { $0.itemTitles.first == title }
     }
 
-    func press(_ title: String) {
+    internal func press(_ title: String) {
         guard let button = Controls.button(title, in: content) else {
             Issue.record("no button \(title)")
             return
@@ -84,7 +84,7 @@ final class CoverageRenameWindow {
         Controls.send(button)
     }
 
-    func cell(_ column: String, _ row: Int) -> NSTextField? {
+    internal func cell(_ column: String, _ row: Int) -> NSTextField? {
         guard let table, let tableColumn = table.tableColumns.first(where: { $0.identifier.rawValue == column }) else {
             return nil
         }
@@ -92,7 +92,7 @@ final class CoverageRenameWindow {
     }
 
     /// Chooses the item whose title is `title` in a pop-up menu, as the user does.
-    func choose(_ title: String, in popupTitle: String) {
+    internal func choose(_ title: String, in popupTitle: String) {
         guard let popup = popup(popupTitle), let index = popup.itemTitles.firstIndex(of: title) else {
             Issue.record("no item \(title) in \(popupTitle)")
             return
@@ -104,7 +104,7 @@ final class CoverageRenameWindow {
     // MARK: Fields
 
     @Test
-    func typingInAFieldShowsAtOnce() throws {
+    internal func typingInAFieldShowsAtOnce() throws {
         nameMask.stringValue = "n[C]"
         controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: nameMask))
         #expect(session.settings.nameMask == "n[C]" && cell("new", 0)?.stringValue == "n1.txt")
@@ -122,7 +122,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func aHistoryEntryChosenInAComboBoxIsTaken() {
+    internal func aHistoryEntryChosenInAComboBoxIsTaken() {
         session.store.remember("[N]_old", in: .nameMask)
         session.settings.nameMask = "[N]2"
         #expect(nameMask.numberOfItems == 1)
@@ -140,7 +140,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func boxesPopUpsAndSteppersChangeTheSettings() throws {
+    internal func boxesPopUpsAndSteppersChangeTheSettings() throws {
         for title in ["^", "1x", "[E]", "RegEx", "Subst."] {
             let box = try #require(Controls.button(title, in: content))
             box.state = box.state == .on ? .off : .on
@@ -171,7 +171,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func settingsFromTheSessionFillTheFields() {
+    internal func settingsFromTheSessionFillTheFields() {
         var settings = RenameSettings()
         settings.counter = CounterDefinition(start: 4, step: 2, digits: 0)
         settings.extensionMask = "[E]x"
@@ -196,7 +196,7 @@ final class CoverageRenameWindow {
     // MARK: The status line
 
     @Test
-    func theStatusLineSaysWhatIsWrong() {
+    internal func theStatusLineSaysWhatIsWrong() {
         session.settings.nameMask = "[Q]"
         #expect(status == "Invalid placeholder: [Q]")
         session.settings.nameMask = "[=tc.size]"
@@ -212,7 +212,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func theStatusLineCountsConflictsAndUnusableNames() {
+    internal func theStatusLineCountsConflictsAndUnusableNames() {
         session.loadNames(fromText: "same.txt\nsame.txt\n..\n")
         #expect(status == "2 name conflict(s), 1 name(s) cannot be used")
         session.loadNames(fromText: "taken.txt")
@@ -228,7 +228,7 @@ final class CoverageRenameWindow {
     // MARK: The list
 
     @Test
-    func theCellsShowHowEachItemStands() {
+    internal func theCellsShowHowEachItemStands() {
         session.loadNames(fromText: "a.txt\nnew.txt\n..\n")
         #expect(cell("old", 0)?.stringValue == "a" && cell("ext", 0)?.stringValue == "txt")
         #expect(cell("new", 0)?.textColor == .secondaryLabelColor)
@@ -253,7 +253,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func clickingAHeaderSortsAndAgainTurnsTheOrder() throws {
+    internal func clickingAHeaderSortsAndAgainTurnsTheOrder() throws {
         let table = try #require(table)
         func click(_ id: String) {
             if let column = table.tableColumns.first(where: { $0.identifier.rawValue == id }) {
@@ -274,7 +274,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func rowsAreDraggedToAnotherPlace() throws {
+    internal func rowsAreDraggedToAnotherPlace() throws {
         let table = try #require(table)
         let scratch = ScratchPasteboard()
         let pasteboard = scratch.pasteboard
@@ -301,7 +301,7 @@ final class CoverageRenameWindow {
     // MARK: Keys
 
     @Test
-    func keysOfTheList() throws {
+    internal func keysOfTheList() throws {
         let table = try #require(table)
         table.selectRowIndexes([1], byExtendingSelection: false)
         let second = session.rows[1].entry.name
@@ -331,7 +331,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func functionKeysOfTheWindow() {
+    internal func functionKeysOfTheWindow() {
         session.settings.nameMask = "[N]2"
         window.sendEvent(Controls.key(Controls.Code.f5))
         #expect(session.rows.first?.entry.name == "a2.txt" && session.settings == .unchanged)
@@ -348,7 +348,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func shiftDeleteDropsAnEntryFromAHistory() {
+    internal func shiftDeleteDropsAnEntryFromAHistory() {
         session.store.remember("old", in: .search)
         session.store.remember("older", in: .search)
         session.settings.search = "older"
@@ -370,7 +370,7 @@ final class CoverageRenameWindow {
     // MARK: Placeholders
 
     @Test
-    func buttonsPutPlaceholdersIntoTheMasks() {
+    internal func buttonsPutPlaceholdersIntoTheMasks() {
         session.settings.nameMask = ""
         session.settings.extensionMask = ""
         for title in ["[N] Name", "[C] Counter", "[YMD] Date", "[hms] Time"] { press(title) }
@@ -386,7 +386,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func moreFieldsComeFromMenus() throws {
+    internal func moreFieldsComeFromMenus() throws {
         session.settings.nameMask = ""
         var menus: [(NSMenu, NSView)] = []
         controller.popUpMenu = { menus.append(($0, $1)) }
@@ -405,7 +405,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func theRangePickerAsksForPositions() {
+    internal func theRangePickerAsksForPositions() {
         session.settings.nameMask = ""
         session.settings.extensionMask = ""
         ui.formAnswers = [
@@ -424,7 +424,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func theRangePickerShowsTheFirstName() {
+    internal func theRangePickerShowsTheFirstName() {
         let folder = session.rows.firstIndex { $0.entry.item.isFolder } ?? 0
         session.move(IndexSet(integer: folder), to: 0)
         session.settings.nameMask = ""
@@ -444,7 +444,7 @@ final class CoverageRenameWindow {
     // MARK: Menus
 
     @Test
-    func savedSettingsAreSavedLoadedAndDeleted() {
+    internal func savedSettingsAreSavedLoadedAndDeleted() {
         session.settings.nameMask = "s[C]"
         ui.promptAnswers = [.text(" Mine "), .cancel]
         choose("Save settings…", in: "F2 Load/save settings")
@@ -465,7 +465,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func deletingOtherSavedSettingsKeepsTheLoadedName() {
+    internal func deletingOtherSavedSettingsKeepsTheLoadedName() {
         session.save(as: "One")
         session.save(as: "Two")
         // Nothing loaded yet: the first entry is proposed.
@@ -482,7 +482,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func namesComeFromTheNamesMenu() throws {
+    internal func namesComeFromTheNamesMenu() throws {
         ui.formAnswers = [.values(["names": .text("x\ny")])]
         choose("Edit names…", in: "F10 Names")
         #expect(session.givenNames == ["x", "y"])
@@ -515,7 +515,7 @@ final class CoverageRenameWindow {
     // MARK: Buttons
 
     @Test
-    func startUndoResultListAndClose() {
+    internal func startUndoResultListAndClose() {
         session.settings.nameMask = "r[C]"
         press("Start!")
         #expect(session.rowCount == 0 && memory.allPaths.contains("/w/r1.txt"))
@@ -532,7 +532,7 @@ final class CoverageRenameWindow {
 
     /// A field that does not let go of the keyboard keeps the run from starting.
     @Test
-    func startWaitsForTheFieldsToLetGo() {
+    internal func startWaitsForTheFieldsToLetGo() {
         let stubborn = Stubborn(frame: NSRect(x: 0, y: 0, width: 10, height: 10))
         content?.addSubview(stubborn)
         #expect(window.makeFirstResponder(stubborn))
@@ -545,7 +545,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func startIsRefusedWhileARunIsUnderWay() {
+    internal func startIsRefusedWhileARunIsUnderWay() {
         let jobs = CancellingJobService(moment: .held, panels: bench.panelSet)
         bench.kernel.attach(jobs)
         session.settings.nameMask = "r[C]"
@@ -564,7 +564,7 @@ final class CoverageRenameWindow {
     }
 
     @Test
-    func theWindowIsNeverMadeFromAnArchive() {
+    internal func theWindowIsNeverMadeFromAnArchive() {
         #expect(MultiRenameWindowController(coder: NSCoder()) == nil)
     }
 }
@@ -572,15 +572,15 @@ final class CoverageRenameWindow {
 /// The tool opened through its command with a window, as the program opens it.
 @MainActor
 @Suite(.serialized)
-struct CoverageRenamePluginWindow {
-    let memory = MemoryFileSystem()
-    let box: Sandbox
-    let plugin: MultiRenamePlugin
-    let bench: TestBench
+internal struct CoverageRenamePluginWindow {
+    internal let memory = MemoryFileSystem()
+    internal let box: Sandbox
+    internal let plugin: MultiRenamePlugin
+    internal let bench: TestBench
     /// The windows the tool was asked to show: none is put on screen.
-    let presenter = StabilityPresenter()
+    internal let presenter = StabilityPresenter()
 
-    init() throws {
+    internal init() throws {
         _ = NSApplication.shared
         box = try Sandbox()
         memory.addFile("/p/a.txt")
@@ -590,10 +590,10 @@ struct CoverageRenamePluginWindow {
         bench = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/p"), right: memory.url("/p"))
     }
 
-    var windows: [NSWindow] { presenter.open.filter { $0.title == "Multi-Rename Tool" } }
+    internal var windows: [NSWindow] { presenter.open.filter { $0.title == "Multi-Rename Tool" } }
 
     @Test
-    func openingAgainReplacesTheWindowAndClosingKeepsTheSettings() async {
+    internal func openingAgainReplacesTheWindowAndClosingKeepsTheSettings() async {
         defer {
             plugin.stop()
             presenter.closeAll()
@@ -625,9 +625,9 @@ struct CoverageRenamePluginWindow {
 /// The tool without a window, where the log goes when no folder is given.
 @MainActor
 @Suite
-struct CoverageRenamePluginDefaults {
+internal struct CoverageRenamePluginDefaults {
     @Test
-    func theLogGoesToTheUsersLogsFolderAndTheClipboardIsEmpty() throws {
+    internal func theLogGoesToTheUsersLogsFolderAndTheClipboardIsEmpty() throws {
         let memory = MemoryFileSystem()
         memory.addFile("/d/a.txt")
         let plugin = MultiRenamePlugin(opensWindows: false)

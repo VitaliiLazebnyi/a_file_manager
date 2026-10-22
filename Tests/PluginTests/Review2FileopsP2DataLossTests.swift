@@ -39,12 +39,12 @@ private func names(in folder: URL) -> [String] {
 }
 
 @Suite(.serialized)
-struct Review2FileopsP2DataLoss {
-    let box: Sandbox
-    let fileSystems = FileSystemRegistry()
-    let virtual: VirtualFileSystem
+internal struct Review2FileopsP2DataLoss {
+    internal let box: Sandbox
+    internal let fileSystems = FileSystemRegistry()
+    internal let virtual: VirtualFileSystem
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         fileSystems.register(LocalFileSystem())
         virtual = VirtualFileSystem(fileSystems: fileSystems)
@@ -54,7 +54,7 @@ struct Review2FileopsP2DataLoss {
     // F001, F018: the target is the file's own folder, named through the branch view. Before:
     // the file was copied onto itself and then removed as the source of the move.
     @Test
-    func aMoveWithinABranchViewNeverRemovesTheFile() throws {
+    internal func aMoveWithinABranchViewNeverRemovesTheFile() throws {
         let file = try box.file("d/a.txt", "precious")
         let job = FileJob(
             kind: .move,
@@ -72,7 +72,7 @@ struct Review2FileopsP2DataLoss {
     // F006, F013: two files of one name from two folders, moved into one folder under
     // "Overwrite all". Before: the second overwrote the first, and both sources were gone.
     @Test
-    func twoSourcesOfOneNameBothSurviveAMoveUnderOverwriteAll() throws {
+    internal func twoSourcesOfOneNameBothSurviveAMoveUnderOverwriteAll() throws {
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
         let job = FileJob(
@@ -97,7 +97,7 @@ struct Review2FileopsP2DataLoss {
 
     // The same through a mask that gives three sources one name.
     @Test
-    func aMaskThatGivesThreeSourcesOneNameLosesNone() throws {
+    internal func aMaskThatGivesThreeSourcesOneNameLosesNone() throws {
         let sources = [
             try box.file("s/a.doc", "doc"), try box.file("s/a.pdf", "pdf"), try box.file("s/a.rtf", "rtf")
         ]
@@ -124,7 +124,7 @@ struct Review2FileopsP2DataLoss {
     // F022, F033: the target name is a link to another file. Before: Resume cut that file and
     // wrote the source over it.
     @Test
-    func resumeNeverWritesThroughALinkAtTheTarget() throws {
+    internal func resumeNeverWritesThroughALinkAtTheTarget() throws {
         let kept = "the victim's own contents"
         let victim = try box.file("elsewhere/victim.txt", kept)
         let source = try box.file("s/f.txt", String(repeating: "source-bytes ", count: 20))
@@ -145,7 +145,7 @@ struct Review2FileopsP2DataLoss {
     // F012, F020: a disk image mounted inside the folder that is deleted for good, and nobody
     // says that the volume is meant too. Before: everything on the volume was deleted.
     @Test
-    func deletingAFolderLeavesAVolumeMountedInsideItAlone() throws {
+    internal func deletingAFolderLeavesAVolumeMountedInsideItAlone() throws {
         let mount = box.url("tree/mnt")
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
         try box.file("tree/beside.txt", "outside")

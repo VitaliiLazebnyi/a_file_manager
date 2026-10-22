@@ -5,9 +5,9 @@ import Testing
 
 /// Review 2, K035/K036: the formats shared by the whole program take any number, on any thread.
 @Suite
-struct Review2KernelFormat {
+internal struct Review2KernelFormat {
     @Test
-    func anyNumberIsASize() {
+    internal func anyNumberIsASize() {
         #expect(Format.kilobytes(.max) == "9,007,199,254,740,992 k")
         #expect(Format.kilobytes(.max - 512) == "9,007,199,254,740,991 k")
         #expect(Format.kilobytes(.min) == "-9,007,199,254,740,992 k")
@@ -29,7 +29,7 @@ struct Review2KernelFormat {
     }
 
     @Test
-    func speedsAndTimesThatAreNoNumbersAreShownAsSomething() {
+    internal func speedsAndTimesThatAreNoNumbersAreShownAsSomething() {
         for speed in [Double.nan, .infinity, -.infinity, 1e300, -1e300, -5, 0] {
             #expect(Format.speed(speed).hasSuffix("/s"))
         }
@@ -43,7 +43,7 @@ struct Review2KernelFormat {
     }
 
     @Test
-    func sumsOfSizesStopAtTheEndsOfTheRange() {
+    internal func sumsOfSizesStopAtTheEndsOfTheRange() {
         #expect(
             Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min
                 && Int64(5).addingSaturated(-7) == -2
@@ -53,7 +53,7 @@ struct Review2KernelFormat {
     }
 
     @Test
-    func namesFromOutsideAreShownWithoutWhatWouldMislead() {
+    internal func namesFromOutsideAreShownWithoutWhatWouldMislead() {
         #expect(
             Format.displayName("report.txt") == "report.txt" && Format.displayName("été 写真 👨‍👩‍👧.jpg") == "été 写真 👨‍👩‍👧.jpg"
         )
@@ -66,7 +66,7 @@ struct Review2KernelFormat {
     }
 
     @Test
-    func groupingDigitsIsSafeOnManyThreadsAtOnce() {
+    internal func groupingDigitsIsSafeOnManyThreadsAtOnce() {
         let wrong = Parallel.map(Array(0..<20_000)) { index -> Bool in
             let value = Int64(index) * 1_000_003
             return Format.bytes(value).replacingOccurrences(of: ",", with: "") != String(value)

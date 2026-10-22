@@ -59,7 +59,7 @@ public final class SyncComparison: @unchecked Sendable {
     private var topEntries: [Int?] = [nil, nil]
 
     /// The size of the blocks files are compared in.
-    static let blockSize = 256 * 1_024
+    internal static let blockSize = 256 * 1_024
 
     public init(
         options: SyncOptions,
@@ -113,7 +113,7 @@ public final class SyncComparison: @unchecked Sendable {
     /// Whether the dates of these two places may be rounded or shifted by their file systems:
     /// anything but APFS and HFS+ on this Mac (FAT and exFAT keep two-second dates, shares and
     /// servers whatever theirs do, archives two seconds).
-    static func needsTolerance(_ first: URL, _ second: URL, fileSystems _: FileSystemRegistry) -> Bool {
+    internal static func needsTolerance(_ first: URL, _ second: URL, fileSystems _: FileSystemRegistry) -> Bool {
         func exact(_ url: URL) -> Bool {
             guard url.isFileURL else {
                 return false
@@ -308,25 +308,25 @@ public final class SyncComparison: @unchecked Sendable {
     /// localized comparison is none, and it ends the program for certain names (K001), which a
     /// folder on a server or in an archive may well hold. Each name's key is made once; the pairs
     /// themselves (large values) are moved once.
-    static func sorted(_ pairs: [Pair]) -> [Pair] {
+    internal static func sorted(_ pairs: [Pair]) -> [Pair] {
         Sorter.sorted(pairs, numeric: true) { ($0.left ?? $0.right)!.name }
     }
 
-    struct Pair {
-        var left: FileItem?
-        var right: FileItem?
+    internal struct Pair {
+        internal var left: FileItem?
+        internal var right: FileItem?
         /// False when the two names differ in case.
-        var isExactMatch = true
+        internal var isExactMatch = true
         /// A name alone on its side whose lower-case form belongs to a name that has a partner: its twin in
         /// the other folder is already paired with another name.
-        var collides = false
+        internal var collides = false
     }
 
     /// Puts the entries of two folders side by side: by exact name (the same bytes) first, then
     /// what is left over by name without regard to case or Unicode form.
     ///
     /// Two names that differ only in form (NFC and NFD) are two files and keep their own rows.
-    static func pair(_ leftItems: [FileItem], _ rightItems: [FileItem]) -> [Pair] {
+    internal static func pair(_ leftItems: [FileItem], _ rightItems: [FileItem]) -> [Pair] {
         var rightByName: [[UInt8]: Int] = [:]
         for (index, item) in rightItems.enumerated() where rightByName[Array(item.name.utf8)] == nil {
             rightByName[Array(item.name.utf8)] = index
@@ -420,7 +420,7 @@ public final class SyncComparison: @unchecked Sendable {
     ///
     /// Nil when cancelled. The blocks a reader hands out may be of any length; they are cut to
     /// match.
-    static func sameContent(
+    internal static func sameContent(
         _ first: URL,
         _ second: URL,
         fileSystems: FileSystemRegistry,

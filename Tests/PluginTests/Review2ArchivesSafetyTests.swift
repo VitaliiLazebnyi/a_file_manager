@@ -37,16 +37,16 @@ private func tarBody(_ text: String) -> Data {
 /// Review round 2: what an archive (or a file that only claims to be one) can do to the
 /// program and to the disk.
 @Suite
-struct Review2ArchivesSafety {
-    let bench: ArchiveBench
-    var box: Sandbox { bench.box }
+internal struct Review2ArchivesSafety {
+    internal let bench: ArchiveBench
+    internal var box: Sandbox { bench.box }
 
-    init() throws {
+    internal init() throws {
         bench = try ArchiveBench()
     }
 
     /// A ZIP written record by record, for names no packer would write.
-    func writeZip(_ name: String, limits: ZipLimits = .standard, names: [String]) throws -> URL {
+    internal func writeZip(_ name: String, limits: ZipLimits = .standard, names: [String]) throws -> URL {
         let url = box.url(name)
         let output = try OutputFile(creating: url)
         let writer = ZipWriter(output, limits: limits)
@@ -63,7 +63,7 @@ struct Review2ArchivesSafety {
     // MARK: Paths (A005, A030, A077, A013, A029)
 
     @Test
-    func pathsAreCutAtTheByteNotAtTheCharacter() {
+    internal func pathsAreCutAtTheByteNotAtTheCharacter() {
         // A slash followed by a combining mark is one Character and still a separator.
         #expect(ArchiveTree.normalized("../\u{301}evil.txt") == nil)
         #expect(ArchiveTree.normalized("a/\u{301}b") == nil)
@@ -88,7 +88,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func aSlashWithACombiningMarkCannotLeaveTheTargetFolder() throws {
+    internal func aSlashWithACombiningMarkCannotLeaveTheTargetFolder() throws {
         let names = ["../\u{301}evil.txt", "ok/\u{301}hidden.txt", "fine.txt"]
         let zip = try writeZip("slash.zip", names: names)
         var tar = Data()
@@ -129,7 +129,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func deepPathsAreRefusedBeforeTheyFillTheMemory() throws {
+    internal func deepPathsAreRefusedBeforeTheyFillTheMemory() throws {
         // One member 300 folders deep is not shown (and costs nothing).
         let deep = Array(repeating: "d", count: 300).joined(separator: "/") + "/f.txt"
         let one = try writeZip("deep.zip", names: [deep, "plain.txt"])
@@ -154,7 +154,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func theOrderOfTheTreeIsKeptWhileEntriesComeAndGo() {
+    internal func theOrderOfTheTreeIsKeptWhileEntriesComeAndGo() {
         var tree = ArchiveTree()
         var generator = SystemRandomNumberGenerator()
         for index in 0..<40 { tree.insert(ArchiveEntry(path: "d\(index % 7)/f\(index)", isDirectory: false)) }
@@ -185,7 +185,7 @@ struct Review2ArchivesSafety {
     // MARK: Unpacking (A096, A097)
 
     @Test
-    func nothingIsUnpackedThroughALinkThatAlreadyStandsInTheTarget() throws {
+    internal func nothingIsUnpackedThroughALinkThatAlreadyStandsInTheTarget() throws {
         let outside = try box.folder("outside")
         let target = try box.folder("target")
         try FileManager.default.createSymbolicLink(
@@ -216,7 +216,7 @@ struct Review2ArchivesSafety {
     // MARK: Files that are handed to bsdtar (A038, A087)
 
     @Test
-    func aTextFileNamedLikeAnArchiveIsNotGivenToBsdtar() throws {
+    internal func aTextFileNamedLikeAnArchiveIsNotGivenToBsdtar() throws {
         let secret = try box.file("secret.txt", "TOP-SECRET-CONTENT")
         for (name, head) in [
             ("holiday.7z", "#mtree\n"), ("list.rar", ""),
@@ -246,7 +246,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func realForeignArchivesStillOpen() throws {
+    internal func realForeignArchivesStillOpen() throws {
         try bench.makeTree()
         #expect(runTool("/usr/bin/bsdtar", ["--format", "7zip", "-cf", "tree.7z", "tree"], in: box.root).status == 0)
         #expect(
@@ -265,7 +265,7 @@ struct Review2ArchivesSafety {
     // MARK: Typed paths (A001, A002, A056)
 
     @Test
-    func aTypedPathIsOnlyAskedAboutOnLocalDisks() throws {
+    internal func aTypedPathIsOnlyAskedAboutOnLocalDisks() throws {
         try box.file("real/a.zip", "x")
         try box.folder("folder.zip")
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: box.url("real"))
@@ -285,7 +285,7 @@ struct Review2ArchivesSafety {
     // MARK: Formats
 
     @Test
-    func longPaddingBetweenXZStreamsIsRead() throws {
+    internal func longPaddingBetweenXZStreamsIsRead() throws {
         var file = try XZCoder.compress(Data("first ".utf8))
         file.append(Data(count: 200_000))
         file.append(try XZCoder.compress(Data("second".utf8)))
@@ -298,7 +298,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func aZip64EndRecordIsFoundBehindASelfExtractorStub() throws {
+    internal func aZip64EndRecordIsFoundBehindASelfExtractorStub() throws {
         let plain = try writeZip(
             "wide.zip",
             limits: ZipLimits(maxField: 0xFFFF_FFFE, maxEntries: 2),
@@ -313,7 +313,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func aFileThatTakesOverTheNameOfAHardLinkKeepsItsOwnContents() throws {
+    internal func aFileThatTakesOverTheNameOfAHardLinkKeepsItsOwnContents() throws {
         var tar = Data()
         tar.append(tarHeader(name: "target.txt", size: 6))
         tar.append(tarBody("target"))
@@ -330,7 +330,7 @@ struct Review2ArchivesSafety {
     // MARK: Encryption (A023, A048, A042, A098)
 
     @Test
-    func newArchivesAreEncryptedWithAESAndOldOnesStillOpen() throws {
+    internal func newArchivesAreEncryptedWithAESAndOldOnesStillOpen() throws {
         let tree = try bench.makeTree()
         let archive = box.url("aes.zip")
         try bench.pack([tree], to: archive) {
@@ -391,7 +391,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func theCipherMatchesItselfAcrossBlockSizes() throws {
+    internal func theCipherMatchesItselfAcrossBlockSizes() throws {
         var plain = Data(count: 100_003)
         plain.withUnsafeMutableBytes { arc4random_buf($0.baseAddress, $0.count) }
         let salt = Data((0..<16).map { UInt8($0) })
@@ -416,7 +416,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func aDeclinedPasswordIsNotAskedForAgainByTheSameOperation() throws {
+    internal func aDeclinedPasswordIsNotAskedForAgainByTheSameOperation() throws {
         let tree = try bench.makeTree()
         let archive = box.url("locked.zip")
         try bench.pack([tree], to: archive) { $0.password = "sesame" }
@@ -442,7 +442,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func unpackingPlainMembersOfAPartlyEncryptedArchiveAsksNothing() throws {
+    internal func unpackingPlainMembersOfAPartlyEncryptedArchiveAsksNothing() throws {
         let tree = try bench.makeTree()
         let archive = box.url("mixed.zip")
         try bench.pack([tree.appendingPathComponent("readme.txt")], to: archive)
@@ -460,7 +460,7 @@ struct Review2ArchivesSafety {
     // MARK: The temporary folder (A040, A058, A083)
 
     @Test
-    func whatACrashLeftBehindIsSweptAndWhatWasKeptStays() throws {
+    internal func whatACrashLeftBehindIsSweptAndWhatWasKeptStays() throws {
         let parent = try box.folder("tmp")
         // The number of a process that has ended.
         let process = Process()
@@ -507,7 +507,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func noCopyIsMadeWhenTheTemporaryVolumeHasNoRoomToSpare() throws {
+    internal func noCopyIsMadeWhenTheTemporaryVolumeHasNoRoomToSpare() throws {
         try bench.makeTree()
         #expect(runTool("/usr/bin/tar", ["-czf", "tree.tgz", "tree"], in: box.root).status == 0)
         #expect(runTool("/usr/bin/zip", ["-qr", "tree.zip", "tree"], in: box.root).status == 0)
@@ -536,7 +536,7 @@ struct Review2ArchivesSafety {
     }
 
     @Test
-    func archivesNestOnlySoDeep() throws {
+    internal func archivesNestOnlySoDeep() throws {
         try bench.makeTree()
         #expect(runTool("/usr/bin/zip", ["-qr", "inner.zip", "tree"], in: box.root).status == 0)
         #expect(runTool("/usr/bin/zip", ["-q", "outer.zip", "inner.zip"], in: box.root).status == 0)

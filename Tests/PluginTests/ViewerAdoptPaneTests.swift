@@ -11,12 +11,12 @@ import Testing
 /// out again.
 @MainActor
 @Suite(.serialized)
-struct ViewerAdoptPane {
-    let memory = MemoryFileSystem()
-    let plugin: ViewerPlugin
-    let bench: TestBench
+internal struct ViewerAdoptPane {
+    internal let memory = MemoryFileSystem()
+    internal let plugin: ViewerPlugin
+    internal let bench: TestBench
 
-    init() {
+    internal init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
         plugin.mediaPlayback = CovViewPlayback.factory
@@ -25,7 +25,7 @@ struct ViewerAdoptPane {
     }
 
     @discardableResult
-    func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
+    internal func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
@@ -44,7 +44,7 @@ struct ViewerAdoptPane {
     }
 
     @Test
-    func closingThePaneEndsAReadThatWaitsForTheServer() async throws {
+    internal func closingThePaneEndsAReadThatWaitsForTheServer() async throws {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -59,7 +59,7 @@ struct ViewerAdoptPane {
     }
 
     @Test
-    func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async {
+    internal func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -85,7 +85,7 @@ struct ViewerAdoptPane {
     }
 
     @Test
-    func aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() async throws {
+    internal func aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() async throws {
         // Above what is kept in memory (the pane's blocks are made small for the test, 1 MB in
         // all, as 64 MB are in the program); lines of about 25 bytes.
         let block = Data(String(repeating: "line of the big text\n", count: 5_000).utf8)

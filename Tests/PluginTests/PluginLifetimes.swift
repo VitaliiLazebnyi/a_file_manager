@@ -32,15 +32,15 @@ import VirtualFoldersPlugin
 /// bench is.
 @MainActor
 @Suite
-struct PluginLifetimes {
-    nonisolated static let names = [
+internal struct PluginLifetimes {
+    nonisolated internal static let names = [
         "LocalFileSystem", "Archives", "Network", "VirtualFolders", "Navigation", "Places", "Viewer", "MacIntegration",
         "FileOperations", "FileProperties", "MultiRename", "CompareContent", "FileTools", "FindFiles", "DirectorySync",
         "SystemTools", "Clipboard", "Selection", "ViewOptions", "FolderTabs", "Configuration"
     ]
 
     /// Each plugin as the tests start it: nothing is launched and nothing is written outside.
-    static let plugins: [String: (NSPasteboard) -> any Plugin] = [
+    internal static let plugins: [String: (NSPasteboard) -> any Plugin] = [
         "LocalFileSystem": { _ in LocalFileSystemPlugin() },
         "Archives": { _ in ArchivesPlugin(flushDelay: nil, launchesApplications: false) },
         "Network": { _ in NetworkPlugin(launchesApplications: false, passwords: MemoryPasswords()) },
@@ -65,7 +65,7 @@ struct PluginLifetimes {
     ]
 
     @Test(arguments: names)
-    func thePluginGoesWithItsKernel(_ name: String) throws {
+    internal func thePluginGoesWithItsKernel(_ name: String) throws {
         let scratch = ScratchPasteboard()
         weak var kernel: Kernel?
         weak var commands: CommandRegistry?
@@ -93,7 +93,7 @@ struct PluginLifetimes {
     }
 
     @Test
-    func theConnectionsGoWithTheNetworkPlugin() {
+    internal func theConnectionsGoWithTheNetworkPlugin() {
         weak var center: ConnectionCenter?
         weak var environment: SessionEnvironment?
         do {

@@ -11,9 +11,9 @@ import Testing
 @testable import VirtualFoldersPlugin
 
 @Suite
-struct VirtualLocations {
+internal struct VirtualLocations {
     @Test
-    func aBranchLocationCarriesItsRealDirectory() throws {
+    internal func aBranchLocationCarriesItsRealDirectory() throws {
         let real = URL(fileURLWithPath: "/Users/x/My Files/dir")
         let url = VirtualLocation.branch(of: real).url
         #expect(url.scheme == "vfolder" && url.lastPathComponent == "dir" && url.path == "/Users/x/My Files/dir")
@@ -23,7 +23,7 @@ struct VirtualLocations {
     }
 
     @Test
-    func otherFileSystemsHostsAndPortsSurvive() throws {
+    internal func otherFileSystemsHostsAndPortsSurvive() throws {
         let memory = MemoryFileSystem()
         #expect(
             VirtualLocation(VirtualLocation.branch(of: memory.url("/A/docs")).url) == .branch(of: memory.url("/A/docs"))
@@ -45,7 +45,7 @@ struct VirtualLocations {
     }
 
     @Test
-    func aListLocationKnowsItsTitleAndWhereItCameFrom() {
+    internal func aListLocationKnowsItsTitleAndWhereItCameFrom() {
         let origin = URL(fileURLWithPath: "/Users/x")
         let url = VirtualLocation.list(id: 7, title: "Search result", origin: origin).url
         #expect(url.lastPathComponent == "Search result")
@@ -58,7 +58,7 @@ struct VirtualLocations {
     }
 
     @Test
-    func foreignAndBrokenLocationsAreNotVirtual() throws {
+    internal func foreignAndBrokenLocationsAreNotVirtual() throws {
         #expect(VirtualLocation(URL(fileURLWithPath: "/tmp")) == nil)
         #expect(VirtualLocation(try #require(URL(string: "vfolder://nonsense/x"))) == nil)
         #expect(VirtualLocation(try #require(URL(string: "vfolder://pick.hzz/x"))) == nil)
@@ -68,16 +68,16 @@ struct VirtualLocations {
 
 /// The walk reads many directories at once: this suite is the one to run with the thread sanitizer.
 @Suite
-struct BranchWalking {
-    let fileSystems = FileSystemRegistry()
-    let memory = MemoryFileSystem()
+internal struct BranchWalking {
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
 
-    init() {
+    internal init() {
         fileSystems.register(LocalFileSystem())
         fileSystems.register(memory)
     }
 
-    func names(_ starts: [BranchWalker.Start], _ walker: BranchWalker) throws -> [String] {
+    internal func names(_ starts: [BranchWalker.Start], _ walker: BranchWalker) throws -> [String] {
         var names: [String] = []
         try walker.walk(starts) { batch in
             names += batch.map(\.name)
@@ -87,7 +87,7 @@ struct BranchWalking {
     }
 
     @Test
-    func listsEveryFileBelowWithItsRelativePathAndRealLocation() throws {
+    internal func listsEveryFileBelowWithItsRelativePathAndRealLocation() throws {
         memory.addFile("/A/one.txt")
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/A/docs/deep/er/leaf.txt")
@@ -122,7 +122,7 @@ struct BranchWalking {
     }
 
     @Test
-    func aWideTreeIsReadCompletelyOnAllCores() throws {
+    internal func aWideTreeIsReadCompletelyOnAllCores() throws {
         var expected: [String] = []
         for folder in 0..<300 {
             for file in 0..<3 {
@@ -144,7 +144,7 @@ struct BranchWalking {
     }
 
     @Test
-    func stopsWhenNoMoreIsWantedAndSkipsWhatCannotBeRead() throws {
+    internal func stopsWhenNoMoreIsWantedAndSkipsWhatCannotBeRead() throws {
         for folder in 0..<200 { memory.addFile("/many/d\(folder)/f.txt") }
         var received = 0
         try BranchWalker(fileSystems: fileSystems, showHidden: false)
@@ -168,7 +168,7 @@ struct BranchWalking {
     }
 
     @Test
-    func linksAreListedNotFollowedAndPackagesStayWhole() throws {
+    internal func linksAreListedNotFollowedAndPackagesStayWhole() throws {
         let box = try Sandbox()
         try box.file("real/a.txt")
         try box.file("Tool.app/Contents/Info.plist")
@@ -185,7 +185,7 @@ struct BranchWalking {
     }
 
     @Test
-    func manyWalksAtOnceShareTheProvidersSafely() {
+    internal func manyWalksAtOnceShareTheProvidersSafely() {
         for folder in 0..<40 { memory.addFile("/shared/d\(folder)/x/f.txt") }
         let virtual = VirtualFileSystem(fileSystems: fileSystems)
         let counts = Parallel.map(Array(0..<8)) { index -> Int in
@@ -198,19 +198,19 @@ struct BranchWalking {
 
 @MainActor
 @Suite
-struct VirtualFolderCommands {
-    let memory = MemoryFileSystem()
-    let plugin = VirtualFoldersPlugin()
-    let bench: TestBench
+internal struct VirtualFolderCommands {
+    internal let memory = MemoryFileSystem()
+    internal let plugin = VirtualFoldersPlugin()
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
-    var fileSystem: VirtualFileSystem { plugin.fileSystem! }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
+    internal var fileSystem: VirtualFileSystem { plugin.fileSystem! }
 
     private let scratch = ScratchPasteboard()
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt", "1")
         memory.addFile("/A/docs/in.txt", "inside")
         memory.addFile("/A/docs/deep/leaf.txt", "leaf")
@@ -227,7 +227,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func registersItsFileSystemServiceCommandsAndOptions() {
+    internal func registersItsFileSystemServiceCommandsAndOptions() {
         #expect(bench.kernel.fileSystems.all.contains { $0.scheme == "vfolder" })
         #expect(bench.kernel.services.find((any FileListService).self) != nil)
         #expect(bench.kernel.keyBindings.command(for: Shortcut(.character("b"), .control)) == .branchView)
@@ -241,7 +241,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func branchViewShowsEveryFileBelowAndLeavesThroughTheParentRow() {
+    internal func branchViewShowsEveryFileBelowAndLeavesThroughTheParentRow() {
         commands.perform(.branchView)
         #expect(left.names == ["docs/deep/leaf.txt", "docs/in.txt", "one.txt", "pics/cat.jpg"])
         #expect(commands.isChecked(.branchView) && left.model.hasParentRow)
@@ -258,7 +258,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func leavingWithTheCommandGoesToTheFolderOfTheFileUnderTheCursor() {
+    internal func leavingWithTheCommandGoesToTheFolderOfTheFileUnderTheCursor() {
         commands.perform(.branchView)
         left.moveCursor(toName: "docs/deep/leaf.txt")
         commands.perform(.branchView)
@@ -275,7 +275,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func selectedBranchShowsOnlyTheMarkedItemsAndRestoresTheSelection() {
+    internal func selectedBranchShowsOnlyTheMarkedItemsAndRestoresTheSelection() {
         left.model.select(mask: "docs one.txt")
         commands.perform("cm_DirBranchSel")
         #expect(left.names == ["docs/deep/leaf.txt", "docs/in.txt", "one.txt"])
@@ -292,7 +292,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func theSidedCommandsWorkOnTheirPanel() {
+    internal func theSidedCommandsWorkOnTheirPanel() {
         commands.perform("cm_RightDirBranch")
         #expect(
             right.names == ["other.txt"] && VirtualLocation(right.model.directory) != nil
@@ -305,7 +305,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func operationsWorkOnTheRealFiles() {
+    internal func operationsWorkOnTheRealFiles() {
         commands.perform(.branchView)
         left.moveCursor(toName: "docs/in.txt")
         bench.interaction.choiceAnswers = [0]
@@ -320,7 +320,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func aFileListKeepsRealLocationsAndFullPathsAsNames() throws {
+    internal func aFileListKeepsRealLocationsAndFullPathsAsNames() throws {
         let service = try #require(bench.kernel.services.find((any FileListService).self))
         let files = [
             memory.url("/A/docs/in.txt"), memory.url("/B/other.txt"), memory.url("/A/gone.txt"),
@@ -351,7 +351,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func aForgottenListFailsWithoutHarm() {
+    internal func aForgottenListFailsWithoutHarm() {
         let stale = VirtualLocation.list(id: 4_711, title: "Old", origin: memory.url("/A")).url
         left.show(stale)
         #expect(left.model.directory == memory.url("/A") && left.failures.count == 1)
@@ -360,7 +360,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func loadsAListFile() {
+    internal func loadsAListFile() {
         memory.addFile("/A/found.lst", "\u{FEFF}mem:/A/one.txt\r\ndocs/in.txt\r\n\r\n  mem:/B/other.txt  \n")
         commands.perform("LOADLIST", .location(memory.url("/A/found.lst")))
         #expect(left.names == ["mem:/A/docs/in.txt", "mem:/A/one.txt", "mem:/B/other.txt"])
@@ -372,7 +372,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func optionsChangeWhatABranchLists() {
+    internal func optionsChangeWhatABranchLists() {
         commands.perform(.branchView)
         bench.kernel.settings.set(true, forKey: VirtualFoldersPlugin.listsFoldersKey)
         bench.kernel.preferences.pages.first { $0.title == "Branch View" }?.onChange()
@@ -382,7 +382,7 @@ struct VirtualFolderCommands {
     }
 
     @Test
-    func watchingIsForwardedToTheRealFileSystem() async throws {
+    internal func watchingIsForwardedToTheRealFileSystem() async throws {
         let watched = WatchableFileSystem()
         let registry = FileSystemRegistry()
         registry.register(watched)

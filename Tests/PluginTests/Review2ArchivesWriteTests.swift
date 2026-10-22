@@ -8,32 +8,32 @@ import Testing
 /// Review round 2: nothing that was put into an archive is lost, written twice or written
 /// where it does not belong, whatever happens while it is written.
 @Suite
-struct Review2ArchivesWrites {
-    let bench: ArchiveBench
-    var box: Sandbox { bench.box }
+internal struct Review2ArchivesWrites {
+    internal let bench: ArchiveBench
+    internal var box: Sandbox { bench.box }
 
-    init() throws {
+    internal init() throws {
         bench = try ArchiveBench()
     }
 
-    func makeZip(_ name: String = "tree.zip") throws -> URL {
+    internal func makeZip(_ name: String = "tree.zip") throws -> URL {
         try bench.makeTree()
         #expect(runTool("/usr/bin/zip", ["-qr", name, "tree"], in: box.root).status == 0)
         return box.url(name)
     }
 
-    func write(_ text: String, to url: URL) throws {
+    internal func write(_ text: String, to url: URL) throws {
         let writer = try bench.fileSystems.provider(for: url).write(url)
         try writer.write(Data(text.utf8))
         try writer.close(attributes: FileAttributes())
     }
 
-    func listed(_ archive: URL) -> [String] {
+    internal func listed(_ archive: URL) -> [String] {
         runTool("/usr/bin/unzip", ["-Z1", archive.path]).output.split(separator: "\n").map(String.init)
     }
 
     /// Puts a file of the disk onto the memory file system ("a server").
-    func upload(_ local: URL, to path: String) throws -> URL {
+    internal func upload(_ local: URL, to path: String) throws -> URL {
         let url = bench.memory.url(path)
         bench.memory.createDirectory(at: url.deletingLastPathComponent())
         let writer = try bench.memory.write(url)
@@ -43,7 +43,7 @@ struct Review2ArchivesWrites {
     }
 
     /// What the server holds, as a file on the disk that the system's tools can look at.
-    func download(_ url: URL, as name: String) throws -> URL {
+    internal func download(_ url: URL, as name: String) throws -> URL {
         let local = box.url(name)
         try? FileManager.default.removeItem(at: local)
         try bench.read(url).write(to: local)
@@ -53,7 +53,7 @@ struct Review2ArchivesWrites {
     // MARK: Quit (A011, A012, A027, A086)
 
     @Test
-    func oneCallWritesAnArchiveInsideAnArchive() throws {
+    internal func oneCallWritesAnArchiveInsideAnArchive() throws {
         try bench.makeTree()
         #expect(runTool("/usr/bin/zip", ["-qr", "inner.zip", "tree"], in: box.root).status == 0)
         // Large enough that putting it back into the outer archive is left to the delay.
@@ -74,7 +74,7 @@ struct Review2ArchivesWrites {
     }
 
     @Test
-    func oneCallWritesAnArchiveOnAServerThatKeepsWritesBack() throws {
+    internal func oneCallWritesAnArchiveOnAServerThatKeepsWritesBack() throws {
         let local = try makeZip()
         let onServer = try upload(local, to: "/store/tree.zip")
         try write("to the server", to: bench.inside(onServer, "tree/sent.txt"))
@@ -87,7 +87,7 @@ struct Review2ArchivesWrites {
     // MARK: Changes while a write is under way (A016, A017)
 
     @Test
-    func aMemberDeletedWhileItIsFirstWrittenIsGoneAfterTheNextWrite() throws {
+    internal func aMemberDeletedWhileItIsFirstWrittenIsGoneAfterTheNextWrite() throws {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         try write("short-lived", to: tree.appending(name: "new.txt"))
@@ -111,7 +111,7 @@ struct Review2ArchivesWrites {
     }
 
     @Test
-    func aMemberReplacedWhileItIsFirstWrittenIsWrittenOnce() throws {
+    internal func aMemberReplacedWhileItIsFirstWrittenIsWrittenOnce() throws {
         let archive = try makeZip()
         let member = bench.inside(archive, "tree/twice.txt")
         try write("first version", to: member)
@@ -134,7 +134,7 @@ struct Review2ArchivesWrites {
     // MARK: Members on their way (A033, A101)
 
     @Test
-    func aMemberUnderAJobsTemporaryNameIsNeverWrittenIntoTheFile() throws {
+    internal func aMemberUnderAJobsTemporaryNameIsNeverWrittenIntoTheFile() throws {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         let temporary = tree.appending(name: ".afm-\(UUID().uuidString).tmp")
@@ -164,7 +164,7 @@ struct Review2ArchivesWrites {
     // MARK: Archives the store lets go (A021, A024, A028, A072)
 
     @Test
-    func aChangeNeverLandsInAnArchiveTheStoreHasLetGo() throws {
+    internal func aChangeNeverLandsInAnArchiveTheStoreHasLetGo() throws {
         let archive = try makeZip()
         let first = try bench.store.archive(at: archive)
         // With something waiting, or a writer open, the archive is not let go.
@@ -192,7 +192,7 @@ struct Review2ArchivesWrites {
     }
 
     @Test
-    func openingManyArchivesNeverDropsOneWithChangesWaiting() throws {
+    internal func openingManyArchivesNeverDropsOneWithChangesWaiting() throws {
         let archive = try makeZip()
         try write("waiting", to: bench.inside(archive, "tree/waiting.txt"))
         let busy = try bench.store.archive(at: archive)
@@ -206,7 +206,7 @@ struct Review2ArchivesWrites {
     }
 
     @Test
-    func writersAndEvictionRaceWithoutLosingAFile() throws {
+    internal func writersAndEvictionRaceWithoutLosingAFile() throws {
         let archives = try (0..<16)
             .map { index -> URL in
                 let url = box.url("race\(index).zip")
@@ -262,7 +262,7 @@ struct Review2ArchivesWrites {
     // MARK: Pack into an archive on a server (A018, A019, A020, A095)
 
     @Test
-    func packIntoAnArchiveOnAServerEncryptsWhenAsked() throws {
+    internal func packIntoAnArchiveOnAServerEncryptsWhenAsked() throws {
         let local = try makeZip()
         let onServer = try upload(local, to: "/store/s.zip")
         let secret = try box.file("secret.txt", String(repeating: "top secret line\n", count: 200))
@@ -287,7 +287,7 @@ struct Review2ArchivesWrites {
     }
 
     @Test
-    func aFailedPackIntoAnArchiveOnAServerLeavesTheOldMember() throws {
+    internal func aFailedPackIntoAnArchiveOnAServerLeavesTheOldMember() throws {
         let local = try makeZip()
         let onServer = try upload(local, to: "/store/s.zip")
         let before = try bench.read(bench.inside(onServer, "tree/readme.txt"))
@@ -333,7 +333,7 @@ struct Review2ArchivesWrites {
     // MARK: The archive file itself (A034, A035, A037, A047, A079)
 
     @Test
-    func anArchiveReachedThroughALinkIsChangedWhereItLies() throws {
+    internal func anArchiveReachedThroughALinkIsChangedWhereItLies() throws {
         let archive = try makeZip()
         try box.folder("real")
         let real = box.url("real/real.zip")
@@ -360,7 +360,7 @@ struct Review2ArchivesWrites {
     }
 
     @Test
-    func anArchiveKeepsItsRightsAndANewOneIsNoMoreOpenThanItsSources() throws {
+    internal func anArchiveKeepsItsRightsAndANewOneIsNoMoreOpenThanItsSources() throws {
         let archive = try makeZip()
         func mode(_ url: URL) -> Int {
             (try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int) ?? -1
@@ -400,7 +400,7 @@ struct Review2ArchivesWrites {
     }
 
     @Test
-    func packIntoAnArchiveWithChangesWaitingLosesNeither() throws {
+    internal func packIntoAnArchiveWithChangesWaitingLosesNeither() throws {
         let archive = try makeZip()
         // A change that waits in the open archive, then a pack that rewrites the file.
         try write("waiting", to: bench.inside(archive, "tree/waiting.txt"))
@@ -433,7 +433,7 @@ struct Review2ArchivesWrites {
     }
 
     @Test
-    func aDamagedDirectoryCannotMakeAWriteOverwriteAnotherMember() throws {
+    internal func aDamagedDirectoryCannotMakeAWriteOverwriteAnotherMember() throws {
         // Two members; the directory's entry for the second points at the first one's header.
         let url = box.url("crossed.zip")
         let output = try OutputFile(creating: url)
@@ -479,7 +479,7 @@ struct Review2ArchivesWrites {
     // MARK: The main thread (A003, A004, A015, A054, A091)
 
     @Test
-    func capabilitiesAnswerWhileAWriteIsUnderWay() throws {
+    internal func capabilitiesAnswerWhileAWriteIsUnderWay() throws {
         let archive = try makeZip()
         try write("pending", to: bench.inside(archive, "tree/pending.txt"))
         let (entered, release) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))
@@ -509,7 +509,7 @@ struct Review2ArchivesWrites {
     // MARK: Rescue (A078, A082)
 
     @Test
-    func membersThatAreKeptComeWithAListOfWhatTheyAre() throws {
+    internal func membersThatAreKeptComeWithAListOfWhatTheyAre() throws {
         let archive = try makeZip()
         try write("unsaved one", to: bench.inside(archive, "tree/one.txt"))
         try write("on its way", to: bench.inside(archive, "tree/.afm-\(UUID().uuidString).tmp"))
@@ -532,7 +532,7 @@ struct Review2ArchivesWrites {
     // MARK: The gate
 
     @Test
-    func aWaitForARunningWriteEndsWhenItIsCancelled() throws {
+    internal func aWaitForARunningWriteEndsWhenItIsCancelled() throws {
         let archive = try makeZip()
         try write("pending", to: bench.inside(archive, "tree/pending.txt"))
         let (entered, release) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0))

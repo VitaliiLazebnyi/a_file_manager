@@ -18,18 +18,18 @@ private final class FakeOverlayHost: PanelOverlayHost {
 /// Files live in a memory file system, so everything is read through the provider interface.
 @MainActor
 @Suite(.serialized)
-struct ViewerWindows {
-    let memory = MemoryFileSystem()
-    let bench: TestBench
-    let plugin: ViewerPlugin
+internal struct ViewerWindows {
+    internal let memory = MemoryFileSystem()
+    internal let bench: TestBench
+    internal let plugin: ViewerPlugin
     fileprivate let hosts: [ObjectIdentifier: FakeOverlayHost]
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
 
-    var commands: CommandRegistry { bench.commands }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() throws {
+    internal init() throws {
         _ = NSApplication.shared
         var lines: [String] = []
         for number in 1...5_000 {
@@ -77,7 +77,7 @@ struct ViewerWindows {
         var hosts: [ObjectIdentifier: FakeOverlayHost] = [:]
     }
 
-    static func write(_ data: Data, to path: String, in memory: MemoryFileSystem) throws {
+    internal static func write(_ data: Data, to path: String, in memory: MemoryFileSystem) throws {
         let writer = try memory.write(memory.url(path))
         try writer.write(data)
         try writer.close(attributes: FileAttributes())
@@ -86,7 +86,7 @@ struct ViewerWindows {
     fileprivate func host(_ panel: FakePanel) -> FakeOverlayHost { hosts[ObjectIdentifier(panel)]! }
 
     @discardableResult
-    func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
+    internal func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
@@ -95,7 +95,7 @@ struct ViewerWindows {
     }
 
     /// A key press as the window would deliver it.
-    func key(_ characters: String, code: UInt16 = 0, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
+    internal func key(_ characters: String, code: UInt16 = 0, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
         NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
@@ -110,13 +110,13 @@ struct ViewerWindows {
         )!
     }
 
-    func functionKey(_ number: Int, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
+    internal func functionKey(_ number: Int, _ flags: NSEvent.ModifierFlags = []) -> NSEvent {
         let codes: [UInt16] = [122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111]
         return key("", code: codes[number - 1], flags)
     }
 
     /// Opens a Lister on a file of the left panel and waits until its text is shown.
-    func openLister(on name: String) async throws -> ViewerWindowController {
+    internal func openLister(on name: String) async throws -> ViewerWindowController {
         bench.left.moveCursor(toName: name)
         #expect(commands.perform(.viewSingle))
         let controller = try #require(plugin.windows.last)
@@ -127,7 +127,7 @@ struct ViewerWindows {
     }
 
     /// Waits until the pager shows the rows of the pane's current mode.
-    func rowsShown(_ controller: ViewerWindowController) async -> Bool {
+    internal func rowsShown(_ controller: ViewerWindowController) async -> Bool {
         let pane = controller.pane
         return await wait {
             pane.pager.document?.layout == pane.layout
@@ -136,14 +136,14 @@ struct ViewerWindows {
         }
     }
 
-    func visibleText(_ pane: ViewerPane, rows: Int = 3) -> [String] {
+    internal func visibleText(_ pane: ViewerPane, rows: Int = 3) -> [String] {
         ((try? pane.pager.document?.rows(from: 0, count: rows)) ?? []).map(\.text)
     }
 
     // MARK: Registration
 
     @Test
-    func theViewerRegistersItsCommandsKeysPageAndService() {
+    internal func theViewerRegistersItsCommandsKeysPageAndService() {
         let keys = bench.kernel.keyBindings
         #expect(keys.command(for: .f(3)) == .view && keys.command(for: .f(3, .shift)) == .viewSingle)
         #expect(keys.command(for: .f(3, [.option, .shift])) == .viewInternalSingle)
@@ -170,7 +170,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func viewingNeedsAFile() {
+    internal func viewingNeedsAFile() {
         bench.left.model.moveCursor(to: 0)
         #expect(bench.left.model.cursorIsOnParentRow && !commands.isEnabled(.view) && !commands.isEnabled(.viewSingle))
         bench.left.moveCursor(toName: "docs")
@@ -183,7 +183,7 @@ struct ViewerWindows {
     // MARK: Lister windows
 
     @Test
-    func theServiceShowsFilesOfAnyFileSystemAndTexts() async throws {
+    internal func theServiceShowsFilesOfAnyFileSystemAndTexts() async throws {
         let service = try #require(bench.kernel.services.find((any ViewerService).self))
         service.view(memory.url("/A/short.txt"))
         let file = try #require(plugin.windows.last)
@@ -217,7 +217,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func aTextIsLaidOutOnceWhenItsWindowKeepsItsSize() async throws {
+    internal func aTextIsLaidOutOnceWhenItsWindowKeepsItsSize() async throws {
         let controller = try await openLister(on: "long.txt")
         // The window's layout is finished first: on a busy machine the text may be shown before
         // a layout pass the window still owes, which then wraps it once more for the final width.
@@ -243,7 +243,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func aMissingFileIsReportedInTheWindow() async throws {
+    internal func aMissingFileIsReportedInTheWindow() async throws {
         plugin.view(memory.url("/A/nothing.txt"))
         let controller = try #require(plugin.windows.last)
         #expect(await wait { controller.pane.failure != nil })
@@ -254,7 +254,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func severalMarkedFilesAreSteppedThroughWithNAndP() async throws {
+    internal func severalMarkedFilesAreSteppedThroughWithNAndP() async throws {
         bench.left.model.select(mask: "*.txt")
         #expect(commands.perform(.view))
         let controller = try #require(plugin.windows.last)
@@ -288,7 +288,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func modesAreChosenAtStartupAndSwitchedWithTheirKeys() async throws {
+    internal func modesAreChosenAtStartupAndSwitchedWithTheirKeys() async throws {
         let controller = try await openLister(on: "short.txt")
         let pane = controller.pane
         #expect(await rowsShown(controller))
@@ -332,7 +332,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func binaryUnicodeHtmlAndImagesOpenInTheirModes() async throws {
+    internal func binaryUnicodeHtmlAndImagesOpenInTheirModes() async throws {
         let binary = try await openLister(on: "tool.bin")
         #expect(binary.pane.mode == .binary && binary.pane.statusText.contains("Binary"))
         let wide = try await openLister(on: "wide.txt")
@@ -365,7 +365,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func theConfigurationDecidesTheStartupMode() async throws {
+    internal func theConfigurationDecidesTheStartupMode() async throws {
         ui.formAnswers = [
             .values([
                 "viewer.startupMode": .index(3), "viewer.htmlAsText": .flag(false), "viewer.binaryWidth": .text("40")
@@ -392,7 +392,7 @@ struct ViewerWindows {
     // MARK: Search, selection, clipboard
 
     @Test
-    func findSearchesTheWholeFileAndRepeatsInBothDirections() async throws {
+    internal func findSearchesTheWholeFileAndRepeatsInBothDirections() async throws {
         let controller = try await openLister(on: "long.txt")
         let pane = controller.pane
         #expect(await rowsShown(controller))
@@ -441,7 +441,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func theSelectionIsCopiedAsTextOrAsHex() async throws {
+    internal func theSelectionIsCopiedAsTextOrAsHex() async throws {
         let controller = try await openLister(on: "short.txt")
         let pane = controller.pane
         #expect(await rowsShown(controller))
@@ -469,7 +469,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func positionsAreReachedByPercentOffsetAndLine() async throws {
+    internal func positionsAreReachedByPercentOffsetAndLine() async throws {
         let controller = try await openLister(on: "long.txt")
         let pane = controller.pane
         #expect(await rowsShown(controller))
@@ -503,7 +503,7 @@ struct ViewerWindows {
     // MARK: Quick view
 
     @Test
-    func theQuickViewCoversTheTargetPanelAndFollowsTheCursor() async throws {
+    internal func theQuickViewCoversTheTargetPanelAndFollowsTheCursor() async throws {
         bench.left.moveCursor(toName: "short.txt")
         #expect(commands.perform(.quickView))
         let quick = try #require(plugin.quickView)
@@ -542,7 +542,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func switchingToTheCoveredPanelOrChangingItsPlaceEndsTheQuickView() async {
+    internal func switchingToTheCoveredPanelOrChangingItsPlaceEndsTheQuickView() async {
         bench.left.moveCursor(toName: "short.txt")
         commands.perform(.quickView)
         #expect(plugin.quickView != nil)
@@ -566,7 +566,7 @@ struct ViewerWindows {
     }
 
     @Test
-    func theSeparateQuickViewIsAWindowThatFollowsTheCursor() async throws {
+    internal func theSeparateQuickViewIsAWindowThatFollowsTheCursor() async throws {
         bench.left.moveCursor(toName: "short.txt")
         #expect(commands.perform(.separateQuickView))
         let controller = try #require(plugin.windows.last)

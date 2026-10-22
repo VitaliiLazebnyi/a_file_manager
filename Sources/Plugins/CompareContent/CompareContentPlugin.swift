@@ -15,9 +15,9 @@ public final class CompareContentPlugin: Plugin {
     private let opensWindows: Bool
     private let effects: CompareWindowEffects
     /// The sessions of the open windows; without windows (tests), the last one started.
-    private(set) var sessions: [CompareSession] = []
+    internal private(set) var sessions: [CompareSession] = []
     /// The open windows.
-    private(set) var windows: [CompareWindowController] = []
+    internal private(set) var windows: [CompareWindowController] = []
     private weak var owner: Kernel?
 
     /// Tests pass `opensWindows: false` and look at the session; the work then runs on the
@@ -27,7 +27,7 @@ public final class CompareContentPlugin: Plugin {
     }
 
     /// Windows whose beeps, file panel, font panel and clipboard are `effects`.
-    init(opensWindows: Bool, effects: CompareWindowEffects) {
+    internal init(opensWindows: Bool, effects: CompareWindowEffects) {
         self.opensWindows = opensWindows
         self.effects = effects
     }
@@ -170,14 +170,14 @@ public final class CompareContentPlugin: Plugin {
 }
 
 /// Which two files the command compares (spec 09 › Opening and choosing the files).
-enum CompareOperands {
+internal enum CompareOperands {
     /// Two selected files of the source panel; or its one selected file with the first selected
     /// file of the target panel, else with the file of the same name there; or, with nothing
     /// selected, the file under the cursor with the file of the same name in the target panel.
     ///
     /// The target panel's cursor is never used. Works on what the panels list.
     @MainActor
-    static func choose(source: PanelModel, target: PanelModel) -> (left: URL?, right: URL?) {
+    internal static func choose(source: PanelModel, target: PanelModel) -> (left: URL?, right: URL?) {
         /// The first `limit` marked files in list order. Nothing marked is known at once, and the walk over the
         /// marks (a bit each) stops at the limit, so a selection of 300,000 does not cost a pass over them.
         func selectedFiles(_ model: PanelModel, limit: Int) -> [FileItem] {
@@ -213,7 +213,7 @@ enum CompareOperands {
     }
 
     /// The files another plugin named; nil when the argument names none.
-    static func parse(_ argument: CommandArgument, fileSystems: FileSystemRegistry, base: URL) -> (
+    internal static func parse(_ argument: CommandArgument, fileSystems: FileSystemRegistry, base: URL) -> (
         left: URL?, right: URL?
     )? {
         if let location = argument.location {

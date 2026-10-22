@@ -3,14 +3,14 @@ import Foundation
 
 /// The text of checksum files (spec 19 › Checksum files): written by Create checksums, read
 /// by Verify.
-enum ChecksumFile {
-    struct Entry: Equatable {
-        var name: String
+internal enum ChecksumFile {
+    internal struct Entry: Equatable {
+        internal var name: String
         /// Lower-case hex.
-        var digest: String
+        internal var digest: String
         /// The method, where the line or the file's extension tells it; otherwise every
         /// method with a digest of this length is tried.
-        var method: ChecksumMethod?
+        internal var method: ChecksumMethod?
     }
 
     /// One line without its end: `<digest> *<name>`, or for SFV `<name> <DIGEST>`.
@@ -19,7 +19,7 @@ enum ChecksumFile {
     /// SFV: a name that starts with `;` or `#` (a comment there) or with white space gets `./` in
     /// front. The other formats (GNU): a name with a line break or, then, a backslash is escaped
     /// (`\n`, `\r`, `\\`) and the line starts with a backslash.
-    static func line(name: String, digest: [UInt8], method: ChecksumMethod) -> String {
+    internal static func line(name: String, digest: [UInt8], method: ChecksumMethod) -> String {
         if method == .crc32 {
             let needsPrefix = name.first.map { $0 == ";" || $0 == "#" || $0.isWhitespace } ?? false
             return "\(needsPrefix ? "./" : "")\(name) \(digest.hex.uppercased())"
@@ -47,7 +47,7 @@ enum ChecksumFile {
     }
 
     /// Whether a name holds a line feed or carriage return (found on the code points: `\r\n` is one character to Swift).
-    static func hasLineBreak(_ name: String) -> Bool {
+    internal static func hasLineBreak(_ name: String) -> Bool {
         name.unicodeScalars.contains { $0 == "\n" || $0 == "\r" }
     }
 
@@ -56,7 +56,7 @@ enum ChecksumFile {
     /// The Unix format ends lines with LF and keeps `/` in paths; the other one is that of the
     /// Windows original: CRLF and `\`. The text is UTF-8; `byteOrderMark` puts the mark in front
     /// that the original needs to read it as such.
-    static func contents(
+    internal static func contents(
         _ entries: [(name: String, digest: [UInt8])],
         method: ChecksumMethod,
         unixFormat: Bool,
@@ -78,7 +78,7 @@ enum ChecksumFile {
     /// Whether the mark is written: always when asked for; otherwise only in the Windows
     /// format and when a name needs more than ASCII (there the original would take the text
     /// for the local code page).
-    static func needsByteOrderMark(names: [String], unixFormat: Bool, alwaysUTF8: Bool) -> Bool {
+    internal static func needsByteOrderMark(names: [String], unixFormat: Bool, alwaysUTF8: Bool) -> Bool {
         alwaysUTF8 || (!unixFormat && names.contains { !$0.allSatisfy(\.isASCII) })
     }
 
@@ -93,24 +93,24 @@ enum ChecksumFile {
         return methods
     }()
 
-    static func method(forFileNamed name: String) -> ChecksumMethod? {
+    internal static func method(forFileNamed name: String) -> ChecksumMethod? {
         byExtension[FileItem.split(name).ext.lowercased()]
     }
 
     /// The files Verify takes for checksum files: `*.sfv *.md5 *.sha* *.bk3` and the user's
     /// extra masks (the spec's `ChecksumExtraTypes`).
-    static func isChecksumFile(_ name: String, extraMasks: String = "") -> Bool {
+    internal static func isChecksumFile(_ name: String, extraMasks: String = "") -> Bool {
         checksumFileTest(extraMasks: extraMasks)(name)
     }
 
     /// The test of `isChecksumFile`, with the mask compiled once for many names.
-    static func checksumFileTest(extraMasks: String = "") -> (String) -> Bool {
+    internal static func checksumFileTest(extraMasks: String = "") -> (String) -> Bool {
         let mask = FileMask("*.sfv *.md5 *.sha* *.bk3 " + extraMasks)
         return { mask.matches($0) }
     }
 
     /// The text of a checksum file: UTF-8 with or without a mark, UTF-16, or the Western code page.
-    static func text(from data: Data) -> String {
+    internal static func text(from data: Data) -> String {
         if data.starts(with: [0xEF, 0xBB, 0xBF]) {
             return String(decoding: data.dropFirst(3), as: UTF8.self)
         }
@@ -165,9 +165,9 @@ enum ChecksumFile {
 
     /// What was read from a checksum file: its entries, and the numbers of the lines that are
     /// neither an entry nor a comment nor empty.
-    struct Parsed {
-        var entries: [Entry] = []
-        var unreadableLines: [Int] = []
+    internal struct Parsed {
+        internal var entries: [Entry] = []
+        internal var unreadableLines: [Int] = []
     }
 
     /// Reads the lines of a checksum file named `fileName`: `<digest> *<name>` (also with two
@@ -176,7 +176,7 @@ enum ChecksumFile {
     /// file is named after.
     ///
     /// Comment lines (`;`, `#`) are passed over, and so is nothing else.
-    static func parse(_ text: String, fileName: String) -> [Entry] {
+    internal static func parse(_ text: String, fileName: String) -> [Entry] {
         parseLines(text, fileName: fileName).entries
     }
 
@@ -186,7 +186,7 @@ enum ChecksumFile {
     /// and `#1 hit.txt DC186425` are entries (the name follows the same rule as the others),
     /// and a `;` line that does not end in a CRC is a comment. The other formats start every entry
     /// with a digest or a tag, so a line starting with `;` or `#` is always a comment there.
-    static func parseLines(_ text: String, fileName: String) -> Parsed {
+    internal static func parseLines(_ text: String, fileName: String) -> Parsed {
         let fileMethod = method(forFileNamed: fileName)
         func fittingFileMethod(_ digest: Substring) -> ChecksumMethod? {
             fileMethod.flatMap { $0.digestLength * 2 == digest.count ? $0 : nil }
@@ -272,43 +272,43 @@ enum ChecksumFile {
 }
 
 /// What Verify found for one file.
-enum VerifyResult: Equatable {
+internal enum VerifyResult: Equatable {
     case ok, notFound, readError, wrongChecksum
     /// Something in the checksum file itself that cannot be read: a line, or the whole file.
     case unreadable
 }
 
 /// The outcome of Verify checksums, and its text (spec 08 › Verify window).
-struct VerifyReport {
-    struct Section {
-        var title: String
-        var rows: [(name: String, result: VerifyResult)]
+internal struct VerifyReport {
+    internal struct Section {
+        internal var title: String
+        internal var rows: [(name: String, result: VerifyResult)]
     }
 
-    var sections: [Section] = []
-    var methods: Set<ChecksumMethod> = []
+    internal var sections: [Section] = []
+    internal var methods: Set<ChecksumMethod> = []
 
-    func count(_ result: VerifyResult) -> Int {
+    internal func count(_ result: VerifyResult) -> Int {
         sections.reduce(0) { $0 + $1.rows.filter { $0.result == result }.count }
     }
 
-    var errors: Int { count(.notFound) + count(.readError) + count(.wrongChecksum) + count(.unreadable) }
+    internal var errors: Int { count(.notFound) + count(.readError) + count(.wrongChecksum) + count(.unreadable) }
 
     /// The names of the files that failed, as the panel knows them; where the checksum file itself is
     /// at fault, its own name (the title of the section).
-    var failedNames: [String] {
+    internal var failedNames: [String] {
         sections.flatMap { section in
             section.rows.filter { $0.result != .ok }.map { $0.result == .unreadable ? section.title : $0.name }
         }
     }
 
     /// `<METHOD>: Errors: N`.
-    var title: String {
+    internal var title: String {
         let method = methods.count == 1 ? methods.map(\.reportName).joined() : "Checksums"
         return "\(method): Errors: \(errors)"
     }
 
-    static func row(_ name: String, _ result: VerifyResult) -> String {
+    internal static func row(_ name: String, _ result: VerifyResult) -> String {
         switch result {
         case .ok:
             return "OK:  \(name)"
@@ -328,7 +328,7 @@ struct VerifyReport {
     }
 
     /// The rows of the window; with `onlyErrors` just the failures and the summary.
-    func text(onlyErrors: Bool) -> String {
+    internal func text(onlyErrors: Bool) -> String {
         var lines: [String] = []
         for section in sections {
             lines.append(section.title + ":")
@@ -352,15 +352,17 @@ struct VerifyReport {
 /// **Threading.** Everything here blocks and runs on a job's thread. The files are hashed on
 /// all cores at once, each file as a stream of blocks on one of them; the results come back
 /// in the order of the input.
-enum ChecksumRun {
+internal enum ChecksumRun {
     /// The digests of each file for each of its methods, or the error that stopped it.
     ///
     /// With an `expected` digest and several methods of that length only the first (the likeliest)
     /// is computed in a first pass over the file; the others, all in one further pass, only when it
     /// does not match. The digests of methods not computed are empty.
-    static func digests(of files: [(url: URL, methods: [ChecksumMethod], expected: String?)], run: ToolRun) -> [Result<
-        [[UInt8]], any Error
-    >] {
+    internal static func digests(of files: [(url: URL, methods: [ChecksumMethod], expected: String?)], run: ToolRun)
+        -> [Result<
+            [[UInt8]], any Error
+        >]
+    {
         let busy = BusyFiles()
         return Parallel.map(files) { file -> Result<[[UInt8]], any Error> in
             busy.enter()
@@ -434,16 +436,18 @@ enum ChecksumRun {
 
     /// Whether BLAKE3 may spread a block over the cores now: when fewer files than cores are
     /// being hashed, so that cores are left over.
-    static func spreadsBLAKE3(filesInProgress: Int, cores: Int = ProcessInfo.processInfo.activeProcessorCount) -> Bool {
+    internal static func spreadsBLAKE3(filesInProgress: Int, cores: Int = ProcessInfo.processInfo.activeProcessorCount)
+        -> Bool
+    {
         filesInProgress < cores
     }
 
     /// The pieces BLAKE3 is fed when it must not spread the work: smaller than the 16 chunks (16 KB)
     /// from which it uses more than one thread.
-    static let serialPiece = 8 << 10
+    internal static let serialPiece = 8 << 10
 
     /// Gives `block` to `hasher`; to a BLAKE3 hasher that must not spread it, piece by piece.
-    static func feed(_ hasher: any StreamHasher, _ block: Data, spread: Bool) {
+    internal static func feed(_ hasher: any StreamHasher, _ block: Data, spread: Bool) {
         guard hasher is BLAKE3Hasher, !spread, block.count > serialPiece else {
             hasher.update(block)
             return
@@ -456,7 +460,7 @@ enum ChecksumRun {
         }
     }
 
-    static func digests(of files: [(url: URL, methods: [ChecksumMethod])], run: ToolRun) -> [Result<
+    internal static func digests(of files: [(url: URL, methods: [ChecksumMethod])], run: ToolRun) -> [Result<
         [[UInt8]], any Error
     >] {
         digests(of: files.map { ($0.url, $0.methods, nil) }, run: run)
@@ -464,7 +468,7 @@ enum ChecksumRun {
 
     /// The files below the operands, in listing order; folders are walked recursively and
     /// links to folders are not followed.
-    static func files(below operands: [FileItem], run: ToolRun) throws -> [FileItem] {
+    internal static func files(below operands: [FileItem], run: ToolRun) throws -> [FileItem] {
         var files: [FileItem] = []
         for operand in operands {
             try run.checkCancelled()
@@ -483,16 +487,16 @@ enum ChecksumRun {
         return files
     }
 
-    struct CreateOptions: Equatable {
-        var method = ChecksumMethod.crc32
-        var separatePerFile = false
-        var separatePerFolder = false
-        var alwaysUTF8 = false
-        var unixFormat = true
+    internal struct CreateOptions: Equatable {
+        internal var method = ChecksumMethod.crc32
+        internal var separatePerFile = false
+        internal var separatePerFolder = false
+        internal var alwaysUTF8 = false
+        internal var unixFormat = true
     }
 
     /// The checksum file a file is listed in.
-    static func outputURL(for file: FileItem, target: URL, options: CreateOptions) -> URL {
+    internal static func outputURL(for file: FileItem, target: URL, options: CreateOptions) -> URL {
         if options.separatePerFolder {
             // One file per folder, written into that folder; the target path is not used.
             let folder = file.url.deletingLastPathComponent()
@@ -512,7 +516,7 @@ enum ChecksumRun {
 
     /// How a file is named inside a checksum file in `folder`: by its path from there when it
     /// lies below, else by its full path (a bare name would be ambiguous and lead nowhere).
-    static func name(of file: URL, in folder: URL) -> String {
+    internal static func name(of file: URL, in folder: URL) -> String {
         guard file.isInside(folder) else {
             return file.path
         }
@@ -521,7 +525,7 @@ enum ChecksumRun {
 
     /// The name of the checksum file of one file, from a pattern with `*`: `*.*.sfv` adds
     /// the extension to the whole name, `*.sfv` puts it in place of the file's own.
-    static func separateName(for fileName: String, pattern: String, method: ChecksumMethod) -> String {
+    internal static func separateName(for fileName: String, pattern: String, method: ChecksumMethod) -> String {
         let stars = pattern.filter { $0 == "*" }.count
         let patternExtension = FileItem.split(pattern).ext
         let ext = patternExtension.isEmpty || patternExtension.contains("*") ? method.fileExtension : patternExtension
@@ -532,7 +536,9 @@ enum ChecksumRun {
     ///
     /// `target` is the checksum file for all, or, with separate files, the folder and pattern for
     /// them. Returns what was written.
-    static func create(for operands: [FileItem], target: URL, options: CreateOptions, run: ToolRun) throws -> [URL] {
+    internal static func create(for operands: [FileItem], target: URL, options: CreateOptions, run: ToolRun) throws
+        -> [URL]
+    {
         var files = try files(below: operands, run: run)
         // A checksum file among the operands is about to be replaced: it is not hashed, or the
         // new one would list itself with a stale digest.
@@ -604,7 +610,7 @@ enum ChecksumRun {
     }
 
     /// Checks the files listed in checksum files against their checksums.
-    static func verify(checksumFiles: [FileItem], run: ToolRun) throws -> VerifyReport {
+    internal static func verify(checksumFiles: [FileItem], run: ToolRun) throws -> VerifyReport {
         var report = VerifyReport()
         struct Pending {
             var section: Int
@@ -702,7 +708,8 @@ enum ChecksumRun {
     /// in square brackets in the name.
     ///
     /// Every method the length of the checksum allows is tried.
-    static func verify(_ files: [(item: FileItem, digest: String)], title: String, run: ToolRun) throws -> VerifyReport
+    internal static func verify(_ files: [(item: FileItem, digest: String)], title: String, run: ToolRun) throws
+        -> VerifyReport
     {
         var report = VerifyReport()
         let methods = files.map { ChecksumMethod.candidates(hexDigits: $0.digest.count) }
@@ -736,7 +743,7 @@ enum ChecksumRun {
     private static let bracketedChecksum = try? NSRegularExpression(pattern: #"\[([0-9A-Fa-f]{8})\]"#)
 
     /// A CRC32 in square brackets in a file name: `Movie [1A2B3C4D].mkv`.
-    static func checksumInName(_ name: String) -> String? {
+    internal static func checksumInName(_ name: String) -> String? {
         guard name.utf8.contains(UInt8(ascii: "[")), let regex = bracketedChecksum,
             let match = regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
             let range = Range(match.range(at: 1), in: name)
@@ -745,7 +752,7 @@ enum ChecksumRun {
     }
 
     /// A checksum on the clipboard: nothing but hex digits of a known length.
-    static func checksum(fromClipboard text: String?) -> String? {
+    internal static func checksum(fromClipboard text: String?) -> String? {
         guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines),
             text.allSatisfy({ $0.isASCII && $0.isHexDigit }),
             !ChecksumMethod.candidates(hexDigits: text.count).isEmpty

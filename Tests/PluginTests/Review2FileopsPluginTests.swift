@@ -17,17 +17,17 @@ import VirtualFoldersPlugin
 
 @MainActor
 @Suite
-struct Review2FileopsCommands {
-    let box: Sandbox
+internal struct Review2FileopsCommands {
+    internal let box: Sandbox
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let virtual = VirtualFoldersPlugin()
-    let bench: TestBench
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let virtual = VirtualFoldersPlugin()
+    internal let bench: TestBench
 
-    var ui: ScriptedInteraction { bench.interaction }
-    var commands: CommandRegistry { bench.commands }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("d/a.txt", "precious")
         try box.file("d/b.txt", "second")
@@ -49,7 +49,7 @@ struct Review2FileopsCommands {
 
     // F001, F018: what Paste after Cut does in a branch view.
     @Test
-    func movingFilesIntoTheBranchViewTheyAreShownInChangesNothing() throws {
+    internal func movingFilesIntoTheBranchViewTheyAreShownInChangesNothing() throws {
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         var ended = false
         transfers.transfer(
@@ -69,7 +69,7 @@ struct Review2FileopsCommands {
     }
 
     @Test
-    func pastingACopyIntoABranchViewGivesItANewNameInTheRealFolder() throws {
+    internal func pastingACopyIntoABranchViewGivesItANewNameInTheRealFolder() throws {
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         transfers.transfer(.copy, [box.url("d/a.txt")], into: try branch(of: "d"), renamingSelfCopies: true) { _ in }
         #expect(
@@ -78,7 +78,7 @@ struct Review2FileopsCommands {
     }
 
     @Test
-    func nothingCanBePastedIntoAListOfFiles() throws {
+    internal func nothingCanBePastedIntoAListOfFiles() throws {
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         let list = try #require(virtual.fileSystem)
             .register(
@@ -93,7 +93,7 @@ struct Review2FileopsCommands {
 
     // F026
     @Test
-    func copyingTowardsABranchViewGoesIntoTheRealFolder() throws {
+    internal func copyingTowardsABranchViewGoesIntoTheRealFolder() throws {
         bench.right.show(try branch(of: "t"))
         bench.left.moveCursor(toName: "a.txt")
         ui.promptAnswers = [.accept]
@@ -104,7 +104,7 @@ struct Review2FileopsCommands {
     }
 
     @Test
-    func aListOfFilesIsNotOfferedAsATarget() throws {
+    internal func aListOfFilesIsNotOfferedAsATarget() throws {
         bench.right.show(
             try #require(virtual.fileSystem)
                 .register(
@@ -126,7 +126,7 @@ struct Review2FileopsCommands {
 
     // F001: a rename typed in a branch view.
     @Test
-    func renamingInABranchViewWithF6IsARename() throws {
+    internal func renamingInABranchViewWithF6IsARename() throws {
         bench.left.show(try branch(of: "d"))
         bench.left.moveCursor(toName: "a.txt")
         var info = stat()
@@ -140,7 +140,7 @@ struct Review2FileopsCommands {
 
     // F056, F006: several items renamed with one mask.
     @Test
-    func aRenameOfSeveralItemsToOneNameKeepsThemAllAndAsksOnce() {
+    internal func aRenameOfSeveralItemsToOneNameKeepsThemAllAndAsksOnce() {
         bench.left.moveCursor(toName: "a.txt")
         commands.perform(.selectAll)
         bench.left.model.setSelected(false, names: ["sub"])
@@ -154,7 +154,7 @@ struct Review2FileopsCommands {
     }
 
     @Test
-    func aRenameOfSeveralItemsInABranchViewLeavesEachInItsFolder() throws {
+    internal func aRenameOfSeveralItemsInABranchViewLeavesEachInItsFolder() throws {
         bench.left.show(try branch(of: "d"))
         bench.left.moveCursor(toName: "a.txt")
         commands.perform(.selectAll)
@@ -165,7 +165,7 @@ struct Review2FileopsCommands {
 
     // F002, F004, F011, F071
     @Test
-    func aLargeSelectionIsRememberedAndOnlyWrittenOutWhenAskedFor() throws {
+    internal func aLargeSelectionIsRememberedAndOnlyWrittenOutWhenAskedFor() throws {
         let count = ClipboardPlugin.eagerLimit + 5
         for index in 0..<count { try box.file("many/f\(index).txt", "\(index)") }
         bench.left.show(box.url("many"))
@@ -206,7 +206,7 @@ struct Review2FileopsCommands {
     }
 
     @Test
-    func filesAnotherProgramOffersAsOneListAreReadInOnePiece() {
+    internal func filesAnotherProgramOffersAsOneListAreReadInOnePiece() {
         bench.right.focus()
         // Files written by somebody else: the system offers them as one list as well.
         pasteboard.clearContents()
@@ -222,7 +222,7 @@ struct Review2FileopsCommands {
 
     // F040
     @Test
-    func aTextIsPastedAsAFileWithoutLeavingADraft() {
+    internal func aTextIsPastedAsAFileWithoutLeavingADraft() {
         pasteboard.clearContents()
         pasteboard.setString("some text", forType: .string)
         bench.right.focus()
@@ -232,7 +232,7 @@ struct Review2FileopsCommands {
 
     // F055
     @Test
-    func namesThatCouldMisleadAreWrittenOutInQuestions() {
+    internal func namesThatCouldMisleadAreWrittenOutInQuestions() {
         #expect(DisplayName.escaped("plain name.txt") == "plain name.txt")
         #expect(DisplayName.escaped("a\nb\u{202E}txt.exe\u{200B}") == "a<U+000A>b<U+202E>txt.exe<U+200B>")
         let item = FileItem(url: box.url("d/x\ny"), name: "x\ny")
@@ -243,10 +243,10 @@ struct Review2FileopsCommands {
 }
 
 @Suite
-struct Review2FileopsNames {
+internal struct Review2FileopsNames {
     // F014, F015, F016: reproducers of the fuzzer, as typed text.
     @Test
-    func rangesNearTheEndsOfIntDoNotCrash() throws {
+    internal func rangesNearTheEndsOfIntDoNotCrash() throws {
         var context = NameTemplate.Context()
         context.cursorName = "report.txt"
         #expect(
@@ -293,7 +293,7 @@ struct Review2FileopsNames {
 
     // F035, F075
     @Test
-    func aMaskThatComesToNothingNamesNothing() throws {
+    internal func aMaskThatComesToNothingNamesNothing() throws {
         let context = NameTemplate.Context()
         #expect(try NameTemplate.names(from: "<[T2+1D]", context: context).isEmpty)
         #expect(try NameTemplate.names(from: "<[T2+1D] | real", context: context) == ["real"])
@@ -302,7 +302,7 @@ struct Review2FileopsNames {
 
     // F035, F074
     @Test
-    func theDateFormattersAreMadeOncePerText() throws {
+    internal func theDateFormattersAreMadeOncePerText() throws {
         var context = NameTemplate.Context()
         context.now = Date(timeIntervalSince1970: 1_700_000_000)
         let names = try NameTemplate.names(from: "<0-19999>[C] [d] [t]", context: context)
@@ -313,7 +313,7 @@ struct Review2FileopsNames {
 
     // F059
     @Test
-    func theClipboardCannotBringPathsIntoAName() throws {
+    internal func theClipboardCannotBringPathsIntoAName() throws {
         var context = NameTemplate.Context()
         context.clipboard = "../../etc/passwd\nsecond line"
         #expect(try NameTemplate.names(from: "<[X]", context: context) == [".._.._etc_passwd"])
@@ -331,10 +331,10 @@ struct Review2FileopsNames {
 }
 
 @Suite
-struct Review2FileopsLog {
-    let box: Sandbox
+internal struct Review2FileopsLog {
+    internal let box: Sandbox
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
     }
 
@@ -349,7 +349,7 @@ struct Review2FileopsLog {
 
     // F060, F055
     @Test
-    func aNameWithALineBreakIsOneLineInTheLog() {
+    internal func aNameWithALineBreakIsOneLineInTheLog() {
         let forged = OperationRecord(
             .copy,
             source: "/a/x\n2026-01-01 00:00:00: Delete: /etc/passwd",
@@ -370,7 +370,7 @@ struct Review2FileopsLog {
 
     // F061
     @Test
-    func aBurstThatFillsTheLogSeveralTimesRotatesEachTime() throws {
+    internal func aBurstThatFillsTheLogSeveralTimesRotatesEachTime() throws {
         let log = OperationLog(configuration(.size(200)))
         // Twelve lines of 61 bytes in one burst: three fit into a file of 200 bytes.
         for index in 0..<12 {
@@ -388,7 +388,7 @@ struct Review2FileopsLog {
 
     // F062
     @Test
-    func theLogAppendsAlsoAfterSomebodyElseEmptiedOrExtendedIt() throws {
+    internal func theLogAppendsAlsoAfterSomebodyElseEmptiedOrExtendedIt() throws {
         let log = OperationLog(configuration())
         log.write(OperationRecord(.copy, source: "/one"))
         #expect(log.flush(timeout: 30))
@@ -418,7 +418,7 @@ struct Review2FileopsLog {
 
     // F027
     @Test
-    func theFlushAtQuitGivesUpAfterItsTime() throws {
+    internal func theFlushAtQuitGivesUpAfterItsTime() throws {
         let log = OperationLog(configuration())
         log.write(OperationRecord(.copy, source: "/one"))
         #expect(log.flush(timeout: 30))
@@ -429,25 +429,25 @@ struct Review2FileopsLog {
 /// A file system over memory whose reads wait until they are let go.
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
-    let base = MemoryFileSystem(scheme: "gated")
-    var scheme: String { base.scheme }
-    var capabilities: FileSystemCapabilities { [.write] }
-    let entered = DispatchSemaphore(value: 0)
-    let gate = DispatchSemaphore(value: 0)
+internal final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
+    internal let base = MemoryFileSystem(scheme: "gated")
+    internal var scheme: String { base.scheme }
+    internal var capabilities: FileSystemCapabilities { [.write] }
+    internal let entered = DispatchSemaphore(value: 0)
+    internal let gate = DispatchSemaphore(value: 0)
     private let lock = NSLock()
     private var waits = false
     private var count = 0
 
-    var reads: Int { lock.withLock { count } }
-    func holdNextRead() { lock.withLock { waits = true } }
+    internal var reads: Int { lock.withLock { count } }
+    internal func holdNextRead() { lock.withLock { waits = true } }
 
-    func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
+    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
         try base.list(directory, showHidden: showHidden)
     }
-    func item(at url: URL) -> FileItem? { base.item(at: url) }
-    func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    func read(_ url: URL) throws -> any FileReader {
+    internal func item(at url: URL) -> FileItem? { base.item(at: url) }
+    internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
+    internal func read(_ url: URL) throws -> any FileReader {
         // The contents as they are now; handed out only after the gate opens.
         let reader = try base.read(url)
         let held: Bool = lock.withLock {
@@ -461,22 +461,22 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         return reader
     }
-    func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
-    func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
-    func remove(_ url: URL) throws { try base.remove(url) }
-    func move(_ source: URL, to destination: URL, replacing: Bool) throws {
+    internal func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
+    internal func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
+    internal func remove(_ url: URL) throws { try base.remove(url) }
+    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
         try base.move(source, to: destination, replacing: replacing)
     }
-    func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
+    internal func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
         try base.copy(source, to: destination, progress: progress)
     }
 }
 
 @Suite
-struct Review2FileopsComments {
+internal struct Review2FileopsComments {
     // F077
     @Test
-    func aFirstNameThatLooksLikeAByteOrderMarkStaysAName() throws {
+    internal func aFirstNameThatLooksLikeAByteOrderMarkStaysAName() throws {
         // `ÿþ` in the Windows code page is FF FE: the mark of UTF-16.
         var file = DescriptIon(data: Data([0x0A, 0xFF, 0xFE]) + Data("x one\r\nother two\r\n".utf8))
         #expect(file.entries.map(\.name) == ["ÿþx", "other"])
@@ -493,7 +493,7 @@ struct Review2FileopsComments {
 
     // F078
     @Test
-    func separatorsAreFoundNextToCombiningMarks() {
+    internal func separatorsAreFoundNextToCombiningMarks() {
         // A comment that starts with a combining accent, a name that ends with a format character.
         let file = DescriptIon(data: Data("x \u{0301}comment\r\n\"a b\"\u{0301} c\r\nn\u{0600} text\r\n".utf8))
         #expect(file.entries.count == 3)
@@ -509,7 +509,7 @@ struct Review2FileopsComments {
 
     // F068
     @Test
-    func aNameTheFileCannotHoldIsRefusedInsteadOfBeingReadBackAsAnother() throws {
+    internal func aNameTheFileCannotHoldIsRefusedInsteadOfBeingReadBackAsAnother() throws {
         #expect(
             DescriptIon.canName("plain.txt") && DescriptIon.canName("with space.txt")
                 && DescriptIon.canName("quote\"inside")
@@ -535,7 +535,7 @@ struct Review2FileopsComments {
 
     // F036, F065
     @Test
-    func aReadingThatBeganBeforeAChangeIsNotRemembered() throws {
+    internal func aReadingThatBeganBeforeAChangeIsNotRemembered() throws {
         let gated = GatedFileSystem()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(gated)
@@ -562,7 +562,7 @@ struct Review2FileopsComments {
 
     // F066
     @Test
-    func aPipeCalledLikeTheCommentFileIsNotRead() throws {
+    internal func aPipeCalledLikeTheCommentFileIsNotRead() throws {
         let box = try Sandbox()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
@@ -590,7 +590,7 @@ struct Review2FileopsComments {
 
     // F067
     @Test
-    func aLinkedOrHiddenCommentFileStaysLinkedAndHidden() throws {
+    internal func aLinkedOrHiddenCommentFileStaysLinkedAndHidden() throws {
         let box = try Sandbox()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
@@ -610,10 +610,10 @@ struct Review2FileopsComments {
 
 @MainActor
 @Suite
-struct Review2FileopsAttributes {
+internal struct Review2FileopsAttributes {
     // F028, F076
     @Test
-    func anOctalModeIsTheWholeModeAsForChmod() {
+    internal func anOctalModeIsTheWholeModeAsForChmod() {
         #expect(PermissionChange("755") == .absolute(0o755, keepingSpecialBits: false))
         #expect(PermissionChange("755")?.applied(to: 0o4755, isDirectory: false) == 0o755)
         #expect(PermissionChange("4755")?.applied(to: 0o644, isDirectory: false) == 0o4755)
@@ -625,7 +625,7 @@ struct Review2FileopsAttributes {
 
     // F069
     @Test
-    func everyChangeCanBeWrittenAndReadBack() throws {
+    internal func everyChangeCanBeWrittenAndReadBack() throws {
         for text in ["755", "4755", "rwxr-x---", "u+x,go-w", "a+rX", "o=", "ug+rw"] {
             let change = try #require(PermissionChange(text))
             #expect(PermissionChange(change.text) == change, "\(text) → \(change.text)")
@@ -641,7 +641,7 @@ struct Review2FileopsAttributes {
 
     // F028: Recurse with the mode left as shown.
     @Test
-    func recurseWithUntouchedPermissionsIsAskedAboutNotDroppedSilently() throws {
+    internal func recurseWithUntouchedPermissionsIsAskedAboutNotDroppedSilently() throws {
         var draft = AttributeDraft(items: [
             FileItem(url: URL(fileURLWithPath: "/tmp/d"), name: "d", kind: .directory, stat: .init(permissions: 0o750))
         ])
@@ -655,7 +655,7 @@ struct Review2FileopsAttributes {
 
     // F063, F064, F043
     @Test
-    func changesStartFromWhatTheItemHasNowAndNeverUnlockOrFollowALink() throws {
+    internal func changesStartFromWhatTheItemHasNowAndNeverUnlockOrFollowALink() throws {
         let box = try Sandbox()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
@@ -699,7 +699,7 @@ struct Review2FileopsAttributes {
 
     // F029, F030
     @Test
-    func aLongListOfFailuresIsCutForTheMessage() {
+    internal func aLongListOfFailuresIsCutForTheMessage() {
         let failures = (0..<20).map { "item \($0): no" }
         let text = PropertyActions.summary(of: failures, total: 300_000)
         #expect(text.split(separator: "\n").count == 21 && text.hasSuffix("… and 299980 more"))

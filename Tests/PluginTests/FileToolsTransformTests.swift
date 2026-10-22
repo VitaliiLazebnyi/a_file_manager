@@ -11,20 +11,20 @@ import Testing
 /// that ship with macOS.
 @MainActor
 @Suite
-struct FileToolsTransforms {
-    let memory = MemoryFileSystem()
-    let box: Sandbox
-    let settings = MemorySettings()
-    let bench: TestBench
-    static let megabyteOfPattern = patternData(1_048_576)
-    var megabyte: Data { Self.megabyteOfPattern }
+internal struct FileToolsTransforms {
+    internal let memory = MemoryFileSystem()
+    internal let box: Sandbox
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
+    internal static let megabyteOfPattern = patternData(1_048_576)
+    internal var megabyte: Data { Self.megabyteOfPattern }
 
-    var ui: ScriptedInteraction { bench.interaction }
-    var run: ToolRun { ToolRun(fileSystems: bench.kernel.fileSystems) }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var run: ToolRun { ToolRun(fileSystems: bench.kernel.fileSystems) }
 
     private let scratch = ScratchPasteboard()
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.folder("A")
         try box.folder("B")
@@ -40,25 +40,25 @@ struct FileToolsTransforms {
     }
 
     @discardableResult
-    func write(_ path: String, _ data: Data) throws -> URL {
+    internal func write(_ path: String, _ data: Data) throws -> URL {
         try data.write(to: box.url(path))
         bench.left.reload()
         bench.left.moveCursor(toName: (path as NSString).lastPathComponent)
         return box.url(path)
     }
 
-    func item(_ path: String) -> FileItem {
+    internal func item(_ path: String) -> FileItem {
         guard let item = bench.kernel.fileSystems.item(at: box.url(path)) else {
             preconditionFailure("\(path) is missing")
         }
         return item
     }
 
-    func data(_ path: String) -> Data? { try? Data(contentsOf: box.url(path)) }
-    func byteCount(_ path: String) -> Int { data(path)?.count ?? -1 }
+    internal func data(_ path: String) -> Data? { try? Data(contentsOf: box.url(path)) }
+    internal func byteCount(_ path: String) -> Int { data(path)?.count ?? -1 }
 
     /// Runs a command whose form is answered with `values` on top of its proposals.
-    func perform(_ command: CommandID, cursor: String? = nil, _ values: [String: FormValues.Value] = [:]) {
+    internal func perform(_ command: CommandID, cursor: String? = nil, _ values: [String: FormValues.Value] = [:]) {
         if let cursor {
             bench.left.reload()
             bench.left.moveCursor(toName: cursor)
@@ -70,7 +70,7 @@ struct FileToolsTransforms {
     // MARK: Registration
 
     @Test
-    func commandsAndMenu() {
+    internal func commandsAndMenu() {
         let ids: [CommandID] = ["cm_Split", "cm_Combine", "cm_Encode", "cm_Decode", "cm_CRCcreate", "cm_CRCcheck"]
         #expect(bench.kernel.menus.menus.first?.items == ids)
         #expect(ids.allSatisfy { bench.commands[$0] != nil })
@@ -86,7 +86,7 @@ struct FileToolsTransforms {
     // MARK: Split
 
     @Test
-    func splitSizes() {
+    internal func splitSizes() {
         #expect(
             Splitter.size(from: "1000") == 1_000 && Splitter.size(from: " 2k ") == 2_048
                 && Splitter.size(from: "1.5M") == 1_572_864
@@ -105,7 +105,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func splitWritesPartsAndTheCrcFile() throws {
+    internal func splitWritesPartsAndTheCrcFile() throws {
         let source = try write("A/random_1MB.bin", megabyte)
         // The fourth preset of the list is 360 k.
         perform(.splitFile, ["preset": .index(5)])
@@ -133,7 +133,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func splitByTypedSizeIntoTheSourceFolderAndOntoAnotherFileSystem() throws {
+    internal func splitByTypedSizeIntoTheSourceFolderAndOntoAnotherFileSystem() throws {
         try write("A/data.tar.gz", patternData(2_500))
         // An empty target is the source folder; the typed size is remembered.
         perform(.splitFile, ["target": .text(""), "size": .text("1k")])
@@ -152,7 +152,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func splitRefusesBadSizesAndCleansUp() throws {
+    internal func splitRefusesBadSizesAndCleansUp() throws {
         try write("A/data.bin", patternData(5_000))
         perform(.splitFile, ["size": .text("lots")])
         #expect(ui.log.last == "inform: Split" && namesOnDisk(box.url("B")).isEmpty)
@@ -174,7 +174,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func splitOfAnEmptyFile() throws {
+    internal func splitOfAnEmptyFile() throws {
         try write("A/empty.txt", Data())
         perform(.splitFile, ["size": .text("100")])
         #expect(namesOnDisk(box.url("B")) == ["empty.001", "empty.crc"] && byteCount("B/empty.001") == 0)
@@ -184,7 +184,7 @@ struct FileToolsTransforms {
     // MARK: Combine
 
     @Test
-    func partSeries() {
+    internal func partSeries() {
         #expect(PartSeries.next(after: "file.001") == "file.002" && PartSeries.next(after: "file.099") == "file.100")
         #expect(
             PartSeries.next(after: "file.999") == nil && PartSeries.next(after: "notes.txt") == nil
@@ -212,7 +212,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func combineFromTheFirstPartOrTheCrcFile() throws {
+    internal func combineFromTheFirstPartOrTheCrcFile() throws {
         try write("A/random_1MB.bin", megabyte)
         perform(.splitFile, ["target": .text(""), "size": .text("400k")])
         try FileManager.default.removeItem(at: box.url("A/random_1MB.bin"))
@@ -231,7 +231,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func combineChecksTheCrc() throws {
+    internal func combineChecksTheCrc() throws {
         try write("A/data.bin", patternData(3_000))
         perform(.splitFile, ["target": .text(""), "size": .text("1000")])
         let plan = try Combiner.plan(for: item("A/data.001"), run: run)
@@ -256,7 +256,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func combineWithoutACrcFile() throws {
+    internal func combineWithoutACrcFile() throws {
         for (index, text) in ["one ", "two ", "three"].enumerated() {
             try box.file("A/letter.txt.00\(index + 1)", text)
         }
@@ -287,7 +287,7 @@ struct FileToolsTransforms {
     // MARK: Encode
 
     @Test
-    func sixBitLines() {
+    internal func sixBitLines() {
         #expect(String(decoding: SixBitText.encode(Data("Cat".utf8), xx: false), as: UTF8.self) == "#0V%T\r\n")
         #expect(String(decoding: SixBitText.encode(Data("Cat".utf8), xx: true), as: UTF8.self) == "1Eq3o\r\n")
         #expect(SixBitText.decode(Array("#0V%T".utf8)[...], xx: false) == Array("Cat".utf8))
@@ -314,7 +314,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func uuencodeMatchesTheSystemTool() throws {
+    internal func uuencodeMatchesTheSystemTool() throws {
         let source = try write("A/decoded.txt", patternData(1_100))
         perform(.encodeFile, ["method": .index(1)])
         let ours = box.read("B/decoded.uue") ?? ""
@@ -333,7 +333,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func base64MatchesTheSystemTool() throws {
+    internal func base64MatchesTheSystemTool() throws {
         let source = try write("A/decoded.txt", patternData(1_100))
         perform(.encodeFile)
         let ours = box.read("B/decoded.b64") ?? ""
@@ -348,7 +348,7 @@ struct FileToolsTransforms {
     }
 
     @Test(arguments: EncodeMethod.allCases, [0, 1, 2, 3, 44, 45, 46, 56, 57, 58, 1_000, 150_000])
-    func encodeAndDecodeRoundTrip(method: EncodeMethod, count: Int) throws {
+    internal func encodeAndDecodeRoundTrip(method: EncodeMethod, count: Int) throws {
         let original = patternData(count)
         try original.write(to: box.url("A/file.bin"))
         let encoded = try Encoder.encode(item("A/file.bin"), into: memory.url("/out"), method: method, run: run)
@@ -366,7 +366,7 @@ struct FileToolsTransforms {
     }
 
     @Test(arguments: EncodeMethod.allCases)
-    func encodeInSeveralParts(method: EncodeMethod) throws {
+    internal func encodeInSeveralParts(method: EncodeMethod) throws {
         let original = patternData(5_000)
         try write("A/big.dat", original)
         // 20 lines per file, or as many as fit into 10 lines' worth of bytes.
@@ -406,7 +406,7 @@ struct FileToolsTransforms {
     // MARK: Decode
 
     @Test
-    func decodesWhatTheSystemToolsWrite() throws {
+    internal func decodesWhatTheSystemToolsWrite() throws {
         let original = patternData(70_001)
         let source = try write("A/sample.bin", original)
         func reference(_ tool: String, _ arguments: [String], as name: String) throws {
@@ -428,7 +428,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func decodesMailsAndYEnc() throws {
+    internal func decodesMailsAndYEnc() throws {
         let mail = """
             From: someone
             Content-Type: multipart/mixed; boundary="xx"
@@ -482,7 +482,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func decodeNamesTargetsAndClashes() throws {
+    internal func decodeNamesTargetsAndClashes() throws {
         #expect(
             Decoder.safeName("a/b\\c.txt") == "c.txt" && Decoder.safeName("..") == nil && Decoder.safeName(nil) == nil
         )
@@ -523,7 +523,7 @@ struct FileToolsTransforms {
     }
 
     @Test
-    func cancellingLeavesNoHalfWrittenFiles() throws {
+    internal func cancellingLeavesNoHalfWrittenFiles() throws {
         try write("A/data.bin", megabyte)
         let stopped = ToolRun(fileSystems: bench.kernel.fileSystems)
         stopped.cancellation.cancel()

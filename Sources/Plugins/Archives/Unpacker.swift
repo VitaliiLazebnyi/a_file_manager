@@ -4,31 +4,31 @@ import Foundation
 /// A number several threads add to.
 ///
 /// All state is guarded by `lock`.
-final class SharedCounter: @unchecked Sendable {
+internal final class SharedCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var total: Int64 = 0
 
-    func add(_ amount: Int64) {
+    internal func add(_ amount: Int64) {
         lock.lock()
         total += amount
         lock.unlock()
     }
 
-    var value: Int64 {
+    internal var value: Int64 {
         lock.lock()
         defer { lock.unlock() }
         return total
     }
 }
 
-enum Background {
+internal enum Background {
     /// Runs `work` on another thread and calls `tick` on this one ten times a second until it
     /// is done: the job's thread stays free to report progress while all cores are busy.
     ///
     /// The other thread is one of the kernel's own, not one of the system's shared pool: the work
     /// reads an archive and writes files, and where that waits (a share, a server) it must not keep
     /// a thread everybody else's work needs.
-    static func run<Result: Sendable>(_ work: @escaping @Sendable () -> Result, tick: () -> Void) -> Result {
+    internal static func run<Result: Sendable>(_ work: @escaping @Sendable () -> Result, tick: () -> Void) -> Result {
         let group = DispatchGroup()
         // Written by the work before it leaves the group, read here only after the wait.
         nonisolated(unsafe) var result: Result?
@@ -48,21 +48,21 @@ enum Background {
 ///
 /// What is unpacked from a marked archive is marked the same way, as the system's own unpacker
 /// does, so that a program from such an archive is still checked when it is first opened.
-enum Quarantine {
+internal enum Quarantine {
     private static let name = "com.apple.quarantine"
 
     /// The mark of the file at `path`; nil when it has none.
     ///
     /// Read in one call: the mark is a short line of text, which a buffer of 4 KB holds with room
     /// to spare.
-    static func read(_ path: String) -> Data? {
+    internal static func read(_ path: String) -> Data? {
         var value = Data(count: 4_096)
         let got = value.withUnsafeMutableBytes { getxattr(path, name, $0.baseAddress, $0.count, 0, 0) }
         return got > 0 ? value.prefix(got) : nil
     }
 
     /// Marks a file or folder on the local disk; other places cannot carry the mark.
-    static func apply(_ value: Data?, to url: URL) {
+    internal static func apply(_ value: Data?, to url: URL) {
         guard let value, url.isFileURL else {
             return
         }
@@ -81,13 +81,13 @@ enum Quarantine {
 /// Here the write goes on into the folder that was opened, wherever that has been moved to.
 ///
 /// **Threading.** Any number of threads at once; each call opens and closes what it needs.
-final class UnpackFolder: Sendable {
-    let url: URL
+internal final class UnpackFolder: Sendable {
+    internal let url: URL
     private let descriptor: Int32
 
     /// What the user allows new files to be (`umask`): rights an archive stores beyond that
     /// (a file anyone may write to) are not given, as `tar` and `unzip` do not give them.
-    static let allowed: mode_t = {
+    internal static let allowed: mode_t = {
         let mask = umask(0o022)
         umask(mask)
         return ~mask & 0o7777
@@ -97,7 +97,7 @@ final class UnpackFolder: Sendable {
     /// the user chose.
     ///
     /// Only what lies below it comes from the archive.
-    init(_ url: URL) throws {
+    internal init(_ url: URL) throws {
         self.url = url
         descriptor = open(url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         guard descriptor >= 0 else { throw posixError(errno, url.path) }
@@ -156,7 +156,7 @@ final class UnpackFolder: Sendable {
     }
 
     /// Makes the folder at `names` (and those above it) and gives it the archive's mark.
-    func makeFolder(_ names: [String], quarantine: Data?) throws {
+    internal func makeFolder(_ names: [String], quarantine: Data?) throws {
         let folder = try openFolder(ArraySlice(names))
         defer { close(folder) }
         Self.mark(folder, quarantine)
@@ -165,7 +165,7 @@ final class UnpackFolder: Sendable {
     /// Makes the symbolic link at `names`.
     ///
     /// One that stands there is replaced only with `replacing`.
-    func makeLink(_ names: [String], to destination: String, replacing: Bool) throws {
+    internal func makeLink(_ names: [String], to destination: String, replacing: Bool) throws {
         guard let name = names.last, PathSafety.isSafeName(name) else {
             throw ArchiveError.unsupported("Unpacking to an empty name")
         }
@@ -183,7 +183,7 @@ final class UnpackFolder: Sendable {
     /// replaced only with `replacing` (a symbolic link there is replaced like a file, never written
     /// through); without, it makes the write fail. `opened` is called when the folder is open and
     /// before the file is made (tests).
-    func write(
+    internal func write(
         _ names: [String],
         replacing: Bool,
         permissions: UInt16,
@@ -250,10 +250,10 @@ final class UnpackFolder: Sendable {
 ///
 /// ZIP members are checked against their CRC, compressed streams against their own checksums, TAR
 /// headers against theirs.
-enum ArchiveTester {
+internal enum ArchiveTester {
     /// Asks for the password once, before several threads would each ask for it; and only
     /// when one of the members that are wanted (`only`; all without it) is encrypted.
-    static func unlock(_ archive: OpenArchive, only: Set<String>? = nil) throws {
+    internal static func unlock(_ archive: OpenArchive, only: Set<String>? = nil) throws {
         guard
             let encrypted = archive.entries.first(where: {
                 $0.isEncrypted && !$0.isDirectory && only?.contains($0.path) != false
@@ -282,7 +282,7 @@ enum ArchiveTester {
     /// Members that can be read independently are tested on all cores. `counter` receives the bytes
     /// read, for a progress display. With `only`, just the members at those paths are read. Blocks;
     /// meant for a job's thread.
-    static func test(
+    internal static func test(
         _ archive: OpenArchive,
         cancellation: CancellationFlag,
         counter: SharedCounter? = nil,
@@ -356,27 +356,27 @@ enum ArchiveTester {
 }
 
 /// How Unpack is to work (spec 08 › Unpack › Fields and options).
-struct UnpackOptions {
+internal struct UnpackOptions {
     /// Which files to take, by name: `*.txt *.md`.
-    var mask = "*.*"
+    internal var mask = "*.*"
     /// Keeps the paths stored with the files; without, every file goes straight into the target.
-    var keepsPaths = true
+    internal var keepsPaths = true
     /// Each archive goes into a folder of its own, named after the archive.
-    var separateFolders = false
+    internal var separateFolders = false
     /// Existing files are replaced without asking.
-    var overwrites = false
+    internal var overwrites = false
 }
 
-struct UnpackResult {
-    var unpacked = 0
-    var problems: [String] = []
-    var cancelled = false
+internal struct UnpackResult {
+    internal var unpacked = 0
+    internal var problems: [String] = []
+    internal var cancelled = false
     /// The first thing that arrived, for the cursor.
-    var firstTarget: URL?
+    internal var firstTarget: URL?
 }
 
 /// Answers to "the file exists" while unpacking.
-enum UnpackConflictChoice {
+internal enum UnpackConflictChoice {
     case overwrite, overwriteAll, skip, skipAll, cancel
 }
 
@@ -390,14 +390,14 @@ enum UnpackConflictChoice {
 /// Unchecked: what changes (the answers to questions, the result, the counts, the open
 /// folders) is touched only by the thread that calls `run`; the members that are written on
 /// all cores use only what is fixed in `init` and `bytesDone` (which guards itself).
-final class Unpacker: @unchecked Sendable {
+internal final class Unpacker: @unchecked Sendable {
     /// What to take out of one archive: all of it, or what was selected in a panel.
-    struct Source {
-        let archive: OpenArchive
+    internal struct Source {
+        internal let archive: OpenArchive
         /// The folder inside the archive that paths are kept relative to.
-        var base = ""
+        internal var base = ""
         /// Paths of the selected members (folders with everything in them); nil takes all.
-        var selection: [String]?
+        internal var selection: [String]?
     }
 
     private struct Task {
@@ -430,7 +430,7 @@ final class Unpacker: @unchecked Sendable {
     /// Set before `run`.
     internal var isOnLocalVolume: (String) -> Bool = Volume.isOnLocalVolume
 
-    init(
+    internal init(
         fileSystems: FileSystemRegistry,
         monitor: any JobMonitor,
         options: UnpackOptions,
@@ -445,7 +445,7 @@ final class Unpacker: @unchecked Sendable {
         overwriteAll = options.overwrites
     }
 
-    func run(_ sources: [Source], into target: URL) -> UnpackResult {
+    internal func run(_ sources: [Source], into target: URL) -> UnpackResult {
         let target = ArchiveURL.resolved(target)
         do {
             var work: [(archive: OpenArchive, tasks: [Task])] = []
@@ -562,7 +562,7 @@ final class Unpacker: @unchecked Sendable {
 
     /// True when `url` is a place below `folder`, by the bytes of the two paths once `.` and
     /// `..` are taken out of them (the kernel's check for paths from outside).
-    static func lies(_ url: URL, below folder: URL) -> Bool {
+    internal static func lies(_ url: URL, below folder: URL) -> Bool {
         PathSafety.isContained(url, in: folder)
     }
 

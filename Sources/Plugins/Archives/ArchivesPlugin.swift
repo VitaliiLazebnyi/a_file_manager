@@ -14,8 +14,8 @@ public import Foundation
 public final class ArchivesPlugin: Plugin {
     public let name = "Archives"
     // (Not private: the tests set limits and hooks.)
-    let environment = ArchiveEnvironment()
-    let store: ArchiveStore
+    internal let environment = ArchiveEnvironment()
+    internal let store: ArchiveStore
     /// What "Unpack and Open" hands the unpacked member to; nil opens nothing.
     internal let openFile: (@MainActor (URL) -> Bool)?
 

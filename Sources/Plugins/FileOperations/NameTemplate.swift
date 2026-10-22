@@ -297,7 +297,7 @@ public enum NameTemplate {
     /// Whatever would make it more than that is replaced: the characters no name may hold, a `/`
     /// (it would nest folders nobody typed), a leading `~`, and a text that is only dots (`..`
     /// would lead out of the folder).
-    static func clipboardText(_ clipboard: String) -> String {
+    internal static func clipboardText(_ clipboard: String) -> String {
         let line = clipboard.prefix { !$0.isNewline }
         var text = String(
             line.unicodeScalars.map { scalar -> Character in

@@ -6,10 +6,10 @@ import Foundation
 /// (in double quotes when it holds a space), a space, the comment, CRLF.
 ///
 /// A value type without any file access; `CommentStore` reads and writes it.
-struct DescriptIon: Equatable {
-    static let fileName = "descript.ion"
+internal struct DescriptIon: Equatable {
+    internal static let fileName = "descript.ion"
     /// The longest comment the format takes.
-    static let commentLimit = 4_095
+    internal static let commentLimit = 4_095
     /// Follows a comment of several lines, whose lines are joined with a literal `\n`.
     private static let multilineMarker = "\u{04}\u{C2}"
 
@@ -17,31 +17,31 @@ struct DescriptIon: Equatable {
     ///
     /// A new file is plain text, and becomes UTF-16 only when a name or a comment needs it
     /// (`CommentPreferredFormat=4`, the default).
-    enum Encoding: Equatable {
+    internal enum Encoding: Equatable {
         case ansi
         case utf8(bom: Bool)
         case utf16LittleEndian, utf16BigEndian
     }
 
-    struct Entry: Equatable {
-        var name: String
+    internal struct Entry: Equatable {
+        internal var name: String
         /// With real line breaks (`\n`) between the lines.
-        var comment: String
+        internal var comment: String
     }
 
     /// In the order of the file, which is kept when the file is written again.
-    private(set) var entries: [Entry] = []
-    private(set) var encoding = Encoding.ansi
+    internal private(set) var entries: [Entry] = []
+    internal private(set) var encoding = Encoding.ansi
 
-    init() {}
+    internal init() {}
 
     /// Reads whatever can be read; a file that cannot be decoded gives no comments.
-    init(data: Data) {
+    internal init(data: Data) {
         self.init(decoded: Self.decode(data) ?? ("", .ansi))
     }
 
     /// Nil when the bytes cannot be decoded in the encoding their start announces.
-    init?(strict data: Data) {
+    internal init?(strict data: Data) {
         guard let decoded = Self.decode(data) else {
             return nil
         }
@@ -117,7 +117,7 @@ struct DescriptIon: Equatable {
     /// Whether the file can hold a comment for this name and give it back: a name is written
     /// as it is, or between quotes when it holds a space, and nothing in the format escapes a
     /// quote or a line break.
-    static func canName(_ name: String) -> Bool {
+    internal static func canName(_ name: String) -> Bool {
         let scalars = name.unicodeScalars
         if scalars.isEmpty || scalars.contains(where: { $0 == "\n" || $0 == "\r" }) {
             return false
@@ -128,18 +128,18 @@ struct DescriptIon: Equatable {
 
     /// Names are compared without regard to case, as the shipped `DESCRIPT.ION` writes them in
     /// capitals.
-    func comment(for name: String) -> String? {
+    internal func comment(for name: String) -> String? {
         let wanted = name.lowercased()
         return entries.first { $0.name.lowercased() == wanted }?.comment
     }
 
     /// The comments by lower-cased name, for looking up many files of a folder.
-    var commentsByName: [String: String] {
+    internal var commentsByName: [String: String] {
         Dictionary(entries.map { ($0.name.lowercased(), $0.comment) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Sets, replaces or (with an empty text) removes the comment of a file.
-    mutating func setComment(_ comment: String, for name: String) {
+    internal mutating func setComment(_ comment: String, for name: String) {
         let comment = Self.normalized(comment)
         let wanted = name.lowercased()
         let index = entries.firstIndex { $0.name.lowercased() == wanted }
@@ -159,19 +159,19 @@ struct DescriptIon: Equatable {
     }
 
     /// Line ends as `\n`, and no empty lines or spaces at the end.
-    static func normalized(_ comment: String) -> String {
+    internal static func normalized(_ comment: String) -> String {
         var text = comment.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
         while let last = text.last, last == "\n" || last == " " { text.removeLast() }
         return text
     }
 
-    var isEmpty: Bool { entries.isEmpty }
+    internal var isEmpty: Bool { entries.isEmpty }
 
     /// The file's bytes.
     ///
     /// The encoding the file was read in is kept as long as it can hold every character; plain text
     /// that cannot becomes UTF-16 LE with a byte-order mark.
-    func data() -> Data {
+    internal func data() -> Data {
         var text = ""
         for entry in entries {
             text += entry.name.unicodeScalars.contains(" ") ? "\"\(entry.name)\"" : entry.name
@@ -242,7 +242,7 @@ struct DescriptIon: Equatable {
 /// that has stopped answering, with a flag nobody sets).
 ///
 /// `remembered`, `beingRead`, `generations` and `waitLimit` are guarded by `condition`.
-final class CommentStore: @unchecked Sendable {
+internal final class CommentStore: @unchecked Sendable {
     private struct Remembered {
         let comments: [String: String]
         let read: Date
@@ -255,7 +255,7 @@ final class CommentStore: @unchecked Sendable {
     /// Changes made here are known at once (`forget`); this is for changes other programs make.
     private static let lifetime: TimeInterval = 3
     /// How long a thread waits for another thread's reading of the same folder.
-    var waitLimit: TimeInterval {
+    internal var waitLimit: TimeInterval {
         get { condition.withLock { patience } }
         set { condition.withLock { patience = newValue } }
     }
@@ -272,12 +272,12 @@ final class CommentStore: @unchecked Sendable {
     /// A reading that began before a change is not remembered: it may be the file as it was.
     private var generations: [String: Int] = [:]
 
-    init(fileSystems: FileSystemRegistry) {
+    internal init(fileSystems: FileSystemRegistry) {
         self.fileSystems = fileSystems
     }
 
     /// The comment of an item, on one line; empty when it has none.
-    func comment(for item: FileItem, cancellation: CancellationFlag = CancellationFlag()) -> String {
+    internal func comment(for item: FileItem, cancellation: CancellationFlag = CancellationFlag()) -> String {
         comments(in: item.url.deletingLastPathComponent(), cancellation: cancellation)[item.name.lowercased()] ?? ""
     }
 
@@ -285,7 +285,7 @@ final class CommentStore: @unchecked Sendable {
     ///
     /// Nothing when `cancellation` was set before they were read, or when another thread's reading
     /// did not come back in time.
-    func comments(in directory: URL, cancellation: CancellationFlag = CancellationFlag()) -> [String: String] {
+    internal func comments(in directory: URL, cancellation: CancellationFlag = CancellationFlag()) -> [String: String] {
         let key = directory.locationKey
         condition.lock()
         let patience = Date().addingTimeInterval(self.patience)
@@ -320,7 +320,7 @@ final class CommentStore: @unchecked Sendable {
         return comments
     }
 
-    func forget(_ directory: URL) {
+    internal func forget(_ directory: URL) {
         let key = directory.locationKey
         condition.lock()
         remembered[key] = nil
@@ -332,7 +332,7 @@ final class CommentStore: @unchecked Sendable {
     /// The comment file of a folder; empty when there is none, it cannot be read, or
     /// `cancellation` was set before all of it was read (a read that waits for a server is
     /// ended by the flag).
-    func load(_ directory: URL, cancellation: CancellationFlag = CancellationFlag()) -> DescriptIon {
+    internal func load(_ directory: URL, cancellation: CancellationFlag = CancellationFlag()) -> DescriptIon {
         let url = directory.appending(name: DescriptIon.fileName)
         // Something that is called `descript.ion` and is a pipe would never finish being read.
         guard !cancellation.isCancelled, LocalInfo.canBeRead(url),
@@ -357,7 +357,9 @@ final class CommentStore: @unchecked Sendable {
     /// The comment file of a folder for a change that rewrites it: absent is an empty one, but a
     /// file that is there and cannot be read whole (no permission, too large, not decodable)
     /// throws, because writing it afterwards would destroy every other comment in it.
-    func loadForUpdate(_ directory: URL, cancellation: CancellationFlag = CancellationFlag()) throws -> DescriptIon {
+    internal func loadForUpdate(_ directory: URL, cancellation: CancellationFlag = CancellationFlag()) throws
+        -> DescriptIon
+    {
         let url = directory.appending(name: DescriptIon.fileName)
         let provider = try fileSystems.provider(for: url)
         guard LocalInfo.canBeRead(url) else { throw CommentFileError.unreadable }
@@ -395,7 +397,7 @@ final class CommentStore: @unchecked Sendable {
     /// a failure leaves the old comments as they were. A file without comments is removed. With
     /// `hidden`, the file gets the hidden flag where the file system has one (a new `descript.ion`
     /// is hidden in Total Commander).
-    func setComment(
+    internal func setComment(
         _ comment: String,
         for name: String,
         in directory: URL,
@@ -449,12 +451,12 @@ final class CommentStore: @unchecked Sendable {
     }
 }
 
-enum CommentFileError: LocalizedError {
+internal enum CommentFileError: LocalizedError {
     case unreadable
     /// The format has no way to write this name so that it reads back as the same name.
     case unnameable
 
-    var errorDescription: String? {
+    internal var errorDescription: String? {
         switch self {
         case .unreadable:
             return

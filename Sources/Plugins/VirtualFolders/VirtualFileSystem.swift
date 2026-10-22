@@ -90,19 +90,19 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     /// The lists that are remembered; the oldest is forgotten when one more is registered.
-    static let listLimit = 64
+    internal static let listLimit = 64
     /// The files all lists together may hold; when a list is registered and there are more, the
     /// least recently used lists that are not watched are forgotten (the new one is kept).
-    static let entryLimit = 3_000_000
+    internal static let entryLimit = 3_000_000
     /// A list up to this long is prepared on the spot; a longer one in the background.
-    static let inlineEntryLimit = 2_048
+    internal static let inlineEntryLimit = 2_048
     /// How many files of a list that is not prepared yet are looked at to find folders to watch.
-    static let parentScanLimit = 4_096
+    internal static let parentScanLimit = 4_096
     /// The directories of a branch that are watched for changes; a larger branch is watched
     /// in its upper levels only.
-    static let watchLimit = 512
+    internal static let watchLimit = 512
     /// The entries of a file list that are looked up side by side before they are handed over.
-    static let entriesPerBatch = 256
+    internal static let entriesPerBatch = 256
 
     public let scheme = VirtualLocation.scheme
     /// Weak: the registry holds this file system, whose work (a list prepared in the background,
@@ -253,7 +253,7 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     ///
     /// The scheme, host, port and path, without a trailing slash (which `URL.path` never has), as
     /// `locationKey` has them.
-    static func identity(of url: URL) -> [UInt8] {
+    internal static func identity(of url: URL) -> [UInt8] {
         var bytes = Array((url.scheme ?? "file").utf8)
         bytes.append(0)
         if let host = url.host { bytes.append(contentsOf: host.utf8) }
@@ -466,7 +466,7 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     /// The names the items are listed under: their own, except where two have the very same
     /// name (compared by bytes, as marks are), when each of those is listed by its `path`, so
     /// that no two entries of a list are marked together.
-    static func uniqueNames(of items: [FileItem], path: (FileItem) -> String) -> [String] {
+    internal static func uniqueNames(of items: [FileItem], path: (FileItem) -> String) -> [String] {
         var counts: [[UInt8]: Int] = [:]
         for item in items { counts[Array(item.name.utf8), default: 0] += 1 }
         var names = items.map { counts[Array($0.name.utf8)] == 1 ? $0.name : path($0) }
@@ -487,9 +487,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
 
     /// A list is kept in memory only: after a restart, or when many newer ones were made, the
     /// location of an old one leads nowhere.
-    struct ForgottenList: LocalizedError {
-        let title: String
-        var errorDescription: String? { "The list “\(title)” is no longer available." }
+    internal struct ForgottenList: LocalizedError {
+        internal let title: String
+        internal var errorDescription: String? { "The list “\(title)” is no longer available." }
     }
 
     private func noteCapabilities(of locations: [URL], for virtual: URL) {

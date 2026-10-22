@@ -10,19 +10,19 @@ import Testing
 /// filters, and what the plugin registers.
 @MainActor
 @Suite
-struct ViewOptions {
-    let memory = MemoryFileSystem()
-    let settings = MemorySettings()
-    let bench: TestBench
+internal struct ViewOptions {
+    internal let memory = MemoryFileSystem()
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
 
     /// Offers two columns, as a content plugin would.
-    final class ColumnsPlugin: Plugin {
-        let name = "Columns"
-        func start(in kernel: Kernel) {
+    internal final class ColumnsPlugin: Plugin {
+        internal let name = "Columns"
+        internal func start(in kernel: Kernel) {
             kernel.columns.register(ContentColumn(id: "upper", title: "Upper") { $0.name.uppercased() })
             kernel.columns.register(
                 ContentColumn(id: "length", title: "Length", alignsRight: true) { "\($0.name.count)" }
@@ -30,7 +30,7 @@ struct ViewOptions {
         }
     }
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt")
         memory.addFile("/A/two.md")
         memory.addFile("/A/run.sh")
@@ -50,7 +50,7 @@ struct ViewOptions {
     // MARK: Registration
 
     @Test
-    func registersCommandsKeysMenusToolbarAndPreferences() {
+    internal func registersCommandsKeysMenusToolbarAndPreferences() {
         let kernel = bench.kernel
         #expect(kernel.keyClashes.isEmpty)
         #expect(
@@ -81,7 +81,7 @@ struct ViewOptions {
     // MARK: Views and columns
 
     @Test
-    func theViewCommandsSwitchTheSourcePanel() {
+    internal func theViewCommandsSwitchTheSourcePanel() {
         #expect(commands.isChecked(.viewFull) && !commands.isChecked(.viewBrief))
         commands.perform(.viewBrief)
         #expect(
@@ -97,7 +97,7 @@ struct ViewOptions {
     }
 
     @Test
-    func customColumnsAreChosenInAForm() {
+    internal func customColumnsAreChosenInAForm() {
         left.viewMode = .brief
         bench.interaction.formAnswers = [.values(["length": .flag(true)])]
         commands.perform("cm_CustomColumnConfig")
@@ -121,7 +121,7 @@ struct ViewOptions {
     }
 
     @Test
-    func withoutPluginColumnsThereIsNothingToChoose() {
+    internal func withoutPluginColumnsThereIsNothingToChoose() {
         let bare = TestBench(
             plugins: [ViewOptionsPlugin()],
             fileSystems: [MemoryFileSystem()],
@@ -134,7 +134,7 @@ struct ViewOptions {
     // MARK: Display filters
 
     @Test
-    func programsShowsWhatCanBeRun() {
+    internal func programsShowsWhatCanBeRun() {
         #expect(left.names == ["docs", "one.txt", "run.sh", "tool", "two.md"] && commands.isChecked("cm_SrcAllFiles"))
         commands.perform("cm_SrcExecs")
         #expect(
@@ -157,7 +157,7 @@ struct ViewOptions {
     }
 
     @Test
-    func aCustomFilterIsAskedForRememberedAndReset() {
+    internal func aCustomFilterIsAskedForRememberedAndReset() {
         #expect(!commands.isEnabled("cm_SrcUserSpec"))
         bench.interaction.promptAnswers = [.text("*.txt *.md")]
         commands.perform("cm_SrcUserDef")
@@ -186,7 +186,7 @@ struct ViewOptions {
     }
 
     @Test
-    func onlySelectedFilesIsASnapshot() {
+    internal func onlySelectedFilesIsASnapshot() {
         #expect(!commands.isEnabled("cm_ShowOnlySelected"))
         left.model.select(mask: "*.txt *.sh")
         commands.perform("cm_ShowOnlySelected")
@@ -201,7 +201,7 @@ struct ViewOptions {
     }
 
     @Test
-    func aFilterLaidOverADisplayFilterKeepsItChecked() {
+    internal func aFilterLaidOverADisplayFilterKeepsItChecked() {
         commands.perform("cm_SrcUserDef", .text("*.txt"))
         // What the quick filter does: its title starts with the one below.
         let below = left.model.filter!
@@ -213,7 +213,7 @@ struct ViewOptions {
     }
 
     @Test
-    func displayMasks() {
+    internal func displayMasks() {
         func item(_ name: String, folder: Bool = false) -> FileItem {
             FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, kind: .init(isDirectory: folder))
         }
@@ -246,7 +246,7 @@ struct ViewOptions {
     // MARK: Sorting and hidden files
 
     @Test
-    func hiddenFilesInBothPanelsOrInOne() {
+    internal func hiddenFilesInBothPanelsOrInOne() {
         memory.addFile("/A/.dot")
         memory.addFile("/B/.dot")
         commands.perform(.showHidden)

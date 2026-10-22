@@ -11,8 +11,8 @@ import Testing
 /// exponential, work off the main thread with a list-version guard, numbers that used to trap,
 /// the ANSI file that used to raise.
 @Suite
-struct Review2FindSelectionRules {
-    func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
+internal struct Review2FindSelectionRules {
+    internal func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -23,7 +23,7 @@ struct Review2FindSelectionRules {
     }
 
     @Test
-    func aRegexMaskThatBacktracksEndsAndSaysSo() {
+    internal func aRegexMaskThatBacktracksEndsAndSaysSo() {
         let mask = SelectionMask("<(a+)+$")
         let name = String(repeating: "a", count: 45) + "!"
         // Used by the work on its own thread only while the test waits for it to finish.
@@ -36,7 +36,7 @@ struct Review2FindSelectionRules {
     }
 
     @Test
-    func aRegexMaskStopsWhenCancelled() {
+    internal func aRegexMaskStopsWhenCancelled() {
         let mask = SelectionMask(#"<^(\w+[ _-]?)+\.jpg$"#)
         let flag = CancellationFlag()
         Thread {
@@ -52,7 +52,7 @@ struct Review2FindSelectionRules {
     }
 
     @Test
-    func manyAnyLevelsInAPathMaskAreNotExponential() {
+    internal func manyAnyLevelsInAPathMaskAreNotExponential() {
         let mask = SelectionMask("**/**/**/**/**/**/**/**/**/**/**/**/**/x.txt")
         let directory = (0..<30).map { "d\($0)" }
         // Used by the work on its own thread only while the test waits for it to finish.
@@ -73,7 +73,7 @@ struct Review2FindSelectionRules {
     }
 
     @Test
-    func aNameAnsiCannotWriteDoesNotRaise() {
+    internal func aNameAnsiCannotWriteDoesNotRaise() {
         let name = "\u{3000}\u{0300}"
         let item = FileItem(url: URL(fileURLWithPath: "/tmp/x"), name: name)
         let data = SelectionFile.encode(
@@ -88,14 +88,14 @@ struct Review2FindSelectionRules {
 
 @MainActor
 @Suite
-struct Review2FindSelectionCommands {
-    typealias Ids = SelectionCommands
+internal struct Review2FindSelectionCommands {
+    internal typealias Ids = SelectionCommands
 
-    let memory = MemoryFileSystem()
+    internal let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
 
-    func makeBench(background: Bool) -> TestBench {
+    internal func makeBench(background: Bool) -> TestBench {
         TestBench(
             plugins: [SelectionPlugin(pasteboard: pasteboard, background: background)],
             fileSystems: [LocalFileSystem(), memory],
@@ -105,13 +105,13 @@ struct Review2FindSelectionCommands {
     }
 
     /// Gives the main run loop the time to hand the result of background work back.
-    func settle(_ condition: () -> Bool) async {
+    internal func settle(_ condition: () -> Bool) async {
         let patience = Date(timeIntervalSinceNow: Wait.ceiling)
         while !condition(), Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
     @Test
-    func aRegexMaskIsEvaluatedOffTheMainThread() async {
+    internal func aRegexMaskIsEvaluatedOffTheMainThread() async {
         memory.addFile("/A/alpha.txt")
         memory.addFile("/A/beta.txt")
         let bench = makeBench(background: true)
@@ -124,7 +124,7 @@ struct Review2FindSelectionCommands {
     }
 
     @Test
-    func aMaskThatBacktracksIsReportedAndSelectsNothing() async {
+    internal func aMaskThatBacktracksIsReportedAndSelectsNothing() async {
         memory.addFile("/A/" + String(repeating: "a", count: 45) + "!")
         memory.addFile("/A/b")
         let bench = makeBench(background: true)
@@ -141,7 +141,7 @@ struct Review2FindSelectionCommands {
     /// list it had, and the command is worked out again for the list as it is (see Review2PluginsA2Tests
     /// for a panel that went to another folder: that result is dropped).
     @Test
-    func aResultForAnotherListIsWorkedOutAgain() async {
+    internal func aResultForAnotherListIsWorkedOutAgain() async {
         memory.addFile("/A/alpha.txt")
         let bench = makeBench(background: true)
         bench.left.show(memory.url("/A"), focus: nil, history: .keep, completion: nil)
@@ -153,7 +153,7 @@ struct Review2FindSelectionCommands {
     }
 
     @Test
-    func aLongListIsSelectedInvertedAndRestoredWithoutBlocking() async {
+    internal func aLongListIsSelectedInvertedAndRestoredWithoutBlocking() async {
         for index in 0..<(Selections.longList + 5_000) { memory.addFile("/A/f\(index).txt") }
         memory.addFile("/A/keep.md")
         let bench = makeBench(background: true)
@@ -178,7 +178,7 @@ struct Review2FindSelectionCommands {
     }
 
     @Test
-    func comparingTwoFoldersAndTheClipboardWorkInTheBackground() async {
+    internal func comparingTwoFoldersAndTheClipboardWorkInTheBackground() async {
         memory.addFile("/A/only_left.txt")
         memory.addFile("/A/both.txt", "1")
         memory.addFile("/B/both.txt", "1")
@@ -196,7 +196,7 @@ struct Review2FindSelectionCommands {
     }
 
     @Test
-    func extremeCountsDoNotTrap() {
+    internal func extremeCountsDoNotTrap() {
         memory.addFile("/A/a.txt")
         memory.addFile("/A/b.txt")
         let bench = makeBench(background: false)
@@ -209,7 +209,7 @@ struct Review2FindSelectionCommands {
     }
 
     @Test
-    func savingOverAFileKeepsNoTemporaryFileAndReplacesTheOldOne() {
+    internal func savingOverAFileKeepsNoTemporaryFileAndReplacesTheOldOne() {
         memory.addFile("/A/one.txt")
         memory.addFile("/B/list.txt", "old")
         let bench = makeBench(background: false)

@@ -7,8 +7,8 @@ import Testing
 
 /// The calls the provider interface gained, as the local disks answer them.
 @Suite
-struct KernelApiOnLocalDisks {
-    let local = LocalFileSystem()
+internal struct KernelApiOnLocalDisks {
+    internal let local = LocalFileSystem()
 
     private func status(_ url: URL) -> stat {
         var st = stat()
@@ -40,7 +40,7 @@ struct KernelApiOnLocalDisks {
     // MARK: Cancellation
 
     @Test
-    func aCancelledListingStopsBeforeTheNextBuffer() throws {
+    internal func aCancelledListingStopsBeforeTheNextBuffer() throws {
         let box = try Sandbox()
         // More names than one buffer holds, so the listing comes in several pieces.
         let count = 9_000
@@ -77,7 +77,7 @@ struct KernelApiOnLocalDisks {
     // MARK: Continuing a file
 
     @Test
-    func aFileIsContinuedInPlace() throws {
+    internal func aFileIsContinuedInPlace() throws {
         let box = try Sandbox()
         let file = try box.file("part.bin", "0123456789")
         #expect(
@@ -121,7 +121,7 @@ struct KernelApiOnLocalDisks {
     // MARK: Metadata
 
     @Test
-    func aFoldersTagsHiddenFlagAndCreationDateSurvive() throws {
+    internal func aFoldersTagsHiddenFlagAndCreationDateSurvive() throws {
         let box = try Sandbox()
         let source = try box.folder("source")
         let copy = try box.folder("copy")
@@ -169,7 +169,7 @@ struct KernelApiOnLocalDisks {
     }
 
     @Test
-    func aLockComesLastAndTheCopyCanStillBeTakenAway() throws {
+    internal func aLockComesLastAndTheCopyCanStillBeTakenAway() throws {
         let box = try Sandbox()
         // The folder is made under a temporary name, as a job does with a file: still unfinished.
         let source = try box.folder("locked")
@@ -194,7 +194,7 @@ struct KernelApiOnLocalDisks {
     // MARK: Quarantine
 
     @Test
-    func theQuarantineMarkIsReadAndSet() throws {
+    internal func theQuarantineMarkIsReadAndSet() throws {
         let box = try Sandbox()
         let marked = try box.file("download.zip")
         let plain = try box.file("out.txt")
@@ -218,7 +218,7 @@ struct KernelApiOnLocalDisks {
     // MARK: Free space
 
     @Test
-    func aStaleFreeSpaceFigureIsAnsweredAtOnceAndCorrectedBehind() async throws {
+    internal func aStaleFreeSpaceFigureIsAnsweredAtOnceAndCorrectedBehind() async throws {
         let box = try Sandbox()
         // The disk says what the test tells it to. (The real figures move by gigabytes while
         // other programs write, which no margin allows for.)

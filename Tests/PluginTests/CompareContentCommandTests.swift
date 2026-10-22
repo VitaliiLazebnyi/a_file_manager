@@ -14,16 +14,16 @@ import Testing
 /// No window is involved.
 @MainActor
 @Suite
-struct CompareContentCommands {
-    let memory = MemoryFileSystem()
-    let plugin = CompareContentPlugin(opensWindows: false)
-    let settings = MemorySettings()
-    let bench: TestBench
+internal struct CompareContentCommands {
+    internal let memory = MemoryFileSystem()
+    internal let plugin = CompareContentPlugin(opensWindows: false)
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
 
-    var ui: ScriptedInteraction { bench.interaction }
-    var session: CompareSession { plugin.sessions[0] }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var session: CompareSession { plugin.sessions[0] }
 
-    init() {
+    internal init() {
         memory.addFile("/A/notes.txt", "one\ntwo\nthree\nfour\n")
         memory.addFile("/B/notes.txt", "one\n2\nthree\nfour\nfive\n")
         memory.addFile("/A/other.txt", "alpha\n")
@@ -43,14 +43,14 @@ struct CompareContentCommands {
     }
 
     /// Runs the command and returns the names of the two files it took.
-    func operands(_ argument: CommandArgument = .nothing) -> [String?] {
+    internal func operands(_ argument: CommandArgument = .nothing) -> [String?] {
         bench.commands.perform(.compareByContent, argument)
         return [session.leftURL?.path, session.rightURL?.path]
     }
 
     /// Compares the file of that name in the left panel with its partner, after re-reading
     /// the panels for files a test has just made.
-    func compare(_ name: String) {
+    internal func compare(_ name: String) {
         bench.left.reload()
         bench.right.reload()
         bench.left.moveCursor(toName: name)
@@ -58,12 +58,12 @@ struct CompareContentCommands {
     }
 
     /// The left and right texts of the rows, `|` between the sides.
-    func rows() -> [String] {
+    internal func rows() -> [String] {
         (0..<session.rowCount).map { "\(session.text(.left, row: $0) ?? "~")|\(session.text(.right, row: $0) ?? "~")" }
     }
 
     @Test
-    func commandIsRegisteredWithMenusButtonAndPreferences() {
+    internal func commandIsRegisteredWithMenusButtonAndPreferences() {
         #expect(bench.commands[.compareByContent]?.title == "Compare By Content…")
         #expect(bench.kernel.menus.menus.first { $0.title == "Files" }?.items.contains(.compareByContent) == true)
         #expect(bench.kernel.menus.contextMenu(onItem: true).contains(.compareByContent))
@@ -76,14 +76,14 @@ struct CompareContentCommands {
     // MARK: Which files (spec 09 › Opening and choosing the files)
 
     @Test
-    func twoSelectedFilesOfTheSourcePanel() {
+    internal func twoSelectedFilesOfTheSourcePanel() {
         bench.left.model.select(mask: "other.txt third.txt notes.txt folder")
         // The first two in list order; folders do not count.
         #expect(operands() == ["/A/notes.txt", "/A/other.txt"])
     }
 
     @Test
-    func oneSelectedFileWithTheTargetsSelectionOrTheSameName() {
+    internal func oneSelectedFileWithTheTargetsSelectionOrTheSameName() {
         bench.left.model.select(mask: "notes.txt")
         bench.right.model.select(mask: "zebra.txt twin.txt")
         #expect(operands() == ["/A/notes.txt", "/B/twin.txt"])
@@ -97,7 +97,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func theCursorFileWithTheSameNameInTheOtherPanel() {
+    internal func theCursorFileWithTheSameNameInTheOtherPanel() {
         bench.left.moveCursor(toName: "notes.txt")
         // The target panel's cursor is never used.
         bench.right.moveCursor(toName: "zebra.txt")
@@ -119,7 +119,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func otherPluginsNameTheFilesThemselves() {
+    internal func otherPluginsNameTheFilesThemselves() {
         #expect(operands(.text("mem:///A/other.txt\nmem:///B/zebra.txt")) == ["/A/other.txt", "/B/zebra.txt"])
         #expect(session.blocks.count == 1)
         #expect(operands(.text("mem:/A/third.txt\n")) == ["/A/third.txt", nil])
@@ -129,7 +129,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func identicalFilesOnlyGetTheMessage() {
+    internal func identicalFilesOnlyGetTheMessage() {
         bench.left.moveCursor(toName: "twin.txt")
         bench.commands.perform(.compareByContent)
         #expect(ui.log == ["inform: Compare contents"])
@@ -142,7 +142,7 @@ struct CompareContentCommands {
     // MARK: The comparison
 
     @Test
-    func rowsNumbersAndHighlights() {
+    internal func rowsNumbersAndHighlights() {
         bench.left.moveCursor(toName: "notes.txt")
         bench.commands.perform(.compareByContent)
         #expect(rows() == ["one|one", "two|2", "three|three", "four|four", "~|five"])
@@ -172,7 +172,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func optionsAreAppliedAndRemembered() {
+    internal func optionsAreAppliedAndRemembered() {
         memory.addFile("/A/case.txt", "Hello  World\r\nsame\n")
         memory.addFile("/B/case.txt", "hello world\nsame\n")
         compare("case.txt")
@@ -200,7 +200,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func binaryFilesAreComparedInHex() {
+    internal func binaryFilesAreComparedInHex() {
         memory.addFile("/A/data.bin", "AB\u{0}DEFGHIJKLMNOPQRS")
         memory.addFile("/B/data.bin", "AB\u{0}DEFGHIJKLMNOPQxS!")
         compare("data.bin")
@@ -230,7 +230,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func resyncAndSwap() {
+    internal func resyncAndSwap() {
         memory.addFile("/A/r.txt", "start\nrepeat\nrepeat\nleft only\nend\n")
         memory.addFile("/B/r.txt", "start\nrepeat\nright only\nrepeat\nend\n")
         compare("r.txt")
@@ -258,7 +258,7 @@ struct CompareContentCommands {
     // MARK: Editing and saving
 
     @Test
-    func differencesAreCopiedAcrossUndoneAndSaved() {
+    internal func differencesAreCopiedAcrossUndoneAndSaved() {
         bench.left.moveCursor(toName: "notes.txt")
         bench.commands.perform(.compareByContent)
         // Nothing can be changed outside edit mode.
@@ -299,7 +299,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func wholeBlocksAndInsertionsGoToTheRightPlace() {
+    internal func wholeBlocksAndInsertionsGoToTheRightPlace() {
         memory.addFile("/A/block.txt", "head\na1\na2\na3\ntail")
         memory.addFile("/B/block.txt", "head\r\nb1\r\ntail\r\nextra\r\n")
         compare("block.txt")
@@ -315,7 +315,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func aFailedSaveIsReportedAndTheChangesStay() {
+    internal func aFailedSaveIsReportedAndTheChangesStay() {
         bench.left.moveCursor(toName: "notes.txt")
         bench.commands.perform(.compareByContent)
         session.setEditing(true)
@@ -329,7 +329,7 @@ struct CompareContentCommands {
     }
 
     @Test
-    func encodingsSurviveEditing() throws {
+    internal func encodingsSurviveEditing() throws {
         let box = try Sandbox()
         try (Data([0xFF, 0xFE]) + "erste\r\nzweite\r\n".data(using: .utf16LittleEndian)!)
             .write(
@@ -361,10 +361,10 @@ struct CompareContentCommands {
 /// The window itself: opened when the background comparison has found differences, and drawn.
 @MainActor
 @Suite
-struct CompareContentWindow {
+internal struct CompareContentWindow {
     /// Lets the main thread run what the comparisons send it until `done` holds, up to `Wait.ceiling`: a comparison
     /// under load may take long, and only a hang reaches the ceiling.
-    func spin(until done: () -> Bool) async -> Bool {
+    internal func spin(until done: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !done() {
             guard Date() < deadline else {
@@ -376,7 +376,7 @@ struct CompareContentWindow {
     }
 
     @Test
-    func windowOpensForDifferentFilesOnly() async {
+    internal func windowOpensForDifferentFilesOnly() async {
         let memory = MemoryFileSystem()
         memory.addFile("/A/a.txt", (0..<500).map { "line \($0)" }.joined(separator: "\n"))
         memory.addFile(

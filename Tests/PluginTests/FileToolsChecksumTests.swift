@@ -11,18 +11,18 @@ import Testing
 /// and `cksum`.
 @MainActor
 @Suite
-struct FileToolsChecksums {
-    let memory = MemoryFileSystem()
-    let box: Sandbox
-    let settings = MemorySettings()
+internal struct FileToolsChecksums {
+    internal let memory = MemoryFileSystem()
+    internal let box: Sandbox
+    internal let settings = MemorySettings()
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let bench: TestBench
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let bench: TestBench
 
-    var ui: ScriptedInteraction { bench.interaction }
-    var left: FakePanel { bench.left }
+    internal var ui: ScriptedInteraction { bench.interaction }
+    internal var left: FakePanel { bench.left }
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.file("work/a.txt", "alpha")
         try box.file("work/b b.txt", "beta")
@@ -38,7 +38,7 @@ struct FileToolsChecksums {
         )
     }
 
-    func select(_ names: [String]) {
+    internal func select(_ names: [String]) {
         left.reload()
         left.model.clearSelection()
         for name in names {
@@ -47,14 +47,14 @@ struct FileToolsChecksums {
         if let first = names.first { left.moveCursor(toName: first) }
     }
 
-    func create(_ names: [String], _ values: [String: FormValues.Value] = [:]) {
+    internal func create(_ names: [String], _ values: [String: FormValues.Value] = [:]) {
         select(names)
         ui.formAnswers = [.values(values)]
         #expect(bench.commands.perform(.createChecksums))
     }
 
     /// Runs Verify and returns the window's title and text (shown in a form, there being no viewer).
-    func verify(_ names: [String]) -> (title: String, text: String) {
+    internal func verify(_ names: [String]) -> (title: String, text: String) {
         select(names)
         ui.formAnswers = [.accept]
         let shown = ui.forms.count
@@ -65,10 +65,10 @@ struct FileToolsChecksums {
         return (String((ui.log.last ?? "").dropFirst("form: ".count)), text)
     }
 
-    func method(_ method: ChecksumMethod) -> FormValues.Value {
+    internal func method(_ method: ChecksumMethod) -> FormValues.Value {
         .index(ChecksumMethod.dialogOrder.firstIndex(of: method) ?? 0)
     }
-    func digest(_ tool: String, _ arguments: [String], _ path: String) throws -> String {
+    internal func digest(_ tool: String, _ arguments: [String], _ path: String) throws -> String {
         String(
             try systemTool(tool, arguments + [box.url(path).path]).output
                 .split(whereSeparator: {
@@ -81,7 +81,7 @@ struct FileToolsChecksums {
     // MARK: Create
 
     @Test
-    func proposalsAndDialog() {
+    internal func proposalsAndDialog() {
         select(["a.txt"])
         ui.formAnswers = [.cancel]
         bench.commands.perform(.createChecksums)
@@ -106,7 +106,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func md5FileMatchesTheSystemTool() throws {
+    internal func md5FileMatchesTheSystemTool() throws {
         create(["a.txt", "b b.txt"], ["method": method(.md5)])
         let expected = try ["a.txt", "b b.txt"].map { "\(try digest("/sbin/md5", ["-q"], "work/" + $0)) *\($0)\n" }
             .joined()
@@ -119,7 +119,7 @@ struct FileToolsChecksums {
     @Test(arguments: [
         (ChecksumMethod.sha1, "1"), (.sha224, "224"), (.sha256, "256"), (.sha384, "384"), (.sha512, "512")
     ])
-    func shaFilesAreAcceptedByShasum(method chosen: ChecksumMethod, algorithm: String) throws {
+    internal func shaFilesAreAcceptedByShasum(method chosen: ChecksumMethod, algorithm: String) throws {
         // Folders are walked recursively, in the panel's order (folders first); names are relative to the checksum file.
         create(["a.txt", "b b.txt", "sub"], ["method": method(chosen)])
         let name = "work." + chosen.fileExtension
@@ -135,7 +135,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func sfvFileMatchesCksum() throws {
+    internal func sfvFileMatchesCksum() throws {
         create(["a.txt", "b b.txt"])
         let crcs = try ["a.txt", "b b.txt"]
             .map {
@@ -145,7 +145,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func everyMethodRoundTripsThroughVerify() {
+    internal func everyMethodRoundTripsThroughVerify() {
         for chosen in ChecksumMethod.allCases {
             create(
                 ["a.txt", "sub"],
@@ -161,7 +161,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func windowsFormatAndUnicodeNames() throws {
+    internal func windowsFormatAndUnicodeNames() throws {
         try box.file("work/sub/ünï.txt", "x")
         create(["sub"], ["unix": .flag(false), "method": method(.md5), "target": .text(box.url("work/win.md5").path)])
         let data = try Data(contentsOf: box.url("work/win.md5"))
@@ -191,7 +191,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func separateFilesPerFileAndPerFolder() {
+    internal func separateFilesPerFileAndPerFolder() {
         #expect(ChecksumRun.separateName(for: "test.txt", pattern: "*.*.sfv", method: .crc32) == "test.txt.sfv")
         #expect(ChecksumRun.separateName(for: "test.txt", pattern: "*.sfv", method: .crc32) == "test.sfv")
         #expect(ChecksumRun.separateName(for: "test.txt", pattern: "*.*", method: .md5) == "test.txt.md5")
@@ -231,7 +231,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func createOnAnotherFileSystemAndFailures() {
+    internal func createOnAnotherFileSystemAndFailures() {
         memory.addFile("/data/one.bin", "1")
         memory.addFile("/data/two.bin", "2")
         left.show(memory.url("/data"))
@@ -255,7 +255,7 @@ struct FileToolsChecksums {
     // MARK: Reading checksum files
 
     @Test
-    func lineFormats() {
+    internal func lineFormats() {
         typealias Entry = ChecksumFile.Entry
         let md5 = String(repeating: "ab", count: 16)
         let sha256 = String(repeating: "CD", count: 32)
@@ -320,7 +320,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func encodingsOfChecksumFiles() {
+    internal func encodingsOfChecksumFiles() {
         let line = "ä.txt 00000000\n"
         #expect(ChecksumFile.text(from: Data([0xEF, 0xBB, 0xBF]) + Data(line.utf8)) == line)
         #expect(ChecksumFile.text(from: Data(line.utf8)) == line)
@@ -333,7 +333,7 @@ struct FileToolsChecksums {
     // MARK: Verify
 
     @Test
-    func verifyReportsOkMissingAndWrong() throws {
+    internal func verifyReportsOkMissingAndWrong() throws {
         create(["a.txt", "b b.txt", "sub"], ["method": method(.md5)])
         try "changed".write(to: box.url("work/b b.txt"), atomically: true, encoding: .utf8)
         try FileManager.default.removeItem(at: box.url("work/sub/c.txt"))
@@ -365,7 +365,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func verifiesFilesWrittenByTheSystemTools() throws {
+    internal func verifiesFilesWrittenByTheSystemTools() throws {
         let work = box.url("work")
         try Data(
             try systemTool("/usr/bin/shasum", ["-a", "256", "a.txt", "b b.txt", "sub/c.txt"], in: work).output.utf8
@@ -414,7 +414,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func verifyAgainstTheClipboardAndTheFileName() throws {
+    internal func verifyAgainstTheClipboardAndTheFileName() throws {
         let sha256 = try digest("/usr/bin/shasum", ["-a", "256"], "work/a.txt")
         pasteboard.clearContents()
         pasteboard.setString("  \(sha256.uppercased())\n", forType: .string)
@@ -456,7 +456,7 @@ struct FileToolsChecksums {
     }
 
     @Test
-    func verifyManyFilesOnAnotherFileSystem() {
+    internal func verifyManyFilesOnAnotherFileSystem() {
         var lines = ""
         for index in 0..<200 {
             let content = "file number \(index)"

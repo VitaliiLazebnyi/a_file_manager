@@ -283,10 +283,10 @@ public final class SelectionPlugin: Plugin {
 }
 
 /// Which entries a selection command affects (spec 03 › Selection, *Selection (with Num +)*).
-enum SelectionScope {
+internal enum SelectionScope {
     case both, files, folders
 
-    func contains(_ item: FileItem) -> Bool {
+    internal func contains(_ item: FileItem) -> Bool {
         switch self {
         case .both:
             return true
@@ -312,13 +312,13 @@ enum SelectionScope {
 /// thread, through the file system's provider, and the job's completion returns to the main
 /// thread to change the selection.
 @MainActor
-final class Selections {
-    enum Similarity {
+internal final class Selections {
+    internal enum Similarity {
         case ext, name, nameAndExt, path
     }
 
     /// A list shown only in part by this plugin.
-    enum RestrictedView {
+    internal enum RestrictedView {
         case comparison
     }
 
@@ -342,9 +342,9 @@ final class Selections {
     /// The computation under way; a newer command ends it.
     private var running: CancellationFlag?
     /// Lists longer than this are worked on off the main thread.
-    static let longList = 20_000
+    internal static let longList = 20_000
     /// How many names are applied to the model in one piece of main-thread work.
-    static let applyPiece = 20_000
+    internal static let applyPiece = 20_000
 
     /// The behaviour for the panels of `kernel`, with the clipboard `pasteboard`; with `background`,
     /// what can take long is handed to `runsWork`, which works it out elsewhere.
@@ -370,8 +370,8 @@ final class Selections {
     private var ui: any UserInteraction { kernel.interaction }
 
     /// What Num +, Ctrl+Num + and Num * affect, and the choice their Shift variants make.
-    var configured: SelectionScope { store.marksFolders ? .both : .files }
-    var other: SelectionScope { store.marksFolders ? .files : .both }
+    internal var configured: SelectionScope { store.marksFolders ? .both : .files }
+    internal var other: SelectionScope { store.marksFolders ? .files : .both }
 
     // MARK: Changing a selection
 
@@ -398,7 +398,7 @@ final class Selections {
     }
 
     /// How often a result that the list outgrew is worked out again before it is given up.
-    static let attempts = 8
+    internal static let attempts = 8
 
     /// Works `work` out and then `apply`s its result on the main thread.
     ///
@@ -525,13 +525,13 @@ final class Selections {
 
     // MARK: Groups
 
-    static let maskHelp =
+    internal static let maskHelp =
         "Specify file type, e.g. *.txt, or RegEx with leading '<', like <(a|b). "
         + "Masks after | are left out: *.*|*.bak. >name uses a saved selection type."
 
     /// Select group / Unselect group (spec 03 › Select and unselect group): asks for a mask,
     /// or takes it from `.text` (the `SELECTFILES` way).
-    func group(select: Bool, scope: SelectionScope, proposal: String = "*.*", argument: CommandArgument) {
+    internal func group(select: Bool, scope: SelectionScope, proposal: String = "*.*", argument: CommandArgument) {
         if let mask = argument.text {
             apply(mask, select: select, scope: scope)
             return
@@ -547,7 +547,7 @@ final class Selections {
     }
 
     /// Selects or unselects what a mask, or a selection type written `>name`, matches.
-    func apply(_ text: String, select: Bool, scope: SelectionScope) {
+    internal func apply(_ text: String, select: Bool, scope: SelectionScope) {
         let text = text.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else {
             return
@@ -588,7 +588,7 @@ final class Selections {
 
     /// The saved selection types and the masks used so far, to select or unselect by, or to
     /// remove from the list (the dialog's lower half and its history in the specification).
-    func groupFromList() {
+    internal func groupFromList() {
         let types = store.types
         let rows = types.map { ">" + $0.name } + store.history
         guard !rows.isEmpty else {
@@ -621,7 +621,7 @@ final class Selections {
 
     /// Define selection (spec 03 › Select and unselect group, *Define...*): creates, changes
     /// or deletes a predefined selection type.
-    func defineType() {
+    internal func defineType() {
         let types = store.types
         var type = SelectionType(name: "")
         if !types.isEmpty {
@@ -707,7 +707,7 @@ final class Selections {
 
     /// `step` 0 means every entry; n ≥ 1 every n-th line downward from the cursor, and
     /// n ≤ -1 upward (spec 17 › Commands with parameters).
-    func all(select: Bool, scope: SelectionScope, step: Int) {
+    internal func all(select: Bool, scope: SelectionScope, step: Int) {
         let model = source
         let change: PanelModel.SelectionChange = select ? .add : .remove
         guard step != 0 else {
@@ -752,7 +752,7 @@ final class Selections {
         )
     }
 
-    func invert(scope: SelectionScope) {
+    internal func invert(scope: SelectionScope) {
         let model = source
         // Inverting everything is a pass over bits.
         if scope == .both {
@@ -775,7 +775,7 @@ final class Selections {
 
     /// Restore Selection: the saved marks that are still shown become the selection (a pass
     /// over bits in the model).
-    func restore() {
+    internal func restore() {
         source.restoreSelection()
     }
 
@@ -783,7 +783,7 @@ final class Selections {
     ///
     /// The same extension is asked of files only; the same folder matters where a list gathers
     /// entries of several folders (a branch view, a search result).
-    func similar(to similarity: Similarity, as cursor: FileItem, select: Bool) {
+    internal func similar(to similarity: Similarity, as cursor: FileItem, select: Bool) {
         let model = source
         @Sendable
         func same(_ first: String, _ second: String) -> Bool {
@@ -813,7 +813,7 @@ final class Selections {
 
     /// Selects or unselects `count` items from the cursor on and moves the cursor past them;
     /// a negative count works upward.
-    func step(select: Bool, count: Int) {
+    internal func step(select: Bool, count: Int) {
         let model = source
         guard count != 0, model.rowCount > 0 else {
             return
@@ -854,7 +854,7 @@ final class Selections {
     /// under the cursor, written through the file system the file lies on.
     ///
     /// The text is made and written in the job; the old file stays until the new one is complete.
-    func saveToFile(_ encoding: SelectionFile.Encoding, argument: CommandArgument) {
+    internal func saveToFile(_ encoding: SelectionFile.Encoding, argument: CommandArgument) {
         let model = source
         // The marked entries are picked out in the job, not here (a long selection).
         // Offered only where there are operands.
@@ -949,7 +949,7 @@ final class Selections {
     ///
     /// The file is read and its names picked out in the job, which ends when it is cancelled; the
     /// entries are then found like those of any mask.
-    func loadFromFile(argument: CommandArgument) {
+    internal func loadFromFile(argument: CommandArgument) {
         let model = source
         let directory = model.directory
         let proposal = model.cursorFile.flatMap { $0.ext.lowercased() == "txt" ? $0.name : nil } ?? ""
@@ -1004,7 +1004,7 @@ final class Selections {
     /// The clipboard is read once, on the main thread (the pasteboard is not safe against use from
     /// two threads at once); the lines are matched against the names off the main thread, and the
     /// text may be as big as memory.
-    func loadFromClipboard() {
+    internal func loadFromClipboard() {
         let model = source
         let (items, directory) = (model.items, model.directory)
         guard let text = pasteboard.string(forType: .string), text.utf8.count <= Self.clipboardLimit else {
@@ -1027,11 +1027,11 @@ final class Selections {
 
     /// The entries a text of names stands for: the ones whose name is written exactly like a
     /// line, and, for a line no entry is written like, the ones that read the same.
-    struct ListedNames {
+    internal struct ListedNames {
         private var exact = Set<NameBytes>()
         private var alike = Set<String>()
 
-        init(_ text: String, among items: [FileItem]) {
+        internal init(_ text: String, among items: [FileItem]) {
             let known = Set(items.map(\.name))
             let written = Set(items.map { NameBytes($0.name) })
             for name in SelectionFile.listed(in: text, among: known) {
@@ -1039,9 +1039,9 @@ final class Selections {
             }
         }
 
-        var isEmpty: Bool { exact.isEmpty && alike.isEmpty }
+        internal var isEmpty: Bool { exact.isEmpty && alike.isEmpty }
 
-        func contains(_ item: FileItem) -> Bool {
+        internal func contains(_ item: FileItem) -> Bool {
             exact.contains(NameBytes(item.name)) || (!alike.isEmpty && alike.contains(item.name))
         }
     }
@@ -1065,7 +1065,7 @@ final class Selections {
     ///
     /// Whether the volumes tell upper from lower case is asked of them, which can take long: it is
     /// done with the comparison, off the main thread, and given up when a newer command starts.
-    func compare(mode: DirectoryComparison.Mode, withSubdirectories: Bool) {
+    internal func compare(mode: DirectoryComparison.Mode, withSubdirectories: Bool) {
         let (left, right) = (kernel.panels.left.model, kernel.panels.right.model)
         let (leftFolder, rightFolder) = (left.directory, right.directory)
         let ignoresOneHour = store.ignoresOneHour
@@ -1123,7 +1123,7 @@ final class Selections {
     /// shows another directory.
     ///
     /// Nothing is deleted.
-    func markNewerHideSame() {
+    internal func markNewerHideSame() {
         let models = [kernel.panels.left.model, kernel.panels.right.model]
         if models.contains(where: { shows(.comparison, in: $0) }) {
             models.forEach { end(.comparison, in: $0) }
@@ -1198,7 +1198,7 @@ final class Selections {
 
     // MARK: Lists shown in part
 
-    func shows(_ view: RestrictedView, in model: PanelModel) -> Bool {
+    internal func shows(_ view: RestrictedView, in model: PanelModel) -> Bool {
         guard let restriction = restrictions[ObjectIdentifier(model)], restriction.model === model,
             restriction.view == view
         else { return false }
@@ -1226,7 +1226,7 @@ final class Selections {
 /// Hands a block to the main thread through the run loop (all modes that count), not through the
 /// main dispatch queue: a block that asks the user something runs a modal dialog, and a dialog
 /// started from inside a block of the main queue keeps every later block of the queue waiting.
-func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
+internal func performOnMainLoop(_ block: @escaping @MainActor @Sendable () -> Void) {
     // The main run loop runs its blocks on the main thread.
     RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(block) }
     CFRunLoopWakeUp(CFRunLoopGetMain())

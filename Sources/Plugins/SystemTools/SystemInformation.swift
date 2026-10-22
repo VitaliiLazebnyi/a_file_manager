@@ -8,21 +8,21 @@ import Foundation
 ///
 /// A plain value; `gather` asks the system and the volumes and may block, so it runs on a job's
 /// thread.
-struct SystemInformation: Equatable {
-    struct Section: Equatable {
-        let title: String
-        var rows: [Row]
+internal struct SystemInformation: Equatable {
+    internal struct Section: Equatable {
+        internal let title: String
+        internal var rows: [Row]
     }
 
-    struct Row: Equatable {
-        let label: String
-        let value: String
+    internal struct Row: Equatable {
+        internal let label: String
+        internal let value: String
     }
 
-    var sections: [Section]
+    internal var sections: [Section]
 
     /// The sections as lines of text with the values in one column.
-    var text: String {
+    internal var text: String {
         let width = sections.flatMap(\.rows).map(\.label.count).max() ?? 0
         return
             sections.map { section in
@@ -38,7 +38,7 @@ struct SystemInformation: Equatable {
     // MARK: Formats
 
     /// Memory as the dialog writes it: `131,072 M (128 G)`.
-    static func memory(_ bytes: UInt64) -> String {
+    internal static func memory(_ bytes: UInt64) -> String {
         let megabytes = Int64(bytes / (1_024 * 1_024))
         let gigabytes = Double(bytes) / Double(1 << 30)
         let rounded = gigabytes.rounded() == gigabytes ? String(Int(gigabytes)) : String(format: "%.1f", gigabytes)
@@ -46,13 +46,13 @@ struct SystemInformation: Equatable {
     }
 
     /// Time since start: `130h 19m 21s`.
-    static func uptime(_ seconds: TimeInterval) -> String {
+    internal static func uptime(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))
         return "\(total / 3_600)h \(total / 60 % 60)m \(total % 60)s"
     }
 
     /// Free space of a volume as on the drive line: `1,439,946,852 k of 7,811,085,600 k free`.
-    static func space(free: Int64?, total: Int64?) -> String {
+    internal static func space(free: Int64?, total: Int64?) -> String {
         guard let free, let total else {
             return "size unknown"
         }
@@ -62,7 +62,7 @@ struct SystemInformation: Equatable {
     // MARK: Asking the system
 
     /// One named value of the system (`sysctl`), as text.
-    static func systemText(_ name: String) -> String? {
+    internal static func systemText(_ name: String) -> String? {
         var size = 0
         // The first call tells the size, the second fills a buffer of that size.
         guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0,
@@ -74,7 +74,7 @@ struct SystemInformation: Equatable {
     }
 
     /// One named value of the system (`sysctl`), as a number.
-    static func systemNumber(_ name: String) -> Int? {
+    internal static func systemNumber(_ name: String) -> Int? {
         var value: Int64 = 0
         var size = MemoryLayout<Int64>.size
         guard sysctlbyname(name, &value, &size, nil, 0) == 0 else {
@@ -85,7 +85,7 @@ struct SystemInformation: Equatable {
 
     /// Memory nobody uses and the share that is in use: `75,067 M (58 %)`. `pageSize` is the size of a page of
     /// memory, when the system tells it.
-    static func freeMemory(of total: UInt64, pageSize: Int?) -> String? {
+    internal static func freeMemory(of total: UInt64, pageSize: Int?) -> String? {
         var statistics = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &statistics) { pointer in
@@ -106,9 +106,9 @@ struct SystemInformation: Equatable {
     /// What `gather` asks the system: its named values and its volumes.
     ///
     /// Tests answer in its place.
-    struct Questions: Sendable {
+    internal struct Questions: Sendable {
         /// The system's own.
-        static let system = Self(
+        internal static let system = Self(
             text: SystemInformation.systemText,
             number: SystemInformation.systemNumber,
             volumes: {
@@ -120,18 +120,18 @@ struct SystemInformation: Equatable {
         )
 
         /// A named value as text.
-        var text: @Sendable (String) -> String?
+        internal var text: @Sendable (String) -> String?
         /// A named value as a number.
-        var number: @Sendable (String) -> Int?
+        internal var number: @Sendable (String) -> Int?
         /// The volumes to list; nil when the system does not tell.
-        var volumes: @Sendable () -> [URL]?
+        internal var volumes: @Sendable () -> [URL]?
     }
 
     /// `displays` are the screens as text; they belong to the main thread and are read there
     /// before the job starts.
     ///
     /// Nil when `cancellation` was set before every volume had answered.
-    static func gather(displays: [String], cancellation: CancellationFlag, asking system: Questions) -> Self? {
+    internal static func gather(displays: [String], cancellation: CancellationFlag, asking system: Questions) -> Self? {
         let process = ProcessInfo.processInfo
         var hardware = [Row(label: "Model", value: system.text("hw.model") ?? "unknown")]
         hardware.append(Row(label: "Processor", value: system.text("machdep.cpu.brand_string") ?? "unknown"))
@@ -192,7 +192,7 @@ struct SystemInformation: Equatable {
     /// A volume that has stopped answering never returns from the question. The question is
     /// therefore asked through `BlockingCalls`: it goes on alone, and this function comes back
     /// as soon as `cancellation` is set, so the job that called it can end.
-    static func volumes(_ mounted: [URL]?, cancellation: CancellationFlag) -> [Row] {
+    internal static func volumes(_ mounted: [URL]?, cancellation: CancellationFlag) -> [Row] {
         let keys: Set<URLResourceKey> = [
             .volumeNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityKey,
             .volumeLocalizedFormatDescriptionKey
@@ -228,11 +228,11 @@ struct SystemInformation: Equatable {
 
 /// The rules for a volume's name (spec 12 › Volume label, adapted: the Mac allows long names
 /// and most characters, but neither `/` nor `:` nor a leading dot).
-enum VolumeName {
-    static let maximumLength = 255
+internal enum VolumeName {
+    internal static let maximumLength = 255
 
     /// Nil when the name is fine, else what is wrong with it.
-    static func problem(with name: String) -> String? {
+    internal static func problem(with name: String) -> String? {
         if name.isEmpty {
             return "The name must not be empty."
         }

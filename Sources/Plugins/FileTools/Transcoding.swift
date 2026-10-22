@@ -4,11 +4,11 @@ import Foundation
 /// The formats of Encode File (spec 08 › Encode).
 ///
 /// The raw values are those of the spec's `EncodeMethod` setting.
-enum EncodeMethod: Int, CaseIterable {
+internal enum EncodeMethod: Int, CaseIterable {
     case mime = 0
     case uue, xxe
 
-    var title: String {
+    internal var title: String {
         switch self {
         case .mime:
             return "MIME (Base64)"
@@ -21,7 +21,7 @@ enum EncodeMethod: Int, CaseIterable {
         }
     }
 
-    var fileExtension: String {
+    internal var fileExtension: String {
         switch self {
         case .mime:
             return "b64"
@@ -35,14 +35,14 @@ enum EncodeMethod: Int, CaseIterable {
     }
 
     /// The bytes of the original one full line carries.
-    var bytesPerLine: Int { self == .mime ? 57 : 45 }
+    internal var bytesPerLine: Int { self == .mime ? 57 : 45 }
     /// The length of a full line with its CRLF.
-    var lineLength: Int { self == .mime ? 78 : 63 }
+    internal var lineLength: Int { self == .mime ? 78 : 63 }
 }
 
 /// The alphabets of the two older formats, and their lines.
-enum SixBitText {
-    static let xxAlphabet = Array("+-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".utf8)
+internal enum SixBitText {
+    internal static let xxAlphabet = Array("+-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".utf8)
     /// The character of every six-bit value in each alphabet.
     private static let uuCharacters: [UInt8] = (0..<64).map { $0 == 0 ? 96 : UInt8($0) + 32 }
     /// The six-bit value of every character in each alphabet; 255 for the others.
@@ -55,7 +55,7 @@ enum SixBitText {
 
     /// Lines of up to 45 bytes each: a length character, four characters for every three
     /// bytes, CRLF.
-    static func encode(_ data: Data, xx: Bool) -> Data {
+    internal static func encode(_ data: Data, xx: Bool) -> Data {
         let (full, rest) = data.count.quotientAndRemainder(dividingBy: 45)
         var output = Data(count: full * 63 + (rest > 0 ? 3 + (rest + 2) / 3 * 4 : 0))
         guard !output.isEmpty else {
@@ -96,7 +96,7 @@ enum SixBitText {
     }
 
     /// The bytes of one line, nil when the line is not one of this format.
-    static func decode(_ line: ArraySlice<UInt8>, xx: Bool) -> [UInt8]? {
+    internal static func decode(_ line: ArraySlice<UInt8>, xx: Bool) -> [UInt8]? {
         (xx ? xxValues : uuValues)
             .withUnsafeBufferPointer { table in
                 line.withUnsafeBufferPointer { text -> [UInt8]? in
@@ -137,10 +137,10 @@ enum SixBitText {
 }
 
 /// Encode File (spec 08 › Encode, Encoded output format).
-enum Encoder {
+internal enum Encoder {
     /// The names of the encoded files: one file keeps the base name, several are numbered
     /// `name001.uue`, `name002.uue`, … which is what Decode looks for.
-    static func outputNames(for name: String, method: EncodeMethod, parts: Int) -> [String] {
+    internal static func outputNames(for name: String, method: EncodeMethod, parts: Int) -> [String] {
         let base = FileItem.split(name).base
         guard parts > 1 else {
             return [base + "." + method.fileExtension]
@@ -151,7 +151,7 @@ enum Encoder {
     /// How many lines go into one file: the smaller of the two limits, 0 for no limit.
     ///
     /// "Bytes per file" counts the encoded text without the header.
-    static func linesPerFile(lines: Int, bytes: Int64, method: EncodeMethod) -> Int {
+    internal static func linesPerFile(lines: Int, bytes: Int64, method: EncodeMethod) -> Int {
         let fromBytes = bytes > 0 ? max(1, Int(min(bytes / Int64(method.lineLength), Int64(Int32.max)))) : 0
         if lines > 0, fromBytes > 0 {
             return min(lines, fromBytes)
@@ -159,7 +159,7 @@ enum Encoder {
         return max(lines, fromBytes)
     }
 
-    static func header(for name: String, method: EncodeMethod) -> String {
+    internal static func header(for name: String, method: EncodeMethod) -> String {
         switch method {
         case .mime:
             let quoted = name.replacingOccurrences(of: "\"", with: "_")
@@ -175,7 +175,7 @@ enum Encoder {
     /// Encodes `source` into `directory` and returns the files written; on failure or cancel
     /// none of them is left, and a file that was there before is never touched (see `Splitter.split`).
     @discardableResult
-    static func encode(
+    internal static func encode(
         _ source: FileItem,
         into directory: URL,
         method: EncodeMethod,
@@ -301,7 +301,7 @@ enum Encoder {
 }
 
 /// Where a decoder puts what it finds.
-protocol DecodeSink: AnyObject {
+internal protocol DecodeSink: AnyObject {
     /// A file starts; `name` is as the encoded text gives it, nil when it gives none.
     func begin(name: String?) throws
     func write(_ bytes: [UInt8]) throws
@@ -318,7 +318,7 @@ protocol DecodeSink: AnyObject {
 /// `sum -r` of UUEncode, the size and CRC32 of yEnc, the padding of Base64. What does not
 /// hold is collected in `problems`; the decoded bytes are written all the same, so the caller
 /// can keep the file and say that it is incomplete or damaged.
-final class DecodeMachine {
+internal final class DecodeMachine {
     private enum State {
         case searching
         case mimeHeaders(name: String?, isBase64: Bool)
@@ -344,9 +344,9 @@ final class DecodeMachine {
     private let sink: any DecodeSink
     private var state = State.searching
     private var sextets: [UInt8] = []
-    private(set) var filesDecoded = 0
+    internal private(set) var filesDecoded = 0
     /// What is wrong with the files decoded so far; empty when everything that can be checked holds.
-    private(set) var problems: [String] = []
+    internal private(set) var problems: [String] = []
     /// False until anything but white space was seen; only then can plain Base64 start.
     private var sawText = false
     private var currentName: String?
@@ -368,12 +368,12 @@ final class DecodeMachine {
     private var yPartLength: Int64?
     private var yHasPart = false
 
-    init(sink: any DecodeSink) {
+    internal init(sink: any DecodeSink) {
         self.sink = sink
     }
 
     /// Whether a file is being decoded whose end has not come yet: the next part is needed.
-    var isInsideFile: Bool {
+    internal var isInsideFile: Bool {
         if case .searching = state {
             return false
         }
@@ -389,7 +389,7 @@ final class DecodeMachine {
     /// Plain Base64 has no end mark: it goes on only where the text breaks off inside a group of
     /// four, or on a full line (the parts the encoder writes break off after full lines); otherwise
     /// it ended.
-    var needsMoreParts: Bool {
+    internal var needsMoreParts: Bool {
         switch state {
         case .searching, .mimeHeaders:
             return false
@@ -420,7 +420,7 @@ final class DecodeMachine {
 
     /// Whether a line opens a new encoded file or mail part: where a Base64 body ends even
     /// without padding or a boundary, and what an independent next file starts with.
-    static func startsNewFile(_ line: ArraySlice<UInt8>) -> Bool {
+    internal static func startsNewFile(_ line: ArraySlice<UInt8>) -> Bool {
         func has(_ prefix: String, folded: Bool) -> Bool {
             let wanted = Array(prefix.utf8)
             guard line.count >= wanted.count else {
@@ -466,7 +466,7 @@ final class DecodeMachine {
     }
 
     /// Ends what is open when the input is over, and says what was missing.
-    func finish() throws {
+    internal func finish() throws {
         switch state {
         case .sixBit:
             report("the end line is missing: the text is incomplete (a part may be missing)")
@@ -593,7 +593,7 @@ final class DecodeMachine {
         return false
     }
 
-    func feed(_ line: ArraySlice<UInt8>) throws {
+    internal func feed(_ line: ArraySlice<UInt8>) throws {
         if awaitingTrailer != nil, case .searching = state, resolveTrailer(with: line) {
             return
         }
@@ -804,7 +804,7 @@ final class DecodeMachine {
 }
 
 /// Decode File (spec 08 › Decode).
-enum Decoder {
+internal enum Decoder {
     /// Cuts blocks of a file into lines.
     ///
     /// A line longer than this is handed on in pieces (the output of `base64` is one line as long
@@ -894,7 +894,7 @@ enum Decoder {
     ///
     /// The path is cut on the code points (a `/` followed by a combining mark is one character to
     /// Swift, but a slash to the file system).
-    static func safeName(_ name: String?, replacingColon: Bool = true) -> String? {
+    internal static func safeName(_ name: String?, replacingColon: Bool = true) -> String? {
         guard let scalars = name?.unicodeScalars else {
             return nil
         }
@@ -931,7 +931,7 @@ enum Decoder {
     }
 
     /// The name of the decoded file when the data gives none: the encoded file's without its extension.
-    static func fallbackName(for encodedName: String) -> String {
+    internal static func fallbackName(for encodedName: String) -> String {
         let base = FileItem.split(encodedName).base
         return base == encodedName ? encodedName + ".decoded" : base
     }
@@ -958,9 +958,9 @@ enum Decoder {
     }
 
     /// What a decode made: the files, and what is wrong with them (see `DecodeMachine.problems`).
-    struct Outcome: Equatable {
-        var files: [URL]
-        var problems: [String]
+    internal struct Outcome: Equatable {
+        internal var files: [URL]
+        internal var problems: [String]
     }
 
     /// Decodes the file and, while a file inside it is unfinished, the parts that follow it by
@@ -968,12 +968,15 @@ enum Decoder {
     ///
     /// Returns the files written.
     @discardableResult
-    static func decode(_ first: FileItem, into directory: URL, autoRename: Bool = false, run: ToolRun) throws -> [URL] {
+    internal static func decode(_ first: FileItem, into directory: URL, autoRename: Bool = false, run: ToolRun) throws
+        -> [URL]
+    {
         try decodeChecked(first, into: directory, autoRename: autoRename, run: run).files
     }
 
     /// Like `decode`, and says what is incomplete or damaged: the files are kept all the same.
-    static func decodeChecked(_ first: FileItem, into directory: URL, autoRename: Bool = false, run: ToolRun) throws
+    internal static func decodeChecked(_ first: FileItem, into directory: URL, autoRename: Bool = false, run: ToolRun)
+        throws
         -> Outcome
     {
         let provider = try run.provider(for: first.url)

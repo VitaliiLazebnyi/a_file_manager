@@ -6,30 +6,30 @@ import Foundation
 /// timeouts the pattern is taken as unusable and the rest answer at once.
 ///
 /// Shared by the threads of one search. All state is guarded by `lock`.
-final class RegexTrip: @unchecked Sendable {
+internal final class RegexTrip: @unchecked Sendable {
     private let lock = NSLock()
     private var timeouts = 0
     private let limit: Int
 
-    init(limit: Int = 3) {
+    internal init(limit: Int = 3) {
         self.limit = limit
     }
 
-    func recordTimeout() {
+    internal func recordTimeout() {
         lock.lock()
         timeouts += 1
         lock.unlock()
     }
 
     /// Whether any regular expression of the search ran out of time.
-    var hasTimedOut: Bool {
+    internal var hasTimedOut: Bool {
         lock.lock()
         defer { lock.unlock() }
         return timeouts > 0
     }
 
     /// Whether enough of them did for the pattern to be given up.
-    var isTripped: Bool {
+    internal var isTripped: Bool {
         lock.lock()
         defer { lock.unlock() }
         return timeouts >= limit
@@ -42,18 +42,18 @@ final class RegexTrip: @unchecked Sendable {
 /// is never run with the plain `firstMatch`: the matching is stopped from the progress block of
 /// `enumerateMatches` when the budget has passed or the work was cancelled, on whatever thread the
 /// caller is.
-enum FindRegex {
+internal enum FindRegex {
     /// What one match may take.
-    static let defaultBudget: TimeInterval = 0.25
+    internal static let defaultBudget: TimeInterval = 0.25
 
-    enum Outcome: Equatable {
+    internal enum Outcome: Equatable {
         case matched, unmatched, timedOut
     }
 
     /// Whether `text` holds a match, within `budget` seconds of work.
     ///
     /// A cancelled run reports `timedOut`; whoever cancelled does not use the answer.
-    static func firstMatch(
+    internal static func firstMatch(
         _ regex: NSRegularExpression,
         in text: String,
         budget: TimeInterval = defaultBudget,
@@ -83,7 +83,7 @@ enum FindRegex {
     }
 
     /// `firstMatch` that also counts a timeout in `trip` and gives up at once on a tripped pattern.
-    static func matches(
+    internal static func matches(
         _ regex: NSRegularExpression,
         in text: String,
         trip: RegexTrip?,

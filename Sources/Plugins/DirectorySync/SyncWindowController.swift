@@ -7,7 +7,8 @@ import AppKit
 ///
 /// It draws a `SyncSession` and forwards clicks and keys to it; nothing here touches a file system.
 /// Main thread only.
-final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate,
+internal final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
+    NSTableViewDelegate,
     NSMenuDelegate
 {
     private let session: SyncSession
@@ -78,7 +79,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
-    init(session: SyncSession, effects: SyncWindowEffects = .system) {
+    internal init(session: SyncSession, effects: SyncWindowEffects = .system) {
         self.session = session
         self.effects = effects
         kernel = session.kernel
@@ -102,10 +103,10 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     }
 
     /// The window is made in code, never from an archive.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
     /// Shows the window with what the session holds now.
-    func show() {
+    internal func show() {
         // The list is drawn from this window again (closing let go of it).
         table.dataSource = self
         table.delegate = self
@@ -295,7 +296,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     }
 
     /// Esc: interrupts a running comparison and says so; false when nothing runs.
-    func interruptComparison() -> Bool {
+    internal func interruptComparison() -> Bool {
         guard session.phase == .comparing else {
             return false
         }
@@ -469,7 +470,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
 
     // MARK: Menus
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
+    internal func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === rowMenu { buildRowMenu() } else { buildSetsMenu(menu) }
     }
 
@@ -573,23 +574,23 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
 
     // MARK: Table
 
-    func numberOfRows(in _: NSTableView) -> Int { session.entries.count }
+    internal func numberOfRows(in _: NSTableView) -> Int { session.entries.count }
 
-    func tableView(_: NSTableView, isGroupRow row: Int) -> Bool {
+    internal func tableView(_: NSTableView, isGroupRow row: Int) -> Bool {
         if case .header = session.entries[row] {
             return true
         }
         return false
     }
 
-    func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
+    internal func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
         if case .header = session.entries[row] {
             return false
         }
         return true
     }
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+    internal func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let id = tableColumn?.identifier.rawValue ?? "header"
         let identifier = NSUserInterfaceItemIdentifier("cell." + id)
         let cell =
@@ -616,7 +617,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         return cell
     }
 
-    static func text(of row: SyncRow, column: String) -> String {
+    internal static func text(of row: SyncRow, column: String) -> String {
         func size(_ item: FileItem?) -> String { item.map { row.isDirectory ? "<DIR>" : Format.bytes($0.size) } ?? "" }
         func date(_ item: FileItem?) -> String { item.map { dateFormatter.string(from: $0.modified) } ?? "" }
         func name(_ item: FileItem?) -> String { item.map { row.isDirectory ? "[\($0.name)]" : $0.name } ?? "" }
@@ -660,7 +661,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     }
 
     /// The colour shows what the comparison proposed (spec 09 › Result list).
-    static func color(of row: SyncRow) -> NSColor {
+    internal static func color(of row: SyncRow) -> NSColor {
         switch row.defaultAction {
         case .copyToRight:
             return .systemGreen
@@ -683,7 +684,7 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     }
 
     /// A click on a column header sorts by name, size or date of that side; again reverses.
-    func tableView(_: NSTableView, didClick tableColumn: NSTableColumn) {
+    internal func tableView(_: NSTableView, didClick tableColumn: NSTableColumn) {
         let id = tableColumn.identifier.rawValue
         guard id != "action" else {
             return
@@ -694,11 +695,11 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         session.sort = (key, side, same ? !session.sort.ascending : true)
     }
 
-    func tableViewSelectionDidChange(_: Notification) {
+    internal func tableViewSelectionDidChange(_: Notification) {
         updateIndicator()
     }
 
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         session.cancelComparison()
         // A closed window asks nothing more of the session, whose kernel may be gone before
         // the window's views are when the program ends; `show` takes the list up again.

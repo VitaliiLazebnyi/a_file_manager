@@ -25,11 +25,11 @@ private final class Record<Value>: @unchecked Sendable {
 /// The background work of one server never waits behind that of another (second pass: the
 /// cause of network tests that failed when they ran beside a test with a server that is dead).
 @Suite
-struct Review2NetworkP2Background {
+internal struct Review2NetworkP2Background {
     private final class Lane {}
 
     @Test
-    func aLaneThatIsStuckHoldsUpOnlyItself() {
+    internal func aLaneThatIsStuckHoldsUpOnlyItself() {
         let (stuck, free) = (Lane(), Lane())
         let release = DispatchSemaphore(value: 0)
         let started = Record<Int>()
@@ -57,7 +57,7 @@ struct Review2NetworkP2Background {
     }
 
     @Test
-    func aDeadServerDoesNotKeepAnotherServersConnectionFromComingBack() throws {
+    internal func aDeadServerDoesNotKeepAnotherServersConnectionFromComingBack() throws {
         // One server that never sends a byte of a file, with readers dropped in the middle:
         // each waits in the background for an answer that does not come.
         var dead = TestFTPServer.Options()
@@ -95,7 +95,7 @@ struct Review2NetworkP2Background {
 /// The calls that change something end on the caller's flag (N010, N026; kernel API of the
 /// first pass: `createDirectory`, `remove`, `move`, `setAttributes` with `cancellation`).
 @Suite
-struct Review2NetworkP2Cancelling {
+internal struct Review2NetworkP2Cancelling {
     /// A fixture whose first login sits at its password question until `answer` is signalled.
     private func heldAtLogin() throws -> (fixture: FTPFixture, answer: DispatchSemaphore, first: AdoptOutcome) {
         var options = TestFTPServer.Options()
@@ -116,7 +116,7 @@ struct Review2NetworkP2Cancelling {
     }
 
     @Test
-    func everyChangingCallOfAnFTPServerLeavesAWaitWhenItsFlagIsSet() throws {
+    internal func everyChangingCallOfAnFTPServerLeavesAWaitWhenItsFlagIsSet() throws {
         let (fixture, answer, first) = try heldAtLogin()
         let fs = fixture.fileSystem
         let calls: [(String, @Sendable (CancellationFlag) throws -> Void)] = [
@@ -175,7 +175,7 @@ struct Review2NetworkP2Cancelling {
     }
 
     @Test
-    func aChangingCallOnASecureShellServerThatDoesNotAnswerEndsOnItsFlag() throws {
+    internal func aChangingCallOnASecureShellServerThatDoesNotAnswerEndsOnItsFlag() throws {
         let environment = SessionEnvironment()
         var values = NetworkOptions.Values()
         values.timeout = 600
@@ -228,7 +228,7 @@ struct Review2NetworkP2Cancelling {
     }
 
     @Test
-    func aRequestThatIsNeverAnsweredEndsOnTheFlag() throws {
+    internal func aRequestThatIsNeverAnsweredEndsOnTheFlag() throws {
         guard FakeSFTPServer.isAvailable else {
             return
         }
@@ -248,7 +248,7 @@ struct Review2NetworkP2Cancelling {
     }
 
     @Test
-    func eitherFlagEndsTheWaitAndNothingIsLeftRegistered() {
+    internal func eitherFlagEndsTheWaitAndNothingIsLeftRegistered() {
         let (own, callers) = (CancellationFlag(), CancellationFlag())
         // The caller's flag.
         withEither(own, callers) { both in
@@ -278,9 +278,9 @@ struct Review2NetworkP2Cancelling {
 /// An address the user typed is not asked about (N071; `ServerConsentService` of the kernel).
 @MainActor
 @Suite
-struct Review2NetworkP2Consent {
+internal struct Review2NetworkP2Consent {
     @Test
-    func aServerTheUserNamedInPersonIsNotAskedAbout() throws {
+    internal func aServerTheUserNamedInPersonIsNotAskedAbout() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/a.txt", "a")
         let asked = Record<ServerKey>()
@@ -304,7 +304,7 @@ struct Review2NetworkP2Consent {
     /// Off the main thread: the climb through 3,000 levels takes seconds of a debug build, which other tests waited
     /// for when it ran there.
     @Test
-    nonisolated func theTopOfAServerIsKnownFromTheAddressAlone() {
+    nonisolated internal func theTopOfAServerIsKnownFromTheAddressAlone() {
         let center = ConnectionCenter(environment: SessionEnvironment())
         let fs = RemoteFileSystem(scheme: "sftp", center: center)
         let key = ServerKey(scheme: "sftp", host: "files.example.com", port: 2_222)
@@ -319,7 +319,7 @@ struct Review2NetworkP2Consent {
     }
 
     @Test
-    func otherLocationsSayNothing() throws {
+    internal func otherLocationsSayNothing() throws {
         let fixture = try FTPFixture()
         let asked = Record<ServerKey>()
         fixture.environment.askToConnect = { profile in
@@ -338,7 +338,7 @@ struct Review2NetworkP2Consent {
     }
 
     @Test
-    func aLoginThatIsUnderWayIsNotDroppedByTheNews() throws {
+    internal func aLoginThatIsUnderWayIsNotDroppedByTheNews() throws {
         var options = TestFTPServer.Options()
         (options.user, options.password) = ("anna", "pw")
         let fixture = try FTPFixture(options)
@@ -362,7 +362,7 @@ struct Review2NetworkP2Consent {
 /// The order of the Keychain calls when a password is stored (N100), with the Security
 /// framework's four calls replaced by a recording stand-in: no Keychain is touched.
 @Suite
-struct Review2NetworkP2Keychain {
+internal struct Review2NetworkP2Keychain {
     /// A Keychain that holds its items in memory and writes down what it was asked.
     private final class FakeKeychain: @unchecked Sendable {
         private let lock = NSLock()
@@ -430,7 +430,7 @@ struct Review2NetworkP2Keychain {
     }
 
     @Test
-    func aStoredPasswordIsChangedInPlaceAndNeverRemovedFirst() {
+    internal func aStoredPasswordIsChangedInPlaceAndNeverRemovedFirst() {
         let keychain = FakeKeychain()
         let passwords = KeychainPasswords(service: "test", calls: keychain.calls)
         // Nothing there yet: looked for by the update, then added.
@@ -450,7 +450,7 @@ struct Review2NetworkP2Keychain {
     }
 
     @Test
-    func aChangeThatFailsLeavesTheOldPasswordThere() {
+    internal func aChangeThatFailsLeavesTheOldPasswordThere() {
         let keychain = FakeKeychain()
         let passwords = KeychainPasswords(service: "test", calls: keychain.calls)
         passwords.setPassword("kept", for: "a")
@@ -471,7 +471,7 @@ struct Review2NetworkP2Keychain {
     }
 
     @Test
-    func theVaultMovesAPasswordWithoutLosingItOnTheWay() {
+    internal func theVaultMovesAPasswordWithoutLosingItOnTheWay() {
         let keychain = FakeKeychain()
         let store = KeychainPasswords(service: "test", calls: keychain.calls)
         let vault = PasswordVault(store: store)
@@ -500,9 +500,9 @@ struct Review2NetworkP2Keychain {
 /// a mount that is never answered is taken back on Cancel, and an eject that is never
 /// answered is given up after its time.
 @Suite
-struct Review2NetworkP2Mounting {
+internal struct Review2NetworkP2Mounting {
     @Test
-    func aMountThatIsNeverAnsweredIsTakenBackWhenItIsCancelled() {
+    internal func aMountThatIsNeverAnsweredIsTakenBackWhenItIsCancelled() {
         let cancelled = Record<Int>()
         let answers = Record<(Int32, CFArray?) -> Void>()
         var calls = SystemVolumeMounter.Calls.mounting(request: 0x5EED) { _, answer in
@@ -528,7 +528,7 @@ struct Review2NetworkP2Mounting {
     }
 
     @Test
-    func aMountIsAnsweredAndAFailureNamesNoPassword() throws {
+    internal func aMountIsAnsweredAndAFailureNamesNoPassword() throws {
         var calls = SystemVolumeMounter.Calls.mounting(request: 0) { _, answer in
             OtherThread.start { answer(0, ["/Volumes/share"] as CFArray) }
             return 0
@@ -565,7 +565,7 @@ struct Review2NetworkP2Mounting {
     }
 
     @Test
-    func anEjectThatIsNeverAnsweredIsGivenUpAfterItsTime() throws {
+    internal func anEjectThatIsNeverAnsweredIsGivenUpAfterItsTime() throws {
         let answers = Record<((any Error)?) -> Void>()
         var calls = SystemVolumeMounter.Calls()
         calls.unmount = { _, answer in answers.add(answer) }
@@ -590,9 +590,9 @@ struct Review2NetworkP2Mounting {
 ///
 /// The check is made slow with a hook where it runs; the server is the local TLS test server.
 @Suite(.enabled(if: TLSServer.isAvailable))
-struct Review2NetworkP2Certificates {
+internal struct Review2NetworkP2Certificates {
     @Test
-    func aSlowCheckHoldsUpNeitherItsOwnStreamNorAnother() throws {
+    internal func aSlowCheckHoldsUpNeitherItsOwnStreamNorAnother() throws {
         let box = try Sandbox()
         try box.folder("srv")
         let server = try TLSServer(mode: .implicit, box: box)
@@ -638,9 +638,9 @@ struct Review2NetworkP2Certificates {
 
 /// The test server itself: what the tests lean on when they run side by side.
 @Suite
-struct Review2NetworkP2TestServer {
+internal struct Review2NetworkP2TestServer {
     @Test
-    func aStoppedServerTakesNoConnectionAndStoppingIsFinal() throws {
+    internal func aStoppedServerTakesNoConnectionAndStoppingIsFinal() throws {
         let box = try Sandbox()
         try box.folder("srv")
         // Servers started and stopped in a row while others run: a stopped server's port
@@ -667,7 +667,7 @@ struct Review2NetworkP2TestServer {
     }
 
     @Test
-    func aTransferTheClientGaveUpIsAnsweredWithoutWaitingForATimeLimit() throws {
+    internal func aTransferTheClientGaveUpIsAnsweredWithoutWaitingForATimeLimit() throws {
         // The client asks for a listing and never opens the data connection, then says something
         // else: the server answers 425 at once and goes on, whatever the machine's load.
         let box = try Sandbox()

@@ -13,18 +13,18 @@ import Testing
 /// (spec 07 › File clipboard and name lists).
 @MainActor
 @Suite
-struct ClipboardMore {
-    let memory = MemoryFileSystem()
+internal struct ClipboardMore {
+    internal let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let bench: TestBench
-    let modified = Date(timeIntervalSince1970: 1_000_000)
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let bench: TestBench
+    internal let modified = Date(timeIntervalSince1970: 1_000_000)
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var text: String? { pasteboard.string(forType: .string) }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var text: String? { pasteboard.string(forType: .string) }
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt", "new")
         memory.addFile("/A/two.txt", "2", permissions: 0o600)
         memory.addFile("/A/docs/in.txt", "inside")
@@ -38,7 +38,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func namesAreOneLineEachAndFoldersEndWithASlash() {
+    internal func namesAreOneLineEachAndFoldersEndWithASlash() {
         commands.perform(.selectAll)
         commands.perform(ClipboardCommands.copyNames)
         #expect(text == "docs/\none.txt\ntwo.txt")
@@ -62,7 +62,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func withoutASelectionTheCursorItemIsMeant() {
+    internal func withoutASelectionTheCursorItemIsMeant() {
         left.moveCursor(toName: "two.txt")
         commands.perform(ClipboardCommands.copyNames)
         #expect(text == "two.txt")
@@ -74,7 +74,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func detailsAreTabSeparatedColumns() {
+    internal func detailsAreTabSeparatedColumns() {
         let date = Format.date(modified)
         commands.perform(.selectAll)
         commands.perform(ClipboardCommands.copyDetails)
@@ -100,7 +100,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func detailsIncludeThePluginColumnsThePanelShows() {
+    internal func detailsIncludeThePluginColumnsThePanelShows() {
         bench.kernel.columns.register(ContentColumn(id: "shout", title: "Shout") { $0.name.uppercased() + "\t!" })
         bench.kernel.columns.register(ContentColumn(id: "unused", title: "Unused") { _ in "?" })
         left.extraColumns = ["shout"]
@@ -116,7 +116,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func detailsCanBeSavedToAFile() {
+    internal func detailsCanBeSavedToAFile() {
         left.moveCursor(toName: "one.txt")
         commands.perform(ClipboardCommands.saveDetailsWithHeaders, .text("details.txt"))
         #expect(
@@ -140,7 +140,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func aTextOnTheClipboardIsPastedAsANewFile() {
+    internal func aTextOnTheClipboardIsPastedAsANewFile() {
         #expect(!commands.isEnabled(.pasteFromClipboard))
         pasteboard.clearContents()
         pasteboard.setString("hello\nworld", forType: .string)
@@ -155,7 +155,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func aPictureOnTheClipboardIsPastedAsPNG() throws {
+    internal func aPictureOnTheClipboardIsPastedAsPNG() throws {
         let bitmap = try #require(
             NSBitmapImageRep(
                 bitmapDataPlanes: nil,
@@ -180,7 +180,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func pastingContentsNeedsAWritableFolderAndCanBeSwitchedOff() {
+    internal func pastingContentsNeedsAWritableFolderAndCanBeSwitchedOff() {
         pasteboard.clearContents()
         pasteboard.setString("text", forType: .string)
         memory.capabilities = []
@@ -192,7 +192,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func filesOnTheClipboardWinOverText() throws {
+    internal func filesOnTheClipboardWinOverText() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -211,7 +211,7 @@ struct ClipboardMore {
     }
 
     @Test
-    func registration() {
+    internal func registration() {
         let inMenus =
             bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
             + bench.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
@@ -234,14 +234,14 @@ struct ClipboardMore {
     // MARK: Pure types
 
     @Test
-    func freeNamesCountUp() {
+    internal func freeNamesCountUp() {
         #expect(PastedContent.freeName(extension: "txt") { _ in false } == "Clipboard.txt")
         let taken: Set = ["Clipboard.png", "Clipboard (2).png"]
         #expect(PastedContent.freeName(extension: "png", isTaken: taken.contains) == "Clipboard (3).png")
     }
 
     @Test
-    func aCalculatedFolderSizeReplacesDIR() {
+    internal func aCalculatedFolderSizeReplacesDIR() {
         let list = NameList(displayPath: { $0.path })
         var folder = FileItem(url: URL(fileURLWithPath: "/x/docs"), name: "docs", kind: .directory)
         #expect(list.details([folder], .fullPath, headers: false, mask: 3) == "/x/docs/\t<DIR>")

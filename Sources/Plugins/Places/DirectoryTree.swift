@@ -13,9 +13,9 @@ public final class TreeNode {
     public fileprivate(set) var isScanned = false
     /// The node's place in `parent.children`, kept up to date wherever the children change, so
     /// that stepping from one folder to the next costs nothing.
-    fileprivate(set) var indexInParent = 0
+    internal fileprivate(set) var indexInParent = 0
     /// The name in lower case, made when a quick search first needs it.
-    fileprivate(set) lazy var folded: String = name.lowercased()
+    internal fileprivate(set) lazy var folded: String = name.lowercased()
     /// Child by name, for folders with many children; built when first asked for and kept in step.
     fileprivate var childIndex: [String: TreeNode]?
     /// While `DirectoryTree.attach` links the subfolders of this folder in several turns.
@@ -112,12 +112,12 @@ public final class DirectoryTree {
     ///
     /// One comparison makes the keys of both names, which costs about a microsecond: for one pair.
     /// A list is put in order with `sorted(names:)`, which makes each name's key once.
-    static func compare(_ first: String, _ second: String) -> Bool {
+    internal static func compare(_ first: String, _ second: String) -> Bool {
         Sorter.compare(first, second, numeric: true) == .orderedAscending
     }
 
     /// Names in the order of the tree.
-    static func sorted(names: some Sequence<String>) -> [String] {
+    internal static func sorted(names: some Sequence<String>) -> [String] {
         Sorter.sorted(Array(names), numeric: true) { $0 }
     }
 
@@ -189,7 +189,7 @@ public final class DirectoryTree {
     ///
     /// (Not at the character `/`: a folder whose name begins with a combining mark would make `/`
     /// and the mark one character.).
-    static func components(of path: String) -> [String] {
+    internal static func components(of path: String) -> [String] {
         path.utf8.split(separator: 0x2F).map { String(decoding: $0, as: UTF8.self) }
     }
 
@@ -504,9 +504,9 @@ public final class DirectoryTree {
 /// Case is ignored.
 public struct TreeQuickSearch {
     private let pattern: String
-    let hasWildcards: Bool
+    internal let hasWildcards: Bool
     /// The typed text in lower case.
-    var text: String { hasWildcards ? String(pattern.dropLast()) : pattern }
+    internal var text: String { hasWildcards ? String(pattern.dropLast()) : pattern }
 
     public init(_ typed: String) {
         let typed = typed.lowercased()
@@ -521,7 +521,7 @@ public struct TreeQuickSearch {
     }
 
     /// For a name that is in lower case already.
-    func matches(folded name: String) -> Bool {
+    internal func matches(folded name: String) -> Bool {
         hasWildcards ? fnmatch(pattern, name, 0) == 0 : name.hasPrefix(pattern)
     }
 }
@@ -751,7 +751,7 @@ public final class TreeScanner: @unchecked Sendable {
     }()
 
     /// Whether a scan leaves this folder unread.
-    static func isProtected(_ url: URL) -> Bool {
+    internal static func isProtected(_ url: URL) -> Bool {
         url.isFileURL && protectedPaths.contains(url.path)
     }
 
@@ -759,7 +759,7 @@ public final class TreeScanner: @unchecked Sendable {
     /// system lets a thread do that (not a pool thread of Dispatch, which then runs at its
     /// quality-of-service class's priority), and without the system fetching a file or folder
     /// that is only in the cloud, which a listing would do.
-    static func gently<T>(_ body: () -> T) -> T {
+    internal static func gently<T>(_ body: () -> T) -> T {
         let (disk, cloud) = (
             getiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_THREAD),
             getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
@@ -870,7 +870,7 @@ public final class TreeScanner: @unchecked Sendable {
     /// A device other than the parent's is not enough to say so: the user's folders on the start-up
     /// disk are firmlinked from the data volume, and the system answers with the volume's mount
     /// point for them, not their own.
-    static func isMountPoint(_ path: String) -> Bool {
+    internal static func isMountPoint(_ path: String) -> Bool {
         // The system names the mount point by its real path; a path without one is none.
         guard let pointer = realpath(path, nil) else {
             return false

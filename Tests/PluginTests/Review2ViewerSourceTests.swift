@@ -13,32 +13,32 @@ import UniformTypeIdentifiers
 /// are slow to close, and files that do not end.
 ///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
-    let scheme = "hook"
-    let capabilities: FileSystemCapabilities = []
-    var sizes: [String: Int64] = [:]
-    var special: Set<String> = []
-    var contents: [String: Data] = [:]
-    var endless: Set<String> = []
+internal final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
+    internal let scheme = "hook"
+    internal let capabilities: FileSystemCapabilities = []
+    internal var sizes: [String: Int64] = [:]
+    internal var special: Set<String> = []
+    internal var contents: [String: Data] = [:]
+    internal var endless: Set<String> = []
     private let lock = NSLock()
     private var closed = 0
     /// Called by `close()` of every reader.
-    var onClose: () -> Void = {}
-    var closeCount: Int {
+    internal var onClose: () -> Void = {}
+    internal var closeCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return closed
     }
 
-    func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
-    func parent(of directory: URL) -> URL? { directory.deletingLastPathComponent() }
-    func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("x") }
-    func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("x") }
-    func remove(_: URL) {}
-    func move(_: URL, to _: URL, replacing _: Bool) {}
-    func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
+    internal func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
+    internal func parent(of directory: URL) -> URL? { directory.deletingLastPathComponent() }
+    internal func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("x") }
+    internal func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("x") }
+    internal func remove(_: URL) {}
+    internal func move(_: URL, to _: URL, replacing _: Bool) {}
+    internal func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
 
-    func item(at url: URL) -> FileItem? {
+    internal func item(at url: URL) -> FileItem? {
         FileItem(
             url: url,
             name: url.lastPathComponent,
@@ -79,7 +79,7 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         }
     }
 
-    func read(_ url: URL) -> any FileReader {
+    internal func read(_ url: URL) -> any FileReader {
         Reader(
             self,
             data: endless.contains(url.path) ? nil : contents[url.path] ?? Data(count: Int(sizes[url.path] ?? 0))
@@ -90,7 +90,7 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 /// Review round 2, the sources of bytes: opening links and special files, closing readers off the
 /// calling thread, saving, the copies for the players, and the rules for links in a viewed file.
 @Suite
-struct Review2ViewerSource {
+internal struct Review2ViewerSource {
     private func folder() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(
             "afm-r2viewer-\(UUID().uuidString)",
@@ -109,7 +109,7 @@ struct Review2ViewerSource {
     // MARK: Opening
 
     @Test
-    func aLinkToAFileIsOpenedWithTheSizeOfItsTarget() throws {
+    internal func aLinkToAFileIsOpenedWithTheSizeOfItsTarget() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         let target = directory.appendingPathComponent("target.log")
@@ -129,7 +129,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func devicesAndPipesAreRefusedWithoutBeingRead() throws {
+    internal func devicesAndPipesAreRefusedWithoutBeingRead() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         for path in ["/dev/zero", "/dev/null"] {
@@ -152,7 +152,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func measuringAFileOfUnknownSizeStopsWithItsFlag() {
+    internal func measuringAFileOfUnknownSizeStopsWithItsFlag() {
         let provider = Review2HookProvider()
         provider.endless = ["/stream"]
         let registry = FileSystemRegistry()
@@ -172,7 +172,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func specialEntriesAreRefusedWhateverTheFileSystem() throws {
+    internal func specialEntriesAreRefusedWhateverTheFileSystem() throws {
         let provider = Review2HookProvider()
         provider.endless = ["/stream"]
         provider.special = ["/stream"]
@@ -186,7 +186,7 @@ struct Review2ViewerSource {
     // MARK: Closing
 
     @Test
-    func closingTheSourceDoesNotWaitForTheReaders() throws {
+    internal func closingTheSourceDoesNotWaitForTheReaders() throws {
         let provider = Review2HookProvider()
         provider.contents["/a"] = Data(repeating: 0x42, count: 100_000)
         let registry = FileSystemRegistry()
@@ -206,7 +206,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aReaderInUseWhenTheSourceIsClosedIsClosedWhenItComesBack() throws {
+    internal func aReaderInUseWhenTheSourceIsClosedIsClosedWhenItComesBack() throws {
         let provider = Review2HookProvider()
         provider.contents["/a"] = Data(repeating: 0x42, count: 100_000)
         let registry = FileSystemRegistry()
@@ -234,7 +234,7 @@ struct Review2ViewerSource {
     // MARK: The block cache
 
     @Test
-    func aShortBlockIsNotKeptInMemory() throws {
+    internal func aShortBlockIsNotKeptInMemory() throws {
         /// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
         final class Flaky: ByteSource, @unchecked Sendable {
             let length: Int64 = 40_000
@@ -255,7 +255,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aLongReadOfFourBlocksGoesPastTheMemoryCache() throws {
+    internal func aLongReadOfFourBlocksGoesPastTheMemoryCache() throws {
         let data = Data((0..<(1 << 20)).map { UInt8(truncatingIfNeeded: $0) })
         let cached = CachedByteSource(DataByteSource(data), blockSize: 256 << 10, capacity: 4)
         _ = try cached.read(at: 0, count: 1 << 20)
@@ -266,7 +266,7 @@ struct Review2ViewerSource {
     // MARK: Save as
 
     @Test
-    func savingOntoTheViewedFileIsRecognisedAndRefused() throws {
+    internal func savingOntoTheViewedFileIsRecognisedAndRefused() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         let file = directory.appendingPathComponent("a.txt")
@@ -288,7 +288,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aSaveWritesATemporaryFileAndMovesItIntoPlace() throws {
+    internal func aSaveWritesATemporaryFileAndMovesItIntoPlace() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         let target = directory.appendingPathComponent("copy.bin")
@@ -301,7 +301,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aSaveOfAFileThatBecameShorterFailsAndLeavesTheTargetAlone() throws {
+    internal func aSaveOfAFileThatBecameShorterFailsAndLeavesTheTargetAlone() throws {
         final class Short: ByteSource {
             let length: Int64 = 2_000_000
             func read(at offset: Int64, count: Int) -> Data {
@@ -330,7 +330,7 @@ struct Review2ViewerSource {
     // MARK: Temporary copies
 
     @Test
-    func theNameOfACopyIsOneSafeComponent() {
+    internal func theNameOfACopyIsOneSafeComponent() {
         for name in [
             "..", ".", "", "../../x", "a/b", "a\\b", "x:y", "..%2F..%2Fx", "\u{0}evil",
             String(repeating: "n", count: 400) + ".mov"
@@ -349,7 +349,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aNameWithEncodedSeparatorsStaysInsideItsFolder() throws {
+    internal func aNameWithEncodedSeparatorsStaysInsideItsFolder() throws {
         let provider = Review2HookProvider()
         // As a server sends it: the last component is "../../escape.mp4" once decoded.
         let url = URL(string: "hook:///a/..%2F..%2Fescape.mp4")!
@@ -368,7 +368,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aFileTooBigToCopyIsRefusedBeforeAByteIsRead() {
+    internal func aFileTooBigToCopyIsRefusedBeforeAByteIsRead() {
         let registry = FileSystemRegistry()
         let provider = Review2HookProvider()
         provider.sizes["/huge.mov"] = 50 << 30
@@ -389,7 +389,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aCopyIsNotRegisteredForAPaneThatLetGoMeanwhileOrAfterRemoveAll() throws {
+    internal func aCopyIsNotRegisteredForAPaneThatLetGoMeanwhileOrAfterRemoveAll() throws {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -413,7 +413,7 @@ struct Review2ViewerSource {
     // MARK: Links
 
     @Test
-    func onlyWebAndMailLinksOpenInTheBrowser() {
+    internal func onlyWebAndMailLinksOpenInTheBrowser() {
         #expect(
             LinkPolicy.opensInBrowser(URL(string: "https://example.com/a")!)
                 && LinkPolicy.opensInBrowser(URL(string: "http://example.com")!)
@@ -428,7 +428,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aPageCanOnlyLeadToFilesBesideTheOneShown() {
+    internal func aPageCanOnlyLeadToFilesBesideTheOneShown() {
         let base = URL(fileURLWithPath: "/Users/me/pages/index.html")
         func target(_ text: String) -> String? { LinkPolicy.target(of: URL(string: text)!, relativeTo: base)?.path }
         #expect(target("other.html") == "/Users/me/pages/other.html")
@@ -453,7 +453,7 @@ struct Review2ViewerSource {
     }
 
     @Test
-    func aPageShownFromAStringNavigatesOnceAndThenNowhere() {
+    internal func aPageShownFromAStringNavigatesOnceAndThenNowhere() {
         let blank = URL(string: "about:blank")
         typealias Page = WebContentView
         // The load of the page itself, once.
@@ -493,7 +493,7 @@ struct Review2ViewerSource {
     // MARK: Encodings
 
     @Test
-    func codePagesThatCannotBeDecodedAreNotOffered() {
+    internal func codePagesThatCannotBeDecodedAreNotOffered() {
         // EUC-JP and GB 18030 were taken out in the first pass and are back (second pass), decoded by their layout; other
         // code pages of many bytes (ISO-2022, EUC-KR, HZ ...) are still not offered.
         #expect(ViewerEncoding.codePage(51_932) != nil && ViewerEncoding.codePage(54_936) != nil)
@@ -509,7 +509,7 @@ struct Review2ViewerSource {
     // MARK: Folders
 
     @Test
-    func countingAFolderOnAServerStopsAtItsLimit() {
+    internal func countingAFolderOnAServerStopsAtItsLimit() {
         let memory = MemoryFileSystem()
         for folder in 0..<5 {
             for file in 0..<20 { memory.addFile("/tree/d\(folder)/f\(file).txt", String(repeating: "a", count: 10)) }

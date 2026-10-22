@@ -6,18 +6,18 @@ public import AppKit
 /// Commands only the viewer uses, by their names in the specification (17 › Command catalogue).
 extension CommandID {
     /// Lister with the file under the cursor (Shift+F3).
-    static let viewSingle: CommandID = "cm_ListOnly"
+    internal static let viewSingle: CommandID = "cm_ListOnly"
     /// Lister with the marked files.
-    static let viewMarked: CommandID = "cm_ListMulti"
+    internal static let viewMarked: CommandID = "cm_ListMulti"
     /// Lister with text modes only: no images, multimedia or Quick Look (Alt+Shift+F3).
-    static let viewInternalSingle: CommandID = "cm_ListInternalOnly"
-    static let viewInternalMarked: CommandID = "cm_ListInternalMulti"
-    static let quickViewInternalOnly: CommandID = "cm_SrcQuickInternalOnly"
-    static let hideQuickView: CommandID = "cm_SrcHideQuickView"
-    static let updateQuickView: CommandID = "cm_UpdateQuickView"
-    static let separateQuickView: CommandID = "cm_SeparateQuickView"
-    static let separateQuickViewInternalOnly: CommandID = "cm_SeparateQuickInternalOnly"
-    static let configureLister: CommandID = "cm_ConfigLister"
+    internal static let viewInternalSingle: CommandID = "cm_ListInternalOnly"
+    internal static let viewInternalMarked: CommandID = "cm_ListInternalMulti"
+    internal static let quickViewInternalOnly: CommandID = "cm_SrcQuickInternalOnly"
+    internal static let hideQuickView: CommandID = "cm_SrcHideQuickView"
+    internal static let updateQuickView: CommandID = "cm_UpdateQuickView"
+    internal static let separateQuickView: CommandID = "cm_SeparateQuickView"
+    internal static let separateQuickViewInternalOnly: CommandID = "cm_SeparateQuickInternalOnly"
+    internal static let configureLister: CommandID = "cm_ConfigLister"
 }
 
 /// Lister, the built-in viewer (spec 10), and the Quick View panel (spec 03 › Quick View).
@@ -34,8 +34,8 @@ public final class ViewerPlugin: Plugin, ViewerService {
     private weak var owner: Kernel?
     private var settings: ListerSettings?
     private let temporaryCopies = TemporaryCopies()
-    private(set) var windows: [ViewerWindowController] = []
-    private(set) var quickView: QuickViewPanel?
+    internal private(set) var windows: [ViewerWindowController] = []
+    internal private(set) var quickView: QuickViewPanel?
     /// What the panes play sounds and films with: the system's player, or a test's that plays nothing.
     internal var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
     /// Puts a Lister window on screen (with `showsWindows`).
@@ -210,7 +210,9 @@ public final class ViewerPlugin: Plugin, ViewerService {
 
     /// Opens a Lister window on the files of a session; it fills when the first has been read.
     @discardableResult
-    func open(_ items: [ViewerItem], internalOnly: Bool, followsCursor: Bool = false) -> ViewerWindowController? {
+    internal func open(_ items: [ViewerItem], internalOnly: Bool, followsCursor: Bool = false)
+        -> ViewerWindowController?
+    {
         guard let kernel = owner, let settings else {
             return nil
         }
@@ -275,7 +277,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
 
     /// Before `volume` is ejected: the Lister windows that show one of its files close, and a
     /// quick view of one shows nothing until the cursor moves on.
-    func letGo(of volume: URL) {
+    internal func letGo(of volume: URL) {
         func isOnVolume(_ url: URL?) -> Bool {
             guard let url, url.isFileURL else {
                 return false

@@ -10,8 +10,8 @@ import Testing
 /// not read for every key, names by path on every file system, `[u]`, the planner's edge cases,
 /// the undo store.
 @Suite
-struct Review2FindRename {
-    var context: RenameContext = {
+internal struct Review2FindRename {
+    internal var context: RenameContext = {
         var context = RenameContext()
         context.count = 3
         context.timeZone = TimeZone(identifier: "UTC") ?? .current
@@ -19,7 +19,7 @@ struct Review2FindRename {
         return context
     }()
 
-    func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
+    internal func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -32,7 +32,7 @@ struct Review2FindRename {
     // MARK: Search & Replace
 
     @Test
-    func theWildcardMatcherFindsWhatTheRegularExpressionOfItFinds() throws {
+    internal func theWildcardMatcherFindsWhatTheRegularExpressionOfItFinds() throws {
         // Many small searches and names, compared with the regular expression that defines the wildcard.
         var generator = SystemRandomNumberGenerator()
         let pieces = ["a", "b", "A", ".", "*", "?", "é", "😀"]
@@ -75,7 +75,7 @@ struct Review2FindRename {
     }
 
     @Test
-    func manyStarsInTheSearchAreNotSlowOnALongName() throws {
+    internal func manyStarsInTheSearchAreNotSlowOnALongName() throws {
         var settings = RenameSettings()
         settings.search = String(repeating: "*a", count: 14) + "*b"
         settings.replacement = "X"
@@ -93,7 +93,7 @@ struct Review2FindRename {
     }
 
     @Test
-    func aRegexOfTheUserThatBacktracksGivesNoNameInsteadOfHanging() throws {
+    internal func aRegexOfTheUserThatBacktracksGivesNoNameInsteadOfHanging() throws {
         // Used by the work on its own thread only while the test waits for it to finish.
         nonisolated(unsafe) var settings = RenameSettings()
         settings.regularExpression = true
@@ -127,7 +127,7 @@ struct Review2FindRename {
     }
 
     @Test
-    func aRegexIsEndedWhenThePreviewIsCancelled() throws {
+    internal func aRegexIsEndedWhenThePreviewIsCancelled() throws {
         var settings = RenameSettings()
         settings.regularExpression = true
         settings.search = #"^(\w+[ _-]?)+\.jpg$"#
@@ -154,7 +154,7 @@ struct Review2FindRename {
     // MARK: Names, targets, planner
 
     @Test
-    func anItemNamedByPathIsRenamedWhereItIsOnEveryFileSystem() {
+    internal func anItemNamedByPathIsRenamedWhereItIsOnEveryFileSystem() {
         let memory = MemoryFileSystem()
         let item = FileItem(url: memory.url("/root/sub/a.txt"), name: "sub/a.txt")
         #expect(RenameEntry(item).name == "a.txt" && RenameEntry.diskName(of: item) == "a.txt")
@@ -171,7 +171,7 @@ struct Review2FindRename {
     }
 
     @Test
-    func precomposingANameIsARename() {
+    internal func precomposingANameIsARename() {
         let decomposed = "e\u{301}.txt"
         let item = FileItem(
             url: URL(string: "mem:///d/" + decomposed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)!,
@@ -194,7 +194,7 @@ struct Review2FindRename {
     }
 
     @Test
-    func aNumberedNameIsHeldToTheLongestAName() {
+    internal func aNumberedNameIsHeldToTheLongestAName() {
         let long = String(repeating: "é", count: 120) + ".txt"
         let numbered = RenamePlanner.numbered(URL(string: "mem:///d/")!.appending(name: long), 12, isFolder: false)
         #expect(
@@ -207,7 +207,7 @@ struct Review2FindRename {
     }
 
     @Test
-    func aFolderAndWhatIsInItAreRenamedInsideOut() {
+    internal func aFolderAndWhatIsInItAreRenamedInsideOut() {
         func url(_ path: String) -> URL { URL(string: "mem://" + path)! }
         let sources = [
             url("/d/dir"), url("/d/dir/a.txt"), url("/d/other.txt"), url("/d/dir/sub"), url("/d/dir/sub/b.txt")
@@ -233,7 +233,7 @@ struct Review2FindRename {
     }
 
     @Test
-    func aRenameOntoANameThatIsNotThereReplacesNothing() throws {
+    internal func aRenameOntoANameThatIsNotThereReplacesNothing() throws {
         let box = try Sandbox()
         try box.file("a.txt", "first")
         #expect(!RenameRunner.isSameFile(box.url("a.txt"), box.url("A-missing.txt")))
@@ -248,7 +248,7 @@ struct Review2FindRename {
     // MARK: Log
 
     @Test
-    func theLogIsWrittenForTheUserAlone() throws {
+    internal func theLogIsWrittenForTheUserAlone() throws {
         let box = try Sandbox()
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
@@ -262,13 +262,13 @@ struct Review2FindRename {
 
 @MainActor
 @Suite
-struct Review2FindRenameSessions {
-    let memory = MemoryFileSystem()
-    let settings = MemorySettings()
-    let bench: TestBench
-    let box: Sandbox
+internal struct Review2FindRenameSessions {
+    internal let memory = MemoryFileSystem()
+    internal let settings = MemorySettings()
+    internal let bench: TestBench
+    internal let box: Sandbox
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         for name in ["a.txt", "b.txt", "c.txt"] { memory.addFile("/d/" + name, name) }
         memory.addDirectory("/other")
@@ -281,7 +281,7 @@ struct Review2FindRenameSessions {
         )
     }
 
-    func session(
+    internal func session(
         clipboard: @escaping @Sendable () -> String?,
         changes: (@MainActor () -> Int)?,
         background: Bool = false
@@ -301,7 +301,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func theClipboardIsReadOnlyWhenAMaskUsesItAndOnlyWhenItChanged() {
+    internal func theClipboardIsReadOnlyWhenAMaskUsesItAndOnlyWhenItChanged() {
         // Used by the session's callbacks, which run one at a time while the test waits for them.
         nonisolated(unsafe) var reads = 0
         // The change count of the clipboard, asked on the main thread.
@@ -327,7 +327,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func aClipboardThatDoesNotAnswerLeavesThePreviewWithTheErrorMarker() {
+    internal func aClipboardThatDoesNotAnswerLeavesThePreviewWithTheErrorMarker() {
         let blocked = DispatchSemaphore(value: 0)
         let session = session(
             clipboard: {
@@ -344,7 +344,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func changesOfTheFieldsAreHeldBackForAMomentAndTheLastOneWins() async {
+    internal func changesOfTheFieldsAreHeldBackForAMomentAndTheLastOneWins() async {
         let session = session(clipboard: { nil }, changes: nil, background: true)
         var changes = 0
         session.onChange = { changes += 1 }
@@ -360,7 +360,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func twoSortsInARowLeaveTheLastOneInForce() async {
+    internal func twoSortsInARowLeaveTheLastOneInForce() async {
         memory.removeTree("/d")
         for index in 0..<2_500 {
             memory.addFile(
@@ -380,7 +380,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func namesFromAListThatMoveFilesAreAskedAbout() {
+    internal func namesFromAListThatMoveFilesAreAskedAbout() {
         let session = session(clipboard: { nil }, changes: nil)
         session.loadNames(fromText: "x.txt\nsub/y.txt\nz.txt")
         bench.interaction.choiceAnswers = [1]
@@ -393,7 +393,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func aRunLeavesThePreviewAndTheListAsTheyShouldBe() {
+    internal func aRunLeavesThePreviewAndTheListAsTheyShouldBe() {
         let session = session(clipboard: { nil }, changes: nil)
         session.settings.nameMask = "n_[N]"
         #expect(session.counts.changing == 3)
@@ -402,7 +402,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func precomposingRenamesTheFileOnTheLocalDisk() throws {
+    internal func precomposingRenamesTheFileOnTheLocalDisk() throws {
         let decomposed = "e\u{301}.txt"
         try box.file("p/" + decomposed, "x")
         let local = TestBench(
@@ -442,7 +442,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func theUndoHistoryNeedsNoDecodingToBeCounted() async {
+    internal func theUndoHistoryNeedsNoDecodingToBeCounted() async {
         let store = RenameStore(settings: settings)
         store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/d/a"), to: URL(fileURLWithPath: "/d/b"))])
         store.flush()
@@ -457,7 +457,7 @@ struct Review2FindRenameSessions {
     }
 
     @Test
-    func aRunLargerThanTheLimitIsKeptOnlyForThisSession() {
+    internal func aRunLargerThanTheLimitIsKeptOnlyForThisSession() {
         let big = (0..<(RenameStore.persistedItemLimit + 5))
             .map {
                 RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))

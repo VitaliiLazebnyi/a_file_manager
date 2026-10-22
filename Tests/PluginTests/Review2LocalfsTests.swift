@@ -7,7 +7,7 @@ import Testing
 
 extension LocalFileSystem {
     /// `places()` once the first read in the background has landed (it never waits itself).
-    func settledPlaces(timeout: TimeInterval = Wait.ceiling) -> [Place] {
+    internal func settledPlaces(timeout: TimeInterval = Wait.ceiling) -> [Place] {
         let end = Date().addingTimeInterval(timeout)
         var places = self.places()
         while !places.contains(where: { $0.url.path == "/" }), Date() < end {
@@ -37,8 +37,8 @@ private func status(_ url: URL) -> stat {
 
 /// Review 2, local file system: special files, links, permissions, locks, places, watching.
 @Suite
-struct Review2LocalFileSystem {
-    let local = LocalFileSystem()
+internal struct Review2LocalFileSystem {
+    internal let local = LocalFileSystem()
 
     // MARK: Special files
 
@@ -49,7 +49,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func readingAPipeOrADeviceIsRefusedAtOnce() throws {
+    internal func readingAPipeOrADeviceIsRefusedAtOnce() throws {
         let box = try Sandbox()
         let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: pipe)
@@ -77,7 +77,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func appendingToAPipeIsRefusedAtOnceAndALinkIsNotFollowed() throws {
+    internal func appendingToAPipeIsRefusedAtOnceAndALinkIsNotFollowed() throws {
         let box = try Sandbox()
         let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("pipelink"), withDestinationURL: pipe)
@@ -105,7 +105,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func copyingMetadataToOrFromAPipeIsRefusedAndCopyTakesOnlyFilesAndLinks() throws {
+    internal func copyingMetadataToOrFromAPipeIsRefusedAndCopyTakesOnlyFilesAndLinks() throws {
         let box = try Sandbox()
         let pipe = fifo(box)
         let file = try box.file("f.txt", "data")
@@ -133,7 +133,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func aBlockedCallIsEndedByInterrupt() throws {
+    internal func aBlockedCallIsEndedByInterrupt() throws {
         // Not 0: should the pipe not be made, nothing is closed that is somebody else's.
         var pair: [Int32] = [-1, -1]
         try #require(pipe(&pair) == 0)
@@ -168,7 +168,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func aReaderAndAWriterThatWereInterruptedThrowAndCloseCleanly() throws {
+    internal func aReaderAndAWriterThatWereInterruptedThrowAndCloseCleanly() throws {
         let box = try Sandbox()
         let file = try box.file("f.txt", String(repeating: "z", count: 100))
         let reader = try local.read(file)
@@ -196,7 +196,7 @@ struct Review2LocalFileSystem {
     // MARK: write()
 
     @Test
-    func aNewFileIsPrivateUntilItIsClosedAndThenGetsItsRights() throws {
+    internal func aNewFileIsPrivateUntilItIsClosedAndThenGetsItsRights() throws {
         let box = try Sandbox()
         let url = box.url("new.bin")
         let writer = try local.write(url)
@@ -221,7 +221,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func theAttributesOfANewFileGoToTheFileAndNotToWhatTheNameBecame() throws {
+    internal func theAttributesOfANewFileGoToTheFileAndNotToWhatTheNameBecame() throws {
         let box = try Sandbox()
         let victim = try box.file("victim.txt", "mine")
         chmod(victim.path, 0o644)
@@ -243,7 +243,7 @@ struct Review2LocalFileSystem {
     // MARK: Links
 
     @Test
-    func settingAttributesOnALinkChangesTheLinkAndNotItsTarget() throws {
+    internal func settingAttributesOnALinkChangesTheLinkAndNotItsTarget() throws {
         let box = try Sandbox()
         let target = try box.file("target.txt", "t")
         chmod(target.path, 0o644)
@@ -265,7 +265,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func aLinkIntoNowhereAndALinkToAPipeAreListedWithoutBlocking() throws {
+    internal func aLinkIntoNowhereAndALinkToAPipeAreListedWithoutBlocking() throws {
         let box = try Sandbox()
         let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("dangling"), withDestinationURL: box.url("nowhere"))
@@ -298,7 +298,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func aLockedCopyThatKeptItsNameIsAsLockedAsItsSource() throws {
+    internal func aLockedCopyThatKeptItsNameIsAsLockedAsItsSource() throws {
         let box = try Sandbox()
         defer { unlockAll(in: box) }
         let source = try box.file("src.txt", "data")
@@ -322,7 +322,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func aLockedCopyUnderATemporaryNameCanBeGivenItsRealName() throws {
+    internal func aLockedCopyUnderATemporaryNameCanBeGivenItsRealName() throws {
         let box = try Sandbox()
         defer { unlockAll(in: box) }
         let source = try box.file("src.txt", "data")
@@ -341,7 +341,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func theTableOfLockedTemporariesIsNeverWipedWholesale() throws {
+    internal func theTableOfLockedTemporariesIsNeverWipedWholesale() throws {
         let box = try Sandbox()
         defer { unlockAll(in: box) }
         let source = try box.file("src.txt", "d")
@@ -358,7 +358,7 @@ struct Review2LocalFileSystem {
     // MARK: Moving
 
     @Test
-    func movingOntoAnotherNameOfTheSameFileMovesIt() throws {
+    internal func movingOntoAnotherNameOfTheSameFileMovesIt() throws {
         let box = try Sandbox()
         let a = try box.file("a.txt", "same")
         let b = box.url("b.txt")
@@ -373,7 +373,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func aRenameOfOnlyTheLettersCaseOrTheFormOfAnAccentNeverRemovesTheFile() throws {
+    internal func aRenameOfOnlyTheLettersCaseOrTheFormOfAnAccentNeverRemovesTheFile() throws {
         let box = try Sandbox()
         let decomposed = "e\u{0301}.txt"
         let composed = "\u{00E9}.txt"
@@ -408,7 +408,7 @@ struct Review2LocalFileSystem {
     // MARK: Places and volumes
 
     @Test
-    func thePlacesAreAnsweredAtOnceAndAnnouncedWhenTheyChange() async throws {
+    internal func thePlacesAreAnsweredAtOnceAndAnnouncedWhenTheyChange() async throws {
         let fresh = LocalFileSystem()
         let start = DispatchTime.now().uptimeNanoseconds
         let first = fresh.places()
@@ -447,7 +447,7 @@ struct Review2LocalFileSystem {
     }
 
     @Test
-    func askingForVolumesOftenIsQuickAndAgrees() throws {
+    internal func askingForVolumesOftenIsQuickAndAgrees() throws {
         let box = try Sandbox()
         let first = try #require(local.volume(of: box.root))
         let done = Locked(0)
@@ -460,9 +460,9 @@ struct Review2LocalFileSystem {
 
 /// The watcher: no waiting for the caller, one report for a burst, nothing after stop.
 @Suite
-struct Review2DirectoryWatcher {
+internal struct Review2DirectoryWatcher {
     @Test
-    func startingToWatchReturnsAtOnceEvenForManyFolders() throws {
+    internal func startingToWatchReturnsAtOnceEvenForManyFolders() throws {
         let box = try Sandbox()
         let folders = (0..<500).map { box.url("f\($0)") }
         let watcher = DirectoryWatcher(queue: DispatchQueue(label: "test")) { _ in }
@@ -475,7 +475,7 @@ struct Review2DirectoryWatcher {
     }
 
     @Test
-    func aBurstOfChangesIsReportedInLumpsAndNothingComesAfterStop() async throws {
+    internal func aBurstOfChangesIsReportedInLumpsAndNothingComesAfterStop() async throws {
         let box = try Sandbox()
         try box.folder("watched")
         let count = Locked(0)
@@ -510,7 +510,7 @@ struct Review2DirectoryWatcher {
     }
 
     @Test
-    func aFolderThatIsWatchedAgainAfterAChangeOfTheSetKeepsReporting() async throws {
+    internal func aFolderThatIsWatchedAgainAfterAChangeOfTheSetKeepsReporting() async throws {
         let box = try Sandbox()
         try box.folder("a")
         try box.folder("b")

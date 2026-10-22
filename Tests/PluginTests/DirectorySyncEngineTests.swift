@@ -15,16 +15,20 @@ private func describe(_ rows: [SyncRow]) -> [String] {
 
 /// The comparison engine over trees in memory and on disk (spec 09 › Comparison algorithm).
 @Suite
-struct SyncComparing {
-    let fileSystems = FileSystemRegistry()
-    let memory = MemoryFileSystem()
+internal struct SyncComparing {
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
 
-    init() {
+    internal init() {
         fileSystems.register(LocalFileSystem())
         fileSystems.register(memory)
     }
 
-    func compare(_ left: String = "/L", _ right: String = "/R", _ configure: (inout SyncOptions) -> Void = { _ in })
+    internal func compare(
+        _ left: String = "/L",
+        _ right: String = "/R",
+        _ configure: (inout SyncOptions) -> Void = { _ in }
+    )
         -> SyncResult
     {
         var options = SyncOptions()
@@ -37,7 +41,7 @@ struct SyncComparing {
     }
 
     /// One file of every kind the comparison tells apart.
-    func makeTree() {
+    internal func makeTree() {
         memory.addFile("/L/equal.txt", "same", modified: early)
         memory.addFile("/R/equal.txt", "same", modified: early)
         memory.addFile("/L/left.txt", "only here")
@@ -57,7 +61,7 @@ struct SyncComparing {
     }
 
     @Test
-    func namesThatDifferOnlyInUnicodeFormKeepTheirOwnRows() {
+    internal func namesThatDifferOnlyInUnicodeFormKeepTheirOwnRows() {
         let (composed, decomposed) = ("caf\u{E9}.txt", "cafe\u{301}.txt")
         for side in ["/L", "/R"] {
             memory.addFile(side + "/" + composed, side == "/L" ? "left composed" : "right composed", modified: early)
@@ -84,7 +88,7 @@ struct SyncComparing {
     }
 
     @Test
-    func statesAndDefaultDirections() {
+    internal func statesAndDefaultDirections() {
         makeTree()
         let result = compare()
         #expect(
@@ -107,14 +111,14 @@ struct SyncComparing {
     }
 
     @Test
-    func withoutSubdirectoriesOnlyTheStartFolders() {
+    internal func withoutSubdirectoriesOnlyTheStartFolders() {
         makeTree()
         let rows = compare { $0.subdirectories = false }.rows
         #expect(rows.count == 7 && rows.allSatisfy { $0.directory.isEmpty })
     }
 
     @Test
-    func byContentReadsPairsThatLookEqual() {
+    internal func byContentReadsPairsThatLookEqual() {
         makeTree()
         let result = compare { $0.byContent = true }
         let states = Dictionary(uniqueKeysWithValues: result.rows.map { ($0.relativePath, $0.state) })
@@ -126,7 +130,7 @@ struct SyncComparing {
     }
 
     @Test
-    func ignoreDateKnowsOnlyEqualAndDifferent() {
+    internal func ignoreDateKnowsOnlyEqualAndDifferent() {
         makeTree()
         memory.addFile("/L/dated.txt", "1234", modified: early)
         memory.addFile("/R/dated.txt", "abcd", modified: early.addingTimeInterval(9_999))
@@ -151,7 +155,7 @@ struct SyncComparing {
     }
 
     @Test
-    func asymmetricDeletesOnTheRightAndNeverCopiesLeft() {
+    internal func asymmetricDeletesOnTheRightAndNeverCopiesLeft() {
         makeTree()
         let rows = compare { $0.asymmetric = true }.rows
         let actions = Dictionary(uniqueKeysWithValues: rows.map { ($0.relativePath, $0.action) })
@@ -161,7 +165,7 @@ struct SyncComparing {
     }
 
     @Test
-    func dateTolerances() {
+    internal func dateTolerances() {
         func state(_ seconds: TimeInterval, _ configure: (inout SyncOptions) -> Void = { _ in }) -> SyncState {
             var options = SyncOptions()
             configure(&options)
@@ -198,7 +202,7 @@ struct SyncComparing {
     }
 
     @Test
-    func masksWithExclusions() {
+    internal func masksWithExclusions() {
         #expect(SyncMask("*.txt *.md").matchesFile("a.MD") && !SyncMask("*.txt").matchesFile("a.md"))
         #expect(SyncMask("*.* | *.bak;~*").matchesFile("a.txt") && !SyncMask("*.* | *.bak;~*").matchesFile("~a.txt"))
         #expect(
@@ -222,7 +226,7 @@ struct SyncComparing {
     }
 
     @Test
-    func onlySelectedNamesOfTheStartFolders() {
+    internal func onlySelectedNamesOfTheStartFolders() {
         makeTree()
         let rows = compare { $0.onlyNames = ["left.txt", "sub", "right.txt"] }.rows
         #expect(
@@ -234,7 +238,7 @@ struct SyncComparing {
     }
 
     @Test
-    func emptyDirectoriesAreRowsOfTheirOwn() {
+    internal func emptyDirectoriesAreRowsOfTheirOwn() {
         memory.addDirectory("/L/empty")
         memory.addDirectory("/L/both")
         memory.addDirectory("/R/both")
@@ -258,7 +262,7 @@ struct SyncComparing {
     }
 
     @Test
-    func namesThatDifferInCaseAndFilesFacingFoldersAreExcluded() {
+    internal func namesThatDifferInCaseAndFilesFacingFoldersAreExcluded() {
         memory.addFile("/L/Readme.txt", "a")
         memory.addFile("/R/README.TXT", "a")
         memory.addFile("/L/thing", "a file")
@@ -279,7 +283,7 @@ struct SyncComparing {
     }
 
     @Test
-    func aFolderThatCannotBeReadIsLeftOutOnBothSides() {
+    internal func aFolderThatCannotBeReadIsLeftOutOnBothSides() {
         makeTree()
         memory.unreadable = ["/R/sub"]
         let result = compare { $0.asymmetric = true }
@@ -290,7 +294,7 @@ struct SyncComparing {
     }
 
     @Test
-    func cancelledComparisonStopsAndSaysSo() {
+    internal func cancelledComparisonStopsAndSaysSo() {
         makeTree()
         let comparison = SyncComparison(options: SyncOptions(), fileSystems: fileSystems)
         comparison.cancellation.cancel()
@@ -308,7 +312,7 @@ struct SyncComparing {
     }
 
     @Test
-    func aFinishedComparisonIsLetGo() {
+    internal func aFinishedComparisonIsLetGo() {
         makeTree()
         weak var finished: SyncComparison?
         do {
@@ -324,7 +328,7 @@ struct SyncComparing {
     }
 
     @Test
-    func everyCombinationOfOptionsKeepsItsPromises() {
+    internal func everyCombinationOfOptionsKeepsItsPromises() {
         makeTree()
         memory.addDirectory("/L/hollow")
         for bits in 0..<32 {
@@ -353,7 +357,7 @@ struct SyncComparing {
     }
 
     @Test
-    func manyPairsAreComparedOnAllCoresAndStayInOrder() {
+    internal func manyPairsAreComparedOnAllCoresAndStayInOrder() {
         for index in 0..<300 {
             let name = String(format: "d%02d/f%03d.bin", index % 12, index)
             memory.addFile("/L/" + name, String(repeating: "a", count: 2_000) + "\(index)", modified: early)
@@ -393,7 +397,7 @@ struct SyncComparing {
     }
 
     @Test
-    func comparesAcrossFileSystemsAndIgnoresLinks() throws {
+    internal func comparesAcrossFileSystemsAndIgnoresLinks() throws {
         let box = try Sandbox()
         try box.file("L/same.txt", "identical bytes", modified: early)
         try box.file("L/changed.txt", "left bytes!", modified: early)
@@ -420,7 +424,7 @@ struct SyncComparing {
     }
 
     @Test
-    func streamsOfUnevenBlocksCompareCorrectly() throws {
+    internal func streamsOfUnevenBlocksCompareCorrectly() throws {
         let big = String(repeating: "0123456789", count: 70_000)
         memory.addFile("/a", big)
         memory.addFile("/b", big)
@@ -464,7 +468,7 @@ struct SyncComparing {
     }
 
     @Test
-    func showButtonsFilterByComputedDirection() {
+    internal func showButtonsFilterByComputedDirection() {
         makeTree()
         let rows = compare().rows
         func shown(_ show: SyncShow) -> [String] { rows.filter(show.shows).map(\.name) }
@@ -481,7 +485,7 @@ struct SyncComparing {
     }
 
     @Test
-    func actionsARowAccepts() {
+    internal func actionsARowAccepts() {
         makeTree()
         let rows = Dictionary(uniqueKeysWithValues: compare().rows.map { ($0.name, $0) })
         let (left, right, pair) = (rows["left.txt"]!, rows["right.txt"]!, rows["size.txt"]!)
@@ -508,11 +512,11 @@ struct SyncComparing {
 
 /// Planning and carrying out (spec 09 › The "Synchronize" dialog and the run).
 @Suite
-struct SyncExecuting {
-    let fileSystems = FileSystemRegistry()
-    let memory = MemoryFileSystem()
+internal struct SyncExecuting {
+    internal let fileSystems = FileSystemRegistry()
+    internal let memory = MemoryFileSystem()
 
-    init() {
+    internal init() {
         fileSystems.register(LocalFileSystem())
         fileSystems.register(memory)
         memory.addFile("/L/new.txt", "from the left", modified: early.addingTimeInterval(500))
@@ -525,7 +529,7 @@ struct SyncExecuting {
         memory.addFile("/R/same.txt", "same", modified: early)
     }
 
-    func rows(_ configure: (inout SyncOptions) -> Void = { _ in }) -> [SyncRow] {
+    internal func rows(_ configure: (inout SyncOptions) -> Void = { _ in }) -> [SyncRow] {
         var options = SyncOptions()
         configure(&options)
         return SyncComparison(options: options, fileSystems: fileSystems)
@@ -537,7 +541,7 @@ struct SyncExecuting {
     }
 
     @discardableResult
-    func run(
+    internal func run(
         _ plan: SyncPlan,
         confirming: Bool = false,
         _ prepare: (SyncExecutor) -> Void = { _ in },
@@ -552,7 +556,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func planCountsWhatTheRowsAsk() {
+    internal func planCountsWhatTheRowsAsk() {
         let plan = SyncPlan(rows: rows())
         #expect(plan.toRight.map(\.relativePath) == ["new.txt", "update.txt"])
         #expect(plan.toLeft.map(\.relativePath) == ["back.txt", "sub/deep/arrives.txt"])
@@ -590,7 +594,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func bothDirectionsArriveWithTheirDatesAndTheSidesAreEqualAfterwards() {
+    internal func bothDirectionsArriveWithTheirDatesAndTheSidesAreEqualAfterwards() {
         var progress: [JobProgress] = []
         let outcome = run(SyncPlan(rows: rows())) { $0.onProgress = { progress.append($0) } }
         #expect(outcome.copied == 4 && outcome.skipped == 0 && outcome.errors.isEmpty && !outcome.wasCancelled)
@@ -622,7 +626,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func overwritesAreConfirmedPerFile() {
+    internal func overwritesAreConfirmedPerFile() {
         var asked: [String] = []
         var outcome = run(SyncPlan(rows: rows()), confirming: true) { executor in
             executor.onOverwrite = { target, copy in
@@ -653,7 +657,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func cancellingAtAQuestionStopsTheRun() {
+    internal func cancellingAtAQuestionStopsTheRun() {
         let outcome = run(SyncPlan(rows: rows()), confirming: true) { $0.onOverwrite = { _, _ in .cancel } }
         #expect(outcome.wasCancelled && outcome.copied == 0)
         #expect(memory.contents("/L/back.txt") == "older" && !memory.exists("/R/new.txt") && !memory.exists("/L/sub"))
@@ -671,7 +675,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func errorsCanBeSkippedRetriedOrEndTheRun() {
+    internal func errorsCanBeSkippedRetriedOrEndTheRun() {
         let plan = SyncPlan(rows: rows())
         memory.removeTree("/L/new.txt")
         memory.removeTree("/R/back.txt")
@@ -706,7 +710,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func asymmetricMakesTheRightACopyOfTheLeft() {
+    internal func asymmetricMakesTheRightACopyOfTheLeft() {
         memory.addFile("/R/stale/old.txt", "stale")
         memory.addDirectory("/R/hollow/inner")
         memory.addDirectory("/L/hollow")
@@ -730,7 +734,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func foldersAreCreatedAndAFolderTheUserKeptAFileInStays() {
+    internal func foldersAreCreatedAndAFolderTheUserKeptAFileInStays() {
         memory.addDirectory("/L/fresh/inner")
         memory.addFile("/R/doomed/keep.txt")
         memory.addFile("/R/doomed/go.txt")
@@ -753,7 +757,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func deletingOnBothSidesAndOnTheLeft() {
+    internal func deletingOnBothSidesAndOnTheLeft() {
         var all = rows()
         for index in all.indices {
             if all[index].name == "same.txt" { all[index].action = .deleteBoth }
@@ -777,7 +781,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func anotherTargetFolderKeepsTheRelativePaths() {
+    internal func anotherTargetFolderKeepsTheRelativePaths() {
         var plan = SyncPlan(rows: rows())
         plan.retarget(toRight: false, root: memory.url("/Elsewhere"))
         plan.retarget(toRight: true, root: memory.url("/Backup/today"))
@@ -790,7 +794,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func worksBetweenDiskAndAnotherFileSystem() throws {
+    internal func worksBetweenDiskAndAnotherFileSystem() throws {
         let box = try Sandbox()
         try box.file("L/disk.txt", "from the disk", modified: early.addingTimeInterval(100))
         try box.file("L/both.txt", "disk version, newer", modified: early.addingTimeInterval(100))
@@ -819,7 +823,7 @@ struct SyncExecuting {
     }
 
     @Test
-    func aFileSystemThatCopiesNothingItselfIsStreamed() {
+    internal func aFileSystemThatCopiesNothingItselfIsStreamed() {
         memory.refusesInternalCopy = true
         let outcome = run(SyncPlan(rows: rows()))
         #expect(

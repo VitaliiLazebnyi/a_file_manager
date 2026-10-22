@@ -2,17 +2,18 @@ import Foundation
 
 /// The words "First of each word uppercase (English in Titles)" leaves in lower case
 /// (spec 18 › Case switches, the `LowercaseStrings` setting).
-struct TitleCaseRule: Equatable {
-    static let defaultSetting = "English in Titles:a,an,the,at,by,for,in,of,on,to,from,up,and,as,but,or,nor,yet,so,vs"
-    static let standard = Self(setting: defaultSetting)
+internal struct TitleCaseRule: Equatable {
+    internal static let defaultSetting =
+        "English in Titles:a,an,the,at,by,for,in,of,on,to,from,up,and,as,but,or,nor,yet,so,vs"
+    internal static let standard = Self(setting: defaultSetting)
 
-    let label: String
-    let words: Set<String>
+    internal let label: String
+    internal let words: Set<String>
     /// A `!` at the end of the label: the last word may stay in lower case too.
-    let allowsLowercaseLastWord: Bool
+    internal let allowsLowercaseLastWord: Bool
 
     /// `<description>:<word list>`.
-    init(setting: String) {
+    internal init(setting: String) {
         // Without a label the whole setting is the word list.
         let colon = setting.firstIndex(of: ":")
         var label = colon.map { String(setting[..<$0]) } ?? "English in Titles"
@@ -31,10 +32,10 @@ struct TitleCaseRule: Equatable {
 
 /// The conversions of the Upper/lowercase box and of the case switches `[U] [L] [F] [f] [n]`
 /// (spec 09 › Upper/lowercase).
-enum LetterCase: Int, Codable, CaseIterable {
+internal enum LetterCase: Int, Codable, CaseIterable {
     case unchanged, lower, upper, firstUpper, words, titleWords
 
-    var title: String {
+    internal var title: String {
         switch self {
         case .unchanged:
             return "Unchanged"
@@ -61,7 +62,7 @@ enum LetterCase: Int, Codable, CaseIterable {
     /// A dot is not among them, so an extension stays in lower case.
     private static let wordBreaks: Set<Character> = ["/", "\\", "-", "_", "(", "[", "{", ",", ";", "+", "&"]
 
-    func apply(to text: String, rule: TitleCaseRule = .standard) -> String {
+    internal func apply(to text: String, rule: TitleCaseRule = .standard) -> String {
         switch self {
         case .unchanged:
             return text
@@ -115,25 +116,25 @@ enum LetterCase: Int, Codable, CaseIterable {
 
 /// Everything the fields of the tool hold: what "Save settings" stores under a name
 /// (spec 09 › Saved settings and persistence).
-struct RenameSettings: Codable, Equatable {
-    var nameMask = "[N]"
-    var extensionMask = "[E]"
-    var search = ""
-    var replacement = ""
+internal struct RenameSettings: Codable, Equatable {
+    internal var nameMask = "[N]"
+    internal var extensionMask = "[E]"
+    internal var search = ""
+    internal var replacement = ""
     /// `^`: respect upper and lower case.
-    var caseSensitive = false
+    internal var caseSensitive = false
     /// `1x`: replace only the first occurrence.
-    var firstOnly = false
+    internal var firstOnly = false
     /// `[E]`: also search the extension.
-    var searchesExtension = true
-    var regularExpression = false
+    internal var searchesExtension = true
+    internal var regularExpression = false
     /// Subst.: the whole name is replaced by the replacement, not just the matched part.
-    var substitute = false
-    var letterCase = LetterCase.unchanged
-    var counter = CounterDefinition()
+    internal var substitute = false
+    internal var letterCase = LetterCase.unchanged
+    internal var counter = CounterDefinition()
 
     /// The settings of `<default>`: no change.
-    static let unchanged = Self()
+    internal static let unchanged = Self()
 }
 
 /// Search & Replace of the Multi-Rename Tool (spec 18 › Search & Replace in the Multi-Rename
@@ -144,8 +145,8 @@ struct RenameSettings: Codable, Equatable {
 /// A regular expression the user typed is run with a bound on its time and ends when the work
 /// is cancelled (`RenameRegex`); the plain search with `*` and `?` is matched by hand
 /// (`WildcardMatcher`), in time proportional to the name times the mask.
-struct SearchReplace {
-    enum Problem: Error, Equatable {
+internal struct SearchReplace {
+    internal enum Problem: Error, Equatable {
         case invalidExpression(String)
         /// A regular expression that takes too long for the names of the list.
         case tooSlow(String)
@@ -172,12 +173,12 @@ struct SearchReplace {
     private let substitute: Bool
     /// Counts the names a regular expression ran out of time on.
     private let guardian = RenameRegexGuard()
-    let search: String
+    internal let search: String
 
     /// Whether the regular expression took too long for some names: those got no new name.
-    var timedOut: Bool { guardian.hasTimedOut }
+    internal var timedOut: Bool { guardian.hasTimedOut }
 
-    init(_ settings: RenameSettings) throws {
+    internal init(_ settings: RenameSettings) throws {
         firstOnly = settings.firstOnly
         substitute = settings.regularExpression && settings.substitute
         search = settings.search
@@ -219,13 +220,13 @@ struct SearchReplace {
 
     /// The name after the replacements; a name the regular expression takes too long for is
     /// left as it is (use `replacing` to know).
-    func apply(to text: String) -> String {
+    internal func apply(to text: String) -> String {
         replacing(in: text, cancelled: { false }) ?? text
     }
 
     /// The name after the replacements, or nil when the regular expression ran out of time or
     /// the work was cancelled: the preview then shows `<Error!>`.
-    func replacing(in text: String, cancelled: () -> Bool) -> String? {
+    internal func replacing(in text: String, cancelled: () -> Bool) -> String? {
         var text = text
         for pair in pairs {
             let source = text as NSString
@@ -307,7 +308,7 @@ struct SearchReplace {
     /// up to and including the first x, once. **Not used for matching**: made of many stars it
     /// takes time that grows with the power of their number; `WildcardMatcher` finds the same
     /// matches by hand. This is its definition, which the tests compare it with.
-    static func wildcardPattern(_ search: String) -> String {
+    internal static func wildcardPattern(_ search: String) -> String {
         let characters = Array(search)
         return characters.enumerated()
             .map { index, character -> String in
@@ -330,7 +331,7 @@ struct SearchReplace {
     ///
     /// Subroutine calls `(?1)` and recursion `(?R)` have no counterpart; such an expression is
     /// reported as invalid.
-    static func systemPattern(_ pattern: String) -> String {
+    internal static func systemPattern(_ pattern: String) -> String {
         var pattern = pattern
         for (from, to) in [("(?P<", "(?<"), ("(?g)", ""), ("(?-g)", "")] {
             pattern = pattern.replacingOccurrences(of: from, with: to)
@@ -397,12 +398,12 @@ struct SearchReplace {
 /// Search & Replace, then the case conversion.
 ///
 /// Built once, on any thread; `newName` may then be called from several threads at once.
-struct RenameEngine {
+internal struct RenameEngine {
     /// The text the preview shows where a name could not be made.
-    static let errorText = "<Error!>"
+    internal static let errorText = "<Error!>"
 
-    let settings: RenameSettings
-    let context: RenameContext
+    internal let settings: RenameSettings
+    internal let context: RenameContext
     private let nameMask: RenameMask
     private let extensionMask: RenameMask
     private let searchReplace: SearchReplace?
@@ -410,9 +411,13 @@ struct RenameEngine {
     /// Ends a regular expression that is still working on a name (the preview was overtaken, the run cancelled).
     private let cancelled: @Sendable () -> Bool
     /// What is wrong with the settings as a whole, if anything: then no item gets a name.
-    let problem: any Error?
+    internal let problem: any Error?
 
-    init(_ settings: RenameSettings, context: RenameContext, cancelled: @escaping @Sendable () -> Bool = { false }) {
+    internal init(
+        _ settings: RenameSettings,
+        context: RenameContext,
+        cancelled: @escaping @Sendable () -> Bool = { false }
+    ) {
         self.settings = settings
         self.cancelled = cancelled
         var context = context
@@ -431,7 +436,7 @@ struct RenameEngine {
     }
 
     /// Set once names were computed: a regular expression that took too long for some of them.
-    var tooSlow: any Error? {
+    internal var tooSlow: any Error? {
         searchReplace?.timedOut == true ? SearchReplace.Problem.tooSlow(settings.search) : nil
     }
 
@@ -439,7 +444,7 @@ struct RenameEngine {
     ///
     /// With `given`, that name (loaded from a file or typed by the user) takes the place of the
     /// masks' result. Nil is `<Error!>`.
-    func newName(for subject: RenameSubject, index: Int, given: String? = nil) -> String? {
+    internal func newName(for subject: RenameSubject, index: Int, given: String? = nil) -> String? {
         guard let searchReplace else {
             return nil
         }
@@ -485,7 +490,7 @@ struct RenameEngine {
     }
 
     /// Control characters become spaces and slashes at the end are dropped.
-    static func tidied(_ name: String) -> String {
+    internal static func tidied(_ name: String) -> String {
         var name = String(
             name.map { character in
                 character.unicodeScalars.contains { $0.value < 32 || $0.value == 127 } ? " " : character
@@ -498,7 +503,7 @@ struct RenameEngine {
     /// Why a name cannot be given to a file; nil when it can.
     ///
     /// A slash inside the name is fine: it moves the item into that folder.
-    static func invalidity(of name: String) -> String? {
+    internal static func invalidity(of name: String) -> String? {
         if name.isEmpty {
             return "The name is empty."
         }

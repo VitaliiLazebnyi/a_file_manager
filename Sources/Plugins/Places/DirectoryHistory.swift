@@ -27,7 +27,7 @@ public struct DirectoryHistory: Codable, Equatable {
 
     /// The location as it is stored: a password in a URL is left out, because histories land
     /// in the settings, which are exported and shared.
-    static func stored(_ directory: URL) -> String {
+    internal static func stored(_ directory: URL) -> String {
         let text = directory.absoluteString
         // The range is one in the components' own text.
         guard text.contains("@"), let components = URLComponents(string: text), var stored = components.string,

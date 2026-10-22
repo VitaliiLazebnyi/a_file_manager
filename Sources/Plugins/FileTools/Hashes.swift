@@ -7,7 +7,7 @@ import zlib
 ///
 /// One hasher belongs to one thread at a time, and may go from one thread to another between
 /// blocks.
-protocol StreamHasher: AnyObject, Sendable {
+internal protocol StreamHasher: AnyObject, Sendable {
     func update(_ data: Data)
     /// The digest; the hasher is used up afterwards.
     func finish() -> [UInt8]
@@ -16,15 +16,15 @@ protocol StreamHasher: AnyObject, Sendable {
 /// The checksum methods of "Create checksum files" (spec 08 › Methods).
 ///
 /// The raw values are the numbers of the spec's `Lastmd5` setting.
-enum ChecksumMethod: Int, CaseIterable, Codable {
+internal enum ChecksumMethod: Int, CaseIterable, Codable {
     case crc32 = 0
     case md5, sha1, sha256, sha512, sha224, sha384, sha3_256, sha3_512, sha3_224, sha3_384, blake3
 
     /// The order of the dialog.
-    static let dialogOrder = allCases.sorted { $0.dialogPosition < $1.dialogPosition }
+    internal static let dialogOrder = allCases.sorted { $0.dialogPosition < $1.dialogPosition }
 
     /// The place in the dialog.
-    var dialogPosition: Int {
+    internal var dialogPosition: Int {
         switch self {
         case .crc32:
             return 0
@@ -64,7 +64,7 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
         }
     }
 
-    var title: String {
+    internal var title: String {
         switch self {
         case .crc32:
             return "CRC32 (SFV)"
@@ -105,7 +105,7 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
     }
 
     /// The name in the title of the Verify window: `MD5`, `SHA2_256` (spec 08 › Verify window).
-    var reportName: String {
+    internal var reportName: String {
         switch self {
         case .crc32:
             return "CRC32"
@@ -122,7 +122,7 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
     ///
     /// The spec records `.sfv`, `.md5`, `.sha`, `.sha256` and `.bk3`; the others follow the same
     /// pattern.
-    var fileExtension: String {
+    internal var fileExtension: String {
         switch self {
         case .crc32:
             return "sfv"
@@ -142,11 +142,11 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
     }
 
     /// The method as OpenSSL-style lines name it: `SHA256(name)= …`, `SHA3-256(name)= …`.
-    var tagName: String {
+    internal var tagName: String {
         title.replacingOccurrences(of: "_", with: "-").replacingOccurrences(of: "CRC32 (SFV)", with: "CRC32")
     }
 
-    var digestLength: Int {
+    internal var digestLength: Int {
         switch self {
         case .crc32:
             return 4
@@ -173,12 +173,12 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
 
     /// The methods a digest of this many hex digits can come from (spec 08 › Hash-length
     /// disambiguation), the SHA-2 family first.
-    static func candidates(hexDigits: Int) -> [Self] {
+    internal static func candidates(hexDigits: Int) -> [Self] {
         [.crc32, .md5, .sha1, .sha224, .sha256, .sha384, .sha512, .sha3_224, .sha3_256, .sha3_384, .sha3_512, .blake3]
             .filter { $0.digestLength * 2 == hexDigits }
     }
 
-    func makeHasher() -> any StreamHasher {
+    internal func makeHasher() -> any StreamHasher {
         switch self {
         case .crc32:
             return CRC32Hasher()
@@ -214,16 +214,16 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
 }
 
 extension Sequence where Element == UInt8 {
-    var hex: String { map { String(format: "%02x", $0) }.joined() }
+    internal var hex: String { map { String(format: "%02x", $0) }.joined() }
 }
 
 /// CRC32 with the system's zlib, which uses the processor's CRC instructions.
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
-final class CRC32Hasher: StreamHasher, @unchecked Sendable {
-    private(set) var value: UInt = zlib.crc32(0, nil, 0)
+internal final class CRC32Hasher: StreamHasher, @unchecked Sendable {
+    internal private(set) var value: UInt = zlib.crc32(0, nil, 0)
 
-    func update(_ data: Data) {
+    internal func update(_ data: Data) {
         data.withUnsafeBytes { buffer in
             guard !buffer.isEmpty, var pointer = buffer.bindMemory(to: Bytef.self).baseAddress else {
                 return
@@ -239,9 +239,9 @@ final class CRC32Hasher: StreamHasher, @unchecked Sendable {
         }
     }
 
-    var checksum: UInt32 { UInt32(truncatingIfNeeded: value) }
+    internal var checksum: UInt32 { UInt32(truncatingIfNeeded: value) }
 
-    func finish() -> [UInt8] {
+    internal func finish() -> [UInt8] {
         withUnsafeBytes(of: checksum.bigEndian, Array.init)
     }
 }
@@ -249,22 +249,22 @@ final class CRC32Hasher: StreamHasher, @unchecked Sendable {
 /// MD5 and the SHA-1/SHA-2 hashes of CryptoKit.
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
-final class CryptoHasher<Function: HashFunction>: StreamHasher, @unchecked Sendable {
+internal final class CryptoHasher<Function: HashFunction>: StreamHasher, @unchecked Sendable {
     private var function = Function()
 
-    func update(_ data: Data) { function.update(data: data) }
-    func finish() -> [UInt8] { Array(function.finalize()) }
+    internal func update(_ data: Data) { function.update(data: data) }
+    internal func finish() -> [UInt8] { Array(function.finalize()) }
 }
 
 /// SHA-224, which CryptoKit leaves out.
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
-final class SHA224Hasher: StreamHasher, @unchecked Sendable {
+internal final class SHA224Hasher: StreamHasher, @unchecked Sendable {
     private var context = CC_SHA256_CTX()
 
-    init() { CC_SHA224_Init(&context) }
+    internal init() { CC_SHA224_Init(&context) }
 
-    func update(_ data: Data) {
+    internal func update(_ data: Data) {
         data.withUnsafeBytes { buffer in
             var offset = 0
             while offset < buffer.count {
@@ -275,7 +275,7 @@ final class SHA224Hasher: StreamHasher, @unchecked Sendable {
         }
     }
 
-    func finish() -> [UInt8] {
+    internal func finish() -> [UInt8] {
         var digest = [UInt8](repeating: 0, count: Int(CC_SHA224_DIGEST_LENGTH))
         CC_SHA224_Final(&digest, &context)
         return digest
@@ -289,7 +289,7 @@ final class SHA224Hasher: StreamHasher, @unchecked Sendable {
 /// allocated.
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
-final class SHA3Hasher: StreamHasher, @unchecked Sendable {
+internal final class SHA3Hasher: StreamHasher, @unchecked Sendable {
     private let state = UnsafeMutablePointer<UInt64>.allocate(capacity: 25)
     private let rate: Int
     private let digestLength: Int
@@ -297,7 +297,7 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
     private let pending: UnsafeMutableRawPointer
     private var pendingCount = 0
 
-    init(digestLength: Int) {
+    internal init(digestLength: Int) {
         self.digestLength = digestLength
         rate = 200 - 2 * digestLength
         state.initialize(repeating: 0, count: 25)
@@ -445,7 +445,7 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
         }
     }
 
-    func update(_ data: Data) {
+    internal func update(_ data: Data) {
         data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
             guard !input.isEmpty, let base = input.baseAddress else {
                 return
@@ -471,7 +471,7 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
         }
     }
 
-    func finish() -> [UInt8] {
+    internal func finish() -> [UInt8] {
         _ = (pending + pendingCount).initializeMemory(as: UInt8.self, repeating: 0, count: rate - pendingCount)
         pending.storeBytes(
             of: pending.load(fromByteOffset: pendingCount, as: UInt8.self) ^ 0x06,
@@ -496,7 +496,7 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
 /// is correct because the chaining value of such a subtree does not depend on what is around it.
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
-final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
+internal final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
     private static let chunkStart: UInt32 = 1, chunkEnd: UInt32 = 2, parent: UInt32 = 4, root: UInt32 = 8
     private static let chunkSize = 1_024
 
@@ -759,7 +759,7 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
         bufferLength = 0
     }
 
-    func update(_ data: Data) {
+    internal func update(_ data: Data) {
         data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
             guard let base = input.baseAddress, input.count > 0 else {
                 return
@@ -801,7 +801,7 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
         }
     }
 
-    func finish() -> [UInt8] {
+    internal func finish() -> [UInt8] {
         var words = [UInt32](repeating: 0, count: 16)
         withUnsafeTemporaryAllocation(of: UInt32.self, capacity: 8) { value in
             let value = value.baseAddress!

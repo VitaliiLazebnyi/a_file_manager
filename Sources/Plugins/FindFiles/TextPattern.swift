@@ -25,7 +25,7 @@ public enum TextEncoding: String, Codable, CaseIterable, Sendable {
     }
 
     /// The encoding of 8-bit text; UTF-16 is handled in both byte orders by the pattern.
-    var stringEncoding: String.Encoding {
+    internal var stringEncoding: String.Encoding {
         switch self {
         case .utf8:
             return .utf8
@@ -108,20 +108,20 @@ public struct TextPattern: Sendable {
     ///
     /// Every element is one character (or one byte of a hex string) with the byte sequences that
     /// stand for it: one, or two where upper and lower case both count.
-    struct Needle {
-        let elements: [[[UInt8]]]
+    internal struct Needle {
+        internal let elements: [[[UInt8]]]
         /// Bytes per code unit: 2 for UTF-16.
-        let unit: Int
-        let bigEndian: Bool
-        let wholeWords: Bool
-        let minLength: Int
-        let maxLength: Int
+        internal let unit: Int
+        internal let bigEndian: Bool
+        internal let wholeWords: Bool
+        internal let minLength: Int
+        internal let maxLength: Int
         /// Whether a byte can start the text; most positions of a file are ruled out by this.
-        let firstBytes: [Bool]
+        internal let firstBytes: [Bool]
         /// The bytes of the text when there is only one way to write it; found with `memmem`.
-        let literal: [UInt8]?
+        internal let literal: [UInt8]?
 
-        init(elements: [[[UInt8]]], unit: Int = 1, bigEndian: Bool = false, wholeWords: Bool) {
+        internal init(elements: [[[UInt8]]], unit: Int = 1, bigEndian: Bool = false, wholeWords: Bool) {
             self.elements = elements
             self.unit = unit
             self.bigEndian = bigEndian
@@ -140,7 +140,7 @@ public struct TextPattern: Sendable {
         /// Looks for the text in a piece of a file. `skip` start positions at the front were
         /// judged with the piece before; with `isLast` false, a hit that touches the end of
         /// the piece is left to the next one when the character after it matters.
-        func occurs(in hay: UnsafeRawBufferPointer, skip: Int, isLast: Bool) -> Bool {
+        internal func occurs(in hay: UnsafeRawBufferPointer, skip: Int, isLast: Bool) -> Bool {
             guard minLength > 0, hay.count >= minLength, let base = hay.baseAddress else {
                 return false
             }
@@ -253,7 +253,7 @@ public struct TextPattern: Sendable {
 
     private let matcher: Matcher
     /// Counts the pieces of files a regular expression ran out of time on.
-    let trip = RegexTrip()
+    internal let trip = RegexTrip()
     public let notContaining: Bool
     /// The chosen encodings the text cannot be written in; they were left out.
     public let droppedEncodings: [TextEncoding]
@@ -306,7 +306,7 @@ public struct TextPattern: Sendable {
     }
 
     /// `\t`, `\n` and `\\` of a plain text (spec 09 › "Find text", Escapes).
-    static func unescape(_ text: String) -> String {
+    internal static func unescape(_ text: String) -> String {
         var result = ""
         var escaped = false
         for character in text {
@@ -376,7 +376,7 @@ public struct TextPattern: Sendable {
     ///
     /// Without "Case sensitive", the code of a lowercase letter also finds the uppercase letter;
     /// the code of an uppercase letter finds only that.
-    static func hexElements(_ text: String, caseSensitive: Bool) throws -> [[[UInt8]]] {
+    internal static func hexElements(_ text: String, caseSensitive: Bool) throws -> [[[UInt8]]] {
         var bytes: [UInt8] = []
         var digits = ""
         var inQuotes = false
@@ -571,7 +571,7 @@ public struct TextPattern: Sendable {
     }
 
     /// What one piece of a file may take a regular expression.
-    static let pieceBudget: TimeInterval = 2
+    internal static let pieceBudget: TimeInterval = 2
 
     /// Collects the bytes of a file and hands them out as text, whole lines at a time.
     private struct LineDecoder {
@@ -704,13 +704,13 @@ public struct TextPattern: Sendable {
 
     /// Used by one thread at a time, as `FileReader` allows; `interrupt` (which does nothing)
     /// is the only call from another thread.
-    final class DataReader: FileReader, @unchecked Sendable {
+    internal final class DataReader: FileReader, @unchecked Sendable {
         private let data: Data
         private var position = 0
 
-        init(_ data: Data) { self.data = data }
+        internal init(_ data: Data) { self.data = data }
 
-        func read(upToCount count: Int) -> Data? {
+        internal func read(upToCount count: Int) -> Data? {
             guard position < data.count else {
                 return nil
             }
@@ -719,7 +719,7 @@ public struct TextPattern: Sendable {
             return data.subdata(in: position..<end)
         }
 
-        func seek(to offset: UInt64) { position = min(Int(clamping: offset), data.count) }
-        func close() {}
+        internal func seek(to offset: UInt64) { position = min(Int(clamping: offset), data.count) }
+        internal func close() {}
     }
 }

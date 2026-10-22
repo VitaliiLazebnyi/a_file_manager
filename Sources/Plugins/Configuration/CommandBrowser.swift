@@ -10,7 +10,7 @@ import AppKit
 ///
 /// The categories are the menus the commands are in; this program has no `totalcmd.inc` with
 /// numbers, so the Nr. column is replaced by the keys.
-final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSearchFieldDelegate {
+internal final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSearchFieldDelegate {
     private final class Window: ToolWindow {
         var onCopy: (() -> Bool)?
 
@@ -28,11 +28,11 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     private let categories = NSPopUpButton(frame: .zero, pullsDown: false)
     private var primaryButton = NSButton()
     private var userButtons: [NSButton] = []
-    private(set) var rows: [CommandRow] = []
+    internal private(set) var rows: [CommandRow] = []
     private var isPicking = false
     private var picked: CommandRow?
 
-    init(center: ConfigurationCenter) {
+    internal init(center: ConfigurationCenter) {
         self.center = center
         let window = Window(
             contentRect: NSRect(x: 0, y: 0, width: 680, height: 520),
@@ -51,7 +51,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     }
 
     @available(*, unavailable)
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    internal required init?(coder _: NSCoder) { fatalError("not used") }
 
     private func buildContent(in window: NSWindow) {
         filter.placeholderString = "Filter"
@@ -92,14 +92,14 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     // MARK: Showing
 
     /// Opens the dialog on its own: the chosen command is run.
-    func show(category: String? = nil) {
+    internal func show(category: String? = nil) {
         prepare(picking: false, category: category)
         center.effects.present(self)
         window?.makeFirstResponder(filter)
     }
 
     /// Runs the dialog for an editor; nil when the user cancelled.
-    func pick() -> CommandRow? {
+    internal func pick() -> CommandRow? {
         guard let window, !isPicking else {
             return nil
         }
@@ -113,7 +113,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     }
 
     /// Everything `show` and `pick` do short of putting the window on screen.
-    func prepare(picking: Bool, category: String?) {
+    internal func prepare(picking: Bool, category: String?) {
         isPicking = picking
         picked = nil
         primaryButton.title = picking ? "OK" : "Run"
@@ -152,7 +152,7 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         for button in userButtons.dropFirst() { button.isEnabled = selectedUserCommand != nil }
     }
 
-    func controlTextDidChange(_: Notification) { reload() }
+    internal func controlTextDidChange(_: Notification) { reload() }
     @objc
     private func categoryChanged() { reload() }
 
@@ -236,18 +236,18 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         reload(selecting: renamed.id)
     }
 
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         if isPicking { center.effects.stopModal() }
     }
 }
 
 extension ConfigurationCenter {
     /// Lets the user pick a command for an editor (the magnifier button of spec 14).
-    func pickCommand() -> CommandRow? {
+    internal func pickCommand() -> CommandRow? {
         browser().pick()
     }
 
-    func browser() -> CommandBrowserController {
+    internal func browser() -> CommandBrowserController {
         if let browserWindow {
             return browserWindow
         }
@@ -256,32 +256,32 @@ extension ConfigurationCenter {
         return controller
     }
 
-    func showOptions(_ section: OptionsWindowController.Section) {
+    internal func showOptions(_ section: OptionsWindowController.Section) {
         let controller = optionsWindow ?? OptionsWindowController(center: self)
         optionsWindow = controller
         controller.show(section)
     }
 
-    func showText(_ text: String, title: String) {
+    internal func showText(_ text: String, title: String) {
         let controller = textWindows[title] ?? TextWindowController(title: title)
         textWindows[title] = controller
         controller.show(text, present: effects.present)
     }
 
-    func closeWindows() {
+    internal func closeWindows() {
         optionsWindow?.close()
         browserWindow?.close()
         textWindows.values.forEach { $0.close() }
     }
 
     /// The keyboard help, from the bindings in force (spec 17 › Help, `cm_Keyboard`).
-    func keyboardHelp() -> String {
+    internal func keyboardHelp() -> String {
         "Keyboard shortcuts of \(kernel.productName)\nChange them in Configuration › Options › Keyboard.\n\n"
             + CommandCatalog.shortcutSheet(commandRows(), menus: kernel.menus.menus)
     }
 
     /// Where the things a Total Commander user looks for are in this program.
-    func whatIsWhere() -> String {
+    internal func whatIsWhere() -> String {
         """
         \(kernel.productName): what is where
 

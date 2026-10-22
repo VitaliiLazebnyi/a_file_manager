@@ -136,17 +136,18 @@ internal final class SystemVolumes: VolumeAccess {
 ///
 /// Main thread, except what runs inside the jobs.
 @MainActor
-final class VolumeEjection {
+internal final class VolumeEjection {
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let access: any VolumeAccess
     private let home: () -> URL
     private let note: (String) -> Void
     /// How often, and how long apart, an eject that this program itself refused is tried again.
-    nonisolated static let ownRefusalRetries = 4
-    nonisolated static let retryDelay: TimeInterval = 0.5
+    nonisolated internal static let ownRefusalRetries = 4
+    nonisolated internal static let retryDelay: TimeInterval = 0.5
 
-    init(kernel: Kernel, access: any VolumeAccess, home: @escaping () -> URL, note: @escaping (String) -> Void) {
+    internal init(kernel: Kernel, access: any VolumeAccess, home: @escaping () -> URL, note: @escaping (String) -> Void)
+    {
         self.kernel = kernel
         self.access = access
         self.home = home
@@ -164,7 +165,7 @@ final class VolumeEjection {
     }
 
     /// Ejects the drive `directory` is on.
-    func eject(driveOf directory: URL) {
+    internal func eject(driveOf directory: URL) {
         let access = self.access
         kernel.jobs.run(
             title: "Volume:",

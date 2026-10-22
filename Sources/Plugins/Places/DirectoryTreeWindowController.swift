@@ -19,7 +19,7 @@ import AppKit
 /// stored in the cache when it ends and gives up after `hiddenScanLimit`; the tree is then
 /// released, since the cache holds it. Aborting with Esc stores what was read, marked as
 /// incomplete.
-final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate, NSOutlineViewDataSource,
+internal final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate, NSOutlineViewDataSource,
     NSOutlineViewDelegate,
     NSTextFieldDelegate
 {
@@ -87,10 +87,10 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     /// The key (location and hidden folders) of the scan that runs, for its store ticket.
     private var scanKey: String?
     /// How many nodes are linked into the tree in one call of `attach`.
-    static let linkBudget = 2_000
+    internal static let linkBudget = 2_000
     /// How long one turn of the main thread may go on linking and reloading before the rest
     /// waits for the next one (seconds).
-    static let turnBudget: TimeInterval = 0.008
+    internal static let turnBudget: TimeInterval = 0.008
     /// Folders linked whose rows must be loaded again, once each, when their turn comes.
     private var reloadQueue: [TreeNode] = []
     private var reloadQueued = Set<ObjectIdentifier>()
@@ -144,7 +144,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     /// hour); `beep`: the sound of a search that found nothing.
     ///
     /// Tests replace both.
-    init(
+    internal init(
         kernel: Kernel,
         cache: TreeCache,
         hiddenScanLimit: TimeInterval = 15 * 60,
@@ -179,9 +179,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     }
 
     @available(*, unavailable)
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    internal required init?(coder _: NSCoder) { fatalError("not used") }
 
-    static func isRescanKey(_ event: NSEvent) -> Bool {
+    internal static func isRescanKey(_ event: NSEvent) -> Bool {
         Shortcut.f(2).matches(event) || Shortcut(.character("r"), .control).matches(event)
     }
 
@@ -239,7 +239,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     // MARK: Opening
 
     /// Shows the tree of the volume `directory` is on, with the cursor on `directory`.
-    func show(for directory: URL, showHidden: Bool) {
+    internal func show(for directory: URL, showHidden: Bool) {
         guard let provider = try? kernel.fileSystems.provider(for: directory) else {
             return
         }
@@ -479,7 +479,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// The program quits: a scan that goes on without a window ends now.
-    func shutDown() {
+    internal func shutDown() {
         scanner?.cancellation.cancel()
         scanner = nil
         generation += 1
@@ -611,7 +611,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// A folder the scan has not reached is read on its own when the user opens it.
-    func outlineViewItemWillExpand(_ notification: Notification) {
+    internal func outlineViewItemWillExpand(_ notification: Notification) {
         guard let tree, let node = notification.userInfo?["NSObject"] as? TreeNode, !node.isScanned,
             let provider = try? kernel.fileSystems.provider(for: tree.rootURL)
         else { return }
@@ -731,18 +731,18 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    func controlTextDidChange(_: Notification) {
+    internal func controlTextDidChange(_: Notification) {
         search(includingStart: true)
     }
 
     /// Keys in the quick-search field: Ctrl+Enter and Ctrl+arrows step through the matches, and
     /// plain arrows move the cursor in the tree.
-    func control(_: NSControl, textView _: NSTextView, doCommandBy _: Selector) -> Bool {
+    internal func control(_: NSControl, textView _: NSTextView, doCommandBy _: Selector) -> Bool {
         handleFieldKey(NSApplication.shared.currentEvent)
     }
 
     /// The key press behind a command of the quick-search field, if it was one.
-    func handleFieldKey(_ event: NSEvent?) -> Bool {
+    internal func handleFieldKey(_ event: NSEvent?) -> Bool {
         guard let event, event.type == .keyDown else {
             return false
         }
@@ -825,7 +825,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         close()
     }
 
-    func windowWillClose(_: Notification) {
+    internal func windowWillClose(_: Notification) {
         isShown = false
         showCounter += 1
         if scanner != nil {
@@ -846,25 +846,25 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     // MARK: Outline
 
-    func outlineView(_: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+    internal func outlineView(_: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
         guard let node = item as? TreeNode else {
             return tree == nil ? 0 : 1
         }
         return node.children.count
     }
 
-    func outlineView(_: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+    internal func outlineView(_: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
         guard let node = item as? TreeNode else {
             return tree?.root as Any
         }
         return node.children[index]
     }
 
-    func outlineView(_: NSOutlineView, isItemExpandable item: Any) -> Bool {
+    internal func outlineView(_: NSOutlineView, isItemExpandable item: Any) -> Bool {
         (item as? TreeNode).map { !$0.children.isEmpty || !$0.isScanned } == true
     }
 
-    func outlineView(_ outlineView: NSOutlineView, viewFor _: NSTableColumn?, item: Any) -> NSView? {
+    internal func outlineView(_ outlineView: NSOutlineView, viewFor _: NSTableColumn?, item: Any) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("folder")
         let cell =
             outlineView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
@@ -880,7 +880,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         return cell
     }
 
-    func outlineViewSelectionDidChange(_: Notification) {
+    internal func outlineViewSelectionDidChange(_: Notification) {
         updatePath()
     }
 }

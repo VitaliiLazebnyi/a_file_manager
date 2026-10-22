@@ -49,23 +49,23 @@ private final class MountedImage {
 }
 
 @Suite
-struct VirtualFoldersAdoption {
-    let memory = MemoryFileSystem()
-    let registry = FileSystemRegistry()
-    let virtual: VirtualFileSystem
+internal struct VirtualFoldersAdoption {
+    internal let memory = MemoryFileSystem()
+    internal let registry = FileSystemRegistry()
+    internal let virtual: VirtualFileSystem
 
-    init() {
+    internal init() {
         registry.register(LocalFileSystem())
         registry.register(memory)
         virtual = VirtualFileSystem(fileSystems: registry)
     }
 
-    func names(_ url: URL) throws -> [String] {
+    internal func names(_ url: URL) throws -> [String] {
         try virtual.list(url, showHidden: true).map(\.name).sorted()
     }
 
     @Test
-    func eachLocationReportsWhatItsOwnFileSystemCanDo() throws {
+    internal func eachLocationReportsWhatItsOwnFileSystemCanDo() throws {
         let box = try Sandbox()
         try box.file("L/a.txt")
         memory.addFile("/R/b.txt")
@@ -88,7 +88,7 @@ struct VirtualFoldersAdoption {
     }
 
     @Test
-    func aCancelledBranchWalkOfAStalledTreeEndsAndLeavesNothingBehind() throws {
+    internal func aCancelledBranchWalkOfAStalledTreeEndsAndLeavesNothingBehind() throws {
         memory.addFile("/S/a/f.txt")
         memory.stallsListings = true
         let flag = CancellationFlag()
@@ -109,7 +109,7 @@ struct VirtualFoldersAdoption {
     }
 
     @Test
-    func aWalkWithAFlagThatIsNeverSetListsAsWithout() throws {
+    internal func aWalkWithAFlagThatIsNeverSetListsAsWithout() throws {
         memory.addFile("/W/a/f.txt")
         memory.addFile("/W/g.txt")
         let branch = virtual.branch(of: memory.url("/W"))
@@ -119,7 +119,7 @@ struct VirtualFoldersAdoption {
     }
 
     @Test
-    func callsAreForwardedToTheRealFileSystem() throws {
+    internal func callsAreForwardedToTheRealFileSystem() throws {
         memory.capabilities = [.write, .append, .deferredWrites]
         memory.keepsMetadata = true
         memory.quarantineValue = Data("0083;5e;Safari;".utf8)
@@ -172,7 +172,7 @@ struct VirtualFoldersAdoption {
     }
 
     @Test
-    func sameNamedFilesOfAPickedViewHaveNamesOfTheirOwn() throws {
+    internal func sameNamedFilesOfAPickedViewHaveNamesOfTheirOwn() throws {
         memory.addFile("/X/a/same.txt", "1")
         memory.addFile("/X/b/same.txt", "22")
         memory.addFile("/X/c/other.txt", "3")
@@ -188,7 +188,7 @@ struct VirtualFoldersAdoption {
     }
 
     @Test
-    func foldersOfAPickedViewKeepTheirContentsApart() throws {
+    internal func foldersOfAPickedViewKeepTheirContentsApart() throws {
         memory.addFile("/Y/p/dir/in.txt")
         memory.addFile("/Y/q/dir/in.txt")
         let picked = virtual.registerPicked([memory.url("/Y/p/dir"), memory.url("/Y/q/dir")], in: memory.url("/Y"))
@@ -200,7 +200,7 @@ struct VirtualFoldersAdoption {
     }
 
     @Test
-    func operationsOnAPickedViewActOnTheRealFiles() throws {
+    internal func operationsOnAPickedViewActOnTheRealFiles() throws {
         let box = try Sandbox()
         try box.file("a/same.txt", "1")
         try box.file("b/same.txt", "2")
@@ -216,7 +216,7 @@ struct VirtualFoldersAdoption {
     }
 
     @Test
-    func twoNamesThatDifferOnlyInNormalisationAreTwoFiles() throws {
+    internal func twoNamesThatDifferOnlyInNormalisationAreTwoFiles() throws {
         let (composed, decomposed) = ("caf\u{e9}.txt", "cafe\u{301}.txt")
         memory.addFile("/N/" + composed)
         memory.addFile("/N/" + decomposed)
@@ -230,7 +230,7 @@ struct VirtualFoldersAdoption {
     }
 
     @Test
-    func aBranchWalkStaysOnItsVolume() throws {
+    internal func aBranchWalkStaysOnItsVolume() throws {
         let box = try Sandbox()
         try box.file("plain/a.txt")
         guard let image = MountedImage(in: box, at: "mounted") else {
@@ -249,9 +249,9 @@ struct VirtualFoldersAdoption {
 }
 
 @Suite
-struct PlacesAdoption {
+internal struct PlacesAdoption {
     @Test
-    func levelsComeWithTheirNodesAndLinkLikeTheOldPath() throws {
+    internal func levelsComeWithTheirNodesAndLinkLikeTheOldPath() throws {
         let box = try Sandbox()
         for path in ["a/b/c", "a/d", "e", "f/g", "a/b/h"] { try box.folder(path) }
         try box.file("a/file.txt")
@@ -290,7 +290,7 @@ struct PlacesAdoption {
     }
 
     @Test
-    func aWideFolderIsLinkedInBoundedTurns() {
+    internal func aWideFolderIsLinkedInBoundedTurns() {
         let names = (0..<25).map { "folder\($0)" }
         let nodes = DirectoryTree.makeNodes(names, sorted: false)
         let tree = DirectoryTree(rootURL: URL(fileURLWithPath: "/V"))
@@ -322,14 +322,14 @@ struct PlacesAdoption {
     }
 
     @Test
-    func attachingToAKnownFolderKeepsWhatIsBelowIt() {
+    internal func attachingToAKnownFolderKeepsWhatIsBelowIt() {
         let tree = DirectoryTree(rootURL: URL(fileURLWithPath: "/V"), paths: ["a", "a/deep", "b"])
         tree.attach(DirectoryTree.makeNodes(["a", "c"], sorted: true), ofPath: "")
         #expect(tree.paths == ["a", "a/deep", "c"] && tree.count == 3 && tree.node(at: "c")?.parent === tree.root)
     }
 
     @Test
-    func aScanDoesNotEnterAMountedVolume() throws {
+    internal func aScanDoesNotEnterAMountedVolume() throws {
         let box = try Sandbox()
         try box.folder("plain/sub")
         guard let image = MountedImage(in: box, at: "mounted") else {
@@ -354,14 +354,14 @@ struct PlacesAdoption {
 
 @MainActor
 @Suite
-struct ConfigurationAdoption {
-    let memory = MemoryFileSystem()
-    let box: Sandbox
+internal struct ConfigurationAdoption {
+    internal let memory = MemoryFileSystem()
+    internal let box: Sandbox
 
-    init() throws { box = try Sandbox() }
+    internal init() throws { box = try Sandbox() }
 
     @Test
-    func aMarkedNameIsNotMarkedForItsNormalisationTwin() {
+    internal func aMarkedNameIsNotMarkedForItsNormalisationTwin() {
         let (composed, decomposed) = ("caf\u{e9}.txt", "cafe\u{301}.txt")
         memory.addFile("/A/" + composed)
         memory.addFile("/A/" + decomposed)
@@ -393,7 +393,7 @@ struct ConfigurationAdoption {
     }
 
     @Test
-    func aStartMenuEntryInAChainIsWaitedFor() async {
+    internal func aStartMenuEntryInAChainIsWaitedFor() async {
         _ = try? box.folder("A")
         _ = try? box.folder("B")
         let plugin = ConfigurationPlugin(

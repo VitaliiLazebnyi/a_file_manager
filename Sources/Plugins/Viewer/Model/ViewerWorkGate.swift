@@ -15,15 +15,15 @@ import Foundation
 ///   instead of the work) instead of making one thread more.
 ///
 /// All state is guarded by `lock`.
-final class ViewerWorkGate: @unchecked Sendable {
+internal final class ViewerWorkGate: @unchecked Sendable {
     /// Index builds of text documents.
-    static let indexBuilds = ViewerWorkGate(
+    internal static let indexBuilds = ViewerWorkGate(
         live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)),
         stuck: 8
     )
 
-    let live: Int
-    let stuck: Int
+    internal let live: Int
+    internal let stuck: Int
     private let lock = NSLock()
     private struct Waiting {
         let flag: CancellationFlag
@@ -37,20 +37,20 @@ final class ViewerWorkGate: @unchecked Sendable {
     private var running: [Int: Running] = [:]
     private var lastID = 0
 
-    init(live: Int, stuck: Int) {
+    internal init(live: Int, stuck: Int) {
         self.live = max(1, live)
         self.stuck = max(1, stuck)
     }
 
     /// Jobs that hold a thread now, cancelled or not (for tests).
-    var threadsInUse: Int {
+    internal var threadsInUse: Int {
         lock.lock()
         defer { lock.unlock() }
         return running.count
     }
 
     /// Jobs that wait for their turn (for tests).
-    var waitingCount: Int {
+    internal var waitingCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return waiting.filter { !$0.flag.isCancelled }.count
@@ -61,7 +61,7 @@ final class ViewerWorkGate: @unchecked Sendable {
     /// jobs that have not come back.
     ///
     /// Any thread.
-    func submit(
+    internal func submit(
         cancellation flag: CancellationFlag,
         refused: @Sendable () -> Void = {},
         _ work: @escaping @Sendable () -> Void

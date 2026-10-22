@@ -5,7 +5,7 @@ import IOKit
 ///
 /// Several files are copied at once only where that helps: a spinning disk gets slower when its
 /// head has to serve several streams.
-enum StorageMedium {
+internal enum StorageMedium {
     private static let lock = NSLock()
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var known: [String: Bool] = [:]
@@ -14,7 +14,7 @@ enum StorageMedium {
     ///
     /// Anything else, and anything the system cannot tell, counts as not spinning. Safe to call
     /// from any thread; asks the system once per device.
-    static func isRotational(_ url: URL) -> Bool {
+    internal static func isRotational(_ url: URL) -> Bool {
         guard url.isFileURL else {
             return false
         }
@@ -39,7 +39,7 @@ enum StorageMedium {
     }
 
     /// Looks the device up in the I/O registry; the disk driver above it states its medium.
-    static func mediumIsRotational(bsdName: String) -> Bool {
+    internal static func mediumIsRotational(bsdName: String) -> Bool {
         guard let matching = IOBSDNameMatching(kIOMainPortDefault, 0, bsdName),
             case let service = IOServiceGetMatchingService(kIOMainPortDefault, matching), service != 0
         else {

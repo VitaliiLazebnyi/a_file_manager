@@ -8,16 +8,16 @@ import Testing
 /// Round 2 of the review, Find Files: bounded patterns, a walk without races that reports as
 /// it goes, the long text, numbers that used to trap, files seen twice.
 @Suite
-struct Review2FindFiles {
-    let fileSystems: FileSystemRegistry
-    let memory: MemoryFileSystem
+internal struct Review2FindFiles {
+    internal let fileSystems: FileSystemRegistry
+    internal let memory: MemoryFileSystem
 
-    init() {
+    internal init() {
         (fileSystems, memory) = makeFileSystems()
     }
 
     /// Runs `work` on another thread and fails instead of hanging if it does not end.
-    func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
+    internal func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -30,7 +30,7 @@ struct Review2FindFiles {
     // MARK: Patterns
 
     @Test
-    func aNameRegexThatBacktracksEndsAndFindsNothing() {
+    internal func aNameRegexThatBacktracksEndsAndFindsNothing() {
         let mask = SearchMask(#"^(\w+[ _-]?)+\.jpg$"#, regex: true)
         let name = String(repeating: "a", count: 40) + ".png"
         // Used by the work on its own thread only while the test waits for it to finish.
@@ -42,7 +42,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func aContentRegexThatBacktrackingEndsAndCancels() throws {
+    internal func aContentRegexThatBacktrackingEndsAndCancels() throws {
         var options = TextSearchOptions()
         options.regex = true
         let pattern = try TextPattern("(a+)+$", caseSensitive: true, options: options)
@@ -68,7 +68,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func aFieldRuleRegexIsCheckedAndBounded() {
+    internal func aFieldRuleRegexIsCheckedAndBounded() {
         var query = SearchQuery(directory: memory.url("/"))
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .regex, "(")])
         #expect(FileSearch(query, fileSystems: fileSystems).problem as? TextPattern.Problem == .badRegex("("))
@@ -86,14 +86,14 @@ struct Review2FindFiles {
         #expect(found.isEmpty)
     }
 
-    func names(of query: SearchQuery) -> [String] {
+    internal func names(of query: SearchQuery) -> [String] {
         var found: [String] = []
         FileSearch(query, fileSystems: fileSystems).run { found.append($0.name) }
         return found
     }
 
     @Test
-    func aVeryLongTextIsFoundOnASmallStack() throws {
+    internal func aVeryLongTextIsFoundOnASmallStack() throws {
         // The matcher used to recurse once per character: 6,000 were enough to overflow a thread's stack.
         let text = String(repeating: "ab", count: 10_000)
         for options in [TextSearchOptions(), TextSearchOptions(wholeWords: true)] {
@@ -112,7 +112,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func utf16WithoutAMarkIsSearchedByRegexInBothByteOrders() throws {
+    internal func utf16WithoutAMarkIsSearchedByRegexInBothByteOrders() throws {
         var options = TextSearchOptions(regex: true, encodings: [.utf16])
         options.regex = true
         let pattern = try TextPattern("wor", caseSensitive: true, options: options)
@@ -122,7 +122,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func aLongLineIsCutBetweenCharacters() throws {
+    internal func aLongLineIsCutBetweenCharacters() throws {
         var options = TextSearchOptions()
         options.regex = true
         let pattern = try TextPattern("é{3}x", caseSensitive: true, options: options)
@@ -136,7 +136,7 @@ struct Review2FindFiles {
     // MARK: The walk
 
     @Test
-    func hitsOfAFolderComeBeforeItsLastFilesAreTested() {
+    internal func hitsOfAFolderComeBeforeItsLastFilesAreTested() {
         // 70 files; the tests of the last ones wait until the first hits have been reported.
         for index in 0..<70 { memory.addFile(String(format: "/many/f%02d.txt", index)) }
         let release = DispatchSemaphore(value: 0)
@@ -173,7 +173,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func aSlowFrontJobDoesNotLetTheOthersListTheWholeTree() {
+    internal func aSlowFrontJobDoesNotLetTheOthersListTheWholeTree() {
         for folder in 0..<200 {
             for file in 0..<10 { memory.addFile(String(format: "/wide/d%03d/f%d.txt", folder, file)) }
         }
@@ -206,7 +206,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func cancellingAContentSearchWhileItRunsIsSafe() {
+    internal func cancellingAContentSearchWhileItRunsIsSafe() {
         for folder in 0..<12 {
             for file in 0..<40 {
                 memory.addFile("/tree/d\(folder)/f\(file).txt", String(repeating: "lorem ipsum ", count: 50))
@@ -226,7 +226,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func aWalkThatIsClosedDoesNotComeBackToLife() {
+    internal func aWalkThatIsClosedDoesNotComeBackToLife() {
         for index in 0..<30 { memory.addFile("/deep/a/b/c/d\(index)/e.txt", "x") }
         var query = SearchQuery(directory: memory.url("/deep"))
         query.resultLimit = 5
@@ -244,7 +244,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func searchInFoundFilesDoesNotCompareEveryItemWithEveryFolder() {
+    internal func searchInFoundFilesDoesNotCompareEveryItemWithEveryFolder() {
         for folder in 0..<300 { for file in 0..<10 { memory.addFile("/found/d\(folder)/n\(file).txt") } }
         var items: [URL] = []
         for folder in 0..<300 {
@@ -264,7 +264,7 @@ struct Review2FindFiles {
     // MARK: Files seen twice, special files
 
     @Test
-    func theSameRemotePlaceWrittenTwoWaysIsNotADuplicateOfItself() {
+    internal func theSameRemotePlaceWrittenTwoWaysIsNotADuplicateOfItself() {
         func item(_ text: String) -> FileItem {
             FileItem(
                 url: URL(string: text)!,
@@ -289,7 +289,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func overlappingRootsKeepHardLinksAndDropTheSameFolder() throws {
+    internal func overlappingRootsKeepHardLinksAndDropTheSameFolder() throws {
         let box = try Sandbox()
         try box.file("dir/one.txt", "x")
         try FileManager.default.linkItem(at: box.url("dir/one.txt"), to: box.url("dir/two.txt"))
@@ -301,7 +301,7 @@ struct Review2FindFiles {
     }
 
     @Test
-    func aFifoOrAStubIsNotOpenedForReading() throws {
+    internal func aFifoOrAStubIsNotOpenedForReading() throws {
         let box = try Sandbox()
         try box.file("real.txt", "needle")
         #expect(mkfifo(box.url("pipe").path, 0o644) == 0)
@@ -320,7 +320,7 @@ struct Review2FindFiles {
     // MARK: Numbers that used to trap
 
     @Test
-    func absurdNumbersAreHeldToWhatTheyCanBe() {
+    internal func absurdNumbersAreHeldToWhatTheyCanBe() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         for unit in Age.Unit.allCases {
             for count in [Int.max, Int.min, -1, 0, 1 << 62] {
@@ -344,7 +344,7 @@ struct Review2FindFiles {
     // MARK: Spotlight
 
     @Test
-    func spotlightReChecksWhatTheIndexCannotJudge() {
+    internal func spotlightReChecksWhatTheIndexCannotJudge() {
         var query = SearchQuery(directory: memory.url("/"), text: "smith")
         #expect(SpotlightQuery.handlesText(of: query) && !SpotlightQuery.recheckingText(of: query))
         query.caseSensitive = true

@@ -23,7 +23,7 @@ public enum TextEncoding: Equatable, Sendable {
         }
     }
 
-    var bom: [UInt8] {
+    internal var bom: [UInt8] {
         switch self {
         case .utf8(true):
             return [0xEF, 0xBB, 0xBF]
@@ -39,7 +39,7 @@ public enum TextEncoding: Equatable, Sendable {
         }
     }
 
-    var stringEncoding: String.Encoding {
+    internal var stringEncoding: String.Encoding {
         switch self {
         case .utf8:
             return .utf8
@@ -74,7 +74,7 @@ public enum TextEncoding: Equatable, Sendable {
     ///
     /// A file with a byte-order mark that holds invalid sequences is shown with replacement
     /// characters; writing it back would change those bytes.
-    static func decodeDetectedChecked(_ data: Data) -> (encoding: Self, text: String, isLossless: Bool) {
+    internal static func decodeDetectedChecked(_ data: Data) -> (encoding: Self, text: String, isLossless: Bool) {
         if let marked = detect(prefixOf: data) {
             let body = data.dropFirst(marked.bom.count)
             if let text = String(data: body, encoding: marked.stringEncoding) {
@@ -101,14 +101,14 @@ public enum TextEncoding: Equatable, Sendable {
         return nil
     }
 
-    func decode(_ data: Data) -> String {
+    internal func decode(_ data: Data) -> String {
         let body = data.dropFirst(bom.count)
         // Broken UTF-16 (an odd byte at the end) still shows what can be read.
         return String(data: body, encoding: stringEncoding) ?? String(decoding: body, as: UTF8.self)
     }
 
     /// The bytes of a text; in Latin-1 a character beyond it becomes a question mark.
-    func encode(_ text: String) -> Data {
+    internal func encode(_ text: String) -> Data {
         var data = Data(bom)
         switch self {
         case .utf8:
@@ -131,7 +131,7 @@ public enum TextEncoding: Equatable, Sendable {
     }
 
     /// The bytes of a text, or nil when the encoding cannot hold it (Latin-1 and a character beyond it).
-    func encodeExactly(_ text: String) -> Data? {
+    internal func encodeExactly(_ text: String) -> Data? {
         text.data(using: stringEncoding, allowLossyConversion: false).map { Data(bom) + $0 }
     }
 }
@@ -251,7 +251,7 @@ public struct TextDocument: Equatable, Sendable {
 
     /// The file's bytes, or an error where they cannot be the text: characters the encoding cannot
     /// hold (they would become question marks), or a file that was not valid when loaded.
-    func encodedData(named name: String) throws -> Data {
+    internal func encodedData(named name: String) throws -> Data {
         guard isLossless else { throw CompareLoader.SaveError.invalidSequences(name, encoding) }
         guard let data = encoding.encodeExactly(text()) else {
             throw CompareLoader.SaveError.notRepresentable(name, encoding)

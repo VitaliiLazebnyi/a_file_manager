@@ -12,11 +12,11 @@ import Testing
 /// random delay (so answers arrive out of order), reads are cut short, reads fail from some
 /// position on, a request is never answered, or nothing is read from the pipe at all. Unchecked:
 /// set up in `init` and not changed afterwards.
-final class FakeSFTPServer: @unchecked Sendable {
-    static let python = "/usr/bin/python3"
-    static var isAvailable: Bool { FileManager.default.isExecutableFile(atPath: python) }
+internal final class FakeSFTPServer: @unchecked Sendable {
+    internal static let python = "/usr/bin/python3"
+    internal static var isAvailable: Bool { FileManager.default.isExecutableFile(atPath: python) }
 
-    enum Mode: String {
+    internal enum Mode: String {
         case normal
         /// Reads at or behind 98304 answer with a failure.
         case failingReads = "failread"
@@ -53,9 +53,9 @@ final class FakeSFTPServer: @unchecked Sendable {
         case shortPacket = "shortpacket"
     }
 
-    let transport: SFTPTransport
+    internal let transport: SFTPTransport
 
-    init(root: URL, box: Sandbox, mode: Mode = .normal, delay: ClosedRange<Int> = 20...60) throws {
+    internal init(root: URL, box: Sandbox, mode: Mode = .normal, delay: ClosedRange<Int> = 20...60) throws {
         let script = box.url("fake-sftp.py")
         try Self.script.write(to: script, atomically: true, encoding: .utf8)
         transport = SFTPTransport(
@@ -64,7 +64,7 @@ final class FakeSFTPServer: @unchecked Sendable {
         )
     }
 
-    static let script = """
+    internal static let script = """
         import heapq, os, random, select, struct, sys, time
         mode, root, low, high = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
         handles = {}
@@ -292,13 +292,13 @@ final class FakeSFTPServer: @unchecked Sendable {
 /// The SFTP client against the delaying test server: a window of requests, answers out of
 /// order, short reads, failures, and requests that are never answered.
 @Suite(.enabled(if: FakeSFTPServer.isAvailable))
-struct NetworkFixSFTP {
-    let box: Sandbox
-    let center: ConnectionCenter
-    let fileSystem: RemoteFileSystem
-    let key = ServerKey(scheme: "sftp", host: "fake.invalid")
+internal struct NetworkFixSFTP {
+    internal let box: Sandbox
+    internal let center: ConnectionCenter
+    internal let fileSystem: RemoteFileSystem
+    internal let key = ServerKey(scheme: "sftp", host: "fake.invalid")
 
-    init(mode: FakeSFTPServer.Mode = .normal, timeout: TimeInterval = 10) throws {
+    internal init(mode: FakeSFTPServer.Mode = .normal, timeout: TimeInterval = 10) throws {
         box = try Sandbox()
         try box.folder("srv")
         let server = try FakeSFTPServer(root: box.url("srv"), box: box, mode: mode)
@@ -313,14 +313,14 @@ struct NetworkFixSFTP {
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
 
-    func url(_ path: String) -> URL { key.url(path: path) }
+    internal func url(_ path: String) -> URL { key.url(path: path) }
 
-    static func pattern(_ count: Int) -> Data {
+    internal static func pattern(_ count: Int) -> Data {
         Data((0..<count).map { UInt8(truncatingIfNeeded: $0 &* 131 &+ $0 / 997) })
     }
 
     @Test
-    func movesDataThroughTheWindowInBothDirections() throws {
+    internal func movesDataThroughTheWindowInBothDirections() throws {
         let content = Self.pattern(4_000_000)
         let started = Date()
         let writer = try fileSystem.write(url("/big.bin"))
@@ -358,7 +358,7 @@ struct NetworkFixSFTP {
     }
 
     @Test
-    func aFailingReadDeliversWhatCameBeforeIt() throws {
+    internal func aFailingReadDeliversWhatCameBeforeIt() throws {
         let suite = try Self(mode: .failingReads)
         let content = Self.pattern(300_000)
         try content.write(to: suite.box.url("srv/f.bin"))
@@ -375,7 +375,7 @@ struct NetworkFixSFTP {
     }
 
     @Test
-    func aRequestThatTimesOutDoesNotCloseTheChannel() throws {
+    internal func aRequestThatTimesOutDoesNotCloseTheChannel() throws {
         let suite = try Self(mode: .hangingStat, timeout: 2)
         let content = Self.pattern(500_000)
         try content.write(to: suite.box.url("srv/f.bin"))
@@ -407,7 +407,7 @@ struct NetworkFixSFTP {
     }
 
     @Test
-    func aStalledPipeFailsInsteadOfHanging() throws {
+    internal func aStalledPipeFailsInsteadOfHanging() throws {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
         let channel = SFTPChannel(

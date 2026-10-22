@@ -36,13 +36,13 @@ public struct VolumeError: LocalizedError, Sendable {
 /// The real thing: the NetFS framework, which is what Finder's Connect to Server uses.
 public final class SystemVolumeMounter: VolumeMounter {
     /// The system's calls, which answer later or never; tests put stand-ins in their place.
-    struct Calls {
+    internal struct Calls {
         /// `NetFSMountURLAsync`: asks for the mount without waiting.
         ///
         /// Returns the status of asking, puts what to cancel the request with into its seventh
         /// argument, and later calls the block with the status and the mount points, on the queue
         /// it is given.
-        var mount:
+        internal var mount:
             @Sendable (
                 _ url: CFURL?, _ mountPath: CFURL?, _ user: CFString?, _ password: CFString?,
                 _ openOptions: CFMutableDictionary?, _ mountOptions: CFMutableDictionary?,
@@ -50,14 +50,14 @@ public final class SystemVolumeMounter: VolumeMounter {
                 _ report: (@Sendable @convention(block) (Int32, AsyncRequestID?, CFArray?) -> Void)?
             ) -> Int32 = NetFSMountURLAsync
         /// `NetFSMountURLCancel`.
-        var cancel: @Sendable (_ request: AsyncRequestID?) -> Int32 = NetFSMountURLCancel
-        var unmount: @Sendable (_ volume: URL, _ answer: @escaping @Sendable (any Error?) -> Void) -> Void = {
+        internal var cancel: @Sendable (_ request: AsyncRequestID?) -> Int32 = NetFSMountURLCancel
+        internal var unmount: @Sendable (_ volume: URL, _ answer: @escaping @Sendable (any Error?) -> Void) -> Void = {
             FileManager.default.unmountVolume(at: $0, options: [.withoutUI], completionHandler: $1)
         }
     }
 
     /// How long ejecting may take before the wait for it is given up.
-    static let unmountTime: TimeInterval = 60
+    internal static let unmountTime: TimeInterval = 60
     private let calls: Calls
     private let patience: TimeInterval
 
@@ -65,7 +65,7 @@ public final class SystemVolumeMounter: VolumeMounter {
         self.init(calls: Calls(), unmountTime: Self.unmountTime)
     }
 
-    init(calls: Calls, unmountTime: TimeInterval) {
+    internal init(calls: Calls, unmountTime: TimeInterval) {
         self.calls = calls
         patience = unmountTime
     }

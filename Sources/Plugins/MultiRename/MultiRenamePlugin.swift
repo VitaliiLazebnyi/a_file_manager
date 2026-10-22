@@ -9,7 +9,7 @@ public final class MultiRenamePlugin: Plugin {
     private let logDirectory: URL?
     private var window: MultiRenameWindowController?
     /// The tool's state while it is open; without windows (tests) it is driven directly.
-    private(set) var session: MultiRenameSession?
+    internal private(set) var session: MultiRenameSession?
     /// The settings last used in this run of the program; they are not kept beyond it.
     private var lastSettings: RenameSettings?
     private var store: RenameStore?

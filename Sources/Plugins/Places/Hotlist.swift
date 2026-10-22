@@ -114,7 +114,7 @@ public struct Hotlist: Codable, Equatable {
     /// order) and drops the rest; `room` is what is left.
     ///
     /// Returns how many were dropped. Without recursion into more than the entries that stay.
-    static func trimmed(_ entries: inout [HotlistEntry], room: inout Int) -> Int {
+    internal static func trimmed(_ entries: inout [HotlistEntry], room: inout Int) -> Int {
         var dropped = 0
         var kept: [HotlistEntry] = []
         for var entry in entries {
@@ -417,7 +417,7 @@ public struct HotlistMenu {
         selected = places.firstIndex(where: isCurrent) ?? 0
     }
 
-    static let separatorTitle = "────────────"
+    internal static let separatorTitle = "────────────"
 
     private static func mark(_ isCurrent: Bool) -> String { isCurrent ? "✓ " : "    " }
 }

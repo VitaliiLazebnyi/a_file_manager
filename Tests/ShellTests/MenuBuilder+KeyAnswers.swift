@@ -6,7 +6,7 @@ import AppKit
 extension MenuBuilder {
     /// The object that answers for the keys of a menu bar built by `mainMenu`: the delegate of
     /// the plugins' menus; nil when the bar has none.
-    static func keyAnswers(of main: NSMenu) -> MenuKeys? {
+    internal static func keyAnswers(of main: NSMenu) -> MenuKeys? {
         main.items.lazy.compactMap { $0.submenu?.delegate as? MenuKeys }.first
     }
 }

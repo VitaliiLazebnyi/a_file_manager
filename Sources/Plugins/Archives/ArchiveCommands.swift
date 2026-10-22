@@ -6,36 +6,37 @@ import Foundation
 /// Command names only this plugin uses (spec 17 › Command catalogue).
 extension CommandID {
     /// Pack with "Move to archive" ticked.
-    static let moveToArchive: CommandID = "cm_MoveToArchive"
-    static let testArchive: CommandID = "cm_TestArchive"
+    internal static let moveToArchive: CommandID = "cm_MoveToArchive"
+    internal static let testArchive: CommandID = "cm_TestArchive"
     /// Enters the file under the cursor as an archive, whatever its name ends in.
-    static let openAsArchive: CommandID = "afm_OpenAsArchive"
+    internal static let openAsArchive: CommandID = "afm_OpenAsArchive"
 }
 
 /// The keys of the Packer page in the settings.
-enum ArchiveSettings {
-    static let opensAsFolders = "archives.openAsFolders"
-    static let extensions = "archives.extensions"
-    static let entersAnyFile = "archives.enterAnyFile"
-    static let format = "archives.format"
-    static let level = "archives.level"
-    static let storesPaths = "archives.storePaths"
-    static let recurses = "archives.recurse"
-    static let verifies = "archives.verify"
-    static let datesByNewest = "archives.dateByNewest"
-    static let unpackPaths = "archives.unpackPaths"
-    static let unpackSeparate = "archives.unpackSeparate"
-    static let unpackOverwrite = "archives.unpackOverwrite"
+internal enum ArchiveSettings {
+    internal static let opensAsFolders = "archives.openAsFolders"
+    internal static let extensions = "archives.extensions"
+    internal static let entersAnyFile = "archives.enterAnyFile"
+    internal static let format = "archives.format"
+    internal static let level = "archives.level"
+    internal static let storesPaths = "archives.storePaths"
+    internal static let recurses = "archives.recurse"
+    internal static let verifies = "archives.verify"
+    internal static let datesByNewest = "archives.dateByNewest"
+    internal static let unpackPaths = "archives.unpackPaths"
+    internal static let unpackSeparate = "archives.unpackSeparate"
+    internal static let unpackOverwrite = "archives.unpackOverwrite"
 
     /// The endings Enter opens as folders.
     ///
     /// Office documents and installer packages are ZIP or XAR files too, but Enter should hand
     /// those to their applications (spec 08 › Opening an archive, `PreferOpenTypes`); "Open as
     /// Archive" still enters them.
-    static let defaultExtensions = "zip 7z rar tar gz tgz bz2 tbz tbz2 xz txz jar war cab cpio lha lzh arj z taz"
-    static let levels = ["0 (store)", "1 (fastest)", "2", "3", "4", "5", "6 (normal)", "7", "8", "9 (best)"]
+    internal static let defaultExtensions =
+        "zip 7z rar tar gz tgz bz2 tbz tbz2 xz txz jar war cab cpio lha lzh arj z taz"
+    internal static let levels = ["0 (store)", "1 (fastest)", "2", "3", "4", "5", "6 (normal)", "7", "8", "9 (best)"]
 
-    static func options(from settings: any SettingsStore) -> ArchiveOptions {
+    internal static func options(from settings: any SettingsStore) -> ArchiveOptions {
         var options = ArchiveOptions()
         options.compressionLevel = max(0, min(settings.index(level, default: 6), 9))
         options.opensAsFolders = settings.flag(opensAsFolders, default: true)
@@ -60,7 +61,7 @@ enum ArchiveSettings {
 /// job's thread, with a progress window and Cancel; the job's completion returns to the main
 /// thread to report and to refresh the panels.
 @MainActor
-final class ArchiveCommands {
+internal final class ArchiveCommands {
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let store: ArchiveStore
@@ -70,7 +71,7 @@ final class ArchiveCommands {
     private let currentEvent: @MainActor () -> NSEvent?
     private var environment: ArchiveEnvironment { store.environment }
 
-    init(
+    internal init(
         kernel: Kernel,
         store: ArchiveStore,
         openFile: (@MainActor (URL) -> Bool)?,
@@ -99,7 +100,7 @@ final class ArchiveCommands {
     private var target: any PanelHandle { kernel.panels.target }
 
     /// Copies the settings for the working threads; called on the main thread.
-    func refreshOptions() {
+    internal func refreshOptions() {
         environment.options = ArchiveSettings.options(from: settings)
     }
 
@@ -124,7 +125,7 @@ final class ArchiveCommands {
         return event.keyCode == 121 && event.modifierFlags.contains(.control)
     }
 
-    func archiveRoot(for file: URL, isZip: Bool? = nil) -> URL {
+    internal func archiveRoot(for file: URL, isZip: Bool? = nil) -> URL {
         ArchiveURL.make(
             scheme: ArchiveFileSystem.scheme(forArchive: file, fileSystems: fileSystems, isZip: isZip),
             archive: file
@@ -132,7 +133,7 @@ final class ArchiveCommands {
     }
 
     /// The opener for Enter: archives are entered like folders.
-    func open(_ file: FileItem, in panel: any PanelHandle) -> Bool {
+    internal func open(_ file: FileItem, in panel: any PanelHandle) -> Bool {
         let options = environment.options
         guard !file.isDirectory else {
             return false
@@ -147,7 +148,7 @@ final class ArchiveCommands {
 
     /// Enter on a file inside an archive shows what the archive knows about it
     /// (spec 08 › Enter on a file inside an archive).
-    func showMember(_ file: FileItem, in _: any PanelHandle) -> Bool {
+    internal func showMember(_ file: FileItem, in _: any PanelHandle) -> Bool {
         guard let location = ArchiveURL.location(of: file.url), !file.isDirectory else {
             return false
         }
@@ -246,7 +247,7 @@ final class ArchiveCommands {
     /// Enters the file under the cursor as an archive, whatever it is called.
     ///
     /// The first bytes are read in the background to see whether it is a ZIP, which can be changed.
-    func openAsArchive() {
+    internal func openAsArchive() {
         let panel = source
         guard let file = panel.model.cursorFile else {
             return
@@ -277,7 +278,7 @@ final class ArchiveCommands {
     // MARK: Pack
 
     /// Splits a prefix such as `tgz:` off a Pack target (spec 08 › Target string).
-    nonisolated static func splitPrefix(_ text: String) -> (format: ArchiveFormat?, path: String) {
+    nonisolated internal static func splitPrefix(_ text: String) -> (format: ArchiveFormat?, path: String) {
         guard let colon = text.firstIndex(of: ":"), !text[text.index(after: colon)...].hasPrefix("//") else {
             return (nil, text)
         }
@@ -288,7 +289,7 @@ final class ArchiveCommands {
     }
 
     /// The file name a new archive gets: the typed name with the ending of the chosen format.
-    nonisolated static func archiveName(_ typed: String, format: ArchiveFormat) -> String {
+    nonisolated internal static func archiveName(_ typed: String, format: ArchiveFormat) -> String {
         let ext = (typed as NSString).pathExtension.lowercased()
         if format == .zip, ArchiveFileSystem.zipExtensions.contains(ext) {
             return typed
@@ -300,7 +301,7 @@ final class ArchiveCommands {
         return typed + "." + format.defaultExtension
     }
 
-    func pack(move: Bool) {
+    internal func pack(move: Bool) {
         refreshOptions()
         let model = source.model
         let (items, sourceDirectory, targetDirectory) = (model.operands(), model.directory, target.model.directory)
@@ -457,15 +458,15 @@ final class ArchiveCommands {
     ///
     /// A branch or list view names its items by path, which is not the last name of their
     /// locations.
-    nonisolated static func names(of operands: [FileItem], packedAs completed: [URL]) -> [String] {
+    nonisolated internal static func names(of operands: [FileItem], packedAs completed: [URL]) -> [String] {
         let packed = Set(completed)
         return operands.filter { packed.contains($0.url) }.map(\.name)
     }
 
-    nonisolated static let encryptionNote =
+    nonisolated internal static let encryptionNote =
         "The archive is encrypted with AES-256. 7-Zip, WinZip, Keka and The Unarchiver open it; "
         + "the old unzip program and the Finder do not."
-    nonisolated static let legacyLabel =
+    nonisolated internal static let legacyLabel =
         "Use the old ZIP encryption instead (weak: it can be broken within minutes; "
         + "only for programs that cannot open AES)"
 
@@ -491,7 +492,7 @@ final class ArchiveCommands {
 
     // MARK: Unpack
 
-    func unpack() {
+    internal func unpack() {
         refreshOptions()
         let model = source.model
         // (Whether and how many are marked is asked as such: the set of all marked names is not built.)
@@ -624,7 +625,7 @@ final class ArchiveCommands {
 
     // MARK: Test
 
-    func test() {
+    internal func test() {
         refreshOptions()
         let model = source.model
         var archives = model.operands().filter { !$0.isDirectory }.map(\.url)

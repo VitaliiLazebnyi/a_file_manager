@@ -20,26 +20,26 @@ extension CommandID {
 }
 
 /// The settings keys of the preference page.
-enum NetworkSettings {
-    static let passiveMode = "network.passiveMode"
-    static let keepAlive = "network.keepAliveSeconds"
-    static let transferMode = "network.transferMode"
-    static let parallelConnections = "network.parallelConnections"
-    static let textFiles = "network.textFiles"
-    static let anonymousPassword = "network.anonymousPassword"
-    static let timeout = "network.timeoutSeconds"
-    static let askToSave = "network.askToSaveQuickConnections"
-    static let listName = "network.downloadList"
-    static let lastServer = "network.lastServerAddress"
+internal enum NetworkSettings {
+    internal static let passiveMode = "network.passiveMode"
+    internal static let keepAlive = "network.keepAliveSeconds"
+    internal static let transferMode = "network.transferMode"
+    internal static let parallelConnections = "network.parallelConnections"
+    internal static let textFiles = "network.textFiles"
+    internal static let anonymousPassword = "network.anonymousPassword"
+    internal static let timeout = "network.timeoutSeconds"
+    internal static let askToSave = "network.askToSaveQuickConnections"
+    internal static let listName = "network.downloadList"
+    internal static let lastServer = "network.lastServerAddress"
     /// The plain FTP servers the user agreed to send a password to without encryption.
-    static let unprotectedHosts = "network.unprotectedPasswordHosts"
-    static let parallelCounts = [1, 2, 3, 4, 6, 8]
-    static let parallelChoices = parallelCounts.map(String.init)
+    internal static let unprotectedHosts = "network.unprotectedPasswordHosts"
+    internal static let parallelCounts = [1, 2, 3, 4, 6, 8]
+    internal static let parallelChoices = parallelCounts.map(String.init)
 
     /// Reads the preferences into the form the connections use.
     ///
     /// Main thread.
-    static func values(from settings: any SettingsStore) -> NetworkOptions.Values {
+    internal static func values(from settings: any SettingsStore) -> NetworkOptions.Values {
         var values = NetworkOptions.Values()
         values.passiveByDefault = settings.flag(passiveMode, default: true)
         values.keepAliveInterval = max(0, TimeInterval(settings.text(keepAlive, default: "60")) ?? 60)
@@ -57,14 +57,14 @@ enum NetworkSettings {
 /// chosen.
 ///
 /// A location of another file system, or one that names no server, is ignored.
-final class TypedAddresses: ServerConsentService {
+internal final class TypedAddresses: ServerConsentService {
     private let center: ConnectionCenter
 
-    init(center: ConnectionCenter) {
+    internal init(center: ConnectionCenter) {
         self.center = center
     }
 
-    func userChose(_ location: URL) {
+    internal func userChose(_ location: URL) {
         guard let key = ServerKey(location), ServerKey.schemes.contains(key.scheme) else {
             return
         }
@@ -89,7 +89,7 @@ public final class NetworkPlugin: Plugin {
     /// The live connections; tests look at them.
     public private(set) var center = ConnectionCenter()
     /// The behaviour behind the commands, once started.
-    private(set) var commands: NetworkCommands?
+    internal private(set) var commands: NetworkCommands?
     private var store: ConnectionStore?
     private var consent: TypedAddresses?
 

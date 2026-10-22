@@ -8,12 +8,14 @@ import Testing
 /// The viewer's logic without any window: detection, decoding block by block, the row index,
 /// the hex and binary layouts, searching, and reading through a file-system provider.
 @Suite
-struct ViewerModel {
+internal struct ViewerModel {
     // MARK: Helpers
 
     /// Decodes `data` in pieces of `size` bytes, carrying what a piece leaves undecoded into
     /// the next, and returns the units with their offsets in the whole.
-    func decodeInPieces(_ data: [UInt8], _ encoding: ViewerEncoding, size: Int) -> (units: [UInt16], offsets: [Int]) {
+    internal func decodeInPieces(_ data: [UInt8], _ encoding: ViewerEncoding, size: Int) -> (
+        units: [UInt16], offsets: [Int]
+    ) {
         var units: [UInt16] = []
         var offsets: [Int] = []
         var pending: [UInt8] = []
@@ -35,7 +37,7 @@ struct ViewerModel {
     }
 
     /// The rows of a whole text, cut in one go: what the index must agree with.
-    func referenceRows(_ data: Data, _ encoding: ViewerEncoding, _ options: TextLayoutOptions) -> [(
+    internal func referenceRows(_ data: Data, _ encoding: ViewerEncoding, _ options: TextLayoutOptions) -> [(
         start: Int64, startsLine: Bool
     )] {
         var text = DecodedText()
@@ -52,7 +54,7 @@ struct ViewerModel {
         return rows
     }
 
-    func document(
+    internal func document(
         _ data: Data,
         _ encoding: ViewerEncoding = .utf8,
         _ layout: ViewerLayout,
@@ -65,7 +67,7 @@ struct ViewerModel {
         return document
     }
 
-    func find(
+    internal func find(
         _ text: String,
         _ options: SearchOptions = SearchOptions(),
         in data: Data,
@@ -88,7 +90,7 @@ struct ViewerModel {
     // MARK: Detection
 
     @Test
-    func byteOrderMarksNameTheEncoding() {
+    internal func byteOrderMarksNameTheEncoding() {
         #expect(
             ViewerDetection.guessText(Data([0xEF, 0xBB, 0xBF, 0x41]), isWholeFile: true)
                 == .init(encoding: .utf8, bomLength: 3)
@@ -104,7 +106,7 @@ struct ViewerModel {
     }
 
     @Test
-    func textEncodingsAreGuessedFromTheContent() {
+    internal func textEncodingsAreGuessedFromTheContent() {
         func guess(_ bytes: [UInt8], whole: Bool = true) -> ViewerDetection.TextGuess {
             ViewerDetection.guessText(Data(bytes), isWholeFile: whole)
         }
@@ -129,7 +131,7 @@ struct ViewerModel {
     }
 
     @Test
-    func contentKindsComeFromNameAndFirstBytes() {
+    internal func contentKindsComeFromNameAndFirstBytes() {
         func kind(_ name: String, _ head: [UInt8] = []) -> ViewerDetection.Content {
             ViewerDetection.content(name: name, sample: Data(head))
         }
@@ -163,7 +165,7 @@ struct ViewerModel {
     // MARK: Decoding
 
     @Test
-    func decodingBlockByBlockEqualsDecodingAtOnce() throws {
+    internal func decodingBlockByBlockEqualsDecodingAtOnce() throws {
         let sample = "ASCII, Größe, 日本語のテキスト, emoji 😀🎉, tab\tend\r\n"
         let cases: [(ViewerEncoding, [UInt8])] = [
             (.utf8, Array(sample.utf8)), (.utf16LE, try #require(ViewerEncoding.utf16LE.encode(sample))),
@@ -191,7 +193,7 @@ struct ViewerModel {
     }
 
     @Test
-    func aCharacterCutOffAtTheEndWaitsForItsRest() {
+    internal func aCharacterCutOffAtTheEndWaitsForItsRest() {
         var text = DecodedText()
         let euro: [UInt8] = [0x41, 0xE2, 0x82]
         #expect(ViewerEncoding.utf8.decode(euro, final: false, into: &text) == 1 && text.units == [0x41])
@@ -209,7 +211,7 @@ struct ViewerModel {
     }
 
     @Test
-    func malformedInputBecomesReplacementCharactersAndKeepsItsOffsets() {
+    internal func malformedInputBecomesReplacementCharactersAndKeepsItsOffsets() {
         var text = DecodedText()
         // An overlong form, a lone continuation byte, a surrogate, a value beyond U+10FFFF.
         let bytes: [UInt8] = [0x41, 0xC0, 0x80, 0x80, 0xED, 0xA0, 0x80, 0xF5, 0x42]
@@ -233,7 +235,7 @@ struct ViewerModel {
     // MARK: Rows
 
     @Test
-    func linesEndWithCRLFOrCROrLF() throws {
+    internal func linesEndWithCRLFOrCROrLF() throws {
         let data = Data("one\r\ntwo\rthree\n\nlast".utf8)
         let document = document(data, .utf8, .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         let rows = try document.rows(from: 0, count: 100)
@@ -252,7 +254,7 @@ struct ViewerModel {
     }
 
     @Test
-    func longLinesWrapAtWordsOrAreCut() throws {
+    internal func longLinesWrapAtWordsOrAreCut() throws {
         let data = Data("the quick brown fox jumps\nabcdefghijklmnop\n\tx\ty".utf8)
         let wrapped = try document(data, .utf8, .text(TextLayoutOptions(columns: 10, wordWrap: true, tabWidth: 4)))
             .rows(from: 0, count: 100)
@@ -279,7 +281,7 @@ struct ViewerModel {
     }
 
     /// Text with every kind of line end, long lines, empty lines and characters of one to four bytes.
-    func syntheticText(lines: Int) -> String {
+    internal func syntheticText(lines: Int) -> String {
         var generator = SystemRandomNumberGenerator()
         let words = [
             "alpha", "beta", "γάμμα", "delta", "日本語", "x", "épsilon", "😀", "zeta",
@@ -299,7 +301,7 @@ struct ViewerModel {
     }
 
     @Test(arguments: [true, false])
-    func theIndexBuiltInSegmentsEqualsCuttingTheWholeText(parallel: Bool) throws {
+    internal func theIndexBuiltInSegmentsEqualsCuttingTheWholeText(parallel: Bool) throws {
         let text = syntheticText(lines: 60_000)
         for encoding in [ViewerEncoding.utf8, .utf16LE] {
             let data = Data(try #require(encoding.encode(text)))
@@ -341,7 +343,7 @@ struct ViewerModel {
     }
 
     @Test
-    func theIndexAgreesWithASimpleSplitAtLineEnds() throws {
+    internal func theIndexAgreesWithASimpleSplitAtLineEnds() throws {
         var lines: [String] = []
         for number in 0..<200_000 { lines.append("line \(number) " + String(repeating: "x", count: number % 50)) }
         let data = Data(lines.joined(separator: "\n").utf8)
@@ -362,7 +364,7 @@ struct ViewerModel {
     }
 
     @Test
-    func aFileWithoutLineEndsIsStillCutIntoRows() throws {
+    internal func aFileWithoutLineEndsIsStillCutIntoRows() throws {
         let data = Data(repeating: 0x61, count: 300_000)
         let document = document(
             data,
@@ -377,7 +379,7 @@ struct ViewerModel {
     }
 
     @Test
-    func indexingStopsWhenCancelled() {
+    internal func indexingStopsWhenCancelled() {
         let document = TextDocument(
             source: DataByteSource(Data(repeating: 0x0A, count: 1 << 20)),
             encoding: .utf8,
@@ -389,7 +391,7 @@ struct ViewerModel {
     }
 
     @Test
-    func aByteOrderMarkIsNotPartOfTheText() throws {
+    internal func aByteOrderMarkIsNotPartOfTheText() throws {
         let data = Data([0xEF, 0xBB, 0xBF] + Array("first\nsecond".utf8))
         let document = TextDocument(
             source: DataByteSource(data),
@@ -409,7 +411,7 @@ struct ViewerModel {
     // MARK: Hex and binary
 
     @Test
-    func hexRowsLookAsInTheSpecification() throws {
+    internal func hexRowsLookAsInTheSpecification() throws {
         let data = Data("Report 1\r\nLorem ipsum dolor".utf8)
         let document = document(data, .ansi, .hex)
         let rows = try document.rows(from: 0, count: 10)
@@ -429,7 +431,7 @@ struct ViewerModel {
     }
 
     @Test
-    func aSelectionShowsInBothPartsOfAHexRow() throws {
+    internal func aSelectionShowsInBothPartsOfAHexRow() throws {
         let document = document(Data((0..<40).map { UInt8($0 + 0x30) }), .ansi, .hex)
         let row = try #require(try document.rows(from: 1, count: 1).first)
         // Bytes 18…20 of the file are the third to fifth of the second row.
@@ -444,7 +446,7 @@ struct ViewerModel {
     }
 
     @Test
-    func binaryRowsHaveAFixedLengthAndDotsForControlCharacters() throws {
+    internal func binaryRowsHaveAFixedLengthAndDotsForControlCharacters() throws {
         let data = Data(Array("ab\r\ncd\u{0}ef".utf8) + [0xE4, 0xFF])
         let document = document(data, .ansi, .binary(width: 4))
         #expect(document.rowCount == 3)
@@ -462,7 +464,7 @@ struct ViewerModel {
     }
 
     @Test
-    func placesInARowMapToBytesAndBack() throws {
+    internal func placesInARowMapToBytesAndBack() throws {
         let data = Data("aä😀\tz\n".utf8)
         let document = document(data, .utf8, .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         let row = try #require(try document.rows(from: 0, count: 1).first)
@@ -481,7 +483,7 @@ struct ViewerModel {
     // MARK: Search
 
     @Test
-    func plainTextSearchWithItsSwitches() throws {
+    internal func plainTextSearchWithItsSwitches() throws {
         let data = Data("The manager met a man. MAN overboard! Tab\there.\r\nNext line\nback\\slash".utf8)
         #expect(try find("man", in: data) == 4..<7)
         #expect(try find("man", SearchOptions(wholeWords: true), in: data) == 18..<21)
@@ -499,7 +501,7 @@ struct ViewerModel {
     }
 
     @Test
-    func hexSearchTakesBytesAndQuotedText() throws {
+    internal func hexSearchTakesBytesAndQuotedText() throws {
         let data = Data([0x00, 0x50, 0x4B, 0x01, 0x02, 0xFF, 0x50, 0x4B, 0x03, 0x04])
         let hex = SearchOptions(hex: true)
         #expect(try find("01 02 FF", hex, in: data) == 3..<6)
@@ -514,7 +516,7 @@ struct ViewerModel {
     }
 
     @Test
-    func regularExpressions() throws {
+    internal func regularExpressions() throws {
         let data = Data("id=17; id=2048\nname = Smith\nNAME = Jones".utf8)
         let regex = SearchOptions(regex: true)
         #expect(try find("id=\\d{3,}", regex, in: data) == 7..<14)
@@ -534,7 +536,7 @@ struct ViewerModel {
     }
 
     @Test
-    func searchingInOtherEncodingsGivesByteRanges() throws {
+    internal func searchingInOtherEncodingsGivesByteRanges() throws {
         let text = "Zeile eins\r\nGrößenwahn und Ärger"
         let wide = Data(try #require(ViewerEncoding.utf16LE.encode(text)))
         #expect(try find("größenwahn", in: wide, encoding: .utf16LE) == 24..<44)
@@ -551,7 +553,7 @@ struct ViewerModel {
     }
 
     @Test(arguments: [false, true])
-    func matchesAcrossChunkBordersAreFound(backwards: Bool) throws {
+    internal func matchesAcrossChunkBordersAreFound(backwards: Bool) throws {
         // Chunks of 64 bytes: the needle lies across the border at 4096 and, in UTF-8, the
         // border even splits a character of it.
         var text = String(repeating: "abcdefg ", count: 511) + "abc Grüße aus Köln, 日本 "
@@ -618,7 +620,7 @@ struct ViewerModel {
     }
 
     @Test
-    func everyOccurrenceIsFoundOnceInOrder() throws {
+    internal func everyOccurrenceIsFoundOnceInOrder() throws {
         var bytes = [UInt8](repeating: 0x2E, count: 200_000)
         let places = [0, 61, 64, 4_090, 65_535, 65_540, 131_070, 199_997]
         for place in places { bytes.replaceSubrange(place..<place + 3, with: Array("hit".utf8)) }
@@ -645,7 +647,7 @@ struct ViewerModel {
     }
 
     @Test
-    func aCancelledSearchFindsNothingAndProgressIsReported() throws {
+    internal func aCancelledSearchFindsNothingAndProgressIsReported() throws {
         let data = Data(repeating: 0x61, count: 1 << 20) + Data("needle".utf8)
         let pattern = try SearchPattern("needle", options: SearchOptions(), encoding: .utf8)
         let cancelled = CancellationFlag()
@@ -680,7 +682,7 @@ struct ViewerModel {
     // MARK: Reading through a provider
 
     /// A file of `count` bytes in a memory file system: byte `i` is `i % 251`.
-    func memoryFile(_ count: Int) throws -> (FileSystemRegistry, MemoryFileSystem, URL, Data) {
+    internal func memoryFile(_ count: Int) throws -> (FileSystemRegistry, MemoryFileSystem, URL, Data) {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -694,7 +696,7 @@ struct ViewerModel {
     }
 
     @Test
-    func filesAreReadThroughTheirProviderWithSeek() throws {
+    internal func filesAreReadThroughTheirProviderWithSeek() throws {
         let (registry, _, url, data) = try memoryFile(300_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
         #expect(source is ProviderByteSource && source.length == 300_000)
@@ -721,7 +723,7 @@ struct ViewerModel {
     }
 
     @Test
-    func aTextOnAnotherFileSystemIsIndexedSearchedAndShown() throws {
+    internal func aTextOnAnotherFileSystemIsIndexedSearchedAndShown() throws {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -766,7 +768,7 @@ struct ViewerModel {
     // MARK: HTML and folders
 
     @Test
-    func htmlBecomesTextWithItsLinks() {
+    internal func htmlBecomesTextWithItsLinks() {
         let html = """
             <html><head><title>Page</title><style>p { color: red }</style><script>alert("<b>")</script></head>
             <body><h1>Head&nbsp;line</h1><p>First   paragraph
@@ -797,14 +799,14 @@ struct ViewerModel {
     }
 
     @Test
-    func folderSizesThatLeaveTheRangeOfANumberStopAtItsEnd() {
+    internal func folderSizesThatLeaveTheRangeOfANumberStopAtItsEnd() {
         let sum =
             FolderSummary(files: 1, folders: 0, bytes: .max - 1) + FolderSummary(files: 1, folders: 0, bytes: 10)
         #expect(sum == FolderSummary(files: 2, folders: 0, bytes: .max))
     }
 
     @Test
-    func foldersAreSummedUpThroughTheirFileSystem() {
+    internal func foldersAreSummedUpThroughTheirFileSystem() {
         let memory = MemoryFileSystem()
         memory.addFile("/top/a.txt", "12345")
         memory.addFile("/top/sub/b.txt", "123")

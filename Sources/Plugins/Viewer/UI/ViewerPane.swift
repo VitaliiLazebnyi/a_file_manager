@@ -6,16 +6,16 @@ import PDFKit
 import Quartz
 
 /// What a viewer is asked to show: a file on any file system, or a text that is not a file.
-struct ViewerItem {
-    enum Source {
+internal struct ViewerItem {
+    internal enum Source {
         case file(URL)
         case text(String)
     }
 
-    let source: Source
-    let title: String
+    internal let source: Source
+    internal let title: String
 
-    var url: URL? {
+    internal var url: URL? {
         if case .file(let url) = source {
             return url
         }
@@ -33,7 +33,7 @@ struct ViewerItem {
 /// copying to the clipboard — runs on background queues and comes back with a generation
 /// number; what was overtaken by a newer load is dropped. Each load has a cancellation flag
 /// that stops the work of the one before.
-final class ViewerPane: NSView, NSMenuDelegate {
+internal final class ViewerPane: NSView, NSMenuDelegate {
     /// A monitor of the application's key presses that is removed when it goes: whoever
     /// holds it can be sure the monitor never outlives it.
     private final class KeyMonitor {
@@ -48,71 +48,71 @@ final class ViewerPane: NSView, NSMenuDelegate {
         }
     }
 
-    let kernel: Kernel
-    let settings: ListerSettings
+    internal let kernel: Kernel
+    internal let settings: ListerSettings
     /// True in the quick-view pane: Esc and Q do not close anything, and keys are taken only
     /// while the pane has the keyboard.
-    let isEmbedded: Bool
+    internal let isEmbedded: Bool
     /// No Quick Look, no images, no multimedia (the specification's `cm_ListInternalOnly`).
-    var internalOnly = false
+    internal var internalOnly = false
     /// Where Copy puts its result.
-    var pasteboard = NSPasteboard.general
+    internal var pasteboard = NSPasteboard.general
     /// Where links that may be opened go: the browser, the mail program.
-    var links: any LinkOpening = SystemLinks()
+    internal var links: any LinkOpening = SystemLinks()
     /// The panels the pane asks with, and printing.
-    var dialogs: any ViewerDialogs = SystemDialogs()
+    internal var dialogs: any ViewerDialogs = SystemDialogs()
     /// What sounds and films are played with: the system's player, or a test's that plays nothing.
-    var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
+    internal var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
 
     /// The window title changed (a file was loaded, a track names itself).
-    var onTitleChange: (String) -> Void = { _ in }
+    internal var onTitleChange: (String) -> Void = { _ in }
     /// Asked to close the window (Esc, Q, F10).
-    var onClose: () -> Void = {}
+    internal var onClose: () -> Void = {}
     /// Asked to step through the files of the session: +1 next, -1 previous.
-    var onStep: (Int) -> Void = { _ in }
+    internal var onStep: (Int) -> Void = { _ in }
     /// Options › Configure… and Save position.
-    var onConfigure: () -> Void = {}
-    var onSavePosition: () -> Void = {}
+    internal var onConfigure: () -> Void = {}
+    internal var onSavePosition: () -> Void = {}
     /// Position and count of the file among those of the session, for `<< 1/3 >>`.
-    var fileCounter: (index: Int, count: Int) = (0, 1) { didSet { updateChrome() } }
+    internal var fileCounter: (index: Int, count: Int) = (0, 1) { didSet { updateChrome() } }
 
     // MARK: State
 
     /// What is known about the loaded file.
-    struct Loaded {
-        let item: ViewerItem
-        let source: any ByteSource
-        let sample: Data
-        let guess: ViewerDetection.TextGuess
-        let content: ViewerDetection.Content
+    internal struct Loaded {
+        internal let item: ViewerItem
+        internal let source: any ByteSource
+        internal let sample: Data
+        internal let guess: ViewerDetection.TextGuess
+        internal let content: ViewerDetection.Content
         /// Whether reading on several threads at once pays off (a local disk, memory).
-        let parallel: Bool
+        internal let parallel: Bool
     }
 
-    private(set) var item: ViewerItem?
+    internal private(set) var item: ViewerItem?
     /// Why the file could not be opened, when it could not.
-    private(set) var failure: String?
+    internal private(set) var failure: String?
     /// What the folder shown by `showFolder` holds, once it has been counted.
-    private(set) var folderSummary: FolderSummary?
-    private(set) var loaded: Loaded?
-    var mode = ViewMode.text
-    var fontSlot = FontSlot.ansi
+    internal private(set) var folderSummary: FolderSummary?
+    internal private(set) var loaded: Loaded?
+    internal var mode = ViewMode.text
+    internal var fontSlot = FontSlot.ansi
     /// The Encoding menu's choice of code page; nil = as configured for the font.
-    var codePage: ViewerEncoding?
+    internal var codePage: ViewerEncoding?
     /// Num + / Num − change the font size for as long as the window lives; Ctrl+0 undoes it.
-    var fontSizeChange = 0.0
-    var loadGeneration = 0
+    internal var fontSizeChange = 0.0
+    internal var loadGeneration = 0
     /// Counts the calls of `present`: what a background job of an earlier one brings back is
     /// dropped, whatever the order the jobs finish in (the work queue is concurrent).
-    private(set) var presentGeneration = 0
+    internal private(set) var presentGeneration = 0
     private var presentCancellation = CancellationFlag()
-    var cancellation = CancellationFlag()
-    let workQueue = DispatchQueue(label: "viewer.work", qos: .userInitiated, attributes: .concurrent)
+    internal var cancellation = CancellationFlag()
+    internal let workQueue = DispatchQueue(label: "viewer.work", qos: .userInitiated, attributes: .concurrent)
     /// How a file whose reads are slow (a server) is kept once read: in blocks of this size, this
     /// many of them in memory.
     ///
     /// A file that fits (64 MB) is kept whole, a bigger one on disk.
-    var slowFileBlocks = (size: 256 << 10, count: 256)
+    internal var slowFileBlocks = (size: 256 << 10, count: 256)
     private let temporaryCopies: TemporaryCopies
     /// The text of an HTML file with its tags removed, kept while the file is shown.
     private var strippedHTML: (links: [String], source: any ByteSource)?
@@ -121,19 +121,19 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     // MARK: Search state (see ViewerPane+Actions)
 
-    var lastSearch: (text: String, options: SearchOptions)?
-    var lastSearchWentBackwards = false
+    internal var lastSearch: (text: String, options: SearchOptions)?
+    internal var lastSearchWentBackwards = false
     /// A running search or other long work: what the status line shows, and how to stop it.
-    var activity: (text: String, progress: Double?, cancel: CancellationFlag)? { didSet { updateChrome() } }
+    internal var activity: (text: String, progress: Double?, cancel: CancellationFlag)? { didSet { updateChrome() } }
 
     // MARK: Views
 
-    let pager = TextPagerView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-    private(set) var imageView: ImageCanvasView?
-    private(set) var mediaView: MediaView?
-    private(set) var pdfView: PDFView?
-    private(set) var webView: WebContentView?
-    private(set) var richText: NSTextView?
+    internal let pager = TextPagerView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+    internal private(set) var imageView: ImageCanvasView?
+    internal private(set) var mediaView: MediaView?
+    internal private(set) var pdfView: PDFView?
+    internal private(set) var webView: WebContentView?
+    internal private(set) var richText: NSTextView?
     private var previewView: QLPreviewView?
     private var contentView: NSView?
     private let contentHost = NSView()
@@ -147,9 +147,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
     private let cancelButton = NSButton(title: "Cancel", target: nil, action: nil)
     /// Set while the pane is in a window; it goes with the pane at the latest.
     private var keyMonitor: KeyMonitor?
-    static let menuTitles = ["File", "Edit", "Options", "Encoding"]
+    internal static let menuTitles = ["File", "Edit", "Options", "Encoding"]
 
-    init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, isEmbedded: Bool) {
+    internal init(kernel: Kernel, settings: ListerSettings, temporaryCopies: TemporaryCopies, isEmbedded: Bool) {
         self.kernel = kernel
         self.settings = settings
         self.temporaryCopies = temporaryCopies
@@ -171,7 +171,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// Made in code only: an archive gives none.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
     deinit {
         cancellation.cancel()
@@ -254,10 +254,10 @@ final class ViewerPane: NSView, NSMenuDelegate {
         if !isEmbedded || hasKeyboard { window?.makeFirstResponder(responder ?? self) }
     }
 
-    override var acceptsFirstResponder: Bool { true }
+    override internal var acceptsFirstResponder: Bool { true }
 
     /// Whether the keyboard is somewhere inside the pane.
-    var hasKeyboard: Bool {
+    internal var hasKeyboard: Bool {
         guard let responder = window?.firstResponder as? NSView else {
             return false
         }
@@ -265,13 +265,13 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// Gives the pane the keyboard: to the text when it shows text.
-    func takeKeyboard() {
+    internal func takeKeyboard() {
         window?.makeFirstResponder(contentView === pager ? pager : self)
     }
 
     // MARK: Keys
 
-    override func viewDidMoveToWindow() {
+    override internal func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         keyMonitor = nil
         guard window != nil else {
@@ -290,7 +290,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// What the key monitor does with a key of the application: a key of this pane's window
     /// that the pane handles is taken (nil), any other is passed on.
-    func monitored(_ event: NSEvent) -> NSEvent? {
+    internal func monitored(_ event: NSEvent) -> NSEvent? {
         takes(event) ? nil : event
     }
 
@@ -308,7 +308,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     /// Shows a file or a text.
     ///
     /// Returns at once; the content appears when it has been read.
-    func load(_ item: ViewerItem) {
+    internal func load(_ item: ViewerItem) {
         stopWork()
         self.item = item
         loaded = nil
@@ -430,12 +430,12 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// Reads the file again (F2).
-    func reload() {
+    internal func reload() {
         if let item { load(item) }
     }
 
     /// Stops whatever the pane is doing for the file it shows and lets go of the file.
-    func stopWork() {
+    internal func stopWork() {
         cancellation.cancel()
         cancellation = CancellationFlag()
         presentCancellation.cancel()
@@ -453,7 +453,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// Shows nothing (the quick view between two files).
-    func clear(message: String = "") {
+    internal func clear(message: String = "") {
         stopWork()
         item = nil
         loaded = nil
@@ -466,7 +466,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     ///
     /// The folder is counted in the background, on all cores; moving on to something else stops the
     /// counting.
-    func showFolder(_ url: URL, name: String) {
+    internal func showFolder(_ url: URL, name: String) {
         clear(message: "\(name)\n\nCounting…")
         let generation = loadGeneration
         let cancellation = cancellation
@@ -493,7 +493,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         }
     }
 
-    func showMessage(_ text: String) {
+    internal func showMessage(_ text: String) {
         pager.clear()
         dropRichViews()
         setContent(RichViews.message(text))
@@ -516,7 +516,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         previewView = nil
     }
 
-    override func viewWillMove(toWindow newWindow: NSWindow?) {
+    override internal func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
         guard previewView != nil, newWindow !== window else {
             return
@@ -586,7 +586,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     // MARK: Presenting
 
     /// Switches the display mode (Options › 1…8).
-    func setMode(_ newMode: ViewMode) {
+    internal func setMode(_ newMode: ViewMode) {
         guard loaded != nil else {
             return
         }
@@ -597,7 +597,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// The encoding the current mode shows text in.
-    var encoding: ViewerEncoding {
+    internal var encoding: ViewerEncoding {
         guard let loaded else {
             return .utf8
         }
@@ -619,7 +619,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         }
     }
 
-    var currentFont: NSFont {
+    internal var currentFont: NSFont {
         let slot: FontSlot = fontSlot == .variable && mode != .binary && mode != .hex ? .variable : .ansi
         let chosen = settings.font(slot)
         let size = CGFloat(min(96, max(6, chosen.size + fontSizeChange)))
@@ -630,7 +630,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// How the current mode lays out its rows.
-    var layout: ViewerLayout {
+    internal var layout: ViewerLayout {
         switch mode {
         case .binary:
             return .binary(width: settings.binaryWidth)
@@ -650,7 +650,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// Shows the loaded file in the current mode.
-    func present(keeping offset: Int64? = nil) {
+    internal func present(keeping offset: Int64? = nil) {
         guard let loaded else {
             return
         }
@@ -747,25 +747,25 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// The text of an HTML file shown as text is cut again from its bytes the next time (after
     /// another encoding was chosen).
-    func redecodeHTML() {
+    internal func redecodeHTML() {
         if mode == .html { strippedHTML = nil }
     }
 
     /// The links of the HTML file that is shown as text.
-    var htmlLinks: [String] { mode == .html ? strippedHTML?.links ?? [] : [] }
+    internal var htmlLinks: [String] { mode == .html ? strippedHTML?.links ?? [] : [] }
 
     /// The most entries the quick view counts in a folder on a server.
-    nonisolated static let remoteFolderEntryLimit = 20_000
+    nonisolated internal static let remoteFolderEntryLimit = 20_000
     /// Files up to this size are read whole where a mode needs all of a file at once.
-    nonisolated static let wholeFileLimit: Int64 = 1 << 30
+    nonisolated internal static let wholeFileLimit: Int64 = 1 << 30
     /// An HTML file is shown as a page up to this size (it is handed to the web view, a string
     /// of twice the size, on the main thread); beyond it the text modes show it.
-    nonisolated static let htmlPageLimit: Int64 = 8 << 20
+    nonisolated internal static let htmlPageLimit: Int64 = 8 << 20
     /// An RTF file is shown formatted up to this size (its layout is done on the main thread).
-    nonisolated static let rtfLimit: Int64 = 4 << 20
+    nonisolated internal static let rtfLimit: Int64 = 4 << 20
     /// An HTML file is shown with its tags removed up to this size; beyond it the tags are
     /// text, as in the plain text modes (removing them takes memory and time in proportion).
-    static let htmlTextLimit: Int64 = 32 << 20
+    internal static let htmlTextLimit: Int64 = 32 << 20
 
     /// Image, PDF, media, HTML page, RTF or Quick Look: read or copied in the background,
     /// shown when ready.
@@ -932,7 +932,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     /// cannot be read.
     ///
     /// A file on the local disk is mapped, the others are read through `source`.
-    nonisolated static func wholeData(
+    nonisolated internal static func wholeData(
         of source: any ByteSource,
         at url: URL,
         limit: Int64,
@@ -964,7 +964,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     ///
     /// Nothing else is followed: a page cannot make the viewer open another server, another folder,
     /// or a local file it does not sit beside.
-    func followLink(_ link: URL) {
+    internal func followLink(_ link: URL) {
         if LinkPolicy.opensInBrowser(link) {
             links.open(link)
         } else if let base = item?.url, let target = LinkPolicy.target(of: link, relativeTo: base) {
@@ -991,27 +991,27 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// Lays a text wrapped at the window's edge out anew for the width it has now, unless the
     /// window is still being resized (the end of the live resize asks again).
-    func layOutAfterResize(whileResizing: Bool) {
+    internal func layOutAfterResize(whileResizing: Bool) {
         guard !whileResizing, contentView === pager, pager.shownLayout != nil, pager.shownLayout != layout else {
             return
         }
         present(keeping: pager.topOffset)
     }
 
-    override func viewDidEndLiveResize() {
+    override internal func viewDidEndLiveResize() {
         super.viewDidEndLiveResize()
         pagerResized()
     }
 
     /// Shows the text again after an option changed, keeping the place.
-    func relayout() {
+    internal func relayout() {
         guard mode.isTextual, loaded != nil else {
             return
         }
         present(keeping: pager.document != nil ? pager.topOffset : nil)
     }
 
-    func changeFontSize(by delta: Double) {
+    internal func changeFontSize(by delta: Double) {
         fontSizeChange = delta == 0 ? 0 : min(60, max(-8, fontSizeChange + delta))
         pager.font = currentFont
         // A size that does not change the columns (a fixed width) needs no new index; one that
@@ -1021,7 +1021,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// Takes over what was changed in the configuration.
-    func applySettings() {
+    internal func applySettings() {
         pager.showsCaret = settings.caret
         pager.searchGoBack = settings.searchGoBack
         imageView?.fit = settings.imageFit
@@ -1035,7 +1035,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     // MARK: Menu strip and status line
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
+    internal func menuNeedsUpdate(_ menu: NSMenu) {
         guard let index = menuButtons.firstIndex(where: { $0.menu === menu }) else {
             return
         }
@@ -1044,7 +1044,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// The titles of the entries of one of the menus, for tests.
-    func menuTitles(_ menu: String) -> [String] { menuEntries(menu).map { $0?.title ?? "-" } }
+    internal func menuTitles(_ menu: String) -> [String] { menuEntries(menu).map { $0?.title ?? "-" } }
 
     @objc
     private func previousFile() { onStep(-1) }
@@ -1057,7 +1057,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// What the percent item shows: the position in a text, the zoom of an image (spec 10 ›
     /// Position and zoom item).
-    var percentText: String {
+    internal var percentText: String {
         if let imageView {
             return String(format: "%.1f %%", imageView.zoom * 100)
         }
@@ -1067,7 +1067,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         return ""
     }
 
-    var statusText: String {
+    internal var statusText: String {
         if let activity {
             return activity.text
         }
@@ -1106,7 +1106,7 @@ final class ViewerPane: NSView, NSMenuDelegate {
         return parts.joined(separator: "  ·  ")
     }
 
-    func updateChrome() {
+    internal func updateChrome() {
         statusLabel.stringValue = statusText
         percentButton.title = percentText
         percentButton.isHidden = percentText.isEmpty

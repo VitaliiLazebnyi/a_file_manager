@@ -4,12 +4,12 @@ public import AppKit
 
 /// The commands of this plugin, under the names of the specification (17 › Command catalogue).
 extension CommandID {
-    static let splitFile: CommandID = "cm_Split"
-    static let combineFiles: CommandID = "cm_Combine"
-    static let encodeFile: CommandID = "cm_Encode"
-    static let decodeFile: CommandID = "cm_Decode"
-    static let createChecksums: CommandID = "cm_CRCcreate"
-    static let verifyChecksums: CommandID = "cm_CRCcheck"
+    internal static let splitFile: CommandID = "cm_Split"
+    internal static let combineFiles: CommandID = "cm_Combine"
+    internal static let encodeFile: CommandID = "cm_Encode"
+    internal static let decodeFile: CommandID = "cm_Decode"
+    internal static let createChecksums: CommandID = "cm_CRCcreate"
+    internal static let verifyChecksums: CommandID = "cm_CRCcheck"
 }
 
 /// Split, combine, encode, decode and checksums (spec 08).
@@ -96,34 +96,34 @@ public final class FileToolsPlugin: Plugin {
 /// dialog. All reading, writing and hashing happens inside a job on the job's thread (hashing
 /// on all cores); the job's completion returns to the main thread to report and refresh.
 @MainActor
-final class FileTools {
+internal final class FileTools {
     /// The settings keys; the spec's names are given where it has them.
-    enum Keys {
-        static let scope = "filetools."
+    internal enum Keys {
+        internal static let scope = "filetools."
         /// `SplitBytesPerFile`, as typed.
-        static let splitSize = scope + "splitBytesPerFile"
+        internal static let splitSize = scope + "splitBytesPerFile"
         /// `EncodeMethod`.
-        static let encodeMethod = scope + "encodeMethod"
+        internal static let encodeMethod = scope + "encodeMethod"
         /// `EncodeLinesPerFile`.
-        static let encodeLines = scope + "encodeLinesPerFile"
+        internal static let encodeLines = scope + "encodeLinesPerFile"
         /// `Lastmd5`.
-        static let checksumMethod = scope + "lastChecksumMethod"
+        internal static let checksumMethod = scope + "lastChecksumMethod"
         /// `CrcSeparateFiles`, `CrcSeparateFolders`, `CrcForceUtf8`, `CrcForwardSlashes`, `CrcAppendExt`.
-        static let separateFiles = scope + "crcSeparateFiles"
-        static let separateFolders = scope + "crcSeparateFolders"
-        static let forceUTF8 = scope + "crcForceUtf8"
-        static let unixFormat = scope + "crcUnixFormat"
-        static let appendExtension = scope + "crcAppendExt"
+        internal static let separateFiles = scope + "crcSeparateFiles"
+        internal static let separateFolders = scope + "crcSeparateFolders"
+        internal static let forceUTF8 = scope + "crcForceUtf8"
+        internal static let unixFormat = scope + "crcUnixFormat"
+        internal static let appendExtension = scope + "crcAppendExt"
         /// `ChecksumExtraTypes`.
-        static let extraTypes = scope + "checksumExtraTypes"
-        static let onlyErrors = scope + "verifyOnlyErrors"
+        internal static let extraTypes = scope + "checksumExtraTypes"
+        internal static let onlyErrors = scope + "verifyOnlyErrors"
     }
 
     /// Unowned: the kernel owns the plugin, and through it this.
     private unowned let kernel: Kernel
     private let pasteboard: NSPasteboard
 
-    init(_ kernel: Kernel, pasteboard: NSPasteboard) {
+    internal init(_ kernel: Kernel, pasteboard: NSPasteboard) {
         self.kernel = kernel
         self.pasteboard = pasteboard
     }
@@ -206,7 +206,7 @@ final class FileTools {
 
     // MARK: Split and combine
 
-    func split(_ file: FileItem) {
+    internal func split(_ file: FileItem) {
         let directory = source.directory
         let presets = ["(the size typed above)"] + Splitter.presets.map(\.title)
         let fields: [FormField] = [
@@ -246,7 +246,7 @@ final class FileTools {
         )
     }
 
-    func combine(_ file: FileItem) {
+    internal func combine(_ file: FileItem) {
         let directory = source.directory
         let fields: [FormField] = [
             .note("Combine \(file.name) and all files with ascending names to the following directory:"),
@@ -295,7 +295,7 @@ final class FileTools {
 
     // MARK: Encode and decode
 
-    func encode(_ file: FileItem) {
+    internal func encode(_ file: FileItem) {
         let directory = source.directory
         let lastLines = settings.index(Keys.encodeLines, default: 0)
         let fields: [FormField] = [
@@ -338,7 +338,7 @@ final class FileTools {
         )
     }
 
-    func decode(_ file: FileItem) {
+    internal func decode(_ file: FileItem) {
         let directory = source.directory
         let fields: [FormField] = [
             .note("Decode the file \(file.name) to directory:"), .text("target", "", targetProposal),
@@ -383,14 +383,19 @@ final class FileTools {
     /// The proposal of "Save CRC file(s) to": next to the one file under its name, or, for
     /// several items, in the source folder under the folder's name (`checksums` at a root),
     /// from how many items there are and the name of the first, which is all it needs.
-    nonisolated static func checksumProposal(count: Int, firstName: String?, in directory: URL, method: ChecksumMethod)
+    nonisolated internal static func checksumProposal(
+        count: Int,
+        firstName: String?,
+        in directory: URL,
+        method: ChecksumMethod
+    )
         -> URL
     {
         let name = count == 1 ? firstName : (directory.lastPathComponent == "/" ? nil : directory.lastPathComponent)
         return directory.appending(name: (name ?? "checksums") + "." + method.fileExtension)
     }
 
-    func createChecksums() {
+    internal func createChecksums() {
         let model = source
         // The operands are made on the job's thread: with 300,000 marks that is a pass over them, and the form needs
         // only how many there are and, for one, its name.
@@ -505,7 +510,7 @@ final class FileTools {
         var errors: Int
     }
 
-    func verifyChecksums() {
+    internal func verifyChecksums() {
         let model = source
         let operands = model.operandsSnapshot()
         let cursor = model.cursorItem

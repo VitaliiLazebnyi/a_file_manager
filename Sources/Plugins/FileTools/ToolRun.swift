@@ -2,11 +2,11 @@ import AFMKernel
 import Foundation
 
 /// What a file tool reports instead of a result.
-enum ToolError: LocalizedError, Equatable {
+internal enum ToolError: LocalizedError, Equatable {
     case cancelled
     case failed(String)
 
-    var errorDescription: String? {
+    internal var errorDescription: String? {
         switch self {
         case .cancelled:
             return "The operation was cancelled."
@@ -18,7 +18,7 @@ enum ToolError: LocalizedError, Equatable {
 }
 
 /// What to do about a file that is in the way of one a tool wants to write.
-enum ExistingFileChoice {
+internal enum ExistingFileChoice {
     case overwrite, overwriteAll, skip, autoRename, cancel
 }
 
@@ -32,12 +32,12 @@ enum ExistingFileChoice {
 /// Unchecked `Sendable`: what several threads touch is guarded by `lock` (the reports also by
 /// `reportLock`); `overwritesAll` and `journal` are used by the job's thread only (`create`,
 /// `transaction`).
-final class ToolRun: @unchecked Sendable {
+internal final class ToolRun: @unchecked Sendable {
     /// Files are read and written in blocks of this size, never as a whole.
-    static let blockSize = 1 << 20
+    internal static let blockSize = 1 << 20
 
-    let fileSystems: FileSystemRegistry
-    let cancellation: CancellationFlag
+    internal let fileSystems: FileSystemRegistry
+    internal let cancellation: CancellationFlag
     private let report: @Sendable (JobProgress) -> Void
     private let askExisting: @Sendable (URL) -> ExistingFileChoice
     private let lock = NSLock()
@@ -53,7 +53,7 @@ final class ToolRun: @unchecked Sendable {
 
     /// Without a job (in tests of the tools themselves) nothing is reported and existing
     /// files are overwritten.
-    init(
+    internal init(
         fileSystems: FileSystemRegistry,
         cancellation: CancellationFlag = CancellationFlag(),
         report: @escaping @Sendable (JobProgress) -> Void = { _ in },
@@ -66,7 +66,7 @@ final class ToolRun: @unchecked Sendable {
     }
 
     /// A run inside a job: progress goes to its window, questions through `ask`.
-    convenience init(
+    internal convenience init(
         fileSystems: FileSystemRegistry,
         monitor: any JobMonitor,
         askExisting: @escaping @MainActor @Sendable (URL) -> ExistingFileChoice
@@ -89,7 +89,7 @@ final class ToolRun: @unchecked Sendable {
     /// A program that was split, sent and put together again is still checked by the system when it
     /// is first opened. Not set by tools that write something about their sources (a list of
     /// checksums).
-    var carriesOrigin: Bool {
+    internal var carriesOrigin: Bool {
         get { lock.withLock { carries } }
         set { lock.withLock { carries = newValue } }
     }
@@ -113,13 +113,13 @@ final class ToolRun: @unchecked Sendable {
         lock.unlock()
     }
 
-    func checkCancelled() throws {
+    internal func checkCancelled() throws {
         if cancellation.isCancelled { throw ToolError.cancelled }
     }
 
     // MARK: Progress
 
-    func expect(bytes: Int64, items: Int) {
+    internal func expect(bytes: Int64, items: Int) {
         lock.lock()
         bytesTotal = bytes
         itemsTotal = items
@@ -130,7 +130,7 @@ final class ToolRun: @unchecked Sendable {
     /// Shows what is being worked on.
     ///
     /// Safe from any thread.
-    func show(_ lines: [String]) {
+    internal func show(_ lines: [String]) {
         lock.lock()
         self.lines = lines
         lock.unlock()
@@ -141,7 +141,7 @@ final class ToolRun: @unchecked Sendable {
     /// second.
     ///
     /// Safe from any thread.
-    func advance(_ bytes: Int64, items: Int = 0, force: Bool = false) {
+    internal func advance(_ bytes: Int64, items: Int = 0, force: Bool = false) {
         // The decision is one step under the lock: a report that is due takes its turn at once
         // (the time of the last report moves on), so no other thread finds it due as well.
         let due = lock.withLock { () -> Bool in
@@ -176,10 +176,15 @@ final class ToolRun: @unchecked Sendable {
 
     // MARK: Reading and writing
 
-    func provider(for url: URL) throws -> any FileSystemProvider { try fileSystems.provider(for: url) }
+    internal func provider(for url: URL) throws -> any FileSystemProvider { try fileSystems.provider(for: url) }
 
     /// Hands a file to `body` block by block, counting the bytes as progress.
-    func read(_ url: URL, counted: Bool = true, blockSize: Int = ToolRun.blockSize, _ body: (Data) throws -> Void)
+    internal func read(
+        _ url: URL,
+        counted: Bool = true,
+        blockSize: Int = ToolRun.blockSize,
+        _ body: (Data) throws -> Void
+    )
         throws
     {
         try read(try openReader(url), counted: counted, blockSize: blockSize, body)
@@ -189,7 +194,7 @@ final class ToolRun: @unchecked Sendable {
     ///
     /// Tools open their source before they create anything, so that a source that cannot be read
     /// costs no output file.
-    func openReader(_ url: URL) throws -> any FileReader {
+    internal func openReader(_ url: URL) throws -> any FileReader {
         do {
             // What a plugin still holds back for this file (an archive written after a delay) is written first.
             try fileSystems.flushPendingWrites(to: url, cancellation: cancellation)
@@ -203,7 +208,7 @@ final class ToolRun: @unchecked Sendable {
         }
     }
 
-    func read(
+    internal func read(
         _ reader: any FileReader,
         counted: Bool = true,
         blockSize: Int = ToolRun.blockSize,
@@ -236,7 +241,7 @@ final class ToolRun: @unchecked Sendable {
     /// The whole of a small file (a checksum file, a `.crc` file).
     ///
     /// A file longer than `limit` is an error, never a silently shortened text.
-    func contents(of url: URL, limit: Int = 256 << 20) throws -> Data {
+    internal func contents(of url: URL, limit: Int = 256 << 20) throws -> Data {
         var data = Data()
         let reader = try openReader(url)
         defer { reader.close() }
@@ -270,7 +275,7 @@ final class ToolRun: @unchecked Sendable {
     /// replacement happens only when `transaction` ends well, and everything the run created
     /// is taken back when it does not, so a cancelled or failed run never leaves a mixture of
     /// old and new files and never touches what was there before.
-    func create(_ url: URL, autoRename: Bool = false, deferred: Bool = false) throws -> ToolOutput? {
+    internal func create(_ url: URL, autoRename: Bool = false, deferred: Bool = false) throws -> ToolOutput? {
         var url = url
         let provider = try provider(for: url)
         var output: ToolOutput?
@@ -333,7 +338,7 @@ final class ToolRun: @unchecked Sendable {
     /// The outputs it made with `deferred: true` take the place of the files they replace when it
     /// has finished without an error; if it throws (or is cancelled), they are all removed again
     /// and the files that were there before are untouched.
-    func transaction<Value>(_ body: () throws -> Value) throws -> Value {
+    internal func transaction<Value>(_ body: () throws -> Value) throws -> Value {
         do {
             let value = try body()
             try checkCancelled()
@@ -364,7 +369,7 @@ final class ToolRun: @unchecked Sendable {
     }
 
     /// `name(2).ext`, `name(3).ext`, …: the first that is free (spec 08 › Decode).
-    static func freeName(for url: URL, provider: any FileSystemProvider) -> URL {
+    internal static func freeName(for url: URL, provider: any FileSystemProvider) -> URL {
         let (base, ext) = FileItem.split(url.lastPathComponent)
         func candidate(_ number: Int) -> URL {
             url.deletingLastPathComponent().appending(name: "\(base)(\(number))" + (ext.isEmpty ? "" : "." + ext))
@@ -376,7 +381,7 @@ final class ToolRun: @unchecked Sendable {
 
     /// Writes a small file in one go.
     @discardableResult
-    func write(_ data: Data, to url: URL, deferred: Bool = false) throws -> URL? {
+    internal func write(_ data: Data, to url: URL, deferred: Bool = false) throws -> URL? {
         guard let output = try create(url, deferred: deferred) else {
             return nil
         }
@@ -392,7 +397,7 @@ final class ToolRun: @unchecked Sendable {
 
     /// Whether two locations are one file: the same place, or (on this Mac) the same device and
     /// inode, which sees through letter case, links and symbolic links in the path.
-    static func isSameFile(_ first: URL, _ second: URL) -> Bool {
+    internal static func isSameFile(_ first: URL, _ second: URL) -> Bool {
         first.isSameLocation(as: second) || first.isSameFile(as: second, followingLinks: true)
     }
 }
@@ -401,8 +406,8 @@ final class ToolRun: @unchecked Sendable {
 ///
 /// What is not finished is removed again, so a failed or cancelled tool leaves no half-written
 /// files.
-final class ToolOutput {
-    let url: URL
+internal final class ToolOutput {
+    internal let url: URL
     private let writer: any FileWriter
     private let provider: any FileSystemProvider
     /// Where the data goes while it replaces an existing file at `url`; nil when it is written to `url` itself.
@@ -411,14 +416,14 @@ final class ToolOutput {
     private let deferred: Bool
     private enum State { case open, closed, done, undone }
     private var state = State.open
-    private(set) var bytesWritten: Int64 = 0
+    internal private(set) var bytesWritten: Int64 = 0
     private let cancellation: CancellationFlag?
     /// Ties the writer to the run's cancel while the output lives, so a blocked write ends.
     private let interruption: AnyObject?
     /// The mark of coming from elsewhere that the finished file gets (see `ToolRun.carriesOrigin`), asked when it is finished.
     private let origin: () -> Data?
 
-    init(
+    internal init(
         url: URL,
         writer: any FileWriter,
         provider: any FileSystemProvider,
@@ -439,7 +444,7 @@ final class ToolOutput {
 
     private var partial: URL { temporary ?? url }
 
-    func write(_ data: Data) throws {
+    internal func write(_ data: Data) throws {
         do {
             try writer.write(data)
         } catch {
@@ -452,7 +457,7 @@ final class ToolOutput {
     /// Completes the file.
     ///
     /// One that replaces another takes its place now, or, when the output is deferred, at `commit`.
-    func finish() throws {
+    internal func finish() throws {
         guard state == .open else {
             return
         }
@@ -471,7 +476,7 @@ final class ToolOutput {
     }
 
     /// Puts a finished, deferred output in the place of the file it replaces.
-    func commit() throws {
+    internal func commit() throws {
         guard state == .closed, let temporary else {
             return
         }
@@ -486,7 +491,7 @@ final class ToolOutput {
     }
 
     /// Drops an output that is not finished.
-    func abandon() {
+    internal func abandon() {
         guard state == .open else {
             return
         }
@@ -499,7 +504,7 @@ final class ToolOutput {
     /// anew.
     ///
     /// A file it replaced is not touched; that happens only at `commit`.
-    func undo() {
+    internal func undo() {
         switch state {
         case .open:
             abandon()

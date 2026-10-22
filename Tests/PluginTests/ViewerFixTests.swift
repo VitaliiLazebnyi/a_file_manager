@@ -9,7 +9,7 @@ import Testing
 /// texts, the raw-byte row scan, partial results of a huge line, decoding without offsets,
 /// HTML as text, cached remote reads and temporary copies.
 @Suite
-struct ViewerFix {
+internal struct ViewerFix {
     // MARK: Search
 
     private func find(
@@ -33,7 +33,7 @@ struct ViewerFix {
     }
 
     @Test
-    func anchorsAndWordBoundariesDoNotMatchAtTheSearchStart() throws {
+    internal func anchorsAndWordBoundariesDoNotMatchAtTheSearchStart() throws {
         let data = Data("foo bar\nbaz qux".utf8)
         let regex = SearchOptions(regex: true)
         // From inside "foo", ^\w+ is the next line's word, not the rest of the first one.
@@ -44,7 +44,7 @@ struct ViewerFix {
     }
 
     @Test
-    func anchorsAndWordBoundariesDoNotMatchAtChunkBorders() throws {
+    internal func anchorsAndWordBoundariesDoNotMatchAtChunkBorders() throws {
         let data = Data("aabar bar\nx bar".utf8)
         let regex = SearchOptions(regex: true)
         for chunk in 1...12 {
@@ -54,7 +54,7 @@ struct ViewerFix {
     }
 
     @Test
-    func aTextInADoubleByteEncodingIsFoundAcrossChunkBorders() throws {
+    internal func aTextInADoubleByteEncodingIsFoundAcrossChunkBorders() throws {
         let gbk = try #require(ViewerEncoding.codePage(936))
         #expect(gbk.kind == .doubleByte)
         let text = String(repeating: "你好世界", count: 40) + "end"
@@ -77,7 +77,7 @@ struct ViewerFix {
     }
 
     @Test
-    func plainTextMatchingCaseIsSearchedInTheRawBytes() throws {
+    internal func plainTextMatchingCaseIsSearchedInTheRawBytes() throws {
         let data = Data("Größe grösse GRÖSSE Größe".utf8)
         let sensitive = SearchOptions(caseSensitive: true)
         #expect(try find("Größe", sensitive, in: data) == 0..<7)
@@ -94,7 +94,7 @@ struct ViewerFix {
     }
 
     @Test
-    func aBacktrackingExpressionCanBeCancelled() throws {
+    internal func aBacktrackingExpressionCanBeCancelled() throws {
         let data = Data(String(repeating: "a", count: 40).utf8 + Data("!".utf8))
         let pattern = try SearchPattern("(a+)+$", options: SearchOptions(regex: true), encoding: .utf8)
         let flag = CancellationFlag()
@@ -120,7 +120,7 @@ struct ViewerFix {
     // MARK: Decoding
 
     @Test
-    func decodingWithoutOffsetsGivesTheSameText() {
+    internal func decodingWithoutOffsetsGivesTheSameText() {
         let data = Data("Zeile 1\r\nGröße € 😀\nend".utf8)
         var with = DecodedText()
         var without = DecodedText()
@@ -168,7 +168,7 @@ struct ViewerFix {
     }
 
     @Test
-    func theRawByteScanFindsTheSameRowsAsDecodingEverything() throws {
+    internal func theRawByteScanFindsTheSameRowsAsDecodingEverything() throws {
         let text = sampleText(seed: 7, lines: 600)
         let utf8 = Data(text.utf8)
         let gbk = try #require(ViewerEncoding.codePage(936))
@@ -211,7 +211,7 @@ struct ViewerFix {
     }
 
     @Test
-    func aFileWithoutLineEndsShowsItsStartBeforeItIsRead() throws {
+    internal func aFileWithoutLineEndsShowsItsStartBeforeItIsRead() throws {
         // One line of 10 MB: its rows are handed over every few megabytes while it is read.
         let data = Data(repeating: UInt8(ascii: "x"), count: 10 << 20)
         var partials: [(rows: Int, covered: Int64)] = []
@@ -232,7 +232,7 @@ struct ViewerFix {
     }
 
     @Test
-    func theIndexPublishesTheFrontierSegmentAsItGoes() throws {
+    internal func theIndexPublishesTheFrontierSegmentAsItGoes() throws {
         let data = Data(repeating: UInt8(ascii: "y"), count: 9 << 20)
         let document = TextDocument(
             source: DataByteSource(data),
@@ -250,7 +250,7 @@ struct ViewerFix {
     }
 
     @Test
-    func checkpointsArePacked() {
+    internal func checkpointsArePacked() {
         var list = TextRowIndex.CheckpointList()
         list.append(.init(offset: 1 << 40, linesBefore: 77, startsLine: true))
         list.append(.init(offset: 5, linesBefore: 0, startsLine: false))
@@ -260,7 +260,7 @@ struct ViewerFix {
     }
 
     @Test
-    func aFailedReadIsRecordedAndShown() {
+    internal func aFailedReadIsRecordedAndShown() {
         final class Failing: ByteSource {
             let length: Int64 = 3_000
             func read(at offset: Int64, count: Int) throws -> Data {
@@ -281,7 +281,7 @@ struct ViewerFix {
     // MARK: HTML
 
     @Test
-    func htmlIsStrippedFromUnitsAndCanBeCancelled() {
+    internal func htmlIsStrippedFromUnitsAndCanBeCancelled() {
         let html = "<p>One &amp; two</p><script>x<y</script><a href=\"u\">l</a><!-- c --><pre> a  b </pre>"
         let expected = HTMLText.plainText(from: html)
         #expect(expected.text == "One & two\nl {u}\n a  b\n" && expected.links == ["u"])
@@ -292,7 +292,7 @@ struct ViewerFix {
     }
 
     @Test
-    func htmlIsStrippedFast() {
+    internal func htmlIsStrippedFast() {
         var html = ""
         for number in 0..<20_000 {
             html +=
@@ -311,7 +311,7 @@ struct ViewerFix {
     // MARK: Cached remote reads
 
     @Test
-    func aSmallRemoteFileIsFetchedOnceForAnyNumberOfLongReads() throws {
+    internal func aSmallRemoteFileIsFetchedOnceForAnyNumberOfLongReads() throws {
         /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
         final class Counting: ByteSource, @unchecked Sendable {
             let data = Data((0..<300_000).map { UInt8($0 % 251) })
@@ -344,7 +344,7 @@ struct ViewerFix {
     // MARK: Temporary copies
 
     @Test
-    func temporaryCopiesAreUniqueKeyedByStampAndReleased() throws {
+    internal func temporaryCopiesAreUniqueKeyedByStampAndReleased() throws {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -391,7 +391,7 @@ struct ViewerFix {
     }
 
     @Test
-    func leftoverFoldersOfDeadProcessesAreSwept() throws {
+    internal func leftoverFoldersOfDeadProcessesAreSwept() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "afm-sweep-test-\(UUID().uuidString)",
             isDirectory: true

@@ -11,14 +11,14 @@ import Testing
 ///
 /// Every payload only tries to `touch` a marker file in the test's own folder.
 @Suite
-struct Review2ConfigAShell {
-    static let shells = ["/bin/zsh", "/bin/sh"]
+internal struct Review2ConfigAShell {
+    internal static let shells = ["/bin/zsh", "/bin/sh"]
 
     /// Names that ran commands before, and their relatives.
     ///
     /// The marks after a quote, a backtick, a backslash and a dollar sign are U+0301: one
     /// `Character` with what they follow.
-    static let hostile: [String] = [
+    internal static let hostile: [String] = [
         "a\"\u{301};touch M1;\"\u{301}", "`\u{301};touch M2;`\u{301}", "\\\u{301}", "$\u{301}(touch M3)",
         "'\u{301};touch M4;'\u{301}",
         "a\"\u{FE0F};touch M5;\"\u{FE0F}", "';touch M6;'", "a;touch M7", "$(touch M8)", "`touch M9`",
@@ -30,14 +30,14 @@ struct Review2ConfigAShell {
         "\u{1B}[31mred", "a\rb"
     ]
 
-    let box: Sandbox
+    internal let box: Sandbox
 
-    init() throws {
+    internal init() throws {
         box = try Sandbox()
         try box.folder("run")
     }
 
-    func context(name: String?, selection: [String] = []) -> ExpansionContext {
+    internal func context(name: String?, selection: [String] = []) -> ExpansionContext {
         ExpansionContext(
             left: PanelSnapshot(path: "/tmp/A dir/", cursorName: name, selection: selection),
             right: PanelSnapshot(path: "/B/", cursorName: nil),
@@ -47,21 +47,21 @@ struct Review2ConfigAShell {
         )
     }
 
-    func expand(_ template: String, name: String?, selection: [String] = []) -> ExpandedParameters {
+    internal func expand(_ template: String, name: String?, selection: [String] = []) -> ExpandedParameters {
         ParameterExpander(context: context(name: name, selection: selection)).expand(template)
     }
 
-    struct Outcome {
+    internal struct Outcome {
         /// The arguments of each case, as the shell made them.
-        var arguments: [[String]]
-        var created: [String]
+        internal var arguments: [[String]]
+        internal var created: [String]
     }
 
     /// Runs `printf` with the pieces of every case as its arguments, all cases in one script,
     /// exactly as the runner hands a line to a shell.
     ///
     /// Returns what arrived and which files appeared in the folder the script ran in.
-    func run(_ cases: [[ExpandedPiece]], shell: String) throws -> Outcome {
+    internal func run(_ cases: [[ExpandedPiece]], shell: String) throws -> Outcome {
         var pieces: [ExpandedPiece] = []
         for one in cases { pieces += [.text("printf '%s\\0' ")] + one + [.text("\nprintf '\\001\\0'\n")] }
         let script = try ShellLine.script(pieces).get()
@@ -91,15 +91,15 @@ struct Review2ConfigAShell {
     }
 
     /// The same bytes whatever form the test process or the shell prefers for accents.
-    func same(_ a: [[String]], _ b: [[String]]) -> Bool {
+    internal func same(_ a: [[String]], _ b: [[String]]) -> Bool {
         a.map { $0.map(\.decomposedStringWithCanonicalMapping) }
             == b.map { $0.map(\.decomposedStringWithCanonicalMapping) }
     }
 
-    func protected(_ name: String) -> String { name.unicodeScalars.first == "-" ? "./" + name : name }
+    internal func protected(_ name: String) -> String { name.unicodeScalars.first == "-" ? "./" + name : name }
 
     /// Every template in which a placeholder may stand, with what the shell must make of it.
-    static let templates: [(template: String, expected: @Sendable (String, String) -> [String])] = [
+    internal static let templates: [(template: String, expected: @Sendable (String, String) -> [String])] = [
         ("%N", { _, guarded in [guarded] }),
         ("x%Ny", { name, _ in ["x" + name + "y"] }),
         ("--out=%N", { name, _ in ["--out=" + name] }),
@@ -120,7 +120,7 @@ struct Review2ConfigAShell {
     ]
 
     @Test
-    func aNameIsOneArgumentAndNothingOfItRunsInAnyPlaceAndShell() throws {
+    internal func aNameIsOneArgumentAndNothingOfItRunsInAnyPlaceAndShell() throws {
         for shell in Self.shells {
             for (template, expected) in Self.templates {
                 // Command substitution takes the line breaks off the end; such names are checked elsewhere.
@@ -145,7 +145,7 @@ struct Review2ConfigAShell {
 
     /// Names put together from everything a shell gives a meaning to, always the same ones.
     @Test
-    func namesMadeOfShellCharactersArriveUnchanged() throws {
+    internal func namesMadeOfShellCharactersArriveUnchanged() throws {
         let parts: [String] = [
             " ", "\t", "\n", "\"", "'", "\\", "$", "`", "!", "*", "?", "[", "]", "(", ")", "{", "}", "<", ">", "|", "&",
             ";", "~", "#",
@@ -179,7 +179,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func aPlaceWhereNoReferenceIsSafeIsRefused() {
+    internal func aPlaceWhereNoReferenceIsSafeIsRefused() {
         let refused = [
             "`printf %s %N`", "\"`cmd %N`\"", "$'%N'", "echo # %N", "cat <<EOF\n%N\nEOF", "cat << 'EOF' %N", "\\%N",
             "$((%N + 1))", "echo $((1 + %N))",
@@ -213,7 +213,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func noValueIsEverPartOfTheScript() throws {
+    internal func noValueIsEverPartOfTheScript() throws {
         for name in Self.hostile {
             for template in ["%N", "\"%N\"", "'%N'", "%P%N", "%S", "%|EVIL|"] {
                 let script = try ShellLine.script(expand("cmd " + template, name: name, selection: [name]).pieces).get()
@@ -235,7 +235,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func quotingOffIsTheUsersChoiceAndDataCannotMakeIt() throws {
+    internal func quotingOffIsTheUsersChoiceAndDataCannotMakeIt() throws {
         // %Q: the name is pasted as it is and the shell splits it, as documented.
         let off = expand("%Q%N", name: "a b")
         #expect(off.pieces == [.raw("a b")] && off.text == "a b")
@@ -266,7 +266,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func aValueKeepsEveryCharacter() {
+    internal func aValueKeepsEveryCharacter() {
         // Only blanks the user wrote go from the ends of the line.
         #expect(expand("  %N  ", name: "a\u{A0}").pieces == [.value("a\u{A0}")])
         #expect(expand("%N", name: "report\u{3000}").pieces == [.value("report\u{3000}")])
@@ -278,7 +278,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func numbersTheUserTypesNeverTrap() {
+    internal func numbersTheUserTypesNeverTrap() {
         let huge = "9223372036854775807"
         let beyond = "99999999999999999999999999"
         for template in [
@@ -300,7 +300,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func aLeadingDashIsGuardedOnlyWhereAWordBegins() {
+    internal func aLeadingDashIsGuardedOnlyWhereAWordBegins() {
         #expect(
             expand("%N", name: "-x").pieces == [.value("./-x")] && expand("\"%N\"", name: "-x").text == "\"./-x\""
         )
@@ -322,7 +322,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func listFilesRefuseNamesThatWouldBeTwoLines() {
+    internal func listFilesRefuseNamesThatWouldBeTwoLines() {
         let broken = expand("xargs rm < %L", name: nil, selection: ["x\n/Users/me/important", "b"])
         #expect(broken.problem?.contains("line break") == true)
         #expect(
@@ -335,7 +335,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func thePromptShowsNamesAndTakesThemBack() {
+    internal func thePromptShowsNamesAndTakesThemBack() {
         let pieces = expand("-v %N %P%N '%N'", name: "my file.txt").pieces
         let shown = ShellLine.prompt(pieces)
         #expect(
@@ -358,7 +358,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func textForMessagesHasNoLineBreaksOrControlCharacters() {
+    internal func textForMessagesHasNoLineBreaksOrControlCharacters() {
         #expect(DisplayText.oneLine("a\nb\rc\td\u{1B}[31m\u{202E}x\u{7}") == "a\\nb\\rc\\td\\u{1B}[31m\\u{202E}x\\u{7}")
         #expect(DisplayText.oneLine("caf\u{e9} 👨‍👩‍👧 ok") == "caf\u{e9} 👨‍👩‍👧 ok")
         #expect(
@@ -368,7 +368,7 @@ struct Review2ConfigAShell {
     }
 
     @Test
-    func aProgramGetsItsArgumentsByteForByte() async throws {
+    internal func aProgramGetsItsArgumentsByteForByte() async throws {
         // `é` in one character: Foundation's `Process` would hand it over as `e` and an accent.
         let name = "caf\u{e9} a\u{A0}.txt"
         let out = box.url("run/bytes.bin")

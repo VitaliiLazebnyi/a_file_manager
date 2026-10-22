@@ -5,8 +5,8 @@ import zlib
 
 /// The checksum of ZIP and GZIP, from the system's zlib (which uses the processor's own
 /// instructions for it).
-enum CRC32 {
-    static func update(_ crc: UInt32, _ data: Data) -> UInt32 {
+internal enum CRC32 {
+    internal static func update(_ crc: UInt32, _ data: Data) -> UInt32 {
         data.withUnsafeBytes { bytes -> UInt32 in
             var crc = uLong(crc)
             var offset = 0
@@ -20,11 +20,11 @@ enum CRC32 {
         }
     }
 
-    static func of(_ data: Data) -> UInt32 { update(0, data) }
+    internal static func of(_ data: Data) -> UInt32 { update(0, data) }
 
     /// The checksum of two blocks in a row from the checksums of each: lets blocks be summed
     /// on several cores.
-    static func combine(_ first: UInt32, _ second: UInt32, secondLength: Int) -> UInt32 {
+    internal static func combine(_ first: UInt32, _ second: UInt32, secondLength: Int) -> UInt32 {
         UInt32(truncatingIfNeeded: crc32_combine(uLong(first), uLong(second), secondLength))
     }
 }
@@ -34,12 +34,12 @@ enum CRC32 {
 ///
 /// The system's; a test passes calls that fail as zlib can fail (no memory, a stream in a state it
 /// does not accept).
-struct DeflateCalls: Sendable {
-    let start: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
-    let run: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
+internal struct DeflateCalls: Sendable {
+    internal let start: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
+    internal let run: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
 
     /// A raw stream, without the zlib or gzip wrapping.
-    static let zlib = Self(
+    internal static let zlib = Self(
         start: { stream, level in
             deflateInit2_(
                 stream,
@@ -57,13 +57,13 @@ struct DeflateCalls: Sendable {
 }
 
 /// Deflate compression (ZIP method 8, GZIP) through zlib.
-enum Deflater {
+internal enum Deflater {
     /// One independent piece of a deflate stream, at level 1 (fast) … 9 (small).
     ///
     /// Pieces made this way, each on its own core, form one valid stream when written one after the
     /// other; the last one is `final`, the others end their block on a byte boundary without ending
     /// the stream. Throws when zlib fails, rather than hand on a piece that is cut short.
-    static func piece(_ data: Data, level: Int, final: Bool, calls: DeflateCalls = .zlib) throws -> Data {
+    internal static func piece(_ data: Data, level: Int, final: Bool, calls: DeflateCalls = .zlib) throws -> Data {
         let stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
         stream.initialize(to: z_stream())
         defer { stream.deallocate() }
@@ -100,8 +100,8 @@ enum Deflater {
 
 /// Decompresses deflate data from another stream: raw (ZIP members) or wrapped (GZIP files,
 /// also several members in a row, as parallel compressors write them).
-final class InflateStream: ByteStream {
-    enum Wrapping {
+internal final class InflateStream: ByteStream {
+    internal enum Wrapping {
         case raw, gzip
     }
 
@@ -114,7 +114,7 @@ final class InflateStream: ByteStream {
     private var sourceEnded = false
     private let control: StreamInterrupt?
 
-    init(_ source: any ByteStream, wrapping: Wrapping, control: StreamInterrupt? = nil) {
+    internal init(_ source: any ByteStream, wrapping: Wrapping, control: StreamInterrupt? = nil) {
         self.source = source
         self.wrapping = wrapping
         self.control = control
@@ -141,7 +141,7 @@ final class InflateStream: ByteStream {
         stream.pointee.avail_in = uInt(block.count)
     }
 
-    func read(upToCount count: Int) throws -> Data? {
+    internal func read(upToCount count: Int) throws -> Data? {
         guard !isFinished, count > 0 else {
             return nil
         }
@@ -195,13 +195,13 @@ final class InflateStream: ByteStream {
         }
     }
 
-    func close() {
+    internal func close() {
         source.close()
     }
 }
 
 /// LZMA in the `.xz` container, through the system's Compression framework.
-final class XZCoder {
+internal final class XZCoder {
     private let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
     private var isOpen = false
     private let encodes: Bool
@@ -209,7 +209,7 @@ final class XZCoder {
 
     /// An LZMA coder; a test passes an `algorithm` the system does not know, which it refuses
     /// as it would refuse to start one without memory for it.
-    init(encoding: Bool, algorithm: compression_algorithm = COMPRESSION_LZMA) throws {
+    internal init(encoding: Bool, algorithm: compression_algorithm = COMPRESSION_LZMA) throws {
         encodes = encoding
         self.algorithm = algorithm
         try start()
@@ -236,7 +236,9 @@ final class XZCoder {
     ///
     /// Returns what came out, how much of the input was used, and whether the compressed stream
     /// ended (after which a new one may start).
-    func process(_ input: Data, finish: Bool, limit: Int = .max) throws -> (output: Data, consumed: Int, ended: Bool) {
+    internal func process(_ input: Data, finish: Bool, limit: Int = .max) throws -> (
+        output: Data, consumed: Int, ended: Bool
+    ) {
         var output = Data()
         let capacity = 1 << 17
         let chunk = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
@@ -271,17 +273,17 @@ final class XZCoder {
         return (output, consumed, ended)
     }
 
-    func restart() throws {
+    internal func restart() throws {
         try start()
     }
 
-    static func compress(_ data: Data) throws -> Data {
+    internal static func compress(_ data: Data) throws -> Data {
         try XZCoder(encoding: true).process(data, finish: true).output
     }
 }
 
 /// Decompresses an `.xz` file; several streams in a row are read as one.
-final class XZStream: ByteStream {
+internal final class XZStream: ByteStream {
     private let source: any ByteStream
     private let coder: XZCoder
     private var pending = Data()
@@ -292,7 +294,7 @@ final class XZStream: ByteStream {
     private var readyOffset = 0
     private let control: StreamInterrupt?
 
-    init(_ source: any ByteStream, control: StreamInterrupt? = nil) throws {
+    internal init(_ source: any ByteStream, control: StreamInterrupt? = nil) throws {
         self.source = source
         self.control = control
         coder = try XZCoder(encoding: false)
@@ -300,7 +302,7 @@ final class XZStream: ByteStream {
 
     /// Never more than `count` bytes: the coder delivers in blocks of its own size, and a
     /// reader that asks for one TAR header must get no more than that.
-    func read(upToCount count: Int) throws -> Data? {
+    internal func read(upToCount count: Int) throws -> Data? {
         if readyOffset >= ready.count {
             guard let more = try decode(upToCount: count) else {
                 return nil
@@ -346,31 +348,31 @@ final class XZStream: ByteStream {
         return nil
     }
 
-    func close() {
+    internal func close() {
         source.close()
     }
 }
 
 /// A program of the system run as a child process, without a shell: every argument reaches the
 /// program exactly as given.
-enum Tool {
-    static let bsdtar = "/usr/bin/bsdtar"
-    static let bzip2 = "/usr/bin/bzip2"
-    static let gzip = "/usr/bin/gzip"
+internal enum Tool {
+    internal static let bsdtar = "/usr/bin/bsdtar"
+    internal static let bzip2 = "/usr/bin/bzip2"
+    internal static let gzip = "/usr/bin/gzip"
 
     /// What a child process sees of its surroundings: nothing of the user's.
     ///
     /// The tools read options from variables (`BZIP2`, `TAR_READER_OPTIONS`, …) and look for helper
     /// programs on the search path; neither is the caller's to steer. The UTF-8 locale is what lets
     /// bsdtar pass on names that are not ASCII.
-    static let environment = ["PATH": "/usr/bin:/bin", "LC_ALL": "en_US.UTF-8", "LANG": "en_US.UTF-8"]
+    internal static let environment = ["PATH": "/usr/bin:/bin", "LC_ALL": "en_US.UTF-8", "LANG": "en_US.UTF-8"]
     /// Of what a tool complains about, this much is kept; a tool that warns about every one
     /// of a million entries must not fill the memory.
-    static let errorLimit = 64 << 10
+    internal static let errorLimit = 64 << 10
 
     /// A process set up to run a tool: the surroundings above, and a working folder in which
     /// there is nothing to find by a relative path.
-    static func process(_ executable: String, _ arguments: [String]) -> Process {
+    internal static func process(_ executable: String, _ arguments: [String]) -> Process {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -381,7 +383,11 @@ enum Tool {
 
     /// Reads a pipe to its end on a thread of its own (not one of the shared pool's, which a
     /// child that never ends would take away for good) and keeps the first `errorLimit` bytes.
-    static func collect(_ handle: FileHandle, group: DispatchGroup, into store: @escaping @Sendable (Data) -> Void) {
+    internal static func collect(
+        _ handle: FileHandle,
+        group: DispatchGroup,
+        into store: @escaping @Sendable (Data) -> Void
+    ) {
         group.enter()
         Thread.detachNewThread {
             var kept = Data()
@@ -400,7 +406,7 @@ enum Tool {
     }
 
     /// Runs the program with `input` on its standard input and returns its standard output.
-    static func filter(_ executable: String, _ arguments: [String], input: Data) throws -> Data {
+    internal static func filter(_ executable: String, _ arguments: [String], input: Data) throws -> Data {
         let process = Self.process(executable, arguments)
         let (stdin, stdout, stderr) = (Pipe(), Pipe(), Pipe())
         process.standardInput = stdin
@@ -431,7 +437,7 @@ enum Tool {
         return output
     }
 
-    static func failure(_ executable: String, _ errors: Data) -> ArchiveError {
+    internal static func failure(_ executable: String, _ errors: Data) -> ArchiveError {
         let text = String(decoding: errors, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         let name = (executable as NSString).lastPathComponent
         return .toolFailed(text.isEmpty ? "\(name) failed." : text)
@@ -445,7 +451,7 @@ enum Tool {
 ///
 /// Unchecked: `errors` and `isClosed` are guarded by `lock`; the rest is fixed in `init` or
 /// belongs to the thread that reads the stream. Other threads only `stop` the child.
-final class ProcessStream: ByteStream, @unchecked Sendable {
+internal final class ProcessStream: ByteStream, @unchecked Sendable {
     private let process: Process
     private let executable: String
     private let output = Pipe()
@@ -457,7 +463,7 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
     private var ended = false
     private let control: StreamInterrupt?
 
-    init(_ executable: String, _ arguments: [String], control: StreamInterrupt? = nil) throws {
+    internal init(_ executable: String, _ arguments: [String], control: StreamInterrupt? = nil) throws {
         self.executable = executable
         self.control = control
         process = Tool.process(executable, arguments)
@@ -487,7 +493,7 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
 
     deinit { close() }
 
-    func read(upToCount count: Int) throws -> Data? {
+    internal func read(upToCount count: Int) throws -> Data? {
         guard !ended else {
             return nil
         }
@@ -520,7 +526,7 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
         return nil
     }
 
-    func close() {
+    internal func close() {
         lock.lock()
         let wasClosed = isClosed
         isClosed = true
@@ -534,12 +540,12 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
 }
 
 /// What a compressed file says about its unpacked size without being unpacked.
-enum CompressedSize {
+internal enum CompressedSize {
     /// The size of an `.xz` file's contents, from the indexes at the ends of its streams
     /// (several streams in a row are one file).
     ///
     /// Nil when they cannot be read; every number in them is checked against the file.
-    static func ofXZ(_ file: RandomAccessFile) -> UInt64? {
+    internal static func ofXZ(_ file: RandomAccessFile) -> UInt64? {
         var end = file.size
         var total: UInt64 = 0
         var (streams, steps) = (0, 0)
@@ -613,7 +619,7 @@ enum CompressedSize {
     /// That is the size itself for one stream of less than 4 GB, which is what nearly every such
     /// file is, but nothing in the file proves it. A number too small for the compressed data to
     /// have come from is raised by the 4 GB steps it must have lost.
-    static func claimedByGzip(_ file: RandomAccessFile) -> UInt64? {
+    internal static func claimedByGzip(_ file: RandomAccessFile) -> UInt64? {
         guard file.size >= 18, let tail = try? file.read(at: file.size - 4, count: 4), tail.count == 4 else {
             return nil
         }
@@ -631,7 +637,7 @@ extension ArchiveFormat.Codec {
     /// Decompresses the local file at `url`.
     ///
     /// With a `control`, the stream ends with an error once the request is set.
-    func decompressing(_ file: RandomAccessFile, control: StreamInterrupt? = nil) throws -> any ByteStream {
+    internal func decompressing(_ file: RandomAccessFile, control: StreamInterrupt? = nil) throws -> any ByteStream {
         switch self {
         case .gzip:
             return InflateStream(FileRangeStream(file), wrapping: .gzip, control: control)
@@ -655,8 +661,8 @@ extension ArchiveFormat.Codec {
 /// Each of the three formats allows that: deflate pieces join into one stream, and BZIP2 and XZ
 /// files may consist of several streams. Used by one thread; the pieces are compressed on the
 /// others.
-final class ParallelCompressor {
-    enum Method: Equatable {
+internal final class ParallelCompressor {
+    internal enum Method: Equatable {
         case none
         case gzip(level: Int)
         case bzip2(level: Int)
@@ -672,7 +678,7 @@ final class ParallelCompressor {
     private let pieceSize: Int
     private let windowSize: Int
 
-    init(_ method: Method, to output: OutputFile, modified: Date = Date()) throws {
+    internal init(_ method: Method, to output: OutputFile, modified: Date = Date()) throws {
         self.method = method
         self.output = output
         let cores = ProcessInfo.processInfo.activeProcessorCount
@@ -698,7 +704,7 @@ final class ParallelCompressor {
         }
     }
 
-    func write(_ data: Data) throws {
+    internal func write(_ data: Data) throws {
         if method == .none {
             try output.write(data)
             return
@@ -707,7 +713,7 @@ final class ParallelCompressor {
         if buffer.count >= windowSize { try drain(final: false) }
     }
 
-    func finish() throws {
+    internal func finish() throws {
         try drain(final: true)
         if case .gzip = method {
             var trailer = Data()

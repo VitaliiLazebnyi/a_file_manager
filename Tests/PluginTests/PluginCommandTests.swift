@@ -22,20 +22,20 @@ import ViewOptionsPlugin
 /// of these commands opens a window of theirs).
 @MainActor
 @Suite
-struct PluginCommands {
-    let memory = MemoryFileSystem()
+internal struct PluginCommands {
+    internal let memory = MemoryFileSystem()
     private let presenter = StabilityPresenter()
-    let mac = MacIntegrationPlugin(launchesApplications: false)
+    internal let mac = MacIntegrationPlugin(launchesApplications: false)
     private let scratch = ScratchPasteboard()
-    var pasteboard: NSPasteboard { scratch.pasteboard }
-    let bench: TestBench
+    internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
-    var ui: ScriptedInteraction { bench.interaction }
+    internal var commands: CommandRegistry { bench.commands }
+    internal var left: FakePanel { bench.left }
+    internal var right: FakePanel { bench.right }
+    internal var ui: ScriptedInteraction { bench.interaction }
 
-    init() {
+    internal init() {
         memory.addFile("/A/one.txt", "new")
         memory.addFile("/A/two.txt", "2")
         memory.addFile("/A/docs/in.txt", "inside")
@@ -57,7 +57,7 @@ struct PluginCommands {
     }
 
     /// Shows two folders of the local disk in the panels.
-    func showOnDisk(_ box: Sandbox) {
+    internal func showOnDisk(_ box: Sandbox) {
         left.show(box.url("A"))
         right.show(box.url("B"))
     }
@@ -65,7 +65,7 @@ struct PluginCommands {
     // MARK: Registration
 
     @Test
-    func pluginsRegisterCommandsMenusAndServices() {
+    internal func pluginsRegisterCommandsMenusAndServices() {
         #expect(left.names == ["docs", "one.txt", "two.txt"] && right.names == ["one.txt"])
         #expect(bench.kernel.menus.menus.map(\.title).starts(with: ["Files", "Edit", "Mark", "Commands", "Show"]))
         let inMenus =
@@ -91,7 +91,7 @@ struct PluginCommands {
     // MARK: Selection
 
     @Test
-    func selection() {
+    internal func selection() {
         commands.perform(.selectAll)
         #expect(left.model.selection.count == 3)
         commands.perform(.invertSelection)
@@ -109,7 +109,7 @@ struct PluginCommands {
     }
 
     @Test
-    func commandsThatMeanEverythingWaitForACompleteListing() throws {
+    internal func commandsThatMeanEverythingWaitForACompleteListing() throws {
         let listing = try PanelLoader.load(memory.url("/A"), showHidden: false, fileSystems: bench.kernel.fileSystems)
             .listing
         left.model.show(listing, complete: false)
@@ -127,7 +127,7 @@ struct PluginCommands {
     // MARK: Navigation
 
     @Test
-    func navigation() {
+    internal func navigation() {
         left.moveCursor(toName: "docs")
         commands.perform(.open)
         #expect(left.model.directory.path == "/A/docs" && left.names == ["in.txt"])
@@ -148,7 +148,7 @@ struct PluginCommands {
     }
 
     @Test
-    func changeDirectoryTakesLocationsAndTypedText() {
+    internal func changeDirectoryTakesLocationsAndTypedText() {
         commands.perform(.changeDirectory, .location(memory.url("/B/one.txt")))
         #expect(left.model.directory.path == "/B" && left.model.cursorItem?.name == "one.txt")
         commands.perform(.changeDirectory, .text("../A/docs"))
@@ -162,7 +162,7 @@ struct PluginCommands {
     }
 
     @Test
-    func panelsFollowEachOther() {
+    internal func panelsFollowEachOther() {
         commands.perform(.targetEqualsSource)
         #expect(right.model.directory.path == "/A")
         left.show(memory.url("/A/docs"))
@@ -176,7 +176,7 @@ struct PluginCommands {
     // MARK: Folder tabs
 
     @Test
-    func folderTabs() {
+    internal func folderTabs() {
         commands.perform(.newTab)
         #expect(left.tabs.count == 2 && left.tabs.activeIndex == 1 && left.names == ["docs", "one.txt", "two.txt"])
         left.moveCursor(toName: "docs")
@@ -197,7 +197,7 @@ struct PluginCommands {
     // MARK: File operations
 
     @Test
-    func copyAsksForTheTargetAndAboutOverwriting() {
+    internal func copyAsksForTheTargetAndAboutOverwriting() {
         left.moveCursor(toName: "one.txt")
         ui.promptAnswers = [.accept]
         ui.choiceAnswers = [0]
@@ -209,7 +209,7 @@ struct PluginCommands {
     }
 
     @Test
-    func copyingASelectionDeselectsItAndRefreshesTheTarget() {
+    internal func copyingASelectionDeselectsItAndRefreshesTheTarget() {
         commands.perform(.selectAll)
         ui.promptAnswers = [.accept]
         ui.choiceAnswers = [1]
@@ -222,7 +222,7 @@ struct PluginCommands {
     }
 
     @Test
-    func copyInTheSameFolderPutsTheCursorOnTheCopy() {
+    internal func copyInTheSameFolderPutsTheCursorOnTheCopy() {
         left.moveCursor(toName: "two.txt")
         ui.promptAnswers = [.text("two copy.txt")]
         commands.perform(.copySamePanel)
@@ -231,7 +231,7 @@ struct PluginCommands {
     }
 
     @Test
-    func copyingOntoItselfIsRefusedWithAMessage() {
+    internal func copyingOntoItselfIsRefusedWithAMessage() {
         left.moveCursor(toName: "two.txt")
         ui.promptAnswers = [.text("/A/")]
         commands.perform(.copy)
@@ -240,7 +240,7 @@ struct PluginCommands {
     }
 
     @Test
-    func moveAndRename() {
+    internal func moveAndRename() {
         left.moveCursor(toName: "two.txt")
         ui.promptAnswers = [.accept]
         commands.perform(.renameMove)
@@ -261,7 +261,7 @@ struct PluginCommands {
     }
 
     @Test
-    func newFolders() {
+    internal func newFolders() {
         left.moveCursor(toName: "docs")
         ui.promptAnswers = [.text("made/inner | other")]
         commands.perform(.makeDirectory)
@@ -273,7 +273,7 @@ struct PluginCommands {
     }
 
     @Test
-    func deleteAsksAndDeletesDirectlyWhereThereIsNoTrash() {
+    internal func deleteAsksAndDeletesDirectlyWhereThereIsNoTrash() {
         left.moveCursor(toName: "docs")
         ui.choiceAnswers = [0, 0]
         commands.perform(.delete)
@@ -291,7 +291,7 @@ struct PluginCommands {
     }
 
     @Test
-    func onAReadOnlyFileSystemChangingCommandsAreWithheld() {
+    internal func onAReadOnlyFileSystemChangingCommandsAreWithheld() {
         memory.capabilities = []
         left.moveCursor(toName: "one.txt")
         for command in [
@@ -304,7 +304,7 @@ struct PluginCommands {
     }
 
     @Test
-    func nothingIsOfferedOnTheParentRow() {
+    internal func nothingIsOfferedOnTheParentRow() {
         left.model.moveCursor(to: 0)
         #expect(left.model.cursorIsOnParentRow)
         for command in [CommandID.copy, .renameMove, .renameOnly, .delete, .view, .edit, .cutToClipboard] {
@@ -316,7 +316,7 @@ struct PluginCommands {
     // MARK: On the local disk: Trash, editor, clipboard
 
     @Test
-    func newTextFileIsCreatedAndHandedToTheEditor() throws {
+    internal func newTextFileIsCreatedAndHandedToTheEditor() throws {
         let box = try Sandbox()
         try box.file("A/readme.md", "r")
         try box.folder("B")
@@ -328,7 +328,7 @@ struct PluginCommands {
     }
 
     @Test
-    func openingAFileGoesToTheOpeners() throws {
+    internal func openingAFileGoesToTheOpeners() throws {
         let box = try Sandbox()
         try box.file("A/readme.md", "r")
         try box.folder("B")
@@ -349,7 +349,7 @@ struct PluginCommands {
     }
 
     @Test
-    func deleteMovesToTheTrashOnTheLocalDisk() throws {
+    internal func deleteMovesToTheTrashOnTheLocalDisk() throws {
         let box = try Sandbox()
         try box.file("A/readme.md", "r")
         try box.folder("B")
@@ -362,7 +362,7 @@ struct PluginCommands {
     }
 
     @Test
-    func clipboardCopiesMovesAndRenamesSelfCopies() throws {
+    internal func clipboardCopiesMovesAndRenamesSelfCopies() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.file("A/docs/in.txt", "2")
@@ -396,7 +396,7 @@ struct PluginCommands {
     }
 
     @Test
-    func theClipboardCarriesLocalFilesOnly() {
+    internal func theClipboardCarriesLocalFilesOnly() {
         left.moveCursor(toName: "one.txt")
         #expect(!commands.isEnabled(.copyToClipboard) && !commands.isEnabled(.cutToClipboard))
         commands.perform(.copyFullNames)
@@ -406,7 +406,7 @@ struct PluginCommands {
     // MARK: View options
 
     @Test
-    func sortingAndHiddenFiles() {
+    internal func sortingAndHiddenFiles() {
         commands.perform(.sortBySize)
         #expect(left.model.sort == ListOrder(key: .size, descending: true) && commands.isChecked(.sortBySize))
         #expect(left.names == ["docs", "one.txt", "two.txt"])

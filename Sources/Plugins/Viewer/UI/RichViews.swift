@@ -18,7 +18,7 @@ import WebKit
 /// away delete the lot; what a crash left behind is swept at the next launch.
 ///
 /// What changes is guarded by `lock`; `directory` is immutable.
-final class TemporaryCopies: @unchecked Sendable {
+internal final class TemporaryCopies: @unchecked Sendable {
     private struct Copy {
         var folder: URL
         var file: URL
@@ -28,16 +28,16 @@ final class TemporaryCopies: @unchecked Sendable {
     }
 
     /// Why a copy was not made.
-    enum Refusal: Error, Equatable {
+    internal enum Refusal: Error, Equatable {
         case cancelled
         /// The size of the file, and the most that is copied.
         case tooLarge(Int64, limit: Int64)
         case noRoom
         case unreadable
 
-        var isCancelled: Bool { self == .cancelled }
+        internal var isCancelled: Bool { self == .cancelled }
 
-        var message: String {
+        internal var message: String {
             switch self {
             case .cancelled:
                 return ""
@@ -57,11 +57,11 @@ final class TemporaryCopies: @unchecked Sendable {
     }
 
     /// Copies nobody shows that are kept for the next time.
-    static let idleLimit = 2
+    internal static let idleLimit = 2
     /// ... but together no more than this many bytes.
-    static let idleByteLimit: Int64 = 512 << 20
+    internal static let idleByteLimit: Int64 = 512 << 20
     /// What must stay free on the disk after a copy.
-    static let freeSpaceMargin: Int64 = 256 << 20
+    internal static let freeSpaceMargin: Int64 = 256 << 20
 
     private let lock = NSLock()
     private var root: URL?
@@ -76,7 +76,7 @@ final class TemporaryCopies: @unchecked Sendable {
     /// Taken while the folder of all copies is made: one thread makes it.
     private let rootLock = NSLock()
 
-    convenience init(directory: URL = FileManager.default.temporaryDirectory) {
+    internal convenience init(directory: URL = FileManager.default.temporaryDirectory) {
         self.init(directory: directory, disk: .system)
     }
 
@@ -91,7 +91,7 @@ final class TemporaryCopies: @unchecked Sendable {
     /// provider, kept for `owner` until it is released.
     ///
     /// Nil when it cannot be read or `cancellation` was set.
-    func localURL(
+    internal func localURL(
         for url: URL,
         fileSystems: FileSystemRegistry,
         owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
@@ -101,7 +101,7 @@ final class TemporaryCopies: @unchecked Sendable {
     }
 
     /// `localURL`, with the reason when there is none.
-    func localCopy(
+    internal func localCopy(
         for url: URL,
         fileSystems: FileSystemRegistry,
         owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
@@ -207,7 +207,7 @@ final class TemporaryCopies: @unchecked Sendable {
 
     /// A file name for a copy: one path component, whatever the name of the file was (it may
     /// be anything a server sent, decoded: `..`, `a/b`, a very long name).
-    static func safeName(_ name: String) -> String {
+    internal static func safeName(_ name: String) -> String {
         var cleaned = String(
             String.UnicodeScalarView(
                 name.unicodeScalars.map { scalar in
@@ -251,7 +251,7 @@ final class TemporaryCopies: @unchecked Sendable {
 
     /// The pane `owner` shows something else: its copies are kept only while the idle ones are
     /// few enough.
-    func release(owner: ObjectIdentifier) {
+    internal func release(owner: ObjectIdentifier) {
         lock.lock()
         releases[owner, default: 0] += 1
         for key in copies.keys where copies[key]?.owners.contains(owner) == true { copies[key]?.owners.remove(owner) }
@@ -292,7 +292,7 @@ final class TemporaryCopies: @unchecked Sendable {
     private let group = DispatchGroup()
 
     /// Returns once the copies that were let go of have been deleted (for tests).
-    func waitForCleanup() {
+    internal func waitForCleanup() {
         group.wait()
     }
 
@@ -301,7 +301,7 @@ final class TemporaryCopies: @unchecked Sendable {
     ///
     /// With `waiting` off it does not wait at all; `done` is called, on whatever thread, once the
     /// deletion has been carried out (at once when there was nothing to delete).
-    func removeAll(waiting: Bool = true, then done: (@Sendable () -> Void)? = nil) {
+    internal func removeAll(waiting: Bool = true, then done: (@Sendable () -> Void)? = nil) {
         lock.lock()
         let folder = root
         root = nil
@@ -367,11 +367,11 @@ final class TemporaryCopies: @unchecked Sendable {
 
     /// Once per launch, in the background: removes the folders of processes that are gone (a crash
     /// does not run `deinit`), and those of earlier versions that are over a day old.
-    static let sweepOnce: Void = {
+    internal static let sweepOnce: Void = {
         BlockingCalls.run { sweep(in: FileManager.default.temporaryDirectory) }
     }()
 
-    static func sweep(in directory: URL, now: Date = Date()) {
+    internal static func sweep(in directory: URL, now: Date = Date()) {
         let manager = FileManager.default
         guard let names = try? manager.contentsOfDirectory(atPath: directory.path) else {
             return
@@ -394,16 +394,16 @@ final class TemporaryCopies: @unchecked Sendable {
 ///
 /// It plays with a `MediaPlayback`: the system's in the program, a recording one in tests. Main
 /// thread only.
-final class MediaView: NSView {
+internal final class MediaView: NSView {
     private let playerView = AVPlayerView()
     /// What it plays with.
-    let playback: any MediaPlayback
+    internal let playback: any MediaPlayback
     /// Called when the track has played to its end (a playlist then moves on).
-    var onEnd: () -> Void = {}
+    internal var onEnd: () -> Void = {}
     /// Called with "track – artist" when the file's tags name them.
-    var onTitle: ((String) -> Void)?
+    internal var onTitle: ((String) -> Void)?
 
-    init(frame: NSRect, playback: any MediaPlayback) {
+    internal init(frame: NSRect, playback: any MediaPlayback) {
         self.playback = playback
         super.init(frame: frame)
         playerView.player = playback.player
@@ -414,9 +414,9 @@ final class MediaView: NSView {
     }
 
     /// Made in code only: an archive gives none.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
-    func play(_ url: URL, volume: Float) {
+    internal func play(_ url: URL, volume: Float) {
         playback.load(url) { [weak self] in self?.onEnd() }
         playback.volume = volume
         playback.play()
@@ -439,30 +439,30 @@ final class MediaView: NSView {
         }
     }
 
-    func stop() {
+    internal func stop() {
         playback.pause()
         playback.unload()
     }
 
-    var volume: Float { playback.volume }
+    internal var volume: Float { playback.volume }
 
-    func togglePlaying() {
+    internal func togglePlaying() {
         if playback.isPlaying { playback.pause() } else { playback.play() }
     }
 
-    func toggleMute() { playback.isMuted.toggle() }
+    internal func toggleMute() { playback.isMuted.toggle() }
 
-    func changeVolume(by delta: Float) {
+    internal func changeVolume(by delta: Float) {
         playback.volume = min(1, max(0, playback.volume + delta))
     }
 
     /// Moves by `seconds`, not before the start.
-    func seek(by seconds: Double) {
+    internal func seek(by seconds: Double) {
         playback.seek(toSeconds: max(0, playback.currentSeconds + seconds))
     }
 
     /// One video frame, or a tenth of a second of audio (key E).
-    func step() {
+    internal func step() {
         playback.pause()
         guard playback.hasItem else {
             return
@@ -471,7 +471,7 @@ final class MediaView: NSView {
     }
 
     /// Fit the video to the window, or fill the window with it (key F).
-    func toggleFit() {
+    internal func toggleFit() {
         playerView.videoGravity = playerView.videoGravity == .resizeAspect ? .resizeAspectFill : .resizeAspect
     }
 }
@@ -482,16 +482,16 @@ final class MediaView: NSView {
 /// The page is shown once, from the string; every navigation after that is refused (a `<meta
 /// http-equiv="refresh">` and a script-less redirect are navigations too, and would load a page of
 /// the web into the viewer), and a link that was clicked is handed to `onLink`. Main thread only.
-final class WebContentView: NSView, WKNavigationDelegate {
+internal final class WebContentView: NSView, WKNavigationDelegate {
     private let webView: WKWebView
-    var onLink: (URL) -> Void = { _ in }
+    internal var onLink: (URL) -> Void = { _ in }
     /// Whether the load of the page itself is still to come.
     private var expectsPage = false
     /// Forbids every load but inline styles and images that are part of the page itself.
-    static let policy =
+    internal static let policy =
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:\">"
 
-    override init(frame: NSRect) {
+    override internal init(frame: NSRect) {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
         configuration.websiteDataStore = .nonPersistent()
@@ -503,20 +503,22 @@ final class WebContentView: NSView, WKNavigationDelegate {
     }
 
     /// Made in code only: an archive gives none.
-    required init?(coder _: NSCoder) { nil }
+    internal required init?(coder _: NSCoder) { nil }
 
-    func show(html: String) {
+    internal func show(html: String) {
         expectsPage = true
         webView.loadHTMLString(Self.policy + html, baseURL: nil)
     }
 
     /// What a navigation is allowed to do: the first one (the page, from a string), a jump to a
     /// place in the page (`#name`), and nothing else.
-    enum Decision: Equatable {
+    internal enum Decision: Equatable {
         case allow, cancel, followLink
     }
 
-    nonisolated static func decide(isMainFrame: Bool, isLinkClick: Bool, url: URL?, expectsPage: Bool) -> Decision {
+    nonisolated internal static func decide(isMainFrame: Bool, isLinkClick: Bool, url: URL?, expectsPage: Bool)
+        -> Decision
+    {
         let isBlank =
             url.map {
                 $0.scheme == "about"
@@ -538,7 +540,7 @@ final class WebContentView: NSView, WKNavigationDelegate {
         return .cancel
     }
 
-    func webView(
+    internal func webView(
         _: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
@@ -569,7 +571,7 @@ final class WebContentView: NSView, WKNavigationDelegate {
         }
     }
 
-    func printOperation(with info: NSPrintInfo) -> NSPrintOperation { webView.printOperation(with: info) }
+    internal func printOperation(with info: NSPrintInfo) -> NSPrintOperation { webView.printOperation(with: info) }
 }
 
 /// What a link in a file that is viewed may do.
@@ -577,8 +579,8 @@ final class WebContentView: NSView, WKNavigationDelegate {
 /// A file is untrusted: a click on a link in it opens a web page or a mail in the program for that,
 /// and the viewer follows only links to files beside the one shown. Everything else (`file:`,
 /// `smb:`, `ftp:`, `sftp:`, the URL schemes of other programs) does nothing.
-enum LinkPolicy {
-    static func opensInBrowser(_ url: URL) -> Bool {
+internal enum LinkPolicy {
+    internal static func opensInBrowser(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else {
             return false
         }
@@ -593,7 +595,7 @@ enum LinkPolicy {
     /// scheme, host and port).
     ///
     /// Nil otherwise.
-    static func target(of link: URL, relativeTo base: URL) -> URL? {
+    internal static func target(of link: URL, relativeTo base: URL) -> URL? {
         let text = link.relativeString.replacingOccurrences(of: "about:blank", with: "")
         // A link with a scheme of its own (an absolute one) is not relative.
         if let own = URL(string: text)?.scheme, own.lowercased() != base.scheme?.lowercased() {
@@ -624,43 +626,43 @@ enum LinkPolicy {
 /// The delegate of the views that show RTF and PDF: a click on a link opens a web page or a
 /// mail and nothing else (the framework would open any URL, a file or a share included).
 @MainActor
-final class LinkGate: NSObject, NSTextViewDelegate, @preconcurrency PDFViewDelegate {
+internal final class LinkGate: NSObject, NSTextViewDelegate, @preconcurrency PDFViewDelegate {
     private static var key = 0
 
     /// Where the links it lets through go (tests put their own in).
     private let opener: any LinkOpening
 
     /// A gate that hands the links it lets through to `opener`.
-    init(opener: any LinkOpening = SystemLinks()) {
+    internal init(opener: any LinkOpening = SystemLinks()) {
         self.opener = opener
     }
 
     /// Keeps the gate alive for as long as `view` is (the views hold their delegates weakly).
-    func attach(to view: NSObject) {
+    internal func attach(to view: NSObject) {
         objc_setAssociatedObject(view, &Self.key, self, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 
-    func open(_ link: Any) {
+    internal func open(_ link: Any) {
         let url = (link as? URL) ?? (link as? String).flatMap { URL(string: $0) } ?? (link as? NSURL) as URL?
         if let url, LinkPolicy.opensInBrowser(url) { opener.open(url) }
     }
 
-    func textView(_: NSTextView, clickedOnLink link: Any, at _: Int) -> Bool {
+    internal func textView(_: NSTextView, clickedOnLink link: Any, at _: Int) -> Bool {
         open(link)
         // Handled: the text view does not open it again.
         return true
     }
 
-    func pdfViewWillClick(onLink _: PDFView, with url: URL) {
+    internal func pdfViewWillClick(onLink _: PDFView, with url: URL) {
         open(url)
     }
 }
 
 /// Factories for the views that need no class of their own.
 @MainActor
-enum RichViews {
+internal enum RichViews {
     /// A read-only text view in a scroll view: RTF (spec 10 › RTF) and printing.
-    static func textView(_ text: NSAttributedString) -> (scroll: NSScrollView, text: NSTextView) {
+    internal static func textView(_ text: NSAttributedString) -> (scroll: NSScrollView, text: NSTextView) {
         // A text view that is as wide as the scroll view and as tall as its text.
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
@@ -684,7 +686,7 @@ enum RichViews {
         return (scroll, view)
     }
 
-    static func pdfView(_ document: PDFDocument) -> PDFView {
+    internal static func pdfView(_ document: PDFDocument) -> PDFView {
         let view = PDFView()
         view.autoScales = true
         view.document = document
@@ -696,7 +698,7 @@ enum RichViews {
 
     /// The Mac's counterpart of Lister plugins and of the Explorer preview: whatever Quick
     /// Look can show (spec 10 › Explorer Preview).
-    static func quickLookView(_ url: URL) -> QLPreviewView? {
+    internal static func quickLookView(_ url: URL) -> QLPreviewView? {
         let view: QLPreviewView? = QLPreviewView(frame: .zero, style: .normal)
         view?.autostarts = true
         view?.previewItem = url as NSURL
@@ -704,7 +706,7 @@ enum RichViews {
     }
 
     /// A line of explanation in place of a file that cannot be shown.
-    static func message(_ text: String) -> NSView {
+    internal static func message(_ text: String) -> NSView {
         let label = NSTextField(wrappingLabelWithString: text)
         label.alignment = .center
         label.textColor = .secondaryLabelColor
