@@ -70,7 +70,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     private let sameContentsBox = SearchForm.box("same contents")
 
     // Plugins
-    @MainActor private struct RuleRow {
+    @MainActor
+    private struct RuleRow {
         let field: NSPopUpButton
         let comparison: NSPopUpButton
         let value: NSTextField
@@ -493,16 +494,21 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 
     // MARK: Actions
 
-    @objc private func optionChanged() { updateEnabled() }
-    @objc private func submit() { onSubmit?() }
-    @objc private func moreRules() { addRuleRow() }
+    @objc
+    private func optionChanged() { updateEnabled() }
+    @objc
+    private func submit() { onSubmit?() }
+    @objc
+    private func moreRules() { addRuleRow() }
 
-    @objc private func fewerRules() {
+    @objc
+    private func fewerRules() {
         if ruleRows.count > 1, let row = ruleRows.popLast() { remove(row) }
     }
 
     /// `>>`: choosing start directories on the local disks; several may be picked.
-    @objc private func browse() {
+    @objc
+    private func browse() {
         let panel = NSOpenPanel()
         (panel.canChooseDirectories, panel.canChooseFiles, panel.allowsMultipleSelection) = (true, false, true)
         panel.prompt = "Search here"
@@ -525,7 +531,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         updateEnabled()
     }
 
-    @objc private func loadSaved() {
+    @objc
+    private func loadSaved() {
         guard saved.indices.contains(savedTable.selectedRow) else {
             return
         }
@@ -533,7 +540,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         tabView.selectTabViewItem(at: 0)
     }
 
-    @objc private func saveCurrent() {
+    @objc
+    private func saveCurrent() {
         let proposal =
             saved.indices.contains(savedTable.selectedRow)
             ? saved[savedTable.selectedRow].name : searchForField.stringValue
@@ -544,7 +552,8 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         reloadSaved()
     }
 
-    @objc private func deleteSaved() {
+    @objc
+    private func deleteSaved() {
         guard saved.indices.contains(savedTable.selectedRow) else {
             return
         }

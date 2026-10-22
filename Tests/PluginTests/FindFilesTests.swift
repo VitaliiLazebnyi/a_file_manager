@@ -5,7 +5,8 @@ import Testing
 
 @testable import FindFilesPlugin
 
-@Suite struct Searching {
+@Suite
+struct Searching {
     let fileSystems: FileSystemRegistry
     let memory: MemoryFileSystem
 
@@ -33,7 +34,8 @@ import Testing
         return box
     }
 
-    @Test func searchMasks() {
+    @Test
+    func searchMasks() {
         #expect(SearchMask("Smith").matches("Letter to Mr. Smith.doc"))
         #expect(!SearchMask(".ini").matches("win.ini"))
         #expect(SearchMask("win.ini").matches("WIN.INI"))
@@ -42,7 +44,8 @@ import Testing
         #expect(SearchMask("").matches("anything"))
     }
 
-    @Test func findsByNameInPathOrder() throws {
+    @Test
+    func findsByNameInPathOrder() throws {
         let box = try makeTree()
         #expect(
             find(SearchQuery(directory: box.root, names: "report")) == [
@@ -56,20 +59,23 @@ import Testing
         )
     }
 
-    @Test func depthLimit() throws {
+    @Test
+    func depthLimit() throws {
         let box = try makeTree()
         #expect(find(SearchQuery(directory: box.root, names: "*.txt", maxDepth: 0)).isEmpty)
         #expect(find(SearchQuery(directory: box.root, names: "*.txt", maxDepth: 1)) == ["docs/report_01.txt"])
     }
 
-    @Test func findsText() throws {
+    @Test
+    func findsText() throws {
         let box = try makeTree()
         #expect(find(SearchQuery(directory: box.root, text: "report")) == ["docs/report_01.txt"])
         #expect(find(SearchQuery(directory: box.root, text: "report", caseSensitive: true)).isEmpty)
         #expect(find(SearchQuery(directory: box.root, names: "*.md", text: "smith")) == ["notes.md"])
     }
 
-    @Test func findsTextAcrossBlockBorders() throws {
+    @Test
+    func findsTextAcrossBlockBorders() throws {
         let box = try Sandbox()
         try box.file(
             "big.txt",
@@ -78,7 +84,8 @@ import Testing
         #expect(find(SearchQuery(directory: box.root, text: "NEEDLE")) == ["big.txt"])
     }
 
-    @Test func textIsSearchedOnAllCoresAndReportedInOrder() throws {
+    @Test
+    func textIsSearchedOnAllCoresAndReportedInOrder() throws {
         let box = try Sandbox()
         for index in 0..<200 {
             try box.file(
@@ -90,7 +97,8 @@ import Testing
         #expect(find(SearchQuery(directory: box.root, text: "treasure")) == expected)
     }
 
-    @Test func cancelledSearchFindsNothing() throws {
+    @Test
+    func cancelledSearchFindsNothing() throws {
         let box = try makeTree()
         let search = FileSearch(SearchQuery(directory: box.root), fileSystems: fileSystems)
         search.cancel()
@@ -99,7 +107,8 @@ import Testing
         #expect(count == 0)
     }
 
-    @Test func searchesAnyFileSystem() {
+    @Test
+    func searchesAnyFileSystem() {
         memory.addFile("/mail/inbox/offer.txt", "special REPORT inside")
         memory.addFile("/mail/inbox/photo.jpg", "binary")
         memory.addFile("/mail/sent/report.txt", "plain")

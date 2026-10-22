@@ -7,7 +7,8 @@ import Testing
 @testable import ArchivesPlugin
 
 /// The archive file systems driven as panels, jobs and searches drive any file system.
-@Suite struct ArchiveFileSystems {
+@Suite
+struct ArchiveFileSystems {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 
@@ -30,7 +31,8 @@ import Testing
 
     // MARK: Locations
 
-    @Test func urlsCarryTheArchiveAndThePathInside() throws {
+    @Test
+    func urlsCarryTheArchiveAndThePathInside() throws {
         let archive = URL(fileURLWithPath: "/Users/me/my photos.zip")
         let root = ArchiveURL.make(scheme: "zip", archive: archive)
         #expect(
@@ -77,7 +79,9 @@ import Testing
         #expect(nested.path == "/Users/me/my photos.zip/2026/inner.zip/deep/file")
     }
 
-    @MainActor @Test func leavingAnArchiveLeadsToTheFolderThatHoldsIt() throws {
+    @MainActor
+    @Test
+    func leavingAnArchiveLeadsToTheFolderThatHoldsIt() throws {
         let archive = try makeZip()
         let deep = bench.inside(archive, "tree/sub/deep")
         #expect(bench.zip.parent(of: deep) == bench.inside(archive, "tree/sub"))
@@ -108,7 +112,8 @@ import Testing
         #expect(model.rootTarget?.focus == "tree.zip")
     }
 
-    @Test func pathsAreShownAndReadLikeFolders() throws {
+    @Test
+    func pathsAreShownAndReadLikeFolders() throws {
         let archive = try makeZip()
         let inner = bench.inside(archive, "tree/sub")
         let shown = bench.fileSystems.displayPath(inner)
@@ -136,7 +141,8 @@ import Testing
 
     // MARK: Changing a ZIP
 
-    @Test func aZipIsChangedInPlace() throws {
+    @Test
+    func aZipIsChangedInPlace() throws {
         let archive = try makeZip()
         let root = bench.inside(archive)
         let tree = root.appending(name: "tree")
@@ -217,7 +223,8 @@ import Testing
         #expect(attributes[.modificationDate] as? Date == stamp && attributes[.posixPermissions] as? Int == 0o600)
     }
 
-    @Test func deletingTheLastFileKeepsItsFolder() throws {
+    @Test
+    func deletingTheLastFileKeepsItsFolder() throws {
         // The system's zip -D writes no entries for folders: they exist only through their files.
         try box.file("tree/a/b/only.txt", "only")
         #expect(runTool("/usr/bin/zip", ["-qrD", "bare.zip", "tree"], in: box.root).status == 0)
@@ -237,7 +244,8 @@ import Testing
         #expect(try Data(contentsOf: box.url("bare.zip")).count == 22)
     }
 
-    @Test func otherFormatsAndProtectedFilesRefuseChanges() throws {
+    @Test
+    func otherFormatsAndProtectedFilesRefuseChanges() throws {
         let tree = try bench.makeTree()
         try bench.pack([tree], to: box.url("tree.tar")) { $0.format = .tar }
         let inTar = bench.inside(box.url("tree.tar"), "tree", scheme: ArchiveURL.readOnlyScheme)
@@ -258,7 +266,8 @@ import Testing
         #expect(try bench.names(bench.inside(archive, "tree")).contains("empty.txt"))
     }
 
-    @Test func aChangeFromOutsideIsNoticed() throws {
+    @Test
+    func aChangeFromOutsideIsNoticed() throws {
         let archive = try makeZip()
         let root = bench.inside(archive, "tree")
         #expect(try bench.names(root).count == 5)
@@ -291,7 +300,8 @@ import Testing
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "other/pending.txt"]).output == "pending")
     }
 
-    @Test func changesAreWrittenShortlyAfterTheLastOne() throws {
+    @Test
+    func changesAreWrittenShortlyAfterTheLastOne() throws {
         let archive = try makeZip()
         bench.environment.flushDelay = 0.15
         // The write is due at low priority; on a machine where that does not get to run
@@ -315,7 +325,8 @@ import Testing
 
     // MARK: Nesting and other file systems
 
-    @Test func archivesInsideArchives() throws {
+    @Test
+    func archivesInsideArchives() throws {
         let tree = try bench.makeTree()
         try bench.pack([tree], to: box.url("inner.zip"))
         try bench.pack([tree], to: box.url("inner.tar.gz")) { $0.format = .compressedTar(.gzip) }
@@ -356,7 +367,8 @@ import Testing
         )
     }
 
-    @Test func anArchiveOnAnotherFileSystem() throws {
+    @Test
+    func anArchiveOnAnotherFileSystem() throws {
         let tree = try bench.makeTree()
         // Packed straight onto the other file system…
         let onServer = bench.memory.url("/store/tree.zip")
@@ -393,7 +405,8 @@ import Testing
 
     // MARK: The copy job
 
-    @Test func theCopyJobStreamsOutOfAndIntoArchives() throws {
+    @Test
+    func theCopyJobStreamsOutOfAndIntoArchives() throws {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         // Out: a folder with everything in it, onto the disk.
@@ -477,7 +490,8 @@ import Testing
 
     // MARK: Many threads
 
-    @Test func manyThreadsUseTheProviderAtOnce() throws {
+    @Test
+    func manyThreadsUseTheProviderAtOnce() throws {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         try bench.pack([box.url("tree")], to: box.url("tree.tar.bz2")) { $0.format = .compressedTar(.bzip2) }
@@ -527,7 +541,8 @@ import Testing
         #expect(runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0)
     }
 
-    @Test func cancellingStopsPackingAndLeavesNothingBehind() throws {
+    @Test
+    func cancellingStopsPackingAndLeavesNothingBehind() throws {
         let tree = try bench.makeTree()
         bench.monitor.cancellation.cancel()
         var options = PackOptions()

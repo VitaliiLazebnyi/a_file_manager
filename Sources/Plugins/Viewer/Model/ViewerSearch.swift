@@ -651,7 +651,8 @@ enum ViewerSearch {
             guard count >= needle.count, let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
                 return
             }
-            @inline(__always) func fold(_ byte: UInt8) -> UInt8 {
+            @inline(__always)
+            func fold(_ byte: UInt8) -> UInt8 {
                 folded && byte >= 0x41 && byte <= 0x5A ? byte | 0x20 : byte
             }
             /// The classification of the character that ends at `end`, or begins at `begin`.

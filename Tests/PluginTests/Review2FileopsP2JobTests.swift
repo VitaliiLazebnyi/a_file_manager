@@ -323,7 +323,8 @@ func p2Quarantine(_ url: URL) -> String? {
     return read > 0 ? String(decoding: bytes.prefix(read), as: UTF8.self) : nil
 }
 
-@Suite struct Review2FileopsP2Job {
+@Suite
+struct Review2FileopsP2Job {
     let box: Sandbox
     let fileSystems = FileSystemRegistry()
     let memory = MemoryFileSystem()
@@ -356,7 +357,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: F021 — every changing call of a job can be ended
 
-    @Test func everyChangingCallOfAJobCarriesTheJobsFlag() {
+    @Test
+    func everyChangingCallOfAJobCarriesTheJobsFlag() {
         memory.quarantineValue = Data("0083;5f000000;Test;".utf8)
         memory.addFile("/s/dir/sub/f.txt", "contents")
         memory.addFile("/s/dir/g.txt", "more")
@@ -383,7 +385,8 @@ func p2Quarantine(_ url: URL) -> String? {
         )
     }
 
-    @Test func aRemovalThatWaitsForAServerEndsWhenTheJobIsCancelled() {
+    @Test
+    func aRemovalThatWaitsForAServerEndsWhenTheJobIsCancelled() {
         for index in 0..<5 { probe.base.addFile("/gone/f\(index).txt") }
         probe.stallsRemovals = true
         let flag = CancellationFlag()
@@ -399,7 +402,8 @@ func p2Quarantine(_ url: URL) -> String? {
         #expect(probe.base.allPaths.filter { $0.hasPrefix("/gone/") }.count == 5)
     }
 
-    @Test func tidyingUpAfterACancelStillTakesTheTemporaryFileAway() {
+    @Test
+    func tidyingUpAfterACancelStillTakesTheTemporaryFileAway() {
         let flaky = FlakyFileSystem()
         fileSystems.register(flaky)
         flaky.base.addFile("/s/big.bin", "0123456789abcdef")
@@ -422,7 +426,8 @@ func p2Quarantine(_ url: URL) -> String? {
         #expect(probe.unflagged.isEmpty)
     }
 
-    @Test func aServerThatDoesNotAnswerTheTidyingUpIsGivenUpOn() {
+    @Test
+    func aServerThatDoesNotAnswerTheTidyingUpIsGivenUpOn() {
         let flaky = FlakyFileSystem()
         fileSystems.register(flaky)
         flaky.base.addFile("/s/big.bin", "0123456789abcdef")
@@ -452,7 +457,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: L029 — a folder that is about to be filled is made exclusively
 
-    @Test func aLinkPutInPlaceOfANewTargetFolderIsNotCopiedThrough() throws {
+    @Test
+    func aLinkPutInPlaceOfANewTargetFolderIsNotCopiedThrough() throws {
         let registry = FileSystemRegistry()
         let racing = P2RacingLocalFileSystem()
         registry.register(racing)
@@ -482,7 +488,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: A044 — pending writes are flushed before a file is used
 
-    @Test func aFileIsBroughtUpToDateBeforeItIsCopiedMovedOrDeleted() {
+    @Test
+    func aFileIsBroughtUpToDateBeforeItIsCopiedMovedOrDeleted() {
         let lock = NSLock()
         // Guarded by `lock`.
         nonisolated(unsafe) var flushed: [String] = []
@@ -508,7 +515,8 @@ func p2Quarantine(_ url: URL) -> String? {
         #expect(replies.errors.isEmpty)
     }
 
-    @Test func aFileThatCannotBeBroughtUpToDateIsLeftAlone() {
+    @Test
+    func aFileThatCannotBeBroughtUpToDateIsLeftAlone() {
         struct NotWritten: LocalizedError {
             var errorDescription: String? { "The archive could not be written." }
         }
@@ -536,7 +544,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: A041 — files are read in the order their file system reads them best
 
-    @Test func theSourcesFileSystemSaysInWhichOrderItsFilesAreRead() throws {
+    @Test
+    func theSourcesFileSystemSaysInWhichOrderItsFilesAreRead() throws {
         for name in ["a.txt", "b.txt", "c.txt"] {
             probe.base.addFile("/s/\(name)", name)
             probe.base.addFile("/s/dir/\(name)", name)
@@ -566,7 +575,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: F046 — a paused job waits before the commit
 
-    @Test func theCommitIsAnnouncedBeforeItStartsSoThatAPausedJobWaitsThere() throws {
+    @Test
+    func theCommitIsAnnouncedBeforeItStartsSoThatAPausedJobWaitsThere() throws {
         memory.capabilities = [.write, .deferredWrites]
         memory.addDirectory("/t")
         let sources = [try box.file("s/a.txt", "a"), try box.file("s/b.txt", "b")]
@@ -585,7 +595,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: N009 — the origin mark of what comes from a server or a marked archive
 
-    @Test func whatIsCopiedFromAMarkedFileSystemCarriesTheMarkOnDisk() throws {
+    @Test
+    func whatIsCopiedFromAMarkedFileSystemCarriesTheMarkOnDisk() throws {
         let mark = "0083;5f000000;Test;"
         memory.quarantineValue = Data(mark.utf8)
         memory.capabilities = [.write]
@@ -622,7 +633,8 @@ func p2Quarantine(_ url: URL) -> String? {
     }
 
     // F052
-    @Test func aMarkThatCannotBeSetIsCountedAndNotAskedAbout() {
+    @Test
+    func aMarkThatCannotBeSetIsCountedAndNotAskedAbout() {
         struct Refused: LocalizedError {
             var errorDescription: String? { "marks are not kept here" }
         }
@@ -655,7 +667,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: F041, F047 — work that grows with the tree is done once, or not at all
 
-    @Test func theLinesOfAReportAreOnlyPutTogetherWhenAReportGoesOut() {
+    @Test
+    func theLinesOfAReportAreOnlyPutTogetherWhenAReportGoesOut() {
         for index in 0..<300 { probe.base.addFile("/s/f\(index).txt") }
         probe.base.addDirectory("/t")
         let replies = P2Replies()
@@ -671,7 +684,8 @@ func p2Quarantine(_ url: URL) -> String? {
         )
     }
 
-    @Test func aFolderThatIsSkippedIsNotWalkedAgainForTheCount() {
+    @Test
+    func aFolderThatIsSkippedIsNotWalkedAgainForTheCount() {
         for index in 0..<4 { probe.base.addFile("/s/dir/sub/f\(index).txt") }
         probe.base.addFile("/t/dir/there.txt")
         let replies = P2Replies()
@@ -686,7 +700,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: F001/F018 through the provider's own answer
 
-    @Test func aFileSystemThatSaysWhereItsFilesReallyAreIsBelieved() throws {
+    @Test
+    func aFileSystemThatSaysWhereItsFilesReallyAreIsBelieved() throws {
         let view = P2ViewFileSystem(fileSystems: fileSystems)
         fileSystems.register(view)
         let file = try box.file("d/a.txt", "precious")
@@ -704,7 +719,8 @@ func p2Quarantine(_ url: URL) -> String? {
 
     // MARK: Names
 
-    @Test func theRuleForNamesIsTheKernels() {
+    @Test
+    func theRuleForNamesIsTheKernels() {
         for name in ["", ".", "..", "a/b", "a\u{0}b"] {
             #expect(!FileJob.isSafeName(name) && !PathSafety.isSafeName(name))
         }

@@ -14,7 +14,8 @@ import UniformTypeIdentifiers
 /// Review round 2, second pass, the viewer: wide characters, the sequential scan of a giant line,
 /// the limit on index builds, EUC-JP and GB 18030, printing, links, the pixel limit and a FIFO
 /// that takes the place of a file.
-@Suite struct Review2PluginsBP2Viewer {
+@Suite
+struct Review2PluginsBP2Viewer {
     private func document(
         _ data: Data,
         encoding: ViewerEncoding = .utf8,
@@ -40,7 +41,8 @@ import UniformTypeIdentifiers
 
     // MARK: East Asian width (V035)
 
-    @Test func theEastAsianWidthTableKnowsWideAndNarrowCharacters() {
+    @Test
+    func theEastAsianWidthTableKnowsWideAndNarrowCharacters() {
         for scalar: UInt32 in [
             0x1100, 0x3042, 0x4E00, 0xAC00, 0xFF21, 0xFFE0, 0x1F600, 0x20000, 0x2FFFD, 0x3000, 0x231A
         ] {
@@ -55,7 +57,8 @@ import UniformTypeIdentifiers
         #expect(!EastAsianWidth.isWide(0xFF81))
     }
 
-    @Test func wideCharactersTakeTwoColumnsInTheRows() throws {
+    @Test
+    func wideCharactersTakeTwoColumnsInTheRows() throws {
         let data = Data("日本語日本語日本語\n".utf8)
         // Six columns hold three wide characters.
         #expect(try rows(document(data, columns: 6)) == ["日本語", "日本語", "日本語"])
@@ -68,7 +71,8 @@ import UniformTypeIdentifiers
         #expect(try rows(document(Data("日本\n".utf8), columns: 1)) == ["日", "本"])
     }
 
-    @Test func characterOutsideTheBasicPlaneAreMeasuredAsOneCharacter() throws {
+    @Test
+    func characterOutsideTheBasicPlaneAreMeasuredAsOneCharacter() throws {
         // Emoji and U+20000 are wide; a mathematical letter is not.
         #expect(try rows(document(Data("😀😀😀\n".utf8), columns: 4)) == ["😀😀", "😀"])
         #expect(
@@ -86,7 +90,8 @@ import UniformTypeIdentifiers
         )
     }
 
-    @Test func wideCharactersInUTF16AreCutLikeThoseInUTF8() throws {
+    @Test
+    func wideCharactersInUTF16AreCutLikeThoseInUTF8() throws {
         // Four units, eight columns: the raw scan of a short line must not take it for one row of six.
         let text = "日本語日\n"
         let data = try #require(text.data(using: .utf16LittleEndian))
@@ -95,7 +100,8 @@ import UniformTypeIdentifiers
         #expect(try rows(document(big, encoding: .utf16BE, columns: 6)) == ["日本語", "日"])
     }
 
-    @Test func theFastScanAndTheDecodingScanAgreeOnWideText() throws {
+    @Test
+    func theFastScanAndTheDecodingScanAgreeOnWideText() throws {
         let pieces = ["a", "日", "😀", "\u{301}", "漢字", " ", "x", "é", "ｱ", "\t", "한", "𝐀"]
         var state: UInt64 = 0x1234_5678
         func next() -> Int {
@@ -158,7 +164,8 @@ import UniformTypeIdentifiers
         }
     }
 
-    @Test func aSequentialScanDoesNotReadAGiantLineTwice() throws {
+    @Test
+    func aSequentialScanDoesNotReadAGiantLineTwice() throws {
         var data = Data(repeating: UInt8(ascii: "a"), count: 400_000)
         data.append(Data("\nsecond line\nthird\n".utf8))
         let source = CountingSource(DataByteSource(data))
@@ -177,7 +184,8 @@ import UniformTypeIdentifiers
         #expect(counted.lineCount == 3 && counted.rowCount == 400_000 / 80 + 2)
     }
 
-    @Test func sequentialAndParallelScansGiveTheSameRowsWhateverTheLinesAndSegments() throws {
+    @Test
+    func sequentialAndParallelScansGiveTheSameRowsWhateverTheLinesAndSegments() throws {
         var state: UInt64 = 99
         func next() -> Int {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -250,7 +258,8 @@ import UniformTypeIdentifiers
         return condition()
     }
 
-    @Test func theGateRunsFewJobsAtOnceAndDropsWhatWasCancelledBeforeItsTurn() {
+    @Test
+    func theGateRunsFewJobsAtOnceAndDropsWhatWasCancelledBeforeItsTurn() {
         let gate = ViewerWorkGate(live: 2, stuck: 4)
         let latch = Latch()
         let flags = (1...5).map { _ in CancellationFlag() }
@@ -274,7 +283,8 @@ import UniformTypeIdentifiers
         #expect(latch.startedJobs == [1, 2, 4, 5])
     }
 
-    @Test func whenTooManyCancelledJobsAreStuckANewOneIsRefused() {
+    @Test
+    func whenTooManyCancelledJobsAreStuckANewOneIsRefused() {
         let gate = ViewerWorkGate(live: 1, stuck: 2)
         let latch = Latch()
         var flags: [CancellationFlag] = []
@@ -306,7 +316,8 @@ import UniformTypeIdentifiers
         #expect(wait { again.startedJobs == [1] })
     }
 
-    @Test func theSharedGateIsBoundedAndNeverBlocksItsCaller() {
+    @Test
+    func theSharedGateIsBoundedAndNeverBlocksItsCaller() {
         let gate = ViewerWorkGate.indexBuilds
         #expect(gate.live >= 2 && gate.live <= 4 && gate.stuck >= gate.live)
     }
@@ -324,7 +335,8 @@ import UniformTypeIdentifiers
         return (data, starts)
     }
 
-    @Test func eucJPAndGB18030AreOffered() throws {
+    @Test
+    func eucJPAndGB18030AreOffered() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         #expect(euc.kind == .doubleByte && euc.shape == .eucJP && gb.kind == .doubleByte && gb.shape == .gb18030)
@@ -336,7 +348,8 @@ import UniformTypeIdentifiers
         #expect(ViewerEncoding.codePage(50_220) == nil)
     }
 
-    @Test func eucJPTextIsDecodedWithItsOffsets() throws {
+    @Test
+    func eucJPTextIsDecodedWithItsOffsets() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let characters = ["日", "本", "語", "a", "ｱ", "ｲ", "テ", "キ", "ス", "ト", "、", " ", "b", "\n", "漢", "字"]
         let (data, starts) = try encode(characters, euc)
@@ -355,7 +368,8 @@ import UniformTypeIdentifiers
         #expect(stray.units == [0xFFFD, 0x41, 0xFFFD, 0x41, 0xFFFD, 0xFFFD, 0xFFFD, 0x42])
     }
 
-    @Test func gb18030TextIsDecodedWithItsOffsets() throws {
+    @Test
+    func gb18030TextIsDecodedWithItsOffsets() throws {
         let gb = try #require(ViewerEncoding.codePage(54_936))
         // Two-byte characters, ASCII, four-byte ones in and beyond the Basic Multilingual Plane.
         let characters = ["中", "文", "a", "1", "\u{80}", "\u{FFFF}", "\u{20000}", "😀", "€", "龙", "9", "\n", "b"]
@@ -376,7 +390,8 @@ import UniformTypeIdentifiers
         #expect(stray.units == [0xFFFD, 0x30, 0x41, 0xFFFD, 0x30, 0x4E04, 0xFFFD, 0x7F, 0xFFFD])
     }
 
-    @Test func textDecodedInPiecesEqualsTextDecodedWhole() throws {
+    @Test
+    func textDecodedInPiecesEqualsTextDecodedWhole() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         let eucData =
@@ -412,7 +427,8 @@ import UniformTypeIdentifiers
         }
     }
 
-    @Test func characterBoundariesAreExactInEUCJPAndGB18030() throws {
+    @Test
+    func characterBoundariesAreExactInEUCJPAndGB18030() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         // Long runs without a byte that stands by itself: the boundary cannot be guessed from the neighbours.
@@ -443,7 +459,8 @@ import UniformTypeIdentifiers
         }
     }
 
-    @Test func aSearchInEUCJPAndGB18030FindsWholeCharactersWhateverTheChunkSize() throws {
+    @Test
+    func aSearchInEUCJPAndGB18030FindsWholeCharactersWhateverTheChunkSize() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         for (encoding, characters, needle) in [
@@ -487,7 +504,8 @@ import UniformTypeIdentifiers
         }
     }
 
-    @Test func aTextDocumentInGB18030AndEUCJPShowsItsRows() throws {
+    @Test
+    func aTextDocumentInGB18030AndEUCJPShowsItsRows() throws {
         let euc = try #require(ViewerEncoding.codePage(51_932))
         let gb = try #require(ViewerEncoding.codePage(54_936))
         let eucText = "日本語のテキスト\nｱｲｳ abc\n漢字\n"
@@ -501,7 +519,8 @@ import UniformTypeIdentifiers
 
     // MARK: Printing (the whole text, to a page limit)
 
-    @Test func printingCoversALongTextInFull() {
+    @Test
+    func printingCoversALongTextInFull() {
         // 40,000 lines of 50 bytes: 2 MB, which the old limit of 512 KB cut at a quarter.
         let line = String(repeating: "x", count: 49)
         let text = (1...40_000).map { _ in line }.joined(separator: "\n") + "\n"
@@ -518,7 +537,9 @@ import UniformTypeIdentifiers
         #expect(part.lines.count == 10 && part.text == String(repeating: line + "\n", count: 10))
     }
 
-    @MainActor @Test func theTextForPrintingIsDrawnPageByPage() throws {
+    @MainActor
+    @Test
+    func theTextForPrintingIsDrawnPageByPage() throws {
         let lines = (1...130).map { "line \($0)" }
         let font = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
         let page = NSSize(width: 400, height: 300)
@@ -543,7 +564,9 @@ import UniformTypeIdentifiers
 
     // MARK: Links in RTF and PDF (V021)
 
-    @MainActor @Test func onlyWebAndMailLinksAreOpenedFromRTFAndPDF() {
+    @MainActor
+    @Test
+    func onlyWebAndMailLinksAreOpenedFromRTFAndPDF() {
         let links = CoverageViewerLinks()
         let gate = LinkGate(opener: links)
         let textView = NSTextView()
@@ -571,7 +594,9 @@ import UniformTypeIdentifiers
         )
     }
 
-    @MainActor @Test func theRichViewsAreGivenTheGateAsTheirDelegate() {
+    @MainActor
+    @Test
+    func theRichViewsAreGivenTheGateAsTheirDelegate() {
         let (_, text) = RichViews.textView(NSAttributedString(string: "link"))
         #expect(text.delegate is LinkGate)
         #expect(RichViews.pdfView(PDFDocument()).delegate is LinkGate)
@@ -602,7 +627,8 @@ import UniformTypeIdentifiers
         return data as Data
     }
 
-    @Test func anImageThatClaimsMorePixelsThanTheLimitIsNotDecoded() throws {
+    @Test
+    func anImageThatClaimsMorePixelsThanTheLimitIsNotDecoded() throws {
         let file = try png(64, 32)
         #expect(ImageDecoder.pixelLimit == 400_000_000)
         #expect(ImageDecoder.decode(file) != nil)
@@ -638,7 +664,8 @@ import UniformTypeIdentifiers
         }
     }
 
-    @Test func aLinkWhoseTargetSizeIsKnownIsNotReadToMeasureIt() throws {
+    @Test
+    func aLinkWhoseTargetSizeIsKnownIsNotReadToMeasureIt() throws {
         let url = URL(string: "link:///current.log")!
         let entry = FileItem(
             url: url,
@@ -655,7 +682,8 @@ import UniformTypeIdentifiers
 
     // MARK: Closing at the end
 
-    @Test func theTemporaryCopiesAreDeletedInTheBackgroundWhenTheProgramQuits() {
+    @Test
+    func theTemporaryCopiesAreDeletedInTheBackgroundWhenTheProgramQuits() {
         let copies = TemporaryCopies()
         let memory = MemoryFileSystem()
         memory.addFile("/remote/clip.mov", String(repeating: "m", count: 5_000))
@@ -692,7 +720,8 @@ import UniformTypeIdentifiers
         return folder
     }
 
-    @Test func aFileSwappedForAFIFOAfterItWasOpenedDoesNotHoldUpTheRead() throws {
+    @Test
+    func aFileSwappedForAFIFOAfterItWasOpenedDoesNotHoldUpTheRead() throws {
         let folder = try scratch()
         defer { try? FileManager.default.removeItem(at: folder) }
         let url = folder.appendingPathComponent("f.txt")
@@ -724,7 +753,8 @@ import UniformTypeIdentifiers
         if case .success(let data)? = outcome.withValue({ $0 }) { #expect(data.isEmpty, "a FIFO must not give bytes") }
     }
 
-    @Test func aFIFOIsRefusedWhenOpeningAndWhenReadingDirectly() throws {
+    @Test
+    func aFIFOIsRefusedWhenOpeningAndWhenReadingDirectly() throws {
         let folder = try scratch()
         defer { try? FileManager.default.removeItem(at: folder) }
         let url = folder.appendingPathComponent("pipe")

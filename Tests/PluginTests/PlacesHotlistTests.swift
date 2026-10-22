@@ -7,7 +7,8 @@ import Testing
 @testable import PlacesPlugin
 
 /// The hotlist as a value: entries, submenus, moving, hiding and what an entry's command means.
-@Suite struct PlacesHotlistModel {
+@Suite
+struct PlacesHotlistModel {
     func sample() -> Hotlist {
         Hotlist(entries: [
             .item("&Work", command: "cd /work"),
@@ -20,7 +21,8 @@ import Testing
         ])
     }
 
-    @Test func rowsListEveryEntryWithItsDepth() {
+    @Test
+    func rowsListEveryEntryWithItsDepth() {
         let list = sample()
         #expect(list.rows.map(\.path) == [[0], [1], [1, 0], [1, 1], [1, 1, 0], [2], [3]])
         #expect(list.rows.map(\.depth) == [0, 0, 1, 1, 2, 0, 0])
@@ -31,7 +33,8 @@ import Testing
         #expect(HotlistEntry.item("R&&D", command: "").displayTitle == "R&D")
     }
 
-    @Test func insertRemoveAndUpdate() {
+    @Test
+    func insertRemoveAndUpdate() {
         var list = sample()
         let inserted = list.insert(.item("New", command: "cd /new"), at: [1, 1])
         #expect(inserted == [1, 1])
@@ -50,7 +53,8 @@ import Testing
         #expect(HotlistEntry.titled("Docs", command: "cd /x").kind == .item)
     }
 
-    @Test func addingToASubmenuGoesBeforeTheSubmenusItEndsWith() {
+    @Test
+    func addingToASubmenuGoesBeforeTheSubmenusItEndsWith() {
         var list = sample()
         let inSubmenu = list.add(.item("Tools", command: "cd /tools"), to: [1])
         #expect(inSubmenu == [1, 1])
@@ -59,14 +63,16 @@ import Testing
         #expect(atEnd == [4])
     }
 
-    @Test func theListTakesNoMoreThanItsLimit() {
+    @Test
+    func theListTakesNoMoreThanItsLimit() {
         var list = Hotlist(entries: (0..<Hotlist.limit).map { .item("e\($0)", command: "cd /e\($0)") })
         let refused = list.add(.separator, to: [])
         #expect(refused == nil)
         #expect(list.count == Hotlist.limit)
     }
 
-    @Test func movingWalksThroughSubmenusLikeAFlatList() {
+    @Test
+    func movingWalksThroughSubmenusLikeAFlatList() {
         var list = sample()
         // Down from the top: into the submenu, through it, into the inner one, and out again.
         var path = list.move(at: [0], by: 1)
@@ -92,7 +98,8 @@ import Testing
         #expect(first == [0] && last == [3] && list == sample())
     }
 
-    @Test func hiding() {
+    @Test
+    func hiding() {
         var list = sample()
         #expect(!list.isHidden(list.entries[3]))
         list.hidesMarked = true
@@ -112,12 +119,14 @@ import Testing
         )
     }
 
-    @Test func storedAsJSONAndReadBack() throws {
+    @Test
+    func storedAsJSONAndReadBack() throws {
         let data = try JSONEncoder().encode(sample())
         #expect(try JSONDecoder().decode(Hotlist.self, from: data) == sample())
     }
 
-    @Test func actions() {
+    @Test
+    func actions() {
         #expect(HotlistAction("cd /Users/x/dir") == .changeDirectory(path: "/Users/x/dir", focusingOnIt: false))
         #expect(HotlistAction("CD  \"/with space\"") == .changeDirectory(path: "/with space", focusingOnIt: false))
         #expect(HotlistAction("cd /Dir/Focusme/:") == .changeDirectory(path: "/Dir/Focusme", focusingOnIt: true))
@@ -130,7 +139,8 @@ import Testing
         #expect(HotlistAction.targetPath("") == nil && HotlistAction.targetPath("cm_GoToRoot") == nil)
     }
 
-    @Test func menuMarksTheCurrentDirectoryAndTheSubmenusHoldingIt() {
+    @Test
+    func menuMarksTheCurrentDirectoryAndTheSubmenusHoldingIt() {
         let list = sample()
         let top = HotlistMenu(list, offersFavorites: true) { $0.command == "cd /old" }
         #expect(
@@ -150,7 +160,8 @@ import Testing
         #expect(places.titles.prefix(3) == ["    Home", "    Applications", "✓ Desktop"] && places.selected == 2)
     }
 
-    @Test func editorListIndentsSubmenus() {
+    @Test
+    func editorListIndentsSubmenus() {
         #expect(
             sample().rows.map(HotlistEditorWindowController.title(of:))
                 == [
@@ -162,10 +173,12 @@ import Testing
 }
 
 /// The history of a panel and the frequently used folders, as values.
-@Suite struct PlacesHistoryModel {
+@Suite
+struct PlacesHistoryModel {
     func url(_ path: String) -> URL { URL(fileURLWithPath: path, isDirectory: false) }
 
-    @Test func recordsEveryPlaceOnceTheLastVisitedLast() {
+    @Test
+    func recordsEveryPlaceOnceTheLastVisitedLast() {
         var history = DirectoryHistory()
         let (first, again) = (
             history.record(url("/a"), stayedInPrevious: false), history.record(url("/a/"), stayedInPrevious: true)
@@ -180,7 +193,8 @@ import Testing
         #expect(history.shown(thinning: false, limit: 2).map(\.path) == ["/a", "/c"])
     }
 
-    @Test func thinningHidesFoldersThatWereOnlyPassedThrough() {
+    @Test
+    func thinningHidesFoldersThatWereOnlyPassedThrough() {
         var history = DirectoryHistory()
         history.record(url("/a"), stayedInPrevious: false)
         history.record(url("/a/b"), stayedInPrevious: true)  // stayed in /a
@@ -196,7 +210,8 @@ import Testing
         #expect(history.shown(thinning: false).map(\.path) == ["/z", "/a/b/c/d", "/a/b/c", "/a/b"])
     }
 
-    @Test func keepsNoMoreThanTheStoredLimit() {
+    @Test
+    func keepsNoMoreThanTheStoredLimit() {
         var history = DirectoryHistory()
         for index in 0..<(DirectoryHistory.storedLimit + 20) {
             history.record(url("/d\(index)"), stayedInPrevious: true)
@@ -205,7 +220,8 @@ import Testing
         #expect(history.visits.first?.location == "file:///d20")
     }
 
-    @Test func frequentFoldersAreRankedByVisits() {
+    @Test
+    func frequentFoldersAreRankedByVisits() {
         var frequent = FrequentFolders()
         for path in ["/a", "/b", "/a", "/c", "/a", "/b"] { frequent.record(url(path)) }
         #expect(frequent.top().map(\.directory.path) == ["/a", "/b", "/c"])
@@ -217,7 +233,8 @@ import Testing
         #expect(frequent.counts.count == FrequentFolders.storedLimit && frequent.top(1).first?.directory.path == "/b")
     }
 
-    @Test func menuListsHistoryThenFrequentFolders() {
+    @Test
+    func menuListsHistoryThenFrequentFolders() {
         let menu = HistoryMenu(history: [url("/b"), url("/a")], frequent: [(url("/a"), 7)], current: url("/a")) {
             $0.path
         }
@@ -227,7 +244,9 @@ import Testing
         #expect(HistoryMenu(history: [], frequent: [], current: url("/a")) { $0.path }.rows.isEmpty)
     }
 
-    @MainActor @Test func trackerMeasuresStaysAndSavesToTheSettings() {
+    @MainActor
+    @Test
+    func trackerMeasuresStaysAndSavesToTheSettings() {
         let settings = MemorySettings()
         var time = Date(timeIntervalSince1970: 1_000)
         let tracker = DirectoryHistoryTracker(settings: settings) { time }
@@ -265,7 +284,9 @@ import Testing
 }
 
 /// Hotlist and history driven through their commands, with scripted answers to the lists.
-@MainActor @Suite struct PlacesCommands {
+@MainActor
+@Suite
+struct PlacesCommands {
     let memory = MemoryFileSystem()
     let settings = MemorySettings()
     let clock = Clock()
@@ -335,7 +356,8 @@ import Testing
         bench.kernel.panelEvents.post(.locationChanged, from: panel)
     }
 
-    @Test func registersCommandsKeysMenuButtonsAndPreferences() {
+    @Test
+    func registersCommandsKeysMenuButtonsAndPreferences() {
         let keys = bench.kernel.keyBindings
         #expect(keys.command(for: Shortcut(.character("d"), .control)) == .directoryHotlist)
         #expect(keys.command(for: Shortcut(.downArrow, .option)) == .directoryHistory)
@@ -356,7 +378,8 @@ import Testing
         #expect(CommandID.directoryTree.rawValue == "cm_CDtree")
     }
 
-    @Test func addsAndRemovesTheCurrentDirectory() {
+    @Test
+    func addsAndRemovesTheCurrentDirectory() {
         ui.formAnswers = [pick(1)]
         commands.perform(.directoryHotlist)
         #expect(lastRows == ["    Favorites  ▸", "+ Add current dir", "* Configure…"])
@@ -378,7 +401,8 @@ import Testing
         #expect(settings.scoped(to: "places").value(Hotlist.self, forKey: "hotlist")?.entries.count == 1)
     }
 
-    @Test func choosingAnEntryChangesDirectoryAndTheTargetPanel() {
+    @Test
+    func choosingAnEntryChangesDirectoryAndTheTargetPanel() {
         store(
             Hotlist(entries: [
                 .item("Docs", command: "cd mem:/A/docs", target: "cd mem:/C"),
@@ -396,7 +420,8 @@ import Testing
         #expect(right.model.directory == memory.url("/C"))
     }
 
-    @Test func secondButtonOpensTheEntryInANewTab() {
+    @Test
+    func secondButtonOpensTheEntryInANewTab() {
         store(Hotlist(entries: [.item("C", command: "cd mem:/C")]))
         ui.formAnswers = [pick(0, button: 1)]
         commands.perform(.directoryHotlist)
@@ -404,7 +429,8 @@ import Testing
         #expect(left.model.directory == memory.url("/C") && left.tabs.tabs[0].directory == memory.url("/A"))
     }
 
-    @Test func entriesRunCommands() {
+    @Test
+    func entriesRunCommands() {
         store(
             Hotlist(entries: [
                 .item("Run", command: "cm_Recorded 3"), .item("Plain", command: "cm_Recorded"),
@@ -421,7 +447,8 @@ import Testing
         #expect(left.model.directory == memory.url("/A"))
     }
 
-    @Test func submenusOpenAsTheNextListAndCancelLeadsBack() {
+    @Test
+    func submenusOpenAsTheNextListAndCancelLeadsBack() {
         store(Hotlist(entries: [.submenu("Sub", [.item("C", command: "cd mem:/C")]), .separator]))
         // Into the submenu, back out with Cancel, onto the separator (nothing), in again, add here.
         ui.formAnswers = [pick(0), .cancel, pick(1), pick(0), pick(2)]
@@ -445,7 +472,8 @@ import Testing
         #expect(hotlist.children(of: [0]).map(\.title) == ["A"])
     }
 
-    @Test func favoritesAreOfferedUnlessSwitchedOff() {
+    @Test
+    func favoritesAreOfferedUnlessSwitchedOff() {
         ui.formAnswers = [pick(0), pick(0)]
         commands.perform(.directoryHotlist)
         #expect(lastRows == ["    Desktop"] && left.model.directory == memory.url("/C"))
@@ -456,7 +484,8 @@ import Testing
         #expect(lastRows == ["+ Add current dir", "* Configure…"])
     }
 
-    @Test func hiddenEntriesStayOutOfTheMenu() {
+    @Test
+    func hiddenEntriesStayOutOfTheMenu() {
         store(
             Hotlist(
                 entries: [.item("?Secret", command: "cd mem:/C"), .item("B", command: "cd mem:/B")],
@@ -468,7 +497,8 @@ import Testing
         #expect(lastRows.first == "    B" && left.model.directory == memory.url("/B"))
     }
 
-    @Test func configureStoresWhatTheEditorReturnsAndKeepsTheListOnCancel() {
+    @Test
+    func configureStoresWhatTheEditorReturnsAndKeepsTheListOnCancel() {
         var shown: [Hotlist] = []
         plugin.editHotlist = { list in
             shown.append(list)
@@ -488,7 +518,8 @@ import Testing
 
     // MARK: History
 
-    @Test func historyListsTheVisitedDirectoriesOfThePanel() {
+    @Test
+    func historyListsTheVisitedDirectoriesOfThePanel() {
         go(left, "/A/docs")
         go(left, "/A/docs/deep")
         go(left, "/C", after: 1)
@@ -510,13 +541,15 @@ import Testing
         #expect(lastRows.prefix(3) == ["➤ mem:/A/docs", "    mem:/C", "    mem:/A/docs/deep"])
     }
 
-    @Test func historyKnowsTheCurrentDirectoryBeforeAnyEvent() {
+    @Test
+    func historyKnowsTheCurrentDirectoryBeforeAnyEvent() {
         ui.formAnswers = [.cancel]
         commands.perform(.directoryHistory)
         #expect(lastRows == ["➤ mem:/A", "──────  Frequently used  ──────", "    mem:/A   (1)"])
     }
 
-    @Test func historyButtonsOpenTabsAndTheOtherPanelAndRemoveEntries() {
+    @Test
+    func historyButtonsOpenTabsAndTheOtherPanelAndRemoveEntries() {
         go(left, "/C")
         go(left, "/A")
         ui.formAnswers = [pick(1, button: 1)]
@@ -537,7 +570,8 @@ import Testing
         #expect(lastRows == ["➤ mem:/A", "──────  Frequently used  ──────", "    mem:/A   (2)"])
     }
 
-    @Test func historySettingsLimitTheListAndHideFrequentFolders() {
+    @Test
+    func historySettingsLimitTheListAndHideFrequentFolders() {
         for path in ["/C", "/B", "/A/docs", "/A"] { go(left, path) }
         settings.set("2", forKey: PlacesPlugin.Keys.historyShown)
         settings.set(false, forKey: PlacesPlugin.Keys.showFrequent)
@@ -551,7 +585,8 @@ import Testing
         #expect(lastRows == ["➤ mem:/A", "    mem:/C"])
     }
 
-    @Test func historyIsSavedAndCleared() {
+    @Test
+    func historyIsSavedAndCleared() {
         go(left, "/C")
         // Changes are written shortly after the navigation, not on every step.
         plugin.flushHistory()

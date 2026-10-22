@@ -6,14 +6,16 @@ import Testing
 
 @testable import FolderTabsPlugin
 
-@Suite struct TabFiles {
+@Suite
+struct TabFiles {
     let memory = MemoryFileSystem()
 
     func read(_ text: String) -> TabFile? {
         TabFile(text: text) { memory.location(from: $0) }
     }
 
-    @Test func writesAndReadsBothSides() {
+    @Test
+    func writesAndReadsBothSides() {
         let active = PanelTabs.State(
             tabs: [
                 .init(location: memory.url("/A"), title: "Work", locked: true),
@@ -48,7 +50,8 @@ import Testing
         #expect(read(TabFile(active: inactive).text(displayPath: memory.displayPath)) == TabFile(active: inactive))
     }
 
-    @Test func readsHandWrittenAndDamagedFiles() throws {
+    @Test
+    func readsHandWrittenAndDamagedFiles() throws {
         let file = try #require(
             read(
                 "; my tabs\r\n[ActiveTabs]\r\n3_path=mem:/C\r\n1_path=mem:/A\r\n2_path=elsewhere\r\nactivetab=3\r\nunknown=1\r\n"
@@ -65,7 +68,9 @@ import Testing
     }
 }
 
-@MainActor @Suite struct FolderTabCommands {
+@MainActor
+@Suite
+struct FolderTabCommands {
     let memory = MemoryFileSystem()
     let settings = MemorySettings()
     let bench: TestBench
@@ -91,7 +96,8 @@ import Testing
 
     func paths(_ panel: FakePanel) -> [String] { panel.tabs.tabs.map(\.directory.path) }
 
-    @Test func registersTheSpecificationsKeysAndAPreferencePage() {
+    @Test
+    func registersTheSpecificationsKeysAndAPreferencePage() {
         let keys = bench.kernel.keyBindings
         #expect(keys.command(for: Shortcut(.character("t"), .control)) == .newTab)
         #expect(keys.command(for: Shortcut(.character("t"), [.control, .shift])) == "cm_OpenNewTabBg")
@@ -108,7 +114,8 @@ import Testing
         )
     }
 
-    @Test func opensTabsInTheBackgroundAndInTheOtherPanel() {
+    @Test
+    func opensTabsInTheBackgroundAndInTheOtherPanel() {
         commands.perform("cm_OpenNewTabBg")
         #expect(paths(left) == ["/A", "/A"] && left.tabs.activeIndex == 0)
         left.moveCursor(toName: "docs")
@@ -124,7 +131,8 @@ import Testing
         #expect(left.tabs.count == 2)
     }
 
-    @Test func optionsDecideWhereAndHowNewTabsOpen() {
+    @Test
+    func optionsDecideWhereAndHowNewTabsOpen() {
         left.moveCursor(toName: "docs")
         commands.perform(.openInNewTab)
         commands.perform(.openInNewTab)
@@ -142,7 +150,8 @@ import Testing
         )
     }
 
-    @Test func closesAllOtherTabsAfterAsking() {
+    @Test
+    func closesAllOtherTabsAfterAsking() {
         for folder in ["docs", "pics"] { left.tabs.openTab(showing: memory.url("/A/" + folder), activate: false) }
         left.tabs.tabs[2].isLocked = true
         left.tabs.openTab(showing: memory.url("/B"), activate: true)
@@ -162,7 +171,8 @@ import Testing
         #expect(paths(left) == ["/A/pics", "/B"] && ui.log.count == asked)
     }
 
-    @Test func closesDuplicatesKeepingTheActiveTab() {
+    @Test
+    func closesDuplicatesKeepingTheActiveTab() {
         for path in ["/A/docs", "/A", "/A/docs", "/A/docs/", "/B"] {
             left.tabs.openTab(showing: memory.url(path), activate: false)
         }
@@ -171,7 +181,8 @@ import Testing
         #expect(paths(left) == ["/A", "/A/docs", "/B"] && left.tabs.activeIndex == 1)
     }
 
-    @Test func reopensClosedTabsWhereTheyWere() {
+    @Test
+    func reopensClosedTabsWhereTheyWere() {
         #expect(!commands.isEnabled("afm_ReopenClosedTab"))
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: false)
         left.tabs.openTab(showing: memory.url("/A/pics"), activate: false)
@@ -195,7 +206,8 @@ import Testing
         #expect(!right.tabs.closeTab(at: 0))
     }
 
-    @Test func renamesAndLocksTabs() {
+    @Test
+    func renamesAndLocksTabs() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         ui.formAnswers = [.values(["name": .text("Papers"), "locked": .flag(true)])]
         commands.perform("cm_RenameTab")
@@ -224,7 +236,8 @@ import Testing
         #expect(left.tabs.tabs.map { $0.isLocked } == [false, true])
     }
 
-    @Test func activatesTabsByNumberAndFromTheList() {
+    @Test
+    func activatesTabsByNumberAndFromTheList() {
         for folder in ["docs", "pics"] { left.tabs.openTab(showing: memory.url("/A/" + folder), activate: false) }
         commands.perform("cm_SrcActivateTab3")
         #expect(left.tabs.activeIndex == 2 && left.names == ["cat.jpg"])
@@ -250,7 +263,8 @@ import Testing
         #expect(left.tabs.activeIndex == 2)
     }
 
-    @Test func movesTabsWithinAndBetweenThePanels() {
+    @Test
+    func movesTabsWithinAndBetweenThePanels() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         left.model.customTitle = "Papers"
         commands.perform("cm_MoveTabLeft")
@@ -278,7 +292,8 @@ import Testing
         #expect(!commands.isEnabled("afm_MoveTabToOtherPanel"))
     }
 
-    @Test func exchangesThePanelsWithAllTheirTabs() {
+    @Test
+    func exchangesThePanelsWithAllTheirTabs() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         left.model.isLocked = true
         left.tabs.tabs[0].setSort(ListOrder(key: .size, descending: true))
@@ -291,7 +306,8 @@ import Testing
         #expect(right.tabs.tabs[0].sort == ListOrder(key: .size, descending: true))
     }
 
-    @Test func savesAndLoadsTabFiles() throws {
+    @Test
+    func savesAndLoadsTabFiles() throws {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
         left.model.customTitle = "Papers"
         ui.promptAnswers = [.text("mem:/B/mine")]
@@ -331,7 +347,8 @@ import Testing
         #expect(paths(left) == ["/A", "/A/docs"] && paths(right) == ["/A", "/A/docs"])
     }
 
-    @Test func aMissingOrEmptyTabFileIsReported() {
+    @Test
+    func aMissingOrEmptyTabFileIsReported() {
         commands.perform("OPENTABS", .location(memory.url("/B/none.tab")))
         #expect(ui.log.last == "inform: The tabs could not be loaded." && left.tabs.count == 1)
         commands.perform("OPENTABS", .location(memory.url("/B/other.txt")))

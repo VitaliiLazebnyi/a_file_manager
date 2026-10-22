@@ -351,11 +351,13 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         fieldsChanged()
     }
 
-    @objc private func optionChanged() {
+    @objc
+    private func optionChanged() {
         fieldsChanged()
     }
 
-    @objc private func stepperChanged(_ sender: NSStepper) {
+    @objc
+    private func stepperChanged(_ sender: NSStepper) {
         (sender === startStepper ? startField : stepField).stringValue = String(sender.integerValue)
         fieldsChanged()
     }
@@ -483,14 +485,22 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         fieldsChanged()
     }
 
-    @objc private func insertName() { insert("[N]", into: nameMaskBox) }
-    @objc private func insertNameCounter() { insert("[C]", into: nameMaskBox) }
-    @objc private func insertDate() { insert("[YMD]", into: nameMaskBox) }
-    @objc private func insertTime() { insert("[hms]", into: nameMaskBox) }
-    @objc private func insertExtension() { insert("[E]", into: extensionField) }
-    @objc private func insertExtensionCounter() { insert("[C]", into: extensionField) }
-    @objc private func insertNameRange() { insertRange(of: "N", into: nameMaskBox) }
-    @objc private func insertExtensionRange() { insertRange(of: "E", into: extensionField) }
+    @objc
+    private func insertName() { insert("[N]", into: nameMaskBox) }
+    @objc
+    private func insertNameCounter() { insert("[C]", into: nameMaskBox) }
+    @objc
+    private func insertDate() { insert("[YMD]", into: nameMaskBox) }
+    @objc
+    private func insertTime() { insert("[hms]", into: nameMaskBox) }
+    @objc
+    private func insertExtension() { insert("[E]", into: extensionField) }
+    @objc
+    private func insertExtensionCounter() { insert("[C]", into: extensionField) }
+    @objc
+    private func insertNameRange() { insertRange(of: "N", into: nameMaskBox) }
+    @objc
+    private func insertExtensionRange() { insertRange(of: "E", into: extensionField) }
 
     private static let moreFields: [(String, String)] = [
         ("[P]", "Parent folder"), ("[G]", "Grandparent folder"), ("[A]", "Name with extension"), ("[E]", "Extension"),
@@ -511,7 +521,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         ("E", "Extension"), ("X", "Clipboard text")
     ]
 
-    @objc private func showMoreFields(_ sender: NSButton) {
+    @objc
+    private func showMoreFields(_ sender: NSButton) {
         let menu = NSMenu()
         for (code, label) in Self.moreFields {
             let item = NSMenuItem(title: "\(code)  \(label)", action: #selector(insertFromMenu(_:)), keyEquivalent: "")
@@ -522,7 +533,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         popUpMenu(menu, sender)
     }
 
-    @objc private func showRangeFields(_ sender: NSButton) {
+    @objc
+    private func showRangeFields(_ sender: NSButton) {
         let menu = NSMenu()
         for (letter, label) in Self.rangeFields {
             let item = NSMenuItem(
@@ -537,11 +549,13 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         popUpMenu(menu, sender)
     }
 
-    @objc private func insertFromMenu(_ sender: NSMenuItem) {
+    @objc
+    private func insertFromMenu(_ sender: NSMenuItem) {
         if let code = sender.representedObject as? String { insert(code, into: nameMaskBox) }
     }
 
-    @objc private func insertRangeFromMenu(_ sender: NSMenuItem) {
+    @objc
+    private func insertRangeFromMenu(_ sender: NSMenuItem) {
         if let letter = sender.representedObject as? String { insertRange(of: letter, into: nameMaskBox) }
     }
 
@@ -580,7 +594,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
     // MARK: Menus
 
-    @objc private func settingsChosen(_ sender: NSPopUpButton) {
+    @objc
+    private func settingsChosen(_ sender: NSPopUpButton) {
         guard let tag = sender.selectedItem?.representedObject as? String else {
             return
         }
@@ -619,7 +634,8 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         update()
     }
 
-    @objc private func namesChosen(_ sender: NSPopUpButton) {
+    @objc
+    private func namesChosen(_ sender: NSPopUpButton) {
         guard let tag = sender.selectedItem?.representedObject as? String else {
             return
         }
@@ -647,11 +663,13 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
 
     // MARK: Actions
 
-    @objc private func nextStep() {
+    @objc
+    private func nextStep() {
         session.nextStep()
     }
 
-    @objc private func start() {
+    @objc
+    private func start() {
         guard !session.isBusy, toolWindow.makeFirstResponder(nil) else {
             return
         }
@@ -662,15 +680,18 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         update()
     }
 
-    @objc private func undo() {
+    @objc
+    private func undo() {
         session.undo()
     }
 
-    @objc private func showResultList() {
+    @objc
+    private func showResultList() {
         session.showResultList()
     }
 
-    @objc private func closeWindow() {
+    @objc
+    private func closeWindow() {
         close()
     }
 

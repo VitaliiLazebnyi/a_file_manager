@@ -7,7 +7,8 @@ import Testing
 
 /// Round 2 of the review, Find Files: bounded patterns, a walk without races that reports as
 /// it goes, the long text, numbers that used to trap, files seen twice.
-@Suite struct Review2FindFiles {
+@Suite
+struct Review2FindFiles {
     let fileSystems: FileSystemRegistry
     let memory: MemoryFileSystem
 
@@ -28,7 +29,8 @@ import Testing
 
     // MARK: Patterns
 
-    @Test func aNameRegexThatBacktracksEndsAndFindsNothing() {
+    @Test
+    func aNameRegexThatBacktracksEndsAndFindsNothing() {
         let mask = SearchMask(#"^(\w+[ _-]?)+\.jpg$"#, regex: true)
         let name = String(repeating: "a", count: 40) + ".png"
         // Used by the work on its own thread only while the test waits for it to finish.
@@ -39,7 +41,8 @@ import Testing
         #expect(SearchMask(#"^(\w+[ _-]?)+\.jpg$"#, regex: true).matches("holiday photo.jpg"))
     }
 
-    @Test func aContentRegexThatBacktrackingEndsAndCancels() throws {
+    @Test
+    func aContentRegexThatBacktrackingEndsAndCancels() throws {
         var options = TextSearchOptions()
         options.regex = true
         let pattern = try TextPattern("(a+)+$", caseSensitive: true, options: options)
@@ -64,7 +67,8 @@ import Testing
         #expect(cancelled == false)
     }
 
-    @Test func aFieldRuleRegexIsCheckedAndBounded() {
+    @Test
+    func aFieldRuleRegexIsCheckedAndBounded() {
         var query = SearchQuery(directory: memory.url("/"))
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .regex, "(")])
         #expect(FileSearch(query, fileSystems: fileSystems).problem as? TextPattern.Problem == .badRegex("("))
@@ -88,7 +92,8 @@ import Testing
         return found
     }
 
-    @Test func aVeryLongTextIsFoundOnASmallStack() throws {
+    @Test
+    func aVeryLongTextIsFoundOnASmallStack() throws {
         // The matcher used to recurse once per character: 6,000 were enough to overflow a thread's stack.
         let text = String(repeating: "ab", count: 10_000)
         for options in [TextSearchOptions(), TextSearchOptions(wholeWords: true)] {
@@ -106,7 +111,8 @@ import Testing
         }
     }
 
-    @Test func utf16WithoutAMarkIsSearchedByRegexInBothByteOrders() throws {
+    @Test
+    func utf16WithoutAMarkIsSearchedByRegexInBothByteOrders() throws {
         var options = TextSearchOptions(regex: true, encodings: [.utf16])
         options.regex = true
         let pattern = try TextPattern("wor", caseSensitive: true, options: options)
@@ -115,7 +121,8 @@ import Testing
         #expect(!pattern.isFound(in: Data("hello there\n".data(using: .utf16BigEndian)!)))
     }
 
-    @Test func aLongLineIsCutBetweenCharacters() throws {
+    @Test
+    func aLongLineIsCutBetweenCharacters() throws {
         var options = TextSearchOptions()
         options.regex = true
         let pattern = try TextPattern("é{3}x", caseSensitive: true, options: options)
@@ -128,7 +135,8 @@ import Testing
 
     // MARK: The walk
 
-    @Test func hitsOfAFolderComeBeforeItsLastFilesAreTested() {
+    @Test
+    func hitsOfAFolderComeBeforeItsLastFilesAreTested() {
         // 70 files; the tests of the last ones wait until the first hits have been reported.
         for index in 0..<70 { memory.addFile(String(format: "/many/f%02d.txt", index)) }
         let release = DispatchSemaphore(value: 0)
@@ -164,7 +172,8 @@ import Testing
         #expect(finishes(within: 600) { while lock.withLock({ hits }) < 70 { Thread.sleep(forTimeInterval: 0.01) } })
     }
 
-    @Test func aSlowFrontJobDoesNotLetTheOthersListTheWholeTree() {
+    @Test
+    func aSlowFrontJobDoesNotLetTheOthersListTheWholeTree() {
         for folder in 0..<200 {
             for file in 0..<10 { memory.addFile(String(format: "/wide/d%03d/f%d.txt", folder, file)) }
         }
@@ -196,7 +205,8 @@ import Testing
         #expect(done.wait(timeout: .now() + Wait.ceiling) == .success && count == 2_200)
     }
 
-    @Test func cancellingAContentSearchWhileItRunsIsSafe() {
+    @Test
+    func cancellingAContentSearchWhileItRunsIsSafe() {
         for folder in 0..<12 {
             for file in 0..<40 {
                 memory.addFile("/tree/d\(folder)/f\(file).txt", String(repeating: "lorem ipsum ", count: 50))
@@ -215,7 +225,8 @@ import Testing
         }
     }
 
-    @Test func aWalkThatIsClosedDoesNotComeBackToLife() {
+    @Test
+    func aWalkThatIsClosedDoesNotComeBackToLife() {
         for index in 0..<30 { memory.addFile("/deep/a/b/c/d\(index)/e.txt", "x") }
         var query = SearchQuery(directory: memory.url("/deep"))
         query.resultLimit = 5
@@ -232,7 +243,8 @@ import Testing
         #expect(every > 30 && !complete.reachedResultLimit)
     }
 
-    @Test func searchInFoundFilesDoesNotCompareEveryItemWithEveryFolder() {
+    @Test
+    func searchInFoundFilesDoesNotCompareEveryItemWithEveryFolder() {
         for folder in 0..<300 { for file in 0..<10 { memory.addFile("/found/d\(folder)/n\(file).txt") } }
         var items: [URL] = []
         for folder in 0..<300 {
@@ -251,7 +263,8 @@ import Testing
 
     // MARK: Files seen twice, special files
 
-    @Test func theSameRemotePlaceWrittenTwoWaysIsNotADuplicateOfItself() {
+    @Test
+    func theSameRemotePlaceWrittenTwoWaysIsNotADuplicateOfItself() {
         func item(_ text: String) -> FileItem {
             FileItem(
                 url: URL(string: text)!,
@@ -275,7 +288,8 @@ import Testing
         #expect(two.count == 1 && two[0].count == 2)
     }
 
-    @Test func overlappingRootsKeepHardLinksAndDropTheSameFolder() throws {
+    @Test
+    func overlappingRootsKeepHardLinksAndDropTheSameFolder() throws {
         let box = try Sandbox()
         try box.file("dir/one.txt", "x")
         try FileManager.default.linkItem(at: box.url("dir/one.txt"), to: box.url("dir/two.txt"))
@@ -286,7 +300,8 @@ import Testing
         #expect(found.sorted() == ["one.txt", "two.txt"])
     }
 
-    @Test func aFifoOrAStubIsNotOpenedForReading() throws {
+    @Test
+    func aFifoOrAStubIsNotOpenedForReading() throws {
         let box = try Sandbox()
         try box.file("real.txt", "needle")
         #expect(mkfifo(box.url("pipe").path, 0o644) == 0)
@@ -304,7 +319,8 @@ import Testing
 
     // MARK: Numbers that used to trap
 
-    @Test func absurdNumbersAreHeldToWhatTheyCanBe() {
+    @Test
+    func absurdNumbersAreHeldToWhatTheyCanBe() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         for unit in Age.Unit.allCases {
             for count in [Int.max, Int.min, -1, 0, 1 << 62] {
@@ -327,7 +343,8 @@ import Testing
 
     // MARK: Spotlight
 
-    @Test func spotlightReChecksWhatTheIndexCannotJudge() {
+    @Test
+    func spotlightReChecksWhatTheIndexCannotJudge() {
         var query = SearchQuery(directory: memory.url("/"), text: "smith")
         #expect(SpotlightQuery.handlesText(of: query) && !SpotlightQuery.recheckingText(of: query))
         query.caseSensitive = true

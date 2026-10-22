@@ -89,7 +89,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
 /// Review round 2, the sources of bytes: opening links and special files, closing readers off the
 /// calling thread, saving, the copies for the players, and the rules for links in a viewed file.
-@Suite struct Review2ViewerSource {
+@Suite
+struct Review2ViewerSource {
     private func folder() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(
             "afm-r2viewer-\(UUID().uuidString)",
@@ -107,7 +108,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     // MARK: Opening
 
-    @Test func aLinkToAFileIsOpenedWithTheSizeOfItsTarget() throws {
+    @Test
+    func aLinkToAFileIsOpenedWithTheSizeOfItsTarget() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         let target = directory.appendingPathComponent("target.log")
@@ -126,7 +128,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(try ProviderByteSource.open(empty, fileSystems: local()).length == 0)
     }
 
-    @Test func devicesAndPipesAreRefusedWithoutBeingRead() throws {
+    @Test
+    func devicesAndPipesAreRefusedWithoutBeingRead() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         for path in ["/dev/zero", "/dev/null"] {
@@ -148,7 +151,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(worker.waitUntilFinished() && outcome.value)
     }
 
-    @Test func measuringAFileOfUnknownSizeStopsWithItsFlag() {
+    @Test
+    func measuringAFileOfUnknownSizeStopsWithItsFlag() {
         let provider = Review2HookProvider()
         provider.endless = ["/stream"]
         let registry = FileSystemRegistry()
@@ -167,7 +171,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         if case .success? = outcome.value { Issue.record("The stream was opened") }
     }
 
-    @Test func specialEntriesAreRefusedWhateverTheFileSystem() throws {
+    @Test
+    func specialEntriesAreRefusedWhateverTheFileSystem() throws {
         let provider = Review2HookProvider()
         provider.endless = ["/stream"]
         provider.special = ["/stream"]
@@ -180,7 +185,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     // MARK: Closing
 
-    @Test func closingTheSourceDoesNotWaitForTheReaders() throws {
+    @Test
+    func closingTheSourceDoesNotWaitForTheReaders() throws {
         let provider = Review2HookProvider()
         provider.contents["/a"] = Data(repeating: 0x42, count: 100_000)
         let registry = FileSystemRegistry()
@@ -199,7 +205,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(provider.closeCount == 1)
     }
 
-    @Test func aReaderInUseWhenTheSourceIsClosedIsClosedWhenItComesBack() throws {
+    @Test
+    func aReaderInUseWhenTheSourceIsClosedIsClosedWhenItComesBack() throws {
         let provider = Review2HookProvider()
         provider.contents["/a"] = Data(repeating: 0x42, count: 100_000)
         let registry = FileSystemRegistry()
@@ -226,7 +233,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     // MARK: The block cache
 
-    @Test func aShortBlockIsNotKeptInMemory() throws {
+    @Test
+    func aShortBlockIsNotKeptInMemory() throws {
         /// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
         final class Flaky: ByteSource, @unchecked Sendable {
             let length: Int64 = 40_000
@@ -246,7 +254,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(try cached.read(at: 0, count: 4_096).count == 4_096)
     }
 
-    @Test func aLongReadOfFourBlocksGoesPastTheMemoryCache() throws {
+    @Test
+    func aLongReadOfFourBlocksGoesPastTheMemoryCache() throws {
         let data = Data((0..<(1 << 20)).map { UInt8(truncatingIfNeeded: $0) })
         let cached = CachedByteSource(DataByteSource(data), blockSize: 256 << 10, capacity: 4)
         _ = try cached.read(at: 0, count: 1 << 20)
@@ -256,7 +265,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     // MARK: Save as
 
-    @Test func savingOntoTheViewedFileIsRecognisedAndRefused() throws {
+    @Test
+    func savingOntoTheViewedFileIsRecognisedAndRefused() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         let file = directory.appendingPathComponent("a.txt")
@@ -277,7 +287,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(ViewerSave.isSameFile(directory.appendingPathComponent("x/../a.txt"), file))
     }
 
-    @Test func aSaveWritesATemporaryFileAndMovesItIntoPlace() throws {
+    @Test
+    func aSaveWritesATemporaryFileAndMovesItIntoPlace() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         let target = directory.appendingPathComponent("copy.bin")
@@ -289,7 +300,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["copy.bin"])
     }
 
-    @Test func aSaveOfAFileThatBecameShorterFailsAndLeavesTheTargetAlone() throws {
+    @Test
+    func aSaveOfAFileThatBecameShorterFailsAndLeavesTheTargetAlone() throws {
         final class Short: ByteSource {
             let length: Int64 = 2_000_000
             func read(at offset: Int64, count: Int) -> Data {
@@ -317,7 +329,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     // MARK: Temporary copies
 
-    @Test func theNameOfACopyIsOneSafeComponent() {
+    @Test
+    func theNameOfACopyIsOneSafeComponent() {
         for name in [
             "..", ".", "", "../../x", "a/b", "a\\b", "x:y", "..%2F..%2Fx", "\u{0}evil",
             String(repeating: "n", count: 400) + ".mov"
@@ -335,7 +348,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(TemporaryCopies.safeName(String(repeating: "n", count: 400) + ".mov").hasSuffix(".mov"))
     }
 
-    @Test func aNameWithEncodedSeparatorsStaysInsideItsFolder() throws {
+    @Test
+    func aNameWithEncodedSeparatorsStaysInsideItsFolder() throws {
         let provider = Review2HookProvider()
         // As a server sends it: the last component is "../../escape.mp4" once decoded.
         let url = URL(string: "hook:///a/..%2F..%2Fescape.mp4")!
@@ -353,7 +367,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("escape.mp4").path))
     }
 
-    @Test func aFileTooBigToCopyIsRefusedBeforeAByteIsRead() {
+    @Test
+    func aFileTooBigToCopyIsRefusedBeforeAByteIsRead() {
         let registry = FileSystemRegistry()
         let provider = Review2HookProvider()
         provider.sizes["/huge.mov"] = 50 << 30
@@ -373,7 +388,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         #expect(provider.closeCount == 0)
     }
 
-    @Test func aCopyIsNotRegisteredForAPaneThatLetGoMeanwhileOrAfterRemoveAll() throws {
+    @Test
+    func aCopyIsNotRegisteredForAPaneThatLetGoMeanwhileOrAfterRemoveAll() throws {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -396,7 +412,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     // MARK: Links
 
-    @Test func onlyWebAndMailLinksOpenInTheBrowser() {
+    @Test
+    func onlyWebAndMailLinksOpenInTheBrowser() {
         #expect(
             LinkPolicy.opensInBrowser(URL(string: "https://example.com/a")!)
                 && LinkPolicy.opensInBrowser(URL(string: "http://example.com")!)
@@ -410,7 +427,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         }
     }
 
-    @Test func aPageCanOnlyLeadToFilesBesideTheOneShown() {
+    @Test
+    func aPageCanOnlyLeadToFilesBesideTheOneShown() {
         let base = URL(fileURLWithPath: "/Users/me/pages/index.html")
         func target(_ text: String) -> String? { LinkPolicy.target(of: URL(string: text)!, relativeTo: base)?.path }
         #expect(target("other.html") == "/Users/me/pages/other.html")
@@ -434,7 +452,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         )
     }
 
-    @Test func aPageShownFromAStringNavigatesOnceAndThenNowhere() {
+    @Test
+    func aPageShownFromAStringNavigatesOnceAndThenNowhere() {
         let blank = URL(string: "about:blank")
         typealias Page = WebContentView
         // The load of the page itself, once.
@@ -473,7 +492,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     // MARK: Encodings
 
-    @Test func codePagesThatCannotBeDecodedAreNotOffered() {
+    @Test
+    func codePagesThatCannotBeDecodedAreNotOffered() {
         // EUC-JP and GB 18030 were taken out in the first pass and are back (second pass), decoded by their layout; other
         // code pages of many bytes (ISO-2022, EUC-KR, HZ ...) are still not offered.
         #expect(ViewerEncoding.codePage(51_932) != nil && ViewerEncoding.codePage(54_936) != nil)
@@ -488,7 +508,8 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
 
     // MARK: Folders
 
-    @Test func countingAFolderOnAServerStopsAtItsLimit() {
+    @Test
+    func countingAFolderOnAServerStopsAtItsLimit() {
         let memory = MemoryFileSystem()
         for folder in 0..<5 {
             for file in 0..<20 { memory.addFile("/tree/d\(folder)/f\(file).txt", String(repeating: "a", count: 10)) }

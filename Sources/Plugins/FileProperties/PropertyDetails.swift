@@ -12,7 +12,8 @@ import Foundation
 /// are empty for items elsewhere.
 enum PropertyColumns {
     static func register(in columns: ColumnRegistry, comments: CommentStore) {
-        @Sendable func local(_ item: FileItem, _ text: (LocalDetails) -> String) -> String {
+        @Sendable
+        func local(_ item: FileItem, _ text: (LocalDetails) -> String) -> String {
             LocalInfo.details(item.url).map(text) ?? ""
         }
         // The comment file may lie on a server: the reading, and the wait of the other rows

@@ -225,7 +225,8 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     }
 
     /// Runs on `queue`.
-    @objc private func finished() {
+    @objc
+    private func finished() {
         metadataQuery.disableUpdates()
         var paths: [String] = []
         let total = metadataQuery.resultCount

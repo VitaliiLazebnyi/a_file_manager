@@ -10,8 +10,10 @@ import Testing
 /// The in-process test server speaks no TLS, so this one is a short script for the Python that
 /// comes with the developer tools, with a certificate made by `/usr/bin/openssl` in the sandbox;
 /// where one of the two is missing the tests are skipped.
-@Suite(.enabled(if: TLSServer.isAvailable)) struct NetworkTLS {
-    @Test(arguments: [TLSMode.explicit, .implicit]) func connectsListsAndTransfers(mode: TLSMode) throws {
+@Suite(.enabled(if: TLSServer.isAvailable))
+struct NetworkTLS {
+    @Test(arguments: [TLSMode.explicit, .implicit])
+    func connectsListsAndTransfers(mode: TLSMode) throws {
         let box = try Sandbox()
         try box.file("srv/hello.txt", "hello over TLS")
         let server = try TLSServer(mode: mode, box: box)
@@ -60,7 +62,8 @@ import Testing
         #expect(shown.count == 2)
     }
 
-    @Test func aServerWithoutTLSRefusesExplicitTLS() throws {
+    @Test
+    func aServerWithoutTLSRefusesExplicitTLS() throws {
         let fixture = try FTPFixture()
         let key = ServerKey(scheme: "ftps", host: "127.0.0.1", port: fixture.server.port)
         fixture.center.announce(ConnectionProfile(key: key, tls: .explicit, anonymous: true))

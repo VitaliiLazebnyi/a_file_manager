@@ -5,7 +5,8 @@ import TestSupport
 import Testing
 
 /// The names of new folders and files: lists, placeholders, counters (spec 07 › New folder, 18 › Placeholders).
-@Suite struct NameTemplates {
+@Suite
+struct NameTemplates {
     /// 2026-10-12 14:03:07.250 UTC, cursor on `Holiday pics.jpeg` in /Volumes/Data/Photos.
     var context: NameTemplate.Context {
         var context = NameTemplate.Context()
@@ -26,7 +27,8 @@ import Testing
         try NameTemplate.names(from: text, context: context, quotedLists: quoted)
     }
 
-    @Test func plainNamesListsAndNesting() throws {
+    @Test
+    func plainNamesListsAndNesting() throws {
         #expect(try names("docs") == ["docs"])
         #expect(try names(" made/inner | other ||") == ["made/inner", "other"])
         #expect(try names("p|q/s") == ["p", "q/s"])
@@ -37,7 +39,8 @@ import Testing
         #expect(try names("").isEmpty)
     }
 
-    @Test func dateAndTime() throws {
+    @Test
+    func dateAndTime() throws {
         #expect(try names("<[Y]-[M]-[D] downloads") == ["2026-10-12 downloads"])
         #expect(try names("<[YMD]_[hms]") == ["20261012_140307"])
         #expect(try names("<[y][M] [Y-M-D] [h.m.s] [v]") == ["2610 2026-10-12 14.03.07 250"])
@@ -47,7 +50,8 @@ import Testing
         #expect(try names("<[T1+2M][Y]-[M]") == ["2026-12"])
     }
 
-    @Test func partsOfTheNameUnderTheCursor() throws {
+    @Test
+    func partsOfTheNameUnderTheCursor() throws {
         #expect(try names("<Copy of [N]") == ["Copy of Holiday pics"])
         #expect(
             try names("<[A] ([E]) in [P] of [G], [S] bytes") == [
@@ -66,7 +70,8 @@ import Testing
         #expect(try NameTemplate.names(from: "<[N]-[E]-", context: folder) == ["My.Folder--"])
     }
 
-    @Test func caseSwitchesEnvironmentClipboardAndBrackets() throws {
+    @Test
+    func caseSwitchesEnvironmentClipboardAndBrackets() throws {
         #expect(try names("<[U][N] [L]LOUD [n][E]") == ["HOLIDAY PICS loud jpeg"])
         #expect(try names("<[F]the lord of the rings") == ["The Lord Of The Rings"])
         #expect(try names("<[f]the lord of the rings") == ["The Lord of the Rings"])
@@ -79,7 +84,8 @@ import Testing
         #expect(try NameTemplate.names(from: "<a[X+]b", context: empty) == ["ab"])
     }
 
-    @Test func counterRanges() throws {
+    @Test
+    func counterRanges() throws {
         // The examples of spec 07 › Counter ranges and optional digit.
         #expect(try names("<1-10>[C]") == ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"])
         #expect(try names("<1-3>[C]") == ["1", "2", "3"])
@@ -96,7 +102,8 @@ import Testing
         #expect(NameTemplate.rangePreview("<plain", context: context) == nil)
     }
 
-    @Test func theOptionalDigitFindsTheFirstFreeName() throws {
+    @Test
+    func theOptionalDigitFindsTheFirstFreeName() throws {
         var taken = context
         taken.exists = { ["test", "test2", "new", "new (2)", "new (3)"].contains($0) }
         #expect(try NameTemplate.names(from: "<test[C]", context: taken) == ["test3"])
@@ -110,7 +117,8 @@ import Testing
 }
 
 /// "Only files of this type" (spec 07 › Only files of this type).
-@Suite struct CopyFilters {
+@Suite
+struct CopyFilters {
     /// The relative paths of a small tree that the filter lets through; folders end in `/`.
     func admitted(_ text: String) -> [String] {
         let filter = CopyFilter(text)
@@ -134,13 +142,15 @@ import Testing
         return result
     }
 
-    @Test func emptyAndEverything() {
+    @Test
+    func emptyAndEverything() {
         #expect(CopyFilter("").isEmpty && CopyFilter("*.*").isEmpty && CopyFilter(" * ").isEmpty)
         #expect(!CopyFilter("*.txt").isEmpty && !CopyFilter("*.* | *.bak").isEmpty && !CopyFilter("| **/").isEmpty)
         #expect(admitted("").count == 9)
     }
 
-    @Test func includeAndExcludeMasks() {
+    @Test
+    func includeAndExcludeMasks() {
         #expect(
             admitted("*.txt *.JPG") == [
                 "a.txt", "c.jpg", "docs/d.txt", "docs/build/f.txt", "src/g.txt", "src/docs/h.txt",
@@ -152,7 +162,8 @@ import Testing
         #expect(admitted("\"a.txt\" ?.bak") == ["a.txt", "b.bak"])
     }
 
-    @Test func folderPatterns() {
+    @Test
+    func folderPatterns() {
         #expect(admitted("*.txt | build/ src/") == ["a.txt", "docs/d.txt"])
         // Anchored to the base folder: only its direct subfolder docs is left out.
         #expect(admitted("*.txt | /docs/") == ["a.txt", "src/g.txt", "src/docs/h.txt", "src/docs/deep/i.txt"])
@@ -170,8 +181,10 @@ import Testing
     }
 }
 
-@Suite struct Switches {
-    @Test func commandOptionsAreRead() {
+@Suite
+struct Switches {
+    @Test
+    func commandOptionsAreRead() {
         // The example of spec 17 › Commands with parameters.
         let switches = CommandSwitches.parse("/V0H1T=\"c:\\test\\\"W=\"\"\"a test.*\"\" test2.*\"")
         #expect(switches == ["V": "0", "H": "1", "T": "c:\\test\\", "W": "\"a test.*\" test2.*"])
@@ -182,7 +195,8 @@ import Testing
 }
 
 /// The operation log (spec 13 › Operation › Log file).
-@Suite struct OperationLogs {
+@Suite
+struct OperationLogs {
     let box: Sandbox
     var configuration = OperationLog.Configuration()
 
@@ -199,7 +213,8 @@ import Testing
         var now = Date(timeIntervalSince1970: 1_791_813_787)
     }
 
-    @Test func linesAreWrittenInOrderOffTheCallingThread() {
+    @Test
+    func linesAreWrittenInOrderOffTheCallingThread() {
         let clock = Clock()
         let log = OperationLog(configuration, now: { clock.now })
         log.write(OperationRecord(.copy, source: "/a/one.txt", target: "/b/one.txt"))
@@ -222,7 +237,8 @@ import Testing
         )
     }
 
-    @Test func manyThreadsCanWriteAtOnce() {
+    @Test
+    func manyThreadsCanWriteAtOnce() {
         let log = OperationLog(configuration)
         DispatchQueue.concurrentPerform(iterations: 200) { index in
             log.write(OperationRecord(.copy, source: "/a/\(index)", target: "/b/\(index)"))
@@ -232,7 +248,8 @@ import Testing
         #expect(lines.count == 200 && Set(lines.map { $0.split(separator: " ").last ?? "" }).count == 200)
     }
 
-    @Test func onlyWhatIsWantedIsLogged() {
+    @Test
+    func onlyWhatIsWantedIsLogged() {
         var quiet = configuration
         quiet.logsDeletes = false
         quiet.logsSkipped = false
@@ -260,7 +277,8 @@ import Testing
         #expect(!box.exists("logs/off.log"))
     }
 
-    @Test func rotationBySizeKeepsALimitedNumberOfCopies() {
+    @Test
+    func rotationBySizeKeepsALimitedNumberOfCopies() {
         var rotating = configuration
         rotating.rotation = .size(200)
         rotating.keepCount = 2
@@ -277,7 +295,8 @@ import Testing
         #expect((box.read("logs/operations.log") ?? "").utf8.count <= 200)
     }
 
-    @Test func dailyRotationStartsANewFileAfterMidnight() throws {
+    @Test
+    func dailyRotationStartsANewFileAfterMidnight() throws {
         var rotating = configuration
         rotating.rotation = .daily
         let clock = Clock()

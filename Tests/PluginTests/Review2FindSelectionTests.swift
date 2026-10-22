@@ -10,7 +10,8 @@ import Testing
 /// Round 2 of the review, Selection: regular expressions that cannot hang, a `**` that is not
 /// exponential, work off the main thread with a list-version guard, numbers that used to trap,
 /// the ANSI file that used to raise.
-@Suite struct Review2FindSelectionRules {
+@Suite
+struct Review2FindSelectionRules {
     func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
@@ -21,7 +22,8 @@ import Testing
         return done.wait(timeout: .now() + seconds) == .success
     }
 
-    @Test func aRegexMaskThatBacktracksEndsAndSaysSo() {
+    @Test
+    func aRegexMaskThatBacktracksEndsAndSaysSo() {
         let mask = SelectionMask("<(a+)+$")
         let name = String(repeating: "a", count: 45) + "!"
         // Used by the work on its own thread only while the test waits for it to finish.
@@ -33,7 +35,8 @@ import Testing
         #expect(quick.selected([MaskEntry(name: "aaa")]) == [true] && !quick.timedOut)
     }
 
-    @Test func aRegexMaskStopsWhenCancelled() {
+    @Test
+    func aRegexMaskStopsWhenCancelled() {
         let mask = SelectionMask(#"<^(\w+[ _-]?)+\.jpg$"#)
         let flag = CancellationFlag()
         Thread {
@@ -48,7 +51,8 @@ import Testing
         #expect(result.allSatisfy { !$0 })
     }
 
-    @Test func manyAnyLevelsInAPathMaskAreNotExponential() {
+    @Test
+    func manyAnyLevelsInAPathMaskAreNotExponential() {
         let mask = SelectionMask("**/**/**/**/**/**/**/**/**/**/**/**/**/x.txt")
         let directory = (0..<30).map { "d\($0)" }
         // Used by the work on its own thread only while the test waits for it to finish.
@@ -68,7 +72,8 @@ import Testing
         )
     }
 
-    @Test func aNameAnsiCannotWriteDoesNotRaise() {
+    @Test
+    func aNameAnsiCannotWriteDoesNotRaise() {
         let name = "\u{3000}\u{0300}"
         let item = FileItem(url: URL(fileURLWithPath: "/tmp/x"), name: name)
         let data = SelectionFile.encode(
@@ -81,7 +86,9 @@ import Testing
     }
 }
 
-@MainActor @Suite struct Review2FindSelectionCommands {
+@MainActor
+@Suite
+struct Review2FindSelectionCommands {
     typealias Ids = SelectionCommands
 
     let memory = MemoryFileSystem()
@@ -103,7 +110,8 @@ import Testing
         while !condition(), Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
-    @Test func aRegexMaskIsEvaluatedOffTheMainThread() async {
+    @Test
+    func aRegexMaskIsEvaluatedOffTheMainThread() async {
         memory.addFile("/A/alpha.txt")
         memory.addFile("/A/beta.txt")
         let bench = makeBench(background: true)
@@ -115,7 +123,8 @@ import Testing
         #expect(bench.left.model.selection == ["alpha.txt"])
     }
 
-    @Test func aMaskThatBacktracksIsReportedAndSelectsNothing() async {
+    @Test
+    func aMaskThatBacktracksIsReportedAndSelectsNothing() async {
         memory.addFile("/A/" + String(repeating: "a", count: 45) + "!")
         memory.addFile("/A/b")
         let bench = makeBench(background: true)
@@ -131,7 +140,8 @@ import Testing
     /// The list is read again before the answer comes back: the model refuses the rows made for the
     /// list it had, and the command is worked out again for the list as it is (see Review2PluginsA2Tests
     /// for a panel that went to another folder: that result is dropped).
-    @Test func aResultForAnotherListIsWorkedOutAgain() async {
+    @Test
+    func aResultForAnotherListIsWorkedOutAgain() async {
         memory.addFile("/A/alpha.txt")
         let bench = makeBench(background: true)
         bench.left.show(memory.url("/A"), focus: nil, history: .keep, completion: nil)
@@ -142,7 +152,8 @@ import Testing
         #expect(bench.left.model.selection == ["alpha.txt", "alpine.txt"])
     }
 
-    @Test func aLongListIsSelectedInvertedAndRestoredWithoutBlocking() async {
+    @Test
+    func aLongListIsSelectedInvertedAndRestoredWithoutBlocking() async {
         for index in 0..<(Selections.longList + 5_000) { memory.addFile("/A/f\(index).txt") }
         memory.addFile("/A/keep.md")
         let bench = makeBench(background: true)
@@ -166,7 +177,8 @@ import Testing
         #expect(model.selectionCount == total)
     }
 
-    @Test func comparingTwoFoldersAndTheClipboardWorkInTheBackground() async {
+    @Test
+    func comparingTwoFoldersAndTheClipboardWorkInTheBackground() async {
         memory.addFile("/A/only_left.txt")
         memory.addFile("/A/both.txt", "1")
         memory.addFile("/B/both.txt", "1")
@@ -183,7 +195,8 @@ import Testing
         #expect(bench.left.model.selection == ["both.txt"])
     }
 
-    @Test func extremeCountsDoNotTrap() {
+    @Test
+    func extremeCountsDoNotTrap() {
         memory.addFile("/A/a.txt")
         memory.addFile("/A/b.txt")
         let bench = makeBench(background: false)
@@ -195,7 +208,8 @@ import Testing
         #expect(bench.left.model.rowCount > 0)
     }
 
-    @Test func savingOverAFileKeepsNoTemporaryFileAndReplacesTheOldOne() {
+    @Test
+    func savingOverAFileKeepsNoTemporaryFileAndReplacesTheOldOne() {
         memory.addFile("/A/one.txt")
         memory.addFile("/B/list.txt", "old")
         let bench = makeBench(background: false)

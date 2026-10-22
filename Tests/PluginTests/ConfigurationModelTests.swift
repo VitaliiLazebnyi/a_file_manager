@@ -6,10 +6,13 @@ import Testing
 @testable import ConfigurationPlugin
 
 /// The parts of the configuration plugin that need neither a window nor a kernel.
-@MainActor @Suite struct ConfigurationModels {
+@MainActor
+@Suite
+struct ConfigurationModels {
     // MARK: Preference pages
 
-    @Test func aPreferencePageHoldsChangesUntilApply() {
+    @Test
+    func aPreferencePageHoldsChangesUntilApply() {
         let settings = MemorySettings()
         var changes = 0
         let flag = Preference("demo.flag", "Flag", .flag(default: true))
@@ -57,7 +60,8 @@ import Testing
         Command("em_mine", "Mine")
     ]
 
-    @Test func theKeyMapFollowsTheKernelsRules() {
+    @Test
+    func theKeyMapFollowsTheKernelsRules() {
         let defaults = KeyMap.resolve(keyCommands, overrides: [:])
         #expect(
             defaults["copy"] == [.f(5), .cmd("c")] && defaults["pack"] == [.f(5, .option)] && defaults["em_mine"] == nil
@@ -72,7 +76,8 @@ import Testing
         for command in keyCommands { #expect(keys.shortcuts(for: command.id) == resolved[command.id] ?? []) }
     }
 
-    @Test func aKeyInUseNamesItsCommandAndIsTakenOnlyWhenTheUserAgrees() {
+    @Test
+    func aKeyInUseNamesItsCommandAndIsTakenOnlyWhenTheUserAgrees() {
         let ui = ScriptedInteraction()
         let editor = KeyBindingEditor(commands: keyCommands, overrides: [:])
         #expect(editor.owner(of: .f(5)) == "copy" && editor.owner(of: .f(9)) == nil)
@@ -101,7 +106,8 @@ import Testing
         #expect(editor.shortcuts(for: "copy") == [.f(5), .cmd("c")] && !editor.isChanged)
     }
 
-    @Test func committedKeysAreStoredAndApplyAtOnceAndAfterARestart() {
+    @Test
+    func committedKeysAreStoredAndApplyAtOnceAndAfterARestart() {
         let settings = MemorySettings()
         func freshKeys() -> KeyBindings {
             let keys = KeyBindings()
@@ -141,7 +147,8 @@ import Testing
         )
     }
 
-    @Test func shortcutsAreWrittenReadAndRecognisedFromKeyPresses() {
+    @Test
+    func shortcutsAreWrittenReadAndRecognisedFromKeyPresses() {
         #expect(ShortcutText.display(Shortcut(.character("c"), [.command, .shift, .control, .option])) == "⌃⌥⇧⌘C")
         #expect(ShortcutText.display([.f(5, .shift), Shortcut(.returnKey), Shortcut(.keypadPlus)]) == "⇧F5, ↩, Num +")
         #expect(ShortcutText.parse("ctrl+shift+n") == Shortcut(.character("n"), [.control, .shift]))
@@ -159,7 +166,8 @@ import Testing
         #expect(ShortcutText.shortcut(keyCode: 8, characters: "", modifiers: []) == nil)
     }
 
-    @Test func theCommandListIsGroupedByMenuAndFiltered() {
+    @Test
+    func theCommandListIsGroupedByMenuAndFiltered() {
         let registry = MenuRegistry()
         registry.add(["copy", "pack"], to: MenuSection(MenuID("Files", order: 1), order: 1))
         registry.add(["view"], to: MenuSection(MenuID("Show", order: 2), order: 1))
@@ -178,7 +186,8 @@ import Testing
 
     // MARK: Button bar
 
-    @Test func theButtonBarIsEditedAsAListAndStoredOnCommit() {
+    @Test
+    func theButtonBarIsEditedAsAListAndStoredOnCommit() {
         let settings = MemorySettings()
         let toolbar = ToolbarRegistry()
         var redraws = 0
@@ -226,7 +235,8 @@ import Testing
 
     // MARK: Command language
 
-    @Test func aCommandFieldIsReadAsStepsOrAsOneLine() {
+    @Test
+    func aCommandFieldIsReadAsStepsOrAsOneLine() {
         let known: [CommandID] = ["cm_SelectAll", "cm_Copy", "em_notepad", "cm_List"]
         let resolve: (String) -> CommandID? = { name in known.first { $0.rawValue.lowercased() == name.lowercased() } }
         func steps(_ text: String) -> [CommandStep] {
@@ -262,7 +272,8 @@ import Testing
 
     // MARK: Settings as a file
 
-    @Test func settingsSurviveExportAndImport() throws {
+    @Test
+    func settingsSurviveExportAndImport() throws {
         let settings = MemorySettings()
         settings.set(true, forKey: "a.flag")
         settings.set("text with “quotes”", forKey: "a.text")

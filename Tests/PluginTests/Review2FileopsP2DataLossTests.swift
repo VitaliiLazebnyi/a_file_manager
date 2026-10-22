@@ -38,7 +38,8 @@ private func names(in folder: URL) -> [String] {
     ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).sorted()
 }
 
-@Suite(.serialized) struct Review2FileopsP2DataLoss {
+@Suite(.serialized)
+struct Review2FileopsP2DataLoss {
     let box: Sandbox
     let fileSystems = FileSystemRegistry()
     let virtual: VirtualFileSystem
@@ -52,7 +53,8 @@ private func names(in folder: URL) -> [String] {
 
     // F001, F018: the target is the file's own folder, named through the branch view. Before:
     // the file was copied onto itself and then removed as the source of the move.
-    @Test func aMoveWithinABranchViewNeverRemovesTheFile() throws {
+    @Test
+    func aMoveWithinABranchViewNeverRemovesTheFile() throws {
         let file = try box.file("d/a.txt", "precious")
         let job = FileJob(
             kind: .move,
@@ -69,7 +71,8 @@ private func names(in folder: URL) -> [String] {
 
     // F006, F013: two files of one name from two folders, moved into one folder under
     // "Overwrite all". Before: the second overwrote the first, and both sources were gone.
-    @Test func twoSourcesOfOneNameBothSurviveAMoveUnderOverwriteAll() throws {
+    @Test
+    func twoSourcesOfOneNameBothSurviveAMoveUnderOverwriteAll() throws {
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
         let job = FileJob(
@@ -93,7 +96,8 @@ private func names(in folder: URL) -> [String] {
     }
 
     // The same through a mask that gives three sources one name.
-    @Test func aMaskThatGivesThreeSourcesOneNameLosesNone() throws {
+    @Test
+    func aMaskThatGivesThreeSourcesOneNameLosesNone() throws {
         let sources = [
             try box.file("s/a.doc", "doc"), try box.file("s/a.pdf", "pdf"), try box.file("s/a.rtf", "rtf")
         ]
@@ -119,7 +123,8 @@ private func names(in folder: URL) -> [String] {
 
     // F022, F033: the target name is a link to another file. Before: Resume cut that file and
     // wrote the source over it.
-    @Test func resumeNeverWritesThroughALinkAtTheTarget() throws {
+    @Test
+    func resumeNeverWritesThroughALinkAtTheTarget() throws {
         let kept = "the victim's own contents"
         let victim = try box.file("elsewhere/victim.txt", kept)
         let source = try box.file("s/f.txt", String(repeating: "source-bytes ", count: 20))
@@ -139,7 +144,8 @@ private func names(in folder: URL) -> [String] {
 
     // F012, F020: a disk image mounted inside the folder that is deleted for good, and nobody
     // says that the volume is meant too. Before: everything on the volume was deleted.
-    @Test func deletingAFolderLeavesAVolumeMountedInsideItAlone() throws {
+    @Test
+    func deletingAFolderLeavesAVolumeMountedInsideItAlone() throws {
         let mount = box.url("tree/mnt")
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
         try box.file("tree/beside.txt", "outside")

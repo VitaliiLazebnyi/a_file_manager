@@ -7,7 +7,8 @@ import Testing
 
 /// Fixes found in review: the walk, special files, files seen twice, the name masks and numbers
 /// that used to trap.
-@Suite struct FindFilesFixes {
+@Suite
+struct FindFilesFixes {
     let fileSystems: FileSystemRegistry
 
     init() {
@@ -31,7 +32,8 @@ import Testing
         return done.wait(timeout: .now() + seconds) == .success
     }
 
-    @Test func masksUseCharactersNotBytesOrBrackets() {
+    @Test
+    func masksUseCharactersNotBytesOrBrackets() {
         #expect(SearchMask("file[1].txt").matches("file[1].txt"))
         #expect(!SearchMask("file[1].txt").matches("file1.txt"))
         // Typed composed, named decomposed.
@@ -44,12 +46,14 @@ import Testing
         #expect(SearchMask("*.txt | draft*").matches("final.txt") && !SearchMask("*.txt | draft*").matches("draft.txt"))
     }
 
-    @Test func aLongWildcardIsNotSlow() {
+    @Test
+    func aLongWildcardIsNotSlow() {
         let mask = SearchMask(String(repeating: "a*", count: 40) + "b")
         #expect(finishes { _ = mask.matches(String(repeating: "a", count: 5_000)) })
     }
 
-    @Test func textSearchSkipsPipesAndDevices() throws {
+    @Test
+    func textSearchSkipsPipesAndDevices() throws {
         let box = try Sandbox()
         try box.file("real.txt", "needle")
         #expect(mkfifo(box.url("pipe.txt").path, 0o644) == 0)
@@ -68,7 +72,8 @@ import Testing
         )
     }
 
-    @Test func duplicatesIgnorePipesHardLinksAndRepeatedRoots() throws {
+    @Test
+    func duplicatesIgnorePipesHardLinksAndRepeatedRoots() throws {
         let box = try Sandbox()
         try box.file("a/one.txt", "same bytes")
         try box.file("b/two.txt", "same bytes")
@@ -94,7 +99,8 @@ import Testing
         #expect(FileSearch(onlyLinks, fileSystems: fileSystems).runForDuplicates().isEmpty)
     }
 
-    @Test func overlappingStartDirectoriesAreSearchedOnce() throws {
+    @Test
+    func overlappingStartDirectoriesAreSearchedOnce() throws {
         let box = try Sandbox()
         try box.file("docs/a.txt")
         try box.file("docs/sub/b.txt")
@@ -111,7 +117,8 @@ import Testing
         #expect(find(twice).count == 2)
     }
 
-    @Test func aFolderReachedBySymlinkedParentIsNotSearchedTwice() throws {
+    @Test
+    func aFolderReachedBySymlinkedParentIsNotSearchedTwice() throws {
         let box = try Sandbox()
         try box.file("real/x.txt")
         try FileManager.default.createSymbolicLink(at: box.url("alias"), withDestinationURL: box.url("real"))
@@ -120,7 +127,8 @@ import Testing
         #expect(find(query).count == 1)
     }
 
-    @Test func manyFoldersAreReportedInPathOrder() throws {
+    @Test
+    func manyFoldersAreReportedInPathOrder() throws {
         let box = try Sandbox()
         var expected: [String] = []
         for folder in 0..<40 {
@@ -146,7 +154,8 @@ import Testing
         #expect(folders.count == 41 && folders.first == box.root.lastPathComponent)
     }
 
-    @Test func cancelledSearchEndsEarly() throws {
+    @Test
+    func cancelledSearchEndsEarly() throws {
         let box = try Sandbox()
         for folder in 0..<20 { try box.file("d\(folder)/f.txt", "needle") }
         let search = FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems)
@@ -157,7 +166,8 @@ import Testing
         #expect(count == 0)
     }
 
-    @Test func nameIsTestedBeforeTheCriteria() throws {
+    @Test
+    func nameIsTestedBeforeTheCriteria() throws {
         let box = try Sandbox()
         try box.file("keep.log", "12345")
         try box.file("skip.txt", "12345")
@@ -166,7 +176,8 @@ import Testing
         #expect(find(query) == [box.url("keep.log").path])
     }
 
-    @Test func absurdNumbersDoNotTrap() {
+    @Test
+    func absurdNumbersDoNotTrap() {
         for value in [1e20, -1e20, Double.nan, Double.infinity, 1e300] {
             for comparison in [SizeRule.Comparison.equal, .greater, .less] {
                 _ = SizeRule(comparison, value, .gigabytes).matches(1_000)
@@ -187,7 +198,8 @@ import Testing
         )
     }
 
-    @Test func preparedCriteriaAgreeWithTheDirectOnes() {
+    @Test
+    func preparedCriteriaAgreeWithTheDirectOnes() {
         let now = Date()
         var criteria = FileCriteria()
         criteria.notOlderThan = Age(3, .days)
@@ -208,7 +220,8 @@ import Testing
         #expect(FileCriteria().prepared(now: now) == nil)
     }
 
-    @Test func regexTextSearchReadsLinesInBlocks() {
+    @Test
+    func regexTextSearchReadsLinesInBlocks() {
         let pattern = try? TextPattern(
             "^beta$",
             caseSensitive: true,

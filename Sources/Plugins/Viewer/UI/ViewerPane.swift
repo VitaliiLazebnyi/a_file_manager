@@ -331,7 +331,8 @@ final class ViewerPane: NSView, NSMenuDelegate {
             }
             /// Opens and samples the file. `flag` ends it: the pane's own, or, for a file system, the one
             /// `BlockingCalls` hands over once nobody waits for the answer.
-            @Sendable func open(_ item: ViewerItem, _ flag: CancellationFlag) -> Result<Loaded, any Error> {
+            @Sendable
+            func open(_ item: ViewerItem, _ flag: CancellationFlag) -> Result<Loaded, any Error> {
                 Result { () -> Loaded in
                     switch item.source {
                     case .text(let text):
@@ -1045,10 +1046,14 @@ final class ViewerPane: NSView, NSMenuDelegate {
     /// The titles of the entries of one of the menus, for tests.
     func menuTitles(_ menu: String) -> [String] { menuEntries(menu).map { $0?.title ?? "-" } }
 
-    @objc private func previousFile() { onStep(-1) }
-    @objc private func nextFile() { onStep(1) }
-    @objc private func percentClicked() { goToPercent() }
-    @objc private func cancelActivity() { activity?.cancel.cancel() }
+    @objc
+    private func previousFile() { onStep(-1) }
+    @objc
+    private func nextFile() { onStep(1) }
+    @objc
+    private func percentClicked() { goToPercent() }
+    @objc
+    private func cancelActivity() { activity?.cancel.cancel() }
 
     /// What the percent item shows: the position in a text, the zoom of an image (spec 10 ›
     /// Position and zoom item).

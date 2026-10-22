@@ -5,7 +5,8 @@ import Testing
 @testable import NetworkPlugin
 
 /// The parts of the network plugin that are pure text: listings, replies, addresses.
-@Suite struct NetworkParsers {
+@Suite
+struct NetworkParsers {
     static let utc: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
@@ -31,7 +32,8 @@ import Testing
 
     // MARK: LIST
 
-    @Test func unixListings() {
+    @Test
+    func unixListings() {
         // GNU ls, as vsftpd and ProFTPD send it.
         var entry = list("-rw-r--r--    1 1000     1000         1234 Jan 05 10:30 report.txt")
         #expect(
@@ -106,7 +108,8 @@ import Testing
         }
     }
 
-    @Test func windowsListings() {
+    @Test
+    func windowsListings() {
         var entry = list("01-31-24  03:04PM       <DIR>          Program Files")
         #expect(entry == RemoteEntry(name: "Program Files", isDirectory: true, modified: d(2_024, 1, 31, 15, 4)))
         entry = list("12-07-98  12:30AM              1048576 setup.exe")
@@ -128,7 +131,8 @@ import Testing
         #expect(list("07-04-05  09:00AM       <JUNCTION>     link")?.isSymlink == true)
     }
 
-    @Test func eplfListings() {
+    @Test
+    func eplfListings() {
         var entry = list("+i8388621.29609,m824255902,/,\tdev")
         #expect(
             entry == RemoteEntry(name: "dev", isDirectory: true, modified: Date(timeIntervalSince1970: 824_255_902))
@@ -146,7 +150,8 @@ import Testing
         )
     }
 
-    @Test func mlsdListings() {
+    @Test
+    func mlsdListings() {
         var entry = FTPListParser.mlsd(
             "type=file;size=4096;modify=20261011035043;UNIX.mode=0640; a file; with semicolon.txt"
         )
@@ -179,7 +184,8 @@ import Testing
         )
     }
 
-    @Test func largeListingsAreParsedInOrder() {
+    @Test
+    func largeListingsAreParsedInOrder() {
         let lines = (0..<5_000).map { "-rw-r--r-- 1 u g \($0) Jan 01 2020 file\($0).txt" } + ["total 5000"]
         let entries = FTPListParser.entries(of: lines, asMLSD: false)
         #expect(entries.count == 5_000 && entries[4_999].size == 4_999 && entries[17].name == "file17.txt")
@@ -189,7 +195,8 @@ import Testing
 
     // MARK: Replies
 
-    @Test func replies() {
+    @Test
+    func replies() {
         var parser = FTPReplyParser()
         #expect(parser.feed("220 Welcome") == FTPReply(code: 220, lines: ["Welcome"]))
         #expect(parser.feed("230-First line") == nil)
@@ -217,7 +224,8 @@ import Testing
         #expect(features == ["MDTM": "", "MLST": "type*;size*;modify*;", "REST": "STREAM", "UTF8": ""])
     }
 
-    @Test func replySyntax() {
+    @Test
+    func replySyntax() {
         #expect(FTPSyntax.extendedPassivePort("Entering Extended Passive Mode (|||6446|)") == 6_446)
         #expect(FTPSyntax.extendedPassivePort("Extended (!!!50000!) ok") == 50_000)
         #expect(FTPSyntax.extendedPassivePort("Entering Extended Passive Mode") == nil)
@@ -247,7 +255,8 @@ import Testing
 
     // MARK: Addresses
 
-    @Test func addresses() throws {
+    @Test
+    func addresses() throws {
         var address = try #require(ServerAddress("ftp.example.com"))
         #expect(
             address.scheme == "ftp" && address.port == 21 && address.user == nil && address.path == "/"
@@ -298,7 +307,8 @@ import Testing
         }
     }
 
-    @Test func serverKeysAndPaths() {
+    @Test
+    func serverKeysAndPaths() {
         let key = ServerKey(scheme: "FTP", host: "Example.COM", port: nil)
         #expect(
             key.description == "ftp://example.com"
@@ -323,7 +333,8 @@ import Testing
         #expect(RemotePath.name(of: "/a/b.txt") == "b.txt" && RemotePath.join("/a/", "b") == "/a/b")
     }
 
-    @Test func savedConnections() {
+    @Test
+    func savedConnections() {
         var connection = SavedConnection()
         var accepted = connection.setHost("ftp.example.com:2121", kind: .ftp)
         #expect(accepted && connection.port == 2_121 && connection.hostText == "ftp.example.com:2121")
@@ -354,7 +365,8 @@ import Testing
 
     // MARK: Other pure pieces
 
-    @Test func lineEnds() {
+    @Test
+    func lineEnds() {
         var down = LineEndConverter()
         #expect(down.toLocal(Data("a\r\nb\r".utf8)) == Data("a\nb".utf8))
         // The CR at the end of one block and the LF at the start of the next are one line end.
@@ -366,7 +378,8 @@ import Testing
         #expect(up.toNetwork(Data("\n\n".utf8)) == Data("\n\r\n".utf8))
     }
 
-    @Test func nameEncodings() throws {
+    @Test
+    func nameEncodings() throws {
         #expect(NameEncoding.automatic.decode(Data("Grüße".utf8)) == "Grüße")
         // Not UTF-8: read as Western Latin 1 instead of being dropped.
         #expect(NameEncoding.automatic.decode(Data([0x47, 0x72, 0xFC, 0xDF, 0x65])) == "Grüße")
@@ -377,7 +390,8 @@ import Testing
         #expect(NameEncoding.allCases.allSatisfy { !$0.title.isEmpty })
     }
 
-    @Test func downloadLists() {
+    @Test
+    func downloadLists() {
         let text =
             "\u{FEFF}ftps://127.0.0.1:2122/a.txt -> /tmp/b/a.txt\r\nftp://host/dir/file.zip\n\nput:/src/file.zip -> ftp://host/dir/file.zip\n"
             + "copy:/a -> /b\nmove:/a -> /b\nsleep:1500\nheader: Referer: http://x\ncopyflags: 3\n"
@@ -396,7 +410,8 @@ import Testing
         )
     }
 
-    @Test func volumes() {
+    @Test
+    func volumes() {
         #expect(
             ServerSchemes.mountedVolume(of: URL(fileURLWithPath: "/Volumes/Share/a/b"))
                 == URL(fileURLWithPath: "/Volumes/Share", isDirectory: true)

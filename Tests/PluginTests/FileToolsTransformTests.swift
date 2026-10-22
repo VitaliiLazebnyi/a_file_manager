@@ -9,7 +9,9 @@ import Testing
 
 /// Split, combine, encode and decode, through the plugin's commands and against the tools
 /// that ship with macOS.
-@MainActor @Suite struct FileToolsTransforms {
+@MainActor
+@Suite
+struct FileToolsTransforms {
     let memory = MemoryFileSystem()
     let box: Sandbox
     let settings = MemorySettings()
@@ -67,7 +69,8 @@ import Testing
 
     // MARK: Registration
 
-    @Test func commandsAndMenu() {
+    @Test
+    func commandsAndMenu() {
         let ids: [CommandID] = ["cm_Split", "cm_Combine", "cm_Encode", "cm_Decode", "cm_CRCcreate", "cm_CRCcheck"]
         #expect(bench.kernel.menus.menus.first?.items == ids)
         #expect(ids.allSatisfy { bench.commands[$0] != nil })
@@ -82,7 +85,8 @@ import Testing
 
     // MARK: Split
 
-    @Test func splitSizes() {
+    @Test
+    func splitSizes() {
         #expect(
             Splitter.size(from: "1000") == 1_000 && Splitter.size(from: " 2k ") == 2_048
                 && Splitter.size(from: "1.5M") == 1_572_864
@@ -100,7 +104,8 @@ import Testing
         #expect(Splitter.presets.map(\.title).prefix(2) == ["Automatic", "1.44 MB (3.5\")"])
     }
 
-    @Test func splitWritesPartsAndTheCrcFile() throws {
+    @Test
+    func splitWritesPartsAndTheCrcFile() throws {
         let source = try write("A/random_1MB.bin", megabyte)
         // The fourth preset of the list is 360 k.
         perform(.splitFile, ["preset": .index(5)])
@@ -127,7 +132,8 @@ import Testing
         #expect(ui.forms.last?[1].initialValue == .text(box.url("B").path))
     }
 
-    @Test func splitByTypedSizeIntoTheSourceFolderAndOntoAnotherFileSystem() throws {
+    @Test
+    func splitByTypedSizeIntoTheSourceFolderAndOntoAnotherFileSystem() throws {
         try write("A/data.tar.gz", patternData(2_500))
         // An empty target is the source folder; the typed size is remembered.
         perform(.splitFile, ["target": .text(""), "size": .text("1k")])
@@ -145,7 +151,8 @@ import Testing
         )
     }
 
-    @Test func splitRefusesBadSizesAndCleansUp() throws {
+    @Test
+    func splitRefusesBadSizesAndCleansUp() throws {
         try write("A/data.bin", patternData(5_000))
         perform(.splitFile, ["size": .text("lots")])
         #expect(ui.log.last == "inform: Split" && namesOnDisk(box.url("B")).isEmpty)
@@ -166,7 +173,8 @@ import Testing
         }
     }
 
-    @Test func splitOfAnEmptyFile() throws {
+    @Test
+    func splitOfAnEmptyFile() throws {
         try write("A/empty.txt", Data())
         perform(.splitFile, ["size": .text("100")])
         #expect(namesOnDisk(box.url("B")) == ["empty.001", "empty.crc"] && byteCount("B/empty.001") == 0)
@@ -175,7 +183,8 @@ import Testing
 
     // MARK: Combine
 
-    @Test func partSeries() {
+    @Test
+    func partSeries() {
         #expect(PartSeries.next(after: "file.001") == "file.002" && PartSeries.next(after: "file.099") == "file.100")
         #expect(
             PartSeries.next(after: "file.999") == nil && PartSeries.next(after: "notes.txt") == nil
@@ -202,7 +211,8 @@ import Testing
         #expect(SplitInfo(text: "filename=a\nsize=x\ncrc32=1") == nil && SplitInfo(text: "") == nil)
     }
 
-    @Test func combineFromTheFirstPartOrTheCrcFile() throws {
+    @Test
+    func combineFromTheFirstPartOrTheCrcFile() throws {
         try write("A/random_1MB.bin", megabyte)
         perform(.splitFile, ["target": .text(""), "size": .text("400k")])
         try FileManager.default.removeItem(at: box.url("A/random_1MB.bin"))
@@ -220,7 +230,8 @@ import Testing
         #expect(bench.jobService.reports.last?.bytesDone == 1_048_576)
     }
 
-    @Test func combineChecksTheCrc() throws {
+    @Test
+    func combineChecksTheCrc() throws {
         try write("A/data.bin", patternData(3_000))
         perform(.splitFile, ["target": .text(""), "size": .text("1000")])
         let plan = try Combiner.plan(for: item("A/data.001"), run: run)
@@ -244,7 +255,8 @@ import Testing
         #expect(outside.output == box.url("B/evil.bin"))
     }
 
-    @Test func combineWithoutACrcFile() throws {
+    @Test
+    func combineWithoutACrcFile() throws {
         for (index, text) in ["one ", "two ", "three"].enumerated() {
             try box.file("A/letter.txt.00\(index + 1)", text)
         }
@@ -274,7 +286,8 @@ import Testing
 
     // MARK: Encode
 
-    @Test func sixBitLines() {
+    @Test
+    func sixBitLines() {
         #expect(String(decoding: SixBitText.encode(Data("Cat".utf8), xx: false), as: UTF8.self) == "#0V%T\r\n")
         #expect(String(decoding: SixBitText.encode(Data("Cat".utf8), xx: true), as: UTF8.self) == "1Eq3o\r\n")
         #expect(SixBitText.decode(Array("#0V%T".utf8)[...], xx: false) == Array("Cat".utf8))
@@ -300,7 +313,8 @@ import Testing
         #expect(Encoder.linesPerFile(lines: 0, bytes: 5, method: .mime) == 1)
     }
 
-    @Test func uuencodeMatchesTheSystemTool() throws {
+    @Test
+    func uuencodeMatchesTheSystemTool() throws {
         let source = try write("A/decoded.txt", patternData(1_100))
         perform(.encodeFile, ["method": .index(1)])
         let ours = box.read("B/decoded.uue") ?? ""
@@ -318,7 +332,8 @@ import Testing
         #expect(data("B/back.txt") == patternData(1_100))
     }
 
-    @Test func base64MatchesTheSystemTool() throws {
+    @Test
+    func base64MatchesTheSystemTool() throws {
         let source = try write("A/decoded.txt", patternData(1_100))
         perform(.encodeFile)
         let ours = box.read("B/decoded.b64") ?? ""
@@ -390,7 +405,8 @@ import Testing
 
     // MARK: Decode
 
-    @Test func decodesWhatTheSystemToolsWrite() throws {
+    @Test
+    func decodesWhatTheSystemToolsWrite() throws {
         let original = patternData(70_001)
         let source = try write("A/sample.bin", original)
         func reference(_ tool: String, _ arguments: [String], as name: String) throws {
@@ -411,7 +427,8 @@ import Testing
         #expect(!ui.log.contains { $0.hasPrefix("inform") })
     }
 
-    @Test func decodesMailsAndYEnc() throws {
+    @Test
+    func decodesMailsAndYEnc() throws {
         let mail = """
             From: someone
             Content-Type: multipart/mixed; boundary="xx"
@@ -464,7 +481,8 @@ import Testing
         #expect(data("B/y enc.bin") == bytes)
     }
 
-    @Test func decodeNamesTargetsAndClashes() throws {
+    @Test
+    func decodeNamesTargetsAndClashes() throws {
         #expect(
             Decoder.safeName("a/b\\c.txt") == "c.txt" && Decoder.safeName("..") == nil && Decoder.safeName(nil) == nil
         )
@@ -504,7 +522,8 @@ import Testing
         #expect(box.read("B/cut.txt") == "Cat")
     }
 
-    @Test func cancellingLeavesNoHalfWrittenFiles() throws {
+    @Test
+    func cancellingLeavesNoHalfWrittenFiles() throws {
         try write("A/data.bin", megabyte)
         let stopped = ToolRun(fileSystems: bench.kernel.fileSystems)
         stopped.cancellation.cancel()

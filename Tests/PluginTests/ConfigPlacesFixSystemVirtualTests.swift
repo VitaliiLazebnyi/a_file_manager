@@ -7,8 +7,10 @@ import Testing
 @testable import SystemToolsPlugin
 @testable import VirtualFoldersPlugin
 
-@Suite struct ConfigPlacesFixSystemTools {
-    @Test func aProgramOnThePathBeatsAnApplicationOfTheSameName() throws {
+@Suite
+struct ConfigPlacesFixSystemTools {
+    @Test
+    func aProgramOnThePathBeatsAnApplicationOfTheSameName() throws {
         let box = try Sandbox()
         try box.folder("Apps/mail.app")
         try box.folder("Apps/afmnotaprogram.app")
@@ -33,7 +35,8 @@ import Testing
         #expect(try #require(TypedCommand(box.url("Apps/mail.app").path)).application(relativeTo: box.root) != nil)
     }
 
-    @Test func cancellingEndsAChildThatIgnoresTerminate() {
+    @Test
+    func cancellingEndsAChildThatIgnoresTerminate() {
         let flag = CancellationFlag()
         let runner = ProcessRunner(
             executable: URL(fileURLWithPath: "/bin/sh"),
@@ -50,7 +53,8 @@ import Testing
     }
 }
 
-@Suite struct ConfigPlacesFixVirtual {
+@Suite
+struct ConfigPlacesFixVirtual {
     let fileSystems = FileSystemRegistry()
     let memory = MemoryFileSystem()
     let virtual: VirtualFileSystem
@@ -62,7 +66,8 @@ import Testing
         memory.addFile("/A/one.txt")
     }
 
-    @Test func listIdsAreNotSmallNumbersAndMustMatchTheirLocation() throws {
+    @Test
+    func listIdsAreNotSmallNumbersAndMustMatchTheirLocation() throws {
         let url = virtual.register(files: [memory.url("/A/one.txt")], title: "Found", origin: memory.url("/A"))
         guard case .list(let id, _, _)? = VirtualLocation(url) else {
             Issue.record("not a list")
@@ -77,7 +82,8 @@ import Testing
         #expect(try virtual.list(url, showHidden: false).count == 1)
     }
 
-    @Test func evictionSparesAListThatIsShown() {
+    @Test
+    func evictionSparesAListThatIsShown() {
         let watchable = WatchedSystem()
         fileSystems.register(watchable)
         let first = virtual.register(files: [watchable.url("/d/f")], title: "First", origin: nil)
@@ -93,7 +99,9 @@ import Testing
         _ = watcher
     }
 
-    @MainActor @Test func manyReportsBecomeFewWalks() async throws {
+    @MainActor
+    @Test
+    func manyReportsBecomeFewWalks() async throws {
         let watchable = WatchedSystem()
         let registry = FileSystemRegistry()
         registry.register(watchable)
@@ -116,7 +124,8 @@ import Testing
         _ = watcher
     }
 
-    @Test func aWalkListsEveryFileOnceAndSkipsMountFolders() throws {
+    @Test
+    func aWalkListsEveryFileOnceAndSkipsMountFolders() throws {
         let box = try Sandbox()
         try box.file("a/one.txt")
         try box.file("a/b/two.txt")
@@ -164,7 +173,8 @@ private final class WatchedSystem: FileSystemProvider, @unchecked Sendable {
     private var onChange: (@MainActor @Sendable ([URL]) -> Void)?
 
     func url(_ path: String) -> URL { URL(string: "watched://" + path)! }
-    @MainActor func fire() { onChange?([]) }
+    @MainActor
+    func fire() { onChange?([]) }
 
     func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
     func item(at url: URL) -> FileItem? { FileItem(url: url, name: url.lastPathComponent) }

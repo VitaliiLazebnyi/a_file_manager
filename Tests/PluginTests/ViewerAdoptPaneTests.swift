@@ -9,7 +9,9 @@ import Testing
 
 /// The pane over a file system that is slow: closing it, switching files and laying a big text
 /// out again.
-@MainActor @Suite(.serialized) struct ViewerAdoptPane {
+@MainActor
+@Suite(.serialized)
+struct ViewerAdoptPane {
     let memory = MemoryFileSystem()
     let plugin: ViewerPlugin
     let bench: TestBench
@@ -41,7 +43,8 @@ import Testing
         return await wait { done.value }
     }
 
-    @Test func closingThePaneEndsAReadThatWaitsForTheServer() async throws {
+    @Test
+    func closingThePaneEndsAReadThatWaitsForTheServer() async throws {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -55,7 +58,8 @@ import Testing
         #expect(pane.loaded == nil)
     }
 
-    @Test func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async {
+    @Test
+    func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -80,7 +84,8 @@ import Testing
         pane.stopWork()
     }
 
-    @Test func aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() async throws {
+    @Test
+    func aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() async throws {
         // Above what is kept in memory (the pane's blocks are made small for the test, 1 MB in
         // all, as 64 MB are in the program); lines of about 25 bytes.
         let block = Data(String(repeating: "line of the big text\n", count: 5_000).utf8)

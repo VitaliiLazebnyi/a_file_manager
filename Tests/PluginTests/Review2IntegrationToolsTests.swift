@@ -9,7 +9,8 @@ import Testing
 // from elsewhere that their source carries (network.md item 2, left open by plugins-b), and
 // the sums they make of sizes cannot trap.
 
-@Suite struct Review2IntegrationTools {
+@Suite
+struct Review2IntegrationTools {
     /// A "server": every file on it carries the mark of coming from elsewhere.
     let server = MemoryFileSystem(scheme: "srv")
     /// A place that keeps the marks it is given and gives none of its own.
@@ -28,7 +29,8 @@ import Testing
 
     private func item(_ url: URL) throws -> FileItem { try #require(registry.item(at: url)) }
 
-    @Test func thePartsOfAFileFromAServerAndTheFilePutTogetherAgainCarryItsMark() throws {
+    @Test
+    func thePartsOfAFileFromAServerAndTheFilePutTogetherAgainCarryItsMark() throws {
         let source = server.addFile("/in/program.bin", String(repeating: "0123456789", count: 500))
         let parts = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2_000, run: run())
         #expect(parts.count == 4)
@@ -48,7 +50,8 @@ import Testing
         #expect(target.quarantineMarks["/whole/program.bin"] == mark)
     }
 
-    @Test func anEncodedFileAndWhatIsDecodedFromItCarryTheMarkOfTheirSource() throws {
+    @Test
+    func anEncodedFileAndWhatIsDecodedFromItCarryTheMarkOfTheirSource() throws {
         let source = server.addFile("/in/tool.sh", "#!/bin/sh\necho harmless\n")
         let encoded = try Encoder.encode(try item(source), into: target.url("/out"), method: .mime, run: run())
         #expect(encoded.count == 1 && target.quarantineMarks["/out/tool.b64"] == mark)
@@ -64,13 +67,15 @@ import Testing
         #expect(target.quarantineMarks["/decoded/tool.sh"] == mark)
     }
 
-    @Test func aSourceWithoutAMarkLeavesItsOutputsWithoutOne() throws {
+    @Test
+    func aSourceWithoutAMarkLeavesItsOutputsWithoutOne() throws {
         let source = target.addFile("/plain/data.bin", String(repeating: "x", count: 3_000))
         _ = try Splitter.split(try item(source), into: target.url("/out"), partSize: 2_000, run: run())
         #expect(target.contents("/out/data.002") != nil && target.quarantineMarks.isEmpty)
     }
 
-    @Test func sizesNobodyCanMeanAreRefusedAndTrapNothing() throws {
+    @Test
+    func sizesNobodyCanMeanAreRefusedAndTrapNothing() throws {
         let source = server.addFile("/in/small.bin", "small")
         // The largest size a field can hold, typed as the size of a part.
         let parts = try Splitter.split(try item(source), into: target.url("/out"), partSize: .max, run: run())

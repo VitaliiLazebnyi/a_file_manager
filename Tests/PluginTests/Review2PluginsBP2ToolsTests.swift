@@ -14,7 +14,9 @@ import Testing
 /// BLAKE3 beside many files, the reproducers of the fuzzer, the marks of a long selection, and the
 /// two paths that had no test (a superseded background compare, a listing that the cancel cuts
 /// short).
-@MainActor @Suite struct Review2PluginsBP2Tools {
+@MainActor
+@Suite
+struct Review2PluginsBP2Tools {
     let box: Sandbox
     let registry = FileSystemRegistry()
 
@@ -50,7 +52,8 @@ import Testing
 
     // MARK: T050, BLAKE3 beside many files
 
-    @Test func blake3SpreadsOverTheCoresOnlyWhileCoresAreLeftOver() {
+    @Test
+    func blake3SpreadsOverTheCoresOnlyWhileCoresAreLeftOver() {
         #expect(
             ChecksumRun.spreadsBLAKE3(filesInProgress: 0, cores: 8)
                 && ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 8)
@@ -63,7 +66,8 @@ import Testing
         #expect(!ChecksumRun.spreadsBLAKE3(filesInProgress: 1, cores: 1))
     }
 
-    @Test func feedingBLAKE3InSmallPiecesGivesTheSameDigest() {
+    @Test
+    func feedingBLAKE3InSmallPiecesGivesTheSameDigest() {
         // The piece is smaller than what BLAKE3 spreads over threads (16 chunks of 1 KB).
         #expect(ChecksumRun.serialPiece < 16 * 1_024)
         for size in [0, 1, 1_023, 1_024, 8_191, 8_192, 8_193, 100_000, (1 << 20) + 7, 3 << 20] {
@@ -93,7 +97,8 @@ import Testing
     }
 
     /// Off the main thread: making and hashing 40 files takes seconds, which other tests waited for when it ran there.
-    @Test nonisolated func manyFilesAreHashedToTheSameDigestsAsOneByOne() throws {
+    @Test
+    nonisolated func manyFilesAreHashedToTheSameDigestsAsOneByOne() throws {
         // More files than cores, and a few larger than the blocks BLAKE3 spreads.
         var files: [(url: URL, methods: [ChecksumMethod])] = []
         var expected: [[[UInt8]]] = []
@@ -119,7 +124,8 @@ import Testing
 
     // MARK: The reproducers of the fuzzer
 
-    @Test func theChecksumFileWithAnEmptyNameYieldsNoEntryWithoutAName() {
+    @Test
+    func theChecksumFileWithAnEmptyNameYieldsNoEntryWithoutAName() {
         guard let data = reproducer("checksum-empty-name.md5") else {
             return
         }
@@ -131,7 +137,8 @@ import Testing
         #expect(ChecksumFile.parseLines(text, fileName: "a.md5").unreadableLines == [1])
     }
 
-    @Test func aStoredNameWithASlashAndACombiningMarkDoesNotLeadOutOfTheTargetFolder() throws {
+    @Test
+    func aStoredNameWithASlashAndACombiningMarkDoesNotLeadOutOfTheTargetFolder() throws {
         guard let data = reproducer("combine-containment-slash-combining-mark.crc") else {
             return
         }
@@ -151,7 +158,8 @@ import Testing
         #expect(((try? FileManager.default.contentsOfDirectory(atPath: box.url("out").path)) ?? []) == ["target"])
     }
 
-    @Test func aDecodedNameWithASlashAndACombiningMarkStaysInTheTargetFolder() throws {
+    @Test
+    func aDecodedNameWithASlashAndACombiningMarkStaysInTheTargetFolder() throws {
         guard let data = reproducer("decode-containment-slash-combining-mark.bin") else {
             return
         }
@@ -177,7 +185,8 @@ import Testing
         )
     }
 
-    @Test func theLastWordOnADecodedNameIsTheKernelsCheck() {
+    @Test
+    func theLastWordOnADecodedNameIsTheKernelsCheck() {
         let folder = box.url("target")
         #expect(folder.appending(safeName: "a.txt")?.lastPathComponent == "a.txt")
         for bad in ["", ".", "..", "a/b", "a\0b"] { #expect(folder.appending(safeName: bad) == nil, "\(bad)") }
@@ -185,7 +194,8 @@ import Testing
 
     // MARK: T029, a compare that was superseded and then cancelled
 
-    @Test func aCancelledCompareOverEditedContentLeavesRowsThatMatchTheTexts() async throws {
+    @Test
+    func aCancelledCompareOverEditedContentLeavesRowsThatMatchTheTexts() async throws {
         let lines = (1...3_000).map { "line \($0)" }
         try box.file("A/big.txt", lines.joined(separator: "\n") + "\n")
         try box.file(
@@ -226,7 +236,8 @@ import Testing
 
     // MARK: T040, a listing the cancel cut short, with the flag unset when it began
 
-    @Test func aListingThatTheCancelEndsWhileItRunsIsNotAnEmptyFolder() {
+    @Test
+    func aListingThatTheCancelEndsWhileItRunsIsNotAnEmptyFolder() {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -272,7 +283,8 @@ import Testing
         )
     }
 
-    @Test func theNamesToSynchronizeAreReadFromTheMarksOnly() async {
+    @Test
+    func theNamesToSynchronizeAreReadFromTheMarksOnly() async {
         let memory = MemoryFileSystem()
         for name in ["b.txt", "a.txt", "c.txt"] { memory.addFile("/A/" + name, name) }
         for name in ["z.txt", "a.txt"] { memory.addFile("/B/" + name, name) }
@@ -296,7 +308,8 @@ import Testing
         #expect(changes >= 1)
     }
 
-    @Test func aSelectionReadInTheBackgroundIsDroppedWhenAnotherWindowIsOpened() async {
+    @Test
+    func aSelectionReadInTheBackgroundIsDroppedWhenAnotherWindowIsOpened() async {
         let memory = MemoryFileSystem()
         for name in ["a", "b", "c", "d"] { memory.addFile("/A/" + name, name) }
         memory.addDirectory("/B")
@@ -311,7 +324,8 @@ import Testing
         #expect(session.selectedNames.isEmpty)
     }
 
-    @Test func theFilesToCompareAreFoundWithoutLookingAtEveryMark() {
+    @Test
+    func theFilesToCompareAreFoundWithoutLookingAtEveryMark() {
         let memory = MemoryFileSystem()
         for number in 0..<3_000 { memory.addFile(String(format: "/A/f%04d.txt", number), "x") }
         memory.addDirectory("/A/dir")

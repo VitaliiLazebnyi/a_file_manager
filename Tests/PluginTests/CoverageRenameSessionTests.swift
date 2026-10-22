@@ -12,7 +12,9 @@ import UniformTypeIdentifiers
 /// The session of the Multi-Rename Tool where it is busy, cancelled or given unusual lists:
 /// what is refused while a run is under way, long lists worked on in the background, runs that
 /// are cancelled, and messages that are cut short.
-@MainActor @Suite struct CoverageRenameSession {
+@MainActor
+@Suite
+struct CoverageRenameSession {
     let memory = MemoryFileSystem()
     let box: Sandbox
     let settings = MemorySettings()
@@ -80,7 +82,8 @@ import UniformTypeIdentifiers
 
     // MARK: While a run is under way
 
-    @Test func theListStaysAsItIsWhileARunIsUnderWay() {
+    @Test
+    func theListStaysAsItIsWhileARunIsUnderWay() {
         attachJobs(.held)
         let session = session()
         session.settings.nameMask = "x[N]"
@@ -106,7 +109,8 @@ import UniformTypeIdentifiers
 
     // MARK: Cancelled runs
 
-    @Test func aRunCancelledAtOnceRenamesNothing() {
+    @Test
+    func aRunCancelledAtOnceRenamesNothing() {
         attachJobs(.atStart)
         let session = session()
         session.settings.nameMask = "x[N]"
@@ -115,7 +119,8 @@ import UniformTypeIdentifiers
         #expect(result?.cancelled == true && names == ["a.txt", "b.txt", "c.txt"] && session.rowCount == 3)
     }
 
-    @Test func aRunCancelledWhileAskingAboutConflictsRenamesNothing() {
+    @Test
+    func aRunCancelledWhileAskingAboutConflictsRenamesNothing() {
         attachJobs(.afterQuestion(1))
         let session = session()
         session.settings.nameMask = "same"
@@ -127,7 +132,8 @@ import UniformTypeIdentifiers
     }
 
     /// An Undo cancelled before anything was put back keeps the run, so it can be undone later.
-    @Test func anUndoCancelledAtOnceKeepsTheRun() {
+    @Test
+    func anUndoCancelledAtOnceKeepsTheRun() {
         let session = session()
         session.settings.nameMask = "x[N]"
         session.start()
@@ -147,7 +153,8 @@ import UniformTypeIdentifiers
 
     // MARK: Long lists in the background
 
-    @Test func nextStepOfALongListIsMadeInTheBackground() async {
+    @Test
+    func nextStepOfALongListIsMadeInTheBackground() async {
         let session = session(many(2_000), inBackground: true)
         session.settings.nameMask = "g[C]"
         #expect(await RunLoopWait.until { !session.isComputing })
@@ -156,7 +163,8 @@ import UniformTypeIdentifiers
         #expect(session.settings == .unchanged && session.row(at: 1_999).entry.name == "g2000.txt")
     }
 
-    @Test func aNextStepOvertakenByAChangeOfTheListIsDropped() async {
+    @Test
+    func aNextStepOvertakenByAChangeOfTheListIsDropped() async {
         let session = session(many(2_000), inBackground: true)
         session.settings.nameMask = "g[C]"
         #expect(await RunLoopWait.until { !session.isComputing })
@@ -167,7 +175,8 @@ import UniformTypeIdentifiers
         #expect(session.row(at: 0).entry.name == "f0.txt" && session.givenNames == ["first"])
     }
 
-    @Test func theNamesOfALongListAreEditedFromTheBackground() async {
+    @Test
+    func theNamesOfALongListAreEditedFromTheBackground() async {
         let session = session(many(2_000), inBackground: true)
         // No name for any of them: the text holds the old names.
         session.settings.nameMask = "[X]"
@@ -180,7 +189,8 @@ import UniformTypeIdentifiers
 
     /// The text of the first edit was made for the list before a change: only the second edit,
     /// made for the list as it is, is shown.
-    @Test func anEditOfALongListThatIsOvertakenIsDropped() async {
+    @Test
+    func anEditOfALongListThatIsOvertakenIsDropped() async {
         let session = session(many(2_000), inBackground: true)
         session.editNames()
         session.clearGivenNames()
@@ -190,7 +200,8 @@ import UniformTypeIdentifiers
         #expect(ui.log.filter { $0 == "form: Edit names" }.count == 1)
     }
 
-    @Test func namesAreLoadedFromAFileInTheBackground() async {
+    @Test
+    func namesAreLoadedFromAFileInTheBackground() async {
         memory.addFile("/lists/names.txt", "one\ntwo\nthree")
         let session = session(inBackground: true)
         var loaded = false
@@ -199,7 +210,8 @@ import UniformTypeIdentifiers
         #expect(session.givenNames == ["one", "two", "three"])
     }
 
-    @Test func anEmptyListOfNamesGivesTheMasksBack() {
+    @Test
+    func anEmptyListOfNamesGivesTheMasksBack() {
         let session = session()
         session.loadNames(fromText: "x")
         #expect(session.givenNames == ["x"])
@@ -207,7 +219,8 @@ import UniformTypeIdentifiers
         #expect(session.givenNames == nil)
     }
 
-    @Test func anUndoInTheBackgroundDecodesTheRunsFirst() async {
+    @Test
+    func anUndoInTheBackgroundDecodesTheRunsFirst() async {
         let session = session(inBackground: true)
         session.settings.nameMask = "x[N]"
         session.start()
@@ -221,7 +234,8 @@ import UniformTypeIdentifiers
 
     // MARK: Odd lists and settings
 
-    @Test func theSameSettingsAgainChangeNothing() {
+    @Test
+    func theSameSettingsAgainChangeNothing() {
         let session = session()
         var changes = 0
         session.onChange = { changes += 1 }
@@ -229,13 +243,15 @@ import UniformTypeIdentifiers
         #expect(changes == 0)
     }
 
-    @Test func movingRowsThatAreNotThereMovesNothing() {
+    @Test
+    func movingRowsThatAreNotThereMovesNothing() {
         let session = session()
         #expect(session.move([7, 8], to: 0).isEmpty)
         #expect(session.rows.map(\.entry.name) == ["a.txt", "b.txt", "c.txt"])
     }
 
-    @Test func nextStepTakesGivenNamesAsTheOldOnes() {
+    @Test
+    func nextStepTakesGivenNamesAsTheOldOnes() {
         let session = session()
         session.loadNames(fromText: "x.txt\ny.txt\nz.txt")
         session.nextStep()
@@ -243,14 +259,16 @@ import UniformTypeIdentifiers
         #expect(session.rows.allSatisfy { $0.status == .ready })
     }
 
-    @Test func nextStepGoesBackToNoChange() {
+    @Test
+    func nextStepGoesBackToNoChange() {
         let session = session()
         session.settings.nameMask = "[N]2"
         session.nextStep()
         #expect(session.settings == .unchanged && session.rows.map(\.entry.name) == ["a2.txt", "b2.txt", "c2.txt"])
     }
 
-    @Test func editingANameThatGivesNoNameShowsTheOldOne() {
+    @Test
+    func editingANameThatGivesNoNameShowsTheOldOne() {
         let session = session()
         session.settings.nameMask = "[X]"
         #expect(session.row(at: 0).newName == nil)
@@ -264,13 +282,15 @@ import UniformTypeIdentifiers
         }
     }
 
-    @Test func withoutAClipboardTheOptionalPlaceholderIsEmpty() {
+    @Test
+    func withoutAClipboardTheOptionalPlaceholderIsEmpty() {
         let session = session()
         session.settings.nameMask = "[X+]n"
         #expect(session.row(at: 0).newName == "n.txt")
     }
 
-    @Test func theDateTakenIsReadThroughTheSession() throws {
+    @Test
+    func theDateTakenIsReadThroughTheSession() throws {
         let file = box.url("p.jpg")
         let context = try #require(
             CGContext(
@@ -300,7 +320,8 @@ import UniformTypeIdentifiers
 
     // MARK: Messages of a run
 
-    @Test func namesThatMoveManyFilesAreShownInPart() {
+    @Test
+    func namesThatMoveManyFilesAreShownInPart() {
         let items = many(10)
         let session = session(items)
         session.loadNames(fromText: (0..<10).map { "sub/n\($0).txt" }.joined(separator: "\n"))
@@ -310,7 +331,8 @@ import UniformTypeIdentifiers
         #expect(memory.allPaths.filter { $0.hasPrefix("/many/f") }.count == 10)
     }
 
-    @Test func aGivenNameThatCannotBeUsedIsNotAskedAbout() {
+    @Test
+    func aGivenNameThatCannotBeUsedIsNotAskedAbout() {
         let session = session()
         session.loadNames(fromText: "x/y.txt\nb.txt\n")
         ui.choiceAnswers = [0]
@@ -319,7 +341,8 @@ import UniformTypeIdentifiers
         #expect(memory.allPaths.contains("/f/x/y.txt"))
     }
 
-    @Test func manyConflictsAreShownInPart() {
+    @Test
+    func manyConflictsAreShownInPart() {
         let session = session(many(13))
         session.settings.nameMask = "same"
         session.start()
@@ -327,7 +350,8 @@ import UniformTypeIdentifiers
         #expect(question?.contains("same.txt\n…") == true)
     }
 
-    @Test func aRunWhereEveryRenameFailsKeepsTheList() throws {
+    @Test
+    func aRunWhereEveryRenameFailsKeepsTheList() throws {
         try box.file("A/one.txt")
         try box.file("A/two.txt")
         let items = try ["one.txt", "two.txt"]
@@ -342,7 +366,8 @@ import UniformTypeIdentifiers
         #expect(!session.hasResultList)
     }
 
-    @Test func sixteenFailuresAreCutShort() throws {
+    @Test
+    func sixteenFailuresAreCutShort() throws {
         let names = (0..<16).map { "f\($0).txt" }
         for name in names { try box.file("B/" + name) }
         try box.file("B/blocker")
@@ -354,7 +379,8 @@ import UniformTypeIdentifiers
         #expect(ui.log.contains("inform: 16 file(s) could not be renamed!"))
     }
 
-    @Test func namesThatCannotBeUsedAreToldAfterTheRun() {
+    @Test
+    func namesThatCannotBeUsedAreToldAfterTheRun() {
         let session = session()
         session.loadNames(fromText: "x.txt\n..\n")
         session.start()
@@ -363,13 +389,15 @@ import UniformTypeIdentifiers
 
     // MARK: Undo
 
-    @Test func undoNeedsSomethingToUndo() {
+    @Test
+    func undoNeedsSomethingToUndo() {
         let session = session()
         session.undo()
         #expect(ui.log.isEmpty && !session.isBusy)
     }
 
-    @Test func aCountWithoutRunsUndoesNothing() {
+    @Test
+    func aCountWithoutRunsUndoesNothing() {
         settings.set(1, forKey: "multirename.undoCount")
         let session = session()
         #expect(session.canUndo)
@@ -377,7 +405,8 @@ import UniformTypeIdentifiers
         #expect(ui.log.isEmpty && !session.isBusy)
     }
 
-    @Test func aLongRunIsShownInPartWhenUndone() {
+    @Test
+    func aLongRunIsShownInPartWhenUndone() {
         let session = session(many(21))
         session.settings.nameMask = "u[C]"
         session.start()
@@ -396,12 +425,14 @@ import UniformTypeIdentifiers
         }
     }
 
-    @Test func theResultListNeedsARun() {
+    @Test
+    func theResultListNeedsARun() {
         session().showResultList()
         #expect(ui.log.isEmpty)
     }
 
-    @Test func theResultListGoesToTheViewerOrTheViewCommand() {
+    @Test
+    func theResultListGoesToTheViewerOrTheViewCommand() {
         let session = session()
         session.settings.nameMask = "x[N]"
         session.start()

@@ -20,7 +20,9 @@ import ViewOptionsPlugin
 ///
 /// No window is put on screen: what the viewer and Find Files would show goes to `presenter` (none
 /// of these commands opens a window of theirs).
-@MainActor @Suite struct PluginCommands {
+@MainActor
+@Suite
+struct PluginCommands {
     let memory = MemoryFileSystem()
     private let presenter = StabilityPresenter()
     let mac = MacIntegrationPlugin(launchesApplications: false)
@@ -62,7 +64,8 @@ import ViewOptionsPlugin
 
     // MARK: Registration
 
-    @Test func pluginsRegisterCommandsMenusAndServices() {
+    @Test
+    func pluginsRegisterCommandsMenusAndServices() {
         #expect(left.names == ["docs", "one.txt", "two.txt"] && right.names == ["one.txt"])
         #expect(bench.kernel.menus.menus.map(\.title).starts(with: ["Files", "Edit", "Mark", "Commands", "Show"]))
         let inMenus =
@@ -87,7 +90,8 @@ import ViewOptionsPlugin
 
     // MARK: Selection
 
-    @Test func selection() {
+    @Test
+    func selection() {
         commands.perform(.selectAll)
         #expect(left.model.selection.count == 3)
         commands.perform(.invertSelection)
@@ -104,7 +108,8 @@ import ViewOptionsPlugin
         #expect(left.model.selection.isEmpty)
     }
 
-    @Test func commandsThatMeanEverythingWaitForACompleteListing() throws {
+    @Test
+    func commandsThatMeanEverythingWaitForACompleteListing() throws {
         let listing = try PanelLoader.load(memory.url("/A"), showHidden: false, fileSystems: bench.kernel.fileSystems)
             .listing
         left.model.show(listing, complete: false)
@@ -121,7 +126,8 @@ import ViewOptionsPlugin
 
     // MARK: Navigation
 
-    @Test func navigation() {
+    @Test
+    func navigation() {
         left.moveCursor(toName: "docs")
         commands.perform(.open)
         #expect(left.model.directory.path == "/A/docs" && left.names == ["in.txt"])
@@ -141,7 +147,8 @@ import ViewOptionsPlugin
         #expect(left.model.directory.path == "/A")
     }
 
-    @Test func changeDirectoryTakesLocationsAndTypedText() {
+    @Test
+    func changeDirectoryTakesLocationsAndTypedText() {
         commands.perform(.changeDirectory, .location(memory.url("/B/one.txt")))
         #expect(left.model.directory.path == "/B" && left.model.cursorItem?.name == "one.txt")
         commands.perform(.changeDirectory, .text("../A/docs"))
@@ -154,7 +161,8 @@ import ViewOptionsPlugin
         #expect(left.model.directory.path == "/A" && left.failures.count == 1)
     }
 
-    @Test func panelsFollowEachOther() {
+    @Test
+    func panelsFollowEachOther() {
         commands.perform(.targetEqualsSource)
         #expect(right.model.directory.path == "/A")
         left.show(memory.url("/A/docs"))
@@ -167,7 +175,8 @@ import ViewOptionsPlugin
 
     // MARK: Folder tabs
 
-    @Test func folderTabs() {
+    @Test
+    func folderTabs() {
         commands.perform(.newTab)
         #expect(left.tabs.count == 2 && left.tabs.activeIndex == 1 && left.names == ["docs", "one.txt", "two.txt"])
         left.moveCursor(toName: "docs")
@@ -187,7 +196,8 @@ import ViewOptionsPlugin
 
     // MARK: File operations
 
-    @Test func copyAsksForTheTargetAndAboutOverwriting() {
+    @Test
+    func copyAsksForTheTargetAndAboutOverwriting() {
         left.moveCursor(toName: "one.txt")
         ui.promptAnswers = [.accept]
         ui.choiceAnswers = [0]
@@ -198,7 +208,8 @@ import ViewOptionsPlugin
         #expect(bench.jobService.titles == ["Copy:"] && !bench.jobService.reports.isEmpty)
     }
 
-    @Test func copyingASelectionDeselectsItAndRefreshesTheTarget() {
+    @Test
+    func copyingASelectionDeselectsItAndRefreshesTheTarget() {
         commands.perform(.selectAll)
         ui.promptAnswers = [.accept]
         ui.choiceAnswers = [1]
@@ -210,7 +221,8 @@ import ViewOptionsPlugin
         #expect(left.model.selection.count == 3)
     }
 
-    @Test func copyInTheSameFolderPutsTheCursorOnTheCopy() {
+    @Test
+    func copyInTheSameFolderPutsTheCursorOnTheCopy() {
         left.moveCursor(toName: "two.txt")
         ui.promptAnswers = [.text("two copy.txt")]
         commands.perform(.copySamePanel)
@@ -218,7 +230,8 @@ import ViewOptionsPlugin
         #expect(memory.contents("/A/two copy.txt") == "2" && left.model.cursorItem?.name == "two copy.txt")
     }
 
-    @Test func copyingOntoItselfIsRefusedWithAMessage() {
+    @Test
+    func copyingOntoItselfIsRefusedWithAMessage() {
         left.moveCursor(toName: "two.txt")
         ui.promptAnswers = [.text("/A/")]
         commands.perform(.copy)
@@ -226,7 +239,8 @@ import ViewOptionsPlugin
         #expect(left.names == ["docs", "one.txt", "two.txt"])
     }
 
-    @Test func moveAndRename() {
+    @Test
+    func moveAndRename() {
         left.moveCursor(toName: "two.txt")
         ui.promptAnswers = [.accept]
         commands.perform(.renameMove)
@@ -246,7 +260,8 @@ import ViewOptionsPlugin
         #expect(left.model.cursorItem?.name == "renamed.txt")
     }
 
-    @Test func newFolders() {
+    @Test
+    func newFolders() {
         left.moveCursor(toName: "docs")
         ui.promptAnswers = [.text("made/inner | other")]
         commands.perform(.makeDirectory)
@@ -257,7 +272,8 @@ import ViewOptionsPlugin
         #expect(ui.log.last == "inform: The folder docs cannot be created!")
     }
 
-    @Test func deleteAsksAndDeletesDirectlyWhereThereIsNoTrash() {
+    @Test
+    func deleteAsksAndDeletesDirectlyWhereThereIsNoTrash() {
         left.moveCursor(toName: "docs")
         ui.choiceAnswers = [0, 0]
         commands.perform(.delete)
@@ -274,7 +290,8 @@ import ViewOptionsPlugin
         #expect(memory.exists("/A/one.txt"))
     }
 
-    @Test func onAReadOnlyFileSystemChangingCommandsAreWithheld() {
+    @Test
+    func onAReadOnlyFileSystemChangingCommandsAreWithheld() {
         memory.capabilities = []
         left.moveCursor(toName: "one.txt")
         for command in [
@@ -286,7 +303,8 @@ import ViewOptionsPlugin
         #expect(commands.isEnabled(.copy))
     }
 
-    @Test func nothingIsOfferedOnTheParentRow() {
+    @Test
+    func nothingIsOfferedOnTheParentRow() {
         left.model.moveCursor(to: 0)
         #expect(left.model.cursorIsOnParentRow)
         for command in [CommandID.copy, .renameMove, .renameOnly, .delete, .view, .edit, .cutToClipboard] {
@@ -297,7 +315,8 @@ import ViewOptionsPlugin
 
     // MARK: On the local disk: Trash, editor, clipboard
 
-    @Test func newTextFileIsCreatedAndHandedToTheEditor() throws {
+    @Test
+    func newTextFileIsCreatedAndHandedToTheEditor() throws {
         let box = try Sandbox()
         try box.file("A/readme.md", "r")
         try box.folder("B")
@@ -308,7 +327,8 @@ import ViewOptionsPlugin
         #expect(mac.opened.map(\.lastPathComponent) == ["notes.txt"])
     }
 
-    @Test func openingAFileGoesToTheOpeners() throws {
+    @Test
+    func openingAFileGoesToTheOpeners() throws {
         let box = try Sandbox()
         try box.file("A/readme.md", "r")
         try box.folder("B")
@@ -328,7 +348,8 @@ import ViewOptionsPlugin
         #expect(rejections == 1 && !commands.isEnabled(.edit))
     }
 
-    @Test func deleteMovesToTheTrashOnTheLocalDisk() throws {
+    @Test
+    func deleteMovesToTheTrashOnTheLocalDisk() throws {
         let box = try Sandbox()
         try box.file("A/readme.md", "r")
         try box.folder("B")
@@ -340,7 +361,8 @@ import ViewOptionsPlugin
         #expect(box.exists("A/readme.md"))
     }
 
-    @Test func clipboardCopiesMovesAndRenamesSelfCopies() throws {
+    @Test
+    func clipboardCopiesMovesAndRenamesSelfCopies() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.file("A/docs/in.txt", "2")
@@ -373,7 +395,8 @@ import ViewOptionsPlugin
         #expect(pasteboard.string(forType: .string) == box.url("B").path + "/one (2).txt")
     }
 
-    @Test func theClipboardCarriesLocalFilesOnly() {
+    @Test
+    func theClipboardCarriesLocalFilesOnly() {
         left.moveCursor(toName: "one.txt")
         #expect(!commands.isEnabled(.copyToClipboard) && !commands.isEnabled(.cutToClipboard))
         commands.perform(.copyFullNames)
@@ -382,7 +405,8 @@ import ViewOptionsPlugin
 
     // MARK: View options
 
-    @Test func sortingAndHiddenFiles() {
+    @Test
+    func sortingAndHiddenFiles() {
         commands.perform(.sortBySize)
         #expect(left.model.sort == ListOrder(key: .size, descending: true) && commands.isChecked(.sortBySize))
         #expect(left.names == ["docs", "one.txt", "two.txt"])

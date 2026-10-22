@@ -10,7 +10,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
 
 /// The SFTP client against the system's own `sftp-server`, run directly as a child process on
 /// a sandbox folder: the same protocol as through `ssh`, without a network or a login.
-@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer))) struct NetworkSFTP {
+@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer)))
+struct NetworkSFTP {
     let box: Sandbox
     let center: ConnectionCenter
     let fileSystem: RemoteFileSystem
@@ -36,7 +37,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     /// The location of a path inside the sandbox, as the server sees it.
     func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
 
-    @Test func listsAndDescribes() throws {
+    @Test
+    func listsAndDescribes() throws {
         let stamp = Date(timeIntervalSince1970: 1_500_000_000)
         try box.file("a.txt", "hello", modified: stamp)
         try box.file(".hidden", "h")
@@ -61,7 +63,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(center.isConnected(key) && fileSystem.places().count == 1)
     }
 
-    @Test func readsWritesAndSeeks() throws {
+    @Test
+    func readsWritesAndSeeks() throws {
         let content = Data((0..<700_000).map { UInt8(truncatingIfNeeded: $0 &* 13 &+ $0 / 251) })
         let writer = try fileSystem.write(url("big.bin"))
         // In pieces like the copy job's, larger than one round of requests.
@@ -90,7 +93,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(throws: (any Error).self) { _ = try fileSystem.read(url("missing.bin")) }
     }
 
-    @Test func changes() throws {
+    @Test
+    func changes() throws {
         try box.file("a.txt", "a")
         try box.file("b.txt", "b")
         try fileSystem.createDirectory(at: url("x/y/z"))
@@ -111,7 +115,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(!box.exists("x"))
     }
 
-    @Test func manyThreadsShareOneChannel() throws {
+    @Test
+    func manyThreadsShareOneChannel() throws {
         for index in 0..<12 { try box.file("d\(index)/f\(index).txt", String(repeating: "x", count: index * 1_000)) }
         let results = Parallel.map(Array(0..<12)) { index -> Int in
             let names = (try? fileSystem.list(url("d\(index)"), showHidden: true).map(\.name)) ?? []
@@ -130,7 +135,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         )
     }
 
-    @Test func reconnectsAfterDisconnect() throws {
+    @Test
+    func reconnectsAfterDisconnect() throws {
         try box.file("a.txt", "a")
         #expect(try fileSystem.list(url(""), showHidden: true).count == 1)
         center.disconnect(key)
@@ -138,7 +144,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(try fileSystem.list(url(""), showHidden: true).count == 1)
     }
 
-    @Test func aTransportThatIsNotSFTPFails() throws {
+    @Test
+    func aTransportThatIsNotSFTPFails() throws {
         center.makeSession = { profile, environment in
             SFTPSession(
                 profile: profile,
@@ -150,7 +157,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(!center.isConnected(key))
     }
 
-    @Test func sshArguments() {
+    @Test
+    func sshArguments() {
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (20, 45)
         let profile = ConnectionProfile(
@@ -164,7 +172,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     }
 
     /// The helper `ssh` calls for its questions, driven here by a shell that calls it the same way.
-    @Test func askpassCarriesQuestionAndAnswer() throws {
+    @Test
+    func askpassCarriesQuestionAndAnswer() throws {
         let helper = try AskpassHelper()
         let process = Process()
         let output = Pipe()
@@ -198,7 +207,8 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     ///
     /// The host is unknown and the key has a passphrase, so both of ssh's questions come through
     /// the helper. Nothing of the user's own ssh setup is read or written.
-    @Test(.enabled(if: LocalSSHServer.isAvailable)) func logsInThroughSSH() throws {
+    @Test(.enabled(if: LocalSSHServer.isAvailable))
+    func logsInThroughSSH() throws {
         let server = try LocalSSHServer(box: box, passphrase: "open sesame")
         defer { server.stop() }
         try box.file("srv/hello.txt", "over ssh")

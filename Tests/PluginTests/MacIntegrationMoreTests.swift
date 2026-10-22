@@ -13,7 +13,9 @@ import Testing
 /// and its log.
 ///
 /// Nothing is started and no system panel is shown.
-@MainActor @Suite struct MacIntegrationMore {
+@MainActor
+@Suite
+struct MacIntegrationMore {
     let box: Sandbox
     private let scratch = ScratchPasteboard()
     var pasteboard: NSPasteboard { scratch.pasteboard }
@@ -47,7 +49,8 @@ import Testing
 
     func path(_ name: String) -> String { box.url("A/" + name).path }
 
-    @Test func f4UsesTheEditorOfThePreferences() {
+    @Test
+    func f4UsesTheEditorOfThePreferences() {
         let page = bench.kernel.preferences.pages.first { $0.title == "Edit (F4)" }
         #expect(page?.preferences.map(\.key) == [MacIntegrationPlugin.editorKey])
         #expect(bench.kernel.keyBindings.command(for: .f(4)) == .edit && bench.kernel.keyClashes.isEmpty)
@@ -76,7 +79,8 @@ import Testing
         )
     }
 
-    @Test func theEditorPreferenceNamesAnApplication() {
+    @Test
+    func theEditorPreferenceNamesAnApplication() {
         let textEdit = "/System/Applications/TextEdit.app"
         #expect(MacIntegrationPlugin.editorApplication(named: "TextEdit").path == textEdit)
         #expect(MacIntegrationPlugin.editorApplication(named: " TextEdit.app ").path == textEdit)
@@ -90,7 +94,8 @@ import Testing
         #expect(MacIntegrationPlugin.editorApplication(named: "No Such Editor 12345").path == textEdit)
     }
 
-    @Test func openWithOffersTheApplicationsForTheFile() {
+    @Test
+    func openWithOffersTheApplicationsForTheFile() {
         bench.left.moveCursor(toName: "notes.txt")
         ui.formAnswers = [.values(["row": .index(1)]), .cancel, .values(["row": .index(2)])]
         commands.perform(MacIntegrationPlugin.openWith)
@@ -115,7 +120,8 @@ import Testing
         )
     }
 
-    @Test func quickLookShareAndPathnameTakeTheOperands() {
+    @Test
+    func quickLookShareAndPathnameTakeTheOperands() {
         bench.left.moveCursor(toName: "photo.png")
         commands.perform(MacIntegrationPlugin.quickLook)
         commands.perform(.selectAll)
@@ -146,7 +152,8 @@ import Testing
         #expect(!bench.kernel.menus.contextMenu(onItem: false).contains(MacIntegrationPlugin.share))
     }
 
-    @Test func finderTagsAreReadEditedAndWritten() {
+    @Test
+    func finderTagsAreReadEditedAndWritten() {
         #expect(
             MacIntegrationPlugin.tags(from: " Red, Work ,, Red,") == ["Red", "Work"]
                 && MacIntegrationPlugin.tags(from: " ").isEmpty

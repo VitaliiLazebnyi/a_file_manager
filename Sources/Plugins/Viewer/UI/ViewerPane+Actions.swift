@@ -345,7 +345,8 @@ extension ViewerPane {
         }
     }
 
-    @objc func runMenuEntry(_ sender: NSMenuItem) {
+    @objc
+    func runMenuEntry(_ sender: NSMenuItem) {
         (sender.representedObject as? () -> Void)?()
         updateChrome()
     }

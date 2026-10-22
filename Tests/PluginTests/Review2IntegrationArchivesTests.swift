@@ -60,7 +60,8 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
     }
 }
 
-@Suite struct Review2IntegrationArchives {
+@Suite
+struct Review2IntegrationArchives {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 
@@ -89,7 +90,8 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
 
     // MARK: F046 — the commit of an archive asks between its members
 
-    @Test func theCommitOfAnArchiveAsksBetweenTheMembersItWrites() throws {
+    @Test
+    func theCommitOfAnArchiveAsksBetweenTheMembersItWrites() throws {
         let url = try writeZip("commit.zip", members: (0..<40).map { "old-\($0).txt" })
         for number in 0..<20 { try write("new \(number)", to: bench.inside(url, "new-\(number).txt")) }
         // (A member that was there is given another name, so the file is written anew.)
@@ -107,7 +109,8 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
         #expect(names.count == 59 && names.contains("new-19.txt") && !names.contains("old-0.txt"))
     }
 
-    @Test func aCommitThatIsEndedWhileItRunsHasChangedNothingAndCanBeMadeAgain() throws {
+    @Test
+    func aCommitThatIsEndedWhileItRunsHasChangedNothingAndCanBeMadeAgain() throws {
         let url = try writeZip("stopped.zip", members: (0..<30).map { "old-\($0).txt" })
         for number in 0..<10 { try write("new \(number)", to: bench.inside(url, "new-\(number).txt")) }
         let before = try Data(contentsOf: url)
@@ -139,7 +142,8 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
     /// (`encryptedZipsAskForThePassword` failed that way once in the final runs: it gives three
     /// wrong answers and expects "wrong password"). Many wrong passwords here, so that some pass
     /// the byte: none may be reported as damage, and none may open anything.
-    @Test func noWrongPasswordForTheOldEncryptionIsTakenForADamagedArchive() throws {
+    @Test
+    func noWrongPasswordForTheOldEncryptionIsTakenForADamagedArchive() throws {
         let tree = try bench.makeTree()
         let own = box.url("own.zip")
         try bench.pack([tree], to: own) {
@@ -173,7 +177,8 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
 
     // MARK: L043 — by path (a target that is not a disk of this machine), folders are made exclusively
 
-    @Test func foldersOfATargetThatIsNotALocalDiskAreMadeForThisUnpackingAlone() throws {
+    @Test
+    func foldersOfATargetThatIsNotALocalDiskAreMadeForThisUnpackingAlone() throws {
         let hooked = IntegrationHookedMemory()
         bench.fileSystems.register(hooked)
         hooked.base.addFile("/target/there/kept.txt", "kept")
@@ -198,7 +203,8 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
         #expect(hooked.madeExclusively.sorted() == ["/target/new", "/target/new/deep"])
     }
 
-    @Test func whatAppearsUnderAFoldersNameBeforeItIsMadeIsNotWrittenThrough() throws {
+    @Test
+    func whatAppearsUnderAFoldersNameBeforeItIsMadeIsNotWrittenThrough() throws {
         let hooked = IntegrationHookedMemory()
         bench.fileSystems.register(hooked)
         hooked.base.addDirectory("/target")

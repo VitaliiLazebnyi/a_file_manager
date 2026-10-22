@@ -539,7 +539,8 @@ final class TextRowIndex: @unchecked Sendable {
         let reused = Locked(0)
         /// `lineStart`: where the first line begins that the segments before this one do not own,
         /// when they were read in file order (nil otherwise).
-        @Sendable func work(_ number: Int, lineStart: Int64? = nil) {
+        @Sendable
+        func work(_ number: Int, lineStart: Int64? = nil) {
             // Each piece of work frees what the reads and the decoding left for the pool of the
             // thread: the threads of a parallel loop live on, and a search or an index build of
             // a big file would otherwise keep every buffer until they are idle.
@@ -922,7 +923,8 @@ final class TextRowIndex: @unchecked Sendable {
                 guard !buffer.isEmpty, let start = buffer.baseAddress else {
                     return 0
                 }
-                @inline(__always) func load(_ at: Int) -> UInt64 {
+                @inline(__always)
+                func load(_ at: Int) -> UInt64 {
                     UnsafeRawPointer(start + at).loadUnaligned(as: UInt64.self)
                 }
                 /// The first position at or after `from` of a unit that is `byte` (a line end).

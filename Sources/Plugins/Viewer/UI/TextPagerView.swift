@@ -595,7 +595,8 @@ final class TextPagerView: NSView {
         horizontalScroller.doubleValue = overhang > 0 ? Double(horizontalOffset / overhang) : 0
     }
 
-    @objc private func scrolledVertically() {
+    @objc
+    private func scrolledVertically() {
         scrollerMoved(verticalScroller.hitPart)
     }
 
@@ -614,7 +615,8 @@ final class TextPagerView: NSView {
         }
     }
 
-    @objc private func scrolledHorizontally() {
+    @objc
+    private func scrolledHorizontally() {
         scrollHorizontally(
             to: CGFloat(horizontalScroller.doubleValue) * max(0, widestLine + 2 * inset - textArea.width)
         )

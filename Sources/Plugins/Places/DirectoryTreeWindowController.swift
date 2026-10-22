@@ -299,7 +299,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    @objc private func rootChosen() {
+    @objc
+    private func rootChosen() {
         guard roots.indices.contains(rootPopup.indexOfSelectedItem) else {
             return
         }
@@ -309,7 +310,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         window?.makeFirstResponder(outline)
     }
 
-    @objc private func rescan() {
+    @objc
+    private func rescan() {
         guard let tree else {
             return
         }
@@ -803,7 +805,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     // MARK: Result
 
-    @objc private func accept() {
+    @objc
+    private func accept() {
         guard let tree, let node = selectedNode else {
             return
         }
@@ -817,7 +820,8 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         kernel.panels.source.show(url)
     }
 
-    @objc private func cancel() {
+    @objc
+    private func cancel() {
         close()
     }
 

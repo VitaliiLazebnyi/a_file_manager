@@ -65,8 +65,10 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 }
 
-@Suite struct Review2ConfigBVirtualFileSystem {
-    @Test func theRegistryGoesWithTheFileSystemsInIt() {
+@Suite
+struct Review2ConfigBVirtualFileSystem {
+    @Test
+    func theRegistryGoesWithTheFileSystemsInIt() {
         weak var gone: FileSystemRegistry?
         do {
             let registry = FileSystemRegistry()
@@ -76,7 +78,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(gone == nil)
     }
 
-    @Test func watcherReportsReachTheCallerOnTheMainThreadWhicheverThreadFiresThem() async {
+    @Test
+    func watcherReportsReachTheCallerOnTheMainThreadWhicheverThreadFiresThem() async {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -98,7 +101,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         withExtendedLifetime(watcher) {}
     }
 
-    @Test func aReportAfterTheWatcherWasReleasedGoesNowhere() async throws {
+    @Test
+    func aReportAfterTheWatcherWasReleasedGoesNowhere() async throws {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -118,7 +122,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         _ = watcher
     }
 
-    @Test func aHugeListIsRegisteredWithoutWorkOnTheCallerAndWatchedByAtMostTheLimit() {
+    @Test
+    func aHugeListIsRegisteredWithoutWorkOnTheCallerAndWatchedByAtMostTheLimit() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -134,7 +139,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(virtual.volume(of: list)?.isLocal == false)
     }
 
-    @Test func filesThatDifferOnlyInUnicodeNormalisationAreTwoFilesInAList() throws {
+    @Test
+    func filesThatDifferOnlyInUnicodeNormalisationAreTwoFilesInAList() throws {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -148,7 +154,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(items.count == 2 && Set(items.map { Array($0.name.utf8) }).count == 2)
     }
 
-    @Test func namesInASelectedBranchNeverClash() {
+    @Test
+    func namesInASelectedBranchNeverClash() {
         let items = [
             FileItem(url: URL(fileURLWithPath: "/a/x.txt"), name: "x.txt"),
             FileItem(url: URL(fileURLWithPath: "/b/x.txt"), name: "x.txt"),
@@ -162,7 +169,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(plain == ["/a/x.txt", "/b/x.txt", "/c/y", "/d/y"])
     }
 
-    @Test func leastRecentlyUsedUnwatchedListGoesFirst() {
+    @Test
+    func leastRecentlyUsedUnwatchedListGoesFirst() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -178,7 +186,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(virtual.entries(of: first) != nil && virtual.entries(of: second) == nil)
     }
 
-    @Test func capabilitiesWithoutALocationClaimNothingAnyShownFolderCannotDo() throws {
+    @Test
+    func capabilitiesWithoutALocationClaimNothingAnyShownFolderCannotDo() throws {
         let box = try Sandbox()
         try box.file("a/one.txt")
         let registry = FileSystemRegistry()
@@ -193,7 +202,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(virtual.capabilities.isSubset(of: local) && virtual.capabilities.isSubset(of: limited.capabilities))
     }
 
-    @Test func realLocationOfABranchItemIsTheRealFile() {
+    @Test
+    func realLocationOfABranchItemIsTheRealFile() {
         let registry = FileSystemRegistry()
         let virtual = VirtualFileSystem(fileSystems: registry)
         let real = URL(fileURLWithPath: "/Users/x/dir/a.txt")
@@ -202,7 +212,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(virtual.realLocation(of: VirtualLocation.list(id: 1, title: "T", origin: nil).url) == nil)
     }
 
-    @Test func aTypedListNoteNeedsTheListsOwnTitle() {
+    @Test
+    func aTypedListNoteNeedsTheListsOwnTitle() {
         let provider = Review2WatchFileSystem()
         let registry = FileSystemRegistry()
         registry.register(provider)
@@ -214,8 +225,10 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 }
 
-@Suite struct Review2ConfigBVirtualLocation {
-    @Test func aPasswordIsNeverWrittenIntoALocation() throws {
+@Suite
+struct Review2ConfigBVirtualLocation {
+    @Test
+    func aPasswordIsNeverWrittenIntoALocation() throws {
         let server = try #require(URL(string: "ftp://someone:s3cret@files.example.org/pub"))
         let url = VirtualLocation.branch(of: server).url
         #expect(!url.absoluteString.contains("s3cret"))
@@ -234,7 +247,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(VirtualLocation(url)?.realDirectory?.user == "someone")
     }
 
-    @Test func aPathWithDotsInItIsMadePlain() throws {
+    @Test
+    func aPathWithDotsInItIsMadePlain() throws {
         let hand = try #require(URL(string: "vfolder://branch.h66696c653a2f2f/a/../../etc"))
         guard case .branch(let real)? = VirtualLocation(hand) else {
             Issue.record("not a branch")
@@ -245,8 +259,10 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 }
 
-@Suite struct Review2ConfigBListFiles {
-    @Test func namesWithLineBreaksSurviveAListFile() {
+@Suite
+struct Review2ConfigBListFiles {
+    @Test
+    func namesWithLineBreaksSurviveAListFile() {
         let names = [
             "/tmp/plain.txt", "/tmp/with\nbreak.txt", "/tmp/with\r\nboth", "/tmp/tab\there", " /tmp/leading",
             "/tmp/trailing ", "\"/quoted\"",
@@ -257,7 +273,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(FileListFile.lines(in: Data(text.utf8)) == names)
     }
 
-    @Test func oldListFilesAreReadAsTheyWere() {
+    @Test
+    func oldListFilesAreReadAsTheyWere() {
         let old = "/a/b.txt\r\nC:\\dir\\file.txt\n  /spaced/path  \n\"half\n\\n/not/an/escape\n\"/with\\q\"\n"
         #expect(
             FileListFile.lines(in: Data(old.utf8)) == [
@@ -266,7 +283,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         )
     }
 
-    @Test func aHugeListFileIsRefused() throws {
+    @Test
+    func aHugeListFileIsRefused() throws {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -285,8 +303,10 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 }
 
-@Suite struct Review2ConfigBPlaces {
-    @Test func frequentCountsSaturateAndArePassedThroughAnImportOfTheMaximum() throws {
+@Suite
+struct Review2ConfigBPlaces {
+    @Test
+    func frequentCountsSaturateAndArePassedThroughAnImportOfTheMaximum() throws {
         let json = #"{"counts":{"file:///Users/x/dir":9223372036854775807,"file:///neg":-5}}"#
         var frequent = try JSONDecoder().decode(FrequentFolders.self, from: Data(json.utf8))
         #expect(frequent.counts["file:///neg"] == 0)
@@ -294,7 +314,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(frequent.counts["file:///Users/x/dir"] == Int.max)
     }
 
-    @Test func aStoredHistoryHoldsNoMoreThanItKeeps() throws {
+    @Test
+    func aStoredHistoryHoldsNoMoreThanItKeeps() throws {
         let visits = (0..<1_000).map { #"{"location":"file:///d\#($0)","isVisible":true}"# }.joined(separator: ",")
         let history = try JSONDecoder().decode(DirectoryHistory.self, from: Data(#"{"visits":[\#(visits)]}"#.utf8))
         #expect(history.visits.count == DirectoryHistory.storedLimit && history.current?.path == "/d999")
@@ -306,7 +327,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(!String(decoding: data, as: UTF8.self).contains("\"key\""))
     }
 
-    @Test func aPasswordInALocationIsNotStoredInTheHistory() throws {
+    @Test
+    func aPasswordInALocationIsNotStoredInTheHistory() throws {
         var history = DirectoryHistory()
         history.record(try #require(URL(string: "ftp://u:secret@host/dir")), stayedInPrevious: false)
         #expect(history.visits.first?.location.contains("secret") == false)
@@ -315,7 +337,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(frequent.counts.keys.allSatisfy { !$0.contains("secret") })
     }
 
-    @Test func hotlistEntriesForAwkwardFoldersLeadBackToThem() {
+    @Test
+    func hotlistEntriesForAwkwardFoldersLeadBackToThem() {
         for path in ["/x/trailing ", " /x/leading", "/x/:", "/x/a:", "/x/\"q\"", "/x/plain"] {
             let command = HotlistAction.changeDirectoryCommand(to: path)
             #expect(HotlistAction(command) == .changeDirectory(path: path, focusingOnIt: false), "\(path)")
@@ -323,7 +346,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(HotlistAction("cd /x/y/:") == .changeDirectory(path: "/x/y", focusingOnIt: true))
     }
 
-    @Test func treeCacheFilesAreMode0600InAFolderOf0700AndNeverGoBackToAnOlderState() throws {
+    @Test
+    func treeCacheFilesAreMode0600InAFolderOf0700AndNeverGoBackToAnOlderState() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let root = URL(fileURLWithPath: "/Volumes/R2")
@@ -344,14 +368,16 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(leftovers.isEmpty)
     }
 
-    @Test func treeCachePathsWithLineBreaksAreLeftOutAndTheTreeCountsAsPartial() throws {
+    @Test
+    func treeCachePathsWithLineBreaksAreLeftOutAndTheTreeCountsAsPartial() throws {
         let root = URL(fileURLWithPath: "/Volumes/R2")
         let text = TreeCache.format(TreeCache.Entry(paths: ["ok", "bad\n[injected]", "fine"]), root: root)
         let entry = try #require(TreeCache.parseEntry(text, root: root))
         #expect(entry.paths == ["ok", "fine"] && !entry.isComplete)
     }
 
-    @Test func treeCacheFileOverTheLimitIsNotRead() throws {
+    @Test
+    func treeCacheFileOverTheLimitIsNotRead() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let root = URL(fileURLWithPath: "/Volumes/R2")
@@ -368,8 +394,10 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 }
 
-@Suite struct Review2ConfigBTree {
-    @Test func aScanLeavesProtectedAndCloudFoldersUnreadButAUserOpenedOneIsRead() throws {
+@Suite
+struct Review2ConfigBTree {
+    @Test
+    func aScanLeavesProtectedAndCloudFoldersUnreadButAUserOpenedOneIsRead() throws {
         let box = try Sandbox()
         try box.folder("plain/inner")
         let protected = URL(fileURLWithPath: NSHomeDirectory() + "/Library/CloudStorage")
@@ -384,7 +412,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         _ = own.subfolders(of: protected)
     }
 
-    @Test func aScanStopsAtItsFolderLimitAndCountsAsIncomplete() throws {
+    @Test
+    func aScanStopsAtItsFolderLimitAndCountsAsIncomplete() throws {
         let box = try Sandbox()
         for index in 0..<20 { try box.folder("d\(index)/sub") }
         let scanner = TreeScanner(root: box.root, provider: LocalFileSystem(), batchSize: 4)
@@ -397,7 +426,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(!timed.run { _ in } && timed.reachedLimit)
     }
 
-    @Test func gentleScanRestoresTheThreadsPriorities() {
+    @Test
+    func gentleScanRestoresTheThreadsPriorities() {
         // On a thread of its own (a pool thread of Dispatch does not take a policy of its own).
         let seen = Mutex<[Int32]>([])
         let done = DispatchSemaphore(value: 0)
@@ -413,7 +443,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(values.count == 3 && values[1] == IOPOL_THROTTLE && values[2] == values[0], "\(values)")
     }
 
-    @Test func quickSearchWorksInSlicesAndMatchesTheBlockingSearch() {
+    @Test
+    func quickSearchWorksInSlicesAndMatchesTheBlockingSearch() {
         let root = URL(fileURLWithPath: "/Volumes/R2", isDirectory: true)
         let tree = DirectoryTree(rootURL: root, paths: (0..<5_000).map { "dir\($0)" } + ["needle"])
         let blocking = tree.find("needle", from: nil)
@@ -437,12 +468,14 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 }
 
-@Suite struct Review2ConfigBTabs {
+@Suite
+struct Review2ConfigBTabs {
     let memory = MemoryFileSystem()
 
     func read(_ text: String) -> TabFile? { TabFile(text: text) { memory.location(from: $0) } }
 
-    @Test func pathsAndCaptionsWithLineBreaksRoundTripWithoutInjectingLines() throws {
+    @Test
+    func pathsAndCaptionsWithLineBreaksRoundTripWithoutInjectingLines() throws {
         let awkward = memory.url("/tmp/a\n1_path=sftp://evil.example/x")
         let tab = PanelTabState(location: awkward, title: "t\n1_path=/etc")
         let file = TabFile(
@@ -468,7 +501,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         )
     }
 
-    @Test func aByteOrderMarkAndUTF16FilesAreRead() throws {
+    @Test
+    func aByteOrderMarkAndUTF16FilesAreRead() throws {
         #expect(read("\u{FEFF}[activetabs]\n0_path=mem:/A\n")?.active.tabs.count == 1)
         let utf16 = try #require("[activetabs]\r\n0_path=mem:/A\r\n".data(using: .utf16))
         #expect(read(TabFile.text(decoding: utf16))?.active.tabs.count == 1)
@@ -476,12 +510,14 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(read(TabFile.text(decoding: utf8))?.active.tabs.count == 1)
     }
 
-    @Test func oldTabFilesWithBackslashesAreReadAsTheyStand() {
+    @Test
+    func oldTabFilesWithBackslashesAreReadAsTheyStand() {
         let file = read("[activetabs]\n0_path=mem:/C:\\dir\n0_caption=C:\\Work\n")
         #expect(file?.active.tabs.first?.title == "C:\\Work")
     }
 
-    @Test func aTabFileOpensNoMoreThanTheLimit() throws {
+    @Test
+    func aTabFileOpensNoMoreThanTheLimit() throws {
         let lines = (0..<5_000).map { "\($0)_path=mem:/d\($0)" }.joined(separator: "\n")
         let file = try #require(read("[activetabs]\n" + lines + "\n"))
         #expect(file.active.tabs.count == TabFile.tabLimit)
@@ -490,7 +526,9 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 }
 
-@MainActor @Suite struct Review2ConfigBTabLoading {
+@MainActor
+@Suite
+struct Review2ConfigBTabLoading {
     let memory = MemoryFileSystem()
     let bench: TestBench
 
@@ -505,7 +543,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         )
     }
 
-    @Test func loadingAFileNeverMakesAServerTabTheShownOne() {
+    @Test
+    func loadingAFileNeverMakesAServerTabTheShownOne() {
         memory.addFile(
             "/B/tabs.tab",
             "[activetabs]\n0_path=mem:/A\n1_path=sftp://evil.example/x\n2_path=mem:/B\nactivetab=1\n"
@@ -517,7 +556,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(tabs.tabs[1].directory.scheme == "sftp")
     }
 
-    @Test func aFileWhoseTabsAllConnectLeavesTheShownTabAlone() {
+    @Test
+    func aFileWhoseTabsAllConnectLeavesTheShownTabAlone() {
         memory.addFile(
             "/B/tabs.tab",
             "[activetabs]\n0_path=sftp://evil.example/x\n1_path=ftp://other.example/y\nactivetab=0\n"
@@ -528,7 +568,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(tabs.tabs.contains { $0.directory.scheme == "sftp" })
     }
 
-    @Test func loadingManyTabsTellsTheListenerOncePerPanel() {
+    @Test
+    func loadingManyTabsTellsTheListenerOncePerPanel() {
         let lines = (0..<100).map { "\($0)_path=mem:/A/d\($0)" }.joined(separator: "\n")
         memory.addFile("/B/many.tab", "[activetabs]\n" + lines + "\nactivetab=3\n")
         var changes = 0
@@ -537,7 +578,8 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         #expect(bench.left.tabs.count == 100 && changes == 1)
     }
 
-    @Test func aFileWithThousandsOfTabsOpensTheLimit() {
+    @Test
+    func aFileWithThousandsOfTabsOpensTheLimit() {
         let lines = (0..<3_000).map { "\($0)_path=mem:/A/d\($0)" }.joined(separator: "\n")
         memory.addFile("/B/huge.tab", "[activetabs]\n" + lines + "\n")
         bench.commands.perform("APPENDTABS", .location(memory.url("/B/huge.tab")))
@@ -545,7 +587,9 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
     }
 }
 
-@MainActor @Suite struct Review2ConfigBNavigation {
+@MainActor
+@Suite
+struct Review2ConfigBNavigation {
     let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
     var pasteboard: NSPasteboard { scratch.pasteboard }
@@ -562,13 +606,15 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
         )
     }
 
-    @Test func goingToANeighbourVolumeAsksTheDisksInAJob() {
+    @Test
+    func goingToANeighbourVolumeAsksTheDisksInAJob() {
         bench.commands.perform("cm_GoToNextDrive")
         #expect(bench.jobService.titles == ["Go to volume"])
         #expect(bench.left.model.directory == memory.url("/"))
     }
 
-    @Test func theClipboardIsAskedOnlyWhenItsChangeCountChanged() {
+    @Test
+    func theClipboardIsAskedOnlyWhenItsChangeCountChanged() {
         pasteboard.clearContents()
         #expect(!bench.commands.isEnabled("afm_CdFromClipboard"))
         // Without a change the answer stays, whatever the menus ask.

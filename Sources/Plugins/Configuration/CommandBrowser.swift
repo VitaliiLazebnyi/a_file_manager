@@ -153,7 +153,8 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
     }
 
     func controlTextDidChange(_: Notification) { reload() }
-    @objc private func categoryChanged() { reload() }
+    @objc
+    private func categoryChanged() { reload() }
 
     /// Return in the filter runs (or picks) the selected command; other keys edit the filter.
     internal func control(_: NSControl, textView _: NSTextView, doCommandBy selector: Selector) -> Bool {

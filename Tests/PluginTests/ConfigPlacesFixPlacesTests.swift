@@ -7,8 +7,11 @@ import Testing
 @testable import PlacesPlugin
 
 /// Stored hotlists and histories survive missing keys, unknown keys and bad elements.
-@MainActor @Suite struct ConfigPlacesFixStoredData {
-    @Test func aHotlistReadsLeniently() {
+@MainActor
+@Suite
+struct ConfigPlacesFixStoredData {
+    @Test
+    func aHotlistReadsLeniently() {
         let settings = MemorySettings()
         let json = """
             {"entries":[{"kind":"item","title":"A","command":"cd /a","future":1},
@@ -27,7 +30,8 @@ import Testing
         #expect(settings.data(forKey: "hotlist.unreadable") == Data(json.utf8) && told.count == 1)
     }
 
-    @Test func unreadableDataIsNotLostBySavingOver() {
+    @Test
+    func unreadableDataIsNotLostBySavingOver() {
         let settings = MemorySettings()
         settings.set(Data("{broken".utf8) as Data?, forKey: "hotlist")
         var told = 0
@@ -37,7 +41,8 @@ import Testing
         #expect(settings.data(forKey: "hotlist.unreadable") == Data("{broken".utf8))
     }
 
-    @Test func aCleanHotlistRaisesNoComplaint() {
+    @Test
+    func aCleanHotlistRaisesNoComplaint() {
         let settings = MemorySettings()
         settings.set(Hotlist(entries: [.item("x", command: "cd /x"), .separator]), forKey: "hotlist")
         var told = 0
@@ -45,7 +50,8 @@ import Testing
         #expect(told == 0 && settings.data(forKey: "hotlist.unreadable") == nil)
     }
 
-    @Test func historiesReadLeniently() {
+    @Test
+    func historiesReadLeniently() {
         let settings = MemorySettings()
         settings.set(
             Data(
@@ -64,7 +70,8 @@ import Testing
         #expect(told.count == 1 && settings.data(forKey: "history.left.unreadable") != nil)
     }
 
-    @Test func hotlistEntriesRunUserCommands() {
+    @Test
+    func hotlistEntriesRunUserCommands() {
         #expect(HotlistAction("em_build") == .command("em_build", .nothing))
         #expect(HotlistAction("em_open some words") == .command("em_open", .text("some words")))
         #expect(HotlistAction("emotion") == .changeDirectory(path: "emotion", focusingOnIt: false))
@@ -72,10 +79,12 @@ import Testing
 }
 
 /// The tree: neighbours in constant time, a name index, folded names, failed prefixes.
-@Suite struct ConfigPlacesFixTreeModel {
+@Suite
+struct ConfigPlacesFixTreeModel {
     let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
 
-    @Test func steppingThroughAWideFolderIsLinear() {
+    @Test
+    func steppingThroughAWideFolderIsLinear() {
         let names = (0..<20_000).map { "folder\($0)" }
         let tree = DirectoryTree(rootURL: root)
         tree.setChildren(names, ofPath: "")
@@ -92,7 +101,8 @@ import Testing
         #expect(tree.find("zzzz", from: nil)?.name == "zzzz1")
     }
 
-    @Test func indexesStayRightAfterInsertsAndRewrites() {
+    @Test
+    func indexesStayRightAfterInsertsAndRewrites() {
         let tree = DirectoryTree(rootURL: root, paths: ["b", "d", "f"])
         _ = tree.node(at: "c", creating: true)
         _ = tree.node(at: "a", creating: true)
@@ -110,7 +120,8 @@ import Testing
         #expect(tree.neighbour(of: tree.node(at: "a")!, forward: false).isRoot)
     }
 
-    @Test func aWideFolderResolvesNamesQuickly() {
+    @Test
+    func aWideFolderResolvesNamesQuickly() {
         let names = (0..<30_000).map { "n\($0)" }
         let tree = DirectoryTree(rootURL: root)
         tree.setChildren(names, ofPath: "", sorted: true)
@@ -122,7 +133,8 @@ import Testing
         #expect(tree.count == 30_000)
     }
 
-    @Test func unscannedFoldersStayUnscannedFromTheCache() {
+    @Test
+    func unscannedFoldersStayUnscannedFromTheCache() {
         let tree = DirectoryTree(rootURL: root, paths: ["a", "a/b", "Volumes"], unscanned: ["Volumes"])
         #expect(tree.node(at: "Volumes")?.isScanned == false && tree.node(at: "a")?.isScanned == true)
     }
@@ -133,10 +145,12 @@ extension TreeNode {
 }
 
 /// The cache: keyed by the hidden flag, partial trees, unscanned folders, debounced writes.
-@Suite struct ConfigPlacesFixCache {
+@Suite
+struct ConfigPlacesFixCache {
     let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
 
-    @Test func hiddenAndVisibleTreesAreSeparate() throws {
+    @Test
+    func hiddenAndVisibleTreesAreSeparate() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["a"], for: root)
@@ -151,7 +165,8 @@ extension TreeNode {
         #expect(cache.paths(for: root) == nil && cache.paths(for: root, showHidden: true) == nil)
     }
 
-    @Test func unscannedAndPartialSurviveTheFile() throws {
+    @Test
+    func unscannedAndPartialSurviveTheFile() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["a", "a/b", "Volumes"], unscanned: ["Volumes", "a/b"], isComplete: false, for: root)
@@ -163,7 +178,8 @@ extension TreeNode {
         #expect(TreeCache.parse("root=file:///Volumes/Disk/\n[a]\n(a)\n", root: root) == ["a"])
     }
 
-    @Test func notedFoldersAreWrittenOnceAfterABurst() throws {
+    @Test
+    func notedFoldersAreWrittenOnceAfterABurst() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["base"], for: root)
@@ -179,8 +195,10 @@ extension TreeNode {
 }
 
 /// A scan with the lean reader on the real disk, and its paths.
-@Suite struct ConfigPlacesFixScanning {
-    @Test func theLeanReaderHonoursHiddenFoldersPackagesAndLinks() throws {
+@Suite
+struct ConfigPlacesFixScanning {
+    @Test
+    func theLeanReaderHonoursHiddenFoldersPackagesAndLinks() throws {
         let box = try Sandbox()
         try box.folder("b/inner")
         try box.folder("a")
@@ -203,7 +221,8 @@ extension TreeNode {
         }
     }
 
-    @Test func excludedAndUnreachedFoldersAreRecorded() {
+    @Test
+    func excludedAndUnreachedFoldersAreRecorded() {
         let memory = MemoryFileSystem()
         memory.addDirectory("/V/Volumes/Other")
         memory.addDirectory("/V/keep/inner")

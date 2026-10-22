@@ -681,7 +681,8 @@ public final class TreeScanner: @unchecked Sendable {
     /// at utility priority, and so does the disk work of these threads); a file system that may
     /// wait for a server uses the pool, which adds threads while some wait.
     private func readFolders(_ batch: [(path: String, url: URL)]) -> [[Subfolder]] {
-        @Sendable func read(_ folder: (path: String, url: URL)) -> [Subfolder] {
+        @Sendable
+        func read(_ folder: (path: String, url: URL)) -> [Subfolder] {
             Self.gently { Sorter.sorted(folders(of: folder.url, isScan: true), numeric: true, byName: \.name) }
         }
         guard provider.scheme == "file", root.isFileURL else {

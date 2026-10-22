@@ -4,8 +4,10 @@ import Foundation
 import Testing
 
 /// Review 2, K035/K036: the formats shared by the whole program take any number, on any thread.
-@Suite struct Review2KernelFormat {
-    @Test func anyNumberIsASize() {
+@Suite
+struct Review2KernelFormat {
+    @Test
+    func anyNumberIsASize() {
         #expect(Format.kilobytes(.max) == "9,007,199,254,740,992 k")
         #expect(Format.kilobytes(.max - 512) == "9,007,199,254,740,991 k")
         #expect(Format.kilobytes(.min) == "-9,007,199,254,740,992 k")
@@ -26,7 +28,8 @@ import Testing
         #expect(Format.shortSize(.max).hasSuffix(" T") && Format.shortSize(.min).hasSuffix(" b"))
     }
 
-    @Test func speedsAndTimesThatAreNoNumbersAreShownAsSomething() {
+    @Test
+    func speedsAndTimesThatAreNoNumbersAreShownAsSomething() {
         for speed in [Double.nan, .infinity, -.infinity, 1e300, -1e300, -5, 0] {
             #expect(Format.speed(speed).hasSuffix("/s"))
         }
@@ -39,7 +42,8 @@ import Testing
         )
     }
 
-    @Test func sumsOfSizesStopAtTheEndsOfTheRange() {
+    @Test
+    func sumsOfSizesStopAtTheEndsOfTheRange() {
         #expect(
             Int64.max.addingSaturated(1) == .max && Int64.min.addingSaturated(-1) == .min
                 && Int64(5).addingSaturated(-7) == -2
@@ -48,7 +52,8 @@ import Testing
         #expect(Int.max.addingSaturated(1) == .max)
     }
 
-    @Test func namesFromOutsideAreShownWithoutWhatWouldMislead() {
+    @Test
+    func namesFromOutsideAreShownWithoutWhatWouldMislead() {
         #expect(
             Format.displayName("report.txt") == "report.txt" && Format.displayName("été 写真 👨‍👩‍👧.jpg") == "été 写真 👨‍👩‍👧.jpg"
         )
@@ -60,7 +65,8 @@ import Testing
         )
     }
 
-    @Test func groupingDigitsIsSafeOnManyThreadsAtOnce() {
+    @Test
+    func groupingDigitsIsSafeOnManyThreadsAtOnce() {
         let wrong = Parallel.map(Array(0..<20_000)) { index -> Bool in
             let value = Int64(index) * 1_000_003
             return Format.bytes(value).replacingOccurrences(of: ",", with: "") != String(value)

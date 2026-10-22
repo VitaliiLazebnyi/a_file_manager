@@ -188,7 +188,8 @@ struct DecodedText {
         offsets.removeAll(keepingCapacity: true)
     }
 
-    @inline(__always) fileprivate mutating func append(_ unit: UInt16, _ offset: Int) {
+    @inline(__always)
+    fileprivate mutating func append(_ unit: UInt16, _ offset: Int) {
         units.append(unit)
         if tracksOffsets { offsets.append(Int32(truncatingIfNeeded: offset)) }
     }
@@ -650,7 +651,8 @@ extension ViewerEncoding {
         _ text: inout DecodedText
     ) -> Int {
         let count = bytes.count
-        @inline(__always) func unit(_ at: Int) -> UInt16 {
+        @inline(__always)
+        func unit(_ at: Int) -> UInt16 {
             littleEndian
                 ? UInt16(bytes[at]) | UInt16(bytes[at + 1]) << 8 : UInt16(bytes[at]) << 8 | UInt16(bytes[at + 1])
         }

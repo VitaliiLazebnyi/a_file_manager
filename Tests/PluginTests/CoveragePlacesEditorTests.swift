@@ -55,7 +55,9 @@ struct CoveragePlacesEditorParts {
 }
 
 /// The hotlist editor, run as the modal window it is, with a script that works it.
-@MainActor @Suite(.serialized) struct CoveragePlacesHotlistEditor {
+@MainActor
+@Suite(.serialized)
+struct CoveragePlacesHotlistEditor {
     let memory = MemoryFileSystem()
     let bench: TestBench
     var ui: ScriptedInteraction { bench.interaction }
@@ -96,7 +98,8 @@ struct CoveragePlacesEditorParts {
         .item("A", command: "cd /a"), .submenu("S", [.item("In", command: "cd /in")]), .separator
     ])
 
-    @Test func cancelGivesNothingBack() {
+    @Test
+    func cancelGivesNothingBack() {
         var hidden = sample
         hidden.hidesMarked = true
         let result = edit(hidden) { parts in
@@ -108,7 +111,8 @@ struct CoveragePlacesEditorParts {
         #expect(result == nil)
     }
 
-    @Test func theFieldsBelongToTheSelectedEntry() {
+    @Test
+    func theFieldsBelongToTheSelectedEntry() {
         let result = edit(sample) { parts in
             #expect(parts.command.stringValue == "cd /a" && parts.number == "Entry 1 of 4")
             parts.select(2)
@@ -128,7 +132,8 @@ struct CoveragePlacesEditorParts {
         #expect(result?.entries[0] == .item("A", command: "cd /a") && result?.hideCharacter == "")
     }
 
-    @Test func entriesAreAddedBelowTheSelectionOrIntoTheSubmenu() {
+    @Test
+    func entriesAreAddedBelowTheSelectionOrIntoTheSubmenu() {
         ui.promptAnswers = [.accept, .text("-"), .cancel, .text(""), .text("Sub"), .cancel, .text("")]
         let result = edit(sample) { parts in
             parts.select(1)
@@ -154,7 +159,8 @@ struct CoveragePlacesEditorParts {
         #expect(result?.count == 8)
     }
 
-    @Test func titlesChangeExceptForSeparators() {
+    @Test
+    func titlesChangeExceptForSeparators() {
         ui.promptAnswers = [.text("&First"), .cancel, .text("")]
         let result = edit(sample) { parts in
             parts.click("Change Title…")
@@ -170,7 +176,8 @@ struct CoveragePlacesEditorParts {
         #expect(result?.entries.map(\.title) == ["&First", "S", "-"] && ui.promptAnswers.isEmpty)
     }
 
-    @Test func entriesMoveAndAreDeletedByButtonAndKey() {
+    @Test
+    func entriesMoveAndAreDeletedByButtonAndKey() {
         let result = edit(sample) { parts in
             parts.click("Move Down")
             #expect(parts.titles.prefix(2) == ["▾ S", "      A"])
@@ -197,7 +204,8 @@ struct CoveragePlacesEditorParts {
         #expect(result == Hotlist())
     }
 
-    @Test func aDoubleClickMarksAnEntryHiddenAndTheBoxHidesThem() {
+    @Test
+    func aDoubleClickMarksAnEntryHiddenAndTheBoxHidesThem() {
         let result = edit(sample) { parts in
             guard let table = parts.table, let action = table.doubleAction else {
                 return
@@ -220,7 +228,8 @@ struct CoveragePlacesEditorParts {
         #expect(result?.hideCharacter == "!")
     }
 
-    @Test func aFullListTakesNoMoreAndANamelessFolderIsProposedByItsPath() throws {
+    @Test
+    func aFullListTakesNoMoreAndANamelessFolderIsProposedByItsPath() throws {
         let full = Hotlist(entries: (0..<Hotlist.limit).map { .item("e\($0)", command: "") })
         let nameless = try #require(URL(string: "mem:"))
         ui.promptAnswers = [.accept]

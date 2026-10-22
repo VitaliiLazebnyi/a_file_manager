@@ -8,7 +8,9 @@ import Testing
 
 /// The Show menu's commands, driven against fake panels: views, plugin columns, display
 /// filters, and what the plugin registers.
-@MainActor @Suite struct ViewOptions {
+@MainActor
+@Suite
+struct ViewOptions {
     let memory = MemoryFileSystem()
     let settings = MemorySettings()
     let bench: TestBench
@@ -47,7 +49,8 @@ import Testing
 
     // MARK: Registration
 
-    @Test func registersCommandsKeysMenusToolbarAndPreferences() {
+    @Test
+    func registersCommandsKeysMenusToolbarAndPreferences() {
         let kernel = bench.kernel
         #expect(kernel.keyClashes.isEmpty)
         #expect(
@@ -77,7 +80,8 @@ import Testing
 
     // MARK: Views and columns
 
-    @Test func theViewCommandsSwitchTheSourcePanel() {
+    @Test
+    func theViewCommandsSwitchTheSourcePanel() {
         #expect(commands.isChecked(.viewFull) && !commands.isChecked(.viewBrief))
         commands.perform(.viewBrief)
         #expect(
@@ -92,7 +96,8 @@ import Testing
         #expect(right.viewMode == .full)
     }
 
-    @Test func customColumnsAreChosenInAForm() {
+    @Test
+    func customColumnsAreChosenInAForm() {
         left.viewMode = .brief
         bench.interaction.formAnswers = [.values(["length": .flag(true)])]
         commands.perform("cm_CustomColumnConfig")
@@ -115,7 +120,8 @@ import Testing
         #expect(left.extraColumns == ["gone", "upper"] && left.viewMode == .brief)
     }
 
-    @Test func withoutPluginColumnsThereIsNothingToChoose() {
+    @Test
+    func withoutPluginColumnsThereIsNothingToChoose() {
         let bare = TestBench(
             plugins: [ViewOptionsPlugin()],
             fileSystems: [MemoryFileSystem()],
@@ -127,7 +133,8 @@ import Testing
 
     // MARK: Display filters
 
-    @Test func programsShowsWhatCanBeRun() {
+    @Test
+    func programsShowsWhatCanBeRun() {
         #expect(left.names == ["docs", "one.txt", "run.sh", "tool", "two.md"] && commands.isChecked("cm_SrcAllFiles"))
         commands.perform("cm_SrcExecs")
         #expect(
@@ -149,7 +156,8 @@ import Testing
         #expect(left.names == ["docs", "tool", "two.md"])
     }
 
-    @Test func aCustomFilterIsAskedForRememberedAndReset() {
+    @Test
+    func aCustomFilterIsAskedForRememberedAndReset() {
         #expect(!commands.isEnabled("cm_SrcUserSpec"))
         bench.interaction.promptAnswers = [.text("*.txt *.md")]
         commands.perform("cm_SrcUserDef")
@@ -177,7 +185,8 @@ import Testing
         #expect(left.names == ["one.txt", "run.sh", "tool"] && commands.isChecked("cm_SrcUserDef"))
     }
 
-    @Test func onlySelectedFilesIsASnapshot() {
+    @Test
+    func onlySelectedFilesIsASnapshot() {
         #expect(!commands.isEnabled("cm_ShowOnlySelected"))
         left.model.select(mask: "*.txt *.sh")
         commands.perform("cm_ShowOnlySelected")
@@ -191,7 +200,8 @@ import Testing
         #expect(left.names.count == 5)
     }
 
-    @Test func aFilterLaidOverADisplayFilterKeepsItChecked() {
+    @Test
+    func aFilterLaidOverADisplayFilterKeepsItChecked() {
         commands.perform("cm_SrcUserDef", .text("*.txt"))
         // What the quick filter does: its title starts with the one below.
         let below = left.model.filter!
@@ -202,7 +212,8 @@ import Testing
         #expect(!commands.isChecked("cm_SrcUserDef") && !commands.isChecked("cm_SrcAllFiles"))
     }
 
-    @Test func displayMasks() {
+    @Test
+    func displayMasks() {
         func item(_ name: String, folder: Bool = false) -> FileItem {
             FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, kind: .init(isDirectory: folder))
         }
@@ -234,7 +245,8 @@ import Testing
 
     // MARK: Sorting and hidden files
 
-    @Test func hiddenFilesInBothPanelsOrInOne() {
+    @Test
+    func hiddenFilesInBothPanelsOrInOne() {
         memory.addFile("/A/.dot")
         memory.addFile("/B/.dot")
         commands.perform(.showHidden)

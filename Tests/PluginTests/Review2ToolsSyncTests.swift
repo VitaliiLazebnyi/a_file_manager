@@ -10,7 +10,9 @@ import Testing
 
 /// Review round 2: Synchronize directories must not delete a target because its source looks
 /// empty, must say what went wrong, and must not pair names it cannot tell apart.
-@MainActor @Suite struct Review2DirectorySync {
+@MainActor
+@Suite
+struct Review2DirectorySync {
     let memory = MemoryFileSystem()
     let plugin = DirectorySyncPlugin(opensWindows: false)
     let settings = MemorySettings()
@@ -50,7 +52,8 @@ import Testing
         return nil
     }
 
-    @Test func aMirrorOfAnEmptySourceWarnsAndLeavesTheDeletionUnticked() {
+    @Test
+    func aMirrorOfAnEmptySourceWarnsAndLeavesTheDeletionUnticked() {
         let session = opened()
         #expect(session.sourceLooksEmpty && ui.log.contains("inform: The left directory is empty."))
         ui.formAnswers = [.accept]
@@ -61,14 +64,16 @@ import Testing
         #expect(memory.exists("/B/one.txt") && memory.exists("/B/two.txt") && memory.exists("/B/sub/three.txt"))
     }
 
-    @Test func theDeletionRunsWhenTheUserTicksIt() {
+    @Test
+    func theDeletionRunsWhenTheUserTicksIt() {
         let session = opened()
         ui.formAnswers = [.values(["deleteRight": .flag(true), "confirm": .flag(false), "direct": .flag(true)])]
         session.synchronize()
         #expect(!memory.exists("/B/one.txt") && !memory.exists("/B/two.txt"))
     }
 
-    @Test func anOrdinaryMirrorStillProposesTheDeletionTicked() {
+    @Test
+    func anOrdinaryMirrorStillProposesTheDeletionTicked() {
         memory.addFile("/A/one.txt", "one", modified: early)
         let session = opened()
         #expect(!session.sourceLooksEmpty)
@@ -77,12 +82,14 @@ import Testing
         #expect(checkbox("deleteRight") == true)
     }
 
-    @Test func aTwoWaySyncOfAnEmptySideIsNotAMirror() {
+    @Test
+    func aTwoWaySyncOfAnEmptySideIsNotAMirror() {
         let session = opened(asymmetric: false)
         #expect(!session.sourceLooksEmpty)
     }
 
-    @Test func namesThatDifferOnlyInCaseAreNotPairedWithAnotherName() {
+    @Test
+    func namesThatDifferOnlyInCaseAreNotPairedWithAnotherName() {
         let left = ["a.txt", "A.txt"]
             .map {
                 FileItem(url: URL(fileURLWithPath: "/L/\($0)"), name: $0)
@@ -98,7 +105,8 @@ import Testing
         #expect(SyncComparison.pair(left, [])[0].collides == false)
     }
 
-    @Test func collidingNamesAreExcludedRows() {
+    @Test
+    func collidingNamesAreExcludedRows() {
         memory.addFile("/C/a.txt", "x", modified: early)
         memory.addFile("/C/A.txt", "y", modified: early)
         memory.addFile("/D/a.txt", "x", modified: early)
@@ -113,7 +121,8 @@ import Testing
         #expect(rows[1].state == .equal)
     }
 
-    @Test func datesAreComparedExactlyOnlyWhereBothSidesKeepThemExactly() {
+    @Test
+    func datesAreComparedExactlyOnlyWhereBothSidesKeepThemExactly() {
         let a = memory.addFile("/T/a.txt", "x", modified: early)
         _ = a
         memory.addFile("/U/a.txt", "x", modified: early.addingTimeInterval(2))
@@ -129,7 +138,8 @@ import Testing
         )
     }
 
-    @Test func aLocalApfsPairKeepsNoTolerance() throws {
+    @Test
+    func aLocalApfsPairKeepsNoTolerance() throws {
         let box = try Sandbox()
         try box.file("L/a.txt", "x", modified: early)
         try box.file("R/a.txt", "x", modified: early.addingTimeInterval(2))
@@ -147,7 +157,8 @@ import Testing
         }
     }
 
-    @Test func timeOffsetsAreAppliedToTheCopiedDates() {
+    @Test
+    func timeOffsetsAreAppliedToTheCopiedDates() {
         var options = SyncOptions()
         options.timeOffsetHours = 2
         memory.addFile("/V/a.txt", "new", modified: early.addingTimeInterval(10_000))
@@ -163,7 +174,8 @@ import Testing
         #expect(plan.toLeft[0].targetModified == plan.toLeft[0].modified.addingTimeInterval(7_200))
     }
 
-    @Test func aFailedCommitIsSaidAndNothingIsDeleted() {
+    @Test
+    func aFailedCommitIsSaidAndNothingIsDeleted() {
         struct Refused: Error {}
         memory.capabilities = [.write, .deferredWrites]
         memory.commitFailure = Refused()
@@ -176,7 +188,8 @@ import Testing
         #expect(memory.exists("/B/extra.txt"))
     }
 
-    @Test func errorsAfterSkipAllAreSummarised() {
+    @Test
+    func errorsAfterSkipAllAreSummarised() {
         memory.addFile("/A/x1.txt", "1", modified: early.addingTimeInterval(100))
         memory.addFile("/A/x2.txt", "2", modified: early.addingTimeInterval(100))
         let session = opened(asymmetric: false)
@@ -188,7 +201,8 @@ import Testing
         #expect(ui.log.contains("inform: Synchronize did not finish without errors."))
     }
 
-    @Test func loadingASetOrAdoptingDuringAComparisonDropsTheOldRun() {
+    @Test
+    func loadingASetOrAdoptingDuringAComparisonDropsTheOldRun() {
         let session = opened()
         session.saveSet(named: "mine")
         // The state is cleared and a running comparison would be cancelled; nothing stale arrives later.
@@ -196,7 +210,8 @@ import Testing
         #expect(session.phase == .idle && session.rows.isEmpty)
     }
 
-    @Test func aNewFileOnAFileSystemThatKeepsWritesBackIsWrittenAsATemporaryFirst() {
+    @Test
+    func aNewFileOnAFileSystemThatKeepsWritesBackIsWrittenAsATemporaryFirst() {
         memory.capabilities = [.write, .deferredWrites]
         memory.refusesInternalCopy = true
         memory.addFile("/L/new.txt", "fresh", modified: early.addingTimeInterval(500))
@@ -218,7 +233,8 @@ import Testing
         #expect(!memory.commits.isEmpty)
     }
 
-    @Test func aCancelledCopyLeavesNoTemporaryBehind() {
+    @Test
+    func aCancelledCopyLeavesNoTemporaryBehind() {
         memory.addFile("/L/f.bin", "new content", modified: early.addingTimeInterval(500))
         memory.addFile("/R/f.bin", "old", modified: early)
         let rows = SyncComparison(options: SyncOptions(), fileSystems: bench.kernel.fileSystems)
@@ -249,7 +265,8 @@ import Testing
         #expect(outcome.copied == 0 || memory.contents("/R/f.bin") == "new content")
     }
 
-    @Test func aListingCutShortByTheCancelIsNotAnEmptyFolder() {
+    @Test
+    func aListingCutShortByTheCancelIsNotAnEmptyFolder() {
         memory.addFile("/R/keep/inside.txt", "mine")
         let flag = CancellationFlag()
         flag.cancel()
@@ -269,7 +286,8 @@ import Testing
         #expect(memory.exists("/R/keep/inside.txt"))
     }
 
-    @Test func aLargeListIsLaidOutByKeysAndTheSameWayEveryTime() {
+    @Test
+    func aLargeListIsLaidOutByKeysAndTheSameWayEveryTime() {
         // The layout is a pure function of the rows: sorted by extracted keys, ties by position.
         var items: [SyncRow] = []
         for index in 0..<50 {

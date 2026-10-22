@@ -44,7 +44,9 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
 
 /// Ejecting a drive: the panels leave it for where they came from, the program lets go of it,
 /// and a refusal brings the panels back.
-@MainActor @Suite struct VolumeEjectionTests {
+@MainActor
+@Suite
+struct VolumeEjectionTests {
     let box: Sandbox
     let stick: URL
     let home = FileManager.default.homeDirectoryForCurrentUser
@@ -65,7 +67,8 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         )
     }
 
-    @Test func thePanelsGoBackToWhereTheyCameFromAndTheUserIsTold() {
+    @Test
+    func thePanelsGoBackToWhereTheyCameFromAndTheUserIsTold() {
         let drive = StandInDrive(stick)
         let (bench, tools) = bench(drive)
         var released: [URL] = []
@@ -86,7 +89,8 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         )
     }
 
-    @Test func theDriveOfAGivenLocationIsEjectedWhicheverPanelIsActive() {
+    @Test
+    func theDriveOfAGivenLocationIsEjectedWhicheverPanelIsActive() {
         let drive = StandInDrive(stick)
         let (bench, _) = bench(drive)
         bench.right.show(stick)
@@ -94,7 +98,8 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         #expect(bench.right.model.directory.isSameLocation(as: box.url("B")) && drive.ejects == 1)
     }
 
-    @Test func aDriveInUseIsNotEjectedAndThePanelsComeBack() {
+    @Test
+    func aDriveInUseIsNotEjectedAndThePanelsComeBack() {
         let drive = StandInDrive(stick, refusals: [EjectRefusal(program: "Preview", reason: "The volume is in use.")])
         let (bench, tools) = bench(drive)
         bench.left.show(box.url("Stick/photos"))
@@ -105,7 +110,8 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         )
     }
 
-    @Test func whatThisProgramLetGoOfIsGivenAMoment() {
+    @Test
+    func whatThisProgramLetGoOfIsGivenAMoment() {
         let drive = StandInDrive(
             stick,
             refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")]
@@ -116,7 +122,8 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         #expect(drive.ejects == 2 && bench.interaction.log.last == "notice: “STICK” can now be removed safely.")
     }
 
-    @Test func aWriteThatFailsKeepsTheDrive() {
+    @Test
+    func aWriteThatFailsKeepsTheDrive() {
         struct Unwritable: Error {}
         let drive = StandInDrive(stick)
         let (bench, _) = bench(drive)
@@ -128,7 +135,8 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         #expect(bench.left.model.directory.isSameLocation(as: stick))
     }
 
-    @Test func theSystemDiskIsNotEjected() {
+    @Test
+    func theSystemDiskIsNotEjected() {
         let drive = StandInDrive(stick)
         let (bench, _) = bench(drive)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
@@ -136,7 +144,8 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         #expect(bench.left.model.directory.isSameLocation(as: box.url("A")))
     }
 
-    @Test func onlyDrivesThatLeaveTheMacCanBeEjected() {
+    @Test
+    func onlyDrivesThatLeaveTheMacCanBeEjected() {
         func ejectable(
             _ path: String,
             root: Bool? = false,
@@ -165,7 +174,8 @@ private final class StandInDrive: VolumeAccess, @unchecked Sendable {
         #expect(ejectable("/Volumes/Public", internal: nil, local: false))
     }
 
-    @Test func theHistoryKnowsWhereThePanelWasBeforeTheDrive() {
+    @Test
+    func theHistoryKnowsWhereThePanelWasBeforeTheDrive() {
         let (bench, _) = bench(StandInDrive(stick))
         #expect(bench.left.model.lastVisited { _ in true } == nil)
         for folder in ["B", "Stick", "Stick/photos"] { bench.left.show(box.url(folder)) }

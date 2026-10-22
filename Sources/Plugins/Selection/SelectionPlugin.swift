@@ -386,7 +386,8 @@ final class Selections {
         let shownVersion: Int
         let operands: PanelModel.Operands
 
-        @MainActor init(_ model: PanelModel) {
+        @MainActor
+        init(_ model: PanelModel) {
             self.model = model
             basis = model.basis
             shownVersion = model.shownVersion
@@ -433,7 +434,8 @@ final class Selections {
                 let result = autoreleasepool { work(frozen, flag) }
                 // A result can ask the user something (a mask that took too long): from the run loop.
                 performOnMainLoop {
-                    @MainActor func finish() { if self.running === flag { self.running = nil } }
+                    @MainActor
+                    func finish() { if self.running === flag { self.running = nil } }
                     // A newer command, or a panel that went to another folder: the result is of no use.
                     guard !flag.isCancelled,
                         zip(models, directories).allSatisfy({ $0.directory.isSameLocation(as: $1) })
@@ -783,7 +785,8 @@ final class Selections {
     /// entries of several folders (a branch view, a search result).
     func similar(to similarity: Similarity, as cursor: FileItem, select: Bool) {
         let model = source
-        @Sendable func same(_ first: String, _ second: String) -> Bool {
+        @Sendable
+        func same(_ first: String, _ second: String) -> Bool {
             first.caseInsensitiveCompare(second) == .orderedSame
         }
         let folder = similarity == .path ? cursor.url.deletingLastPathComponent().locationKey : ""

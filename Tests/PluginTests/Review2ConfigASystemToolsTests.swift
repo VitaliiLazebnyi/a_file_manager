@@ -10,7 +10,9 @@ import Testing
 
 /// The system tools after review 2: what is remembered of typed lines, which application a
 /// name means, and jobs that end when they are cancelled.
-@MainActor @Suite struct Review2ConfigASystemTools {
+@MainActor
+@Suite
+struct Review2ConfigASystemTools {
     let tools = SystemToolsPlugin(launchesApplications: false)
     let settings = MemorySettings()
     let bench: TestBench
@@ -35,7 +37,8 @@ import Testing
 
     var history: [String]? { settings.value([String].self, forKey: "systemTools.history") }
 
-    @Test func aLineTypedWithABlankInFrontIsNotRemembered() {
+    @Test
+    func aLineTypedWithABlankInFrontIsNotRemembered() {
         ui.formAnswers = Array(repeating: .accept, count: 8)
         commands.perform(.runCommandLine, .text("echo one"))
         commands.perform(.runCommandLine, .text(" echo secret"))
@@ -52,7 +55,8 @@ import Testing
         #expect(history == nil && tools.log.last == "ran: echo two")
     }
 
-    @Test func printIsOfferedForFilesWithoutMakingTheListOfThem() {
+    @Test
+    func printIsOfferedForFilesWithoutMakingTheListOfThem() {
         bench.left.moveCursor(toName: "one.txt")
         #expect(commands.isEnabled(SystemToolsCommands.printFile))
         bench.left.moveCursor(toName: "sub")
@@ -63,7 +67,8 @@ import Testing
         #expect(!commands.isEnabled(SystemToolsCommands.printFile))
     }
 
-    @Test func anInstalledApplicationComesBeforeOneOfTheSameNameInThePanelsFolder() throws {
+    @Test
+    func anInstalledApplicationComesBeforeOneOfTheSameNameInThePanelsFolder() throws {
         let installed = try box.folder("Apps/Tool.app")
         let planted = try box.folder("Here/Tool.app")
         let only = try box.folder("Here/Only.app")
@@ -81,7 +86,8 @@ import Testing
         )
     }
 
-    @Test func whetherABareNameIsAProgramIsDecidedByThePathItIsGiven() throws {
+    @Test
+    func whetherABareNameIsAProgramIsDecidedByThePathItIsGiven() throws {
         try box.folder("Apps/mytool.app")
         let program = try box.file("bin/mytool", "#!/bin/sh\n")
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: program.path)
@@ -101,7 +107,8 @@ import Testing
         )
     }
 
-    @Test func systemInformationEndsWhenItIsCancelled() {
+    @Test
+    func systemInformationEndsWhenItIsCancelled() {
         let cancelled = CancellationFlag()
         cancelled.cancel()
         #expect(SystemInformation.gather(displays: [], cancellation: cancelled, asking: .system) == nil)
@@ -116,7 +123,8 @@ import Testing
         )
     }
 
-    @Test func aCancelledListWithSubfoldersEntersNoFolder() throws {
+    @Test
+    func aCancelledListWithSubfoldersEntersNoFolder() throws {
         try box.file("A/sub/deep/far.txt")
         let fileSystems = bench.kernel.fileSystems
         let items = try fileSystems.provider(for: box.url("A")).list(box.url("A"), showHidden: false)
@@ -140,7 +148,8 @@ import Testing
         #expect(stopped.rows(of: items).map(\.name) == ["one.txt", "sub"])
     }
 
-    @Test func logLinesStayOneLineAndTheLogIsBounded() {
+    @Test
+    func logLinesStayOneLineAndTheLogIsBounded() {
         commands.perform(.runCommandLine, .text("make 'a\nb'"))
         #expect(tools.log == ["skipped: make 'a\\nb'"])
         for number in 0..<1_200 { commands.perform(.runCommandLine, .text(" make \(number)")) }
@@ -148,7 +157,8 @@ import Testing
         #expect(DisplayText.oneLine("x\u{1B}[0m\ny") == "x\\u{1B}[0m\\ny")
     }
 
-    @Test func theShellIsAlwaysAPosixShell() {
+    @Test
+    func theShellIsAlwaysAPosixShell() {
         #expect(LoginShell.posix.executable == "/bin/zsh" && LoginShell.posix.options.last == "-c")
         #expect(
             !LoginShell.usersShell(environment: ProcessInfo.processInfo.environment, account: LoginShell.accountShell())

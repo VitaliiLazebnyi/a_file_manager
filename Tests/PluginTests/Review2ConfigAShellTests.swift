@@ -10,7 +10,8 @@ import Testing
 /// of it runs.
 ///
 /// Every payload only tries to `touch` a marker file in the test's own folder.
-@Suite struct Review2ConfigAShell {
+@Suite
+struct Review2ConfigAShell {
     static let shells = ["/bin/zsh", "/bin/sh"]
 
     /// Names that ran commands before, and their relatives.
@@ -118,7 +119,8 @@ import Testing
         ("'%|EVIL|' \"%|EVIL|\"", { _, _ in Array(repeating: "e'v\"\u{301}il $x `touch M18`;touch M19", count: 2) })
     ]
 
-    @Test func aNameIsOneArgumentAndNothingOfItRunsInAnyPlaceAndShell() throws {
+    @Test
+    func aNameIsOneArgumentAndNothingOfItRunsInAnyPlaceAndShell() throws {
         for shell in Self.shells {
             for (template, expected) in Self.templates {
                 // Command substitution takes the line breaks off the end; such names are checked elsewhere.
@@ -142,7 +144,8 @@ import Testing
     }
 
     /// Names put together from everything a shell gives a meaning to, always the same ones.
-    @Test func namesMadeOfShellCharactersArriveUnchanged() throws {
+    @Test
+    func namesMadeOfShellCharactersArriveUnchanged() throws {
         let parts: [String] = [
             " ", "\t", "\n", "\"", "'", "\\", "$", "`", "!", "*", "?", "[", "]", "(", ")", "{", "}", "<", ">", "|", "&",
             ";", "~", "#",
@@ -175,7 +178,8 @@ import Testing
         }
     }
 
-    @Test func aPlaceWhereNoReferenceIsSafeIsRefused() {
+    @Test
+    func aPlaceWhereNoReferenceIsSafeIsRefused() {
         let refused = [
             "`printf %s %N`", "\"`cmd %N`\"", "$'%N'", "echo # %N", "cat <<EOF\n%N\nEOF", "cat << 'EOF' %N", "\\%N",
             "$((%N + 1))", "echo $((1 + %N))",
@@ -208,7 +212,8 @@ import Testing
         }
     }
 
-    @Test func noValueIsEverPartOfTheScript() throws {
+    @Test
+    func noValueIsEverPartOfTheScript() throws {
         for name in Self.hostile {
             for template in ["%N", "\"%N\"", "'%N'", "%P%N", "%S", "%|EVIL|"] {
                 let script = try ShellLine.script(expand("cmd " + template, name: name, selection: [name]).pieces).get()
@@ -229,7 +234,8 @@ import Testing
         }
     }
 
-    @Test func quotingOffIsTheUsersChoiceAndDataCannotMakeIt() throws {
+    @Test
+    func quotingOffIsTheUsersChoiceAndDataCannotMakeIt() throws {
         // %Q: the name is pasted as it is and the shell splits it, as documented.
         let off = expand("%Q%N", name: "a b")
         #expect(off.pieces == [.raw("a b")] && off.text == "a b")
@@ -259,7 +265,8 @@ import Testing
         #expect(expand("%%Q %N", name: "a b").pieces == [.text("%Q "), .value("a b")])
     }
 
-    @Test func aValueKeepsEveryCharacter() {
+    @Test
+    func aValueKeepsEveryCharacter() {
         // Only blanks the user wrote go from the ends of the line.
         #expect(expand("  %N  ", name: "a\u{A0}").pieces == [.value("a\u{A0}")])
         #expect(expand("%N", name: "report\u{3000}").pieces == [.value("report\u{3000}")])
@@ -270,7 +277,8 @@ import Testing
         #expect(try! ShellLine.script(expand("a %|NONE| b", name: nil).pieces).get().values == [""])
     }
 
-    @Test func numbersTheUserTypesNeverTrap() {
+    @Test
+    func numbersTheUserTypesNeverTrap() {
         let huge = "9223372036854775807"
         let beyond = "99999999999999999999999999"
         for template in [
@@ -291,7 +299,8 @@ import Testing
         )
     }
 
-    @Test func aLeadingDashIsGuardedOnlyWhereAWordBegins() {
+    @Test
+    func aLeadingDashIsGuardedOnlyWhereAWordBegins() {
         #expect(
             expand("%N", name: "-x").pieces == [.value("./-x")] && expand("\"%N\"", name: "-x").text == "\"./-x\""
         )
@@ -312,7 +321,8 @@ import Testing
         #expect(expand("\"%S \\\" x\"", name: nil, selection: ["a"]).text == "\"a \\\" x\"")
     }
 
-    @Test func listFilesRefuseNamesThatWouldBeTwoLines() {
+    @Test
+    func listFilesRefuseNamesThatWouldBeTwoLines() {
         let broken = expand("xargs rm < %L", name: nil, selection: ["x\n/Users/me/important", "b"])
         #expect(broken.problem?.contains("line break") == true)
         #expect(
@@ -324,7 +334,8 @@ import Testing
         #expect(expand("%L", name: nil, selection: ["-rf"]).listFile?.contents == Data("/tmp/A dir/-rf\n".utf8))
     }
 
-    @Test func thePromptShowsNamesAndTakesThemBack() {
+    @Test
+    func thePromptShowsNamesAndTakesThemBack() {
         let pieces = expand("-v %N %P%N '%N'", name: "my file.txt").pieces
         let shown = ShellLine.prompt(pieces)
         #expect(
@@ -346,7 +357,8 @@ import Testing
         #expect(ShellLine.prompt(expand("%N", name: "line\nbreak").pieces).legend == "${__afm_1} = line\\nbreak")
     }
 
-    @Test func textForMessagesHasNoLineBreaksOrControlCharacters() {
+    @Test
+    func textForMessagesHasNoLineBreaksOrControlCharacters() {
         #expect(DisplayText.oneLine("a\nb\rc\td\u{1B}[31m\u{202E}x\u{7}") == "a\\nb\\rc\\td\\u{1B}[31m\\u{202E}x\\u{7}")
         #expect(DisplayText.oneLine("caf\u{e9} 👨‍👩‍👧 ok") == "caf\u{e9} 👨‍👩‍👧 ok")
         #expect(
@@ -355,7 +367,8 @@ import Testing
         )
     }
 
-    @Test func aProgramGetsItsArgumentsByteForByte() async throws {
+    @Test
+    func aProgramGetsItsArgumentsByteForByte() async throws {
         // `é` in one character: Foundation's `Process` would hand it over as `e` and an accent.
         let name = "caf\u{e9} a\u{A0}.txt"
         let out = box.url("run/bytes.bin")

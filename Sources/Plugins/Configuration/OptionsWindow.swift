@@ -92,7 +92,8 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
     var title: String { model.title }
     var isChanged: Bool { model.isChanged }
 
-    @objc private func changed() {
+    @objc
+    private func changed() {
         for (preference, control) in controls {
             switch preference.kind {
             case .flag:

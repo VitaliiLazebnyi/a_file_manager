@@ -14,7 +14,9 @@ import Testing
 /// The list of servers a password may be sent to without protection,
 /// `network.unprotectedPasswordHosts`, has none of those words in its name: a file could plant a
 /// host there and take that question away without being asked.
-@MainActor @Suite struct Review2IntegrationSettings {
+@MainActor
+@Suite
+struct Review2IntegrationSettings {
     let box: Sandbox
     let settings = MemorySettings()
     let plugin: ConfigurationPlugin
@@ -47,7 +49,8 @@ import Testing
         settings.data(forKey: key).map { String(decoding: $0, as: UTF8.self) }
     }
 
-    @Test func aKeyItsPluginCallsTrustIsImportedOnlyWhenTheUserTicksIt() throws {
+    @Test
+    func aKeyItsPluginCallsTrustIsImportedOnlyWhenTheUserTicksIt() throws {
         let url = box.url("in.json")
         let entries =
             #""network.unprotectedPasswordHosts":["evil.example"],"network.passiveMode":false,"viewer.helper":["/tmp/evil","-x"]"#
@@ -84,7 +87,8 @@ import Testing
         #expect(settings.data(forKey: "viewer.helper") == nil)
     }
 
-    @Test func itIsLeftOutOfAnExportLikeTheOtherConnectionData() {
+    @Test
+    func itIsLeftOutOfAnExportLikeTheOtherConnectionData() {
         var schema = plugin.center!.settingsSchema()
         #expect(schema.group(of: "network.unprotectedPasswordHosts", value: ["a"]) == .trust)
         #expect(schema.isConnectionData("network.unprotectedPasswordHosts"))
@@ -96,7 +100,8 @@ import Testing
 
     /// The schema's copy of the declarations answers on any thread exactly as the registry
     /// does on the main thread: the key itself first, else the longest family it belongs to.
-    @Test func theSchemaAnswersAsTheRegistryDoesOnAnyThread() async {
+    @Test
+    func theSchemaAnswersAsTheRegistryDoesOnAnyThread() async {
         let keys = bench.kernel.settingsKeys
         keys.declare(prefix: "findFiles.", kind: .ordinary)
         keys.declare(prefix: "findFiles.history.", kind: .history)

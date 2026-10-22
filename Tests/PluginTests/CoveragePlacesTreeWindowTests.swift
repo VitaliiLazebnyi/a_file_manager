@@ -11,7 +11,9 @@ import Testing
 
 /// The Directory Tree window: opening, reading, the cache, other roots, keys and quick search,
 /// a scan that goes on without the window, and the result.
-@MainActor @Suite(.serialized) struct CoveragePlacesTreeWindow {
+@MainActor
+@Suite(.serialized)
+struct CoveragePlacesTreeWindow {
     let folders = CoveragePlacesFolders(["/A/a1/deep", "/A/a2", "/B/b1", "/Inner/x", "/Home/h", "/.hidden/in"])
     let memory = MemoryFileSystem()
     let bench: TestBench
@@ -54,7 +56,8 @@ import Testing
         return tree
     }
 
-    @Test func opensOnThePanelsFolderReadsTheTreeAndOffersEveryDisk() async {
+    @Test
+    func opensOnThePanelsFolderReadsTheTreeAndOffersEveryDisk() async {
         let cache = TreeCache(directory: nil)
         let tree = await opened("/A/a1", cache: cache)
         defer { tree.controller.close() }
@@ -73,7 +76,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func theSameTreeAgainOnlyMovesTheCursor() async {
+    @Test
+    func theSameTreeAgainOnlyMovesTheCursor() async {
         let tree = await opened("/A/a1")
         defer { tree.controller.close() }
         // Two in a row: the first answer comes too late and is dropped.
@@ -84,7 +88,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func aStoredTreeOpensWithoutReading() async {
+    @Test
+    func aStoredTreeOpensWithoutReading() async {
         let cache = TreeCache(directory: nil)
         cache.store(["A", "A/a1", "Z"], unscanned: ["Z"], isComplete: false, for: folders.url("/"))
         let tree = await opened("/A/a2", cache: cache)
@@ -99,7 +104,8 @@ import Testing
         CoveragePlacesLoop.key(characters, code: code, modifiers: modifiers)
     }
 
-    @Test func aDiskWithoutANameIsOfferedByItsPathAndAnUnknownPlaceIsNotRead() async throws {
+    @Test
+    func aDiskWithoutANameIsOfferedByItsPathAndAnUnknownPlaceIsNotRead() async throws {
         folders.placeList = [Place(name: "", url: try #require(URL(string: "nowhere:///disk")), kind: .externalDisk)]
         let tree = await opened("/A")
         defer { tree.controller.close() }
@@ -116,7 +122,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func anotherRootIsReadAndAnInvalidChoiceIsIgnored() async {
+    @Test
+    func anotherRootIsReadAndAnInvalidChoiceIsIgnored() async {
         let tree = await opened("/A/a1")
         defer { tree.controller.close() }
         tree.chooseRoot(-1)
@@ -129,7 +136,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func hiddenFoldersMakeATreeOfTheirOwn() async {
+    @Test
+    func hiddenFoldersMakeATreeOfTheirOwn() async {
         let cache = TreeCache(directory: nil)
         let tree = await opened("/A", cache: cache, showHidden: true)
         defer { tree.controller.close() }
@@ -141,7 +149,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func rescanKeysReadTheTreeAgainWhereverTheFocusIs() async {
+    @Test
+    func rescanKeysReadTheTreeAgainWhereverTheFocusIs() async {
         let tree = await opened("/A/a1")
         defer { tree.controller.close() }
         guard let window = tree.window else {
@@ -166,7 +175,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func aWindowWithoutATreeHasNothingToRescan() {
+    @Test
+    func aWindowWithoutATreeHasNothingToRescan() {
         let tree = window()
         defer { tree.controller.close() }
         tree.click("F2 Rescan Tree")
@@ -176,7 +186,8 @@ import Testing
 
     var root: URL { folders.url("/") }
 
-    @Test func escStopsAScanWhoseLateResultsAreDropped() async {
+    @Test
+    func escStopsAScanWhoseLateResultsAreDropped() async {
         let cache = TreeCache(directory: nil)
         folders.hold("/B")
         folders.hold("/A/a1")
@@ -203,7 +214,8 @@ import Testing
         #expect(tree.rows.count > 1)
     }
 
-    @Test func aClosedWindowsScanGoesOnUntilItsLimit() async {
+    @Test
+    func aClosedWindowsScanGoesOnUntilItsLimit() async {
         let cache = TreeCache(directory: nil)
         folders.hold("/B")
         let tree = window(cache: cache, hiddenScanLimit: 0.05)
@@ -216,7 +228,8 @@ import Testing
         #expect(await spin { cache.entry(for: root)?.isComplete == false })
     }
 
-    @Test func aScanThatEndsWithoutTheWindowLeavesTheTreeToTheCache() async {
+    @Test
+    func aScanThatEndsWithoutTheWindowLeavesTheTreeToTheCache() async {
         let cache = TreeCache(directory: nil)
         folders.hold("/B")
         let tree = window(cache: cache)
@@ -237,7 +250,8 @@ import Testing
         #expect(tree.rows.isEmpty)
     }
 
-    @Test func aLimitThatEndsAfterTheWindowCameBackDoesNothing() async {
+    @Test
+    func aLimitThatEndsAfterTheWindowCameBackDoesNothing() async {
         folders.hold("/B")
         let tree = window(hiddenScanLimit: 0.05)
         defer { tree.controller.close() }
@@ -255,7 +269,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func quittingEndsAScanWithoutAWindow() async {
+    @Test
+    func quittingEndsAScanWithoutAWindow() async {
         let cache = TreeCache(directory: nil)
         folders.hold("/B")
         let tree = window(cache: cache)
@@ -270,7 +285,8 @@ import Testing
         #expect(tree.rows.count > 1)
     }
 
-    @Test func anotherRootWhileReadingReplacesTheScan() async {
+    @Test
+    func anotherRootWhileReadingReplacesTheScan() async {
         let cache = TreeCache(directory: nil)
         folders.hold("/B")
         let tree = window(cache: cache)
@@ -301,7 +317,8 @@ import Testing
         outline.expandItem(item, expandChildren: true)
     }
 
-    @Test func aFolderOpenedBeforeItWasReadIsReadThenAndOnce() async {
+    @Test
+    func aFolderOpenedBeforeItWasReadIsReadThenAndOnce() async {
         let tree = await partial()
         defer { tree.controller.close() }
         #expect(tree.rows == ["tree:/", "A", "B"])
@@ -318,7 +335,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func aFolderReadForAnotherTreeIsDropped() async {
+    @Test
+    func aFolderReadForAnotherTreeIsDropped() async {
         let tree = await partial()
         defer { tree.controller.close() }
         folders.hold("/B")
@@ -332,7 +350,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func aFolderTheRescanReadFirstIsNotReadAgain() async {
+    @Test
+    func aFolderTheRescanReadFirstIsNotReadAgain() async {
         let tree = await partial()
         defer { tree.controller.close() }
         folders.hold("/B")
@@ -346,7 +365,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func aFolderReadWhileTheWindowIsAwayFindsNoTree() async {
+    @Test
+    func aFolderReadWhileTheWindowIsAwayFindsNoTree() async {
         let tree = await partial()
         defer { tree.controller.close() }
         folders.hold("/B")
@@ -359,7 +379,8 @@ import Testing
         #expect(await spin { tree.status.isEmpty })
     }
 
-    @Test func aFolderOpenedWhileTheScanRunsIsReadOnItsOwn() async {
+    @Test
+    func aFolderOpenedWhileTheScanRunsIsReadOnItsOwn() async {
         folders.hold("/A")
         let tree = window()
         defer { tree.controller.close() }
@@ -373,7 +394,8 @@ import Testing
         tree.controller.close()
     }
 
-    @Test func typingFindsAFolderAndStepsThroughTheMatches() async {
+    @Test
+    func typingFindsAFolderAndStepsThroughTheMatches() async {
         let tree = await opened("/A/a1")
         defer { tree.controller.close() }
         tree.type("a2")
@@ -403,7 +425,8 @@ import Testing
         #expect(!presenter.isOpen(tree.window) && bench.left.model.directory == folders.url("/A/a1"))
     }
 
-    @Test func keysInTheSearchFieldStepAndGo() async {
+    @Test
+    func keysInTheSearchFieldStepAndGo() async {
         let tree = await opened("/A/a1")
         defer { tree.controller.close() }
         guard let field = tree.searchField else {
@@ -437,7 +460,8 @@ import Testing
         #expect(!presenter.isOpen(tree.window) && bench.left.model.directory == folders.url("/A/a1"))
     }
 
-    @Test func theButtonsGoOrCancelAndAJobKeepsThePanelWhereItIs() async {
+    @Test
+    func theButtonsGoOrCancelAndAJobKeepsThePanelWhereItIs() async {
         let tree = await opened("/A/a1")
         defer { tree.controller.close() }
         tree.outline?.deselectAll(nil)
@@ -459,7 +483,8 @@ import Testing
         #expect(rejected == 1 && presenter.presented.count == 2 && bench.left.model.directory == folders.url("/A"))
     }
 
-    @Test func aSearchOfAHugeTreeGoesOnInTurnsAndANewOneEndsIt() async {
+    @Test
+    func aSearchOfAHugeTreeGoesOnInTurnsAndANewOneEndsIt() async {
         let cache = TreeCache(directory: nil)
         cache.store(["A"] + (0..<200_000).map { "p\($0)" }, for: root)
         let tree = await opened("/A", cache: cache)
@@ -473,7 +498,8 @@ import Testing
         #expect(beeps.value == 1)
     }
 
-    @Test func aFolderOfManySubfoldersIsLinkedInTurns() async {
+    @Test
+    func aFolderOfManySubfoldersIsLinkedInTurns() async {
         folders.add("/W")
         folders.addMany(30_000, below: "/W")
         let cache = TreeCache(directory: nil)
@@ -488,7 +514,8 @@ import Testing
         #expect(tree.rows.count > 30_000 && tree.selected == "W")
     }
 
-    @Test func escWhileManyFoldersWaitDropsTheRest() async {
+    @Test
+    func escWhileManyFoldersWaitDropsTheRest() async {
         folders.add("/W")
         folders.addMany(300_000, below: "/W")
         let tree = window()
@@ -502,7 +529,8 @@ import Testing
         #expect(tree.count < 300_000)
     }
 
-    @Test func theStartUpDiskLeavesOutTheVolumesMountedInIt() async throws {
+    @Test
+    func theStartUpDiskLeavesOutTheVolumesMountedInIt() async throws {
         let box = try Sandbox()
         let local = TestBench(plugins: [], fileSystems: [LocalFileSystem()], left: box.root, right: box.root)
         let controller = DirectoryTreeWindowController(kernel: local.kernel, cache: TreeCache(directory: nil)) {}
@@ -515,7 +543,8 @@ import Testing
         #expect(tree.escape())
     }
 
-    @Test func theCursorsFolderGoneInARescanLeavesTheCursorElsewhere() async {
+    @Test
+    func theCursorsFolderGoneInARescanLeavesTheCursorElsewhere() async {
         let tree = await opened("/B")
         defer { tree.controller.close() }
         #expect(tree.selected == "B")

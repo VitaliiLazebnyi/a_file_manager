@@ -13,7 +13,9 @@ import Testing
 /// The Mac integration with a long list (review 2): the marked items are picked out away from
 /// the main thread, nothing unbounded is handed to Finder or the sharing panel, and the log
 /// keeps short lines.
-@MainActor @Suite struct Review2ConfigAMac {
+@MainActor
+@Suite
+struct Review2ConfigAMac {
     let box: Sandbox
     private let scratch = ScratchPasteboard()
     var pasteboard: NSPasteboard { scratch.pasteboard }
@@ -49,7 +51,8 @@ import Testing
         while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 20_000_000) }
     }
 
-    @Test func theMarkedItemsOfALongListArePickedOutInTheBackground() async {
+    @Test
+    func theMarkedItemsOfALongListArePickedOutInTheBackground() async {
         commands.perform(.selectAll)
         #expect(bench.left.model.selectionCount == count)
         commands.perform(MacIntegrationPlugin.copyAsPathname)
@@ -73,7 +76,8 @@ import Testing
         #expect(ui.log == ["inform: Too many items to share"])
     }
 
-    @Test func aFewMarkedItemsOfALongListAreStillAllOfThem() async {
+    @Test
+    func aFewMarkedItemsOfALongListAreStillAllOfThem() async {
         bench.left.model.setSelected(true, names: ["f7.txt", "f3.txt"])
         commands.perform(MacIntegrationPlugin.copyAsPathname)
         await wait { pasteboard.string(forType: .string) != nil }
@@ -89,7 +93,8 @@ import Testing
         )
     }
 
-    @Test func withoutMarksNothingWaits() {
+    @Test
+    func withoutMarksNothingWaits() {
         bench.left.moveCursor(toName: "f1.txt")
         commands.perform(MacIntegrationPlugin.copyAsPathname)
         #expect(pasteboard.string(forType: .string) == bench.left.model.directory.path + "/f1.txt")
@@ -97,7 +102,8 @@ import Testing
         #expect(mac.log == ["quicklook " + bench.left.model.directory.path + "/f1.txt"])
     }
 
-    @Test func aNameWithALineBreakMakesOneLogLine() {
+    @Test
+    func aNameWithALineBreakMakesOneLogLine() {
         bench.left.show(box.url("S"))
         bench.left.moveCursor(toName: "line\nbreak.txt")
         commands.perform(.edit)

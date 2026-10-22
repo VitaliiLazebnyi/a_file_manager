@@ -202,8 +202,10 @@ private func created(_ url: URL) -> Date? {
 
 // MARK: - Cancelling a stream that waits
 
-@Suite struct FileOpsAdoptCancellation {
-    @Test func cancelEndsAReadThatWaitsAndLeavesNoTemporaryFile() throws {
+@Suite
+struct FileOpsAdoptCancellation {
+    @Test
+    func cancelEndsAReadThatWaitsAndLeavesNoTemporaryFile() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         base.stallsReads = true
@@ -227,7 +229,8 @@ private func created(_ url: URL) -> Date? {
         #expect(namesOnDisk(out).isEmpty)
     }
 
-    @Test func cancelEndsAWriteThatWaitsAndRemovesWhatArrived() throws {
+    @Test
+    func cancelEndsAWriteThatWaitsAndRemovesWhatArrived() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         base.stallsWrites = true
@@ -251,7 +254,8 @@ private func created(_ url: URL) -> Date? {
         #expect(base.allPaths == ["/out"])
     }
 
-    @Test func cancelEndsAVerifyingReadThatWaits() throws {
+    @Test
+    func cancelEndsAVerifyingReadThatWaits() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         let probe = ProbeFileSystem(base)
@@ -288,7 +292,8 @@ private func created(_ url: URL) -> Date? {
         #expect(namesOnDisk(out).isEmpty)
     }
 
-    @Test func cancelEndsAListingThatWaits() throws {
+    @Test
+    func cancelEndsAListingThatWaits() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         base.stallsListings = true
@@ -311,7 +316,8 @@ private func created(_ url: URL) -> Date? {
         #expect(result?.completed.isEmpty == true)
     }
 
-    @Test func aStreamThatIsNotCancelledStillCompletes() throws {
+    @Test
+    func aStreamThatIsNotCancelledStillCompletes() throws {
         let box = try Sandbox()
         let base = MemoryFileSystem()
         let source = base.addFile("/src/a.txt", "payload")
@@ -325,8 +331,10 @@ private func created(_ url: URL) -> Date? {
 
 // MARK: - Metadata of folders
 
-@Suite struct FileOpsAdoptMetadata {
-    @Test func aCopiedFolderKeepsItsTagHiddenFlagAndCreationDate() throws {
+@Suite
+struct FileOpsAdoptMetadata {
+    @Test
+    func aCopiedFolderKeepsItsTagHiddenFlagAndCreationDate() throws {
         let box = try Sandbox()
         let tree = try box.folder("A/tree")
         try box.file("A/tree/in.txt", "inside")
@@ -353,7 +361,8 @@ private func created(_ url: URL) -> Date? {
         #expect(box.read("B/tree/sub/deep.txt") == "deep" && box.read("B/tree/in.txt") == "inside")
     }
 
-    @Test func foldersMadeLateBecauseOfAFilterAreFinishedLikeTheOthers() throws {
+    @Test
+    func foldersMadeLateBecauseOfAFilterAreFinishedLikeTheOthers() throws {
         let box = try Sandbox()
         let tree = try box.folder("A/tree")
         try box.file("A/tree/sub/deep.txt", "deep")
@@ -389,7 +398,8 @@ private func created(_ url: URL) -> Date? {
         }
     }
 
-    @Test func aFinderLockedFolderIsCopiedCompletelyAndLockedLikeTheOriginal() throws {
+    @Test
+    func aFinderLockedFolderIsCopiedCompletelyAndLockedLikeTheOriginal() throws {
         let box = try Sandbox()
         let locked = try box.folder("A/locked")
         try box.file("A/locked/one.txt", "1")
@@ -407,7 +417,8 @@ private func created(_ url: URL) -> Date? {
         #expect(!namesOnDisk(box.url("B/locked")).contains { $0.hasPrefix(".afm-") })
     }
 
-    @Test func aFollowedLinkKeepsTheTagsOfItsTarget() throws {
+    @Test
+    func aFollowedLinkKeepsTheTagsOfItsTarget() throws {
         let box = try Sandbox()
         let real = try box.file("A/real.txt", "target contents")
         setTag(real, "linked")
@@ -424,7 +435,8 @@ private func created(_ url: URL) -> Date? {
         #expect(tag(copy) == "linked")
     }
 
-    @Test func foldersTheJobCreatedAreGivenTheirMetadataLastAndOnlyWhenAttributesAreKept() {
+    @Test
+    func foldersTheJobCreatedAreGivenTheirMetadataLastAndOnlyWhenAttributesAreKept() {
         let base = MemoryFileSystem()
         base.keepsMetadata = true
         base.addFile("/src/tree/a.txt")
@@ -464,7 +476,8 @@ private func created(_ url: URL) -> Date? {
         #expect(merged.metadataCopies.isEmpty)
     }
 
-    @Test func aFileSystemThatKeepsNoMetadataDoesNotSpoilTheCopy() {
+    @Test
+    func aFileSystemThatKeepsNoMetadataDoesNotSpoilTheCopy() {
         let base = MemoryFileSystem()
         base.addFile("/src/tree/a.txt", "a")
         base.addDirectory("/dst")
@@ -481,7 +494,8 @@ private func created(_ url: URL) -> Date? {
 
 // MARK: - Resume
 
-@Suite struct FileOpsAdoptResume {
+@Suite
+struct FileOpsAdoptResume {
     private func setUp(partial: String, source: String, capabilities: FileSystemCapabilities) -> (
         MemoryFileSystem, ProbeFileSystem
     ) {
@@ -506,7 +520,8 @@ private func created(_ url: URL) -> Date? {
         return replies
     }
 
-    @Test func aResumeContinuesThePartialFileWhereTheFileSystemCanAppend() {
+    @Test
+    func aResumeContinuesThePartialFileWhereTheFileSystemCanAppend() {
         let (base, probe) = setUp(
             partial: "hello wo",
             source: "hello world, resumed",
@@ -520,7 +535,8 @@ private func created(_ url: URL) -> Date? {
         #expect(base.allPaths.filter { $0.contains(".afm-") }.isEmpty)
     }
 
-    @Test func withoutAppendTheFileIsWrittenAnewAndSwappedIn() {
+    @Test
+    func withoutAppendTheFileIsWrittenAnewAndSwappedIn() {
         let (base, probe) = setUp(partial: "hello wo", source: "hello world, resumed", capabilities: [.write])
         let replies = resume(base, probe)
         #expect(replies.errors.isEmpty)
@@ -529,7 +545,8 @@ private func created(_ url: URL) -> Date? {
         #expect(probe.count(of: "write") == 1)
     }
 
-    @Test func aFileSystemThatClaimsAppendButRefusesItFallsBackToWritingAnew() {
+    @Test
+    func aFileSystemThatClaimsAppendButRefusesItFallsBackToWritingAnew() {
         let (base, probe) = setUp(partial: "hello wo", source: "hello world, resumed", capabilities: [.write])
         probe.claims = .append
         let replies = resume(base, probe)
@@ -539,7 +556,8 @@ private func created(_ url: URL) -> Date? {
         #expect(base.allPaths.filter { $0.contains(".afm-") }.isEmpty)
     }
 
-    @Test func aPartialFileThatIsNotTheStartOfTheSourceIsNotContinued() {
+    @Test
+    func aPartialFileThatIsNotTheStartOfTheSourceIsNotContinued() {
         let (base, probe) = setUp(
             partial: "hellX wo",
             source: "hello world, resumed",
@@ -551,7 +569,8 @@ private func created(_ url: URL) -> Date? {
         #expect(probe.count(of: "append") == 0)
     }
 
-    @Test func verifyComparesAllOfThePartialFileNotJustItsLastBlock() {
+    @Test
+    func verifyComparesAllOfThePartialFileNotJustItsLastBlock() {
         // A difference at the very start of a partial file of 1.5 MB is beyond the last block.
         let partial = "X" + String(repeating: "a", count: 1_500_000)
         let source = String(repeating: "a", count: 1_501_000) + "tail"
@@ -570,7 +589,8 @@ private func created(_ url: URL) -> Date? {
         #expect(goodProbe.count(of: "append") == 1)
     }
 
-    @Test func aResumeOnTheLocalDiskContinuesTheFileItself() throws {
+    @Test
+    func aResumeOnTheLocalDiskContinuesTheFileItself() throws {
         let box = try Sandbox()
         try box.file("S/f.txt", "0123456789abcdef")
         let partial = try box.file("T/f.txt", "01234567")
@@ -586,7 +606,8 @@ private func created(_ url: URL) -> Date? {
 
 // MARK: - Commit before a move deletes
 
-@Suite struct FileOpsAdoptCommit {
+@Suite
+struct FileOpsAdoptCommit {
     private func destination(_ capabilities: FileSystemCapabilities) -> (MemoryFileSystem, ProbeFileSystem) {
         let base = MemoryFileSystem(scheme: "dst")
         base.capabilities = capabilities
@@ -594,7 +615,8 @@ private func created(_ url: URL) -> Date? {
         return (base, ProbeFileSystem(base))
     }
 
-    @Test func sourcesAreDeletedOnlyAfterTheOneCommitOfTheTargetFolder() throws {
+    @Test
+    func sourcesAreDeletedOnlyAfterTheOneCommitOfTheTargetFolder() throws {
         let box = try Sandbox()
         let files = try (1...3).map { try box.file("A/f\($0).txt", "content \($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
@@ -608,7 +630,8 @@ private func created(_ url: URL) -> Date? {
         #expect(base.contents("/out/f2.txt") == "content 2")
     }
 
-    @Test func aMovedFolderIsRemovedAfterTheCommitToo() throws {
+    @Test
+    func aMovedFolderIsRemovedAfterTheCommitToo() throws {
         let box = try Sandbox()
         let tree = try box.folder("A/tree")
         try box.file("A/tree/a.txt", "a")
@@ -623,7 +646,8 @@ private func created(_ url: URL) -> Date? {
         #expect(base.contents("/out/tree/sub/b.txt") == "b")
     }
 
-    @Test func aFailedCommitKeepsEverySourceAndEndsTheJobAsFailed() throws {
+    @Test
+    func aFailedCommitKeepsEverySourceAndEndsTheJobAsFailed() throws {
         let box = try Sandbox()
         let files = try (1...3).map { try box.file("A/f\($0).txt", "content \($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
@@ -644,7 +668,8 @@ private func created(_ url: URL) -> Date? {
         #expect(base.commits == ["/out"])
     }
 
-    @Test func aTargetWithoutDeferredWritesIsNotCommittedAndSourcesGoAtOnce() throws {
+    @Test
+    func aTargetWithoutDeferredWritesIsNotCommittedAndSourcesGoAtOnce() throws {
         let box = try Sandbox()
         let files = try (1...3).map { try box.file("A/f\($0).txt", "c\($0)") }
         let (base, probe) = destination([.write])
@@ -654,7 +679,8 @@ private func created(_ url: URL) -> Date? {
         #expect(result.completed.count == 3)
     }
 
-    @Test func aHugeMoveIsCommittedInBatches() throws {
+    @Test
+    func aHugeMoveIsCommittedInBatches() throws {
         let box = try Sandbox()
         let files = try (1...7).map { try box.file("A/f\($0).txt", "c\($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
@@ -674,7 +700,8 @@ private func created(_ url: URL) -> Date? {
         #expect((1...7).allSatisfy { base.contents("/out/f\($0).txt") == "c\($0)" })
     }
 
-    @Test func aCommitInTheMiddleOfAMoveMeetsNoFileUnderItsTemporaryName() throws {
+    @Test
+    func aCommitInTheMiddleOfAMoveMeetsNoFileUnderItsTemporaryName() throws {
         let box = try Sandbox()
         let files = try (1...16).map { try box.file("A/f\($0).txt", "c\($0)") }
         let (base, probe) = destination([.write, .deferredWrites])
@@ -698,7 +725,8 @@ private func created(_ url: URL) -> Date? {
         #expect((1...16).allSatisfy { base.contents("/out/f\($0).txt") == "c\($0)" })
     }
 
-    @Test func aSourceThatCouldNotBeRemovedIsNotReportedAsMoved() throws {
+    @Test
+    func aSourceThatCouldNotBeRemovedIsNotReportedAsMoved() throws {
         let box = try Sandbox()
         let tree = try box.folder("A/tree")
         try box.file("A/tree/a.txt", "a")
@@ -720,7 +748,8 @@ private func created(_ url: URL) -> Date? {
 
 // MARK: - Origin marks
 
-@Suite struct FileOpsAdoptQuarantine {
+@Suite
+struct FileOpsAdoptQuarantine {
     private let mark = Data("0083;5f5e1000;Browser;".utf8)
 
     private func tree(in base: MemoryFileSystem) {
@@ -729,7 +758,8 @@ private func created(_ url: URL) -> Date? {
         base.addFile("/src/tree/sub/c.txt", "c")
     }
 
-    @Test func filesAndFoldersFromAMarkedSourceAreMarkedBeforeTheyGetTheirNames() {
+    @Test
+    func filesAndFoldersFromAMarkedSourceAreMarkedBeforeTheyGetTheirNames() {
         let source = MemoryFileSystem(scheme: "mem")
         source.quarantineValue = mark
         tree(in: source)
@@ -753,7 +783,8 @@ private func created(_ url: URL) -> Date? {
         #expect(target.contents("/out/tree/sub/c.txt") == "c")
     }
 
-    @Test func nothingIsMarkedWhenTheSourceHasNoMarkOrTheCopyStaysInOneFileSystem() {
+    @Test
+    func nothingIsMarkedWhenTheSourceHasNoMarkOrTheCopyStaysInOneFileSystem() {
         let source = MemoryFileSystem(scheme: "mem")
         tree(in: source)
         let target = MemoryFileSystem(scheme: "arc")
@@ -779,7 +810,8 @@ private func created(_ url: URL) -> Date? {
         #expect(marked.quarantineMarks.isEmpty)
     }
 
-    @Test func aResumedFileIsMarkedToo() {
+    @Test
+    func aResumedFileIsMarkedToo() {
         for continues in [true, false] {
             let source = MemoryFileSystem(scheme: "mem")
             source.quarantineValue = mark
@@ -807,8 +839,10 @@ private func created(_ url: URL) -> Date? {
 
 // MARK: - The measure cache
 
-@Suite struct FileOpsAdoptMeasure {
-    @Test func aBigFolderRenamedInsideAMergeIsNotCountedAgainEvenWhenTheCacheIsFull() {
+@Suite
+struct FileOpsAdoptMeasure {
+    @Test
+    func aBigFolderRenamedInsideAMergeIsNotCountedAgainEvenWhenTheCacheIsFull() {
         let base = MemoryFileSystem()
         for index in 1...5 { base.addFile("/src/A/small\(index)/one.txt") }
         for index in 0..<70 { base.addFile("/src/A/big/f\(index).txt") }
@@ -831,8 +865,11 @@ private func created(_ url: URL) -> Date? {
 
 // MARK: - Selection and capabilities in the commands
 
-@MainActor @Suite struct FileOpsAdoptSelection {
-    @Test func processedItemsAreFoundByLocationWhoseNamesArePaths() {
+@MainActor
+@Suite
+struct FileOpsAdoptSelection {
+    @Test
+    func processedItemsAreFoundByLocationWhoseNamesArePaths() {
         let inFolder = FileItem(url: URL(fileURLWithPath: "/x/sub/a.txt"), name: "sub/a.txt")
         let alsoNamedA = FileItem(url: URL(fileURLWithPath: "/x/a.txt"), name: "a.txt")
         let other = FileItem(url: URL(fileURLWithPath: "/x/other/b.txt"), name: "other/b.txt")
@@ -845,7 +882,9 @@ private func created(_ url: URL) -> Date? {
     }
 }
 
-@MainActor @Suite struct FileOpsAdoptCapabilities {
+@MainActor
+@Suite
+struct FileOpsAdoptCapabilities {
     let memory = MemoryFileSystem()
     let bench: TestBench
 
@@ -866,7 +905,8 @@ private func created(_ url: URL) -> Date? {
         )
     }
 
-    @Test func commandsFollowTheCapabilitiesOfTheFolderShown() {
+    @Test
+    func commandsFollowTheCapabilitiesOfTheFolderShown() {
         bench.left.show(memory.url("/R"))
         bench.left.moveCursor(toName: "ro.txt")
         for id in [CommandID.makeDirectory, .delete, .renameMove, .setAttributes] {
@@ -879,7 +919,8 @@ private func created(_ url: URL) -> Date? {
         }
     }
 
-    @Test func theTrashIsOfferedWhereTheItemsAreNotWhereTheFileSystemSaysInGeneral() {
+    @Test
+    func theTrashIsOfferedWhereTheItemsAreNotWhereTheFileSystemSaysInGeneral() {
         bench.left.moveCursor(toName: "one.txt")
         bench.interaction.choiceAnswers = [1]
         bench.commands.perform(.delete)

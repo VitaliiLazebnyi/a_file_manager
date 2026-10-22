@@ -154,7 +154,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     return false
 }
 
-@Suite struct Review2FileopsBranchView {
+@Suite
+struct Review2FileopsBranchView {
     let box: Sandbox
     let fileSystems = FileSystemRegistry()
     let virtual: VirtualFileSystem
@@ -180,7 +181,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     // F001, F018
-    @Test func movingAFileOntoItselfThroughABranchViewKeepsTheFile() throws {
+    @Test
+    func movingAFileOntoItselfThroughABranchViewKeepsTheFile() throws {
         let file = try box.file("d/a.txt", "precious")
         let replies = Review2Replies()
         let result = run(.move, [file], to: TargetSpec(directory: virtual.branch(of: box.url("d"))), replies: replies)
@@ -189,7 +191,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(namesOnDisk(box.url("d")) == ["a.txt"])
     }
 
-    @Test func aTargetInABranchViewIsTheRealFolder() throws {
+    @Test
+    func aTargetInABranchViewIsTheRealFolder() throws {
         let job = FileJob(
             kind: .move,
             sources: [try box.file("d/a.txt")],
@@ -207,7 +210,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         )
     }
 
-    @Test func aRenameToAnotherLetterCaseInABranchViewIsARename() throws {
+    @Test
+    func aRenameToAnotherLetterCaseInABranchViewIsARename() throws {
         let file = try box.file("d/a.txt", "precious")
         let before = try #require(inode(file))
         let replies = Review2Replies()
@@ -223,7 +227,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(inode(box.url("d/A.TXT")) == before)
     }
 
-    @Test func aPlainRenameInABranchViewIsARenameNotACopy() throws {
+    @Test
+    func aPlainRenameInABranchViewIsARenameNotACopy() throws {
         let file = try box.file("d/a.txt", "precious")
         let before = try #require(inode(file))
         #expect(setxattr(file.path, "user.afm.test", "v", 1, 0, 0) == 0)
@@ -237,7 +242,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(getxattr(box.url("d/b.txt").path, "user.afm.test", nil, 0, 0, 0) == 1)
     }
 
-    @Test func aFolderIsNotMovedIntoItselfThroughABranchView() throws {
+    @Test
+    func aFolderIsNotMovedIntoItselfThroughABranchView() throws {
         try box.file("d/sub/in.txt", "inside")
         let replies = Review2Replies()
         // Into itself under its own name, and into its own subfolder.
@@ -256,7 +262,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(box.read("d/sub/in.txt") == "inside" && replies.errors.count == 2)
     }
 
-    @Test func copyingOntoItselfThroughABranchViewIsRefused() throws {
+    @Test
+    func copyingOntoItselfThroughABranchViewIsRefused() throws {
         let file = try box.file("d/a.txt", "precious")
         let replies = Review2Replies()
         _ = run(.copy, [file], to: TargetSpec(directory: virtual.branch(of: box.url("d"))), replies: replies)
@@ -264,7 +271,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(namesOnDisk(box.url("d")) == ["a.txt"])
     }
 
-    @Test func aHardLinkOfTheSourceIsNotOverwrittenWithItself() throws {
+    @Test
+    func aHardLinkOfTheSourceIsNotOverwrittenWithItself() throws {
         let file = try box.file("d/a.txt", "precious")
         try box.folder("t")
         try FileManager.default.linkItem(at: file, to: box.url("t/a.txt"))
@@ -276,7 +284,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     // F006: a rename of several items to one name.
-    @Test func severalItemsRenamedToOneNameAreAllKept() throws {
+    @Test
+    func severalItemsRenamedToOneNameAreAllKept() throws {
         let sources = [
             try box.file("d/a.doc", "doc"), try box.file("d/a.pdf", "pdf"), try box.file("d/sub/a.rtf", "rtf")
         ]
@@ -292,7 +301,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 }
 
-@Suite struct Review2FileopsJob {
+@Suite
+struct Review2FileopsJob {
     let box: Sandbox
 
     init() throws {
@@ -301,7 +311,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F007, F017
 
-    @Test func aPipeInAStreamedCopyIsReportedAndNeverOpened() throws {
+    @Test
+    func aPipeInAStreamedCopyIsReportedAndNeverOpened() throws {
         let (fileSystems, memory) = makeFileSystems()
         try box.file("s/real.txt", "data")
         let pipe = box.url("s/pipe")
@@ -330,7 +341,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(replies.errors.count == 2 && replies.errors.allSatisfy { $0.contains("pipe") })
     }
 
-    @Test func aPipeIsNotReadForAChecksumOrACopyThatFollowsLinks() throws {
+    @Test
+    func aPipeIsNotReadForAChecksumOrACopyThatFollowsLinks() throws {
         let (fileSystems, _) = makeFileSystems()
         let pipe = box.url("pipe")
         #expect(mkfifo(pipe.path, 0o644) == 0)
@@ -362,7 +374,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F006, F013
 
-    @Test func equallyNamedSourcesFromTwoFoldersBothArriveUnderOverwriteAll() throws {
+    @Test
+    func equallyNamedSourcesFromTwoFoldersBothArriveUnderOverwriteAll() throws {
         let (fileSystems, _) = makeFileSystems()
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
@@ -382,7 +395,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(!box.exists("s/a/x.txt") && !box.exists("s/b/x.txt"))
     }
 
-    @Test func aMaskThatGivesSeveralSourcesOneNameLosesNone() throws {
+    @Test
+    func aMaskThatGivesSeveralSourcesOneNameLosesNone() throws {
         let (fileSystems, _) = makeFileSystems()
         let sources = [
             try box.file("s/a.doc", "doc"), try box.file("s/a.pdf", "pdf"), try box.file("s/a.rtf", "rtf")
@@ -413,7 +427,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         }
     }
 
-    @Test func anAnswerForAllDoesNotOverwriteTheJobsOwnFileButAnAnswerForOneDoes() throws {
+    @Test
+    func anAnswerForAllDoesNotOverwriteTheJobsOwnFileButAnAnswerForOneDoes() throws {
         let (fileSystems, _) = makeFileSystems()
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
@@ -430,7 +445,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(one.conflicts == ["x.txt"] && namesOnDisk(box.url("u")) == ["x.txt"])
     }
 
-    @Test func twoSourceFoldersThatLandInOneTargetFolderKeepEachOthersFiles() throws {
+    @Test
+    func twoSourceFoldersThatLandInOneTargetFolderKeepEachOthersFiles() throws {
         let (fileSystems, _) = makeFileSystems()
         try box.file("s/one/sub/x.txt", "first")
         try box.file("s/one/sub/only1.txt", "1")
@@ -450,7 +466,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(Set([box.read("t/sub/x.txt"), box.read("t/sub/x (2).txt")]) == ["first", "second"])
     }
 
-    @Test func aFileThatWasThereBeforeTheJobIsStillOverwrittenByTheRule() throws {
+    @Test
+    func aFileThatWasThereBeforeTheJobIsStillOverwrittenByTheRule() throws {
         let (fileSystems, _) = makeFileSystems()
         try box.file("s/x.txt", "new")
         try box.file("t/x.txt", "old")
@@ -467,7 +484,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F022, F033
 
-    @Test func resumeAndAppendNeverWriteThroughALinkAtTheTarget() throws {
+    @Test
+    func resumeAndAppendNeverWriteThroughALinkAtTheTarget() throws {
         let (fileSystems, memory) = makeFileSystems()
         let victim = try box.file("elsewhere/victim.txt", "the victim's own, longer contents: fifty-three bytes.")
         try box.file("s/f.txt", String(repeating: "source-bytes ", count: 20))
@@ -496,7 +514,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         }
     }
 
-    @Test func resumeByWritingAnewChecksThatTheTargetIsTheStartOfTheSource() throws {
+    @Test
+    func resumeByWritingAnewChecksThatTheTargetIsTheStartOfTheSource() throws {
         // A file system that cannot continue a file: the longer file is written next to the old one.
         let fileSystems = FileSystemRegistry()
         let flaky = FlakyFileSystem()
@@ -529,7 +548,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F032, F044
 
-    @Test func aRefusedDeleteNeverChangesTheTargetOfALinkOrAFileThatIsNotLocked() throws {
+    @Test
+    func aRefusedDeleteNeverChangesTheTargetOfALinkOrAFileThatIsNotLocked() throws {
         let (fileSystems, _) = makeFileSystems()
         let key = try box.file("private/key.pem", "secret")
         try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: key.path)
@@ -554,7 +574,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(mode(key) == 0o400 && mode(plain) == 0o444 && FileIdentity.isSymlink(box.url("locked/link")))
     }
 
-    @Test func aLockedFileIsStillUnlockedAndDeletedWhenTheUserAgrees() throws {
+    @Test
+    func aLockedFileIsStillUnlockedAndDeletedWhenTheUserAgrees() throws {
         let (fileSystems, _) = makeFileSystems()
         let file = try box.file("d/locked.txt", "x")
         #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -567,7 +588,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F023, F072
 
-    @Test func agesAreComparedExactlyWhereTheVolumesKeepThemExactly() throws {
+    @Test
+    func agesAreComparedExactlyWhereTheVolumesKeepThemExactly() throws {
         let (fileSystems, _) = makeFileSystems()
         // The scratch folder is on APFS on every Mac this runs on; on anything coarser the test says nothing.
         guard FileIdentity.timestampGrain(of: box.root) == 0 else {
@@ -600,7 +622,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(box.read("t/same.txt") == "old")
     }
 
-    @Test func theGrainOfAVolumeDecidesTheTolerance() {
+    @Test
+    func theGrainOfAVolumeDecidesTheTolerance() {
         let (_, memory) = makeFileSystems()
         #expect(FileIdentity.timestampGrain(of: memory.url("/a/b.txt")) == 2)
         // A place that does not exist yet answers for the folder above it.
@@ -611,7 +634,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F019, F031
 
-    @Test func aLinkBackToAFolderItLiesInIsSeenThroughAnotherLink() throws {
+    @Test
+    func aLinkBackToAFolderItLiesInIsSeenThroughAnotherLink() throws {
         let (fileSystems, _) = makeFileSystems()
         try box.file("Y/f.txt", "inside")
         try FileManager.default.createSymbolicLink(atPath: box.url("Y/m").path, withDestinationPath: ".")
@@ -636,7 +660,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F024, F073 and what a cancel may remove
 
-    @Test func aRetryAfterAKeptPartialFileCompletesTheCopy() throws {
+    @Test
+    func aRetryAfterAKeptPartialFileCompletesTheCopy() throws {
         let fileSystems = FileSystemRegistry()
         let flaky = FlakyFileSystem()
         fileSystems.register(LocalFileSystem())
@@ -661,7 +686,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         )
     }
 
-    @Test func aSkipAfterAFailedCopyKeepsThePartialFileWhenAskedTo() throws {
+    @Test
+    func aSkipAfterAFailedCopyKeepsThePartialFileWhenAskedTo() throws {
         let fileSystems = FileSystemRegistry()
         let flaky = FlakyFileSystem()
         fileSystems.register(LocalFileSystem())
@@ -682,7 +708,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(box.read("t/big.bin") == "0123" && replies.errors.count == 1)
     }
 
-    @Test func aCancelledOrFailedOverwriteLeavesTheFileThatWasThere() throws {
+    @Test
+    func aCancelledOrFailedOverwriteLeavesTheFileThatWasThere() throws {
         let fileSystems = FileSystemRegistry()
         let flaky = FlakyFileSystem()
         fileSystems.register(LocalFileSystem())
@@ -724,7 +751,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     // MARK: F046, F045, F049, F053, F051, F021
 
-    @Test func abortAlsoSetsTheJobsOwnFlagSoThatNothingWaitsOnIt() {
+    @Test
+    func abortAlsoSetsTheJobsOwnFlagSoThatNothingWaitsOnIt() {
         let (fileSystems, memory) = makeFileSystems()
         let flag = CancellationFlag()
         let job = FileJob(
@@ -739,7 +767,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(job.run().cancelled && flag.isCancelled)
     }
 
-    @Test func recordsNobodyWantsAreNotMade() throws {
+    @Test
+    func recordsNobodyWantsAreNotMade() throws {
         let (fileSystems, _) = makeFileSystems()
         try box.file("s/a.txt")
         try box.file("s/sub/b.txt")
@@ -764,7 +793,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(configuration.wants(OperationRecord(.copy, source: "a")) == configuration.wants(.copy, .done))
     }
 
-    @Test func aSourceWhoseNameLeadsOutOfItsFolderIsRefused() throws {
+    @Test
+    func aSourceWhoseNameLeadsOutOfItsFolderIsRefused() throws {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/A/keep.txt", "keep")
         memory.addDirectory("/B")
@@ -785,7 +815,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect((try? memory.list(memory.url("/B"), showHidden: true))?.isEmpty == true)
     }
 
-    @Test func rightsFromAnotherFileSystemArriveWithoutSpecialBitsAndUnderTheUmask() throws {
+    @Test
+    func rightsFromAnotherFileSystemArriveWithoutSpecialBitsAndUnderTheUmask() throws {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/s/tool", "#!", permissions: 0o6777)
         memory.addFile("/s/plain.txt", "x", permissions: 0o640)
@@ -810,7 +841,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     // F050
-    @Test func aLockedSourceOfAMoveToAnotherFileSystemIsAskedAboutLikeADelete() throws {
+    @Test
+    func aLockedSourceOfAMoveToAnotherFileSystemIsAskedAboutLikeADelete() throws {
         let (fileSystems, memory) = makeFileSystems()
         let file = try box.file("s/locked.txt", "contents")
         #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -830,7 +862,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     // F054
-    @Test func anAppendedFileKeepsWhatTheOldOneCarriedBesidesItsContents() throws {
+    @Test
+    func anAppendedFileKeepsWhatTheOldOneCarriedBesidesItsContents() throws {
         let (fileSystems, memory) = makeFileSystems()
         try box.file("s/log.txt", "-more")
         memory.addFile("/t/log.txt", "start")
@@ -850,7 +883,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     // F048
-    @Test func aSourceOnAServerIsAskedAboutOnceNotThreeTimes() throws {
+    @Test
+    func aSourceOnAServerIsAskedAboutOnceNotThreeTimes() throws {
         /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
         final class Counting: FileSystemProvider, @unchecked Sendable {
             let base = MemoryFileSystem(scheme: "counted")
@@ -895,7 +929,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(server.lookups("/s/a.txt") == 1 && server.lookups("/s/b.txt") == 1)
     }
 
-    @Test func oldTemporaryFilesAreSweptAndNothingElse() throws {
+    @Test
+    func oldTemporaryFilesAreSweptAndNothingElse() throws {
         let stale = ".afm-\(UUID().uuidString).tmp"
         try box.file("t/\(stale)", "half a copy")
         try box.file("t/.afm-not-a-uuid.tmp", "mine")
@@ -916,7 +951,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         )
     }
 
-    @Test func aTreeAsDeepAsPathsAllowIsCopiedAndDeleted() throws {
+    @Test
+    func aTreeAsDeepAsPathsAllowIsCopiedAndDeleted() throws {
         let (fileSystems, _) = makeFileSystems()
         // As deep as the system's limit on the length of a path lets a tree be.
         var deep = try box.folder("s")
@@ -957,7 +993,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(delete.completed.count == 2 && answers.errors.isEmpty && namesOnDisk(box.root).isEmpty)
     }
 
-    @Test func aTreeDeeperThanTheLimitIsReportedNotEntered() {
+    @Test
+    func aTreeDeeperThanTheLimitIsReportedNotEntered() {
         let (fileSystems, memory) = makeFileSystems()
         let limit = 12
         var path = "/deep"
@@ -989,7 +1026,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(!memory.exists("/deep/top.txt"))
     }
 
-    @Test func aListOfSourcesFromManyFoldersIsLookedAtFolderByFolder() throws {
+    @Test
+    func aListOfSourcesFromManyFoldersIsLookedAtFolderByFolder() throws {
         let (fileSystems, memory) = makeFileSystems()
         // One source on the local disk, one in memory (which is not a fast local disk): no
         // pool, and the copy still works.
@@ -1005,7 +1043,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(result.completed.count == 2 && namesOnDisk(box.url("t")) == ["a.txt", "b.txt"])
     }
 
-    @Test func manySmallFilesStillArriveThroughThePoolWithOrderedProgress() throws {
+    @Test
+    func manySmallFilesStillArriveThroughThePoolWithOrderedProgress() throws {
         let (fileSystems, _) = makeFileSystems()
         for index in 0..<300 { try box.file("s/f\(index).txt", "contents \(index)") }
         try box.folder("t")
@@ -1034,7 +1073,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 ///
 /// Where the system does not let a test make or attach one (a sandbox), the suite has nothing to
 /// say.
-@Suite(.serialized) struct Review2FileopsMounts {
+@Suite(.serialized)
+struct Review2FileopsMounts {
     let box: Sandbox
     let mount: URL
     let attached: Bool
@@ -1084,7 +1124,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     // F012, F020
-    @Test func deletingAFolderDoesNotGoIntoAVolumeMountedInsideIt() {
+    @Test
+    func deletingAFolderDoesNotGoIntoAVolumeMountedInsideIt() {
         defer { detach() }
         guard attached else {
             return
@@ -1113,7 +1154,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         )
     }
 
-    @Test func movingAFolderDoesNotEmptyAVolumeMountedInsideIt() throws {
+    @Test
+    func movingAFolderDoesNotEmptyAVolumeMountedInsideIt() throws {
         defer { detach() }
         guard attached else {
             return
@@ -1135,7 +1177,8 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         #expect(box.read("t/tree/beside.txt") == "outside" && !box.exists("t/tree/mnt/precious.txt"))
     }
 
-    @Test func withAnExplicitYesTheVolumeIsEntered() {
+    @Test
+    func withAnExplicitYesTheVolumeIsEntered() {
         defer { detach() }
         guard attached else {
             return

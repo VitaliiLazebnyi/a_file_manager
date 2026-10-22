@@ -7,7 +7,8 @@ import Testing
 
 /// Review round 2, second pass: what the directory of a large archive costs in memory
 /// (A051, A076), and that the compact form of it behaves like the plain one.
-@Suite struct Review2ArchivesP2Memory {
+@Suite
+struct Review2ArchivesP2Memory {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 
@@ -154,7 +155,8 @@ import Testing
         return url
     }
 
-    @Test func aLargeDirectoryCostsAFewHundredBytesPerMember() throws {
+    @Test
+    func aLargeDirectoryCostsAFewHundredBytesPerMember() throws {
         // (Measured alone with 200,064 members: 396 bytes each, 975 before. Fewer here, so the
         // test is quick among the others; the cost per member is the same.)
         let members = 60_000

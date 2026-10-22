@@ -30,7 +30,9 @@ import VirtualFoldersPlugin
 ///
 /// Each plugin is started on its own, used a little, and must be gone with its kernel when the
 /// bench is.
-@MainActor @Suite struct PluginLifetimes {
+@MainActor
+@Suite
+struct PluginLifetimes {
     nonisolated static let names = [
         "LocalFileSystem", "Archives", "Network", "VirtualFolders", "Navigation", "Places", "Viewer", "MacIntegration",
         "FileOperations", "FileProperties", "MultiRename", "CompareContent", "FileTools", "FindFiles", "DirectorySync",
@@ -62,7 +64,8 @@ import VirtualFoldersPlugin
         "Configuration": { _ in ConfigurationPlugin(launchesApplications: false, background: nil) { [] } }
     ]
 
-    @Test(arguments: names) func thePluginGoesWithItsKernel(_ name: String) throws {
+    @Test(arguments: names)
+    func thePluginGoesWithItsKernel(_ name: String) throws {
         let scratch = ScratchPasteboard()
         weak var kernel: Kernel?
         weak var commands: CommandRegistry?
@@ -89,7 +92,8 @@ import VirtualFoldersPlugin
         #expect(commands == nil, "\(name) keeps the commands")
     }
 
-    @Test func theConnectionsGoWithTheNetworkPlugin() {
+    @Test
+    func theConnectionsGoWithTheNetworkPlugin() {
         weak var center: ConnectionCenter?
         weak var environment: SessionEnvironment?
         do {

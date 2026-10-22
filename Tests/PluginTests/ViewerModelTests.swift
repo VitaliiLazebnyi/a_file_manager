@@ -7,7 +7,8 @@ import Testing
 
 /// The viewer's logic without any window: detection, decoding block by block, the row index,
 /// the hex and binary layouts, searching, and reading through a file-system provider.
-@Suite struct ViewerModel {
+@Suite
+struct ViewerModel {
     // MARK: Helpers
 
     /// Decodes `data` in pieces of `size` bytes, carrying what a piece leaves undecoded into
@@ -86,7 +87,8 @@ import Testing
 
     // MARK: Detection
 
-    @Test func byteOrderMarksNameTheEncoding() {
+    @Test
+    func byteOrderMarksNameTheEncoding() {
         #expect(
             ViewerDetection.guessText(Data([0xEF, 0xBB, 0xBF, 0x41]), isWholeFile: true)
                 == .init(encoding: .utf8, bomLength: 3)
@@ -101,7 +103,8 @@ import Testing
         )
     }
 
-    @Test func textEncodingsAreGuessedFromTheContent() {
+    @Test
+    func textEncodingsAreGuessedFromTheContent() {
         func guess(_ bytes: [UInt8], whole: Bool = true) -> ViewerDetection.TextGuess {
             ViewerDetection.guessText(Data(bytes), isWholeFile: whole)
         }
@@ -125,7 +128,8 @@ import Testing
         #expect(guess([]).encoding == .utf8)
     }
 
-    @Test func contentKindsComeFromNameAndFirstBytes() {
+    @Test
+    func contentKindsComeFromNameAndFirstBytes() {
         func kind(_ name: String, _ head: [UInt8] = []) -> ViewerDetection.Content {
             ViewerDetection.content(name: name, sample: Data(head))
         }
@@ -158,7 +162,8 @@ import Testing
 
     // MARK: Decoding
 
-    @Test func decodingBlockByBlockEqualsDecodingAtOnce() throws {
+    @Test
+    func decodingBlockByBlockEqualsDecodingAtOnce() throws {
         let sample = "ASCII, Größe, 日本語のテキスト, emoji 😀🎉, tab\tend\r\n"
         let cases: [(ViewerEncoding, [UInt8])] = [
             (.utf8, Array(sample.utf8)), (.utf16LE, try #require(ViewerEncoding.utf16LE.encode(sample))),
@@ -185,7 +190,8 @@ import Testing
         #expect(ViewerEncoding.macRoman.string(from: Data([0x8A, 0xA5])) == "ä•")
     }
 
-    @Test func aCharacterCutOffAtTheEndWaitsForItsRest() {
+    @Test
+    func aCharacterCutOffAtTheEndWaitsForItsRest() {
         var text = DecodedText()
         let euro: [UInt8] = [0x41, 0xE2, 0x82]
         #expect(ViewerEncoding.utf8.decode(euro, final: false, into: &text) == 1 && text.units == [0x41])
@@ -202,7 +208,8 @@ import Testing
         #expect(text.offsets == [0, 2, 2])
     }
 
-    @Test func malformedInputBecomesReplacementCharactersAndKeepsItsOffsets() {
+    @Test
+    func malformedInputBecomesReplacementCharactersAndKeepsItsOffsets() {
         var text = DecodedText()
         // An overlong form, a lone continuation byte, a surrogate, a value beyond U+10FFFF.
         let bytes: [UInt8] = [0x41, 0xC0, 0x80, 0x80, 0xED, 0xA0, 0x80, 0xF5, 0x42]
@@ -225,7 +232,8 @@ import Testing
 
     // MARK: Rows
 
-    @Test func linesEndWithCRLFOrCROrLF() throws {
+    @Test
+    func linesEndWithCRLFOrCROrLF() throws {
         let data = Data("one\r\ntwo\rthree\n\nlast".utf8)
         let document = document(data, .utf8, .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         let rows = try document.rows(from: 0, count: 100)
@@ -243,7 +251,8 @@ import Testing
         #expect(self.document(Data(), .utf8, .text(TextLayoutOptions(columns: 80, wordWrap: true))).rowCount == 0)
     }
 
-    @Test func longLinesWrapAtWordsOrAreCut() throws {
+    @Test
+    func longLinesWrapAtWordsOrAreCut() throws {
         let data = Data("the quick brown fox jumps\nabcdefghijklmnop\n\tx\ty".utf8)
         let wrapped = try document(data, .utf8, .text(TextLayoutOptions(columns: 10, wordWrap: true, tabWidth: 4)))
             .rows(from: 0, count: 100)
@@ -331,7 +340,8 @@ import Testing
         }
     }
 
-    @Test func theIndexAgreesWithASimpleSplitAtLineEnds() throws {
+    @Test
+    func theIndexAgreesWithASimpleSplitAtLineEnds() throws {
         var lines: [String] = []
         for number in 0..<200_000 { lines.append("line \(number) " + String(repeating: "x", count: number % 50)) }
         let data = Data(lines.joined(separator: "\n").utf8)
@@ -351,7 +361,8 @@ import Testing
         #expect(try document.rows(from: 199_998, count: 10).map(\.text) == Array(lines.suffix(2)))
     }
 
-    @Test func aFileWithoutLineEndsIsStillCutIntoRows() throws {
+    @Test
+    func aFileWithoutLineEndsIsStillCutIntoRows() throws {
         let data = Data(repeating: 0x61, count: 300_000)
         let document = document(
             data,
@@ -365,7 +376,8 @@ import Testing
         #expect(try document.row(containing: 150_500) == 150)
     }
 
-    @Test func indexingStopsWhenCancelled() {
+    @Test
+    func indexingStopsWhenCancelled() {
         let document = TextDocument(
             source: DataByteSource(Data(repeating: 0x0A, count: 1 << 20)),
             encoding: .utf8,
@@ -376,7 +388,8 @@ import Testing
         #expect(!document.isIndexComplete && document.rowCount == 0)
     }
 
-    @Test func aByteOrderMarkIsNotPartOfTheText() throws {
+    @Test
+    func aByteOrderMarkIsNotPartOfTheText() throws {
         let data = Data([0xEF, 0xBB, 0xBF] + Array("first\nsecond".utf8))
         let document = TextDocument(
             source: DataByteSource(data),
@@ -395,7 +408,8 @@ import Testing
 
     // MARK: Hex and binary
 
-    @Test func hexRowsLookAsInTheSpecification() throws {
+    @Test
+    func hexRowsLookAsInTheSpecification() throws {
         let data = Data("Report 1\r\nLorem ipsum dolor".utf8)
         let document = document(data, .ansi, .hex)
         let rows = try document.rows(from: 0, count: 10)
@@ -414,7 +428,8 @@ import Testing
         #expect(HexFormat.hexString(Data([0x52, 0x65, 0x00, 0xFF])) == "52 65 00 FF")
     }
 
-    @Test func aSelectionShowsInBothPartsOfAHexRow() throws {
+    @Test
+    func aSelectionShowsInBothPartsOfAHexRow() throws {
         let document = document(Data((0..<40).map { UInt8($0 + 0x30) }), .ansi, .hex)
         let row = try #require(try document.rows(from: 1, count: 1).first)
         // Bytes 18…20 of the file are the third to fifth of the second row.
@@ -428,7 +443,8 @@ import Testing
         #expect(document.textIndex(in: row, of: 20) == 22)
     }
 
-    @Test func binaryRowsHaveAFixedLengthAndDotsForControlCharacters() throws {
+    @Test
+    func binaryRowsHaveAFixedLengthAndDotsForControlCharacters() throws {
         let data = Data(Array("ab\r\ncd\u{0}ef".utf8) + [0xE4, 0xFF])
         let document = document(data, .ansi, .binary(width: 4))
         #expect(document.rowCount == 3)
@@ -445,7 +461,8 @@ import Testing
         #expect(self.document(data, .utf8, .binary(width: 4)).encoding == .ansi)
     }
 
-    @Test func placesInARowMapToBytesAndBack() throws {
+    @Test
+    func placesInARowMapToBytesAndBack() throws {
         let data = Data("aä😀\tz\n".utf8)
         let document = document(data, .utf8, .text(TextLayoutOptions(columns: 80, wordWrap: true)))
         let row = try #require(try document.rows(from: 0, count: 1).first)
@@ -463,7 +480,8 @@ import Testing
 
     // MARK: Search
 
-    @Test func plainTextSearchWithItsSwitches() throws {
+    @Test
+    func plainTextSearchWithItsSwitches() throws {
         let data = Data("The manager met a man. MAN overboard! Tab\there.\r\nNext line\nback\\slash".utf8)
         #expect(try find("man", in: data) == 4..<7)
         #expect(try find("man", SearchOptions(wholeWords: true), in: data) == 18..<21)
@@ -480,7 +498,8 @@ import Testing
         #expect(throws: SearchError.empty) { try find("", in: data) }
     }
 
-    @Test func hexSearchTakesBytesAndQuotedText() throws {
+    @Test
+    func hexSearchTakesBytesAndQuotedText() throws {
         let data = Data([0x00, 0x50, 0x4B, 0x01, 0x02, 0xFF, 0x50, 0x4B, 0x03, 0x04])
         let hex = SearchOptions(hex: true)
         #expect(try find("01 02 FF", hex, in: data) == 3..<6)
@@ -494,7 +513,8 @@ import Testing
         #expect(try SearchPattern.hexBytes("\"é\"0A", encoding: .ansi) == [0xE9, 0x0A])
     }
 
-    @Test func regularExpressions() throws {
+    @Test
+    func regularExpressions() throws {
         let data = Data("id=17; id=2048\nname = Smith\nNAME = Jones".utf8)
         let regex = SearchOptions(regex: true)
         #expect(try find("id=\\d{3,}", regex, in: data) == 7..<14)
@@ -513,7 +533,8 @@ import Testing
         #expect(throws: SearchError.self) { try find("(unclosed", regex, in: data) }
     }
 
-    @Test func searchingInOtherEncodingsGivesByteRanges() throws {
+    @Test
+    func searchingInOtherEncodingsGivesByteRanges() throws {
         let text = "Zeile eins\r\nGrößenwahn und Ärger"
         let wide = Data(try #require(ViewerEncoding.utf16LE.encode(text)))
         #expect(try find("größenwahn", in: wide, encoding: .utf16LE) == 24..<44)
@@ -596,7 +617,8 @@ import Testing
         }
     }
 
-    @Test func everyOccurrenceIsFoundOnceInOrder() throws {
+    @Test
+    func everyOccurrenceIsFoundOnceInOrder() throws {
         var bytes = [UInt8](repeating: 0x2E, count: 200_000)
         let places = [0, 61, 64, 4_090, 65_535, 65_540, 131_070, 199_997]
         for place in places { bytes.replaceSubrange(place..<place + 3, with: Array("hit".utf8)) }
@@ -622,7 +644,8 @@ import Testing
         }
     }
 
-    @Test func aCancelledSearchFindsNothingAndProgressIsReported() throws {
+    @Test
+    func aCancelledSearchFindsNothingAndProgressIsReported() throws {
         let data = Data(repeating: 0x61, count: 1 << 20) + Data("needle".utf8)
         let pattern = try SearchPattern("needle", options: SearchOptions(), encoding: .utf8)
         let cancelled = CancellationFlag()
@@ -670,7 +693,8 @@ import Testing
         return (registry, memory, url, data)
     }
 
-    @Test func filesAreReadThroughTheirProviderWithSeek() throws {
+    @Test
+    func filesAreReadThroughTheirProviderWithSeek() throws {
         let (registry, _, url, data) = try memoryFile(300_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
         #expect(source is ProviderByteSource && source.length == 300_000)
@@ -696,7 +720,8 @@ import Testing
         }
     }
 
-    @Test func aTextOnAnotherFileSystemIsIndexedSearchedAndShown() throws {
+    @Test
+    func aTextOnAnotherFileSystemIsIndexedSearchedAndShown() throws {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -740,7 +765,8 @@ import Testing
 
     // MARK: HTML and folders
 
-    @Test func htmlBecomesTextWithItsLinks() {
+    @Test
+    func htmlBecomesTextWithItsLinks() {
         let html = """
             <html><head><title>Page</title><style>p { color: red }</style><script>alert("<b>")</script></head>
             <body><h1>Head&nbsp;line</h1><p>First   paragraph
@@ -770,13 +796,15 @@ import Testing
         )
     }
 
-    @Test func folderSizesThatLeaveTheRangeOfANumberStopAtItsEnd() {
+    @Test
+    func folderSizesThatLeaveTheRangeOfANumberStopAtItsEnd() {
         let sum =
             FolderSummary(files: 1, folders: 0, bytes: .max - 1) + FolderSummary(files: 1, folders: 0, bytes: 10)
         #expect(sum == FolderSummary(files: 2, folders: 0, bytes: .max))
     }
 
-    @Test func foldersAreSummedUpThroughTheirFileSystem() {
+    @Test
+    func foldersAreSummedUpThroughTheirFileSystem() {
         let memory = MemoryFileSystem()
         memory.addFile("/top/a.txt", "12345")
         memory.addFile("/top/sub/b.txt", "123")

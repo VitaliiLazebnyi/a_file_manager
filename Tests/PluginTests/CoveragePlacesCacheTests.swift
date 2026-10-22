@@ -9,7 +9,8 @@ import Testing
 
 /// The tree cache when its files cannot be written as asked: a write that comes late, a tree
 /// too big for a file, a temporary file that is in the way, a disk that refuses the data.
-@Suite(.serialized) struct CoveragePlacesCacheFiles {
+@Suite(.serialized)
+struct CoveragePlacesCacheFiles {
     let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
     let other = URL(fileURLWithPath: "/Volumes/Other", isDirectory: true)
 
@@ -35,7 +36,8 @@ import Testing
         return (0..<(megabytes * 1_040)).map { "\(prefix)\($0)/\(tail)" }
     }
 
-    @Test func aWriteThatWasOvertakenIsNotMade() throws {
+    @Test
+    func aWriteThatWasOvertakenIsNotMade() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["warm-up"], for: root)
@@ -72,7 +74,8 @@ import Testing
         #expect(TreeCache.parse(try String(contentsOf: otherFile, encoding: .utf8), root: other) == ["second"])
     }
 
-    @Test func aTreeTooBigForAFileRemovesTheOldFile() throws {
+    @Test
+    func aTreeTooBigForAFileRemovesTheOldFile() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["small"], for: root)
@@ -87,7 +90,8 @@ import Testing
         #expect(cache.paths(for: root)?.count == 65 * 1_040)
     }
 
-    @Test func aLinkInThePlaceOfTheTemporaryFileIsNotFollowed() throws {
+    @Test
+    func aLinkInThePlaceOfTheTemporaryFileIsNotFollowed() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(["old"], for: root)
@@ -100,7 +104,8 @@ import Testing
         #expect(TreeCache.parse(try String(contentsOf: file, encoding: .utf8), root: root) == ["old"])
     }
 
-    @Test func aFileThatCannotBeReplacedIsLeftAndTheTemporaryOneGoes() throws {
+    @Test
+    func aFileThatCannotBeReplacedIsLeftAndTheTemporaryOneGoes() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let file = try #require(cache.fileURL(for: root))
@@ -114,7 +119,9 @@ import Testing
         #expect(FileManager.default.fileExists(atPath: file.appendingPathComponent("inside").path))
     }
 
-    @MainActor @Test func aWriteTheDiskRefusesLeavesTheFileAlone() throws {
+    @MainActor
+    @Test
+    func aWriteTheDiskRefusesLeavesTheFileAlone() throws {
         // A kernel makes a write to a closed pipe fail instead of ending the program.
         _ = Kernel(productName: "Test", settings: MemorySettings(), interaction: ScriptedInteraction())
         let box = try Sandbox()
@@ -138,7 +145,8 @@ import Testing
         }
     }
 
-    @Test func aPathOfSlashesNotesNothing() throws {
+    @Test
+    func aPathOfSlashesNotesNothing() throws {
         let cache = TreeCache(directory: nil)
         cache.store(["a"], for: root)
         cache.noteFolder("//", below: root)
@@ -146,7 +154,8 @@ import Testing
         #expect(cache.paths(for: root) == ["a"])
     }
 
-    @Test func aLongTreeStillKnowsItsFoldersAfterAWrite() throws {
+    @Test
+    func aLongTreeStillKnowsItsFoldersAfterAWrite() throws {
         let cache = TreeCache(directory: nil)
         let paths = (0...100_000).map { "f\($0)" }
         cache.store(paths, for: root)
@@ -162,8 +171,10 @@ import Testing
 }
 
 /// The scanner on file systems that do not tell the type of an entry, and when cancelled.
-@Suite struct CoveragePlacesScanner {
-    @Test func entriesOfUnknownTypeAreAskedForTheirType() throws {
+@Suite
+struct CoveragePlacesScanner {
+    @Test
+    func entriesOfUnknownTypeAreAskedForTheirType() throws {
         // The descriptor file system lists every entry with an unknown type; a descriptor of a
         // folder is a folder.
         let box = try Sandbox()
@@ -196,7 +207,8 @@ import Testing
         return fstat(descriptor, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
     }
 
-    @Test func aCancelledScannerReadsNoFolder() throws {
+    @Test
+    func aCancelledScannerReadsNoFolder() throws {
         let box = try Sandbox()
         try box.folder("a")
         let scanner = TreeScanner(root: box.root, provider: LocalFileSystem())
@@ -204,7 +216,8 @@ import Testing
         #expect(scanner.subfolders(of: box.root).isEmpty)
     }
 
-    @Test func aHiddenFolderIsLeftOutByItsFlag() throws {
+    @Test
+    func aHiddenFolderIsLeftOutByItsFlag() throws {
         let box = try Sandbox()
         try box.folder("flagged")
         try box.folder("plain")
@@ -215,7 +228,8 @@ import Testing
         #expect(all.subfolders(of: box.root).map(\.name).sorted() == ["flagged", "plain"])
     }
 
-    @Test func aScanStoppedBetweenFoldersOfALevelKeepsWhatItFoundUnread() {
+    @Test
+    func aScanStoppedBetweenFoldersOfALevelKeepsWhatItFoundUnread() {
         let memory = MemoryFileSystem()
         memory.addDirectory("/R/a/a1")
         memory.addDirectory("/R/b/b1")

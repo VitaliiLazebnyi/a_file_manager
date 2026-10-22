@@ -257,7 +257,8 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         editBox.state = session.isEditing ? .on : .off
     }
 
-    @objc private func optionChanged(_ sender: NSControl) {
+    @objc
+    private func optionChanged(_ sender: NSControl) {
         if sender === verticalBox {
             split.isVertical = verticalBox.state != .on
             settings.set(verticalBox.state == .on, forKey: CompareSettingsKey.vertical)
@@ -306,10 +307,12 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
     }
 
-    @objc private func compare() {
+    @objc
+    private func compare() {
         whenChangesAreSettled { [self] in
             let fileSystems = kernel.fileSystems
-            @MainActor func location(_ field: NSTextField) -> URL? {
+            @MainActor
+            func location(_ field: NSTextField) -> URL? {
                 let text = field.stringValue.trimmingCharacters(in: .whitespaces)
                 return text.isEmpty ? nil : fileSystems.location(from: text, relativeTo: base)
             }
@@ -324,8 +327,10 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
     }
 
-    @objc private func pickLeft() { pickFile(for: leftField) }
-    @objc private func pickRight() { pickFile(for: rightField) }
+    @objc
+    private func pickLeft() { pickFile(for: leftField) }
+    @objc
+    private func pickRight() { pickFile(for: rightField) }
 
     private func pickFile(for field: NSTextField) {
         effects.chooseFile(toolWindow) { [weak self] url in
@@ -337,14 +342,16 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
     }
 
-    @objc private func chooseFont() {
+    @objc
+    private func chooseFont() {
         NSFontManager.shared.target = self
         NSFontManager.shared.setSelectedFont(font, isMultiple: false)
         effects.showFontPanel(self)
     }
 
     /// Called by the font panel.
-    @objc func changeFont(_ sender: NSFontManager?) {
+    @objc
+    func changeFont(_ sender: NSFontManager?) {
         guard let sender else {
             return
         }
@@ -406,15 +413,18 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
     }
 
-    @objc private func nextDifference() {
+    @objc
+    private func nextDifference() {
         if let row = session.difference(from: currentRow, forward: true) { go(toRow: row) } else { effects.beep() }
     }
 
-    @objc private func previousDifference() {
+    @objc
+    private func previousDifference() {
         if let row = session.difference(from: currentRow, forward: false) { go(toRow: row) } else { effects.beep() }
     }
 
-    @objc private func searchNext() { search(forward: true) }
+    @objc
+    private func searchNext() { search(forward: true) }
 
     private func search(forward: Bool) {
         let needle = searchField.stringValue
@@ -439,7 +449,8 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
     }
 
-    @objc private func paneScrolled(_ notification: Notification) {
+    @objc
+    private func paneScrolled(_ notification: Notification) {
         guard !isMirroring, let moved = notification.object as? NSClipView else {
             return
         }
@@ -479,30 +490,36 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         return session.block(containing: first) ?? first..<(first + 1)
     }
 
-    @objc private func copyToRight() {
+    @objc
+    private func copyToRight() {
         if let rows = rowsToCopy { session.copy(rows: rows, to: .right) }
     }
 
-    @objc private func copyToLeft() {
+    @objc
+    private func copyToLeft() {
         if let rows = rowsToCopy { session.copy(rows: rows, to: .left) }
     }
 
-    @objc private func undoEdit() {
+    @objc
+    private func undoEdit() {
         session.undo()
     }
 
-    @objc private func save() {
+    @objc
+    private func save() {
         session.save()
     }
 
-    @objc private func cellEdited(_ sender: NSTextField) {
+    @objc
+    private func cellEdited(_ sender: NSTextField) {
         for (table, side) in [(leftTable, CompareSide.left), (rightTable, .right)] {
             let row = table.row(for: sender)
             if row >= 0 { session.setText(sender.stringValue, side, row: row) }
         }
     }
 
-    @objc private func markResync() {
+    @objc
+    private func markResync() {
         let row = currentRow
         if focusedSide == .left { resyncMarks.left = row } else { resyncMarks.right = row }
         if let left = resyncMarks.left, let right = resyncMarks.right {
@@ -515,17 +532,20 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         }
     }
 
-    @objc private func clearResync() {
+    @objc
+    private func clearResync() {
         resyncMarks = (nil, nil)
         session.clearResync()
     }
 
-    @objc private func swapSides() {
+    @objc
+    private func swapSides() {
         session.swap()
         pullControls()
     }
 
-    @objc private func copySelection() {
+    @objc
+    private func copySelection() {
         let side = focusedSide
         let lines = leftTable.selectedRowIndexes.compactMap { session.text(side, row: $0) }
         effects.pasteboard.clearContents()

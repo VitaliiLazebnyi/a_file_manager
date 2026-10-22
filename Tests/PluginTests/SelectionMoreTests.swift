@@ -9,14 +9,16 @@ import Testing
 
 /// The pure parts of the Mark menu: masks, selection types, selection files and the
 /// comparison of two lists.
-@Suite struct SelectionMoreRules {
+@Suite
+struct SelectionMoreRules {
     func matching(_ mask: String, _ names: [String], folders: Set<String> = []) -> [String] {
         let mask = SelectionMask(mask)
         return zip(names, mask.selected(names.map { MaskEntry(name: $0, isFolder: folders.contains($0)) })).filter(\.1)
             .map(\.0)
     }
 
-    @Test func wildcardsIncludesAndExcludes() {
+    @Test
+    func wildcardsIncludesAndExcludes() {
         let names = ["win.ini", "Write.exe", "notes.bak", "w.old", "README", "long name.txt", ".cvs", "src"]
         let folders: Set = [".cvs", "src"]
         #expect(matching("*.*", names, folders: folders) == names)
@@ -34,14 +36,16 @@ import Testing
         #expect(matching("", names).isEmpty == false)
     }
 
-    @Test func regularExpressions() {
+    @Test
+    func regularExpressions() {
         let names = ["alpha.txt", "Beta.txt", "gamma.md"]
         #expect(matching("<^(a|b)", names) == ["alpha.txt", "Beta.txt"])
         #expect(matching("<\\.md$", names) == ["gamma.md"])
         #expect(!SelectionMask("<(").isValid && matching("<(", names).isEmpty)
     }
 
-    @Test func relatedFiles() {
+    @Test
+    func relatedFiles() {
         let names = ["IMG_1057.JPG", "IMG_1057.CR2", "CRW_1057.CR2", "IMG_2000.CR2", "notes.txt"]
         #expect(matching("*.jpg>*.cr2", names) == ["IMG_1057.JPG", "IMG_1057.CR2"])
         #expect(matching("*.jpg>crw*.cr2", names) == ["IMG_1057.JPG", "CRW_1057.CR2"])
@@ -58,7 +62,8 @@ import Testing
         #expect(mask.selected(entries) == [true, false, true])
     }
 
-    @Test func pathLimitedMasks() {
+    @Test
+    func pathLimitedMasks() {
         func matches(_ mask: String, _ name: String, in directory: [String]) -> Bool {
             SelectionMask(mask).matches(MaskEntry(name: name, directory: directory))
         }
@@ -79,7 +84,8 @@ import Testing
         #expect(SelectionMask("a/*.txt").needsDirectories && !SelectionMask("*.txt|*.bak").needsDirectories)
     }
 
-    @Test func rulesReadPathsRelativeToTheListsDirectory() {
+    @Test
+    func rulesReadPathsRelativeToTheListsDirectory() {
         let base = URL(string: "mem:///work")!
         func item(_ path: String) -> FileItem {
             let url = URL(string: "mem:///work/" + path)!
@@ -93,7 +99,8 @@ import Testing
         #expect(SelectionRule(mask: "deep/*.txt").names(among: items, base: base) == ["sub-deep-c.txt"])
     }
 
-    @Test func selectionTypes() {
+    @Test
+    func selectionTypes() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         func file(_ name: String, size: Int64, daysOld: Double, hidden: Bool = false, folder: Bool = false) -> FileItem
         {
@@ -153,7 +160,8 @@ import Testing
         #expect(data.flatMap { try? JSONDecoder().decode(SelectionType.self, from: $0) } == type)
     }
 
-    @Test func selectionFiles() {
+    @Test
+    func selectionFiles() {
         let items = [
             FileItem(url: URL(fileURLWithPath: "/x/dir1"), name: "dir1", kind: .directory),
             FileItem(url: URL(fileURLWithPath: "/x/ro.txt"), name: "ro.txt"),
@@ -176,7 +184,8 @@ import Testing
         #expect(SelectionFile.names(in: "", among: known).isEmpty)
     }
 
-    @Test func comparingTwoLists() {
+    @Test
+    func comparingTwoLists() {
         func file(_ name: String, _ size: Int64, _ time: TimeInterval) -> FileItem {
             FileItem(
                 url: URL(fileURLWithPath: "/x/" + name),
@@ -236,7 +245,9 @@ import Testing
 }
 
 /// The Mark commands driven through a kernel with fake panels and an in-memory file system.
-@MainActor @Suite struct SelectionMoreCommands {
+@MainActor
+@Suite
+struct SelectionMoreCommands {
     typealias Ids = SelectionCommands
 
     let memory = MemoryFileSystem()
@@ -278,7 +289,8 @@ import Testing
         return (try? reader.read(upToCount: 1 << 20)) ?? Data()
     }
 
-    @Test func registration() {
+    @Test
+    func registration() {
         let bench = makeBench()
         let keys = bench.kernel.keyBindings
         #expect(bench.kernel.keyClashes.isEmpty)
@@ -298,7 +310,8 @@ import Testing
         #expect(proposed == [.selectGroup, .unselectGroup, .invertSelection, Ids.compareDirectories])
     }
 
-    @Test func groupsByMask() {
+    @Test
+    func groupsByMask() {
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
         commands.perform(.selectGroup, .text("*.txt *.md | two.*"))
@@ -333,7 +346,8 @@ import Testing
         )
     }
 
-    @Test func foldersAsConfigured() {
+    @Test
+    func foldersAsConfigured() {
         settings.set(false, forKey: "selection.markDirectories")
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
@@ -360,7 +374,8 @@ import Testing
         #expect(left.model.selection.count == 7)
     }
 
-    @Test func everyNthLineAndSteps() {
+    @Test
+    func everyNthLineAndSteps() {
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
         let files = left.names.filter { !["docs", "shared"].contains($0) }
@@ -381,7 +396,8 @@ import Testing
         #expect(left.model.selection == Set(left.names.prefix(2)) && left.model.cursor == start + 2)
     }
 
-    @Test func likeTheItemUnderTheCursor() {
+    @Test
+    func likeTheItemUnderTheCursor() {
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
         left.moveCursor(toName: "two.md")
@@ -406,7 +422,8 @@ import Testing
         #expect(left.model.cursorIsOnParentRow && !commands.isEnabled(Ids.selectCurrentExtension))
     }
 
-    @Test func historyAndSelectionTypes() {
+    @Test
+    func historyAndSelectionTypes() {
         let bench = makeBench()
         let (commands, left, ui) = (bench.commands, bench.left, bench.interaction)
         commands.perform(Ids.selectFromList)
@@ -469,7 +486,8 @@ import Testing
         #expect(ui.log.last == "inform: There is no selection type called small.")
     }
 
-    @Test func savingAndLoadingSelectionFiles() {
+    @Test
+    func savingAndLoadingSelectionFiles() {
         let bench = makeBench()
         let (commands, left, ui) = (bench.commands, bench.left, bench.interaction)
         commands.perform(.selectGroup, .text("docs *.md"))
@@ -519,7 +537,8 @@ import Testing
         #expect(!memory.exists("/A/.txt"))
     }
 
-    @Test func selectionFilesOnTheLocalDisk() throws {
+    @Test
+    func selectionFilesOnTheLocalDisk() throws {
         let box = try Sandbox()
         try box.file("A/alpha.txt")
         try box.file("A/beta.txt")
@@ -537,7 +556,8 @@ import Testing
         #expect(bench.left.model.selection == ["alpha.txt", "sub"])
     }
 
-    @Test func loadingFromTheClipboard() {
+    @Test
+    func loadingFromTheClipboard() {
         let bench = makeBench()
         let (commands, left) = (bench.commands, bench.left)
         pasteboard.clearContents()
@@ -549,7 +569,8 @@ import Testing
         #expect(left.model.selection == ["docs", "one.txt", "two.md"])
     }
 
-    @Test func comparingDirectories() {
+    @Test
+    func comparingDirectories() {
         let bench = makeBench()
         let (commands, left, right) = (bench.commands, bench.left, bench.right)
         // The previous selection is replaced on both sides.
@@ -576,7 +597,8 @@ import Testing
         #expect(left.model.selection.isEmpty && right.model.selection.isEmpty)
     }
 
-    @Test func markNewerHideSame() {
+    @Test
+    func markNewerHideSame() {
         let bench = makeBench()
         let (commands, left, right) = (bench.commands, bench.left, bench.right)
         commands.perform(Ids.markNewerHideSame)
@@ -607,7 +629,8 @@ import Testing
         #expect(right.model.filter != nil)
     }
 
-    @Test func aLargeListIsSelectedWithFewAnnouncements() {
+    @Test
+    func aLargeListIsSelectedWithFewAnnouncements() {
         for index in 0..<3_000 { memory.addFile("/big/file\(index).\(index % 2 == 0 ? "txt" : "md")") }
         let bench = makeBench()
         bench.left.show(memory.url("/big"))

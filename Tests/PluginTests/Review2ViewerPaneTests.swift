@@ -11,7 +11,9 @@ import UniformTypeIdentifiers
 
 /// Review round 2, the pane and its views on the main thread: nothing waits for a server, a page
 /// leads nowhere, a text that is no longer read keeps what it shows, images are made once.
-@MainActor @Suite(.serialized) struct Review2ViewerPane {
+@MainActor
+@Suite(.serialized)
+struct Review2ViewerPane {
     let memory = MemoryFileSystem()
     let hook = Review2HookProvider()
     let plugin: ViewerPlugin
@@ -52,7 +54,8 @@ import UniformTypeIdentifiers
 
     // MARK: Nothing waits for the server
 
-    @Test func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async {
+    @Test
+    func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async {
         hook.contents["/slow.txt"] = Data(String(repeating: "a line of text\n", count: 2_000).utf8)
         let gate = DispatchSemaphore(value: 0)
         hook.onClose = { _ = gate.wait(timeout: .now() + Wait.ceiling) }
@@ -73,7 +76,8 @@ import UniformTypeIdentifiers
 
     // MARK: The text that is no longer read
 
-    @Test func aTextThatIsNoLongerReadKeepsWhatItShowsWhenScrolled() async {
+    @Test
+    func aTextThatIsNoLongerReadKeepsWhatItShowsWhenScrolled() async {
         let pane = pane()
         pane.frame = NSRect(x: 0, y: 0, width: 700, height: 200)
         memory.addFile("/A/many.txt", (1...2_000).map { "line number \($0)" }.joined(separator: "\n"))
@@ -90,7 +94,8 @@ import UniformTypeIdentifiers
 
     // MARK: Links in the page
 
-    @Test func aLinkInAPageLeadsOnlyToFilesBesideIt() async {
+    @Test
+    func aLinkInAPageLeadsOnlyToFilesBesideIt() async {
         let pane = pane()
         pane.load(ViewerItem(source: .file(memory.url("/A/index.html")), title: "index"))
         #expect(await wait { pane.loaded != nil })
@@ -108,7 +113,8 @@ import UniformTypeIdentifiers
 
     // MARK: Big documents
 
-    @Test func aHugeHTMLFileIsNotLaidOutAsAPageOnTheMainThread() async throws {
+    @Test
+    func aHugeHTMLFileIsNotLaidOutAsAPageOnTheMainThread() async throws {
         let pane = pane()
         var html = Data("<html><body>".utf8)
         let line = Data(String(repeating: "<p>paragraph of the page</p>\n", count: 1_000).utf8)
@@ -124,7 +130,8 @@ import UniformTypeIdentifiers
         pane.stopWork()
     }
 
-    @Test func aHugeRTFFileIsNotFormattedOnTheMainThread() async throws {
+    @Test
+    func aHugeRTFFileIsNotFormattedOnTheMainThread() async throws {
         let pane = pane()
         var rtf = Data("{\\rtf1\\ansi ".utf8)
         let line = Data(String(repeating: "word ", count: 2_000).utf8)
@@ -163,7 +170,8 @@ import UniformTypeIdentifiers
         return try #require(context.makeImage())
     }
 
-    @Test func aZoomThatPassesThroughManySizesMakesOneBitmap() async throws {
+    @Test
+    func aZoomThatPassesThroughManySizesMakesOneBitmap() async throws {
         let frame = try picture(2_000, 1_000)
         let cache = ScaledFrameCache()
         // The queue stands still while the sizes are asked for, so how fast this loop runs on a busy
@@ -196,13 +204,15 @@ import UniformTypeIdentifiers
         return data as Data
     }
 
-    @Test func theImagesOfAnIconOrAMultiPageTIFFAreNotPlayedAsAnAnimation() throws {
+    @Test
+    func theImagesOfAnIconOrAMultiPageTIFFAreNotPlayedAsAnAnimation() throws {
         let tiff = try encoded([try picture(64, 64), try picture(300, 200), try picture(128, 128)], type: .tiff)
         let still = try #require(ImageDecoder.decode(tiff))
         #expect(still.frames.count == 1 && still.frames[0].image.width == 300 && still.frames[0].image.height == 200)
     }
 
-    @Test func aGIFWithSeveralFramesIsStillAnAnimation() throws {
+    @Test
+    func aGIFWithSeveralFramesIsStillAnAnimation() throws {
         let gif = try encoded(
             [try picture(20, 20), try picture(20, 20), try picture(20, 20)],
             type: .gif,
@@ -215,7 +225,8 @@ import UniformTypeIdentifiers
 
     // MARK: Row text
 
-    @Test func linksAndTextOfHTMLThatHasLoneAngleBrackets() {
+    @Test
+    func linksAndTextOfHTMLThatHasLoneAngleBrackets() {
         let result = HTMLText.plainText(from: "<p>if a < b then c</p><p>done</p>")
         #expect(result.text == "if a < b then c\ndone\n", "\(result.text.debugDescription)")
         // A lone `<` at the very end does not drop the rest of the document before it.

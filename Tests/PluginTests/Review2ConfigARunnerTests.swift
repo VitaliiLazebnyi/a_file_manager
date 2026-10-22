@@ -11,7 +11,9 @@ import Testing
 
 /// User commands as the runner performs them (review 2): values stay values from one command
 /// to the next, loops end, and what cannot run says so.
-@MainActor @Suite struct Review2ConfigARunner {
+@MainActor
+@Suite
+struct Review2ConfigARunner {
     let box: Sandbox
     let settings = MemorySettings()
 
@@ -53,7 +55,8 @@ import Testing
         #expect(await RunLoopWait.until(done))
     }
 
-    @Test func commandsThatCallEachOtherAcrossAWaitAreStopped() async {
+    @Test
+    func commandsThatCallEachOtherAcrossAWaitAreStopped() async {
         let (plugin, bench) = bench()
         define(plugin, "em_a", "cm_wait 1, em_b")
         define(plugin, "em_b", "cm_wait 1, em_a")
@@ -65,7 +68,8 @@ import Testing
         #expect(!plugin.center!.runner.isWaiting && bench.interaction.log.count == 1)
     }
 
-    @Test func aStartMenuEntryThatCallsItselfIsStoppedToo() async {
+    @Test
+    func aStartMenuEntryThatCallsItselfIsStoppedToo() async {
         let (plugin, bench) = bench()
         var draft = plugin.center!.startMenuDraft()
         draft.insert(
@@ -80,7 +84,8 @@ import Testing
         #expect(bench.interaction.log == ["inform: “Loop” calls itself"])
     }
 
-    @Test func aRunHasABoundedNumberOfSteps() {
+    @Test
+    func aRunHasABoundedNumberOfSteps() {
         let (plugin, bench) = bench()
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
@@ -97,7 +102,8 @@ import Testing
         #expect(bench.interaction.log.last?.contains("is nested too deeply") == true)
     }
 
-    @Test func aWaitingChainCanBeStopped() async {
+    @Test
+    func aWaitingChainCanBeStopped() async {
         let (plugin, bench) = bench()
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
@@ -115,7 +121,8 @@ import Testing
         #expect(probes == 1)
     }
 
-    @Test func aNameHandedFromOneCommandToTheNextStaysAName() throws {
+    @Test
+    func aNameHandedFromOneCommandToTheNextStaysAName() throws {
         let hostile = "%Q$(touch M) %N;x"
         try box.file("A/" + hostile)
         let (plugin, bench) = bench()
@@ -130,7 +137,8 @@ import Testing
         #expect(plugin.launched == ["echo \"%Q\\$(touch M) %N;x\"", "tool /L=-v [-v \"%Q\\$(touch M) %N;x\"]"])
     }
 
-    @Test func aLineThatCannotTakeANameSafelyIsNotRun() {
+    @Test
+    func aLineThatCannotTakeANameSafelyIsNotRun() {
         let (plugin, bench) = bench()
         define(plugin, "em_tick", "echo", "`basename %N`")
         define(plugin, "em_ansi", "echo", "$'%N'")
@@ -154,7 +162,8 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: box.url("lists").path))
     }
 
-    @Test func theMarkedNamesOfALongListAreGatheredInTheBackground() async {
+    @Test
+    func theMarkedNamesOfALongListAreGatheredInTheBackground() async {
         let memory = MemoryFileSystem()
         let count = CommandRunner.backgroundSelectionThreshold + 3
         for number in 0..<count { memory.addFile("/Big/f\(number) x.txt") }
@@ -196,7 +205,8 @@ import Testing
         #expect(contains("cafe\u{301}.txt") && !contains("caf\u{e9}.txt") && contains("f2 x.txt"))
     }
 
-    @Test func theSelectionIsGatheredOnlyForATextThatAsksForIt() {
+    @Test
+    func theSelectionIsGatheredOnlyForATextThatAsksForIt() {
         #expect(ParameterExpander.usesSelection([.text("%S")]) && ParameterExpander.usesSelection([.text("a %P%s")]))
         #expect(
             ParameterExpander.usesSelection([.text("%L")]) && ParameterExpander.usesSelection([.text("%C1")])
@@ -208,7 +218,8 @@ import Testing
         )
     }
 
-    @Test func anApplicationPathWithASpaceIsOneWord() throws {
+    @Test
+    func anApplicationPathWithASpaceIsOneWord() throws {
         let app = try box.folder("Apps/My App.app")
         let line: [ExpandedPiece] = [.text("\"\(app.path)\" --flag "), .value("a b")]
         let opened = try #require(CommandRunner.applicationLine(for: line))
@@ -224,7 +235,8 @@ import Testing
         )
     }
 
-    @Test func listFilesOfARunThatQuitsAreKeptWhileAProgramMayReadThem() throws {
+    @Test
+    func listFilesOfARunThatQuitsAreKeptWhileAProgramMayReadThem() throws {
         let made = bench()
         let runner = CommandRunner(
             kernel: made.bench.kernel,
@@ -251,7 +263,9 @@ import Testing
 }
 
 /// The runner with real programs: a login shell is started, as in the program.
-@MainActor @Suite struct Review2ConfigALaunching {
+@MainActor
+@Suite
+struct Review2ConfigALaunching {
     let box: Sandbox
     let plugin: ConfigurationPlugin
     let bench: TestBench
@@ -282,7 +296,8 @@ import Testing
         #expect(await RunLoopWait.until(done))
     }
 
-    @Test func aHostileFileNameReachesTheProgramAsItIsAndRunsNothing() async throws {
+    @Test
+    func aHostileFileNameReachesTheProgramAsItIsAndRunsNothing() async throws {
         // The names that ran `touch` before: a quote and a backtick that carry a combining mark.
         let names = ["a\"\u{301};touch PWNED1;\"\u{301}", "`\u{301};touch PWNED2;`\u{301}", "$(touch PWNED3);x", "-n"]
         for name in names { try box.file("A/" + name) }
@@ -324,7 +339,8 @@ import Testing
         #expect(created.isEmpty && bench.interaction.log.isEmpty)
     }
 
-    @Test func aProgramTheShellDoesNotFindIsReported() async {
+    @Test
+    func aProgramTheShellDoesNotFindIsReported() async {
         plugin.center!
             .save(
                 UserCommand(
@@ -338,7 +354,8 @@ import Testing
         #expect(bench.interaction.log.count == 1 && bench.interaction.log[0].contains("cannot be started"))
     }
 
-    @Test func aChainStopsWhenItsProgramCouldNotBeStarted() async {
+    @Test
+    func aChainStopsWhenItsProgramCouldNotBeStarted() async {
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
         let center = plugin.center!

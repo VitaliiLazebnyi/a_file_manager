@@ -9,7 +9,8 @@ import Testing
 /// Round 2 of the review, Multi-Rename: Search & Replace that cannot hang, a clipboard that is
 /// not read for every key, names by path on every file system, `[u]`, the planner's edge cases,
 /// the undo store.
-@Suite struct Review2FindRename {
+@Suite
+struct Review2FindRename {
     var context: RenameContext = {
         var context = RenameContext()
         context.count = 3
@@ -30,7 +31,8 @@ import Testing
 
     // MARK: Search & Replace
 
-    @Test func theWildcardMatcherFindsWhatTheRegularExpressionOfItFinds() throws {
+    @Test
+    func theWildcardMatcherFindsWhatTheRegularExpressionOfItFinds() throws {
         // Many small searches and names, compared with the regular expression that defines the wildcard.
         var generator = SystemRandomNumberGenerator()
         let pieces = ["a", "b", "A", ".", "*", "?", "é", "😀"]
@@ -72,7 +74,8 @@ import Testing
         }
     }
 
-    @Test func manyStarsInTheSearchAreNotSlowOnALongName() throws {
+    @Test
+    func manyStarsInTheSearchAreNotSlowOnALongName() throws {
         var settings = RenameSettings()
         settings.search = String(repeating: "*a", count: 14) + "*b"
         settings.replacement = "X"
@@ -89,7 +92,8 @@ import Testing
         #expect(try SearchReplace(other).apply(to: "xxaYYbzz") == "xx-zz")
     }
 
-    @Test func aRegexOfTheUserThatBacktracksGivesNoNameInsteadOfHanging() throws {
+    @Test
+    func aRegexOfTheUserThatBacktracksGivesNoNameInsteadOfHanging() throws {
         // Used by the work on its own thread only while the test waits for it to finish.
         nonisolated(unsafe) var settings = RenameSettings()
         settings.regularExpression = true
@@ -122,7 +126,8 @@ import Testing
         #expect(names.allSatisfy { $0 == nil } && problem as? SearchReplace.Problem == .tooSlow("(a*)*b"))
     }
 
-    @Test func aRegexIsEndedWhenThePreviewIsCancelled() throws {
+    @Test
+    func aRegexIsEndedWhenThePreviewIsCancelled() throws {
         var settings = RenameSettings()
         settings.regularExpression = true
         settings.search = #"^(\w+[ _-]?)+\.jpg$"#
@@ -148,7 +153,8 @@ import Testing
 
     // MARK: Names, targets, planner
 
-    @Test func anItemNamedByPathIsRenamedWhereItIsOnEveryFileSystem() {
+    @Test
+    func anItemNamedByPathIsRenamedWhereItIsOnEveryFileSystem() {
         let memory = MemoryFileSystem()
         let item = FileItem(url: memory.url("/root/sub/a.txt"), name: "sub/a.txt")
         #expect(RenameEntry(item).name == "a.txt" && RenameEntry.diskName(of: item) == "a.txt")
@@ -164,7 +170,8 @@ import Testing
         #expect(preview.targets.first??.path == "/root/sub/b.txt" && preview.statuses == [.ready])
     }
 
-    @Test func precomposingANameIsARename() {
+    @Test
+    func precomposingANameIsARename() {
         let decomposed = "e\u{301}.txt"
         let item = FileItem(
             url: URL(string: "mem:///d/" + decomposed.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)!,
@@ -186,7 +193,8 @@ import Testing
         #expect(moved.count == 1)
     }
 
-    @Test func aNumberedNameIsHeldToTheLongestAName() {
+    @Test
+    func aNumberedNameIsHeldToTheLongestAName() {
         let long = String(repeating: "é", count: 120) + ".txt"
         let numbered = RenamePlanner.numbered(URL(string: "mem:///d/")!.appending(name: long), 12, isFolder: false)
         #expect(
@@ -198,7 +206,8 @@ import Testing
         )
     }
 
-    @Test func aFolderAndWhatIsInItAreRenamedInsideOut() {
+    @Test
+    func aFolderAndWhatIsInItAreRenamedInsideOut() {
         func url(_ path: String) -> URL { URL(string: "mem://" + path)! }
         let sources = [
             url("/d/dir"), url("/d/dir/a.txt"), url("/d/other.txt"), url("/d/dir/sub"), url("/d/dir/sub/b.txt")
@@ -223,7 +232,8 @@ import Testing
         #expect(RenamePlanner().steps(sources: sources, targets: targets).map(\.item) == [0, 1, 2, 3, 4])
     }
 
-    @Test func aRenameOntoANameThatIsNotThereReplacesNothing() throws {
+    @Test
+    func aRenameOntoANameThatIsNotThereReplacesNothing() throws {
         let box = try Sandbox()
         try box.file("a.txt", "first")
         #expect(!RenameRunner.isSameFile(box.url("a.txt"), box.url("A-missing.txt")))
@@ -237,7 +247,8 @@ import Testing
 
     // MARK: Log
 
-    @Test func theLogIsWrittenForTheUserAlone() throws {
+    @Test
+    func theLogIsWrittenForTheUserAlone() throws {
         let box = try Sandbox()
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
@@ -249,7 +260,9 @@ import Testing
     }
 }
 
-@MainActor @Suite struct Review2FindRenameSessions {
+@MainActor
+@Suite
+struct Review2FindRenameSessions {
     let memory = MemoryFileSystem()
     let settings = MemorySettings()
     let bench: TestBench
@@ -287,11 +300,13 @@ import Testing
         )
     }
 
-    @Test func theClipboardIsReadOnlyWhenAMaskUsesItAndOnlyWhenItChanged() {
+    @Test
+    func theClipboardIsReadOnlyWhenAMaskUsesItAndOnlyWhenItChanged() {
         // Used by the session's callbacks, which run one at a time while the test waits for them.
         nonisolated(unsafe) var reads = 0
         // The change count of the clipboard, asked on the main thread.
-        @MainActor final class ChangeCount { var value = 1 }
+        @MainActor
+        final class ChangeCount { var value = 1 }
         let count = ChangeCount()
         let session = session(
             clipboard: {
@@ -311,7 +326,8 @@ import Testing
         #expect(reads == 2)
     }
 
-    @Test func aClipboardThatDoesNotAnswerLeavesThePreviewWithTheErrorMarker() {
+    @Test
+    func aClipboardThatDoesNotAnswerLeavesThePreviewWithTheErrorMarker() {
         let blocked = DispatchSemaphore(value: 0)
         let session = session(
             clipboard: {
@@ -327,7 +343,8 @@ import Testing
         blocked.signal()
     }
 
-    @Test func changesOfTheFieldsAreHeldBackForAMomentAndTheLastOneWins() async {
+    @Test
+    func changesOfTheFieldsAreHeldBackForAMomentAndTheLastOneWins() async {
         let session = session(clipboard: { nil }, changes: nil, background: true)
         var changes = 0
         session.onChange = { changes += 1 }
@@ -342,7 +359,8 @@ import Testing
         )
     }
 
-    @Test func twoSortsInARowLeaveTheLastOneInForce() async {
+    @Test
+    func twoSortsInARowLeaveTheLastOneInForce() async {
         memory.removeTree("/d")
         for index in 0..<2_500 {
             memory.addFile(
@@ -361,7 +379,8 @@ import Testing
         #expect(session.rows.first?.entry.name == "f0000.txt" && session.rows.last?.entry.name == "f2499.txt")
     }
 
-    @Test func namesFromAListThatMoveFilesAreAskedAbout() {
+    @Test
+    func namesFromAListThatMoveFilesAreAskedAbout() {
         let session = session(clipboard: { nil }, changes: nil)
         session.loadNames(fromText: "x.txt\nsub/y.txt\nz.txt")
         bench.interaction.choiceAnswers = [1]
@@ -373,7 +392,8 @@ import Testing
         #expect(result?.renamed.count == 3 && memory.exists("/d/sub/y.txt"))
     }
 
-    @Test func aRunLeavesThePreviewAndTheListAsTheyShouldBe() {
+    @Test
+    func aRunLeavesThePreviewAndTheListAsTheyShouldBe() {
         let session = session(clipboard: { nil }, changes: nil)
         session.settings.nameMask = "n_[N]"
         #expect(session.counts.changing == 3)
@@ -381,7 +401,8 @@ import Testing
         #expect(session.rowCount == 0 && !session.isBusy && memory.exists("/d/n_a.txt"))
     }
 
-    @Test func precomposingRenamesTheFileOnTheLocalDisk() throws {
+    @Test
+    func precomposingRenamesTheFileOnTheLocalDisk() throws {
         let decomposed = "e\u{301}.txt"
         try box.file("p/" + decomposed, "x")
         let local = TestBench(
@@ -420,7 +441,8 @@ import Testing
         #expect(back == [[0x65, 0x301, 0x2E, 0x74, 0x78, 0x74]])
     }
 
-    @Test func theUndoHistoryNeedsNoDecodingToBeCounted() async {
+    @Test
+    func theUndoHistoryNeedsNoDecodingToBeCounted() async {
         let store = RenameStore(settings: settings)
         store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/d/a"), to: URL(fileURLWithPath: "/d/b"))])
         store.flush()
@@ -434,7 +456,8 @@ import Testing
         #expect(loaded && next.lastUndo?.count == 1)
     }
 
-    @Test func aRunLargerThanTheLimitIsKeptOnlyForThisSession() {
+    @Test
+    func aRunLargerThanTheLimitIsKeptOnlyForThisSession() {
         let big = (0..<(RenameStore.persistedItemLimit + 5))
             .map {
                 RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))

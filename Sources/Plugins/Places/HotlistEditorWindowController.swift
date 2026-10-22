@@ -207,7 +207,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         reload(selecting: path)
     }
 
-    @objc private func addItem() {
+    @objc
+    private func addItem() {
         guard
             let title = kernel.interaction.prompt(
                 "Title of the new entry:",
@@ -219,18 +220,21 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         add(.titled(title, command: proposedCommand))
     }
 
-    @objc private func addSubmenu() {
+    @objc
+    private func addSubmenu() {
         guard let title = kernel.interaction.prompt("Title of the new submenu:"), !title.isEmpty else {
             return
         }
         add(.submenu(title))
     }
 
-    @objc private func addSeparator() {
+    @objc
+    private func addSeparator() {
         add(.separator)
     }
 
-    @objc private func deleteEntry() {
+    @objc
+    private func deleteEntry() {
         guard let path = selectedPath else {
             return
         }
@@ -240,7 +244,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         reload(selecting: rows.isEmpty ? nil : rows[min(row, rows.count - 1)].path)
     }
 
-    @objc private func changeTitle() {
+    @objc
+    private func changeTitle() {
         guard let path = selectedPath, let entry = hotlist.entry(at: path), entry.kind != .separator,
             let title = kernel.interaction.prompt("New title:", value: entry.title), !title.isEmpty
         else { return }
@@ -248,8 +253,10 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         reload(selecting: path)
     }
 
-    @objc private func moveEntryUp() { move(-1) }
-    @objc private func moveEntryDown() { move(1) }
+    @objc
+    private func moveEntryUp() { move(-1) }
+    @objc
+    private func moveEntryDown() { move(1) }
 
     private func move(_ direction: Int) {
         guard let path = selectedPath else {
@@ -258,7 +265,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         reload(selecting: hotlist.move(at: path, by: direction))
     }
 
-    @objc private func toggleHidden() {
+    @objc
+    private func toggleHidden() {
         guard let path = selectedPath else {
             return
         }
@@ -266,7 +274,8 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         reload(selecting: path)
     }
 
-    @objc private func hidingChanged() {
+    @objc
+    private func hidingChanged() {
         hotlist.hidesMarked = hideBox.state == .on
     }
 
@@ -340,14 +349,16 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
 
     // MARK: Result
 
-    @objc private func accept() {
+    @objc
+    private func accept() {
         // A field that is still being edited hands in its text first.
         window?.makeFirstResponder(nil)
         accepted = true
         close()
     }
 
-    @objc private func cancel() {
+    @objc
+    private func cancel() {
         close()
     }
 

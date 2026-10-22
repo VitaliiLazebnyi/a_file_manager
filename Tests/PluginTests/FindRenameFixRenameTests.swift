@@ -9,7 +9,9 @@ import Testing
 
 /// Fixes found in review: names by path, case folding per folder, numbers that used to trap,
 /// the planner's cost, Undo and the store.
-@MainActor @Suite struct MultiRenameFixes {
+@MainActor
+@Suite
+struct MultiRenameFixes {
     var context: RenameContext = {
         var context = RenameContext()
         context.count = 3
@@ -34,7 +36,8 @@ import Testing
 
     // MARK: Masks
 
-    @Test func aTrailingDotBelongsToTheName() {
+    @Test
+    func aTrailingDotBelongsToTheName() {
         #expect(name("[N]", subject: "Acme Inc.") == "Acme Inc.")
         #expect(name("[N]-x", subject: "Acme Inc.") == "Acme Inc.-x")
         #expect(name("[E]", ext: "[E]", subject: "Acme Inc.") == "")
@@ -42,7 +45,8 @@ import Testing
         #expect(name("[N]", subject: ".zshrc") == ".zshrc")
     }
 
-    @Test func hugeCountersGiveTheErrorMarker() {
+    @Test
+    func hugeCountersGiveTheErrorMarker() {
         let big = CounterDefinition(start: Int.max - 1, step: 1, digits: 1)
         #expect(name("[C]", counter: big, index: 0) == "9223372036854775806.txt")
         #expect(name("[C]", counter: big, index: 5) == nil)
@@ -54,7 +58,8 @@ import Testing
         #expect(name("[c3]", counter: CounterDefinition(start: Int.max, step: 5, digits: 1)) == nil)
     }
 
-    @Test func hugeWidthsAreCapped() {
+    @Test
+    func hugeWidthsAreCapped() {
         let counted = name("[C:999999999]")
         #expect(counted?.count == 255 + 4)
         #expect(name("[N01,999999999]", subject: "abc.txt")?.count == 255 + 4)
@@ -65,7 +70,8 @@ import Testing
 
     func url(_ name: String, in folder: String = "/d") -> URL { URL(fileURLWithPath: folder + "/" + name) }
 
-    @Test func autoRenameCountsOnInsteadOfStartingOver() {
+    @Test
+    func autoRenameCountsOnInsteadOfStartingOver() {
         let planner = RenamePlanner()
         let sources = (0..<2_000).map { url("s\($0).txt") }
         let targets = sources.map { _ in Optional(url("same.txt")) }
@@ -94,7 +100,8 @@ import Testing
         #expect(taken.map { $0?.lastPathComponent } == ["x (3).txt", "x (4).txt"])
     }
 
-    @Test func skippingFollowsTheChainOnce() {
+    @Test
+    func skippingFollowsTheChainOnce() {
         let planner = RenamePlanner()
         // 1 -> 2 -> 3 -> ... -> n, and n wants a file that is not in the list.
         let n = 3_000
@@ -115,7 +122,8 @@ import Testing
         #expect(mixed.map { $0?.lastPathComponent } == [nil, nil, "z"])
     }
 
-    @Test func caseIsFoldedPerFolder() {
+    @Test
+    func caseIsFoldedPerFolder() {
         let planner = RenamePlanner(foldedFolders: [url("x", in: "/mac").deletingLastPathComponent().locationKey])
         #expect(planner.key(url("Name.TXT", in: "/mac")) == planner.key(url("name.txt", in: "/mac")))
         #expect(planner.key(url("Name.TXT", in: "/linux")) != planner.key(url("name.txt", in: "/linux")))
@@ -126,7 +134,8 @@ import Testing
         #expect(steps.map(\.ontoItself) == [true, false])
     }
 
-    @Test func aReplacingMoveNeverOverwritesAnotherFile() throws {
+    @Test
+    func aReplacingMoveNeverOverwritesAnotherFile() throws {
         let box = try Sandbox()
         try box.file("a.txt", "first")
         try box.file("b.txt", "second")
@@ -148,7 +157,9 @@ import Testing
 
     // MARK: Lists named by path
 
-    @MainActor @Test func itemsNamedByPathAreRenamedWhereTheyAre() throws {
+    @MainActor
+    @Test
+    func itemsNamedByPathAreRenamedWhereTheyAre() throws {
         let box = try Sandbox()
         try box.file("sub/a.txt", "a")
         try box.file("sub/deep/b.txt", "b")
@@ -194,7 +205,8 @@ import Testing
 
     // MARK: Cache
 
-    @Test func aCachedPreviewGivesTheSameAnswer() throws {
+    @Test
+    func aCachedPreviewGivesTheSameAnswer() throws {
         let box = try Sandbox()
         for name in ["a.txt", "b.txt", "c.txt"] { try box.file(name) }
         let registry = FileSystemRegistry()
@@ -240,7 +252,9 @@ import Testing
 
     // MARK: Store
 
-    @MainActor @Test func undoHistoryLivesInMemoryAndIsSaved() {
+    @MainActor
+    @Test
+    func undoHistoryLivesInMemoryAndIsSaved() {
         let settings = MemorySettings()
         let store = RenameStore(settings: settings)
         let run = (0..<5_000)
@@ -264,7 +278,8 @@ import Testing
         #expect(store.revision == before + 1 && store.history(.nameMask) == ["[N]"])
     }
 
-    @Test func persistedUndoIsCapped() async {
+    @Test
+    func persistedUndoIsCapped() async {
         let settings = MemorySettings()
         let store = await MainActor.run { RenameStore(settings: settings) }
         let big = (0..<(RenameStore.persistedItemLimit - 10))
@@ -282,7 +297,9 @@ import Testing
 }
 
 /// Undo that cannot finish, and sorting, through a session on a file system in memory.
-@MainActor @Suite struct MultiRenameFixSessions {
+@MainActor
+@Suite
+struct MultiRenameFixSessions {
     let memory = MemoryFileSystem()
     let settings = MemorySettings()
     let plugin: MultiRenamePlugin
@@ -310,7 +327,8 @@ import Testing
         return plugin.session!
     }
 
-    @Test func sortingByExtensionKeepsEqualItemsInOrder() {
+    @Test
+    func sortingByExtensionKeepsEqualItemsInOrder() {
         let session = open("*")
         session.sort(by: .ext, ascending: true)
         #expect(session.rows.map(\.entry.name) == ["a.jpg", "a.txt", "b.txt", "c.txt"])
@@ -320,7 +338,8 @@ import Testing
         #expect(session.rows.map(\.entry.name) == ["a.jpg", "a.txt", "b.txt", "c.txt"])
     }
 
-    @Test func aRunThatCanNeverBeUndoneDoesNotBlockEarlierOnes() {
+    @Test
+    func aRunThatCanNeverBeUndoneDoesNotBlockEarlierOnes() {
         var session = open("a.*")
         session.settings.nameMask = "first[C]"
         session.start()

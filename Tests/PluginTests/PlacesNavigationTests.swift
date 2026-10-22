@@ -8,7 +8,9 @@ import Testing
 
 /// The navigation commands beyond the basics: the other panel, volumes, the Mac's standard
 /// places and the clipboard.
-@MainActor @Suite struct NavigationPlaces {
+@MainActor
+@Suite
+struct NavigationPlaces {
     let memory = MemoryFileSystem()
     let other = MemoryFileSystem(scheme: "disk")
     private let scratch = ScratchPasteboard()
@@ -36,7 +38,8 @@ import Testing
         )
     }
 
-    @Test func registersTheSpecificationsKeysWithoutConflicts() {
+    @Test
+    func registersTheSpecificationsKeysWithoutConflicts() {
         let keys = bench.kernel.keyBindings
         #expect(
             keys.command(for: Shortcut(.leftArrow, .control)) == "cm_TransferLeft"
@@ -58,7 +61,8 @@ import Testing
         )
     }
 
-    @Test func showsTheFolderUnderTheCursorInTheOtherPanel() {
+    @Test
+    func showsTheFolderUnderTheCursorInTheOtherPanel() {
         left.moveCursor(toName: "docs")
         commands.perform("cm_TransferRight")
         #expect(right.model.directory.path == "/A/docs" && left.model.directory.path == "/A")
@@ -77,7 +81,8 @@ import Testing
         #expect(left.model.directory.path == "/A/docs")
     }
 
-    @Test func mirrorsThePathEitherWay() {
+    @Test
+    func mirrorsThePathEitherWay() {
         commands.perform(.targetEqualsSource)
         #expect(right.model.directory.path == "/A")
         right.show(memory.url("/B"))
@@ -85,7 +90,8 @@ import Testing
         #expect(left.model.directory.path == "/B")
     }
 
-    @Test func goesToTheStandardPlaces() {
+    @Test
+    func goesToTheStandardPlaces() {
         for (command, path) in [
             ("afm_GoDesktop", "/home/Desktop"), ("afm_GoDocuments", "/home/Documents"),
             ("afm_GoDownloads", "/home/Downloads"),
@@ -102,7 +108,8 @@ import Testing
         )
     }
 
-    @Test func cyclesThroughTheVolumes() {
+    @Test
+    func cyclesThroughTheVolumes() {
         commands.perform("cm_GoToNextDrive")
         #expect(left.model.directory == other.url("/"))
         commands.perform("cm_GoToNextDrive")
@@ -112,7 +119,8 @@ import Testing
         #expect(left.model.directory == memory.url("/"))
     }
 
-    @Test func choosesTheNeighbourPlace() {
+    @Test
+    func choosesTheNeighbourPlace() {
         func place(_ name: String, _ path: String, _ kind: Place.Kind) -> Place {
             Place(name: name, url: URL(fileURLWithPath: path), kind: kind)
         }
@@ -140,7 +148,8 @@ import Testing
         #expect(NavigationPlugin.neighbourPlace(of: URL(fileURLWithPath: "/x"), in: [], delta: 1) == nil)
     }
 
-    @Test func goesToThePathOnTheClipboard() {
+    @Test
+    func goesToThePathOnTheClipboard() {
         #expect(!commands.isEnabled("afm_CdFromClipboard"))
         pasteboard.clearContents()
         pasteboard.setString("  \"mem:/A/docs\"  \nsecond line", forType: .string)

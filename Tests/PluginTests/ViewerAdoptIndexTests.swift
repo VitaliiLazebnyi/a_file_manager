@@ -7,7 +7,8 @@ import Testing
 
 /// The row index: the raw scan of 16-bit text, lines of a few bytes, checkpoints that stay few,
 /// and a new layout that takes over what the old one found.
-@Suite struct ViewerAdoptIndex {
+@Suite
+struct ViewerAdoptIndex {
     private func signature(_ document: TextDocument) throws -> [String] {
         try document.rows(from: 0, count: document.rowCount)
             .map {
@@ -56,7 +57,8 @@ import Testing
 
     // MARK: 16-bit text
 
-    @Test func rawScannedUTF16FindsTheRowsDecodingEverythingFinds() throws {
+    @Test
+    func rawScannedUTF16FindsTheRowsDecodingEverythingFinds() throws {
         let gbk = try #require(ViewerEncoding.codePage(936))
         for seed in [3, 4, 5] as [UInt64] {
             let text = jumble(seed: seed, lines: 500)
@@ -107,7 +109,8 @@ import Testing
         }
     }
 
-    @Test func aLineOfCharactersThatCarryALineEndByteIsNotCut() throws {
+    @Test
+    func aLineOfCharactersThatCarryALineEndByteIsNotCut() throws {
         // U+0A0A is the bytes 0A 0A, U+410A is 0A 41 (little endian) or 41 0A (big endian): no line ends.
         let text = String(repeating: "\u{0A0A}\u{410A}\u{0D0D}\u{0A41}", count: 200) + "\nend"
         for encoding in [ViewerEncoding.utf16LE, .utf16BE] {
@@ -131,7 +134,8 @@ import Testing
 
     // MARK: Short lines and few checkpoints
 
-    @Test func aFileOfNothingButLineEndsNeedsFewCheckpoints() throws {
+    @Test
+    func aFileOfNothingButLineEndsNeedsFewCheckpoints() throws {
         let data = Data(repeating: 0x0A, count: 16 << 20)
         let document = index(
             data,
@@ -175,7 +179,8 @@ import Testing
         #expect(decoded.checkpointCount == raw.checkpointCount)
     }
 
-    @Test func runsOfEmptyLinesAmongTextAreCountedLikeAnyOtherLines() throws {
+    @Test
+    func runsOfEmptyLinesAmongTextAreCountedLikeAnyOtherLines() throws {
         var text = ""
         for number in 0..<400 {
             text +=
@@ -195,7 +200,8 @@ import Testing
         }
     }
 
-    @Test func plainLinesAreCutFromTheirBytesWithTheRowsOfTheDecodedText() throws {
+    @Test
+    func plainLinesAreCutFromTheirBytesWithTheRowsOfTheDecodedText() throws {
         // ASCII only, so that the rows of long lines are cut from the bytes.
         var state: UInt64 = 99
         var text = ""
@@ -221,7 +227,8 @@ import Testing
 
     // MARK: Taking over the rows of another layout
 
-    @Test func aWiderLayoutTakesOverTheSegmentsWhoseLinesStillFitInOneRow() throws {
+    @Test
+    func aWiderLayoutTakesOverTheSegmentsWhoseLinesStillFitInOneRow() throws {
         // Eight segments of 40 KB: the line of 300 characters is in the fifth, all others are short.
         var lines: [String] = []
         var size = 0
@@ -298,7 +305,8 @@ import Testing
         #expect(try signature(thirty) == signature(thirtyFresh))
     }
 
-    @Test func nothingIsTakenOverFromAnotherTextAnotherEncodingOrAnotherTabWidth() {
+    @Test
+    func nothingIsTakenOverFromAnotherTextAnotherEncodingOrAnotherTabWidth() {
         let data = Data((0..<2_000).map { "line \($0)" }.joined(separator: "\n").utf8)
         let source = DataByteSource(data)
         let first = TextDocument(
@@ -343,7 +351,8 @@ import Testing
         #expect(after.segmentsReused == 0 && after.rowCount == 2_000)
     }
 
-    @Test func aSegmentRecordsTheWidestLineOrThatALineWasCut() throws {
+    @Test
+    func aSegmentRecordsTheWidestLineOrThatALineWasCut() throws {
         func widest(_ text: String, columns: Int) throws -> Int {
             let data = Data(text.utf8)
             return

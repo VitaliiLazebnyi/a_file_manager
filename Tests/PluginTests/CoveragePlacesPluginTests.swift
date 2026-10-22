@@ -9,7 +9,9 @@ import Testing
 
 /// The Places plugin beyond the usual way: damaged stored data, quitting, a full list, the
 /// Favorites, rows that lead nowhere, and settings that are not numbers.
-@MainActor @Suite struct CoveragePlacesPlugin {
+@MainActor
+@Suite
+struct CoveragePlacesPlugin {
     let memory = MemoryFileSystem()
     let settings = MemorySettings()
     let plugin = PlacesPlugin(keepsTreesOnDisk: false, favorites: [.item("Desktop", command: "cd mem:/C")])
@@ -44,7 +46,8 @@ import Testing
 
     func informs(_ bench: TestBench) -> [String] { bench.interaction.log.filter { $0.hasPrefix("inform:") } }
 
-    @Test func damagedStoredDataIsReportedOncePerMessage() async {
+    @Test
+    func damagedStoredDataIsReportedOncePerMessage() async {
         settings.set(Data("{broken".utf8) as Data?, forKey: "places.history.left")
         settings.set(Data("{broken".utf8) as Data?, forKey: "places.hotlist")
         let bench = bench()
@@ -61,7 +64,8 @@ import Testing
         )
     }
 
-    @Test func quittingWritesTheHistoryAndTheTreesAwayFromTheMainThread() async {
+    @Test
+    func quittingWritesTheHistoryAndTheTreesAwayFromTheMainThread() async {
         let bench = bench()
         bench.left.show(memory.url("/C"))
         bench.kernel.panelEvents.post(.locationChanged, from: bench.left)
@@ -73,7 +77,8 @@ import Testing
         #expect(stored?.current == memory.url("/C"))
     }
 
-    @Test func withoutSavingTheHistoryIsNotWrittenOnQuit() {
+    @Test
+    func withoutSavingTheHistoryIsNotWrittenOnQuit() {
         settings.set(false, forKey: PlacesPlugin.Keys.saveHistory)
         let bench = bench()
         bench.kernel.panelEvents.post(.locationChanged, from: bench.right)
@@ -81,28 +86,32 @@ import Testing
         #expect(settings.data(forKey: "places.history.right") == nil)
     }
 
-    @Test func treesGoToTheProgramsOwnFolderByDefault() {
+    @Test
+    func treesGoToTheProgramsOwnFolderByDefault() {
         let plugin = PlacesPlugin()
         _ = TestBench(plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
         let file = plugin.treeCache.fileURL(for: memory.url("/"))
         #expect(file?.deletingLastPathComponent().path.hasSuffix("Application Support/Test/TreeCache") == true)
     }
 
-    @Test func aFullListTakesNoMoreAndSaysSo() {
+    @Test
+    func aFullListTakesNoMoreAndSaysSo() {
         store(Hotlist(entries: (0..<Hotlist.limit).map { .item("e\($0)", command: "cd mem:/e\($0)") }))
         let bench = bench()
         bench.commands.perform(.toggleHotlistEntry)
         #expect(informs(bench) == ["inform: The directory hotlist is full."] && hotlist.count == Hotlist.limit)
     }
 
-    @Test func theRootIsAddedUnderItsWholePath() {
+    @Test
+    func theRootIsAddedUnderItsWholePath() {
         let bench = bench(left: "/")
         bench.commands.perform(.toggleHotlistEntry)
         let path = bench.kernel.fileSystems.displayPath(memory.url("/"))
         #expect(hotlist.entries == [.item(path, command: "cd " + path)])
     }
 
-    @Test func cancelInTheFavoritesLeadsBackToTheList() {
+    @Test
+    func cancelInTheFavoritesLeadsBackToTheList() {
         let bench = bench()
         bench.interaction.formAnswers = [pick(0), .cancel, pick(1)]
         bench.commands.perform(.directoryHotlist)
@@ -115,7 +124,8 @@ import Testing
         #expect(hotlist.entries == [.item("A", command: "cd mem:/A")])
     }
 
-    @Test func anEntryWithoutACommandOnlyMovesTheOtherPanel() {
+    @Test
+    func anEntryWithoutACommandOnlyMovesTheOtherPanel() {
         store(Hotlist(entries: [.item("Target only", command: "", target: "cd mem:/C")]))
         let bench = bench()
         bench.interaction.formAnswers = [pick(0)]
@@ -123,14 +133,16 @@ import Testing
         #expect(bench.left.model.directory == memory.url("/A") && bench.right.model.directory == memory.url("/C"))
     }
 
-    @Test func theSeparatorOfTheHistoryLeadsNowhere() {
+    @Test
+    func theSeparatorOfTheHistoryLeadsNowhere() {
         let bench = bench()
         bench.interaction.formAnswers = [pick(1), .cancel]
         bench.commands.perform(.directoryHistory)
         #expect(bench.interaction.forms.count == 2 && bench.left.model.directory == memory.url("/A"))
     }
 
-    @Test func aMaximumThatIsNoNumberTakesTheDefault() {
+    @Test
+    func aMaximumThatIsNoNumberTakesTheDefault() {
         settings.set("lots", forKey: PlacesPlugin.Keys.historyShown)
         let bench = bench()
         for path in ["/B", "/C", "/A"] {
@@ -149,7 +161,8 @@ import Testing
         #expect(rows.count == 5 && rows.first == "➤ mem:/A")
     }
 
-    @Test func theTreeCommandOpensOneWindowAndReusesIt() {
+    @Test
+    func theTreeCommandOpensOneWindowAndReusesIt() {
         _ = NSApplication.shared
         let bench = bench()
         let presenter = StabilityPresenter()

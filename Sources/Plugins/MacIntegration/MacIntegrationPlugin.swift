@@ -71,7 +71,8 @@ public final class MacIntegrationPlugin: Plugin {
         then deliver: @escaping @MainActor @Sendable (Result) -> Void
     ) {
         let operands = model.operandsSnapshot()
-        @Sendable func urls() -> [URL] { operands.items().map(\.url).filter(\.isFileURL) }
+        @Sendable
+        func urls() -> [URL] { operands.items().map(\.url).filter(\.isFileURL) }
         guard operands.markedCount >= Self.backgroundListThreshold else {
             deliver(work(urls()))
             return

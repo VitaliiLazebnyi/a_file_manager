@@ -69,7 +69,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
 
 /// The kernel's per-location capabilities, commit, cancellation and quarantine, as the
 /// archives adopt them.
-@Suite struct ArchiveAdoption {
+@Suite
+struct ArchiveAdoption {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 
@@ -104,7 +105,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
 
     // MARK: Per location
 
-    @Test func eachArchiveSaysWhatItCanDo() throws {
+    @Test
+    func eachArchiveSaysWhatItCanDo() throws {
         let archive = try makeZip()
         let root = bench.inside(archive)
         // Not opened yet: the scheme's word. Opened: the archive's own.
@@ -143,7 +145,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         }
     }
 
-    @Test func aPlaceOutsideTheArchiveAnswersForItsOwnFileSystem() throws {
+    @Test
+    func aPlaceOutsideTheArchiveAnswersForItsOwnFileSystem() throws {
         let archive = try makeZip()
         let root = bench.inside(archive)
         let local = try outside(root, box.url("elsewhere.txt").path)
@@ -164,7 +167,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(bench.memory.commits == ["/store/log.txt"])
     }
 
-    @Test func anArchiveOnAServerThatCannotBeWrittenToCannotBeChanged() throws {
+    @Test
+    func anArchiveOnAServerThatCannotBeWrittenToCannotBeChanged() throws {
         let tree = try bench.makeTree()
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
@@ -181,7 +185,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
 
     // MARK: Commit
 
-    @Test func aCommitPutsWhatClosedWritersBroughtIntoTheArchiveFile() throws {
+    @Test
+    func aCommitPutsWhatClosedWritersBroughtIntoTheArchiveFile() throws {
         // Nothing is written at a rename: what is kept back is up to the delay or to the commit.
         bench.environment.immediateWriteLimit = 0
         let archive = try makeZip()
@@ -207,7 +212,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(FileSignature.of(archive.path) == before)
     }
 
-    @Test func anArchiveOnADriveIsWrittenAndLetGoOfBeforeTheDriveIsEjected() throws {
+    @Test
+    func anArchiveOnADriveIsWrittenAndLetGoOfBeforeTheDriveIsEjected() throws {
         bench.environment.immediateWriteLimit = 0
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
@@ -226,7 +232,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         )
     }
 
-    @Test func aFailedCommitKeepsEverythingForTheNextTry() throws {
+    @Test
+    func aFailedCommitKeepsEverythingForTheNextTry() throws {
         bench.environment.immediateWriteLimit = 0
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
@@ -250,7 +257,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/new.txt"]).output == "precious")
     }
 
-    @Test func aCommitReachesTheArchivesThatHoldTheArchive() throws {
+    @Test
+    func aCommitReachesTheArchivesThatHoldTheArchive() throws {
         let tree = try bench.makeTree()
         try bench.pack([tree], to: box.url("inner.zip"))
         try bench.pack([box.url("inner.zip")], to: box.url("outer.zip"))
@@ -264,7 +272,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(listed(box.url("x/inner.zip")).contains("tree/added.txt") && isSound(box.url("outer.zip")))
     }
 
-    @Test func anArchiveOnAServerIsCommittedThereToo() throws {
+    @Test
+    func anArchiveOnAServerIsCommittedThereToo() throws {
         let tree = try bench.makeTree()
         bench.memory.capabilitiesAt = { _ in [.write, .deferredWrites] }
         let onServer = bench.memory.url("/store/tree.zip")
@@ -286,7 +295,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(throws: (any Error).self) { try bench.zip.commit(root, cancellation: CancellationFlag()) }
     }
 
-    @Test func manySmallFilesDoNotWriteTheArchiveForEachOfThem() throws {
+    @Test
+    func manySmallFilesDoNotWriteTheArchiveForEachOfThem() throws {
         bench.environment.immediateWriteLimit = 16 << 10
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
@@ -307,7 +317,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/small199.txt"]).output == "small file 199")
     }
 
-    @Test func packAndDeleteSourcesWaitsForTheArchiveWhereItLies() throws {
+    @Test
+    func packAndDeleteSourcesWaitsForTheArchiveWhereItLies() throws {
         // The new archive lies inside another one, which keeps it back.
         let outer = try makeZip("outer.zip")
         bench.environment.immediateWriteLimit = 0
@@ -341,7 +352,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(bench.memory.commits == ["/store/c.tar"])
     }
 
-    @Test func thePackedOperandsAreDeselectedByTheNamesThePanelMarksThemWith() {
+    @Test
+    func thePackedOperandsAreDeselectedByTheNamesThePanelMarksThemWith() {
         // A branch or list view names its items by path.
         let notes = FileItem(url: URL(fileURLWithPath: "/A/notes.txt"), name: "sub/notes.txt")
         let todo = FileItem(url: URL(fileURLWithPath: "/A/todo.txt"), name: "other/todo.txt")
@@ -355,7 +367,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
 
     // MARK: Cancellation
 
-    @Test func decompressionAndSkippingEndWhenTheRequestComes() throws {
+    @Test
+    func decompressionAndSkippingEndWhenTheRequestComes() throws {
         let source = EndlessDeflate()
         let control = StreamInterrupt()
         let stream = InflateStream(source, wrapping: .raw, control: control)
@@ -366,7 +379,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(throws: ArchiveError.self) { _ = try stream.read(upToCount: 10) }
     }
 
-    @Test func aReaderIsEndedFromAnotherThreadAndStaysEnded() throws {
+    @Test
+    func aReaderIsEndedFromAnotherThreadAndStaysEnded() throws {
         let source = EndlessDeflate()
         let reader = try ArchiveMemberReader { slot in
             let control = StreamInterrupt()
@@ -381,7 +395,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         reader.close()
     }
 
-    @Test func aChildProcessIsStoppedByTheRequest() throws {
+    @Test
+    func aChildProcessIsStoppedByTheRequest() throws {
         // Two hundred megabytes of zeros decompress to more than the pipe holds: bzip2 waits
         // for whoever reads, which here is nobody, until it is stopped.
         let zeros = box.url("zeros.bz2")
@@ -398,7 +413,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(throws: ArchiveError.self) { _ = try stream.read(upToCount: 10) }
     }
 
-    @Test func aMemberReadFromAStreamEndsWhenInterruptedAndLeavesTheNextReadsAlone() throws {
+    @Test
+    func aMemberReadFromAStreamEndsWhenInterruptedAndLeavesTheNextReadsAlone() throws {
         bench.environment.materializeLimit = 0
         let tree = try bench.makeTree()
         let archive = box.url("tree.tar.gz")
@@ -473,7 +489,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(bench.store.openArchive(at: archive) != nil)
     }
 
-    @Test func fetchingAnArchiveFromAServerCanBeAbandoned() throws {
+    @Test
+    func fetchingAnArchiveFromAServerCanBeAbandoned() throws {
         let tree = try bench.makeTree()
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
@@ -490,7 +507,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(try bench.names(root) == ["tree"])
     }
 
-    @Test func callsOutsideTheArchiveGoToTheFileSystemWithTheFlag() throws {
+    @Test
+    func callsOutsideTheArchiveGoToTheFileSystemWithTheFlag() throws {
         let tree = try bench.makeTree()
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
@@ -521,7 +539,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         bench.memory.stallsReads = false
     }
 
-    @Test func aMemberWriterEndsWhenInterrupted() throws {
+    @Test
+    func aMemberWriterEndsWhenInterrupted() throws {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         let flag = CancellationFlag()
@@ -537,7 +556,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
 
     // MARK: Quarantine
 
-    @Test func membersCarryTheMarkOfTheirArchiveSoThatACopyCanPassItOn() throws {
+    @Test
+    func membersCarryTheMarkOfTheirArchiveSoThatACopyCanPassItOn() throws {
         let archive = try makeZip()
         let value = "0083;65f0a1b2;Safari;F643CD5F-6071-46AB-83AB-390BA944DEC5"
         mark(archive, with: value)
@@ -563,7 +583,8 @@ private func outside(_ root: URL, _ path: String) throws -> URL {
         #expect(bench.zip.quarantine(of: bench.inside(try makeZip("clean.zip"), "tree")) == nil)
     }
 
-    @Test func theMarkOfAnArchiveOnAnotherFileSystemIsThatFileSystemsWord() throws {
+    @Test
+    func theMarkOfAnArchiveOnAnotherFileSystemIsThatFileSystemsWord() throws {
         let tree = try bench.makeTree()
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)

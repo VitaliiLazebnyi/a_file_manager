@@ -82,7 +82,8 @@ public final class NavigationPlugin: Plugin {
     /// copy: a yes is kept for as long as the change count stays, a no is asked again each time,
     /// since a program that fills the clipboard may add the text after the count was changed. Main
     /// thread only (`NSPasteboard` is not safe to use from two threads at once).
-    @MainActor private final class ClipboardText {
+    @MainActor
+    private final class ClipboardText {
         private let pasteboard: NSPasteboard
         private var textCount: Int?
         private var pathRead: (count: Int, path: String?)?

@@ -22,7 +22,8 @@ private final class Notes: @unchecked Sendable {
 }
 
 /// Renaming onto an existing file never loses it (review 2: N005, N006, N007, N034).
-@Suite struct Review2NetworkReplacingMove {
+@Suite
+struct Review2NetworkReplacingMove {
     private func fixture(_ configure: (inout TestFTPServer.Options) -> Void = { _ in }) throws -> FTPFixture {
         var options = TestFTPServer.Options()
         configure(&options)
@@ -39,7 +40,8 @@ private final class Notes: @unchecked Sendable {
             }
     }
 
-    @Test func aSourceThatDoesNotExistLeavesTheDestinationAlone() throws {
+    @Test
+    func aSourceThatDoesNotExistLeavesTheDestinationAlone() throws {
         let fixture = try fixture()
         #expect(throws: (any Error).self) {
             try fixture.fileSystem.move(fixture.url("/missing.txt"), to: fixture.url("/keep.txt"), replacing: true)
@@ -48,7 +50,8 @@ private final class Notes: @unchecked Sendable {
         #expect(!fixture.server.commands.contains { $0.hasPrefix("DELE") })
     }
 
-    @Test func aServerThatReplacesDoesItInOneStep() throws {
+    @Test
+    func aServerThatReplacesDoesItInOneStep() throws {
         let fixture = try fixture()
         try fixture.fileSystem.move(fixture.url("/new.txt"), to: fixture.url("/keep.txt"), replacing: true)
         #expect(fixture.box.read("srv/keep.txt") == "new" && !fixture.box.exists("srv/new.txt"))
@@ -56,7 +59,8 @@ private final class Notes: @unchecked Sendable {
         #expect(!fixture.server.commands.contains { $0.hasPrefix("DELE") })
     }
 
-    @Test func aServerThatDoesNotReplaceGetsTheOldFileMovedAside() throws {
+    @Test
+    func aServerThatDoesNotReplaceGetsTheOldFileMovedAside() throws {
         let fixture = try fixture { $0.renameKeepsExisting = true }
         try fixture.fileSystem.move(fixture.url("/new.txt"), to: fixture.url("/keep.txt"), replacing: true)
         #expect(fixture.box.read("srv/keep.txt") == "new" && !fixture.box.exists("srv/new.txt"))
@@ -76,7 +80,8 @@ private final class Notes: @unchecked Sendable {
         #expect(try fixture.names("/") == ["keep.txt"])
     }
 
-    @Test func aRenameThatIsRefusedForAnotherReasonLosesNothing() throws {
+    @Test
+    func aRenameThatIsRefusedForAnotherReasonLosesNothing() throws {
         // May delete, may not rename: the destination must not be the price.
         let fixture = try fixture { $0.refusesRenameOf = "*" }
         #expect(throws: NetworkError.self) {
@@ -87,7 +92,8 @@ private final class Notes: @unchecked Sendable {
         #expect(try leftovers(fixture).isEmpty)
     }
 
-    @Test func theOldFileIsPutBackWhenTheNewOneCannotTakeItsPlace() throws {
+    @Test
+    func theOldFileIsPutBackWhenTheNewOneCannotTakeItsPlace() throws {
         // The file in the way can be moved aside, the new one cannot be renamed at all.
         let fixture = try fixture {
             $0.renameKeepsExisting = true
@@ -101,7 +107,8 @@ private final class Notes: @unchecked Sendable {
         #expect(!fixture.server.commands.contains { $0.hasPrefix("DELE") })
     }
 
-    @Test func aFolderInTheWayIsNotReplaced() throws {
+    @Test
+    func aFolderInTheWayIsNotReplaced() throws {
         let fixture = try fixture { $0.renameKeepsExisting = true }
         try fixture.box.file("srv/dir/inside.txt", "i")
         #expect(throws: (any Error).self) {
@@ -110,7 +117,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.box.read("srv/dir/inside.txt") == "i" && fixture.box.read("srv/new.txt") == "new")
     }
 
-    @Test func aNameThatDiffersOnlyInCaseIsAskedOfTheServer() throws {
+    @Test
+    func aNameThatDiffersOnlyInCaseIsAskedOfTheServer() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options)
@@ -127,7 +135,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.box.read("srv/file.txt") == "there")
     }
 
-    @Test func aFileMadeBehindTheListingIsSeenWhereAskingIsCheap() throws {
+    @Test
+    func aFileMadeBehindTheListingIsSeenWhereAskingIsCheap() throws {
         let fixture = try FTPFixture()
         _ = try fixture.names("/")
         // Made by somebody else a moment after the folder was read.
@@ -138,8 +147,10 @@ private final class Notes: @unchecked Sendable {
 }
 
 /// An upload is only a success when the server has all of it (review 2: N029).
-@Suite struct Review2NetworkUploads {
-    @Test func anUploadThatLostItsEndIsNotASuccess() throws {
+@Suite
+struct Review2NetworkUploads {
+    @Test
+    func anUploadThatLostItsEndIsNotASuccess() throws {
         var options = TestFTPServer.Options()
         options.keepsOfUploads = 1_000
         let fixture = try FTPFixture(options)
@@ -152,7 +163,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.server.commands.contains("SIZE /whole.bin"))
     }
 
-    @Test func aServerThatTakesAppendForStoreIsNoticed() throws {
+    @Test
+    func aServerThatTakesAppendForStoreIsNoticed() throws {
         var options = TestFTPServer.Options()
         options.appendStartsAnew = true
         let fixture = try FTPFixture(options)
@@ -167,7 +179,8 @@ private final class Notes: @unchecked Sendable {
         #expect(throws: NetworkError.self) { try writer.close(attributes: FileAttributes()) }
     }
 
-    @Test func withoutSIZETheLengthComesFromMLST() throws {
+    @Test
+    func withoutSIZETheLengthComesFromMLST() throws {
         var options = TestFTPServer.Options()
         (options.offersSize, options.keepsOfUploads) = (false, 10)
         let fixture = try FTPFixture(options)
@@ -178,8 +191,10 @@ private final class Notes: @unchecked Sendable {
 }
 
 /// A server that sends what no server should (review 2: N004, N021, N023, N025, N073, N074).
-@Suite struct Review2NetworkFTPHostile {
-    @Test func aListingWithEndlessLinesGivesWhatIsReadable() throws {
+@Suite
+struct Review2NetworkFTPHostile {
+    @Test
+    func aListingWithEndlessLinesGivesWhatIsReadable() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         var raw = Data("-rw-r--r-- 1 o g 3 Jan 01 2020 first.txt\r\n".utf8)
@@ -199,7 +214,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.server.connectionsOpened == 1)
     }
 
-    @Test func aReplyThatNeverEndsIsGivenUp() throws {
+    @Test
+    func aReplyThatNeverEndsIsGivenUp() throws {
         let fixture = try FTPFixture { $0.timeout = 3 }
         _ = try fixture.names("/")
         fixture.server.options.endlessReplyTo = "MKD"
@@ -207,7 +223,8 @@ private final class Notes: @unchecked Sendable {
         #expect(call.ended() && call.failed)
     }
 
-    @Test func aReplyLineWithoutAnEndIsGivenUp() throws {
+    @Test
+    func aReplyLineWithoutAnEndIsGivenUp() throws {
         let fixture = try FTPFixture { $0.timeout = 600 }
         _ = try fixture.names("/")
         fixture.server.options.longLineReplyTo = ("MKD", 2_000_000)
@@ -217,7 +234,8 @@ private final class Notes: @unchecked Sendable {
         #expect(call.ended() && call.failed, "after \(Date().timeIntervalSince(started)) s")
     }
 
-    @Test func aTransferAnnouncedTwiceLeavesTheConnectionInStep() throws {
+    @Test
+    func aTransferAnnouncedTwiceLeavesTheConnectionInStep() throws {
         var options = TestFTPServer.Options()
         options.announcesTwice = true
         let fixture = try FTPFixture(options)
@@ -229,7 +247,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.server.connectionsOpened == 1, "no reply was left over to throw the next command off")
     }
 
-    @Test func activeModeThatFailsDoesNotLeaveAReplyBehind() throws {
+    @Test
+    func activeModeThatFailsDoesNotLeaveAReplyBehind() throws {
         var options = TestFTPServer.Options()
         options.activeNeverConnects = 0.2
         let fixture = try FTPFixture(options) {
@@ -254,7 +273,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.server.connectionsOpened > opened)
     }
 
-    @Test func onlyTheServerMayOpenTheDataConnection() throws {
+    @Test
+    func onlyTheServerMayOpenTheDataConnection() throws {
         func connect(to port: Int) -> Int32 {
             let descriptor = socket(AF_INET, SOCK_STREAM, 0)
             var address = sockaddr_in()
@@ -294,7 +314,8 @@ private final class Notes: @unchecked Sendable {
         #expect(DataListener.comparable("[::1]") == "::1")
     }
 
-    @Test func namesInDecomposedFormGoBackAsTheyCame() throws {
+    @Test
+    func namesInDecomposedFormGoBackAsTheyCame() throws {
         let fixture = try FTPFixture()
         // As a server stores a name that was made on an older Mac: `u` and a combining diaeresis.
         try fixture.box.file("srv/u\u{308}ber.txt", "content")
@@ -314,8 +335,10 @@ private final class Notes: @unchecked Sendable {
 }
 
 /// Every wait ends (review 2: N010, N012, N026, N027, N035, N044, N046, N049, N050, N052, N054).
-@Suite struct Review2NetworkWaits {
-    @Test func aWaitBehindAnotherLoginCanBeCancelled() throws {
+@Suite
+struct Review2NetworkWaits {
+    @Test
+    func aWaitBehindAnotherLoginCanBeCancelled() throws {
         var options = TestFTPServer.Options()
         (options.user, options.password) = ("anna", "pw")
         let fixture = try FTPFixture(options)
@@ -349,7 +372,8 @@ private final class Notes: @unchecked Sendable {
         #expect(third.ended() && !third.failed && fixture.box.exists("srv/made"))
     }
 
-    @Test func disconnectEndsAWaitThatHasNoFlag() throws {
+    @Test
+    func disconnectEndsAWaitThatHasNoFlag() throws {
         var options = TestFTPServer.Options()
         (options.user, options.password) = ("anna", "pw")
         let fixture = try FTPFixture(options)
@@ -374,7 +398,8 @@ private final class Notes: @unchecked Sendable {
         #expect(first.ended() && first.failed)
     }
 
-    @Test func filesHeldOpenDoNotMakeTheNextOneWaitForEver() throws {
+    @Test
+    func filesHeldOpenDoNotMakeTheNextOneWaitForEver() throws {
         let fixture = try FTPFixture { $0.parallelConnections = 1 }
         // Large enough that a file that is not read on is not finished behind the reader's back.
         for index in 0..<3 {
@@ -408,7 +433,8 @@ private final class Notes: @unchecked Sendable {
         held[1].close()
     }
 
-    @Test func aCancelledLoginIsNotRememberedAsARefusal() throws {
+    @Test
+    func aCancelledLoginIsNotRememberedAsARefusal() throws {
         var options = TestFTPServer.Options()
         options.greetingDelay = 2
         let fixture = try FTPFixture(options)
@@ -436,7 +462,8 @@ private final class Notes: @unchecked Sendable {
         #expect(questions == 1)
     }
 
-    @Test func closingAReaderReturnsAtOnceAndGivesTheConnectionBack() throws {
+    @Test
+    func closingAReaderReturnsAtOnceAndGivesTheConnectionBack() throws {
         let fixture = try FTPFixture { $0.parallelConnections = 1 }
         try Data(repeating: 1, count: 8_000_000).write(to: fixture.box.url("srv/big.bin"))
         try fixture.box.file("srv/small.txt", "s")
@@ -458,7 +485,8 @@ private final class Notes: @unchecked Sendable {
         #expect(Background.threadCount <= Background.mostThreads)
     }
 
-    @Test func closingWhileAnotherThreadUsesTheConnectionNextDoesNotCutIt() throws {
+    @Test
+    func closingWhileAnotherThreadUsesTheConnectionNextDoesNotCutIt() throws {
         // The reader reaches the end of its file and gives the connection back; `close` from
         // another thread comes at the same moment. Whoever takes the connection next must not
         // find it cut. Many rounds, since it is a race.
@@ -495,7 +523,8 @@ private final class Notes: @unchecked Sendable {
         #expect(failures.all.isEmpty, "\(failures.all)")
     }
 
-    @Test func manyDroppedTransfersDoNotPileUpThreads() throws {
+    @Test
+    func manyDroppedTransfersDoNotPileUpThreads() throws {
         var options = TestFTPServer.Options()
         options.stallRETR = true
         let fixture = try FTPFixture(options) {
@@ -517,7 +546,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.settle())
     }
 
-    @Test func keepAliveTestsOneConnectionAtATimeAndKeepsThePoolUsable() throws {
+    @Test
+    func keepAliveTestsOneConnectionAtATimeAndKeepsThePoolUsable() throws {
         let fixture = try FTPFixture {
             $0.keepAliveInterval = 0.5
             $0.parallelConnections = 3
@@ -534,7 +564,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.settle(session))
     }
 
-    @Test func linksAreResolvedByOneResolverThatStandsAside() throws {
+    @Test
+    func linksAreResolvedByOneResolverThatStandsAside() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options) { $0.parallelConnections = 1 }
@@ -570,8 +601,10 @@ private final class Notes: @unchecked Sendable {
 }
 
 /// Who may connect where, and with what (review 2: N030, N031, N068, N071, N085, N087).
-@Suite struct Review2NetworkConsent {
-    @Test func aServerNobodyChoseIsAskedAbout() throws {
+@Suite
+struct Review2NetworkConsent {
+    @Test
+    func aServerNobodyChoseIsAskedAbout() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/a.txt", "a")
         // Used by the callbacks, which run one at a time while the calls below wait for them.
@@ -607,7 +640,8 @@ private final class Notes: @unchecked Sendable {
         #expect(try saved.names("/").isEmpty)
     }
 
-    @Test func aTypedAddressDoesNotDropALoginThatIsUnderWay() throws {
+    @Test
+    func aTypedAddressDoesNotDropALoginThatIsUnderWay() throws {
         var options = TestFTPServer.Options()
         (options.user, options.password) = ("anna", "pw")
         let fixture = try FTPFixture(options)
@@ -636,7 +670,8 @@ private final class Notes: @unchecked Sendable {
         #expect(fixture.center.isConnected(fixture.key))
     }
 
-    @Test func aPasswordOnPlainFTPIsAskedAboutAndStoredOnlyOnceAccepted() throws {
+    @Test
+    func aPasswordOnPlainFTPIsAskedAboutAndStoredOnlyOnceAccepted() throws {
         var options = TestFTPServer.Options()
         (options.user, options.password) = ("anna", "right")
         let fixture = try FTPFixture(options)
@@ -676,7 +711,8 @@ private final class Notes: @unchecked Sendable {
         #expect(!FTPSession.isLoopback("ftp.example.com") && !FTPSession.isLoopback("10.0.0.1"))
     }
 
-    @Test func certificatesAcceptedForGoodAreNotReadFromTheSettings() {
+    @Test
+    func certificatesAcceptedForGoodAreNotReadFromTheSettings() {
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var loads = 0
         let trust = CertificateTrust(load: {
@@ -700,8 +736,10 @@ private final class Notes: @unchecked Sendable {
 }
 
 /// A certificate that is not the one accepted before (review 2: N030, N031).
-@Suite(.enabled(if: TLSServer.isAvailable)) struct Review2NetworkChangedCertificate {
-    @Test func aChangedCertificateIsAQuestionOfItsOwn() throws {
+@Suite(.enabled(if: TLSServer.isAvailable))
+struct Review2NetworkChangedCertificate {
+    @Test
+    func aChangedCertificateIsAQuestionOfItsOwn() throws {
         // Two servers with two certificates under one host name: the second is what the first
         // looks like to somebody in the middle.
         let (firstBox, secondBox) = (try Sandbox(), try Sandbox())

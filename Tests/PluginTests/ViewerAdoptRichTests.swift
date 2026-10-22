@@ -8,7 +8,8 @@ import Testing
 
 /// HTML as text, made fast without changing what comes out, and the bitmap an image is
 /// drawn from.
-@Suite struct ViewerAdoptHTML {
+@Suite
+struct ViewerAdoptHTML {
     private func random(_ seed: UInt64) -> (Int) -> Int {
         var state = seed &* 0x9E37_79B9_7F4A_7C15 | 1
         return { bound in
@@ -64,7 +65,8 @@ import Testing
         return units
     }
 
-    @Test func theFastScanGivesTheOutputOfTheUnitByUnitOne() {
+    @Test
+    func theFastScanGivesTheOutputOfTheUnitByUnitOne() {
         var compared = 0
         for seed in 1...400 as ClosedRange<UInt64> {
             let next = random(seed)
@@ -87,7 +89,8 @@ import Testing
         #expect(compared == 800)
     }
 
-    @Test func theFastScanAgreesOnLongPagesToo() {
+    @Test
+    func theFastScanAgreesOnLongPagesToo() {
         for seed in 1_000...1_012 as ClosedRange<UInt64> {
             let next = random(seed)
             let units = generate(next, count: 4_000)
@@ -100,7 +103,8 @@ import Testing
         }
     }
 
-    @Test func linksAreFoundTheSameWayInEveryFormOfTheAttribute() {
+    @Test
+    func linksAreFoundTheSameWayInEveryFormOfTheAttribute() {
         let html = """
             <a href="one">1</a> <A HREF='two&amp;2'>2</A> <a href=three>3</a> <a class=x href = "four">4</a> <a data-href="five">5</a> <a href="#six">6</a>
             <a href="">7</a> <a href="https://e.com/?a=1&amp;b=2&amp;c&amp">8</a> <a title='a href="nested"' href="real">9</a> <a href="ü">10</a>
@@ -113,7 +117,9 @@ import Testing
 }
 
 /// The bitmap an image is drawn from when it is shown smaller than it is.
-@MainActor @Suite struct ViewerAdoptImage {
+@MainActor
+@Suite
+struct ViewerAdoptImage {
     private func picture(_ width: Int, _ height: Int) throws -> CGImage {
         let context = try #require(
             CGContext(
@@ -152,7 +158,8 @@ import Testing
         return condition()
     }
 
-    @Test func aFrameIsScaledOnceForTheSizeItIsShownAt() async throws {
+    @Test
+    func aFrameIsScaledOnceForTheSizeItIsShownAt() async throws {
         let frame = try picture(2_000, 1_000)
         let cache = ScaledFrameCache()
         let ready = Counter()
@@ -189,7 +196,8 @@ import Testing
         #expect(cache.image(for: other, width: 400, height: 200, building: false) == nil)
     }
 
-    @Test func aScaledFrameKeepsItsColorsAndSides() throws {
+    @Test
+    func aScaledFrameKeepsItsColorsAndSides() throws {
         let scaled = try #require(ScaledFrameCache.scale(try picture(1_000, 500), width: 100, height: 50))
         #expect(scaled.width == 100 && scaled.height == 50)
         let rep = NSBitmapImageRep(cgImage: scaled)
@@ -200,7 +208,8 @@ import Testing
         )
     }
 
-    @Test func aLargeImageIsResampledOnceWhileItIsScrolledAndDrawnAgain() async throws {
+    @Test
+    func aLargeImageIsResampledOnceWhileItIsScrolledAndDrawnAgain() async throws {
         let frame = try picture(4_000, 2_000)
         let view = ImageCanvasView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
         view.fit = .window

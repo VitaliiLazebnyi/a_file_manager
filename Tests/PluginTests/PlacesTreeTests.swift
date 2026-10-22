@@ -7,7 +7,8 @@ import Testing
 @testable import PlacesPlugin
 
 /// The directory tree as a model: filling, paths and quick search.
-@Suite struct PlacesTreeModel {
+@Suite
+struct PlacesTreeModel {
     let root = URL(fileURLWithPath: "/Volumes/Disk", isDirectory: true)
 
     func sample() -> DirectoryTree {
@@ -17,7 +18,8 @@ import Testing
         )
     }
 
-    @Test func buildsFromCachedPathsInNaturalOrder() {
+    @Test
+    func buildsFromCachedPathsInNaturalOrder() {
         let tree = sample()
         #expect(tree.count == 7)
         #expect(tree.root.children.map(\.name) == ["Apps", "Work"])
@@ -33,7 +35,8 @@ import Testing
         #expect(jumbled.paths == ["a", "a/x", "b", "b/c", "b/c/d"] && jumbled.count == 5)
     }
 
-    @Test func pathsAndLocations() throws {
+    @Test
+    func pathsAndLocations() throws {
         let tree = sample()
         let node = try #require(tree.node(at: "Apps/Tools"))
         #expect(tree.relativePath(of: node) == "Apps/Tools" && tree.relativePath(of: tree.root) == "")
@@ -53,7 +56,8 @@ import Testing
         #expect(spaced.node(at: "A/b c").map(spaced.url(of:)) == memory.url("/A/b c"))
     }
 
-    @Test func settingChildrenKeepsKnownFoldersAndDropsVanishedOnes() throws {
+    @Test
+    func settingChildrenKeepsKnownFoldersAndDropsVanishedOnes() throws {
         let tree = DirectoryTree(rootURL: root)
         let known = try #require(tree.node(at: "Work/Deep/Deeper", creating: true))
         #expect(tree.count == 3 && !tree.root.isScanned && !known.isScanned)
@@ -67,7 +71,8 @@ import Testing
         #expect(tree.paths == ["alpha", "Work", "Work/Other", "Zeta"])
     }
 
-    @Test func neighboursFollowDisplayOrderAndWrapAround() {
+    @Test
+    func neighboursFollowDisplayOrderAndWrapAround() {
         let tree = sample()
         var node = tree.root
         var forward: [String] = []
@@ -84,7 +89,8 @@ import Testing
         #expect(backward == Array(tree.paths.reversed()) + [""])
     }
 
-    @Test func quickSearchFindsTheNextFolderStartingWithTheText() {
+    @Test
+    func quickSearchFindsTheNextFolderStartingWithTheText() {
         let tree = sample()
         func find(_ text: String, from path: String?, forward: Bool = true, includingStart: Bool = false) -> String? {
             tree.find(text, from: path.flatMap { tree.node(at: $0) }, forward: forward, includingStart: includingStart)
@@ -108,7 +114,8 @@ import Testing
         )
     }
 
-    @Test func rootsFollowTheDisksOfTheVolumeList() {
+    @Test
+    func rootsFollowTheDisksOfTheVolumeList() {
         let home = URL(fileURLWithPath: "/Users/x")
         let places = [
             Place(name: "Home", url: home, kind: .home),
@@ -135,7 +142,8 @@ import Testing
 }
 
 /// Reading trees from file systems and keeping them: these run on several threads.
-@Suite struct PlacesTreeScanning {
+@Suite
+struct PlacesTreeScanning {
     let memory = MemoryFileSystem()
 
     /// Runs a scan and puts what it delivers into a tree.
@@ -149,7 +157,8 @@ import Testing
         return (tree, completed, batches)
     }
 
-    @Test func scansFoldersOnlyLevelByLevel() {
+    @Test
+    func scansFoldersOnlyLevelByLevel() {
         memory.addFile("/V/a/file.txt")
         memory.addFile("/V/a/b/c/deep.txt")
         memory.addDirectory("/V/z")
@@ -168,7 +177,8 @@ import Testing
         #expect(withHidden.tree.paths == [".hidden", ".hidden/inside", "a", "a/b", "a/b/c", "z"])
     }
 
-    @Test func excludedFoldersAreListedButNotRead() {
+    @Test
+    func excludedFoldersAreListedButNotRead() {
         memory.addDirectory("/V/Volumes/Other/deep")
         memory.addDirectory("/V/keep/inner")
         let excluded = memory.url("/V/Volumes").locationKey
@@ -181,7 +191,8 @@ import Testing
         #expect(memory.listRequests(for: "/V/Volumes") == 0)
     }
 
-    @Test func wideTreesAreReadInBatches() {
+    @Test
+    func wideTreesAreReadInBatches() {
         for folder in 0..<300 {
             for sub in 0..<3 { memory.addDirectory("/W/d\(folder)/s\(sub)") }
         }
@@ -203,7 +214,8 @@ import Testing
         // `Concurrency.parallelMapUsesSeveralThreads` in the kernel tests checks that part alone.
     }
 
-    @Test func cancellingStopsTheScan() {
+    @Test
+    func cancellingStopsTheScan() {
         for folder in 0..<50 { memory.addDirectory("/C/d\(folder)/sub/deeper") }
         let scanner = TreeScanner(root: memory.url("/C"), provider: memory, batchSize: 10)
         var received = 0
@@ -226,7 +238,8 @@ import Testing
         #expect(!second.run { _ in })
     }
 
-    @Test func unreadableFoldersCountAsEmptyAndLinksAndPackagesAreLeftOut() throws {
+    @Test
+    func unreadableFoldersCountAsEmptyAndLinksAndPackagesAreLeftOut() throws {
         let box = try Sandbox()
         try box.folder("real/inner")
         try box.folder("Some.app/Contents")
@@ -243,7 +256,8 @@ import Testing
 
     // MARK: Cache
 
-    @Test func cacheKeepsTreesInMemoryAndInFilesOfItsOwnFolder() throws {
+    @Test
+    func cacheKeepsTreesInMemoryAndInFilesOfItsOwnFolder() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let root = memory.url("/V")
@@ -269,13 +283,15 @@ import Testing
         #expect(TreeCache(directory: box.url("cache")).paths(for: root) == nil)
     }
 
-    @Test func cacheWithoutFolderStaysInMemory() {
+    @Test
+    func cacheWithoutFolderStaysInMemory() {
         let cache = TreeCache(directory: nil)
         cache.store(["a"], for: memory.url("/"))
         #expect(cache.paths(for: memory.url("/")) == ["a"] && cache.fileURL(for: memory.url("/")) == nil)
     }
 
-    @Test func cacheFilesOfOtherRootsAndBrokenFilesAreNotTaken() {
+    @Test
+    func cacheFilesOfOtherRootsAndBrokenFilesAreNotTaken() {
         let root = memory.url("/V")
         #expect(TreeCache.parse("root=mem:///V\n[a]\n\ngarbage\n[]\n[b/c]\n", root: root) == ["a", "b/c"])
         #expect(TreeCache.parse("root=mem:///elsewhere\n[a]\n", root: root) == nil)
@@ -283,7 +299,8 @@ import Testing
         #expect(TreeCache.parse(TreeCache.format([], root: root), root: root) == [])
     }
 
-    @Test func cacheLearnsFoldersThePanelsShow() throws {
+    @Test
+    func cacheLearnsFoldersThePanelsShow() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let root = memory.url("/")
@@ -305,7 +322,8 @@ import Testing
         )
     }
 
-    @Test func cacheIsSafeToUseFromManyThreads() throws {
+    @Test
+    func cacheIsSafeToUseFromManyThreads() throws {
         let box = try Sandbox()
         let cache = TreeCache(directory: box.url("cache"))
         let roots = (0..<4).map { memory.url("/r\($0)") }
@@ -331,7 +349,9 @@ import Testing
         }
     }
 
-    @MainActor @Test func pluginTellsTheCacheAboutVisitedFoldersWithoutTouchingRealFolders() throws {
+    @MainActor
+    @Test
+    func pluginTellsTheCacheAboutVisitedFoldersWithoutTouchingRealFolders() throws {
         let box = try Sandbox()
         memory.addDirectory("/A/new")
         memory.addDirectory("/B")

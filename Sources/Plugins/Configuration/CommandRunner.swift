@@ -186,7 +186,8 @@ final class CommandRunner {
         // A branch view or a file list shows real files under display paths and relative
         // names; its items are given by their real paths, and the panel has no path of its own.
         let showsFiles = !model.directory.isFileURL && model.items.first?.url.isFileURL == true
-        @Sendable func name(of item: FileItem) -> String {
+        @Sendable
+        func name(of item: FileItem) -> String {
             showsFiles && item.url.isFileURL ? item.url.path : item.name
         }
         var path =

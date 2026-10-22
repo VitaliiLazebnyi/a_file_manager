@@ -42,8 +42,10 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
 
 /// Review round 2: the diff of large files near the shortest, saving that never loses or mangles
 /// a file, and a session that does not trust a diff that is out of date.
-@Suite struct Review2CompareDiff {
-    @Test func aDeletedBlockInALargeFileCostsAboutTheBlock() {
+@Suite
+struct Review2CompareDiff {
+    @Test
+    func aDeletedBlockInALargeFileCostsAboutTheBlock() {
         let a = sourceLike(24_000, seed: 1)
         var b = a
         var random = Seeded(state: 2)
@@ -57,7 +59,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(Myers.editDistance(segments) <= 1_800 + 100)
     }
 
-    @Test func aMovedBlockInALargeFileCostsAboutTwiceTheBlock() {
+    @Test
+    func aMovedBlockInALargeFileCostsAboutTwiceTheBlock() {
         let a = sourceLike(24_000, seed: 3)
         var b = a
         let block = Array(b[3_000..<3_400])
@@ -72,7 +75,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(Myers.editDistance(segments) <= 1_000 + 100)
     }
 
-    @Test func whenTheSearchIsCutOffLinesUniqueToBothSidesHoldTheDiffTogether() {
+    @Test
+    func whenTheSearchIsCutOffLinesUniqueToBothSidesHoldTheDiffTogether() {
         // A low limit forces the cut-off at once; the lines that occur once on each side anchor the result.
         let a = Array(0..<6_000)
         var b = a
@@ -88,7 +92,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         }
     }
 
-    @Test func cutOffDiffsStayValidOnSmallRandomInputs() {
+    @Test
+    func cutOffDiffsStayValidOnSmallRandomInputs() {
         var random = Seeded(state: 6)
         for _ in 0..<400 {
             let a = (0..<Int.random(in: 0...40, using: &random)).map { _ in Int.random(in: 0..<6, using: &random) }
@@ -97,14 +102,16 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         }
     }
 
-    @Test func theLimitFollowsTheSizeAndStaysBounded() {
+    @Test
+    func theLimitFollowsTheSizeAndStaysBounded() {
         #expect(Myers.defaultLimit(forSize: 19_999) == nil)
         #expect(Myers.defaultLimit(forSize: 20_000) == 8_192)
         #expect((Myers.defaultLimit(forSize: 100_000) ?? 0) > 2_000)
         #expect(Myers.defaultLimit(forSize: 10_000_000) == 256)
     }
 
-    @Test func insideALineOnlyTheStartOfAHugeLineIsLookedAt() {
+    @Test
+    func insideALineOnlyTheStartOfAHugeLineIsLookedAt() {
         let long = String(repeating: "abcdefghij", count: 200_000)
         let ranges = TextDiff.inline(long, long + "X")
         #expect(
@@ -114,7 +121,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
     }
 }
 
-@MainActor @Suite struct Review2CompareSession {
+@MainActor
+@Suite
+struct Review2CompareSession {
     let box: Sandbox
     let plugin = CompareContentPlugin(opensWindows: false)
     let settings = MemorySettings()
@@ -142,7 +151,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         session.setEditing(true)
     }
 
-    @Test func undoPutsBackExactlyWhatEditsReplaced() {
+    @Test
+    func undoPutsBackExactlyWhatEditsReplaced() {
         open()
         let before = session.text(.right, row: 1)
         session.copy(rows: 1..<2, to: .right)
@@ -159,14 +169,16 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         )
     }
 
-    @Test func aRowThatPointsOutsideTheTextsIsNeverTrusted() {
+    @Test
+    func aRowThatPointsOutsideTheTextsIsNeverTrusted() {
         open()
         // Rows far beyond the texts change nothing and do not trap.
         session.copy(rows: 100..<200, to: .right)
         #expect(!session.hasUnsavedChanges)
     }
 
-    @Test func quittingAsksAboutUnsavedEditsAndCanBeCalledOff() {
+    @Test
+    func quittingAsksAboutUnsavedEditsAndCanBeCalledOff() {
         open()
         session.setText("two edited", .left, row: 1)
         ui.choiceAnswers = [2]  // Cancel
@@ -181,7 +193,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(box.read("A/f.txt") == "one\nsecond edit\nthree\nfour\n")
     }
 
-    @Test func stopAsksOnceMoreForWhatIsLeft() {
+    @Test
+    func stopAsksOnceMoreForWhatIsLeft() {
         open()
         session.setText("changed", .right, row: 1)
         ui.choiceAnswers = [0]
@@ -189,7 +202,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(box.read("B/f.txt")?.contains("changed") == true)
     }
 
-    @Test func aSaveNeverOverwritesAFileSomeoneElseChanged() throws {
+    @Test
+    func aSaveNeverOverwritesAFileSomeoneElseChanged() throws {
         open()
         session.setText("mine", .left, row: 1)
         // Someone else writes the file after it was loaded.
@@ -200,7 +214,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(saved == false && box.read("A/f.txt") == "theirs\n" && session.hasUnsavedChanges)
     }
 
-    @Test func aCharacterTheEncodingCannotHoldIsRefusedNotTurnedIntoAQuestionMark() throws {
+    @Test
+    func aCharacterTheEncodingCannotHoldIsRefusedNotTurnedIntoAQuestionMark() throws {
         try Data([0x63, 0x61, 0x66, 0xE9, 0x0A]).write(to: box.url("A/latin.txt"))
         try Data([0x63, 0x61, 0x66, 0xE9, 0x0A, 0x78, 0x0A]).write(to: box.url("B/latin.txt"))
         bench.left.reload()
@@ -215,7 +230,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(try Data(contentsOf: box.url("A/latin.txt")) == Data([0x63, 0x61, 0x66, 0xE9, 0x0A]))
     }
 
-    @Test func theTwoSidesOfOneFileAreNotBothSaved() throws {
+    @Test
+    func theTwoSidesOfOneFileAreNotBothSaved() throws {
         try box.file("A/g.txt", "a\nb\n")
         bench.left.reload()
         bench.left.moveCursor(toName: "g.txt")
@@ -231,7 +247,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(saved == false && box.read("A/g.txt") == "a\nb\n")
     }
 
-    @Test func replaceKeepsHardLinksTogetherAndRefusesAChangedFile() throws {
+    @Test
+    func replaceKeepsHardLinksTogetherAndRefusesAChangedFile() throws {
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
         try box.file("h/one.txt", "old")
@@ -251,7 +268,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(box.read("h/one.txt") == "changed elsewhere, longer")
     }
 
-    @Test func aFileThatCannotBeRenamedOverIsNotLostWhenTheSecondStepFails() throws {
+    @Test
+    func aFileThatCannotBeRenamedOverIsNotLostWhenTheSecondStepFails() throws {
         // A provider that cannot replace in one step: the old file is moved aside and comes back if the new one cannot be put in place.
         let memory = MemoryFileSystem()
         memory.addFile("/d/f.txt", "old")

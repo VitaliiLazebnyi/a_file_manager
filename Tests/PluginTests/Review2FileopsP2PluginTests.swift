@@ -126,7 +126,9 @@ final class P2Bench: ShellServices {
 
 // MARK: - File operations
 
-@MainActor @Suite struct Review2FileopsP2Commands {
+@MainActor
+@Suite
+struct Review2FileopsP2Commands {
     let box: Sandbox
     let memory = MemoryFileSystem()
     let ui = P2RecordingUI()
@@ -157,7 +159,8 @@ final class P2Bench: ShellServices {
     }
 
     // F055: Return must not delete for good.
-    @Test func returnDoesNotConfirmADeletionThatCannotBeUndone() throws {
+    @Test
+    func returnDoesNotConfirmADeletionThatCannotBeUndone() throws {
         let bench = bench()
         bench.left.moveCursor(toName: "one.txt")
         // Nobody chooses a button: Return.
@@ -172,7 +175,8 @@ final class P2Bench: ShellServices {
         #expect(bench.commands.perform(.deleteDirectly) && !memory.exists("/A/one.txt"))
     }
 
-    @Test func whatGoesToTheTrashIsStillConfirmedWithReturn() throws {
+    @Test
+    func whatGoesToTheTrashIsStillConfirmedWithReturn() throws {
         try box.file("d/keep.txt", "kept")
         let bench = bench(left: box.url("d"))
         bench.left.moveCursor(toName: "keep.txt")
@@ -183,7 +187,8 @@ final class P2Bench: ShellServices {
         #expect(question.message == "Test" && question.defaultButton == 0 && box.exists("d/keep.txt"))
     }
 
-    @Test func theQuestionsOfAJobThatDestroySomethingDefaultToSkip() {
+    @Test
+    func theQuestionsOfAJobThatDestroySomethingDefaultToSkip() {
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
         let bridge = JobBridge(monitor: P2DeferredJobs.Monitor(), ui: ui, fileSystems: fileSystems)
@@ -218,7 +223,8 @@ final class P2Bench: ShellServices {
     }
 
     // F008, F025: what a command works on, and what it takes the marks off with.
-    @Test func theOperandsAreCountedWithoutMakingTheListOfThem() throws {
+    @Test
+    func theOperandsAreCountedWithoutMakingTheListOfThem() throws {
         let bench = bench()
         let model = bench.left.model
         model.moveCursor(to: try #require(model.row(ofName: "two.txt")))
@@ -248,7 +254,8 @@ final class P2Bench: ShellServices {
         #expect(FileOperations.Picked(model).count == (model.cursorItem == nil ? 0 : 1))
     }
 
-    @Test func theMarksOfWhatWasProcessedComeOffAndTheOthersStay() {
+    @Test
+    func theMarksOfWhatWasProcessedComeOffAndTheOthersStay() {
         let bench = bench()
         let model = bench.left.model
         model.selectAll()
@@ -272,7 +279,8 @@ final class P2Bench: ShellServices {
         #expect(model.selectionCount == 2)
     }
 
-    @Test func afterACopyOnlyTheCopiedItemsLoseTheirMark() {
+    @Test
+    func afterACopyOnlyTheCopiedItemsLoseTheirMark() {
         let bench = bench()
         memory.addDirectory("/B/two.txt")  // a folder in the way of one of the three
         bench.right.reload()
@@ -285,7 +293,8 @@ final class P2Bench: ShellServices {
     }
 
     // F009
-    @Test func deleteAsksWhatTheFolderCanDoOnceNotPerItem() {
+    @Test
+    func deleteAsksWhatTheFolderCanDoOnceNotPerItem() {
         for index in 0..<60 { memory.addFile("/many/f\(index).txt") }
         let bench = bench(left: memory.url("/many"))
         bench.left.model.selectAll()
@@ -302,7 +311,8 @@ final class P2Bench: ShellServices {
     }
 
     // F027: the log's last lines at the end of the program.
-    @Test func theLogIsWrittenWhileTheProgramPreparesToQuit() async {
+    @Test
+    func theLogIsWrittenWhileTheProgramPreparesToQuit() async {
         let settings = MemorySettings()
         settings.set(true, forKey: OperationSettings.logEnabled)
         settings.set(box.url("logs/operations.log").path, forKey: OperationSettings.logFile)
@@ -323,7 +333,8 @@ final class P2Bench: ShellServices {
         plugin.stop()
     }
 
-    @Test func aLogThatCannotBeWrittenHoldsUpNeitherTheQuitNorItsCaller() async {
+    @Test
+    func aLogThatCannotBeWrittenHoldsUpNeitherTheQuitNorItsCaller() async {
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
         configuration.file = box.url("logs/operations.log")
@@ -358,7 +369,8 @@ final class P2Bench: ShellServices {
         #expect(early)
     }
 
-    @Test func aPipeWhereTheLogShouldBeIsNotOpened() throws {
+    @Test
+    func aPipeWhereTheLogShouldBeIsNotOpened() throws {
         try box.folder("logs")
         #expect(mkfifo(box.url("logs/operations.log").path, 0o600) == 0)
         var configuration = OperationLog.Configuration()
@@ -371,7 +383,8 @@ final class P2Bench: ShellServices {
     }
 
     // New folders are made exclusively, and a job that is cancelled makes none.
-    @Test func aNewFolderIsNotTakenForOneThatAppearedMeanwhile() {
+    @Test
+    func aNewFolderIsNotTakenForOneThatAppearedMeanwhile() {
         let bench = bench()
         #expect(bench.commands.perform(.makeDirectory, .text("fresh|fresh/inner|one.txt")))
         #expect(memory.exists("/A/fresh/inner"))
@@ -384,7 +397,9 @@ final class P2Bench: ShellServices {
 
 // MARK: - Clipboard
 
-@MainActor @Suite struct Review2FileopsP2Clipboard {
+@MainActor
+@Suite
+struct Review2FileopsP2Clipboard {
     let box: Sandbox
     private let scratch = ScratchPasteboard()
     var pasteboard: NSPasteboard { scratch.pasteboard }
@@ -420,7 +435,8 @@ final class P2Bench: ShellServices {
     }
 
     // F003
-    @Test func aLongListOfNamesIsMadeInTheBackgroundAndTheLatestRequestWins() async {
+    @Test
+    func aLongListOfNamesIsMadeInTheBackgroundAndTheLatestRequestWins() async {
         let count = ClipboardPlugin.listedAtOnce + 50
         for index in 0..<count { probe.base.addFile("/long/f\(index).txt") }
         bench.left.show(probe.base.url("/long"))
@@ -455,7 +471,8 @@ final class P2Bench: ShellServices {
     }
 
     // F039
-    @Test func aLongListOfFilesFromAnotherProgramIsReadInSlices() async throws {
+    @Test
+    func aLongListOfFilesFromAnotherProgramIsReadInSlices() async throws {
         let urls = (0..<3_000).map { box.url("src/f\($0).txt") }
         writeAsAnotherProgram(urls)
         let items = try #require(pasteboard.pasteboardItems)
@@ -486,7 +503,8 @@ final class P2Bench: ShellServices {
         #expect(stale.run(cancellation: CancellationFlag()) { _, _ in } == .abandoned)
     }
 
-    @Test func aSliceIsShortAndOnlyFileLocationsAreTaken() {
+    @Test
+    func aSliceIsShortAndOnlyFileLocationsAreTaken() {
         // A slice may take a few thousandths of a second, so that the main thread gets its
         // turn between two of them.
         #expect(FileListReading.sliceTime <= 10_000_000)
@@ -501,7 +519,8 @@ final class P2Bench: ShellServices {
         #expect(FileListReading.fileURL(of: none) == nil)
     }
 
-    @Test func aLongListFromAnotherProgramIsPastedWhole() throws {
+    @Test
+    func aLongListFromAnotherProgramIsPastedWhole() throws {
         let count = ClipboardPlugin.readAtOnce + 44
         var urls: [URL] = []
         for index in 0..<count { urls.append(try box.file("src/f\(index).txt", "\(index)")) }
@@ -522,7 +541,8 @@ final class P2Bench: ShellServices {
     }
 
     // F040: the failure path.
-    @Test func aTextThatCannotBeWrittenLeavesNoDraftBehind() {
+    @Test
+    func aTextThatCannotBeWrittenLeavesNoDraftBehind() {
         struct DiskFull: LocalizedError {
             var errorDescription: String? { "The disk is full." }
         }
@@ -542,7 +562,8 @@ final class P2Bench: ShellServices {
         )
     }
 
-    @Test func whetherThereIsSomethingToPasteIsAskedOncePerStateOfTheClipboard() {
+    @Test
+    func whetherThereIsSomethingToPasteIsAskedOncePerStateOfTheClipboard() {
         pasteboard.clearContents()
         pasteboard.setString("text", forType: .string)
         #expect(commands.isEnabled(.pasteFromClipboard) && commands.isEnabled(.pasteFromClipboard))
@@ -558,7 +579,8 @@ final class P2Bench: ShellServices {
 
 // MARK: - File properties
 
-@Suite struct Review2FileopsP2Properties {
+@Suite
+struct Review2FileopsP2Properties {
     let box: Sandbox
     let fileSystems = FileSystemRegistry()
     let memory = MemoryFileSystem()
@@ -572,7 +594,8 @@ final class P2Bench: ShellServices {
     }
 
     // V070, T024
-    @Test func measuringAFolderOnAServerThatStoppedAnsweringEndsWithTheJob() throws {
+    @Test
+    func measuringAFolderOnAServerThatStoppedAnsweringEndsWithTheJob() throws {
         memory.addFile("/s/dir/sub/f.txt", "12345")
         memory.addFile("/s/file.txt", "123")
         let items = try memory.list(memory.url("/s"), showHidden: true)
@@ -590,7 +613,8 @@ final class P2Bench: ShellServices {
     }
 
     // V070, T024, T047
-    @Test func changingAttributesBelowAFolderThatStoppedAnsweringEndsWithTheJob() throws {
+    @Test
+    func changingAttributesBelowAFolderThatStoppedAnsweringEndsWithTheJob() throws {
         memory.addFile("/s/dir/sub/f.txt")
         let items = try memory.list(memory.url("/s"), showHidden: true)
         memory.stallsListings = true
@@ -608,7 +632,8 @@ final class P2Bench: ShellServices {
         #expect(outcome.failed == 0 && outcome.failures.isEmpty)
     }
 
-    @Test func aTreeIsChangedOnAllCoresWithNothingLeftOut() throws {
+    @Test
+    func aTreeIsChangedOnAllCoresWithNothingLeftOut() throws {
         // Folders in folders, each with files: the calls for them are made from inside calls.
         var files = 0
         var folders = 1
@@ -636,7 +661,8 @@ final class P2Bench: ShellServices {
     }
 
     // V070: the comment column's threads.
-    @Test func nobodyWaitsForEverForACommentFileThatIsNotComing() {
+    @Test
+    func nobodyWaitsForEverForACommentFileThatIsNotComing() {
         probe.base.addFile("/A/descript.ion", "a.txt the comment\r\n")
         probe.base.addFile("/A/a.txt")
         let store = CommentStore(fileSystems: fileSystems)
@@ -685,7 +711,8 @@ final class P2Bench: ShellServices {
         #expect(store.comments(in: folder)["a.txt"] == "the comment")
     }
 
-    @Test func aCommentThatIsBeingSavedIsNotWrittenFromAReadingThatWasStopped() throws {
+    @Test
+    func aCommentThatIsBeingSavedIsNotWrittenFromAReadingThatWasStopped() throws {
         memory.addFile("/A/descript.ion", "a.txt old\r\nb.txt other\r\n")
         let store = CommentStore(fileSystems: fileSystems)
         let flag = CancellationFlag()
@@ -700,7 +727,8 @@ final class P2Bench: ShellServices {
     }
 
     // G002: the six reproducers the fuzzer kept, through the checks that failed.
-    @Test func theCommentFilesThatWereMisreadOrLostAreReadAndRewrittenWhole() throws {
+    @Test
+    func theCommentFilesThatWereMisreadOrLostAreReadAndRewrittenWhole() throws {
         func bytes(_ name: String) throws -> [UInt8] {
             let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
                 .appendingPathComponent("Fuzz/repro/misc/\(name)")
@@ -753,7 +781,9 @@ final class P2Bench: ShellServices {
     }
 }
 
-@MainActor @Suite struct Review2FileopsP2PropertyCommands {
+@MainActor
+@Suite
+struct Review2FileopsP2PropertyCommands {
     let box: Sandbox
     let ui = ScriptedInteraction()
     let jobs = P2DeferredJobs()
@@ -778,7 +808,8 @@ final class P2Bench: ShellServices {
     }
 
     // F037: a dialog about what the panel showed when the command was given.
-    @Test func aDialogIsNotShownOnceThePanelShowsAnotherFolder() throws {
+    @Test
+    func aDialogIsNotShownOnceThePanelShowsAnotherFolder() throws {
         bench.left.moveCursor(toName: "a.txt")
         for command in [CommandID.setAttributes, .editComment] {
             #expect(bench.commands.perform(command))
@@ -813,7 +844,8 @@ final class P2Bench: ShellServices {
     }
 
     // F038: the names of owner and group are asked for in the job.
-    @Test func ownerAndGroupAreLookedUpBeforeTheDialogNotWhileItIsMade() throws {
+    @Test
+    func ownerAndGroupAreLookedUpBeforeTheDialogNotWhileItIsMade() throws {
         bench.left.moveCursor(toName: "a.txt")
         var afterWork = -1
         jobs.afterWork = { afterWork = LocalInfo.nameLookups }
@@ -829,7 +861,8 @@ final class P2Bench: ShellServices {
     }
 
     // F070
-    @Test func allFolderSizesAreOfferedOnlyWhereThereAreFolders() {
+    @Test
+    func allFolderSizesAreOfferedOnlyWhereThereAreFolders() {
         #expect(bench.commands.isEnabled(.countDirectoryContents))
         bench.left.show(box.url("files"))
         #expect(!bench.commands.isEnabled(.countDirectoryContents))
@@ -844,7 +877,8 @@ final class P2Bench: ShellServices {
         #expect(bench.left.model.items.allSatisfy { $0.computedSize == nil })
     }
 
-    @Test func theSizesAreShownAlsoWhenTheListChangedWhileTheyWereWorkedOut() throws {
+    @Test
+    func theSizesAreShownAlsoWhenTheListChangedWhileTheyWereWorkedOut() throws {
         #expect(bench.commands.perform(.countDirectoryContents))
         // The same folder, another list: a file was added while the job ran.
         try box.file("d/zz-new.txt", "new")
@@ -854,7 +888,8 @@ final class P2Bench: ShellServices {
     }
 
     // F010, and the sizes and marks after Calculate Occupied Space.
-    @Test func whatACommandChangedIsShownInThePanelAfterwards() {
+    @Test
+    func whatACommandChangedIsShownInThePanelAfterwards() {
         bench.left.moveCursor(toName: "a.txt")
         #expect(bench.commands.perform(.setAttributes, .text("= +m600")))
         jobs.deliver()

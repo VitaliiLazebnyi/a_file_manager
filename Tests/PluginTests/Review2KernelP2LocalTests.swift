@@ -118,10 +118,12 @@ private final class DeadVolume: @unchecked Sendable {
 
 /// Review 2, second pass: what the local file system says about its entries, and its changes
 /// for callers that hold a cancellation flag.
-@Suite struct Review2KernelP2LocalItems {
+@Suite
+struct Review2KernelP2LocalItems {
     let local = LocalFileSystem()
 
-    @Test func aLinkToAFileSaysHowLargeThatFileIs() throws {
+    @Test
+    func aLinkToAFileSaysHowLargeThatFileIs() throws {
         let box = try Sandbox()
         try box.file("big.bin", "12345")
         try box.folder("folder")
@@ -150,7 +152,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(local.item(at: box.url("to-file"))?.linkTargetSize == 10)
     }
 
-    @Test func theTopOfEveryLocalLocationIsKnownWithoutGoingUp() {
+    @Test
+    func theTopOfEveryLocalLocationIsKnownWithoutGoingUp() {
         let deep = URL(fileURLWithPath: "/" + (0..<300).map { "d\($0)" }.joined(separator: "/"))
         #expect(local.root(of: deep).path == "/" && local.root(of: URL(fileURLWithPath: "/")).path == "/")
         // What going up gives, which is what the kernel did before.
@@ -160,12 +163,14 @@ private final class DeadVolume: @unchecked Sendable {
     }
 }
 
-@Suite struct Review2KernelP2LocalChanges {
+@Suite
+struct Review2KernelP2LocalChanges {
     let local = LocalFileSystem()
 
     // MARK: L029 — a folder that must be new
 
-    @Test func aFolderThatMustBeNewIsMadeOnlyWhereNothingHasItsName() throws {
+    @Test
+    func aFolderThatMustBeNewIsMadeOnlyWhereNothingHasItsName() throws {
         let box = try Sandbox()
         // Missing parents are made as usual; the last name must be free.
         try local.createDirectory(at: box.url("a/b/new"), exclusive: true)
@@ -193,7 +198,8 @@ private final class DeadVolume: @unchecked Sendable {
         }
     }
 
-    @Test func aFolderThatMayBeThereIsMadeAsBefore() throws {
+    @Test
+    func aFolderThatMayBeThereIsMadeAsBefore() throws {
         let box = try Sandbox()
         // The plain call keeps its contract: an existing folder, or a link to one, is success.
         try local.createDirectory(at: box.url("x/y/z"))
@@ -220,7 +226,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(box.exists("slash"))
     }
 
-    @Test func manyThreadsMakeTheSameFoldersAtOnce() throws {
+    @Test
+    func manyThreadsMakeTheSameFoldersAtOnce() throws {
         let box = try Sandbox()
         let failures = Locked(0)
         DispatchQueue.concurrentPerform(iterations: 32) { index in
@@ -246,7 +253,8 @@ private final class DeadVolume: @unchecked Sendable {
 
     // MARK: F043 — deleting inside a tree whose folders may be swapped for links
 
-    @Test func anItemOfATreeIsRemovedOnlyWhereTheTreeReallyIs() throws {
+    @Test
+    func anItemOfATreeIsRemovedOnlyWhereTheTreeReallyIs() throws {
         let box = try Sandbox()
         try box.file("tree/sub/deep/a.txt")
         try box.file("tree/sub/b.txt")
@@ -303,7 +311,8 @@ private final class DeadVolume: @unchecked Sendable {
 
     // MARK: L023 — the changing calls with a flag, on a disk of this Mac
 
-    @Test func theChangingCallsWorkWithAFlagAsWithout() throws {
+    @Test
+    func theChangingCallsWorkWithAFlagAsWithout() throws {
         let box = try Sandbox()
         let flag = CancellationFlag()
         try local.createDirectory(at: box.url("made/inner"), cancellation: flag)
@@ -359,7 +368,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(box.exists("full/in.txt"))
     }
 
-    @Test func aFlagThatIsSetKeepsEveryChangeFromBeingBegun() throws {
+    @Test
+    func aFlagThatIsSetKeepsEveryChangeFromBeingBegun() throws {
         let box = try Sandbox()
         try box.file("a.txt", "abc")
         let before = try #require(local.item(at: box.url("a.txt")))
@@ -401,7 +411,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(local.item(at: box.url("a.txt")) == before && local.quarantine(of: box.url("a.txt")) == nil)
     }
 
-    @Test func aLockThatWasTakenOffForAChangeIsPutBackWhenTheChangeIsStopped() throws {
+    @Test
+    func aLockThatWasTakenOffForAChangeIsPutBackWhenTheChangeIsStopped() throws {
         let box = try Sandbox()
         let file = try box.file("locked.txt")
         #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -437,7 +448,8 @@ private final class DeadVolume: @unchecked Sendable {
         )
     }
 
-    @Test func aCopyIsStoppedBetweenTheStepsTheSystemReports() throws {
+    @Test
+    func aCopyIsStoppedBetweenTheStepsTheSystemReports() throws {
         let box = try Sandbox()
         // Large enough for the system to report progress where it copies block by block.
         let source = box.url("source.bin")
@@ -465,8 +477,10 @@ private final class DeadVolume: @unchecked Sendable {
 }
 
 /// A share whose server has gone, stood in for by a folder whose questions do not come back.
-@Suite struct Review2KernelP2DeadVolume {
-    @Test func aChangeOnAVolumeThatDoesNotAnswerIsLeftBehindWhenItsFlagIsSet() throws {
+@Suite
+struct Review2KernelP2DeadVolume {
+    @Test
+    func aChangeOnAVolumeThatDoesNotAnswerIsLeftBehindWhenItsFlagIsSet() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("share/a.txt", "a")
@@ -495,7 +509,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(!box.exists("share/a.txt"))
     }
 
-    @Test func aVolumeWithSeveralCallsLeftBehindIsNotAskedAgainUntilOneReturns() throws {
+    @Test
+    func aVolumeWithSeveralCallsLeftBehindIsNotAskedAgainUntilOneReturns() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         let local = dead.fileSystem(patienceAfterCancel: 0.05)
@@ -531,7 +546,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(box.exists("share/more"))
     }
 
-    @Test func aChangeThatComesBackInTimeIsNotLeftBehind() throws {
+    @Test
+    func aChangeThatComesBackInTimeIsNotLeftBehind() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("share/a.txt", "a")
@@ -552,7 +568,8 @@ private final class DeadVolume: @unchecked Sendable {
         )
     }
 
-    @Test func aCopyOntoAVolumeThatDoesNotAnswerLeavesNothingAndReportsToNobodyAfterItWasLeft() throws {
+    @Test
+    func aCopyOntoAVolumeThatDoesNotAnswerLeavesNothingAndReportsToNobodyAfterItWasLeft() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("here/a.txt", "abc")
@@ -573,7 +590,8 @@ private final class DeadVolume: @unchecked Sendable {
         #expect(!box.exists("share/a.txt") && reports.withValue { $0 } == 0 && box.read("here/a.txt") == "abc")
     }
 
-    @Test func theVolumeIsAskedOnceAndAnsweredFromMemoryWhileItIsSilent() async throws {
+    @Test
+    func theVolumeIsAskedOnceAndAnsweredFromMemoryWhileItIsSilent() async throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("share/a.txt")
@@ -651,7 +669,8 @@ private final class DeadVolume: @unchecked Sendable {
     /// K004 / K007 / K040 end to end, as far as a stand-in can show it: a panel that is
     /// pointed at a dead share again and again costs one thread per question, the caller
     /// leaves with its flag, and the folders on healthy disks load meanwhile.
-    @Test func aFolderOnADeadShareIsTriedAgainAndAgainWithoutCostingAThreadEachTime() throws {
+    @Test
+    func aFolderOnADeadShareIsTriedAgainAndAgainWithoutCostingAThreadEachTime() throws {
         let box = try Sandbox()
         let dead = DeadVolume(try box.folder("share"))
         try box.file("share/sub/a.txt")

@@ -7,14 +7,16 @@ import Testing
 
 @testable import FindFilesPlugin
 
-@Suite struct TextPatterns {
+@Suite
+struct TextPatterns {
     func pattern(_ text: String, caseSensitive: Bool = false, _ options: TextSearchOptions = TextSearchOptions()) throws
         -> TextPattern
     {
         try TextPattern(text, caseSensitive: caseSensitive, options: options)
     }
 
-    @Test func plainTextIgnoresCaseUnlessAsked() throws {
+    @Test
+    func plainTextIgnoresCaseUnlessAsked() throws {
         let data = Data("Quarterly REPORT for Ärger GmbH".utf8)
         #expect(try pattern("report").isFound(in: data))
         #expect(try !pattern("report", caseSensitive: true).isFound(in: data))
@@ -24,13 +26,15 @@ import Testing
         #expect(try !pattern("ärger", caseSensitive: true).isFound(in: data))
     }
 
-    @Test func escapesStandForTabAndLineBreak() throws {
+    @Test
+    func escapesStandForTabAndLineBreak() throws {
         #expect(TextPattern.unescape("a\\tb\\nc\\\\d\\x") == "a\tb\nc\\d\\x")
         #expect(try pattern("one\\ttwo").isFound(in: Data("one\ttwo".utf8)))
         #expect(try pattern("end\\nstart").isFound(in: Data("end\nstart".utf8)))
     }
 
-    @Test func wholeWords() throws {
+    @Test
+    func wholeWords() throws {
         let words = TextSearchOptions(wholeWords: true)
         #expect(try pattern("port", words).isFound(in: Data("the port is open".utf8)))
         #expect(try pattern("port", words).isFound(in: Data("port".utf8)))
@@ -42,7 +46,8 @@ import Testing
         #expect(try pattern("port", words).isFound(in: Data("report, port".utf8)))
     }
 
-    @Test func hitsAcrossBlockBordersAreFoundWithTheirSurroundings() throws {
+    @Test
+    func hitsAcrossBlockBordersAreFoundWithTheirSurroundings() throws {
         let text = String(repeating: "x", count: 61) + " needle " + String(repeating: "y", count: 40) + " needles"
         let words = TextSearchOptions(wholeWords: true)
         for blockSize in 1...40 {
@@ -54,7 +59,8 @@ import Testing
         }
     }
 
-    @Test func encodings() throws {
+    @Test
+    func encodings() throws {
         let text = "Grüße aus Köln"
         let latin = try #require(text.data(using: .windowsCP1252))
         let dos = try #require(text.data(using: TextEncoding.dos.stringEncoding))
@@ -76,7 +82,8 @@ import Testing
         #expect(try !pattern("au", words).isFound(in: little))
     }
 
-    @Test func textThatAnEncodingCannotWriteDropsThatEncoding() throws {
+    @Test
+    func textThatAnEncodingCannotWriteDropsThatEncoding() throws {
         let both = try pattern("日本", TextSearchOptions(encodings: [.western, .utf8]))
         #expect(both.droppedEncodings == [.western])
         #expect(both.isFound(in: Data("in 日本 gewesen".utf8)))
@@ -86,7 +93,8 @@ import Testing
         #expect(throws: TextPattern.Problem.emptyText) { try pattern("") }
     }
 
-    @Test func hexBytes() throws {
+    @Test
+    func hexBytes() throws {
         let hex = TextSearchOptions(hex: true)
         let data = Data([0x50, 0x4B, 0x03, 0x04, 0x00, 0xFF, 0x12])
         #expect(try pattern("00 FF 12", hex).isFound(in: data))
@@ -102,7 +110,8 @@ import Testing
         }
     }
 
-    @Test func regularExpressionsMatchLineByLine() throws {
+    @Test
+    func regularExpressionsMatchLineByLine() throws {
         let regex = TextSearchOptions(regex: true)
         let data = Data("first line\nError 42: disk full\r\nlast line".utf8)
         #expect(try pattern("^error \\d+", regex).isFound(in: data))
@@ -115,7 +124,8 @@ import Testing
         #expect(throws: TextPattern.Problem.self) { try pattern("(open", regex) }
     }
 
-    @Test func regularExpressionsInOtherEncodings() throws {
+    @Test
+    func regularExpressionsInOtherEncodings() throws {
         let text = "erste Zeile\nGröße: 12 cm\nEnde"
         let utf16 = TextSearchOptions(regex: true, encodings: [.utf16])
         var withMark = Data([0xFE, 0xFF])
@@ -134,7 +144,8 @@ import Testing
     }
 }
 
-@Suite struct SearchCriteriaRules {
+@Suite
+struct SearchCriteriaRules {
     let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
@@ -163,7 +174,8 @@ import Testing
         )
     }
 
-    @Test func ageCutsOffAtMidnightForDaysAndLonger() {
+    @Test
+    func ageCutsOffAtMidnightForDaysAndLonger() {
         let now = date(12, 15)
         #expect(Age(3, .hours).cutoff(before: now, calendar: calendar) == date(12, 12))
         #expect(Age(90, .minutes).cutoff(before: now, calendar: calendar) == now.addingTimeInterval(-5_400))
@@ -179,7 +191,8 @@ import Testing
         )
     }
 
-    @Test func dateCriteria() {
+    @Test
+    func dateCriteria() {
         let now = date(12, 15)
         var criteria = FileCriteria(notOlderThan: Age(2, .days))
         #expect(criteria.matches(file(modified: date(10, 1)), now: now, calendar: calendar))
@@ -202,7 +215,8 @@ import Testing
         #expect(FileCriteria().isEmpty && !criteria.isEmpty)
     }
 
-    @Test func sizeRules() {
+    @Test
+    func sizeRules() {
         #expect(SizeRule(.equal, 19).matches(19) && !SizeRule(.equal, 19).matches(20))
         #expect(SizeRule(.greater, 1, .kilobytes).matches(1_025) && !SizeRule(.greater, 1, .kilobytes).matches(1_024))
         #expect(
@@ -220,7 +234,8 @@ import Testing
         #expect(!criteria.matches(file("dir", size: 100, directory: true), now: Date()))
     }
 
-    @Test func attributesAreTriState() {
+    @Test
+    func attributesAreTriState() {
         var criteria = FileCriteria()
         #expect(!criteria.hasAttributes)
         criteria.hidden = .yes
@@ -247,7 +262,8 @@ import Testing
         )
     }
 
-    @Test func fieldRuleOperators() {
+    @Test
+    func fieldRuleOperators() {
         func rule(_ comparison: FieldRule.Operator, _ value: String) -> FieldRule { FieldRule("f", comparison, value) }
         #expect(rule(.contains, "CAM").matches("TestCam 3") && !rule(.containsCase, "CAM").matches("TestCam 3"))
         #expect(rule(.notContains, "nikon").matches("TestCam") && rule(.notContainsCase, "cam").matches("TestCam"))
@@ -267,7 +283,8 @@ import Testing
         #expect(FieldRule.Operator.allCases.map(\.title).count == Set(FieldRule.Operator.allCases.map(\.title)).count)
     }
 
-    @Test func fieldRulesCombineWithAndOrOr() {
+    @Test
+    func fieldRulesCombineWithAndOrOr() {
         let fields = [
             "len": SearchField(id: "len", title: "Length") { String($0.name.count) },
             "name": SearchField(id: "name", title: "Name") { $0.name }
@@ -318,7 +335,8 @@ private final class ArchiveFake: FileSystemProvider {
     }
 }
 
-@Suite struct ExtendedSearching {
+@Suite
+struct ExtendedSearching {
     let fileSystems: FileSystemRegistry
     let memory: MemoryFileSystem
 
@@ -342,7 +360,8 @@ private final class ArchiveFake: FileSystemProvider {
         SearchQuery(directory: memory.url(path), names: names, text: text)
     }
 
-    @Test func masksWithQuotesAndSpaces() {
+    @Test
+    func masksWithQuotesAndSpaces() {
         #expect(SearchMask("\"Budget 2026.xls\" *.bak").matches("budget 2026.xls"))
         #expect(!SearchMask("\"Budget 2026.xls\" *.bak").matches("Budget.xls"))
         // A name with spaces typed as it is: the whole field is tried as one name.
@@ -356,7 +375,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(find(query(names: "\"Budget 2026.xls\"")) == ["/work/Budget 2026.xls"])
     }
 
-    @Test func regularExpressionForNames() {
+    @Test
+    func regularExpressionForNames() {
         #expect(SearchMask("^budget.*\\.(xls|bak)$", regex: true).matches("Budget 2026.xls"))
         #expect(!SearchMask("^budget.*\\.(xls|bak)$", regex: true).matches("my budget.xls"))
         #expect(SearchMask("", regex: true).matches("anything"))
@@ -368,7 +388,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(search.problem != nil && find(regex).isEmpty)
     }
 
-    @Test func severalStartDirectoriesAreSearchedInTurn() {
+    @Test
+    func severalStartDirectoriesAreSearchedInTurn() {
         var several = query(names: "budget")
         several.moreDirectories = [memory.url("/other")]
         #expect(find(several) == ["/work/Budget 2026.xls", "/work/old/budget.bak", "/other/budget.txt"])
@@ -376,7 +397,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(find(several) == ["/work/Budget 2026.xls", "/other/budget.txt"])
     }
 
-    @Test func onlyChosenItemsAreSearched() {
+    @Test
+    func onlyChosenItemsAreSearched() {
         var chosen = query(names: "*.txt *.bak *.md")
         chosen.onlyItems = [
             memory.url("/work/notes.txt"), memory.url("/work/old"), memory.url("/other/photo.jpg"), memory.url("/gone")
@@ -393,7 +415,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(find(chosen) == ["/work/notes.txt"])
     }
 
-    @Test func criteriaNarrowTheSearch() {
+    @Test
+    func criteriaNarrowTheSearch() {
         var sized = query()
         sized.criteria.size = SizeRule(.greater, 10)
         #expect(find(sized) == ["/work/notes.txt", "/work/old/budget.bak"])
@@ -405,7 +428,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(find(folders) == ["/work/old", "/work/old/deep"])
     }
 
-    @Test func textOptionsReachTheSearch() {
+    @Test
+    func textOptionsReachTheSearch() {
         var whole = query(text: "budget")
         #expect(find(whole) == ["/work/notes.txt", "/work/old/budget.bak"])
         whole.textOptions.notContaining = true
@@ -422,7 +446,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(find(hex).isEmpty)
     }
 
-    @Test func fieldRulesUseBuiltInFieldsAndPluginColumns() {
+    @Test
+    func fieldRulesUseBuiltInFieldsAndPluginColumns() {
         let columns = ColumnRegistry()
         columns.register(
             ContentColumn(id: "comment", title: "Comment") { $0.name.hasPrefix("budget") ? "checked by Ann" : "" }
@@ -448,7 +473,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(fields.first == "tc.name" && fields.last == "comment")
     }
 
-    @Test func archivesAreSearchedWhereAFileSystemOffersTheirContents() {
+    @Test
+    func archivesAreSearchedWhereAFileSystemOffersTheirContents() {
         let archive = ArchiveFake()
         archive.inner.addFile("/pack/inside/budget.txt", "packed budget")
         archive.inner.addFile("/pack/top.txt", "nothing")
@@ -467,7 +493,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(find(inArchives).isEmpty)
     }
 
-    @Test func manyFilesAreExaminedOnAllCoresAndReportedInOrder() throws {
+    @Test
+    func manyFilesAreExaminedOnAllCoresAndReportedInOrder() throws {
         let box = try Sandbox()
         for index in 0..<300 {
             try box.file(
@@ -493,7 +520,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(found == expected)
     }
 
-    @Test func acceptsChecksAnItemFoundElsewhere() throws {
+    @Test
+    func acceptsChecksAnItemFoundElsewhere() throws {
         var query = query(names: "*.txt", text: "budget")
         query.criteria.size = SizeRule(.greater, 5)
         let search = FileSearch(query, fileSystems: fileSystems)
@@ -507,7 +535,8 @@ private final class ArchiveFake: FileSystemProvider {
     }
 }
 
-@Suite struct Duplicates {
+@Suite
+struct Duplicates {
     let fileSystems: FileSystemRegistry
     let memory: MemoryFileSystem
 
@@ -528,7 +557,8 @@ private final class ArchiveFake: FileSystemProvider {
         return FileSearch(query, fileSystems: fileSystems).runForDuplicates().map { $0.map(\.url.path) }
     }
 
-    @Test func sameNameAndSize() {
+    @Test
+    func sameNameAndSize() {
         #expect(groups(DuplicateOptions(isEnabled: true)) == [["/d/A/copy.txt", "/d/B/copy.txt"]])
         #expect(
             groups(DuplicateOptions(isEnabled: true, sameName: true, sameSize: false))
@@ -536,14 +566,16 @@ private final class ArchiveFake: FileSystemProvider {
         )
     }
 
-    @Test func sameSizeGroupsAreOrderedBySize() {
+    @Test
+    func sameSizeGroupsAreOrderedBySize() {
         #expect(
             groups(DuplicateOptions(isEnabled: true, sameName: false, sameSize: true))
                 == [["/d/A/alpha.bin", "/d/B/beta.bin", "/d/B/gamma.bin"], ["/d/A/copy.txt", "/d/B/copy.txt"]]
         )
     }
 
-    @Test func sameContentsIsDecidedByHashing() {
+    @Test
+    func sameContentsIsDecidedByHashing() {
         #expect(
             groups(DuplicateOptions(isEnabled: true, sameName: false, sameSize: false, sameContents: true))
                 == [["/d/A/alpha.bin", "/d/B/beta.bin"], ["/d/A/copy.txt", "/d/B/copy.txt"]]
@@ -559,13 +591,15 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(DuplicateFinder.digest(of: memory.url("/d/gone"), fileSystems: fileSystems) == nil)
     }
 
-    @Test func noSubCriterionSwitchesTheOptionOff() {
+    @Test
+    func noSubCriterionSwitchesTheOptionOff() {
         let none = DuplicateOptions(isEnabled: true, sameName: false, sameSize: false, sameContents: false)
         #expect(!none.isActive && groups(none).isEmpty)
         #expect(!DuplicateOptions().isActive)
     }
 
-    @Test func manyFilesAreHashedOnAllCores() throws {
+    @Test
+    func manyFilesAreHashedOnAllCores() throws {
         let box = try Sandbox()
         for index in 0..<240 {
             try box.file(
@@ -587,7 +621,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(found.allSatisfy { group in group.map(\.url.path) == group.map(\.url.path).sorted() })
     }
 
-    @Test func aCancelledRunShowsNothing() {
+    @Test
+    func aCancelledRunShowsNothing() {
         var query = SearchQuery(directory: memory.url("/d"))
         query.duplicates = DuplicateOptions(isEnabled: true, sameName: false, sameSize: false, sameContents: true)
         let search = FileSearch(query, fileSystems: fileSystems)
@@ -609,14 +644,16 @@ private final class ArchiveFake: FileSystemProvider {
     }
 }
 
-@Suite struct SavedSearches {
+@Suite
+struct SavedSearches {
     func settings(_ searchFor: String, in searchIn: String = "") -> SearchSettings {
         var settings = SearchSettings()
         (settings.searchFor, settings.searchIn) = (searchFor, searchIn)
         return settings
     }
 
-    @Test func savingLoadingAndDeleting() {
+    @Test
+    func savingLoadingAndDeleting() {
         let memory = MemorySettings()
         let store = SearchStore(settings: memory)
         #expect(store.searches.isEmpty)
@@ -637,7 +674,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(store.searches.map(\.name) == ["PICTURES"])
     }
 
-    @Test func aLeadingAngleKeepsTheFieldOfTheWindow() {
+    @Test
+    func aLeadingAngleKeepsTheFieldOfTheWindow() {
         let current = settings("*.swift", in: "/Users/x/src")
         var saved = settings(">", in: ">")
         saved.depth = 2
@@ -646,7 +684,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(settings("*.md", in: "/tmp").loaded(over: current).searchFor == "*.md")
     }
 
-    @Test func summaryNamesWhatIsNotDefault() {
+    @Test
+    func summaryNamesWhatIsNotDefault() {
         #expect(SearchSettings().summary.isEmpty)
         var all = settings("*.txt")
         (all.namesAreRegex, all.findText, all.text, all.searchArchives, all.depth, all.useSpotlight) = (
@@ -660,7 +699,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(all.summary == "*.txt, regex, text \"x\", date, zip, size, attr, 2x, D<=3, plugins, Spotlight")
     }
 
-    @Test func fieldHistoriesKeepTheNewestFirst() {
+    @Test
+    func fieldHistoriesKeepTheNewestFirst() {
         let store = SearchStore(settings: MemorySettings())
         for text in ["a", "b", "c", "a", ""] { store.remember(text, in: .searchFor, limit: 2) }
         #expect(store.history(.searchFor) == ["a", "c"] && store.history(.text).isEmpty)
@@ -668,7 +708,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(store.history(.searchFor) == ["c"])
     }
 
-    @Test func settingsBecomeAQuery() {
+    @Test
+    func settingsBecomeAQuery() {
         let (fileSystems, memory) = makeFileSystems()
         var form = settings("*.txt", in: " mem:/work ; /tmp/x;sub ;")
         (form.findText, form.text, form.caseSensitive, form.depth) = (false, "ignored", true, 1)
@@ -694,12 +735,14 @@ private final class ArchiveFake: FileSystemProvider {
     }
 }
 
-@Suite struct SpotlightQueries {
+@Suite
+struct SpotlightQueries {
     func query(names: String = "", text: String = "") -> SearchQuery {
         SearchQuery(directory: URL(fileURLWithPath: "/Users/x"), names: names, text: text)
     }
 
-    @Test func questionsInSpotlightsLanguage() {
+    @Test
+    func questionsInSpotlightsLanguage() {
         #expect(SpotlightQuery.string(for: query()) == "kMDItemFSName == \"*\"")
         #expect(
             SpotlightQuery.string(for: query(names: "*.txt report | *.bak"))
@@ -716,7 +759,8 @@ private final class ArchiveFake: FileSystemProvider {
         )
     }
 
-    @Test func sizesAndDates() {
+    @Test
+    func sizesAndDates() {
         var sized = query()
         sized.criteria.size = SizeRule(.equal, 2, .kilobytes)
         sized.criteria.dateFrom = Date(timeIntervalSince1970: 0)
@@ -731,7 +775,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(SpotlightQuery.string(for: sized) == "kMDItemFSSize > 1572864")
     }
 
-    @Test func spotlightUnderstandsEveryQuestion() {
+    @Test
+    func spotlightUnderstandsEveryQuestion() {
         var full = query(names: "*.txt \"my file.doc\" | *.bak a\"b", text: "a \"quoted\" \\ text*")
         full.criteria = FileCriteria(
             dateFrom: Date(),
@@ -745,7 +790,8 @@ private final class ArchiveFake: FileSystemProvider {
         }
     }
 
-    @Test func whatTheIndexCannotAnswerIsLeftToTheSearch() {
+    @Test
+    func whatTheIndexCannotAnswerIsLeftToTheSearch() {
         var regex = query(names: "^a", text: "x+")
         regex.namesAreRegex = true
         regex.textOptions.regex = true
@@ -763,7 +809,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(!SpotlightQuery.isAvailable(for: chosen))
     }
 
-    @Test func answersAreCheckedAgainstTheWholeSearch() throws {
+    @Test
+    func answersAreCheckedAgainstTheWholeSearch() throws {
         let box = try Sandbox()
         try box.file("a/report.txt", "about apples")
         try box.file("a/deep/report.txt", "about apples")
@@ -804,7 +851,9 @@ private final class ArchiveFake: FileSystemProvider {
 
 /// The window driven without being shown: its form, a search from start to finish, and what
 /// the buttons below the list do.
-@MainActor @Suite final class FindFilesWindow {
+@MainActor
+@Suite
+final class FindFilesWindow {
     final class Lists: FileListService {
         var shown: [(files: [URL], title: String, panel: any PanelHandle)] = []
         func show(_ files: [URL], title: String, in panel: any PanelHandle) { shown.append((files, title, panel)) }
@@ -846,7 +895,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(await RunLoopWait.until { !window.isSearching })
     }
 
-    @Test func registersCommandsMenusAndPreferences() {
+    @Test
+    func registersCommandsMenusAndPreferences() {
         #expect(bench.commands[.searchFor]?.title == "Find Files…" && bench.commands["cm_SearchStandalone"] != nil)
         #expect(bench.kernel.keyBindings.command(for: .f(7, .option)) == .searchFor)
         #expect(bench.kernel.keyBindings.command(for: .f(7, [.option, .shift])) == "cm_SearchStandalone")
@@ -858,7 +908,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(bench.commands.isEnabled("cm_SearchForInCurDir"))
     }
 
-    @Test func theFormGivesBackWhatItWasGiven() {
+    @Test
+    func theFormGivesBackWhatItWasGiven() {
         var settings = SearchSettings()
         (
             settings.searchFor, settings.searchIn, settings.namesAreRegex, settings.searchArchives,
@@ -892,7 +943,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(window.form.settings == SearchSettings())
     }
 
-    @Test func aSearchListsItsHitsUnderASummary() async {
+    @Test
+    func aSearchListsItsHitsUnderASummary() async {
         await search { $0.searchFor = "*.txt" }
         #expect(
             window.lines == [
@@ -911,7 +963,8 @@ private final class ArchiveFake: FileSystemProvider {
         )
     }
 
-    @Test func textAndDepthComeFromTheForm() async {
+    @Test
+    func textAndDepthComeFromTheForm() async {
         await search { ($0.findText, $0.text) = (true, "REPORT") }
         #expect(window.resultItems.map(\.url.path) == ["/A/one.txt", "/A/docs/one.txt", "/A/docs/three.md"])
         await search { ($0.findText, $0.text, $0.depth) = (true, "report", 0) }
@@ -920,7 +973,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(window.resultItems.map(\.url.path) == ["/B/x.txt"])
     }
 
-    @Test func duplicatesAreListedInGroups() async {
+    @Test
+    func duplicatesAreListedInGroups() async {
         memory.addFile("/A/docs/two.txt", "second")
         await search { $0.duplicates = DuplicateOptions(isEnabled: true, sameContents: true) }
         // The files of a group are in the order of their full paths.
@@ -933,20 +987,23 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(window.copyText.components(separatedBy: "\n")[3].isEmpty)
     }
 
-    @Test func aFormThatCannotBeSearchedWithIsReported() async {
+    @Test
+    func aFormThatCannotBeSearchedWithIsReported() async {
         await search { ($0.findText, $0.text, $0.textOptions.hex) = (true, "xyz", true) }
         #expect(
             bench.interaction.log == ["inform: The search cannot start"] && !window.isSearching && window.lines.isEmpty
         )
     }
 
-    @Test func onlySelectedItemsOfThePanel() async {
+    @Test
+    func onlySelectedItemsOfThePanel() async {
         bench.left.model.select(mask: "docs two.txt")
         await search { ($0.searchFor, $0.onlySelected) = ("*.txt", true) }
         #expect(window.resultItems.map(\.url.path) == ["/A/two.txt", "/A/docs/one.txt"])
     }
 
-    @Test func goToFilePutsThePanelOnTheResult() async {
+    @Test
+    func goToFilePutsThePanelOnTheResult() async {
         let navigation = bench.kernel.commands
         var went: [URL] = []
         navigation.register(
@@ -959,7 +1016,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(went == [memory.url("/A/docs/three.md")])
     }
 
-    @Test func feedToListboxHandsTheResultsToTheListService() async {
+    @Test
+    func feedToListboxHandsTheResultsToTheListService() async {
         await search { $0.searchFor = "one" }
         // Without a plugin that shows lists, nothing happens.
         window.feedToListbox()
@@ -976,7 +1034,8 @@ private final class ArchiveFake: FileSystemProvider {
         #expect(window.lines.isEmpty)
     }
 
-    @Test func newSearchEmptiesTheList() async {
+    @Test
+    func newSearchEmptiesTheList() async {
         await search { $0.searchFor = "one" }
         window.newSearch()
         #expect(window.lines.isEmpty && window.form.settings.searchFor == "one")

@@ -112,7 +112,9 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
 
 // MARK: Selection
 
-@MainActor @Suite struct ToolsAdoptSelection {
+@MainActor
+@Suite
+struct ToolsAdoptSelection {
     let memory = MemoryFileSystem()
 
     init() {
@@ -137,7 +139,8 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
 
     func marked(_ model: PanelModel) -> [String] { model.items.filter { model.isSelected($0) }.map(\.name) }
 
-    @Test func aGroupMarksBothTwins() {
+    @Test
+    func aGroupMarksBothTwins() {
         let bench = makeBench()
         bench.commands.perform(.selectGroup, .text("*.txt"))
         #expect(bench.left.model.selectionCount == 2)
@@ -146,7 +149,8 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
         #expect(bench.left.model.selectionCount == 0)
     }
 
-    @Test func invertingTreatsTheTwinsApart() {
+    @Test
+    func invertingTreatsTheTwinsApart() {
         let bench = makeBench()
         let model = bench.left.model
         model.setSelected(true, names: [composed])
@@ -157,7 +161,8 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
         #expect(!names.contains { isExactly($0, composed) })
     }
 
-    @Test func aRuleAnswersPerEntry() {
+    @Test
+    func aRuleAnswersPerEntry() {
         var type = SelectionType(name: "big")
         type.minSize = 2
         let items = memory.listing("/A")
@@ -167,7 +172,8 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
         #expect(SelectionRule(mask: "*.txt").matching(among: items, base: memory.url("/A")).count == 2)
     }
 
-    @Test func comparingKeepsTheTwinsApart() {
+    @Test
+    func comparingKeepsTheTwinsApart() {
         let early = Date(timeIntervalSince1970: 1_000_000)
         func file(_ name: String) -> FileItem {
             FileItem(url: memory.url("/x/" + name), name: name, stat: .init(size: 1, modified: early))
@@ -184,7 +190,8 @@ private func isExactly(_ name: String, _ other: String) -> Bool { name.utf8.elem
         #expect(alike.leftNames.isEmpty && alike.rightNames.isEmpty)
     }
 
-    @Test func aSelectionFileNamesTheTwinItWrites() {
+    @Test
+    func aSelectionFileNamesTheTwinItWrites() {
         let bench = makeBench()
         pasteboard.clearContents()
         pasteboard.setString(decomposed + "\n", forType: .string)
@@ -200,8 +207,11 @@ extension MemoryFileSystem {
 
 // MARK: Multi-Rename
 
-@MainActor @Suite struct ToolsAdoptMultiRename {
-    @Test func theToolFollowsTheCapabilitiesOfTheFolderItIsIn() {
+@MainActor
+@Suite
+struct ToolsAdoptMultiRename {
+    @Test
+    func theToolFollowsTheCapabilitiesOfTheFolderItIsIn() {
         let memory = MemoryFileSystem()
         memory.addFile("/open/a.txt")
         memory.addFile("/locked/b.txt")
@@ -223,7 +233,8 @@ extension MemoryFileSystem {
 
 // MARK: Find Files
 
-@Suite struct ToolsAdoptFindFiles {
+@Suite
+struct ToolsAdoptFindFiles {
     let fileSystems: FileSystemRegistry
     let memory: MemoryFileSystem
 
@@ -240,7 +251,8 @@ extension MemoryFileSystem {
         return found
     }
 
-    @Test func aFileListedBesideItsFolderIsFoundOnce() {
+    @Test
+    func aFileListedBesideItsFolderIsFoundOnce() {
         var query = SearchQuery(directory: memory.url("/D"), names: "*.txt")
         query.onlyItems = [
             memory.url("/D"), memory.url("/D/top.txt"), memory.url("/D/sub/s.txt"), memory.url("/D/sub/deep/x.txt")
@@ -256,7 +268,8 @@ extension MemoryFileSystem {
         }
     }
 
-    @Test func nestedRootsKeptForTheirDepthReportEachFileOnce() throws {
+    @Test
+    func nestedRootsKeptForTheirDepthReportEachFileOnce() throws {
         var query = SearchQuery(directory: memory.url("/D"), names: "*.txt", maxDepth: 1)
         query.moreDirectories = [memory.url("/D/sub")]
         #expect(find(query).sorted() == ["/D/sub/deep/x.txt", "/D/sub/s.txt", "/D/top.txt"])
@@ -274,7 +287,8 @@ extension MemoryFileSystem {
         }
     }
 
-    @Test func hardLinkedFilesOfOverlappingRootsAreOneResult() throws {
+    @Test
+    func hardLinkedFilesOfOverlappingRootsAreOneResult() throws {
         let box = try Sandbox()
         try box.file("one/a.txt", "a")
         var query = SearchQuery(directory: box.url("one"), names: "*.txt")
@@ -282,7 +296,8 @@ extension MemoryFileSystem {
         #expect(find(query).count == 1)
     }
 
-    @Test func cancellingEndsABlockedListing() {
+    @Test
+    func cancellingEndsABlockedListing() {
         let probe = ProbingFileSystem(memory)
         let registry = FileSystemRegistry()
         registry.register(probe)
@@ -295,7 +310,8 @@ extension MemoryFileSystem {
         #expect(done.wait(timeout: .now() + Wait.ceiling) == .success)
     }
 
-    @Test func cancellingEndsABlockedContentRead() {
+    @Test
+    func cancellingEndsABlockedContentRead() {
         let probe = ProbingFileSystem(memory)
         let registry = FileSystemRegistry()
         registry.register(probe)
@@ -309,7 +325,8 @@ extension MemoryFileSystem {
         #expect(memory.interruptions >= 1)
     }
 
-    @Test func cancellingEndsABlockedDuplicateHash() {
+    @Test
+    func cancellingEndsABlockedDuplicateHash() {
         memory.addFile("/E/a", "same")
         memory.addFile("/E/b", "same")
         let probe = ProbingFileSystem(memory)
@@ -334,7 +351,8 @@ extension MemoryFileSystem {
         #expect(groups.value?.isEmpty == true)
     }
 
-    @Test func specialItemsAreNotHashed() {
+    @Test
+    func specialItemsAreNotHashed() {
         let special = FileItem(url: memory.url("/D/top.txt"), name: "top.txt", kind: .special, stat: .init(size: 1))
         let plain = memory.item(at: memory.url("/D/sub/s.txt"))!
         let groups = DuplicateFinder.groups(
@@ -348,7 +366,8 @@ extension MemoryFileSystem {
 
 // MARK: Directory Sync
 
-@Suite struct ToolsAdoptDirectorySync {
+@Suite
+struct ToolsAdoptDirectorySync {
     let early = Date(timeIntervalSince1970: 1_000_000)
 
     func registry(_ providers: any FileSystemProvider...) -> FileSystemRegistry {
@@ -361,7 +380,8 @@ extension MemoryFileSystem {
     ///
     /// (It was Foundation's localized comparison, which is no order and ends the program for
     /// certain names; for plain names the two agree, which the second half checks.).
-    @Test func theWalkOrdersNamesAsTheSystemDoes() {
+    @Test
+    func theWalkOrdersNamesAsTheSystemDoes() {
         var state: UInt64 = 7
         let alphabet = Array("aAbBzZ0019_.- \u{e9}(")
         func name() -> String {
@@ -408,7 +428,8 @@ extension MemoryFileSystem {
         }
     }
 
-    @Test func cancellingEndsABlockedListing() {
+    @Test
+    func cancellingEndsABlockedListing() {
         let memory = MemoryFileSystem()
         memory.addFile("/L/a")
         memory.addFile("/R/a")
@@ -424,7 +445,8 @@ extension MemoryFileSystem {
         #expect(result.value?.wasCancelled == true && result.value?.errors.isEmpty == true)
     }
 
-    @Test func cancellingEndsABlockedComparisonByContent() {
+    @Test
+    func cancellingEndsABlockedComparisonByContent() {
         let memory = MemoryFileSystem()
         memory.addFile("/L/a", "same", modified: early)
         memory.addFile("/R/a", "same", modified: early)
@@ -442,7 +464,8 @@ extension MemoryFileSystem {
         #expect(result.value?.wasCancelled == true && result.value?.errors.isEmpty == true && memory.interruptions >= 1)
     }
 
-    @Test func cancellingEndsABlockedCopy() {
+    @Test
+    func cancellingEndsABlockedCopy() {
         let memory = MemoryFileSystem()
         memory.refusesInternalCopy = true
         memory.addFile("/L/new.txt", "data", modified: early)
@@ -494,7 +517,8 @@ extension MemoryFileSystem {
         return SyncPlan(rows: rows)
     }
 
-    @Test func copiesAreCommittedBeforeDeletions() {
+    @Test
+    func copiesAreCommittedBeforeDeletions() {
         let (memory, registry) = syncSetup()
         memory.quarantineValue = Data("0081;5f;Safari;".utf8)
         memory.keepsMetadata = true
@@ -513,7 +537,8 @@ extension MemoryFileSystem {
         #expect(Set(memory.metadataCopies.map(\.to)) == ["/R/folder", "/R/.new.txt.afm-sync"])
     }
 
-    @Test func aFailedCommitKeepsTheSources() {
+    @Test
+    func aFailedCommitKeepsTheSources() {
         let (memory, registry) = syncSetup()
         struct Refused: Error {}
         memory.commitFailure = Refused()
@@ -522,13 +547,15 @@ extension MemoryFileSystem {
         #expect(memory.exists("/R/gone.txt"))
     }
 
-    @Test func noCommitWhereWritesAreNotDeferred() {
+    @Test
+    func noCommitWhereWritesAreNotDeferred() {
         let (memory, registry) = syncSetup(deferred: false)
         _ = SyncExecutor(plan: plan(memory, registry), options: SyncRunOptions(), fileSystems: registry).run()
         #expect(memory.commits.isEmpty)
     }
 
-    @Test func trashIsAskedPerLocation() {
+    @Test
+    func trashIsAskedPerLocation() {
         let (memory, registry) = syncSetup(deferred: false)
         memory.capabilitiesAt = { _ in [.write, .trash] }
         let outcome = SyncExecutor(plan: plan(memory, registry), options: SyncRunOptions(), fileSystems: registry).run()
@@ -537,8 +564,11 @@ extension MemoryFileSystem {
     }
 }
 
-@MainActor @Suite struct ToolsAdoptSyncSession {
-    @Test func theSelectionOfTwoPanelsKeepsTheTwins() {
+@MainActor
+@Suite
+struct ToolsAdoptSyncSession {
+    @Test
+    func theSelectionOfTwoPanelsKeepsTheTwins() {
         let memory = MemoryFileSystem()
         memory.addFile("/A/" + composed)
         memory.addFile("/A/" + decomposed)
@@ -559,8 +589,10 @@ extension MemoryFileSystem {
 
 // MARK: Compare content
 
-@Suite struct ToolsAdoptCompare {
-    @Test func linesThatDifferOnlyInNormalisationAreEqual() {
+@Suite
+struct ToolsAdoptCompare {
+    @Test
+    func linesThatDifferOnlyInNormalisationAreEqual() {
         let options = DiffOptions()
         let nfc = TextLine("caf\u{e9} au lait")
         let nfd = TextLine("cafe\u{301} au lait")
@@ -582,7 +614,8 @@ extension MemoryFileSystem {
         #expect(!TextDiff.compute(left: [nfc], right: [TextLine("cafe au lait")], options: options).isIdentical)
     }
 
-    @Test func comparisonIgnoresNormalisationInFiles() {
+    @Test
+    func comparisonIgnoresNormalisationInFiles() {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -597,7 +630,9 @@ extension MemoryFileSystem {
         #expect(!result.isIdentical)
     }
 
-    @MainActor @Test func theChosenFilesAreTheMarkedTwins() {
+    @MainActor
+    @Test
+    func theChosenFilesAreTheMarkedTwins() {
         let memory = MemoryFileSystem()
         memory.addFile("/A/" + composed, "x")
         memory.addFile("/A/" + decomposed, "y")
@@ -617,7 +652,8 @@ extension MemoryFileSystem {
         )
     }
 
-    @Test func cancellingEndsABlockedLoad() {
+    @Test
+    func cancellingEndsABlockedLoad() {
         let memory = MemoryFileSystem()
         memory.addFile("/a.txt", "one\n")
         memory.addFile("/b.txt", "two\n")
@@ -642,7 +678,8 @@ extension MemoryFileSystem {
         #expect(result.value?.wasCancelled == true && result.value?.message == nil && memory.interruptions >= 1)
     }
 
-    @Test func cancellingEndsABlockedIdentityCheck() {
+    @Test
+    func cancellingEndsABlockedIdentityCheck() {
         let memory = MemoryFileSystem()
         memory.isLocal = false
         memory.addFile("/a", String(repeating: "0123456789", count: 1_000))
@@ -670,7 +707,8 @@ extension MemoryFileSystem {
 
 // MARK: File tools
 
-@Suite struct ToolsAdoptFileTools {
+@Suite
+struct ToolsAdoptFileTools {
     private func random(_ count: Int, seed: UInt64) -> Data {
         var state = seed
         return Data(
@@ -746,7 +784,8 @@ extension MemoryFileSystem {
         }
     }
 
-    @Test func sixBitLoopsMatchTheFirstImplementation() {
+    @Test
+    func sixBitLoopsMatchTheFirstImplementation() {
         let lengths =
             [0, 1, 2, 3, 4, 43, 44, 45, 46, 47, 89, 90, 91, 92, 135, 1_000, 4_096, 65_537]
             + (0..<60).map { ($0 * 7_919) % 3_000 }
@@ -787,7 +826,8 @@ extension MemoryFileSystem {
         }
     }
 
-    @Test func aDigestWithoutAMethodHintIsFoundInOnePassOverTheOthers() throws {
+    @Test
+    func aDigestWithoutAMethodHintIsFoundInOnePassOverTheOthers() throws {
         let box = try Sandbox()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
@@ -810,7 +850,8 @@ extension MemoryFileSystem {
         )
     }
 
-    @Test func cancellingEndsABlockedHash() {
+    @Test
+    func cancellingEndsABlockedHash() {
         let memory = MemoryFileSystem()
         memory.addFile("/h/a", "data")
         let probe = ProbingFileSystem(memory)
@@ -833,7 +874,8 @@ extension MemoryFileSystem {
         #expect(memory.interruptions >= 1)
     }
 
-    @Test func cancellingEndsABlockedSplit() {
+    @Test
+    func cancellingEndsABlockedSplit() {
         let memory = MemoryFileSystem()
         let source = memory.addFile("/s/big.bin", String(repeating: "x", count: 100))
         memory.addDirectory("/out")
@@ -858,7 +900,8 @@ extension MemoryFileSystem {
         #expect(memory.allPaths.filter { $0.hasPrefix("/out/") }.isEmpty)
     }
 
-    @Test func cancellingEndsABlockedWrite() {
+    @Test
+    func cancellingEndsABlockedWrite() {
         let memory = MemoryFileSystem()
         let source = memory.addFile("/s/data.bin", String(repeating: "x", count: 100))
         memory.addDirectory("/out")

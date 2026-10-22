@@ -291,7 +291,8 @@ final class FakeSFTPServer: @unchecked Sendable {
 
 /// The SFTP client against the delaying test server: a window of requests, answers out of
 /// order, short reads, failures, and requests that are never answered.
-@Suite(.enabled(if: FakeSFTPServer.isAvailable)) struct NetworkFixSFTP {
+@Suite(.enabled(if: FakeSFTPServer.isAvailable))
+struct NetworkFixSFTP {
     let box: Sandbox
     let center: ConnectionCenter
     let fileSystem: RemoteFileSystem
@@ -318,7 +319,8 @@ final class FakeSFTPServer: @unchecked Sendable {
         Data((0..<count).map { UInt8(truncatingIfNeeded: $0 &* 131 &+ $0 / 997) })
     }
 
-    @Test func movesDataThroughTheWindowInBothDirections() throws {
+    @Test
+    func movesDataThroughTheWindowInBothDirections() throws {
         let content = Self.pattern(4_000_000)
         let started = Date()
         let writer = try fileSystem.write(url("/big.bin"))
@@ -355,7 +357,8 @@ final class FakeSFTPServer: @unchecked Sendable {
         )
     }
 
-    @Test func aFailingReadDeliversWhatCameBeforeIt() throws {
+    @Test
+    func aFailingReadDeliversWhatCameBeforeIt() throws {
         let suite = try Self(mode: .failingReads)
         let content = Self.pattern(300_000)
         try content.write(to: suite.box.url("srv/f.bin"))
@@ -371,7 +374,8 @@ final class FakeSFTPServer: @unchecked Sendable {
         #expect(failed && got == content.prefix(98_304))
     }
 
-    @Test func aRequestThatTimesOutDoesNotCloseTheChannel() throws {
+    @Test
+    func aRequestThatTimesOutDoesNotCloseTheChannel() throws {
         let suite = try Self(mode: .hangingStat, timeout: 2)
         let content = Self.pattern(500_000)
         try content.write(to: suite.box.url("srv/f.bin"))
@@ -402,7 +406,8 @@ final class FakeSFTPServer: @unchecked Sendable {
         #expect(try session.entry(at: "/f.bin")?.size == 500_000)
     }
 
-    @Test func aStalledPipeFailsInsteadOfHanging() throws {
+    @Test
+    func aStalledPipeFailsInsteadOfHanging() throws {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
         let channel = SFTPChannel(

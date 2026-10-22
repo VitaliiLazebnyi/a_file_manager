@@ -28,7 +28,8 @@ func patternData(_ count: Int) -> Data {
 }
 
 /// The checksum methods against reference digests and the system's tools.
-@Suite struct FileToolsHashes {
+@Suite
+struct FileToolsHashes {
     func digest(_ method: ChecksumMethod, _ data: Data, pieces: Int = 1) -> String {
         let hasher = method.makeHasher()
         let step = max(1, (data.count + pieces - 1) / pieces)
@@ -38,7 +39,8 @@ func patternData(_ count: Int) -> Data {
         return hasher.finish().hex
     }
 
-    @Test func knownDigests() {
+    @Test
+    func knownDigests() {
         let abc = Data("abc".utf8)
         #expect(digest(.crc32, Data("123456789".utf8)) == "cbf43926")
         #expect(digest(.crc32, Data()) == "00000000")
@@ -130,7 +132,8 @@ func patternData(_ count: Int) -> Data {
         #expect(digest(.blake3, data, pieces: 64) == expected)
     }
 
-    @Test func agreesWithTheSystemTools() throws {
+    @Test
+    func agreesWithTheSystemTools() throws {
         let box = try Sandbox()
         let data = patternData(300_001)
         let url = box.url("data.bin")
@@ -154,7 +157,8 @@ func patternData(_ count: Int) -> Data {
         }
     }
 
-    @Test func methodsOfTheDialog() {
+    @Test
+    func methodsOfTheDialog() {
         #expect(ChecksumMethod.allCases.map(\.rawValue) == Array(0...11))
         #expect(
             ChecksumMethod(rawValue: 3) == .sha256 && ChecksumMethod(rawValue: 7) == .sha3_256
@@ -176,7 +180,8 @@ func patternData(_ count: Int) -> Data {
         }
     }
 
-    @Test func manyFilesAreHashedOnAllCoresInOrder() {
+    @Test
+    func manyFilesAreHashedOnAllCoresInOrder() {
         let (fileSystems, memory) = makeFileSystems()
         let files = (0..<300)
             .map {
@@ -210,7 +215,8 @@ func patternData(_ count: Int) -> Data {
         )
     }
 
-    @Test func hashingStopsWhenCancelled() {
+    @Test
+    func hashingStopsWhenCancelled() {
         let (fileSystems, memory) = makeFileSystems()
         let run = ToolRun(fileSystems: fileSystems)
         run.cancellation.cancel()

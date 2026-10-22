@@ -127,7 +127,8 @@ private func foldsCase(in folder: URL) throws -> Bool {
     )
 )
 struct FileOpsAdoptVolumes {
-    @Test func theThreeVolumesAreTheKindsTheseTestsNeed() throws {
+    @Test
+    func theThreeVolumesAreTheKindsTheseTestsNeed() throws {
         let (a, b, cs) = (volume("AFM_VOLUME_A"), volume("AFM_VOLUME_B"), volume("AFM_VOLUME_CS"))
         #expect(FileIdentity.device(of: a) != FileIdentity.device(of: b))
         #expect(FileIdentity.device(of: a) != FileIdentity.device(of: cs))
@@ -153,7 +154,8 @@ struct FileOpsAdoptVolumes {
         return (tree, files)
     }
 
-    @Test func aFolderMoveBetweenVolumesCopiesInParallelAndRemovesTheSources() throws {
+    @Test
+    func aFolderMoveBetweenVolumesCopiesInParallelAndRemovesTheSources() throws {
         let (a, b) = (try scratch(volume("AFM_VOLUME_A")), try scratch(volume("AFM_VOLUME_B")))
         defer {
             try? FileManager.default.removeItem(at: a)
@@ -176,7 +178,8 @@ struct FileOpsAdoptVolumes {
         #expect(!namesOnDisk(b.appendingPathComponent("tree")).contains { $0.hasPrefix(".afm-") })
     }
 
-    @Test func aRetryAfterAFailedSourceDeleteDoesNotCopyTheFileAgain() throws {
+    @Test
+    func aRetryAfterAFailedSourceDeleteDoesNotCopyTheFileAgain() throws {
         let (a, b) = (try scratch(volume("AFM_VOLUME_A")), try scratch(volume("AFM_VOLUME_B")))
         defer {
             try? FileManager.default.removeItem(at: a)
@@ -200,7 +203,9 @@ struct FileOpsAdoptVolumes {
 
     // MARK: (b) Letter case on a case-sensitive volume
 
-    @MainActor @Test func renamingToAnotherCaseNeverReplacesTheFileThatHasThatName() throws {
+    @MainActor
+    @Test
+    func renamingToAnotherCaseNeverReplacesTheFileThatHasThatName() throws {
         let cs = try scratch(volume("AFM_VOLUME_CS"))
         defer { try? FileManager.default.removeItem(at: cs) }
         try write("lower", to: cs.appendingPathComponent("readme"))
@@ -225,7 +230,8 @@ struct FileOpsAdoptVolumes {
         #expect(text(cs.appendingPathComponent("SOLO")) == "solo")
     }
 
-    @Test func aMoveOntoAnotherCaseAsksAboutTheCollisionAndKeepsBothFiles() throws {
+    @Test
+    func aMoveOntoAnotherCaseAsksAboutTheCollisionAndKeepsBothFiles() throws {
         let cs = try scratch(volume("AFM_VOLUME_CS"))
         defer { try? FileManager.default.removeItem(at: cs) }
         let readme = cs.appendingPathComponent("readme")
@@ -248,7 +254,8 @@ struct FileOpsAdoptVolumes {
 
     // MARK: (c) Copying into oneself through another spelling
 
-    @Test func aCopyIntoItsOwnSubfolderThroughAnotherSpellingIsRefused() throws {
+    @Test
+    func aCopyIntoItsOwnSubfolderThroughAnotherSpellingIsRefused() throws {
         let a = try scratch(volume("AFM_VOLUME_A"))
         defer { try? FileManager.default.removeItem(at: a) }
         try write("in", to: a.appendingPathComponent("Tree/Sub/file.txt"))

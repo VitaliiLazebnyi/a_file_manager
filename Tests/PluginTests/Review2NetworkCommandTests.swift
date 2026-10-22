@@ -26,7 +26,9 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
 }
 
 /// The Net commands (review 2: N003, N016, N017, N018, N020, N033, N083, N084, N086, N100, N104, N105).
-@MainActor @Suite struct Review2NetworkCommands {
+@MainActor
+@Suite
+struct Review2NetworkCommands {
     let box: Sandbox
     let server: TestFTPServer
     let passwords = MemoryPasswords()
@@ -76,7 +78,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
 
     // MARK: Download list
 
-    @Test func aListIsShownBeforeItRunsAndNothingHappensWithoutAYes() throws {
+    @Test
+    func aListIsShownBeforeItRunsAndNothingHappensWithoutAYes() throws {
         quickConnect("ftp://\(address)/pub")
         // The last button, Cancel.
         try runList(
@@ -97,7 +100,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         #expect(!server.commands.contains { $0.hasPrefix("STOR") || $0.hasPrefix("RETR") })
     }
 
-    @Test func anExistingFileIsNotReplacedWithoutAsking() throws {
+    @Test
+    func anExistingFileIsNotReplacedWithoutAsking() throws {
         quickConnect("ftp://\(address)/pub")
         // The list wants the download to take the name of a file that is already there.
         let precious = try box.file("other/precious.txt", "mine")
@@ -111,7 +115,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         #expect(box.read("other/precious.txt") == "report" && !box.exists("other/report.txt"))
     }
 
-    @Test func aPlainLineOnlyDownloads() throws {
+    @Test
+    func aPlainLineOnlyDownloads() throws {
         quickConnect("ftp://\(address)/pub")
         // No `put:`: a plain line that would send a file of this Mac away, or copy between
         // two local places, is not carried out.
@@ -131,7 +136,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         #expect(ui.log.last == "inform: Some lines of the download list were not carried out.")
     }
 
-    @Test func aListOfLinesThatCannotBeCarriedOutIsToldInShort() throws {
+    @Test
+    func aListOfLinesThatCannotBeCarriedOutIsToldInShort() throws {
         // Very many lines that are no transfers: one message, and no call inside a call for each.
         let lines = (0..<30_000).map { "header: X-\($0): y" }
         try runList(lines, answers: [])
@@ -145,7 +151,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         #expect(ui.log.contains { $0.hasPrefix("choose: Run this download list? (3000 downloads)") })
     }
 
-    @Test func aNameWithALineBreakIsNotAddedToAList() throws {
+    @Test
+    func aNameWithALineBreakIsNotAddedToAList() throws {
         // A server offers a file whose name would read as two lines of a list.
         try box.file("srv/pub/payload\u{2028}move:~x -> ftp:~~evil~k", "p")
         quickConnect("ftp://\(address)/pub")
@@ -168,7 +175,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
 
     // MARK: Secrets
 
-    @Test func theQuickConnectPasswordIsKeptOnlyWhenTheBoxStaysTicked() throws {
+    @Test
+    func theQuickConnectPasswordIsKeptOnlyWhenTheBoxStaysTicked() throws {
         server.options.user = "anna"
         server.options.password = "s3cret-pw"
         for (keeps, name) in [(false, "No password"), (true, "With password")] {
@@ -188,7 +196,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         )
     }
 
-    @Test func aPasswordBelongsToItsServerAndUser() {
+    @Test
+    func aPasswordBelongsToItsServerAndUser() {
         let store = ConnectionStore(settings: MemorySettings(), passwords: passwords)
         var connection = SavedConnection()
         (connection.name, connection.host, connection.user) = ("Work", "files.example.com", "anna")
@@ -230,7 +239,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         #expect(passwords.accounts.filter { $0.contains(connection.id.uuidString) }.isEmpty)
     }
 
-    @Test func passwordsOfAnEarlierVersionAreMovedOnce() {
+    @Test
+    func passwordsOfAnEarlierVersionAreMovedOnce() {
         var connection = SavedConnection()
         (connection.name, connection.host, connection.user) = ("Old", "files.example.com", "anna")
         let settings = MemorySettings()
@@ -253,7 +263,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         #expect(foreign.vault.password(for: planted.profile) == nil)
     }
 
-    @Test func certificatesInTheSettingsAreNotBelieved() {
+    @Test
+    func certificatesInTheSettingsAreNotBelieved() {
         // A settings file that came with a fingerprint for a server: it is not trusted, and it is removed.
         let settings = MemorySettings()
         settings.set(["files.example.com": ["AA:BB"]], forKey: "network.trustedCertificates")
@@ -293,7 +304,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         #expect(next.center.environment.trust.isAccepted("11:22", for: "files.example.com"))
     }
 
-    @Test func theDialogForAChangedCertificateNeedsMoreThanAButton() throws {
+    @Test
+    func theDialogForAChangedCertificateNeedsMoreThanAButton() throws {
         let environment = plugin.center.environment
         let profile = ConnectionProfile(key: ServerKey(scheme: "ftps", host: "files.example.com"))
         let old = CertificateInfo(fingerprint: "AA:BB", subject: "files", problem: "self-signed")
@@ -321,7 +333,8 @@ private final class RefusingMounter: VolumeMounter, @unchecked Sendable {
         #expect(PasswordVault(store: passwords).trustedCertificates() == ["files.example.com": ["CC:DD"]])
     }
 
-    @Test func noMessageShowsAPassword() {
+    @Test
+    func noMessageShowsAPassword() {
         // A mount that fails, and an address that is none.
         commands.perform(.netConnect, .text("smb://anna:s3cret-pw@nas.invalid/share"))
         commands.perform(.netConnect, .text("gopher://anna:s3cret-pw@old.invalid/x"))

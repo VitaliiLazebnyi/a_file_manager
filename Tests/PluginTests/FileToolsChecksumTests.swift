@@ -9,7 +9,9 @@ import Testing
 
 /// Create and Verify checksums through the plugin's commands, compared with `md5`, `shasum`
 /// and `cksum`.
-@MainActor @Suite struct FileToolsChecksums {
+@MainActor
+@Suite
+struct FileToolsChecksums {
     let memory = MemoryFileSystem()
     let box: Sandbox
     let settings = MemorySettings()
@@ -78,7 +80,8 @@ import Testing
 
     // MARK: Create
 
-    @Test func proposalsAndDialog() {
+    @Test
+    func proposalsAndDialog() {
         select(["a.txt"])
         ui.formAnswers = [.cancel]
         bench.commands.perform(.createChecksums)
@@ -102,7 +105,8 @@ import Testing
         #expect(ui.forms.last?[5].initialValue == method(.md5))
     }
 
-    @Test func md5FileMatchesTheSystemTool() throws {
+    @Test
+    func md5FileMatchesTheSystemTool() throws {
         create(["a.txt", "b b.txt"], ["method": method(.md5)])
         let expected = try ["a.txt", "b b.txt"].map { "\(try digest("/sbin/md5", ["-q"], "work/" + $0)) *\($0)\n" }
             .joined()
@@ -130,7 +134,8 @@ import Testing
         #expect(check.status == 0 && check.output.components(separatedBy: ": OK").count == 5)
     }
 
-    @Test func sfvFileMatchesCksum() throws {
+    @Test
+    func sfvFileMatchesCksum() throws {
         create(["a.txt", "b b.txt"])
         let crcs = try ["a.txt", "b b.txt"]
             .map {
@@ -139,7 +144,8 @@ import Testing
         #expect(box.read("work/work.sfv") == "a.txt \(crcs[0])\nb b.txt \(crcs[1])\n")
     }
 
-    @Test func everyMethodRoundTripsThroughVerify() {
+    @Test
+    func everyMethodRoundTripsThroughVerify() {
         for chosen in ChecksumMethod.allCases {
             create(
                 ["a.txt", "sub"],
@@ -154,7 +160,8 @@ import Testing
         }
     }
 
-    @Test func windowsFormatAndUnicodeNames() throws {
+    @Test
+    func windowsFormatAndUnicodeNames() throws {
         try box.file("work/sub/ünï.txt", "x")
         create(["sub"], ["unix": .flag(false), "method": method(.md5), "target": .text(box.url("work/win.md5").path)])
         let data = try Data(contentsOf: box.url("work/win.md5"))
@@ -183,7 +190,8 @@ import Testing
         #expect(ChecksumFile.needsByteOrderMark(names: ["a"], unixFormat: false, alwaysUTF8: false) == false)
     }
 
-    @Test func separateFilesPerFileAndPerFolder() {
+    @Test
+    func separateFilesPerFileAndPerFolder() {
         #expect(ChecksumRun.separateName(for: "test.txt", pattern: "*.*.sfv", method: .crc32) == "test.txt.sfv")
         #expect(ChecksumRun.separateName(for: "test.txt", pattern: "*.sfv", method: .crc32) == "test.sfv")
         #expect(ChecksumRun.separateName(for: "test.txt", pattern: "*.*", method: .md5) == "test.txt.md5")
@@ -222,7 +230,8 @@ import Testing
         #expect(verify(["work.md5"]).title == "MD5: Errors: 0")
     }
 
-    @Test func createOnAnotherFileSystemAndFailures() {
+    @Test
+    func createOnAnotherFileSystemAndFailures() {
         memory.addFile("/data/one.bin", "1")
         memory.addFile("/data/two.bin", "2")
         left.show(memory.url("/data"))
@@ -245,7 +254,8 @@ import Testing
 
     // MARK: Reading checksum files
 
-    @Test func lineFormats() {
+    @Test
+    func lineFormats() {
         typealias Entry = ChecksumFile.Entry
         let md5 = String(repeating: "ab", count: 16)
         let sha256 = String(repeating: "CD", count: 32)
@@ -309,7 +319,8 @@ import Testing
         )
     }
 
-    @Test func encodingsOfChecksumFiles() {
+    @Test
+    func encodingsOfChecksumFiles() {
         let line = "ä.txt 00000000\n"
         #expect(ChecksumFile.text(from: Data([0xEF, 0xBB, 0xBF]) + Data(line.utf8)) == line)
         #expect(ChecksumFile.text(from: Data(line.utf8)) == line)
@@ -321,7 +332,8 @@ import Testing
 
     // MARK: Verify
 
-    @Test func verifyReportsOkMissingAndWrong() throws {
+    @Test
+    func verifyReportsOkMissingAndWrong() throws {
         create(["a.txt", "b b.txt", "sub"], ["method": method(.md5)])
         try "changed".write(to: box.url("work/b b.txt"), atomically: true, encoding: .utf8)
         try FileManager.default.removeItem(at: box.url("work/sub/c.txt"))
@@ -352,7 +364,8 @@ import Testing
         )
     }
 
-    @Test func verifiesFilesWrittenByTheSystemTools() throws {
+    @Test
+    func verifiesFilesWrittenByTheSystemTools() throws {
         let work = box.url("work")
         try Data(
             try systemTool("/usr/bin/shasum", ["-a", "256", "a.txt", "b b.txt", "sub/c.txt"], in: work).output.utf8
@@ -400,7 +413,8 @@ import Testing
         #expect(verify(["win.sfv"]).text.contains("Wrong checksum: sub\\c.txt!"))
     }
 
-    @Test func verifyAgainstTheClipboardAndTheFileName() throws {
+    @Test
+    func verifyAgainstTheClipboardAndTheFileName() throws {
         let sha256 = try digest("/usr/bin/shasum", ["-a", "256"], "work/a.txt")
         pasteboard.clearContents()
         pasteboard.setString("  \(sha256.uppercased())\n", forType: .string)
@@ -441,7 +455,8 @@ import Testing
         )
     }
 
-    @Test func verifyManyFilesOnAnotherFileSystem() {
+    @Test
+    func verifyManyFilesOnAnotherFileSystem() {
         var lines = ""
         for index in 0..<200 {
             let content = "file number \(index)"

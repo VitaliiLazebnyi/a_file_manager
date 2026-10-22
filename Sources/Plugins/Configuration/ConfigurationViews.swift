@@ -15,7 +15,8 @@ final class ActionButton: NSButton {
         bezelStyle = .rounded
     }
 
-    @objc private func pressed() { handler?() }
+    @objc
+    private func pressed() { handler?() }
 }
 
 /// A stack whose parts fill it: across, every part is as wide (or as high) as the stack, and
@@ -169,7 +170,8 @@ final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate 
 
     func tableViewSelectionDidChange(_: Notification) { onSelect() }
 
-    @objc private func doubleClicked() {
+    @objc
+    private func doubleClicked() {
         if table.clickedRow >= 0 { onActivate?() }
     }
 }
@@ -226,7 +228,8 @@ final class StartMenuTarget: NSObject, NSMenuItemValidation {
         (item.representedObject as? String).map(CommandID.init(rawValue:))
     }
 
-    @objc func runEntry(_ sender: NSMenuItem) {
+    @objc
+    func runEntry(_ sender: NSMenuItem) {
         if let id = command(of: sender) { kernel.commands.perform(id) }
     }
 

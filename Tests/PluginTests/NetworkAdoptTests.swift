@@ -62,12 +62,14 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 }
 
 /// Cancelling, appending, per-location capabilities and links, against the FTP test server.
-@Suite struct NetworkAdoptFTP {
+@Suite
+struct NetworkAdoptFTP {
     private func connectionCount(_ fixture: FTPFixture) throws -> Int {
         try #require(try fixture.center.session(for: fixture.key) as? FTPSession).connectionCount
     }
 
-    @Test(arguments: [true, false]) func aCancelledListingEndsAtOnceAndGivesTheConnectionUp(streaming: Bool) throws {
+    @Test(arguments: [true, false])
+    func aCancelledListingEndsAtOnceAndGivesTheConnectionUp(streaming: Bool) throws {
         var options = TestFTPServer.Options()
         options.listDelay = 600
         let fixture = try FTPFixture(options) { $0.timeout = 600 }
@@ -92,7 +94,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         _ = try fixture.fileSystem.list(fixture.url("/"), showHidden: false)
     }
 
-    @Test func aFlagThatIsSetAlreadyStopsEverythingBeforeItStarts() throws {
+    @Test
+    func aFlagThatIsSetAlreadyStopsEverythingBeforeItStarts() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/f.txt", "x")
         let flag = CancellationFlag()
@@ -110,7 +113,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(!fixture.box.exists("srv/g.txt"))
     }
 
-    @Test func aCancelledListingIsNotRemembered() throws {
+    @Test
+    func aCancelledListingIsNotRemembered() throws {
         var options = TestFTPServer.Options()
         options.listDelay = 600
         let fixture = try FTPFixture(options) { $0.timeout = 600 }
@@ -127,7 +131,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(fixture.fileSystem.item(at: fixture.url("/g.txt"))?.size == 1)
     }
 
-    @Test func interruptingAReaderEndsAReadThatWaitsForTheServer() throws {
+    @Test
+    func interruptingAReaderEndsAReadThatWaitsForTheServer() throws {
         let fixture = try FTPFixture { $0.timeout = 600 }
         try fixture.box.file("srv/f.bin", String(repeating: "z", count: 1_000))
         fixture.server.options.stallRETR = true
@@ -152,7 +157,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         reader.interrupt()
     }
 
-    @Test func aReaderInterruptedBeforeItsFirstReadNeverStarts() throws {
+    @Test
+    func aReaderInterruptedBeforeItsFirstReadNeverStarts() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/f.bin", "abc")
         let reader = try fixture.fileSystem.read(fixture.url("/f.bin"))
@@ -162,7 +168,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(!fixture.server.commands.contains { $0.hasPrefix("RETR") })
     }
 
-    @Test func interruptingAWriterEndsAWriteThatWaitsForTheServer() throws {
+    @Test
+    func interruptingAWriterEndsAWriteThatWaitsForTheServer() throws {
         var options = TestFTPServer.Options()
         options.stallSTOR = true
         let fixture = try FTPFixture(options) { $0.timeout = 600 }
@@ -190,7 +197,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 
     // MARK: Continuing a file
 
-    @Test func continuesAFileInTheMiddleAtTheEndAndWhereItEnds() throws {
+    @Test
+    func continuesAFileInTheMiddleAtTheEndAndWhereItEnds() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/f.bin", "0123456789")
         let fs = fixture.fileSystem
@@ -231,7 +239,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(fixture.box.read("srv/f.bin") == "0123abcdefXYZ")
     }
 
-    @Test func aServerThatKeepsTheTailIsReportedNotTrusted() throws {
+    @Test
+    func aServerThatKeepsTheTailIsReportedNotTrusted() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/f.bin", "0123456789")
         // The new content is shorter than what lay behind the offset, and FTP cannot cut a file.
@@ -240,7 +249,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(throws: (any Error).self) { try writer.close(attributes: FileAttributes()) }
     }
 
-    @Test func withoutRESTAndInTextModeTheCapabilityIsMissing() throws {
+    @Test
+    func withoutRESTAndInTextModeTheCapabilityIsMissing() throws {
         var options = TestFTPServer.Options()
         options.offersREST = false
         let fixture = try FTPFixture(options)
@@ -268,7 +278,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 
     // MARK: Links and TLS
 
-    @Test func linksBeyondTheProbeLimitAreResolvedAfterTheListing() throws {
+    @Test
+    func linksBeyondTheProbeLimitAreResolvedAfterTheListing() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options)
@@ -291,7 +302,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(adoptWait(until: allResolved))
     }
 
-    @Test func aLinkResolvedInTheBackgroundIsAFolderInWhatTheFileSystemRemembers() throws {
+    @Test
+    func aLinkResolvedInTheBackgroundIsAFolderInWhatTheFileSystemRemembers() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options)
@@ -319,7 +331,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(adoptWait(until: allFolders))
     }
 
-    @Test func aServerThatWantsTheTLSSessionReusedGetsAnUnderstandableError() {
+    @Test
+    func aServerThatWantsTheTLSSessionReusedGetsAnUnderstandableError() {
         func reply(_ code: Int, _ text: String) -> FTPReply { FTPReply(code: code, lines: [text]) }
         #expect(FTPConnection.requiresSessionReuse(reply(522, "SSL connection failed; session reuse required")))
         #expect(FTPConnection.requiresSessionReuse(reply(522, "Data connection must use cached TLS session")))
@@ -339,8 +352,10 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 }
 
 /// Cancelling against the SFTP test server that stops answering, while other transfers share the channel.
-@Suite(.enabled(if: FakeSFTPServer.isAvailable)) struct NetworkAdoptSFTP {
-    @Test func aCancelledListingEndsAndTheChannelStaysOpen() throws {
+@Suite(.enabled(if: FakeSFTPServer.isAvailable))
+struct NetworkAdoptSFTP {
+    @Test
+    func aCancelledListingEndsAndTheChannelStaysOpen() throws {
         let suite = try NetworkFixSFTP(mode: .hangingIO, timeout: 600)
         try NetworkFixSFTP.pattern(1_000).write(to: suite.box.url("srv/f.bin"))
         let flag = CancellationFlag()
@@ -368,7 +383,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(found == nil)
     }
 
-    @Test func interruptingOneReaderLeavesTheOtherTransfersAlone() throws {
+    @Test
+    func interruptingOneReaderLeavesTheOtherTransfersAlone() throws {
         let suite = try NetworkFixSFTP(mode: .hangingIO, timeout: 600)
         try NetworkFixSFTP.pattern(500_000).write(to: suite.box.url("srv/a.bin"))
         let other = NetworkFixSFTP.pattern(50_000)
@@ -402,7 +418,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         withExtendedLifetime(token) {}
     }
 
-    @Test func interruptingAWriterEndsAWriteWhoseAnswersNeverCome() throws {
+    @Test
+    func interruptingAWriterEndsAWriteWhoseAnswersNeverCome() throws {
         let suite = try NetworkFixSFTP(mode: .hangingIO, timeout: 600)
         let other = NetworkFixSFTP.pattern(50_000)
         try other.write(to: suite.box.url("srv/b.bin"))
@@ -432,7 +449,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         withExtendedLifetime(token) {}
     }
 
-    @Test func aSendThatIsCancelledOnAFullPipeEnds() throws {
+    @Test
+    func aSendThatIsCancelledOnAFullPipeEnds() throws {
         let box = try Sandbox()
         let server = try FakeSFTPServer(root: box.url("."), box: box, mode: .stalled)
         let channel = SFTPChannel(
@@ -458,7 +476,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 }
 
 /// Continuing files over SFTP, against the system's own `sftp-server`.
-@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer))) struct NetworkAdoptSFTPAppend {
+@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer)))
+struct NetworkAdoptSFTPAppend {
     let box: Sandbox
     let fileSystem: RemoteFileSystem
     let key = ServerKey(scheme: "sftp", host: "test.invalid")
@@ -482,7 +501,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
 
     func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
 
-    @Test func continuesCutsAndAppends() throws {
+    @Test
+    func continuesCutsAndAppends() throws {
         try box.file("f.bin", "0123456789")
         #expect(fileSystem.capabilities(for: url("f.bin")).contains(.append))
         #expect(fileSystem.item(at: url("f.bin"))?.size == 10)
@@ -517,7 +537,8 @@ func adoptCancel(_ flag: CancellationFlag, after delay: TimeInterval = 0.3) {
         #expect(!box.exists("none.bin"))
     }
 
-    @Test func aLargeContinuationGoesThroughTheWindow() throws {
+    @Test
+    func aLargeContinuationGoesThroughTheWindow() throws {
         let head = Data((0..<100_000).map { UInt8(truncatingIfNeeded: $0 &* 7) })
         let tail = Data((0..<900_000).map { UInt8(truncatingIfNeeded: $0 &* 11 &+ 3) })
         try head.write(to: box.url("big.bin"))

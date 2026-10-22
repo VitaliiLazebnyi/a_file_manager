@@ -177,7 +177,8 @@ func runJob(
 }
 
 /// Every answer of the Overwrite dialog and every preset of the Copy dialog.
-@Suite struct OverwriteChoices {
+@Suite
+struct OverwriteChoices {
     let box: Sandbox
     let old = Date(timeIntervalSince1970: 1_600_000_000), new = Date(timeIntervalSince1970: 1_700_000_000)
 
@@ -192,7 +193,8 @@ func runJob(
     var sources: [URL] { [box.url("A/one.txt"), box.url("A/two.txt")] }
     var target: TargetSpec { TargetSpec(directory: box.url("B")) }
 
-    @Test func overwriteAndSkipAreForOneFileEach() {
+    @Test
+    func overwriteAndSkipAreForOneFileEach() {
         let replies = Replies(.overwrite, .skip)
         let result = runJob(.copy, sources, to: target, replies: replies)
         #expect(replies.conflicts == ["one.txt", "two.txt"])
@@ -200,7 +202,8 @@ func runJob(
         #expect(result.completed.map(\.lastPathComponent) == ["one.txt"])
     }
 
-    @Test func overwriteAllAndSkipAllAskOnce() {
+    @Test
+    func overwriteAllAndSkipAllAskOnce() {
         let all = Replies(.overwriteAll)
         runJob(.copy, sources, to: target, replies: all)
         #expect(all.conflicts == ["one.txt"] && box.read("B/two.txt") == "s2")
@@ -210,7 +213,8 @@ func runJob(
         #expect(none.conflicts == ["one.txt"] && box.read("B/one.txt") == "source one")
     }
 
-    @Test func renameAsksAgainWhenTheNewNameIsTakenToo() {
+    @Test
+    func renameAsksAgainWhenTheNewNameIsTakenToo() {
         let replies = Replies(.rename("two.txt"), .rename("fresh.txt"), .skip)
         runJob(.copy, [box.url("A/one.txt")], to: target, replies: replies)
         #expect(replies.conflicts == ["one.txt", "two.txt"])
@@ -220,13 +224,15 @@ func runJob(
         )
     }
 
-    @Test func renameExistingMovesTheTargetAsideFirst() {
+    @Test
+    func renameExistingMovesTheTargetAsideFirst() {
         let result = runJob(.copy, [box.url("A/one.txt")], to: target, replies: Replies(.renameExisting("one.old")))
         #expect(box.read("B/one.old") == "target" && box.read("B/one.txt") == "source one")
         #expect(result.lastTarget?.lastPathComponent == "one.txt")
     }
 
-    @Test func autoRenameCopiedHoldsForTheRestOfTheJob() {
+    @Test
+    func autoRenameCopiedHoldsForTheRestOfTheJob() {
         let replies = Replies(.autoRenameCopied)
         let result = runJob(.copy, sources, to: target, replies: replies)
         #expect(replies.conflicts == ["one.txt"])
@@ -234,13 +240,15 @@ func runJob(
         #expect(box.read("B/one.txt") == "target" && result.lastTarget?.lastPathComponent == "two (2).txt")
     }
 
-    @Test func autoRenameExistingKeepsTheOldFilesUnderNumberedNames() {
+    @Test
+    func autoRenameExistingKeepsTheOldFilesUnderNumberedNames() {
         runJob(.copy, sources, to: target, replies: Replies(.autoRenameExisting))
         #expect(box.read("B/one (2).txt") == "target" && box.read("B/one.txt") == "source one")
         #expect(box.read("B/two (2).txt") == "target two" && box.read("B/two.txt") == "s2")
     }
 
-    @Test func theRulesByAgeAndSize() throws {
+    @Test
+    func theRulesByAgeAndSize() throws {
         // one.txt: the source is newer and larger; two.txt: older and smaller.
         runJob(.copy, sources, to: target, replies: Replies(.copyAllLarger))
         #expect(box.read("B/one.txt") == "source one" && box.read("B/two.txt") == "target two")
@@ -255,13 +263,15 @@ func runJob(
         #expect(box.read("B/two.txt") == "s2")
     }
 
-    @Test func renameOlderSkipNewer() {
+    @Test
+    func renameOlderSkipNewer() {
         runJob(.copy, sources, to: target, replies: Replies(.renameOlderSkipNewer))
         #expect(box.read("B/one (2).txt") == "target" && box.read("B/one.txt") == "source one")
         #expect(box.read("B/two.txt") == "target two" && !box.exists("B/two (2).txt"))
     }
 
-    @Test func cancelLeavesEverythingAsItWas() {
+    @Test
+    func cancelLeavesEverythingAsItWas() {
         let result = runJob(.copy, sources, to: target, replies: Replies(.cancel))
         #expect(
             result.cancelled && box.read("B/one.txt") == "target"
@@ -269,7 +279,8 @@ func runJob(
         )
     }
 
-    @Test func aPresetAnswersWithoutAsking() {
+    @Test
+    func aPresetAnswersWithoutAsking() {
         let presets: [(OverwriteMode, String, String)] = [
             (.skipAll, "target", "target two"), (.overwriteOlder, "source one", "target two"),
             (.overwriteAll, "source one", "s2")
@@ -289,13 +300,15 @@ func runJob(
         #expect(replies.conflicts.isEmpty && box.read("B/one (2).txt") == "source one")
     }
 
-    @Test func appendAddsTheSourceToTheEndOfTheTarget() {
+    @Test
+    func appendAddsTheSourceToTheEndOfTheTarget() {
         let result = runJob(.copy, [box.url("A/one.txt")], to: target, replies: Replies(.append))
         #expect(box.read("B/one.txt") == "targetsource one" && box.read("A/one.txt") == "source one")
         #expect(result.completed.count == 1 && namesOnDisk(box.url("B")) == ["one.txt", "two.txt"])
     }
 
-    @Test func resumeContinuesAPartialFile() throws {
+    @Test
+    func resumeContinuesAPartialFile() throws {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/out/big.bin", "0123456789", modified: new, permissions: 0o600)
         try box.file("B/big.bin", "0123", modified: old)
@@ -319,7 +332,8 @@ func runJob(
         #expect(replies.errors.count == 1 && replies.errors[0].contains("cannot be resumed"))
     }
 
-    @Test func aMoveOntoAnExistingNameAsksToo() {
+    @Test
+    func aMoveOntoAnExistingNameAsksToo() {
         let replies = Replies(.overwrite, .skip)
         let result = runJob(.move, sources, to: target, replies: replies)
         #expect(!box.exists("A/one.txt") && box.read("B/one.txt") == "source one")
@@ -328,8 +342,10 @@ func runJob(
 }
 
 /// Read-only, hidden and locked items, and merging into an existing folder.
-@Suite struct ProtectedItems {
-    @Test func aReadOnlyTargetAsksASecondTime() throws {
+@Suite
+struct ProtectedItems {
+    @Test
+    func aReadOnlyTargetAsksASecondTime() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "new")
         try box.file("B/one.txt", "old")
@@ -355,7 +371,8 @@ func runJob(
         #expect(quiet.protections.isEmpty)
     }
 
-    @Test func deletingReadOnlyAndHiddenFilesAsks() {
+    @Test
+    func deletingReadOnlyAndHiddenFilesAsks() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/ro.txt", "r", permissions: 0o444)
         memory.addFile("/a/.hidden", "h")
@@ -377,7 +394,8 @@ func runJob(
         #expect(all.protections == ["readOnly delete ro.txt"] && memory.allPaths == ["/a"])
     }
 
-    @Test func aLockedFileIsAskedAboutWhenTheSystemRefuses() throws {
+    @Test
+    func aLockedFileIsAskedAboutWhenTheSystemRefuses() throws {
         let box = try Sandbox()
         let locked = try box.file("A/locked.txt", "l")
         #expect(chflags(locked.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -394,7 +412,8 @@ func runJob(
         #expect(delete.protections.count == 1 && !box.exists("A/locked.txt") && deleted.completed.count == 1)
     }
 
-    @Test func mergingIntoAnExistingFolderCanBeAskedAbout() {
+    @Test
+    func mergingIntoAnExistingFolderCanBeAskedAbout() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/one.txt", "1")
         memory.addFile("/b/docs/keep.txt", "k")
@@ -418,8 +437,10 @@ func runJob(
 }
 
 /// The options of the Copy dialog: filter, attributes, links, verify, errors, the log's records.
-@Suite struct TransferOptionsInJobs {
-    @Test func theFilterChoosesWhatIsCopied() {
+@Suite
+struct TransferOptionsInJobs {
+    @Test
+    func theFilterChoosesWhatIsCopied() {
         let (fileSystems, memory) = makeFileSystems()
         for path in [
             "/a/one.txt", "/a/two.bak", "/a/docs/in.txt", "/a/docs/pic.jpg", "/a/docs/build/out.txt",
@@ -458,7 +479,8 @@ func runJob(
         #expect(memory.allPaths.filter { $0.hasPrefix("/b/") } == ["/b/docs", "/b/docs/in.txt", "/b/one.txt"])
     }
 
-    @Test func aFilteredMoveKeepsWhatWasLeftOut() {
+    @Test
+    func aFilteredMoveKeepsWhatWasLeftOut() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/in.txt", "t")
         memory.addFile("/a/docs/pic.jpg", "j")
@@ -475,7 +497,8 @@ func runJob(
         #expect(memory.allPaths == ["/a", "/a/docs", "/a/docs/pic.jpg", "/b", "/b/docs", "/b/docs/in.txt"])
     }
 
-    @Test func renameMasksInTheTarget() throws {
+    @Test
+    func renameMasksInTheTarget() throws {
         let (fileSystems, memory) = makeFileSystems()
         let box = try Sandbox()
         try box.file("A/report.txt", "r")
@@ -514,7 +537,8 @@ func runJob(
         )
     }
 
-    @Test func attributesAndFolderDates() throws {
+    @Test
+    func attributesAndFolderDates() throws {
         let box = try Sandbox()
         let stamp = Date(timeIntervalSince1970: 1_500_000_000)
         try box.file("A/docs/tool.sh", "#!/bin/sh", modified: stamp)
@@ -544,7 +568,8 @@ func runJob(
         #expect(date("C/docs") != stamp)
     }
 
-    @Test func linksAreCopiedAsLinksOrFollowed() throws {
+    @Test
+    func linksAreCopiedAsLinksOrFollowed() throws {
         let box = try Sandbox()
         try box.file("real/inside.txt", "i")
         try box.file("real.txt", "content")
@@ -566,7 +591,8 @@ func runJob(
         #expect(replies.progress.last?.itemsTotal == 3 && replies.progress.last?.bytesTotal == 8)
     }
 
-    @Test func verifyCatchesACorruptedCopy() throws {
+    @Test
+    func verifyCatchesACorruptedCopy() throws {
         let box = try Sandbox()
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         try box.file("A/data.bin", String(repeating: "d", count: 3_000))
@@ -607,7 +633,8 @@ func runJob(
         )
     }
 
-    @Test func checksumsCompareContents() throws {
+    @Test
+    func checksumsCompareContents() throws {
         let (fileSystems, memory) = makeFileSystems()
         let box = try Sandbox()
         try box.file("a.txt", "same")
@@ -625,7 +652,8 @@ func runJob(
         )
     }
 
-    @Test func keepingGoingOnErrorsSkipsWithoutAskingAndCounts() {
+    @Test
+    func keepingGoingOnErrorsSkipsWithoutAskingAndCounts() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/one.txt", "1")
         memory.addDirectory("/b")
@@ -643,7 +671,8 @@ func runJob(
         #expect(memory.exists("/b/one.txt") && result.completed.count == 1)
     }
 
-    @Test func aPartFileCanBeKeptAndResumed() throws {
+    @Test
+    func aPartFileCanBeKeptAndResumed() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         let content = String(repeating: "0123456789abcdef", count: (5 << 20) / 16)
@@ -670,7 +699,8 @@ func runJob(
         #expect(resumed.completed.count == 1 && memory.contents("/inbox/big.bin") == content)
     }
 
-    @Test func everyItemIsRecordedForTheLog() {
+    @Test
+    func everyItemIsRecordedForTheLog() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/in.txt", "1")
         memory.addFile("/a/one.txt", "new")
@@ -720,7 +750,8 @@ func runJob(
 }
 
 /// Several small files at once, and what stays the same when they are.
-@Suite struct ParallelCopies {
+@Suite
+struct ParallelCopies {
     static let count = 120
 
     /// A tree of small files in memory: /src/file000.txt … and /src/sub/….
@@ -731,7 +762,8 @@ func runJob(
         }
     }
 
-    @Test func smallFilesAreCopiedSeveralAtOnceOnLocalStorage() {
+    @Test
+    func smallFilesAreCopiedSeveralAtOnceOnLocalStorage() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
         wrapped.base.addDirectory("/dst")
@@ -768,7 +800,8 @@ func runJob(
         #expect(progress.last?.itemsTotal == ParallelCopies.count + ParallelCopies.count / 4 + 2)
     }
 
-    @Test func aNetworkVolumeGetsASingleStream() {
+    @Test
+    func aNetworkVolumeGetsASingleStream() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
         wrapped.base.addDirectory("/dst")
@@ -799,7 +832,8 @@ func runJob(
         #expect(local.mostWritesAtOnce == 1)
     }
 
-    @Test func conflictsAreAskedOneAtATimeInProcessingOrder() {
+    @Test
+    func conflictsAreAskedOneAtATimeInProcessingOrder() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
         for index in stride(from: 0, to: Self.count, by: 10) {
@@ -825,7 +859,8 @@ func runJob(
         #expect(wrapped.base.contents("/dst/src/file011.txt") == "content 11")
     }
 
-    @Test func aCancelledParallelCopyLeavesNoPartialFiles() throws {
+    @Test
+    func aCancelledParallelCopyLeavesNoPartialFiles() throws {
         let box = try Sandbox()
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         // Streams from memory onto the disk: each file arrives under a temporary name first.
@@ -857,7 +892,8 @@ func runJob(
         #expect(namesOnDisk(box.url("B/src")) == arrived)
     }
 
-    @Test func manySmallFilesOnDiskArriveCompleteInBothDirections() throws {
+    @Test
+    func manySmallFilesOnDiskArriveCompleteInBothDirections() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         for index in 0..<200 {
@@ -894,7 +930,8 @@ func runJob(
         #expect(namesOnDisk(box.url("C/tree/d3")).allSatisfy { $0.hasPrefix("f") })
     }
 
-    @Test func anErrorInAWorkerAsksLikeAnyOtherAndAbortStopsEverything() {
+    @Test
+    func anErrorInAWorkerAsksLikeAnyOtherAndAbortStopsEverything() {
         let (fileSystems, wrapped) = makeWrappedFileSystems()
         fill(wrapped.base)
         wrapped.base.addDirectory("/dst")

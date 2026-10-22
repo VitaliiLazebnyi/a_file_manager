@@ -334,7 +334,8 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
         Self.permute(state)
     }
 
-    @inline(__always) private static func rotl(_ x: UInt64, _ n: UInt64) -> UInt64 { (x &<< n) | (x &>> (64 &- n)) }
+    @inline(__always)
+    private static func rotl(_ x: UInt64, _ n: UInt64) -> UInt64 { (x &<< n) | (x &>> (64 &- n)) }
 
     private static func permute(_ a: UnsafeMutablePointer<UInt64>) {
         let constants = roundConstants
@@ -530,7 +531,8 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
 
     // MARK: The compression function
 
-    @inline(__always) private static func rotr(_ x: UInt32, _ n: UInt32) -> UInt32 { (x &>> n) | (x &<< (32 &- n)) }
+    @inline(__always)
+    private static func rotr(_ x: UInt32, _ n: UInt32) -> UInt32 { (x &>> n) | (x &<< (32 &- n)) }
 
     @inline(__always)
     private static func mix(

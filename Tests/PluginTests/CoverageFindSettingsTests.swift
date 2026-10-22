@@ -5,9 +5,12 @@ import TestSupport
 import Testing
 
 /// What Find Files keeps in the settings, when part of it cannot be read.
-@MainActor @Suite struct CoverageFindSettings {
+@MainActor
+@Suite
+struct CoverageFindSettings {
     /// A saved search without its settings (written by another version) is left out; the others load.
-    @Test func aDamagedSearchLeavesTheOthers() throws {
+    @Test
+    func aDamagedSearchLeavesTheOthers() throws {
         let settings = MemorySettings()
         let store = SearchStore(settings: settings)
         var good = SearchSettings()

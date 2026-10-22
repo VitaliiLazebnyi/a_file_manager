@@ -46,8 +46,10 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
     return i == a.count && j == b.count && Myers.apply(segments, to: a, from: b) == b
 }
 
-@Suite struct MyersDiff {
-    @Test func edgeCases() {
+@Suite
+struct MyersDiff {
+    @Test
+    func edgeCases() {
         #expect(Myers.diff([Int](), []) == [])
         #expect(Myers.diff([], [1, 2]) == [DiffSegment(a: 0..<0, b: 0..<2, isEqual: false)])
         #expect(Myers.diff([1, 2], []) == [DiffSegment(a: 0..<2, b: 0..<0, isEqual: false)])
@@ -70,7 +72,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(Myers.editDistance(Myers.diff(Array("ABCABBA"), Array("CBABAC"))) == 5)
     }
 
-    @Test func applyingTheDiffToAYieldsBAndItIsTheShortest() {
+    @Test
+    func applyingTheDiffToAYieldsBAndItIsTheShortest() {
         var random = Seeded(state: 42)
         for round in 0..<600 {
             let alphabet = [2, 3, 5, 12][round % 4]
@@ -88,7 +91,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         }
     }
 
-    @Test func editedCopiesAreFoundExactly() {
+    @Test
+    func editedCopiesAreFoundExactly() {
         var random = Seeded(state: 7)
         for _ in 0..<40 {
             let a = (0..<Int.random(in: 50...400, using: &random)).map { _ in Int.random(in: 0..<60, using: &random) }
@@ -107,7 +111,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         }
     }
 
-    @Test func aBoundedSearchStillGivesACorrectDiff() {
+    @Test
+    func aBoundedSearchStillGivesACorrectDiff() {
         var random = Seeded(state: 99)
         for limit in [1, 2, 5] {
             for _ in 0..<150 {
@@ -120,7 +125,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         }
     }
 
-    @Test func hugeInputsFallBackToTheHeuristicAndStayCorrect() {
+    @Test
+    func hugeInputsFallBackToTheHeuristicAndStayCorrect() {
         // Two long texts in different order: far more differences than an exact search could
         // go through, and more elements than `exactBelow`.
         var random = Seeded(state: 3)
@@ -141,7 +147,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(processorSeconds() - started < 60)
     }
 
-    @Test func linesWithoutAPartnerAreTakenOutFirst() {
+    @Test
+    func linesWithoutAPartnerAreTakenOutFirst() {
         // 200,000 lines on each side with nothing in common but three lines: no search to speak of.
         var a = (0..<200_000).map { "left \($0)" }
         var b = (0..<200_000).map { "right \($0)" }
@@ -154,7 +161,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(segments.filter(\.isEqual).map(\.a) == [10..<11, 100_000..<100_001, 199_990..<199_991])
     }
 
-    @Test func aLargeFileWithFewChangesIsExact() {
+    @Test
+    func aLargeFileWithFewChangesIsExact() {
         var a = (0..<120_000).map { "line \($0 % 5_000) of block \($0 / 5_000)" }
         var b = a
         b.remove(at: 70_000)
@@ -166,7 +174,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(Myers.editDistance(segments) == 5)
     }
 
-    @Test func cancelledDiffEndsEarlyButIsStillACover() {
+    @Test
+    func cancelledDiffEndsEarlyButIsStillACover() {
         let flag = CancellationFlag()
         flag.cancel()
         let (a, b) = ([1, 2, 3, 4], [1, 3, 4, 5])
@@ -175,7 +184,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
     }
 }
 
-@Suite struct TextComparing {
+@Suite
+struct TextComparing {
     func lines(_ text: String) -> [TextLine] { TextDocument.split(text) }
 
     func kinds(_ left: String, _ right: String, _ options: DiffOptions = DiffOptions()) -> String {
@@ -198,7 +208,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
             .joined()
     }
 
-    @Test func encodingsAreDetectedAndWrittenBackUnchanged() {
+    @Test
+    func encodingsAreDetectedAndWrittenBackUnchanged() {
         let samples: [(Data, TextEncoding, [String])] = [
             (Data("grüße\nwelt\n".utf8), .utf8(bom: false), ["grüße", "welt"]),
             (Data([0xEF, 0xBB, 0xBF]) + Data("a\r\nb".utf8), .utf8(bom: true), ["a", "b"]),
@@ -216,7 +227,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(TextEncoding.utf16LittleEndian.name == "UTF-16 LE" && TextEncoding.latin1.name == "Latin-1")
     }
 
-    @Test func linesKeepTheirOwnLineBreaks() {
+    @Test
+    func linesKeepTheirOwnLineBreaks() {
         let document = TextDocument(data: Data("one\ntwo\r\nthree\rfour\n\nlast".utf8))
         #expect(document.lines.map(\.text) == ["one", "two", "three", "four", "", "last"])
         #expect(document.lines.map(\.ending) == [.lf, .crlf, .cr, .lf, .lf, .none])
@@ -232,13 +244,15 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(String(decoding: windows.data(), as: UTF8.self) == "a\r\nb\r\nc\r\nd")
     }
 
-    @Test func binaryFilesAreRecognised() {
+    @Test
+    func binaryFilesAreRecognised() {
         #expect(TextDocument.looksBinary(Data([0x7F, 0x45, 0x4C, 0x46, 0x00, 0x01])))
         #expect(!TextDocument.looksBinary(Data("plain text".utf8)) && !TextDocument.looksBinary(Data()))
         #expect(!TextDocument.looksBinary(Data([0xFF, 0xFE, 0x68, 0x00])))
     }
 
-    @Test func rowsShowChangedAddedAndRemovedLines() {
+    @Test
+    func rowsShowChangedAddedAndRemovedLines() {
         #expect(kinds("a\nb\nc\n", "a\nb\nc\n") == "===")
         #expect(kinds("a\nb\nc\n", "a\nx\nc\n") == "=~=")
         #expect(kinds("a\nc\n", "a\nb\nc\n") == "=+=")
@@ -256,7 +270,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         )
     }
 
-    @Test func optionsDecideWhichLinesAreEqual() {
+    @Test
+    func optionsDecideWhichLinesAreEqual() {
         let exact = DiffOptions(ignoreCase: false, ignoreRepeatedSpaces: false, ignoreLineEndings: false)
         #expect(kinds("Hello\n", "hello\n") == "=" && kinds("Hello\n", "hello\n", exact) == "~")
         #expect(kinds("  a   b\t c  \n", "a b c\n") == "=" && kinds("  a   b\t c  \n", "a b c\n", exact) == "~")
@@ -269,7 +284,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(exact.key(TextLine(" x ", ending: .crlf)) == " x \r\n")
     }
 
-    @Test func theRowsAlwaysRebuildTheRightFile() {
+    @Test
+    func theRowsAlwaysRebuildTheRightFile() {
         var random = Seeded(state: 11)
         let words = ["alpha", "Alpha", "beta", " beta", "gamma  delta", "gamma delta", "", "end", "END", "x"]
         for round in 0..<300 {
@@ -295,7 +311,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         }
     }
 
-    @Test func longTextsAreKeyedOnAllCores() {
+    @Test
+    func longTextsAreKeyedOnAllCores() {
         let left = (0..<60_000).map { TextLine("Line   NUMBER \($0)") }
         var right = left.map { TextLine($0.text.lowercased().replacingOccurrences(of: "   ", with: " ")) }
         right[30_000].text = "different"
@@ -305,7 +322,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(diff.rebuiltRight(left: left, right: right) == right)
     }
 
-    @Test func resyncAnchorsForceLinesTogether() {
+    @Test
+    func resyncAnchorsForceLinesTogether() {
         let left = lines("start\nrepeat\nrepeat\nleft only\nend\n")
         let right = lines("start\nrepeat\nright only\nrepeat\nend\n")
         let free = TextDiff.compute(left: left, right: right)
@@ -325,7 +343,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         )
     }
 
-    @Test func differencesInsideALine() {
+    @Test
+    func differencesInsideALine() {
         func marked(_ left: String, _ right: String) -> [String] {
             let ranges = TextDiff.inline(left, right)
             func cut(_ text: String, _ ranges: [Range<Int>]) -> String {
@@ -350,8 +369,10 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
     }
 }
 
-@Suite struct BinaryComparing {
-    @Test func bytesAreComparedAtTheSameOffsets() {
+@Suite
+struct BinaryComparing {
+    @Test
+    func bytesAreComparedAtTheSameOffsets() {
         let left = Data((0..<40).map { UInt8($0) })
         var right = left
         right[3] = 0xFF
@@ -373,7 +394,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(diff.textRanges(ofByte: 2) == [6..<8, 27..<28])
     }
 
-    @Test func edgeCases() {
+    @Test
+    func edgeCases() {
         #expect(
             BinaryDiff.compute(left: Data(), right: Data()).isIdentical
                 && BinaryDiff.compute(left: Data(), right: Data()).rowCount == 0
@@ -391,7 +413,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         )
     }
 
-    @Test func largeFilesAreComparedInPiecesOnAllCores() {
+    @Test
+    func largeFilesAreComparedInPiecesOnAllCores() {
         var random = Seeded(state: 5)
         var left = Data(count: 3_000_000)
         left.withUnsafeMutableBytes { bytes in
@@ -410,7 +433,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
     }
 }
 
-@Suite struct CompareLoading {
+@Suite
+struct CompareLoading {
     let fileSystems = FileSystemRegistry()
     let memory = MemoryFileSystem()
 
@@ -419,7 +443,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         fileSystems.register(memory)
     }
 
-    @Test func textFilesAreLoadedAndCompared() {
+    @Test
+    func textFilesAreLoadedAndCompared() {
         memory.addFile("/a.txt", "one\ntwo\nthree\n")
         memory.addFile("/b.txt", "one\n2\nthree\nfour\n")
         let result = CompareLoader.load(
@@ -435,7 +460,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(diff.blocks == [1..<2, 3..<4] && width == 5)
     }
 
-    @Test func identicalAndBinaryAndMissingFiles() {
+    @Test
+    func identicalAndBinaryAndMissingFiles() {
         memory.addFile("/a.txt", "same\n")
         memory.addFile("/b.txt", "same\n")
         memory.addFile("/c.txt", "SAME\n")
@@ -485,7 +511,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         )
     }
 
-    @Test func largeLocalFilesAreCheckedInStretchesOnAllCores() throws {
+    @Test
+    func largeLocalFilesAreCheckedInStretchesOnAllCores() throws {
         let box = try Sandbox()
         var random = Seeded(state: 1)
         var data = Data(count: 1_000_003)
@@ -519,7 +546,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(throws: (any Error).self) { try identical("missing") }
     }
 
-    @Test func filesElsewhereAreReadOnceSideBySide() throws {
+    @Test
+    func filesElsewhereAreReadOnceSideBySide() throws {
         memory.isLocal = false
         let text = String(repeating: "0123456789abcdef", count: 200_000)
         memory.addFile("/a", text)
@@ -540,7 +568,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(try identical("/b") == true && identical("/c") == false)
     }
 
-    @Test func savingReplacesTheFileAndLeavesNothingBehind() throws {
+    @Test
+    func savingReplacesTheFileAndLeavesNothingBehind() throws {
         memory.addFile("/dir/file.txt", "old content", permissions: 0o600)
         try CompareLoader.replace(
             memory.url("/dir/file.txt"),

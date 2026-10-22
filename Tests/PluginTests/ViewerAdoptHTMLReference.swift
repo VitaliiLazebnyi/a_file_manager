@@ -15,7 +15,8 @@ enum HTMLReference {
     ]
     static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
 
-    @inline(__always) static func referenceIsWhitespace(_ unit: UInt16) -> Bool {
+    @inline(__always)
+    static func referenceIsWhitespace(_ unit: UInt16) -> Bool {
         switch unit {
         case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000:
             return true
@@ -47,7 +48,8 @@ enum HTMLReference {
                 if !text.isEmpty, text.last != 0x0A { text.append(0x0A) }
                 endsInWhitespace = true
             }
-            @inline(__always) func emit(_ unit: UInt16) {
+            @inline(__always)
+            func emit(_ unit: UInt16) {
                 if preformatted > 0 {
                     text.append(unit)
                     endsInWhitespace = referenceIsWhitespace(unit)

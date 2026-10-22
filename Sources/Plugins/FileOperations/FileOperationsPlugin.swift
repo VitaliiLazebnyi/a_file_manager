@@ -1058,7 +1058,8 @@ final class FileOperations: FileTransferService {
                 let cancellation = monitor.cancellation
                 var context = context
                 /// Whether something is at a location, asked so that the question ends with the job.
-                @Sendable func exists(_ url: URL) -> Bool {
+                @Sendable
+                func exists(_ url: URL) -> Bool {
                     (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) != nil
                 }
                 var created: URL?
@@ -1138,7 +1139,8 @@ final class FileOperations: FileTransferService {
             work: { monitor -> (urls: [URL], failure: (String, any Error)?) in
                 let cancellation = monitor.cancellation
                 var context = context
-                @Sendable func exists(_ url: URL) -> Bool {
+                @Sendable
+                func exists(_ url: URL) -> Bool {
                     (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation) != nil
                 }
                 context.clipboard = typed.contains("[X") ? clipboard() : nil

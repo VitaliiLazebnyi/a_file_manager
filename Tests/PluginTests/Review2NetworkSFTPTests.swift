@@ -7,7 +7,8 @@ import Testing
 
 /// Uploads over SFTP are only a success when the server has all of the file
 /// (review 2: N038, N040, and the length of every upload).
-@Suite(.enabled(if: FakeSFTPServer.isAvailable)) struct Review2NetworkSFTPUploads {
+@Suite(.enabled(if: FakeSFTPServer.isAvailable))
+struct Review2NetworkSFTPUploads {
     private func upload(_ suite: NetworkFixSFTP, _ content: Data) throws {
         let writer = try suite.fileSystem.write(suite.url("/up.bin"))
         do {
@@ -22,7 +23,8 @@ import Testing
         try writer.close(attributes: FileAttributes(modified: Date(timeIntervalSince1970: 1_600_000_000)))
     }
 
-    @Test func aGoodUploadIsMeasuredAndConfirmed() throws {
+    @Test
+    func aGoodUploadIsMeasuredAndConfirmed() throws {
         let suite = try NetworkFixSFTP()
         let content = NetworkFixSFTP.pattern(700_000)
         try upload(suite, content)
@@ -32,7 +34,8 @@ import Testing
         #expect(log.contains("8") && log.last == "4")
     }
 
-    @Test func aClosingThatFailsIsAFailedUpload() throws {
+    @Test
+    func aClosingThatFailsIsAFailedUpload() throws {
         let suite = try NetworkFixSFTP(mode: .failingClose)
         #expect(throws: (any Error).self) { try upload(suite, NetworkFixSFTP.pattern(50_000)) }
         // Reading is not affected: the closing of a handle that was only read tells nothing.
@@ -42,7 +45,8 @@ import Testing
         reader.close()
     }
 
-    @Test func aRefusedWriteLeavesNoGapBehind() throws {
+    @Test
+    func aRefusedWriteLeavesNoGapBehind() throws {
         let suite = try NetworkFixSFTP(mode: .failingWrite)
         let content = NetworkFixSFTP.pattern(900_000)
         #expect(throws: (any Error).self) { try upload(suite, content) }
@@ -53,15 +57,18 @@ import Testing
         #expect(try Data(contentsOf: stored) == content.prefix(65_536))
     }
 
-    @Test func aServerThatForgetsWhatItConfirmedIsNoticed() throws {
+    @Test
+    func aServerThatForgetsWhatItConfirmedIsNoticed() throws {
         let suite = try NetworkFixSFTP(mode: .forgetfulWrite)
         #expect(throws: NetworkError.self) { try upload(suite, NetworkFixSFTP.pattern(300_000)) }
     }
 }
 
 /// The shared channel (review 2: N035, N036, N037, N060, N063, N064, N090, N093, N094, N095).
-@Suite(.enabled(if: FakeSFTPServer.isAvailable)) struct Review2NetworkSFTPChannel {
-    @Test func aServerThatSaysNothingAtAllIsGivenUp() throws {
+@Suite(.enabled(if: FakeSFTPServer.isAvailable))
+struct Review2NetworkSFTPChannel {
+    @Test
+    func aServerThatSaysNothingAtAllIsGivenUp() throws {
         let suite = try NetworkFixSFTP(mode: .hangingStat, timeout: 1)
         try NetworkFixSFTP.pattern(1_000).write(to: suite.box.url("srv/f.bin"))
         let session = try suite.center.session(for: suite.key)
@@ -77,7 +84,8 @@ import Testing
         #expect(starts.count == 2, "a second login was made")
     }
 
-    @Test func closingAHandleNeverWaitsAndComesBeforeWhatFollows() throws {
+    @Test
+    func closingAHandleNeverWaitsAndComesBeforeWhatFollows() throws {
         let suite = try NetworkFixSFTP(mode: .normal, timeout: 10)
         try NetworkFixSFTP.pattern(200_000).write(to: suite.box.url("srv/f.bin"))
         let session = try suite.center.session(for: suite.key)
@@ -100,7 +108,8 @@ import Testing
         #expect(log.filter { $0 == "4" }.count == 20)
     }
 
-    @Test func disconnectEndsALoginThatIsUnderWay() throws {
+    @Test
+    func disconnectEndsALoginThatIsUnderWay() throws {
         let environment = SessionEnvironment()
         var values = NetworkOptions.Values()
         values.timeout = 60
@@ -125,7 +134,8 @@ import Testing
         #expect(throws: NetworkError.self) { _ = try session.entry(at: "/") }
     }
 
-    @Test func aChannelClosedBeforeItStartsDoesNotStart() {
+    @Test
+    func aChannelClosedBeforeItStartsDoesNotStart() {
         // A disconnect may close the channel before the login starts it; the closed pipe must
         // not be touched (its handle raises, which ended the whole program).
         let channel = SFTPChannel(executable: "/bin/sleep", arguments: ["600"], environment: [:])
@@ -134,7 +144,8 @@ import Testing
         #expect(channel.isClosed)
     }
 
-    @Test func aPacketThatIsNotSFTPEndsTheChannelAndItsProcess() throws {
+    @Test
+    func aPacketThatIsNotSFTPEndsTheChannelAndItsProcess() throws {
         // Announces a packet far larger than any the protocol has, after the greeting.
         let box = try Sandbox()
         let script = try box.file(
@@ -155,7 +166,8 @@ import Testing
         #expect(SFTPChannel.largestPacket <= 1 << 20)
     }
 
-    @Test func cancellingOneWriterInTheMiddleOfAPacketLeavesTheChannelToTheOthers() throws {
+    @Test
+    func cancellingOneWriterInTheMiddleOfAPacketLeavesTheChannelToTheOthers() throws {
         let suite = try NetworkFixSFTP(mode: .normal, timeout: 20)
         try NetworkFixSFTP.pattern(400_000).write(to: suite.box.url("srv/f.bin"))
         let session = try suite.center.session(for: suite.key)
@@ -179,8 +191,10 @@ import Testing
 
 /// Renaming over SFTP (review 2: N005, N034), against a server whose rename does not replace
 /// and against the system's own.
-@Suite(.enabled(if: FakeSFTPServer.isAvailable)) struct Review2NetworkSFTPRename {
-    @Test func aServerWithoutReplacingRenameGetsTheOldFileMovedAside() throws {
+@Suite(.enabled(if: FakeSFTPServer.isAvailable))
+struct Review2NetworkSFTPRename {
+    @Test
+    func aServerWithoutReplacingRenameGetsTheOldFileMovedAside() throws {
         let suite = try NetworkFixSFTP(mode: .strictRename)
         try suite.box.file("srv/new.txt", "new")
         try suite.box.file("srv/keep.txt", "old")
@@ -189,7 +203,8 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(atPath: suite.box.url("srv").path).sorted() == ["keep.txt"])
     }
 
-    @Test func aRefusalForAnotherReasonLosesNothing() throws {
+    @Test
+    func aRefusalForAnotherReasonLosesNothing() throws {
         let suite = try NetworkFixSFTP(mode: .strictRename)
         try suite.box.file("srv/locked", "new")
         try suite.box.file("srv/keep.txt", "old")
@@ -237,7 +252,8 @@ struct Review2NetworkSFTPSystemServer {
 
     func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
 
-    @Test func renamingReplacesOnlyWhenAsked() throws {
+    @Test
+    func renamingReplacesOnlyWhenAsked() throws {
         try box.file("new.txt", "new")
         try box.file("keep.txt", "old")
         _ = try fileSystem.list(url(""), showHidden: true)
@@ -261,7 +277,8 @@ struct Review2NetworkSFTPSystemServer {
         #expect(box.read("keep.txt") == "new")
     }
 
-    @Test func uploadsAreMeasuredAndNamesGoBackAsTheyCame() throws {
+    @Test
+    func uploadsAreMeasuredAndNamesGoBackAsTheyCame() throws {
         let content = Data((0..<300_000).map { UInt8(truncatingIfNeeded: $0 &* 13) })
         let writer = try fileSystem.write(url("up.bin"))
         try writer.write(content)
@@ -282,7 +299,8 @@ struct Review2NetworkSFTPSystemServer {
         #expect(!box.exists("u\u{308}ber.txt"))
     }
 
-    @Test func aViewerThatReadsOnePageAsksForOnePage() throws {
+    @Test
+    func aViewerThatReadsOnePageAsksForOnePage() throws {
         let content = Data((0..<4_000_000).map { UInt8(truncatingIfNeeded: $0 &* 7) })
         try content.write(to: box.url("big.bin"))
         let reader = try fileSystem.read(url("big.bin"))
@@ -300,7 +318,8 @@ struct Review2NetworkSFTPSystemServer {
 }
 
 /// The login through the secure shell (review 2: N089, N091, N092, N097, N099).
-@Suite struct Review2NetworkSFTPLogin {
+@Suite
+struct Review2NetworkSFTPLogin {
     /// Stands in for `ssh`: asks for the password the way ssh does, through the same helper, and
     /// is the system's SFTP server once the right one came. `prompt` is the question it asks.
     private func fakeShell(_ box: Sandbox, prompt: String, password: String) throws -> SFTPTransport {
@@ -425,7 +444,8 @@ struct Review2NetworkSFTPSystemServer {
 
     /// The real `ssh` with the options the program gives it, against a secure-shell server of
     /// the system on 127.0.0.1 that shows a banner made to look like an error.
-    @Test(.enabled(if: LocalSSHServer.isAvailable)) func theRealShellTakesTheOptionsAndTheBannerIsNotShownAsTheError()
+    @Test(.enabled(if: LocalSSHServer.isAvailable))
+    func theRealShellTakesTheOptionsAndTheBannerIsNotShownAsTheError()
         throws
     {
         let box = try Sandbox()

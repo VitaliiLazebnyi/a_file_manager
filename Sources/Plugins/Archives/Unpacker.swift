@@ -301,7 +301,8 @@ enum ArchiveTester {
         do { try unlock(archive, only: only) } catch { return [error.localizedDescription] }
         let members = archive.entries.filter { !$0.isDirectory && only?.contains($0.path) != false }
         /// What `work` found wrong with `entry`; nothing once the test is cancelled.
-        @Sendable func problem(with entry: ArchiveEntry, _ work: () throws -> Void) -> String? {
+        @Sendable
+        func problem(with entry: ArchiveEntry, _ work: () throws -> Void) -> String? {
             guard !cancellation.isCancelled else {
                 return nil
             }
@@ -314,7 +315,8 @@ enum ArchiveTester {
                 return "\(entry.path): \(error.localizedDescription)"
             }
         }
-        @Sendable func expected(_ entry: ArchiveEntry) -> Int64? { entry.sizeIsExact ? entry.size : nil }
+        @Sendable
+        func expected(_ entry: ArchiveEntry) -> Int64? { entry.sizeIsExact ? entry.size : nil }
         // An archive that is one compressed stream is tested in a pass through the stream in its
         // file, to its end, for the stream's own checks; members it has a copy of come from there.
         if archive.allowsParallelReads, !archive.isOneStream {

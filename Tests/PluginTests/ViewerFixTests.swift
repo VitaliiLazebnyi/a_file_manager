@@ -8,7 +8,8 @@ import Testing
 /// Fixes to the viewer found in review: search context at chunk borders and in double-byte
 /// texts, the raw-byte row scan, partial results of a huge line, decoding without offsets,
 /// HTML as text, cached remote reads and temporary copies.
-@Suite struct ViewerFix {
+@Suite
+struct ViewerFix {
     // MARK: Search
 
     private func find(
@@ -31,7 +32,8 @@ import Testing
         )
     }
 
-    @Test func anchorsAndWordBoundariesDoNotMatchAtTheSearchStart() throws {
+    @Test
+    func anchorsAndWordBoundariesDoNotMatchAtTheSearchStart() throws {
         let data = Data("foo bar\nbaz qux".utf8)
         let regex = SearchOptions(regex: true)
         // From inside "foo", ^\w+ is the next line's word, not the rest of the first one.
@@ -41,7 +43,8 @@ import Testing
         #expect(try find("\\bba", regex, in: data, from: 5) == 8..<10)
     }
 
-    @Test func anchorsAndWordBoundariesDoNotMatchAtChunkBorders() throws {
+    @Test
+    func anchorsAndWordBoundariesDoNotMatchAtChunkBorders() throws {
         let data = Data("aabar bar\nx bar".utf8)
         let regex = SearchOptions(regex: true)
         for chunk in 1...12 {
@@ -50,7 +53,8 @@ import Testing
         }
     }
 
-    @Test func aTextInADoubleByteEncodingIsFoundAcrossChunkBorders() throws {
+    @Test
+    func aTextInADoubleByteEncodingIsFoundAcrossChunkBorders() throws {
         let gbk = try #require(ViewerEncoding.codePage(936))
         #expect(gbk.kind == .doubleByte)
         let text = String(repeating: "你好世界", count: 40) + "end"
@@ -72,7 +76,8 @@ import Testing
         }
     }
 
-    @Test func plainTextMatchingCaseIsSearchedInTheRawBytes() throws {
+    @Test
+    func plainTextMatchingCaseIsSearchedInTheRawBytes() throws {
         let data = Data("Größe grösse GRÖSSE Größe".utf8)
         let sensitive = SearchOptions(caseSensitive: true)
         #expect(try find("Größe", sensitive, in: data) == 0..<7)
@@ -88,7 +93,8 @@ import Testing
         #expect(try find("über", sensitive, in: bytes, from: 1, encoding: latin, chunkSize: 4) == 11..<15)
     }
 
-    @Test func aBacktrackingExpressionCanBeCancelled() throws {
+    @Test
+    func aBacktrackingExpressionCanBeCancelled() throws {
         let data = Data(String(repeating: "a", count: 40).utf8 + Data("!".utf8))
         let pattern = try SearchPattern("(a+)+$", options: SearchOptions(regex: true), encoding: .utf8)
         let flag = CancellationFlag()
@@ -113,7 +119,8 @@ import Testing
 
     // MARK: Decoding
 
-    @Test func decodingWithoutOffsetsGivesTheSameText() {
+    @Test
+    func decodingWithoutOffsetsGivesTheSameText() {
         let data = Data("Zeile 1\r\nGröße € 😀\nend".utf8)
         var with = DecodedText()
         var without = DecodedText()
@@ -160,7 +167,8 @@ import Testing
             }
     }
 
-    @Test func theRawByteScanFindsTheSameRowsAsDecodingEverything() throws {
+    @Test
+    func theRawByteScanFindsTheSameRowsAsDecodingEverything() throws {
         let text = sampleText(seed: 7, lines: 600)
         let utf8 = Data(text.utf8)
         let gbk = try #require(ViewerEncoding.codePage(936))
@@ -202,7 +210,8 @@ import Testing
         }
     }
 
-    @Test func aFileWithoutLineEndsShowsItsStartBeforeItIsRead() throws {
+    @Test
+    func aFileWithoutLineEndsShowsItsStartBeforeItIsRead() throws {
         // One line of 10 MB: its rows are handed over every few megabytes while it is read.
         let data = Data(repeating: UInt8(ascii: "x"), count: 10 << 20)
         var partials: [(rows: Int, covered: Int64)] = []
@@ -222,7 +231,8 @@ import Testing
         #expect(segment.rowCount == 10 << 20 / 100 + 1 && segment.lineCount == 1)
     }
 
-    @Test func theIndexPublishesTheFrontierSegmentAsItGoes() throws {
+    @Test
+    func theIndexPublishesTheFrontierSegmentAsItGoes() throws {
         let data = Data(repeating: UInt8(ascii: "y"), count: 9 << 20)
         let document = TextDocument(
             source: DataByteSource(data),
@@ -239,7 +249,8 @@ import Testing
         #expect(try document.rows(from: document.rowCount - 1, count: 1).first?.text.count == (9 << 20) % 100)
     }
 
-    @Test func checkpointsArePacked() {
+    @Test
+    func checkpointsArePacked() {
         var list = TextRowIndex.CheckpointList()
         list.append(.init(offset: 1 << 40, linesBefore: 77, startsLine: true))
         list.append(.init(offset: 5, linesBefore: 0, startsLine: false))
@@ -248,7 +259,8 @@ import Testing
         #expect(MemoryLayout<Int64>.stride + MemoryLayout<UInt32>.stride == 12)
     }
 
-    @Test func aFailedReadIsRecordedAndShown() {
+    @Test
+    func aFailedReadIsRecordedAndShown() {
         final class Failing: ByteSource {
             let length: Int64 = 3_000
             func read(at offset: Int64, count: Int) throws -> Data {
@@ -268,7 +280,8 @@ import Testing
 
     // MARK: HTML
 
-    @Test func htmlIsStrippedFromUnitsAndCanBeCancelled() {
+    @Test
+    func htmlIsStrippedFromUnitsAndCanBeCancelled() {
         let html = "<p>One &amp; two</p><script>x<y</script><a href=\"u\">l</a><!-- c --><pre> a  b </pre>"
         let expected = HTMLText.plainText(from: html)
         #expect(expected.text == "One & two\nl {u}\n a  b\n" && expected.links == ["u"])
@@ -278,7 +291,8 @@ import Testing
         #expect(HTMLText.plainText(units: Array(repeating: 0x61, count: 3 << 20), cancellation: flag) == nil)
     }
 
-    @Test func htmlIsStrippedFast() {
+    @Test
+    func htmlIsStrippedFast() {
         var html = ""
         for number in 0..<20_000 {
             html +=
@@ -296,7 +310,8 @@ import Testing
 
     // MARK: Cached remote reads
 
-    @Test func aSmallRemoteFileIsFetchedOnceForAnyNumberOfLongReads() throws {
+    @Test
+    func aSmallRemoteFileIsFetchedOnceForAnyNumberOfLongReads() throws {
         /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
         final class Counting: ByteSource, @unchecked Sendable {
             let data = Data((0..<300_000).map { UInt8($0 % 251) })
@@ -328,7 +343,8 @@ import Testing
 
     // MARK: Temporary copies
 
-    @Test func temporaryCopiesAreUniqueKeyedByStampAndReleased() throws {
+    @Test
+    func temporaryCopiesAreUniqueKeyedByStampAndReleased() throws {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
         registry.register(memory)
@@ -374,7 +390,8 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: root.path))
     }
 
-    @Test func leftoverFoldersOfDeadProcessesAreSwept() throws {
+    @Test
+    func leftoverFoldersOfDeadProcessesAreSwept() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "afm-sweep-test-\(UUID().uuidString)",
             isDirectory: true

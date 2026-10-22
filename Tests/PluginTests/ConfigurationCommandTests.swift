@@ -11,7 +11,8 @@ import Testing
 @testable import ConfigurationPlugin
 
 /// The placeholders of a Parameters field (spec 18 › Button and command parameters).
-@Suite struct ParameterExpansion {
+@Suite
+struct ParameterExpansion {
     let context = ExpansionContext(
         left: PanelSnapshot(path: "/A dir/", cursorName: "my file.txt", selection: ["a.txt", "b c.txt", "d.tar.gz"]),
         right: PanelSnapshot(path: "/B/", cursorName: "other.md"),
@@ -29,7 +30,8 @@ import Testing
 
     let unselected: (inout ExpansionContext) -> Void = { $0.left.selection = [] }
 
-    @Test func singleValues() {
+    @Test
+    func singleValues() {
         #expect(expand("%P") == "\"/A dir/\"" && expand("%T") == "/B/")
         #expect(expand("%N") == "\"my file.txt\"" && expand("%M") == "other.md")
         #expect(expand("%O") == "\"my file\"" && expand("%E") == "txt")
@@ -46,7 +48,8 @@ import Testing
         #expect(expand("%N %M") { $0.left.cursorName = nil } == "\"\" other.md")
     }
 
-    @Test func namesWithSpacesAreQuotedAsOneWord() {
+    @Test
+    func namesWithSpacesAreQuotedAsOneWord() {
         #expect(expand("open %P%N --to %T%M") == "open \"/A dir/my file.txt\" --to /B/other.md")
         // Quotes the user wrote are kept and not doubled.
         #expect(expand("\"%P%N\"") == "\"/A dir/my file.txt\"" && expand("x=\"%N\"") == "x=\"my file.txt\"")
@@ -64,7 +67,8 @@ import Testing
         )
     }
 
-    @Test func selectedNames() {
+    @Test
+    func selectedNames() {
         #expect(expand("%S") == "a.txt \"b c.txt\" d.tar.gz" && expand("%s") == expand("%S"))
         #expect(expand("%P%S") == "\"/A dir/a.txt\" \"/A dir/b c.txt\" \"/A dir/d.tar.gz\"")
         #expect(expand("%T%S1") == "/B/a.txt")
@@ -94,7 +98,8 @@ import Testing
         #expect(expand("\"%S.bak\"") == "\"a.txt.bak\" \"b c.txt.bak\" \"d.tar.gz.bak\"")
     }
 
-    @Test func substrings() {
+    @Test
+    func substrings() {
         #expect(
             expand("%E:~0,2") == "tx" && expand("%E:~1") == "xt" && expand("%E:~-2") == "xt"
                 && expand("%E:~-2,1") == "x"
@@ -107,7 +112,8 @@ import Testing
         #expect(expand("%E:x %E:~") == "txt:x txt:~")
     }
 
-    @Test func directoriesComparedFilesAndSides() {
+    @Test
+    func directoriesComparedFilesAndSides() {
         let deep: (inout ExpansionContext) -> Void = { $0.left.path = "/Users/me/Projects/app/" }
         #expect(expand("%B", deep) == "app" && expand("%B0 %B1 %B2 %B9", deep) == "app Projects me \"\"")
         #expect(expand("%B-1", deep) == "Projects" && expand("%B+1 %B+3 %B+ [%B+0]", deep) == "Users Projects / []")
@@ -131,7 +137,8 @@ import Testing
         #expect(expand("%C1 %C2", rightActive) == "\"/A dir/a.txt\" /B/other.md")
     }
 
-    @Test func argumentsOfAUserCommand() {
+    @Test
+    func argumentsOfAUserCommand() {
         #expect(expand("%A") == "one \"two words\" three" && expand("%q%A") == "one two words three")
         #expect(expand("/L=%A1 /R=%A2") == "/L=one /R=\"two words\"")
         #expect(
@@ -144,13 +151,15 @@ import Testing
         )
     }
 
-    @Test func aLeadingQuestionMarkAsksFirst() {
+    @Test
+    func aLeadingQuestionMarkAsksFirst() {
         let asked = ParameterExpander(context: context).expand("?-v %N")
         #expect(asked.asksFirst && asked.text == "-v \"my file.txt\"")
         #expect(!ParameterExpander(context: context).expand("-v ?").asksFirst)
     }
 
-    @Test func listFilesAreWrittenToTheListFolder() throws {
+    @Test
+    func listFilesAreWrittenToTheListFolder() throws {
         let box = try Sandbox()
         func list(_ text: String, _ change: (inout ExpansionContext) -> Void = { _ in }) throws -> (
             text: String, written: Data?
@@ -211,7 +220,9 @@ import Testing
 }
 
 /// User commands, the Start menu and the settings commands, driven through the kernel.
-@MainActor @Suite struct ConfigurationCommands {
+@MainActor
+@Suite
+struct ConfigurationCommands {
     let box: Sandbox
     let settings = MemorySettings()
     let plugin: ConfigurationPlugin
@@ -269,7 +280,8 @@ import Testing
 
     // MARK: User commands
 
-    @Test func aUserCommandRunsAProgramWithExpandedParameters() {
+    @Test
+    func aUserCommandRunsAProgramWithExpandedParameters() {
         define("em_show", "echo -n", "%P%N %T")
         #expect(commands[CommandID("em_show")]?.title == "show")
         bench.left.moveCursor(toName: "my file.txt")
@@ -287,7 +299,8 @@ import Testing
         #expect(!commands.isEnabled("em_show") && commands.perform("em_show") == false && shell.lines.count == 3)
     }
 
-    @Test func textAfterTheNameReachesTheCommand() {
+    @Test
+    func textAfterTheNameReachesTheCommand() {
         bench.left.moveCursor(toName: "one.txt")
         // Parameters field empty: the text is the parameters, placeholders and all.
         define("em_echo", "echo")
@@ -305,7 +318,8 @@ import Testing
         )
     }
 
-    @Test func aQuestionMarkLetsTheUserChangeTheParameters() {
+    @Test
+    func aQuestionMarkLetsTheUserChangeTheParameters() {
         bench.left.moveCursor(toName: "one.txt")
         define("em_ask", "run", "?%N", title: "Ask")
         ui.promptAnswers = [.text("other.txt --flag"), .cancel]
@@ -318,7 +332,8 @@ import Testing
         )
     }
 
-    @Test func theListFileExistsWhenTheCommandStarts() {
+    @Test
+    func theListFileExistsWhenTheCommandStarts() {
         define("em_list", "cat", "%L")
         commands.perform(.selectAll)
         commands.perform("em_list")
@@ -328,7 +343,8 @@ import Testing
         #expect(written == "\(a)/my file.txt\n\(a)/one.txt\n\(a)/two.txt\n")
     }
 
-    @Test func commandsOfTheProgramChainsAndCd() {
+    @Test
+    func commandsOfTheProgramChainsAndCd() {
         // Names in any case; a chain runs in the written order.
         define("em_marks", "CM_selectall,cm_ExchangeSelection,cm_SpreadSelection")
         ui.promptAnswers = [.text("one.*")]
@@ -349,7 +365,8 @@ import Testing
         #expect(ui.log.last == "inform: Unknown command")
     }
 
-    @Test func aUserCommandThatCallsItselfIsStopped() {
+    @Test
+    func aUserCommandThatCallsItselfIsStopped() {
         define("em_a", "em_b")
         define("em_b", "em_a,em_c")
         define("em_c", "echo done")
@@ -361,7 +378,8 @@ import Testing
         #expect(ui.log.count == 2 && shell.lines.count == 1)
     }
 
-    @Test func theDefinitionDialogStoresRegistersAndBindsTheKey() {
+    @Test
+    func theDefinitionDialogStoresRegistersAndBindsTheKey() {
         ui.formAnswers = [
             .values([
                 "name": .text("Backup"), "title": .text("Back Up Now"), "command": .text("rsync -a"),
@@ -420,7 +438,8 @@ import Testing
 
     // MARK: Start menu
 
-    @Test func theStartMenuRunsItsEntriesByPosition() throws {
+    @Test
+    func theStartMenuRunsItsEntriesByPosition() throws {
         #expect(commands[CommandID("cm_UserMenu10")] != nil && !commands.isEnabled("cm_UserMenu1"))
         ui.formAnswers = [
             .values([
@@ -476,7 +495,8 @@ import Testing
 
     // MARK: Registration and settings
 
-    @Test func theMenusOfTheConfigurationPlugin() {
+    @Test
+    func theMenusOfTheConfigurationPlugin() {
         let menus = Dictionary(uniqueKeysWithValues: bench.kernel.menus.menus.map { ($0.title, $0.items) })
         #expect(
             menus["Configuration"] == [
@@ -498,7 +518,8 @@ import Testing
         #expect(center.keyboardHelp().contains("⌘,") && center.whatIsWhere().contains("English"))
     }
 
-    @Test func settingsAreExportedImportedAndReset() throws {
+    @Test
+    func settingsAreExportedImportedAndReset() throws {
         define("em_keep", "ls")
         settings.set(["cm_SelectAll": ["f9"]], forKey: KeyBindings.settingsKey)
         settings.set("value", forKey: "extra.key")
@@ -552,7 +573,8 @@ import Testing
         #expect(ui.log.last == "inform: The settings could not be imported" && center.store.userCommands.count == 1)
     }
 
-    @Test func theWindowsAreBuiltFromWhatIsRegistered() {
+    @Test
+    func theWindowsAreBuiltFromWhatIsRegistered() {
         define("em_mine", "ls", title: "Mine")
         bench.kernel.preferences.add(
             PreferencePage(
@@ -593,7 +615,8 @@ import Testing
         #expect(!browser.rows.contains { $0.id == "em_mine" })
     }
 
-    @Test func saveSettingsWritesThePanelsTabs() {
+    @Test
+    func saveSettingsWritesThePanelsTabs() {
         commands.perform("cm_ConfigSaveSettings")
         let left = settings.value(PanelTabs.State.self, forKey: "left.tabs")
         #expect(left?.tabs.count == 1 && left == bench.left.tabs.state && settings.data(forKey: "right.tabs") != nil)

@@ -240,7 +240,8 @@ public enum CompareLoader {
         nonisolated(unsafe) var differs = false
         /// Guarded by `lock`.
         nonisolated(unsafe) var failure: (any Error)?
-        @Sendable func take() -> Int? {
+        @Sendable
+        func take() -> Int? {
             lock.lock()
             defer { lock.unlock() }
             guard !differs, failure == nil, next < stretches, !cancellation.isCancelled else {

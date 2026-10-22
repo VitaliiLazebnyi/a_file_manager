@@ -36,7 +36,8 @@ private func tarBody(_ text: String) -> Data {
 
 /// Review round 2: what an archive (or a file that only claims to be one) can do to the
 /// program and to the disk.
-@Suite struct Review2ArchivesSafety {
+@Suite
+struct Review2ArchivesSafety {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 
@@ -61,7 +62,8 @@ private func tarBody(_ text: String) -> Data {
 
     // MARK: Paths (A005, A030, A077, A013, A029)
 
-    @Test func pathsAreCutAtTheByteNotAtTheCharacter() {
+    @Test
+    func pathsAreCutAtTheByteNotAtTheCharacter() {
         // A slash followed by a combining mark is one Character and still a separator.
         #expect(ArchiveTree.normalized("../\u{301}evil.txt") == nil)
         #expect(ArchiveTree.normalized("a/\u{301}b") == nil)
@@ -85,7 +87,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(ArchiveTree.normalized(String(repeating: "x", count: ArchiveTree.maxPathBytes + 1)) == nil)
     }
 
-    @Test func aSlashWithACombiningMarkCannotLeaveTheTargetFolder() throws {
+    @Test
+    func aSlashWithACombiningMarkCannotLeaveTheTargetFolder() throws {
         let names = ["../\u{301}evil.txt", "ok/\u{301}hidden.txt", "fine.txt"]
         let zip = try writeZip("slash.zip", names: names)
         var tar = Data()
@@ -125,7 +128,8 @@ private func tarBody(_ text: String) -> Data {
         )
     }
 
-    @Test func deepPathsAreRefusedBeforeTheyFillTheMemory() throws {
+    @Test
+    func deepPathsAreRefusedBeforeTheyFillTheMemory() throws {
         // One member 300 folders deep is not shown (and costs nothing).
         let deep = Array(repeating: "d", count: 300).joined(separator: "/") + "/f.txt"
         let one = try writeZip("deep.zip", names: [deep, "plain.txt"])
@@ -149,7 +153,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(throws: ArchiveError.self) { try bench.store.archive(at: crowded) }
     }
 
-    @Test func theOrderOfTheTreeIsKeptWhileEntriesComeAndGo() {
+    @Test
+    func theOrderOfTheTreeIsKeptWhileEntriesComeAndGo() {
         var tree = ArchiveTree()
         var generator = SystemRandomNumberGenerator()
         for index in 0..<40 { tree.insert(ArchiveEntry(path: "d\(index % 7)/f\(index)", isDirectory: false)) }
@@ -179,7 +184,8 @@ private func tarBody(_ text: String) -> Data {
 
     // MARK: Unpacking (A096, A097)
 
-    @Test func nothingIsUnpackedThroughALinkThatAlreadyStandsInTheTarget() throws {
+    @Test
+    func nothingIsUnpackedThroughALinkThatAlreadyStandsInTheTarget() throws {
         let outside = try box.folder("outside")
         let target = try box.folder("target")
         try FileManager.default.createSymbolicLink(
@@ -209,7 +215,8 @@ private func tarBody(_ text: String) -> Data {
 
     // MARK: Files that are handed to bsdtar (A038, A087)
 
-    @Test func aTextFileNamedLikeAnArchiveIsNotGivenToBsdtar() throws {
+    @Test
+    func aTextFileNamedLikeAnArchiveIsNotGivenToBsdtar() throws {
         let secret = try box.file("secret.txt", "TOP-SECRET-CONTENT")
         for (name, head) in [
             ("holiday.7z", "#mtree\n"), ("list.rar", ""),
@@ -238,7 +245,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(try kind(Array("070707 type=file\n".utf8) + [0]) == nil)
     }
 
-    @Test func realForeignArchivesStillOpen() throws {
+    @Test
+    func realForeignArchivesStillOpen() throws {
         try bench.makeTree()
         #expect(runTool("/usr/bin/bsdtar", ["--format", "7zip", "-cf", "tree.7z", "tree"], in: box.root).status == 0)
         #expect(
@@ -256,7 +264,8 @@ private func tarBody(_ text: String) -> Data {
 
     // MARK: Typed paths (A001, A002, A056)
 
-    @Test func aTypedPathIsOnlyAskedAboutOnLocalDisks() throws {
+    @Test
+    func aTypedPathIsOnlyAskedAboutOnLocalDisks() throws {
         try box.file("real/a.zip", "x")
         try box.folder("folder.zip")
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: box.url("real"))
@@ -275,7 +284,8 @@ private func tarBody(_ text: String) -> Data {
 
     // MARK: Formats
 
-    @Test func longPaddingBetweenXZStreamsIsRead() throws {
+    @Test
+    func longPaddingBetweenXZStreamsIsRead() throws {
         var file = try XZCoder.compress(Data("first ".utf8))
         file.append(Data(count: 200_000))
         file.append(try XZCoder.compress(Data("second".utf8)))
@@ -287,7 +297,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(String(decoding: data, as: UTF8.self) == "first second")
     }
 
-    @Test func aZip64EndRecordIsFoundBehindASelfExtractorStub() throws {
+    @Test
+    func aZip64EndRecordIsFoundBehindASelfExtractorStub() throws {
         let plain = try writeZip(
             "wide.zip",
             limits: ZipLimits(maxField: 0xFFFF_FFFE, maxEntries: 2),
@@ -301,7 +312,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(try bench.names(bench.inside(box.url("sfx.zip"))) == ["a.txt", "b.txt", "c.txt", "d.txt"])
     }
 
-    @Test func aFileThatTakesOverTheNameOfAHardLinkKeepsItsOwnContents() throws {
+    @Test
+    func aFileThatTakesOverTheNameOfAHardLinkKeepsItsOwnContents() throws {
         var tar = Data()
         tar.append(tarHeader(name: "target.txt", size: 6))
         tar.append(tarBody("target"))
@@ -317,7 +329,8 @@ private func tarBody(_ text: String) -> Data {
 
     // MARK: Encryption (A023, A048, A042, A098)
 
-    @Test func newArchivesAreEncryptedWithAESAndOldOnesStillOpen() throws {
+    @Test
+    func newArchivesAreEncryptedWithAESAndOldOnesStillOpen() throws {
         let tree = try bench.makeTree()
         let archive = box.url("aes.zip")
         try bench.pack([tree], to: archive) {
@@ -377,7 +390,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(ArchiveCommands.legacyLabel.contains("weak") && ArchiveCommands.encryptionNote.contains("AES-256"))
     }
 
-    @Test func theCipherMatchesItselfAcrossBlockSizes() throws {
+    @Test
+    func theCipherMatchesItselfAcrossBlockSizes() throws {
         var plain = Data(count: 100_003)
         plain.withUnsafeMutableBytes { arc4random_buf($0.baseAddress, $0.count) }
         let salt = Data((0..<16).map { UInt8($0) })
@@ -401,7 +415,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(try ZipAES.Cipher(password: "other", salt: salt, keyLength: 32).verifier != encrypting.verifier)
     }
 
-    @Test func aDeclinedPasswordIsNotAskedForAgainByTheSameOperation() throws {
+    @Test
+    func aDeclinedPasswordIsNotAskedForAgainByTheSameOperation() throws {
         let tree = try bench.makeTree()
         let archive = box.url("locked.zip")
         try bench.pack([tree], to: archive) { $0.password = "sesame" }
@@ -426,7 +441,8 @@ private func tarBody(_ text: String) -> Data {
         fresh.store.close()
     }
 
-    @Test func unpackingPlainMembersOfAPartlyEncryptedArchiveAsksNothing() throws {
+    @Test
+    func unpackingPlainMembersOfAPartlyEncryptedArchiveAsksNothing() throws {
         let tree = try bench.makeTree()
         let archive = box.url("mixed.zip")
         try bench.pack([tree.appendingPathComponent("readme.txt")], to: archive)
@@ -443,7 +459,8 @@ private func tarBody(_ text: String) -> Data {
 
     // MARK: The temporary folder (A040, A058, A083)
 
-    @Test func whatACrashLeftBehindIsSweptAndWhatWasKeptStays() throws {
+    @Test
+    func whatACrashLeftBehindIsSweptAndWhatWasKeptStays() throws {
         let parent = try box.folder("tmp")
         // The number of a process that has ended.
         let process = Process()
@@ -489,7 +506,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(!fm.fileExists(atPath: scratch.url.path))
     }
 
-    @Test func noCopyIsMadeWhenTheTemporaryVolumeHasNoRoomToSpare() throws {
+    @Test
+    func noCopyIsMadeWhenTheTemporaryVolumeHasNoRoomToSpare() throws {
         try bench.makeTree()
         #expect(runTool("/usr/bin/tar", ["-czf", "tree.tgz", "tree"], in: box.root).status == 0)
         #expect(runTool("/usr/bin/zip", ["-qr", "tree.zip", "tree"], in: box.root).status == 0)
@@ -517,7 +535,8 @@ private func tarBody(_ text: String) -> Data {
         #expect(try bench.names(bench.inside(onServer, "tree")).contains("readme.txt"))
     }
 
-    @Test func archivesNestOnlySoDeep() throws {
+    @Test
+    func archivesNestOnlySoDeep() throws {
         try bench.makeTree()
         #expect(runTool("/usr/bin/zip", ["-qr", "inner.zip", "tree"], in: box.root).status == 0)
         #expect(runTool("/usr/bin/zip", ["-q", "outer.zip", "inner.zip"], in: box.root).status == 0)

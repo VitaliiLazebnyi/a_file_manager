@@ -89,7 +89,9 @@ private final class Collected<Value>: @unchecked Sendable {
 /// the kernel's hooks for quitting, for bringing a file up to date and for the read order,
 /// and the paths the first pass left without a test (the clock of the delayed writes, the
 /// branches of the quit, members that wait next to an archive on another volume).
-@MainActor @Suite struct Review2ArchivesP2 {
+@MainActor
+@Suite
+struct Review2ArchivesP2 {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 
@@ -145,7 +147,8 @@ private final class Collected<Value>: @unchecked Sendable {
 
     // MARK: The compact directory (A051, A076)
 
-    @Test func theTreeBehavesLikeAPlainTableWhilePlacesAreUsedAgain() {
+    @Test
+    func theTreeBehavesLikeAPlainTableWhilePlacesAreUsedAgain() {
         var tree = ArchiveTree()
         var model: [String: Bool] = [:]  // path → is a folder
         var generator = SystemRandomNumberGenerator()
@@ -206,7 +209,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(tree.unordered.count <= 5 * 4 * 30 + 5 * 4 + 5)
     }
 
-    @Test func aRecordKeepsItsNameAsItWasWritten() throws {
+    @Test
+    func aRecordKeepsItsNameAsItWasWritten() throws {
         var record = ZipRecord()
         // Valid text: kept as text, read back byte for byte.
         record.nameBytes = Data("dir/übung – 日本.txt".utf8)
@@ -258,7 +262,8 @@ private final class Collected<Value>: @unchecked Sendable {
 
     // MARK: Unpacking from the folder's descriptor (L043), absolute paths
 
-    @Test func aLinkPutInPlaceWhileAMemberIsUnpackedDoesNotLeadItAway() throws {
+    @Test
+    func aLinkPutInPlaceWhileAMemberIsUnpackedDoesNotLeadItAway() throws {
         let outside = try box.folder("outside")
         let target = try box.folder("target")
         let archive = try writeZip(
@@ -303,7 +308,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(isLink(target.appendingPathComponent("dir")))
     }
 
-    @Test func noLinkOnTheWayIsGoneThroughWhoeverMadeIt() throws {
+    @Test
+    func noLinkOnTheWayIsGoneThroughWhoeverMadeIt() throws {
         let outside = try box.folder("outside")
         let target = try box.folder("target")
         // A link two folders down, left there before.
@@ -339,7 +345,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(box.read("second/door/planted.txt") == "hello" && result.problems.first?.hasPrefix("door:") == true)
     }
 
-    @Test func membersWithAbsolutePathsLandBelowTheFolderThatIsUnpackedInto() throws {
+    @Test
+    func membersWithAbsolutePathsLandBelowTheFolderThatIsUnpackedInto() throws {
         // Where the members claim to belong: a folder of the test, so a member that got
         // there would be seen (and would harm nothing).
         let claimed = try box.folder("claimed")
@@ -385,7 +392,8 @@ private final class Collected<Value>: @unchecked Sendable {
         )
     }
 
-    @Test func unpackedFilesGetNoRightsBeyondWhatNewFilesGet() throws {
+    @Test
+    func unpackedFilesGetNoRightsBeyondWhatNewFilesGet() throws {
         let zip = try writeZip(
             "open.zip",
             members: [("everyone.txt", 0o666), ("tool", 0o777), ("mine.txt", 0o600)]
@@ -419,7 +427,8 @@ private final class Collected<Value>: @unchecked Sendable {
 
     // MARK: The kernel's hooks (A041, A044, quitting)
 
-    @Test func membersOfAStreamArchiveAreReadInTheOrderTheyLieInIt() throws {
+    @Test
+    func membersOfAStreamArchiveAreReadInTheOrderTheyLieInIt() throws {
         try bench.makeTree()
         for index in 0..<12 { try box.file("tree/many/file\(index).txt", "contents of \(index)") }
         try bench.pack([box.url("tree")], to: box.url("stream.tar.gz")) { $0.format = .compressedTar(.gzip) }
@@ -451,7 +460,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(bench.zip.readOrder(of: asked) == asked)
     }
 
-    @Test func aStreamThatEndsBeforeEveryMemberCameIsAnError() throws {
+    @Test
+    func aStreamThatEndsBeforeEveryMemberCameIsAnError() throws {
         // (A090.) The archive is listed, then cut short where it lies: a pass that is to
         // deliver members the stream no longer holds must say so, not return as if done.
         try bench.makeTree()
@@ -484,7 +494,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(delivered < wanted.count)
     }
 
-    @Test func aFileIsBroughtUpToDateBeforeSomebodyElseUsesIt() throws {
+    @Test
+    func aFileIsBroughtUpToDateBeforeSomebodyElseUsesIt() throws {
         let archive = try makeZip()
         let store = bench.store
         bench.fileSystems.addFlusher { url, cancellation in try store.bringUpToDate(url, cancellation: cancellation) }
@@ -519,7 +530,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(store.hasPendingChanges)
     }
 
-    @Test func changesAreWrittenBeforeTheProgramQuits() throws {
+    @Test
+    func changesAreWrittenBeforeTheProgramQuits() throws {
         let archive = try makeZip()
         let plugin = ArchivesPlugin(flushDelay: nil, launchesApplications: false)
         defer { plugin.store.close() }
@@ -540,7 +552,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(!plugin.environment.quitting.isCancelled)
     }
 
-    @Test func aQuitTheUserDoesNotWaitForKeepsWhatWasNotWritten() throws {
+    @Test
+    func aQuitTheUserDoesNotWaitForKeepsWhatWasNotWritten() throws {
         let archive = try makeZip()
         let plugin = ArchivesPlugin(flushDelay: nil, launchesApplications: false)
         let reports = Collected<String>()
@@ -590,7 +603,8 @@ private final class Collected<Value>: @unchecked Sendable {
         try? FileManager.default.removeItem(at: scratch)
     }
 
-    @Test func aQuitThatRunsOutOfTimeEndsTheWritesAndSaysWhereTheDataIs() throws {
+    @Test
+    func aQuitThatRunsOutOfTimeEndsTheWritesAndSaysWhereTheDataIs() throws {
         // First branch: the writes can be ended. Second: one cannot (it waits for something
         // that never answers), and the program quits all the same, deleting nothing.
         for endable in [true, false] {
@@ -608,7 +622,8 @@ private final class Collected<Value>: @unchecked Sendable {
             let (holding, release, released) = (
                 DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), DispatchSemaphore(value: 0)
             )
-            @Sendable func add(_ path: String) {
+            @Sendable
+            func add(_ path: String) {
                 guard let writer = try? opened.write(path) else {
                     return
                 }
@@ -666,7 +681,8 @@ private final class Collected<Value>: @unchecked Sendable {
 
     // MARK: The clock of the delayed writes (A043, A045)
 
-    @Test func aWriteThatIsDueIsDoneByWhicheverOfItsTwoTimersComesFirst() throws {
+    @Test
+    func aWriteThatIsDueIsDoneByWhicheverOfItsTwoTimersComesFirst() throws {
         let archive = try makeZip()
         let clock = HandClock()
         bench.environment.schedule = { clock.schedule($0, $1, $2) }
@@ -706,7 +722,8 @@ private final class Collected<Value>: @unchecked Sendable {
         #expect(bench.store.flushAll().isEmpty)
     }
 
-    @Test func aWriteThatFailsIsTriedAgainEachTimeAfterTwiceAsLong() throws {
+    @Test
+    func aWriteThatFailsIsTriedAgainEachTimeAfterTwiceAsLong() throws {
         try bench.makeTree()
         try box.folder("locked")
         #expect(runTool("/usr/bin/zip", ["-qr", "locked/tree.zip", "tree"], in: box.root).status == 0)
@@ -760,7 +777,8 @@ private final class Collected<Value>: @unchecked Sendable {
 
     // MARK: New members next to an archive on another volume (A046), and the lock (A104)
 
-    @Test func newMembersOfAnArchiveOnAnotherVolumeWaitNextToIt() throws {
+    @Test
+    func newMembersOfAnArchiveOnAnotherVolumeWaitNextToIt() throws {
         let archive = try makeZip()
         let scratch = bench.environment.scratch.url
         // "Another volume": everything outside the temporary folder's own.
@@ -821,7 +839,8 @@ private final class Collected<Value>: @unchecked Sendable {
         )
     }
 
-    @Test func aChangeAsksTheDiskBeforeItTakesTheLockOfTheDirectory() throws {
+    @Test
+    func aChangeAsksTheDiskBeforeItTakesTheLockOfTheDirectory() throws {
         // An archive that cannot be written says so, as before…
         let archive = try makeZip()
         #expect(chmod(archive.path, 0o444) == 0)

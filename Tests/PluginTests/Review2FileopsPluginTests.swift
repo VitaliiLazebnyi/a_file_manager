@@ -15,7 +15,9 @@ import VirtualFoldersPlugin
 // Regression tests of review round 2 for the commands of the file-operation plugins, the
 // clipboard and the file properties (documentation/review-2/findings/fileops.md).
 
-@MainActor @Suite struct Review2FileopsCommands {
+@MainActor
+@Suite
+struct Review2FileopsCommands {
     let box: Sandbox
     private let scratch = ScratchPasteboard()
     var pasteboard: NSPasteboard { scratch.pasteboard }
@@ -46,7 +48,8 @@ import VirtualFoldersPlugin
     }
 
     // F001, F018: what Paste after Cut does in a branch view.
-    @Test func movingFilesIntoTheBranchViewTheyAreShownInChangesNothing() throws {
+    @Test
+    func movingFilesIntoTheBranchViewTheyAreShownInChangesNothing() throws {
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         var ended = false
         transfers.transfer(
@@ -65,7 +68,8 @@ import VirtualFoldersPlugin
         #expect(box.read("d/c.txt") == "deep" && !box.exists("d/sub/c.txt"))
     }
 
-    @Test func pastingACopyIntoABranchViewGivesItANewNameInTheRealFolder() throws {
+    @Test
+    func pastingACopyIntoABranchViewGivesItANewNameInTheRealFolder() throws {
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         transfers.transfer(.copy, [box.url("d/a.txt")], into: try branch(of: "d"), renamingSelfCopies: true) { _ in }
         #expect(
@@ -73,7 +77,8 @@ import VirtualFoldersPlugin
         )
     }
 
-    @Test func nothingCanBePastedIntoAListOfFiles() throws {
+    @Test
+    func nothingCanBePastedIntoAListOfFiles() throws {
         let transfers = try #require(bench.kernel.services.find((any FileTransferService).self))
         let list = try #require(virtual.fileSystem)
             .register(
@@ -87,7 +92,8 @@ import VirtualFoldersPlugin
     }
 
     // F026
-    @Test func copyingTowardsABranchViewGoesIntoTheRealFolder() throws {
+    @Test
+    func copyingTowardsABranchViewGoesIntoTheRealFolder() throws {
         bench.right.show(try branch(of: "t"))
         bench.left.moveCursor(toName: "a.txt")
         ui.promptAnswers = [.accept]
@@ -97,7 +103,8 @@ import VirtualFoldersPlugin
         #expect(box.read("t/a.txt") == "precious" && namesOnDisk(box.root) == ["d", "t"])
     }
 
-    @Test func aListOfFilesIsNotOfferedAsATarget() throws {
+    @Test
+    func aListOfFilesIsNotOfferedAsATarget() throws {
         bench.right.show(
             try #require(virtual.fileSystem)
                 .register(
@@ -118,7 +125,8 @@ import VirtualFoldersPlugin
     }
 
     // F001: a rename typed in a branch view.
-    @Test func renamingInABranchViewWithF6IsARename() throws {
+    @Test
+    func renamingInABranchViewWithF6IsARename() throws {
         bench.left.show(try branch(of: "d"))
         bench.left.moveCursor(toName: "a.txt")
         var info = stat()
@@ -131,7 +139,8 @@ import VirtualFoldersPlugin
     }
 
     // F056, F006: several items renamed with one mask.
-    @Test func aRenameOfSeveralItemsToOneNameKeepsThemAllAndAsksOnce() {
+    @Test
+    func aRenameOfSeveralItemsToOneNameKeepsThemAllAndAsksOnce() {
         bench.left.moveCursor(toName: "a.txt")
         commands.perform(.selectAll)
         bench.left.model.setSelected(false, names: ["sub"])
@@ -144,7 +153,8 @@ import VirtualFoldersPlugin
         #expect(ui.log.filter { $0.hasPrefix("choose: Overwrite") }.count == 1)
     }
 
-    @Test func aRenameOfSeveralItemsInABranchViewLeavesEachInItsFolder() throws {
+    @Test
+    func aRenameOfSeveralItemsInABranchViewLeavesEachInItsFolder() throws {
         bench.left.show(try branch(of: "d"))
         bench.left.moveCursor(toName: "a.txt")
         commands.perform(.selectAll)
@@ -154,7 +164,8 @@ import VirtualFoldersPlugin
     }
 
     // F002, F004, F011, F071
-    @Test func aLargeSelectionIsRememberedAndOnlyWrittenOutWhenAskedFor() throws {
+    @Test
+    func aLargeSelectionIsRememberedAndOnlyWrittenOutWhenAskedFor() throws {
         let count = ClipboardPlugin.eagerLimit + 5
         for index in 0..<count { try box.file("many/f\(index).txt", "\(index)") }
         bench.left.show(box.url("many"))
@@ -194,7 +205,8 @@ import VirtualFoldersPlugin
         #expect((pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL])?.map(\.lastPathComponent) == ["f1.txt"])
     }
 
-    @Test func filesAnotherProgramOffersAsOneListAreReadInOnePiece() {
+    @Test
+    func filesAnotherProgramOffersAsOneListAreReadInOnePiece() {
         bench.right.focus()
         // Files written by somebody else: the system offers them as one list as well.
         pasteboard.clearContents()
@@ -209,7 +221,8 @@ import VirtualFoldersPlugin
     }
 
     // F040
-    @Test func aTextIsPastedAsAFileWithoutLeavingADraft() {
+    @Test
+    func aTextIsPastedAsAFileWithoutLeavingADraft() {
         pasteboard.clearContents()
         pasteboard.setString("some text", forType: .string)
         bench.right.focus()
@@ -218,7 +231,8 @@ import VirtualFoldersPlugin
     }
 
     // F055
-    @Test func namesThatCouldMisleadAreWrittenOutInQuestions() {
+    @Test
+    func namesThatCouldMisleadAreWrittenOutInQuestions() {
         #expect(DisplayName.escaped("plain name.txt") == "plain name.txt")
         #expect(DisplayName.escaped("a\nb\u{202E}txt.exe\u{200B}") == "a<U+000A>b<U+202E>txt.exe<U+200B>")
         let item = FileItem(url: box.url("d/x\ny"), name: "x\ny")
@@ -228,9 +242,11 @@ import VirtualFoldersPlugin
     }
 }
 
-@Suite struct Review2FileopsNames {
+@Suite
+struct Review2FileopsNames {
     // F014, F015, F016: reproducers of the fuzzer, as typed text.
-    @Test func rangesNearTheEndsOfIntDoNotCrash() throws {
+    @Test
+    func rangesNearTheEndsOfIntDoNotCrash() throws {
         var context = NameTemplate.Context()
         context.cursorName = "report.txt"
         #expect(
@@ -276,7 +292,8 @@ import VirtualFoldersPlugin
     }
 
     // F035, F075
-    @Test func aMaskThatComesToNothingNamesNothing() throws {
+    @Test
+    func aMaskThatComesToNothingNamesNothing() throws {
         let context = NameTemplate.Context()
         #expect(try NameTemplate.names(from: "<[T2+1D]", context: context).isEmpty)
         #expect(try NameTemplate.names(from: "<[T2+1D] | real", context: context) == ["real"])
@@ -284,7 +301,8 @@ import VirtualFoldersPlugin
     }
 
     // F035, F074
-    @Test func theDateFormattersAreMadeOncePerText() throws {
+    @Test
+    func theDateFormattersAreMadeOncePerText() throws {
         var context = NameTemplate.Context()
         context.now = Date(timeIntervalSince1970: 1_700_000_000)
         let names = try NameTemplate.names(from: "<0-19999>[C] [d] [t]", context: context)
@@ -294,7 +312,8 @@ import VirtualFoldersPlugin
     }
 
     // F059
-    @Test func theClipboardCannotBringPathsIntoAName() throws {
+    @Test
+    func theClipboardCannotBringPathsIntoAName() throws {
         var context = NameTemplate.Context()
         context.clipboard = "../../etc/passwd\nsecond line"
         #expect(try NameTemplate.names(from: "<[X]", context: context) == [".._.._etc_passwd"])
@@ -311,7 +330,8 @@ import VirtualFoldersPlugin
     }
 }
 
-@Suite struct Review2FileopsLog {
+@Suite
+struct Review2FileopsLog {
     let box: Sandbox
 
     init() throws {
@@ -328,7 +348,8 @@ import VirtualFoldersPlugin
     }
 
     // F060, F055
-    @Test func aNameWithALineBreakIsOneLineInTheLog() {
+    @Test
+    func aNameWithALineBreakIsOneLineInTheLog() {
         let forged = OperationRecord(
             .copy,
             source: "/a/x\n2026-01-01 00:00:00: Delete: /etc/passwd",
@@ -348,7 +369,8 @@ import VirtualFoldersPlugin
     }
 
     // F061
-    @Test func aBurstThatFillsTheLogSeveralTimesRotatesEachTime() throws {
+    @Test
+    func aBurstThatFillsTheLogSeveralTimesRotatesEachTime() throws {
         let log = OperationLog(configuration(.size(200)))
         // Twelve lines of 61 bytes in one burst: three fit into a file of 200 bytes.
         for index in 0..<12 {
@@ -365,7 +387,8 @@ import VirtualFoldersPlugin
     }
 
     // F062
-    @Test func theLogAppendsAlsoAfterSomebodyElseEmptiedOrExtendedIt() throws {
+    @Test
+    func theLogAppendsAlsoAfterSomebodyElseEmptiedOrExtendedIt() throws {
         let log = OperationLog(configuration())
         log.write(OperationRecord(.copy, source: "/one"))
         #expect(log.flush(timeout: 30))
@@ -394,7 +417,8 @@ import VirtualFoldersPlugin
     }
 
     // F027
-    @Test func theFlushAtQuitGivesUpAfterItsTime() throws {
+    @Test
+    func theFlushAtQuitGivesUpAfterItsTime() throws {
         let log = OperationLog(configuration())
         log.write(OperationRecord(.copy, source: "/one"))
         #expect(log.flush(timeout: 30))
@@ -448,9 +472,11 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 }
 
-@Suite struct Review2FileopsComments {
+@Suite
+struct Review2FileopsComments {
     // F077
-    @Test func aFirstNameThatLooksLikeAByteOrderMarkStaysAName() throws {
+    @Test
+    func aFirstNameThatLooksLikeAByteOrderMarkStaysAName() throws {
         // `ÿþ` in the Windows code page is FF FE: the mark of UTF-16.
         var file = DescriptIon(data: Data([0x0A, 0xFF, 0xFE]) + Data("x one\r\nother two\r\n".utf8))
         #expect(file.entries.map(\.name) == ["ÿþx", "other"])
@@ -466,7 +492,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F078
-    @Test func separatorsAreFoundNextToCombiningMarks() {
+    @Test
+    func separatorsAreFoundNextToCombiningMarks() {
         // A comment that starts with a combining accent, a name that ends with a format character.
         let file = DescriptIon(data: Data("x \u{0301}comment\r\n\"a b\"\u{0301} c\r\nn\u{0600} text\r\n".utf8))
         #expect(file.entries.count == 3)
@@ -481,7 +508,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F068
-    @Test func aNameTheFileCannotHoldIsRefusedInsteadOfBeingReadBackAsAnother() throws {
+    @Test
+    func aNameTheFileCannotHoldIsRefusedInsteadOfBeingReadBackAsAnother() throws {
         #expect(
             DescriptIon.canName("plain.txt") && DescriptIon.canName("with space.txt")
                 && DescriptIon.canName("quote\"inside")
@@ -506,7 +534,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F036, F065
-    @Test func aReadingThatBeganBeforeAChangeIsNotRemembered() throws {
+    @Test
+    func aReadingThatBeganBeforeAChangeIsNotRemembered() throws {
         let gated = GatedFileSystem()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(gated)
@@ -532,7 +561,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F066
-    @Test func aPipeCalledLikeTheCommentFileIsNotRead() throws {
+    @Test
+    func aPipeCalledLikeTheCommentFileIsNotRead() throws {
         let box = try Sandbox()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
@@ -559,7 +589,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F067
-    @Test func aLinkedOrHiddenCommentFileStaysLinkedAndHidden() throws {
+    @Test
+    func aLinkedOrHiddenCommentFileStaysLinkedAndHidden() throws {
         let box = try Sandbox()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
@@ -577,9 +608,12 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 }
 
-@MainActor @Suite struct Review2FileopsAttributes {
+@MainActor
+@Suite
+struct Review2FileopsAttributes {
     // F028, F076
-    @Test func anOctalModeIsTheWholeModeAsForChmod() {
+    @Test
+    func anOctalModeIsTheWholeModeAsForChmod() {
         #expect(PermissionChange("755") == .absolute(0o755, keepingSpecialBits: false))
         #expect(PermissionChange("755")?.applied(to: 0o4755, isDirectory: false) == 0o755)
         #expect(PermissionChange("4755")?.applied(to: 0o644, isDirectory: false) == 0o4755)
@@ -590,7 +624,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F069
-    @Test func everyChangeCanBeWrittenAndReadBack() throws {
+    @Test
+    func everyChangeCanBeWrittenAndReadBack() throws {
         for text in ["755", "4755", "rwxr-x---", "u+x,go-w", "a+rX", "o=", "ug+rw"] {
             let change = try #require(PermissionChange(text))
             #expect(PermissionChange(change.text) == change, "\(text) → \(change.text)")
@@ -605,7 +640,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F028: Recurse with the mode left as shown.
-    @Test func recurseWithUntouchedPermissionsIsAskedAboutNotDroppedSilently() throws {
+    @Test
+    func recurseWithUntouchedPermissionsIsAskedAboutNotDroppedSilently() throws {
         var draft = AttributeDraft(items: [
             FileItem(url: URL(fileURLWithPath: "/tmp/d"), name: "d", kind: .directory, stat: .init(permissions: 0o750))
         ])
@@ -618,7 +654,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F063, F064, F043
-    @Test func changesStartFromWhatTheItemHasNowAndNeverUnlockOrFollowALink() throws {
+    @Test
+    func changesStartFromWhatTheItemHasNowAndNeverUnlockOrFollowALink() throws {
         let box = try Sandbox()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
@@ -661,7 +698,8 @@ final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     // F029, F030
-    @Test func aLongListOfFailuresIsCutForTheMessage() {
+    @Test
+    func aLongListOfFailuresIsCutForTheMessage() {
         let failures = (0..<20).map { "item \($0): no" }
         let text = PropertyActions.summary(of: failures, total: 300_000)
         #expect(text.split(separator: "\n").count == 21 && text.hasSuffix("… and 299980 more"))

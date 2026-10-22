@@ -10,7 +10,8 @@ import Testing
 @testable import LocalFileSystemPlugin
 @testable import ViewOptionsPlugin
 
-@Suite struct LocalDiskFixes {
+@Suite
+struct LocalDiskFixes {
     let local = LocalFileSystem()
 
     private func flags(_ url: URL) -> UInt32 {
@@ -18,7 +19,8 @@ import Testing
         return lstat(url.path, &st) == 0 ? st.st_flags : 0
     }
 
-    @Test func aLockedFileIsCopiedUnderATemporaryNameAndRenamed() throws {
+    @Test
+    func aLockedFileIsCopiedUnderATemporaryNameAndRenamed() throws {
         let box = try Sandbox()
         let source = try box.file("locked.txt", "content")
         #expect(chflags(source.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -53,7 +55,8 @@ import Testing
         #expect(box.exists("locked.txt") && box.exists("copy.txt") && !box.exists("other.txt"))
     }
 
-    @Test func aFailedCopyLeavesAnExistingFileAlone() throws {
+    @Test
+    func aFailedCopyLeavesAnExistingFileAlone() throws {
         let box = try Sandbox()
         let source = try box.file("a.txt", "new")
         try box.file("b.txt", "theirs")
@@ -77,7 +80,8 @@ import Testing
         )
     }
 
-    @Test func pipesAndTheLikeAreToldFromFiles() throws {
+    @Test
+    func pipesAndTheLikeAreToldFromFiles() throws {
         let box = try Sandbox()
         try box.file("plain.txt")
         try box.folder("folder")
@@ -96,7 +100,8 @@ import Testing
         #expect(!FileItem(url: box.url("x"), name: "x").isSpecial)
     }
 
-    @Test func aLargeFolderIsListedLikeASmallOne() throws {
+    @Test
+    func aLargeFolderIsListedLikeASmallOne() throws {
         // Enough entries for the items to be made on several threads.
         let box = try Sandbox()
         let fm = FileManager.default
@@ -124,7 +129,8 @@ import Testing
         #expect(try local.list(box.root, showHidden: false).count == 1_507)
     }
 
-    @Test func aTreeIsMeasuredLikeItIsListed() throws {
+    @Test
+    func aTreeIsMeasuredLikeItIsListed() throws {
         let box = try Sandbox()
         for folder in 0..<12 {
             for file in 0..<20 {
@@ -150,7 +156,8 @@ import Testing
         #expect(local.totalSize(of: box.root, cancellation: cancelled) == 0)
     }
 
-    @Test func placesAndVolumesAnswerFromWhatIsKnown() throws {
+    @Test
+    func placesAndVolumesAnswerFromWhatIsKnown() throws {
         let places = local.settledPlaces()
         #expect(places.first?.kind == .home && places.contains { $0.kind == .internalDisk && $0.url.path == "/" })
         // Asked again, the list comes from memory (`places()` only reads what is known).
@@ -179,7 +186,8 @@ import Testing
 
     private func box() throws -> Sandbox { try Sandbox() }
 
-    @Test func aWatcherThatGoesAwayWhileChangesArriveDoesNoHarm() async throws {
+    @Test
+    func aWatcherThatGoesAwayWhileChangesArriveDoesNoHarm() async throws {
         let box = try Sandbox()
         try box.folder("watched")
         for round in 0..<20 {
@@ -197,7 +205,9 @@ extension Int {
     fileprivate var int64: Int64 { Int64(self) }
 }
 
-@MainActor @Suite struct PluginFixes {
+@MainActor
+@Suite
+struct PluginFixes {
     let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
     var pasteboard: NSPasteboard { scratch.pasteboard }
@@ -215,7 +225,8 @@ extension Int {
         )
     }
 
-    @Test func aTabFileIsReplacedInOneStepAndOnlyIfItIsAFile() {
+    @Test
+    func aTabFileIsReplacedInOneStepAndOnlyIfItIsAFile() {
         bench.commands.perform("SAVETABS", .location(memory.url("/A/my.tab")))
         let first = memory.contents("/A/my.tab")
         #expect(first?.contains("[activetabs]") == true)
@@ -236,14 +247,16 @@ extension Int {
         #expect(bench.interaction.log.last?.contains("could not be saved") == true)
     }
 
-    @Test func aFileTooLargeToBeATabFileIsNotLoaded() {
+    @Test
+    func aFileTooLargeToBeATabFileIsNotLoaded() {
         memory.addFile("/A/huge.tab", String(repeating: "x", count: FolderTabsPlugin.tabFileLimit + 10))
         let before = bench.left.tabs.count
         bench.commands.perform("OPENTABS", .location(memory.url("/A/huge.tab")))
         #expect(bench.left.tabs.count == before && bench.interaction.log.last?.contains("could not be loaded") == true)
     }
 
-    @Test func theClipboardCommandIsOfferedForAnyTextAndReadsOnlyTheFirstLine() {
+    @Test
+    func theClipboardCommandIsOfferedForAnyTextAndReadsOnlyTheFirstLine() {
         #expect(!bench.commands.isEnabled("afm_CdFromClipboard"))
         pasteboard.clearContents()
         pasteboard.setString(
@@ -255,7 +268,8 @@ extension Int {
         #expect(bench.left.model.directory.path == "/A/docs")
     }
 
-    @Test func aLongListIsSortedInTheBackgroundAndAShortOneAtOnce() async throws {
+    @Test
+    func aLongListIsSortedInTheBackgroundAndAShortOneAtOnce() async throws {
         let model = bench.left.model
         bench.commands.perform("cm_SrcBySize")
         #expect(model.sort == ListOrder(key: .size, descending: true))

@@ -4,10 +4,12 @@ import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
-@Suite struct LocalDisk {
+@Suite
+struct LocalDisk {
     let local = LocalFileSystem()
 
-    @Test func listsADirectory() throws {
+    @Test
+    func listsADirectory() throws {
         let box = try Sandbox()
         try box.file("a.txt", String(repeating: "a", count: 2_048))
         try box.folder("docs")
@@ -25,7 +27,8 @@ import Testing
         #expect(local.displayPath(box.url("docs")) == box.url("docs").path)
     }
 
-    @Test func theBulkListingAgreesWithLookingAtEachEntry() throws {
+    @Test
+    func theBulkListingAgreesWithLookingAtEachEntry() throws {
         let box = try Sandbox()
         try box.file(
             "plain.txt",
@@ -77,7 +80,8 @@ import Testing
         #expect(try local.list(box.url("folder/inner"), showHidden: true).isEmpty)
     }
 
-    @Test func aLargeFolderIsListedInPieces() throws {
+    @Test
+    func aLargeFolderIsListedInPieces() throws {
         let box = try Sandbox()
         let count = 9_000
         for index in 0..<count { FileManager.default.createFile(atPath: box.url("f\(index).dat").path, contents: nil) }
@@ -103,7 +107,8 @@ import Testing
         #expect(received == 1)
     }
 
-    @Test func itemsParentsAndRoots() throws {
+    @Test
+    func itemsParentsAndRoots() throws {
         let box = try Sandbox()
         try box.file("a.txt")
         #expect(local.item(at: box.url("a.txt"))?.name == "a.txt")
@@ -113,7 +118,8 @@ import Testing
         #expect(local.root(of: box.root).path == "/")
     }
 
-    @Test func readsSeeksAndWrites() throws {
+    @Test
+    func readsSeeksAndWrites() throws {
         let box = try Sandbox()
         let stamp = Date(timeIntervalSince1970: 1_700_000_000)
         let writer = try local.write(box.url("new.txt"))
@@ -132,14 +138,16 @@ import Testing
         reader.close()
     }
 
-    @Test func writingNeverOverwritesAnExistingFile() throws {
+    @Test
+    func writingNeverOverwritesAnExistingFile() throws {
         let box = try Sandbox()
         try box.file("kept.txt", "precious")
         #expect(throws: FileSystemError.self) { try local.write(box.url("kept.txt")) }
         #expect(box.read("kept.txt") == "precious")
     }
 
-    @Test func movesWithAndWithoutReplacing() throws {
+    @Test
+    func movesWithAndWithoutReplacing() throws {
         let box = try Sandbox()
         try box.file("a.txt", "a")
         try box.file("b.txt", "b")
@@ -153,7 +161,8 @@ import Testing
         #expect(box.read("c.txt") == "a")
     }
 
-    @Test func removesOneItemAndNeverATree() throws {
+    @Test
+    func removesOneItemAndNeverATree() throws {
         let box = try Sandbox()
         try box.file("docs/inside.txt")
         try box.folder("empty")
@@ -169,7 +178,8 @@ import Testing
         #expect(!box.exists("docs"))
     }
 
-    @Test func copyingNeverTouchesAnExistingDestination() throws {
+    @Test
+    func copyingNeverTouchesAnExistingDestination() throws {
         let box = try Sandbox()
         try box.file("a.txt", "a")
         try local.copy(box.url("a.txt"), to: box.url("b.txt")) { _ in true }
@@ -179,7 +189,8 @@ import Testing
         #expect(box.read("c.txt") == "precious")
     }
 
-    @Test func offersPlacesAndVolumeInformation() {
+    @Test
+    func offersPlacesAndVolumeInformation() {
         let places = local.settledPlaces()
         #expect(places.first?.kind == .home)
         #expect(places.contains { $0.kind == .internalDisk && $0.url.path == "/" })
@@ -187,7 +198,8 @@ import Testing
         #expect(volume?.name.isEmpty == false && (volume?.totalBytes ?? 0) > 0)
     }
 
-    @Test func reportsChangesInWatchedFoldersOnly() async throws {
+    @Test
+    func reportsChangesInWatchedFoldersOnly() async throws {
         let box = try Sandbox()
         try box.folder("watched/sub")
         try box.folder("other")

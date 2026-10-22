@@ -36,7 +36,8 @@ private func status(_ url: URL) -> stat {
 }
 
 /// Review 2, local file system: special files, links, permissions, locks, places, watching.
-@Suite struct Review2LocalFileSystem {
+@Suite
+struct Review2LocalFileSystem {
     let local = LocalFileSystem()
 
     // MARK: Special files
@@ -47,7 +48,8 @@ private func status(_ url: URL) -> stat {
         return url
     }
 
-    @Test func readingAPipeOrADeviceIsRefusedAtOnce() throws {
+    @Test
+    func readingAPipeOrADeviceIsRefusedAtOnce() throws {
         let box = try Sandbox()
         let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: pipe)
@@ -74,7 +76,8 @@ private func status(_ url: URL) -> stat {
         #expect(try reader.read(upToCount: 100) == Data("hello".utf8) && (try reader.read(upToCount: 100)) == nil)
     }
 
-    @Test func appendingToAPipeIsRefusedAtOnceAndALinkIsNotFollowed() throws {
+    @Test
+    func appendingToAPipeIsRefusedAtOnceAndALinkIsNotFollowed() throws {
         let box = try Sandbox()
         let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("pipelink"), withDestinationURL: pipe)
@@ -101,7 +104,8 @@ private func status(_ url: URL) -> stat {
         #expect(box.read("target.txt") == "0123ab")
     }
 
-    @Test func copyingMetadataToOrFromAPipeIsRefusedAndCopyTakesOnlyFilesAndLinks() throws {
+    @Test
+    func copyingMetadataToOrFromAPipeIsRefusedAndCopyTakesOnlyFilesAndLinks() throws {
         let box = try Sandbox()
         let pipe = fifo(box)
         let file = try box.file("f.txt", "data")
@@ -128,7 +132,8 @@ private func status(_ url: URL) -> stat {
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: box.url("ln2").path) == file.path)
     }
 
-    @Test func aBlockedCallIsEndedByInterrupt() throws {
+    @Test
+    func aBlockedCallIsEndedByInterrupt() throws {
         // Not 0: should the pipe not be made, nothing is closed that is somebody else's.
         var pair: [Int32] = [-1, -1]
         try #require(pipe(&pair) == 0)
@@ -162,7 +167,8 @@ private func status(_ url: URL) -> stat {
         #expect(throws: (any Error).self) { try interruption.run { 0 } }
     }
 
-    @Test func aReaderAndAWriterThatWereInterruptedThrowAndCloseCleanly() throws {
+    @Test
+    func aReaderAndAWriterThatWereInterruptedThrowAndCloseCleanly() throws {
         let box = try Sandbox()
         let file = try box.file("f.txt", String(repeating: "z", count: 100))
         let reader = try local.read(file)
@@ -189,7 +195,8 @@ private func status(_ url: URL) -> stat {
 
     // MARK: write()
 
-    @Test func aNewFileIsPrivateUntilItIsClosedAndThenGetsItsRights() throws {
+    @Test
+    func aNewFileIsPrivateUntilItIsClosedAndThenGetsItsRights() throws {
         let box = try Sandbox()
         let url = box.url("new.bin")
         let writer = try local.write(url)
@@ -213,7 +220,8 @@ private func status(_ url: URL) -> stat {
         #expect(throws: FileSystemError.self) { try local.write(url) }
     }
 
-    @Test func theAttributesOfANewFileGoToTheFileAndNotToWhatTheNameBecame() throws {
+    @Test
+    func theAttributesOfANewFileGoToTheFileAndNotToWhatTheNameBecame() throws {
         let box = try Sandbox()
         let victim = try box.file("victim.txt", "mine")
         chmod(victim.path, 0o644)
@@ -234,7 +242,8 @@ private func status(_ url: URL) -> stat {
 
     // MARK: Links
 
-    @Test func settingAttributesOnALinkChangesTheLinkAndNotItsTarget() throws {
+    @Test
+    func settingAttributesOnALinkChangesTheLinkAndNotItsTarget() throws {
         let box = try Sandbox()
         let target = try box.file("target.txt", "t")
         chmod(target.path, 0o644)
@@ -255,7 +264,8 @@ private func status(_ url: URL) -> stat {
         }
     }
 
-    @Test func aLinkIntoNowhereAndALinkToAPipeAreListedWithoutBlocking() throws {
+    @Test
+    func aLinkIntoNowhereAndALinkToAPipeAreListedWithoutBlocking() throws {
         let box = try Sandbox()
         let pipe = fifo(box)
         try FileManager.default.createSymbolicLink(at: box.url("dangling"), withDestinationURL: box.url("nowhere"))
@@ -287,7 +297,8 @@ private func status(_ url: URL) -> stat {
         for name in names { lchflags(box.url(name).path, 0) }
     }
 
-    @Test func aLockedCopyThatKeptItsNameIsAsLockedAsItsSource() throws {
+    @Test
+    func aLockedCopyThatKeptItsNameIsAsLockedAsItsSource() throws {
         let box = try Sandbox()
         defer { unlockAll(in: box) }
         let source = try box.file("src.txt", "data")
@@ -310,7 +321,8 @@ private func status(_ url: URL) -> stat {
         #expect(box.exists("copydir"))
     }
 
-    @Test func aLockedCopyUnderATemporaryNameCanBeGivenItsRealName() throws {
+    @Test
+    func aLockedCopyUnderATemporaryNameCanBeGivenItsRealName() throws {
         let box = try Sandbox()
         defer { unlockAll(in: box) }
         let source = try box.file("src.txt", "data")
@@ -328,7 +340,8 @@ private func status(_ url: URL) -> stat {
         #expect(!box.exists(abandoned.lastPathComponent))
     }
 
-    @Test func theTableOfLockedTemporariesIsNeverWipedWholesale() throws {
+    @Test
+    func theTableOfLockedTemporariesIsNeverWipedWholesale() throws {
         let box = try Sandbox()
         defer { unlockAll(in: box) }
         let source = try box.file("src.txt", "d")
@@ -344,7 +357,8 @@ private func status(_ url: URL) -> stat {
 
     // MARK: Moving
 
-    @Test func movingOntoAnotherNameOfTheSameFileMovesIt() throws {
+    @Test
+    func movingOntoAnotherNameOfTheSameFileMovesIt() throws {
         let box = try Sandbox()
         let a = try box.file("a.txt", "same")
         let b = box.url("b.txt")
@@ -358,7 +372,8 @@ private func status(_ url: URL) -> stat {
         #expect(names == ["b.txt", "case.txt"] && box.read("case.txt") == "c")
     }
 
-    @Test func aRenameOfOnlyTheLettersCaseOrTheFormOfAnAccentNeverRemovesTheFile() throws {
+    @Test
+    func aRenameOfOnlyTheLettersCaseOrTheFormOfAnAccentNeverRemovesTheFile() throws {
         let box = try Sandbox()
         let decomposed = "e\u{0301}.txt"
         let composed = "\u{00E9}.txt"
@@ -392,7 +407,8 @@ private func status(_ url: URL) -> stat {
 
     // MARK: Places and volumes
 
-    @Test func thePlacesAreAnsweredAtOnceAndAnnouncedWhenTheyChange() async throws {
+    @Test
+    func thePlacesAreAnsweredAtOnceAndAnnouncedWhenTheyChange() async throws {
         let fresh = LocalFileSystem()
         let start = DispatchTime.now().uptimeNanoseconds
         let first = fresh.places()
@@ -430,7 +446,8 @@ private func status(_ url: URL) -> stat {
         withExtendedLifetime(again) {}
     }
 
-    @Test func askingForVolumesOftenIsQuickAndAgrees() throws {
+    @Test
+    func askingForVolumesOftenIsQuickAndAgrees() throws {
         let box = try Sandbox()
         let first = try #require(local.volume(of: box.root))
         let done = Locked(0)
@@ -442,8 +459,10 @@ private func status(_ url: URL) -> stat {
 }
 
 /// The watcher: no waiting for the caller, one report for a burst, nothing after stop.
-@Suite struct Review2DirectoryWatcher {
-    @Test func startingToWatchReturnsAtOnceEvenForManyFolders() throws {
+@Suite
+struct Review2DirectoryWatcher {
+    @Test
+    func startingToWatchReturnsAtOnceEvenForManyFolders() throws {
         let box = try Sandbox()
         let folders = (0..<500).map { box.url("f\($0)") }
         let watcher = DirectoryWatcher(queue: DispatchQueue(label: "test")) { _ in }
@@ -455,7 +474,8 @@ private func status(_ url: URL) -> stat {
         watcher.stop()
     }
 
-    @Test func aBurstOfChangesIsReportedInLumpsAndNothingComesAfterStop() async throws {
+    @Test
+    func aBurstOfChangesIsReportedInLumpsAndNothingComesAfterStop() async throws {
         let box = try Sandbox()
         try box.folder("watched")
         let count = Locked(0)
@@ -489,7 +509,8 @@ private func status(_ url: URL) -> stat {
         #expect(count.withValue { $0 } == afterStop)
     }
 
-    @Test func aFolderThatIsWatchedAgainAfterAChangeOfTheSetKeepsReporting() async throws {
+    @Test
+    func aFolderThatIsWatchedAgainAfterAChangeOfTheSetKeepsReporting() async throws {
         let box = try Sandbox()
         try box.folder("a")
         try box.folder("b")

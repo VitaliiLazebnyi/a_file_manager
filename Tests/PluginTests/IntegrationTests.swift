@@ -80,7 +80,8 @@ private final class BreakingAnswers: FileJobDelegate {
     func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
 }
 
-@Suite struct ArchiveJobsEndToEnd {
+@Suite
+struct ArchiveJobsEndToEnd {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 
@@ -103,7 +104,8 @@ private final class BreakingAnswers: FileJobDelegate {
             }
     }
 
-    @Test func aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() throws {
+    @Test
+    func aMoveOfSmallAndLargeFilesPutsThemInTheArchiveFileOnceAndRemovesTheSources() throws {
         let archive = try makeZip()
         let sources = try makeSources([
             "a.txt": 20, "b.txt": 3_000, "big1.txt": 300_000, "big2.txt": 700_000, "c.txt": 7
@@ -138,7 +140,8 @@ private final class BreakingAnswers: FileJobDelegate {
     ///
     /// Without it the renames succeed and everything waits for the commit; the folder of the
     /// archive stops being writable when the last file is begun, so that file and the commit fail.
-    @Test(arguments: [true, false]) func aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites: Bool) throws {
+    @Test(arguments: [true, false])
+    func aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites: Bool) throws {
         if !quickWrites { bench.environment.immediateWriteLimit = 0 }
         let archive = try makeZip()
         let sources = try makeSources(["big1.txt": 300_000, "big2.txt": 700_000, "big3.txt": 400_000])
@@ -173,7 +176,8 @@ private final class BreakingAnswers: FileJobDelegate {
         #expect(try Data(contentsOf: archive) == before && isSound(archive))
     }
 
-    @Test func aCopyOutOfAnArchiveCarriesTheArchivesQuarantineMark() throws {
+    @Test
+    func aCopyOutOfAnArchiveCarriesTheArchivesQuarantineMark() throws {
         try box.file("tree/sub/deep/inner.txt", "inner")
         let archive = try makeZip()
         let value = "0083;5e8b1c2d;Safari;"
@@ -190,7 +194,8 @@ private final class BreakingAnswers: FileJobDelegate {
         #expect(markOf(out.appendingPathComponent("sub/deep/inner.txt")) == value)
     }
 
-    @Test func aCopyFromOneFolderOfTheDiskToAnotherIsNotMarked() throws {
+    @Test
+    func aCopyFromOneFolderOfTheDiskToAnotherIsNotMarked() throws {
         // The folder of the source is marked, as a folder that was downloaded is; its files are not.
         try box.file("plain/x.txt", "x")
         mark(box.url("plain"), with: "0083;5e8b1c2d;Safari;")
@@ -207,7 +212,8 @@ private final class BreakingAnswers: FileJobDelegate {
 }
 
 /// A job that reads or writes through a virtual folder, with a server that stops answering.
-@Suite struct JobsThroughVirtualFolders {
+@Suite
+struct JobsThroughVirtualFolders {
     let memory = MemoryFileSystem()
     let probe: ProbeFileSystem
     let registry = FileSystemRegistry()
@@ -221,7 +227,8 @@ private final class BreakingAnswers: FileJobDelegate {
         registry.register(virtual)
     }
 
-    @Test func cancelEndsAReadOfAFileNamedThroughABranchViewAtOnce() throws {
+    @Test
+    func cancelEndsAReadOfAFileNamedThroughABranchViewAtOnce() throws {
         let box = try Sandbox()
         memory.stallsReads = true
         let gate = DispatchSemaphore(value: 0)
@@ -239,7 +246,8 @@ private final class BreakingAnswers: FileJobDelegate {
         #expect(namesOnDisk(out).isEmpty)
     }
 
-    @Test func cancelEndsAWriteIntoABranchViewAtOnce() throws {
+    @Test
+    func cancelEndsAWriteIntoABranchViewAtOnce() throws {
         let box = try Sandbox()
         memory.stallsWrites = true
         let gate = DispatchSemaphore(value: 0)
@@ -261,7 +269,8 @@ private final class BreakingAnswers: FileJobDelegate {
         #expect(memory.allPaths == ["/A"])
     }
 
-    @Test func cancelEndsTheListingOfABranchViewThatWaits() {
+    @Test
+    func cancelEndsTheListingOfABranchViewThatWaits() {
         memory.stallsListings = true
         let gate = DispatchSemaphore(value: 0)
         probe.onList = { gate.signal() }
@@ -285,8 +294,11 @@ private final class BreakingAnswers: FileJobDelegate {
 
 /// A branch view that names two files by their paths: the names of what a job processed are
 /// found by location.
-@MainActor @Suite struct NamesInBranchViews {
-    @Test func processedItemsAreFoundByLocationWhereNamesArePaths() throws {
+@MainActor
+@Suite
+struct NamesInBranchViews {
+    @Test
+    func processedItemsAreFoundByLocationWhereNamesArePaths() throws {
         let registry = FileSystemRegistry()
         let memory = MemoryFileSystem()
         registry.register(memory)
@@ -311,8 +323,10 @@ private final class BreakingAnswers: FileJobDelegate {
 }
 
 /// The viewer reads a file that a branch view names, from a server that stops answering.
-@Suite struct ViewerThroughVirtualFolders {
-    @Test func aBlockedReadEndsWhenItsFlagIsSet() throws {
+@Suite
+struct ViewerThroughVirtualFolders {
+    @Test
+    func aBlockedReadEndsWhenItsFlagIsSet() throws {
         let memory = MemoryFileSystem()
         let probe = ProbeFileSystem(memory)
         let registry = FileSystemRegistry()

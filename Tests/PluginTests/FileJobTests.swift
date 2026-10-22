@@ -5,8 +5,10 @@ import Foundation
 import TestSupport
 import Testing
 
-@Suite struct Targets {
-    @Test func wildcardTargetNames() {
+@Suite
+struct Targets {
+    @Test
+    func wildcardTargetNames() {
         // The examples of spec 07 › Wildcard target names.
         #expect(TargetMask.apply("h?.txt", to: "test.txt") == "he.txt")
         #expect(TargetMask.apply("f*.txt", to: "test.txt") == "fest.txt")
@@ -19,7 +21,8 @@ import Testing
         #expect(TargetMask.apply("plain", to: "a.txt") == "plain")
     }
 
-    @Test func parsesTheTargetField() throws {
+    @Test
+    func parsesTheTargetField() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         try box.folder("B")
@@ -42,7 +45,8 @@ import Testing
         #expect(parse("mem:///inbox/new.txt") == TargetSpec(directory: memory.url("/inbox"), mask: "new.txt"))
     }
 
-    @Test func uniqueNames() throws {
+    @Test
+    func uniqueNames() throws {
         let box = try Sandbox()
         let (fileSystems, _) = makeFileSystems()
         func free(_ name: String) -> String {
@@ -58,18 +62,21 @@ import Testing
     }
 }
 
-@Suite struct Wording {
+@Suite
+struct Wording {
     func item(_ name: String, folder: Bool = false) -> FileItem {
         FileItem(url: URL(fileURLWithPath: "/tmp/\(name)"), name: name, kind: .init(isDirectory: folder))
     }
 
-    @Test func headings() {
+    @Test
+    func headings() {
         #expect(OperationText.heading("Copy", [item("a.txt")]) == "Copy \"a.txt\" to")
         #expect(OperationText.heading("Copy", [item("docs", folder: true)]) == "Copy 1 file(s) to")
         #expect(OperationText.heading("Rename/Move", [item("a"), item("b")]) == "Rename/Move 2 file(s) to")
     }
 
-    @Test func targetProposals() {
+    @Test
+    func targetProposals() {
         #expect(
             OperationText.targetProposal(for: [item("a.txt")], targetPath: "/Volumes/Data/B") == "/Volumes/Data/B/a.txt"
         )
@@ -81,7 +88,8 @@ import Testing
         #expect(OperationText.targetProposal(for: [item("docs", folder: true)], targetPath: nil) == "docs")
     }
 
-    @Test func deleteQuestions() {
+    @Test
+    func deleteQuestions() {
         #expect(
             OperationText.deleteQuestion([item("a.txt")], toTrash: true)
                 == "Do you really want to move the selected file a.txt to the Trash?"
@@ -96,7 +104,8 @@ import Testing
         )
     }
 
-    @Test func formats() {
+    @Test
+    func formats() {
         #expect(Format.bytes(250_944) == "250,944")
         #expect(Format.kilobytes(0) == "0 k")
         #expect(Format.shortSize(15) == "15 b")
@@ -115,8 +124,10 @@ import Testing
 }
 
 /// Jobs on the local disk.
-@Suite struct LocalJobs {
-    @Test func copiesFilesAndFoldersRecursively() throws {
+@Suite
+struct LocalJobs {
+    @Test
+    func copiesFilesAndFoldersRecursively() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.file("A/docs/two.txt", "2")
@@ -140,7 +151,8 @@ import Testing
         #expect(answers.progress.first?.lines == ["From: \(box.url("A/docs").path)", "To: \(box.url("B/docs").path)"])
     }
 
-    @Test func aFinishedJobIsLetGo() throws {
+    @Test
+    func aFinishedJobIsLetGo() throws {
         let box = try Sandbox()
         try box.file("A/docs/one.txt", "1")
         try box.folder("B")
@@ -160,7 +172,8 @@ import Testing
         #expect(finished == nil)
     }
 
-    @Test func noTemporaryNamesAreLeftBehind() throws {
+    @Test
+    func noTemporaryNamesAreLeftBehind() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.file("A/two.txt", "2")
@@ -170,14 +183,16 @@ import Testing
         #expect(box.read("B/two.txt") == "2")
     }
 
-    @Test func createsMissingTargetFolders() throws {
+    @Test
+    func createsMissingTargetFolders() throws {
         let box = try Sandbox()
         try box.folder("A/docs")
         runJob(.copy, [box.url("A/docs")], to: TargetSpec(directory: box.url("B/new/sub")))
         #expect(box.exists("B/new/sub/docs"))
     }
 
-    @Test func copyKeepsTimeAndPermissions() throws {
+    @Test
+    func copyKeepsTimeAndPermissions() throws {
         let box = try Sandbox()
         let stamp = Date(timeIntervalSince1970: 1_700_000_000)
         let source = try box.file("A/tool.sh", "#!/bin/sh", modified: stamp)
@@ -189,7 +204,8 @@ import Testing
         #expect(attributes[.posixPermissions] as? Int == 0o755)
     }
 
-    @Test func overwriteAndSkip() throws {
+    @Test
+    func overwriteAndSkip() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "new")
         try box.file("A/two.txt", "new")
@@ -212,7 +228,8 @@ import Testing
         #expect(namesOnDisk(box.url("B")) == ["one.txt", "two.txt"])
     }
 
-    @Test func overwriteAllOlderKeepsNewerTargets() throws {
+    @Test
+    func overwriteAllOlderKeepsNewerTargets() throws {
         let box = try Sandbox()
         let old = Date(timeIntervalSince1970: 1_600_000_000)
         let new = Date(timeIntervalSince1970: 1_700_000_000)
@@ -232,7 +249,8 @@ import Testing
         #expect(box.read("B/two.txt") == "target")
     }
 
-    @Test func cancelStopsTheJob() throws {
+    @Test
+    func cancelStopsTheJob() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "new")
         try box.file("A/two.txt", "new")
@@ -250,7 +268,8 @@ import Testing
         #expect(namesOnDisk(box.url("B")) == ["one.txt"])
     }
 
-    @Test func aJobWithoutAnyoneToAskStopsAtItsFirstQuestion() throws {
+    @Test
+    func aJobWithoutAnyoneToAskStopsAtItsFirstQuestion() throws {
         let box = try Sandbox()
         let (fileSystems, _) = makeFileSystems()
         try box.file("A/one.txt", "new")
@@ -266,7 +285,8 @@ import Testing
         #expect(box.read("B/one.txt") == "old")
     }
 
-    @Test func copyOntoItselfIsRefused() throws {
+    @Test
+    func copyOntoItselfIsRefused() throws {
         let box = try Sandbox()
         let (fileSystems, _) = makeFileSystems()
         try box.file("A/one.txt", "1")
@@ -287,7 +307,8 @@ import Testing
         #expect(!box.exists("A/sub"))
     }
 
-    @Test func copyWithRenameAndMask() throws {
+    @Test
+    func copyWithRenameAndMask() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.file("A/two.txt", "2")
@@ -301,7 +322,8 @@ import Testing
         #expect(box.read("A/two.bak") == "2")
     }
 
-    @Test func pasteIntoTheSameFolderRenamesTheCopy() throws {
+    @Test
+    func pasteIntoTheSameFolderRenamesTheCopy() throws {
         let box = try Sandbox()
         let (fileSystems, _) = makeFileSystems()
         try box.file("A/one.txt", "1")
@@ -319,7 +341,8 @@ import Testing
         #expect(box.read("A/docs (2)/in.txt") == "2")
     }
 
-    @Test func movesAndMergesFolders() throws {
+    @Test
+    func movesAndMergesFolders() throws {
         let box = try Sandbox()
         try box.file("A/docs/one.txt", "new")
         try box.file("A/docs/sub/two.txt", "2")
@@ -340,7 +363,8 @@ import Testing
         #expect(box.read("B/solo.txt") == "s")
     }
 
-    @Test func moveKeepsSkippedSources() throws {
+    @Test
+    func moveKeepsSkippedSources() throws {
         let box = try Sandbox()
         try box.file("A/docs/one.txt", "new")
         try box.file("A/docs/two.txt", "2")
@@ -354,7 +378,8 @@ import Testing
         #expect(box.read("B/docs/one.txt") == "old" && box.read("B/docs/two.txt") == "2")
     }
 
-    @Test func renameInPlace() throws {
+    @Test
+    func renameInPlace() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         let result = runJob(
@@ -367,7 +392,8 @@ import Testing
         #expect(box.read("A/renamed.md") == "1")
     }
 
-    @Test func deletesTreesItemByItem() throws {
+    @Test
+    func deletesTreesItemByItem() throws {
         let box = try Sandbox()
         try box.file("A/docs/one.txt")
         try box.file("A/docs/deep/two.txt")
@@ -395,7 +421,8 @@ import Testing
         #expect(answers.progress.contains { $0.lines == ["Deleting: \(box.url("A/docs/deep/two.txt").path)"] })
     }
 
-    @Test func aDeleteCanBeCancelledInTheMiddleOfATree() throws {
+    @Test
+    func aDeleteCanBeCancelledInTheMiddleOfATree() throws {
         let box = try Sandbox()
         for index in 0..<20 { try box.file("A/docs/file\(index).txt") }
         let answers = Answers()
@@ -406,7 +433,8 @@ import Testing
         #expect(left > 0 && left < 20)
     }
 
-    @Test func aFolderThatCannotBeReadIsNeverRemoved() throws {
+    @Test
+    func aFolderThatCannotBeReadIsNeverRemoved() throws {
         let box = try Sandbox()
         try box.file("A/docs/precious.txt", "p")
         try box.folder("B/docs")
@@ -429,7 +457,8 @@ import Testing
         #expect(box.read("A/docs/precious.txt") == "p")
     }
 
-    @Test func symbolicLinksAreCopiedAndDeletedAsLinks() throws {
+    @Test
+    func symbolicLinksAreCopiedAndDeletedAsLinks() throws {
         let box = try Sandbox()
         try box.file("real/inside.txt", "i")
         try box.folder("A")
@@ -441,7 +470,8 @@ import Testing
         #expect(box.exists("real/inside.txt"))
     }
 
-    @Test func aMissingSourceIsReportedAndSkipped() throws {
+    @Test
+    func aMissingSourceIsReportedAndSkipped() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -459,8 +489,10 @@ import Testing
 }
 
 /// Jobs between two file systems, and on a file system that is not the local disk.
-@Suite struct CrossFileSystemJobs {
-    @Test func copiesFromDiskIntoAnotherFileSystem() throws {
+@Suite
+struct CrossFileSystemJobs {
+    @Test
+    func copiesFromDiskIntoAnotherFileSystem() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         let stamp = Date(timeIntervalSince1970: 1_700_000_000)
@@ -488,7 +520,8 @@ import Testing
         )
     }
 
-    @Test func copiesFromAnotherFileSystemOntoDisk() throws {
+    @Test
+    func copiesFromAnotherFileSystemOntoDisk() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         let stamp = Date(timeIntervalSince1970: 1_700_000_000)
@@ -510,7 +543,8 @@ import Testing
         #expect(namesOnDisk(box.url("B/out")) == ["report.txt", "sub"])
     }
 
-    @Test func movingBetweenFileSystemsRemovesTheSource() throws {
+    @Test
+    func movingBetweenFileSystemsRemovesTheSource() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         try box.file("A/docs/one.txt", "1")
@@ -527,7 +561,8 @@ import Testing
         #expect(memory.contents("/inbox/docs/one.txt") == "1" && memory.contents("/inbox/solo.txt") == "s")
     }
 
-    @Test func overwritingOnAnotherFileSystemGoesThroughATemporaryName() throws {
+    @Test
+    func overwritingOnAnotherFileSystemGoesThroughATemporaryName() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         try box.file("A/one.txt", "new")
@@ -545,7 +580,8 @@ import Testing
         #expect(memory.allPaths == ["/inbox", "/inbox/one.txt"])
     }
 
-    @Test func aCancelledStreamLeavesNothingBehind() throws {
+    @Test
+    func aCancelledStreamLeavesNothingBehind() throws {
         let box = try Sandbox()
         let (fileSystems, memory) = makeFileSystems()
         try box.file("A/big.bin", String(repeating: "x", count: 5 << 20))
@@ -565,7 +601,8 @@ import Testing
         #expect(Set(answers.progress.map(\.bytesDone)).count > 2)
     }
 
-    @Test func jobsWithinAnotherFileSystemUseItsOwnOperations() {
+    @Test
+    func jobsWithinAnotherFileSystemUseItsOwnOperations() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/one.txt", String(repeating: "1", count: 3_000))
         memory.addFile("/a/docs/two.txt", "2")
@@ -593,7 +630,8 @@ import Testing
         #expect(memory.allPaths == ["/a", "/a/one.txt", "/b"])
     }
 
-    @Test func aFileSystemThatCannotCopyByItselfIsStreamed() {
+    @Test
+    func aFileSystemThatCannotCopyByItselfIsStreamed() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/serverA/data.bin", String(repeating: "d", count: 2_000), permissions: 0o640)
         memory.addDirectory("/serverB")
@@ -610,7 +648,8 @@ import Testing
         #expect(memory.allPaths == ["/serverA", "/serverA/data.bin", "/serverB", "/serverB/data.bin"])
     }
 
-    @Test func anUnreadableFolderIsNotMovedAwayOrDeleted() {
+    @Test
+    func anUnreadableFolderIsNotMovedAwayOrDeleted() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/docs/precious.txt", "p")
         memory.addDirectory("/b/docs")
@@ -638,7 +677,8 @@ import Testing
 
     /// A volume without a Trash: the job asks whether to delete for good (the stand-in
     /// delegate agrees, as it does to every protection question).
-    @Test func trashWhereThereIsNoneOffersToDeleteForGood() {
+    @Test
+    func trashWhereThereIsNoneOffersToDeleteForGood() {
         let (fileSystems, memory) = makeFileSystems()
         memory.addFile("/a/one.txt")
         let answers = Answers()

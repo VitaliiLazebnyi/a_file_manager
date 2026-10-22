@@ -13,7 +13,9 @@ import Testing
 /// scripted user and jobs that run at once.
 ///
 /// No window is involved.
-@MainActor @Suite struct DirectorySyncCommands {
+@MainActor
+@Suite
+struct DirectorySyncCommands {
     let memory = MemoryFileSystem()
     let plugin = DirectorySyncPlugin(opensWindows: false)
     let compareTool = CompareContentPlugin(opensWindows: false)
@@ -56,7 +58,8 @@ import Testing
         session.rows.indices.filter { names.contains(session.rows[$0].name) }
     }
 
-    @Test func commandIsRegisteredWithMenuButtonAndPreferences() {
+    @Test
+    func commandIsRegisteredWithMenuButtonAndPreferences() {
         #expect(bench.commands[.synchronizeDirectories]?.title == "Synchronize Dirs…")
         #expect(
             bench.kernel.menus.menus.first { $0.title == "Commands" }?.items.contains(.synchronizeDirectories) == true
@@ -70,7 +73,8 @@ import Testing
         #expect(bench.kernel.keyClashes.isEmpty)
     }
 
-    @Test func opensWithThePanelsDirectoriesAndSelection() {
+    @Test
+    func opensWithThePanelsDirectoriesAndSelection() {
         bench.right.focus()
         bench.right.model.select(mask: "same.txt")
         bench.left.model.select(mask: "new.txt")
@@ -89,7 +93,8 @@ import Testing
         #expect(session.status == "Files found: 2  (Identical: 1, Different: 0, Unique left: 1, Unique right: 0)")
     }
 
-    @Test func listIsGroupedBySubdirectoryAndFilteredByTheShowButtons() {
+    @Test
+    func listIsGroupedBySubdirectoryAndFilteredByTheShowButtons() {
         let session = opened()
         #expect(session.entries.count == 7 && session.entries[5] == .header("sub/"))
         #expect(session.status == "Files found: 6  (Identical: 1, Different: 3, Unique left: 1, Unique right: 1)")
@@ -111,7 +116,8 @@ import Testing
         #expect(session.visibleRows.prefix(2).map { session.rows[$0].name } == ["update.txt", "new.txt"])
     }
 
-    @Test func synchronizeRunsBothDirectionsAndComparesAgain() {
+    @Test
+    func synchronizeRunsBothDirectionsAndComparesAgain() {
         let session = opened()
         #expect(session.canSynchronize)
         ui.formAnswers = [.accept]
@@ -142,7 +148,8 @@ import Testing
         #expect(bench.left.names.contains("sub") && bench.right.names.contains("new.txt"))
     }
 
-    @Test func theDialogDecidesWhatRuns() {
+    @Test
+    func theDialogDecidesWhatRuns() {
         var session = opened()
         ui.formAnswers = [.cancel]
         session.synchronize()
@@ -174,7 +181,8 @@ import Testing
         )
     }
 
-    @Test func onlyVisibleRowsAreSynchronized() {
+    @Test
+    func onlyVisibleRowsAreSynchronized() {
         let session = opened()
         session.show = [.copyToLeft, .duplicates, .singles]
         ui.formAnswers = [.values(["confirm": .flag(false)])]
@@ -184,7 +192,8 @@ import Testing
         #expect(!memory.exists("/B/new.txt") && memory.contents("/B/update.txt") == "older")
     }
 
-    @Test func directionsAreChangedForOneRowOrMany() {
+    @Test
+    func directionsAreChangedForOneRowOrMany() {
         let session = opened()
         func actions(_ names: String...) -> [SyncAction] {
             rows(session, names[0], names.count > 1 ? names[1] : names[0]).map { session.rows[$0].action }
@@ -229,7 +238,8 @@ import Testing
         #expect(memory.contents("/B/update.txt") == "older" && memory.contents("/A/back.txt") == "older")
     }
 
-    @Test func asymmetricDeletesOnTheRightAfterConfirmation() {
+    @Test
+    func asymmetricDeletesOnTheRightAfterConfirmation() {
         let session = opened {
             $0.options.asymmetric = true
             $0.options.emptyDirectories = true
@@ -244,7 +254,8 @@ import Testing
         #expect(!memory.exists("/A/sub"))
     }
 
-    @Test func failuresAreAskedAboutAndTheRestStillRuns() {
+    @Test
+    func failuresAreAskedAboutAndTheRestStillRuns() {
         let session = opened()
         memory.removeTree("/A/new.txt")
         ui.formAnswers = [.values(["confirm": .flag(false)])]
@@ -254,14 +265,16 @@ import Testing
         #expect(memory.contents("/B/update.txt") == "newer on the left" && !memory.exists("/B/new.txt"))
     }
 
-    @Test func unreadableFoldersAreReported() {
+    @Test
+    func unreadableFoldersAreReported() {
         memory.unreadable = ["/B/sub"]
         let session = opened()
         #expect(ui.log.contains { $0.hasPrefix("inform: Some directories or files could not be read") })
         #expect(!session.rows.contains { $0.directory == "sub/" })
     }
 
-    @Test func viewAndCompareGoThroughOtherPluginsCommands() {
+    @Test
+    func viewAndCompareGoThroughOtherPluginsCommands() {
         var viewed: [URL] = []
         bench.commands.register(Command(.view, "View"), parameterized: { viewed += [$0.location].compactMap { $0 } })
         let session = opened()
@@ -290,7 +303,8 @@ import Testing
         #expect(session.picked.left == nil && session.picked.right == nil)
     }
 
-    @Test func settingsAreSavedUnderNamesAndLoaded() {
+    @Test
+    func settingsAreSavedUnderNamesAndLoaded() {
         var session = opened {
             $0.options.byContent = true
             $0.options.mask = "*.txt | odd*"
@@ -332,8 +346,11 @@ import Testing
 }
 
 /// The window itself: built, filled by a comparison that runs in the background, and drawn.
-@MainActor @Suite struct DirectorySyncWindow {
-    @Test func windowShowsABackgroundComparison() async {
+@MainActor
+@Suite
+struct DirectorySyncWindow {
+    @Test
+    func windowShowsABackgroundComparison() async {
         let memory = MemoryFileSystem()
         for index in 0..<40 {
             memory.addFile("/A/d\(index % 4)/f\(index).txt", "left \(index)")

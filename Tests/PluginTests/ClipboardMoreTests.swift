@@ -11,7 +11,9 @@ import Testing
 
 /// Names and details as text, and pasting a text or picture as a new file
 /// (spec 07 › File clipboard and name lists).
-@MainActor @Suite struct ClipboardMore {
+@MainActor
+@Suite
+struct ClipboardMore {
     let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
     var pasteboard: NSPasteboard { scratch.pasteboard }
@@ -35,7 +37,8 @@ import Testing
         )
     }
 
-    @Test func namesAreOneLineEachAndFoldersEndWithASlash() {
+    @Test
+    func namesAreOneLineEachAndFoldersEndWithASlash() {
         commands.perform(.selectAll)
         commands.perform(ClipboardCommands.copyNames)
         #expect(text == "docs/\none.txt\ntwo.txt")
@@ -58,7 +61,8 @@ import Testing
         #expect(text == "mem:/B")
     }
 
-    @Test func withoutASelectionTheCursorItemIsMeant() {
+    @Test
+    func withoutASelectionTheCursorItemIsMeant() {
         left.moveCursor(toName: "two.txt")
         commands.perform(ClipboardCommands.copyNames)
         #expect(text == "two.txt")
@@ -69,7 +73,8 @@ import Testing
         #expect(text == "mem:/A")
     }
 
-    @Test func detailsAreTabSeparatedColumns() {
+    @Test
+    func detailsAreTabSeparatedColumns() {
         let date = Format.date(modified)
         commands.perform(.selectAll)
         commands.perform(ClipboardCommands.copyDetails)
@@ -94,7 +99,8 @@ import Testing
         #expect(text == "Name\tSize\none.txt\t3")
     }
 
-    @Test func detailsIncludeThePluginColumnsThePanelShows() {
+    @Test
+    func detailsIncludeThePluginColumnsThePanelShows() {
         bench.kernel.columns.register(ContentColumn(id: "shout", title: "Shout") { $0.name.uppercased() + "\t!" })
         bench.kernel.columns.register(ContentColumn(id: "unused", title: "Unused") { _ in "?" })
         left.extraColumns = ["shout"]
@@ -109,7 +115,8 @@ import Testing
         #expect(text?.hasPrefix("Name\tSize\tDate\tAttr\n") == true)
     }
 
-    @Test func detailsCanBeSavedToAFile() {
+    @Test
+    func detailsCanBeSavedToAFile() {
         left.moveCursor(toName: "one.txt")
         commands.perform(ClipboardCommands.saveDetailsWithHeaders, .text("details.txt"))
         #expect(
@@ -132,7 +139,8 @@ import Testing
         #expect(bench.jobService.titles.count == 3)
     }
 
-    @Test func aTextOnTheClipboardIsPastedAsANewFile() {
+    @Test
+    func aTextOnTheClipboardIsPastedAsANewFile() {
         #expect(!commands.isEnabled(.pasteFromClipboard))
         pasteboard.clearContents()
         pasteboard.setString("hello\nworld", forType: .string)
@@ -146,7 +154,8 @@ import Testing
         )
     }
 
-    @Test func aPictureOnTheClipboardIsPastedAsPNG() throws {
+    @Test
+    func aPictureOnTheClipboardIsPastedAsPNG() throws {
         let bitmap = try #require(
             NSBitmapImageRep(
                 bitmapDataPlanes: nil,
@@ -170,7 +179,8 @@ import Testing
         #expect(try reader.read(upToCount: 4) == Data([0x89, 0x50, 0x4E, 0x47]))
     }
 
-    @Test func pastingContentsNeedsAWritableFolderAndCanBeSwitchedOff() {
+    @Test
+    func pastingContentsNeedsAWritableFolderAndCanBeSwitchedOff() {
         pasteboard.clearContents()
         pasteboard.setString("text", forType: .string)
         memory.capabilities = []
@@ -181,7 +191,8 @@ import Testing
         #expect(!commands.isEnabled(.pasteFromClipboard))
     }
 
-    @Test func filesOnTheClipboardWinOverText() throws {
+    @Test
+    func filesOnTheClipboardWinOverText() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -199,7 +210,8 @@ import Testing
         #expect(box.read("B/Clipboard.txt") == "note")
     }
 
-    @Test func registration() {
+    @Test
+    func registration() {
         let inMenus =
             bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
             + bench.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
@@ -221,13 +233,15 @@ import Testing
 
     // MARK: Pure types
 
-    @Test func freeNamesCountUp() {
+    @Test
+    func freeNamesCountUp() {
         #expect(PastedContent.freeName(extension: "txt") { _ in false } == "Clipboard.txt")
         let taken: Set = ["Clipboard.png", "Clipboard (2).png"]
         #expect(PastedContent.freeName(extension: "png", isTaken: taken.contains) == "Clipboard (3).png")
     }
 
-    @Test func aCalculatedFolderSizeReplacesDIR() {
+    @Test
+    func aCalculatedFolderSizeReplacesDIR() {
         let list = NameList(displayPath: { $0.path })
         var folder = FileItem(url: URL(fileURLWithPath: "/x/docs"), name: "docs", kind: .directory)
         #expect(list.details([folder], .fullPath, headers: false, mask: 3) == "/x/docs/\t<DIR>")

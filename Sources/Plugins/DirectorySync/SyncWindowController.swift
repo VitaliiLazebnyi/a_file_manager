@@ -279,11 +279,13 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         session.onlySelected = onlySelectedBox.state == .on
     }
 
-    @objc private func optionChanged() {
+    @objc
+    private func optionChanged() {
         pushControls()
     }
 
-    @objc private func showChanged() {
+    @objc
+    private func showChanged() {
         session.show = SyncShow(showButtons.filter { $0.button.state == .on }.map(\.part))
     }
 
@@ -301,11 +303,13 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         return true
     }
 
-    @objc private func compareFromField() {
+    @objc
+    private func compareFromField() {
         if session.phase != .comparing, session.phase != .synchronizing { compareOrAbort() }
     }
 
-    @objc private func compareOrAbort() {
+    @objc
+    private func compareOrAbort() {
         if session.phase == .comparing {
             session.cancelComparison()
         } else if session.phase != .synchronizing {
@@ -314,16 +318,20 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         }
     }
 
-    @objc private func synchronize() {
+    @objc
+    private func synchronize() {
         session.synchronize()
     }
 
-    @objc private func closeWindow() {
+    @objc
+    private func closeWindow() {
         close()
     }
 
-    @objc private func pickLeft() { pickFolder(for: leftField) }
-    @objc private func pickRight() { pickFolder(for: rightField) }
+    @objc
+    private func pickLeft() { pickFolder(for: leftField) }
+    @objc
+    private func pickRight() { pickFolder(for: rightField) }
 
     private func pickFolder(for field: NSTextField) {
         guard let window else {
@@ -379,7 +387,8 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         }
     }
 
-    @objc private func rowClicked() {
+    @objc
+    private func rowClicked() {
         guard table.clickedRow >= 0, session.entries.indices.contains(table.clickedRow), table.clickedColumn >= 0,
             table.tableColumns[table.clickedColumn].identifier.rawValue == "action",
             case .row(let index) = session.entries[table.clickedRow]
@@ -387,7 +396,8 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         session.cycle(row: index)
     }
 
-    @objc private func rowDoubleClicked() {
+    @objc
+    private func rowDoubleClicked() {
         guard table.clickedColumn < 0 || table.tableColumns[table.clickedColumn].identifier.rawValue != "action" else {
             return
         }
@@ -705,5 +715,6 @@ private final class MenuAction: NSObject {
         self.run = run
     }
 
-    @objc func runAction() { run() }
+    @objc
+    func runAction() { run() }
 }

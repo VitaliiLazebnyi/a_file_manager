@@ -257,7 +257,8 @@ final class MultiRenameSession {
         let (entries, settings, context, given, fileSystems) = (
             self.entries, self.settings, makeContext(cache: cache), givenNames, kernel.fileSystems
         )
-        @Sendable func compute() -> RenamePreview {
+        @Sendable
+        func compute() -> RenamePreview {
             RenameComputation.preview(
                 entries,
                 settings: settings,
@@ -347,7 +348,8 @@ final class MultiRenameSession {
         // Names from anywhere: by the kernel's keys, made once per row where the sort is
         // made (not Foundation's localized comparison, which is no order and ends the
         // program for some names).
-        @Sendable func makeKeys() -> [Keys] {
+        @Sendable
+        func makeKeys() -> [Keys] {
             rows.map { entry -> Keys in
                 let item = entry.item
                 return Keys(
@@ -361,7 +363,8 @@ final class MultiRenameSession {
                 )
             }
         }
-        @Sendable func inOrder(_ first: Keys, _ second: Keys) -> Bool {
+        @Sendable
+        func inOrder(_ first: Keys, _ second: Keys) -> Bool {
             switch key {
             case .name:
                 return first.name < second.name
@@ -377,7 +380,8 @@ final class MultiRenameSession {
             }
         }
         // A stable sort: equal items keep their order, also when the direction turns.
-        @Sendable func permutation() -> [Int] {
+        @Sendable
+        func permutation() -> [Int] {
             let keys = makeKeys()
             return keys.indices.sorted { first, second in
                 if inOrder(keys[first], keys[second]) {
@@ -473,7 +477,8 @@ final class MultiRenameSession {
             return
         }
         let (oldEntries, names) = (entries, newNames)
-        @Sendable func renamed() -> [RenameEntry] {
+        @Sendable
+        func renamed() -> [RenameEntry] {
             var entries = oldEntries
             for index in entries.indices {
                 if let name = names[index], RenameEngine.invalidity(of: name) == nil { entries[index].name = name }
@@ -537,7 +542,8 @@ final class MultiRenameSession {
             return
         }
         let fileSystems = kernel.fileSystems
-        @Sendable func read() -> Result<[String], any Error> {
+        @Sendable
+        func read() -> Result<[String], any Error> {
             Result {
                 let reader = try fileSystems.provider(for: url).read(url)
                 defer { reader.close() }

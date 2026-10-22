@@ -16,7 +16,9 @@ private final class FakeOverlayHost: PanelOverlayHost {
 /// never put on screen, and the quick view over a fake panel.
 ///
 /// Files live in a memory file system, so everything is read through the provider interface.
-@MainActor @Suite(.serialized) struct ViewerWindows {
+@MainActor
+@Suite(.serialized)
+struct ViewerWindows {
     let memory = MemoryFileSystem()
     let bench: TestBench
     let plugin: ViewerPlugin
@@ -140,7 +142,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
 
     // MARK: Registration
 
-    @Test func theViewerRegistersItsCommandsKeysPageAndService() {
+    @Test
+    func theViewerRegistersItsCommandsKeysPageAndService() {
         let keys = bench.kernel.keyBindings
         #expect(keys.command(for: .f(3)) == .view && keys.command(for: .f(3, .shift)) == .viewSingle)
         #expect(keys.command(for: .f(3, [.option, .shift])) == .viewInternalSingle)
@@ -166,7 +169,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(commands[.view]?.barLabel == "View" && commands[.view]?.runsDuringJobs == true)
     }
 
-    @Test func viewingNeedsAFile() {
+    @Test
+    func viewingNeedsAFile() {
         bench.left.model.moveCursor(to: 0)
         #expect(bench.left.model.cursorIsOnParentRow && !commands.isEnabled(.view) && !commands.isEnabled(.viewSingle))
         bench.left.moveCursor(toName: "docs")
@@ -178,7 +182,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
 
     // MARK: Lister windows
 
-    @Test func theServiceShowsFilesOfAnyFileSystemAndTexts() async throws {
+    @Test
+    func theServiceShowsFilesOfAnyFileSystemAndTexts() async throws {
         let service = try #require(bench.kernel.services.find((any ViewerService).self))
         service.view(memory.url("/A/short.txt"))
         let file = try #require(plugin.windows.last)
@@ -211,7 +216,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(plugin.windows.isEmpty)
     }
 
-    @Test func aTextIsLaidOutOnceWhenItsWindowKeepsItsSize() async throws {
+    @Test
+    func aTextIsLaidOutOnceWhenItsWindowKeepsItsSize() async throws {
         let controller = try await openLister(on: "long.txt")
         // The window's layout is finished first: on a busy machine the text may be shown before
         // a layout pass the window still owes, which then wraps it once more for the final width.
@@ -236,7 +242,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(controller.pane.pager.columnsThatFit < columns)
     }
 
-    @Test func aMissingFileIsReportedInTheWindow() async throws {
+    @Test
+    func aMissingFileIsReportedInTheWindow() async throws {
         plugin.view(memory.url("/A/nothing.txt"))
         let controller = try #require(plugin.windows.last)
         #expect(await wait { controller.pane.failure != nil })
@@ -246,7 +253,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         )
     }
 
-    @Test func severalMarkedFilesAreSteppedThroughWithNAndP() async throws {
+    @Test
+    func severalMarkedFilesAreSteppedThroughWithNAndP() async throws {
         bench.left.model.select(mask: "*.txt")
         #expect(commands.perform(.view))
         let controller = try #require(plugin.windows.last)
@@ -279,7 +287,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(plugin.windows.last?.items.map { $0.url?.lastPathComponent } == ["page.html"])
     }
 
-    @Test func modesAreChosenAtStartupAndSwitchedWithTheirKeys() async throws {
+    @Test
+    func modesAreChosenAtStartupAndSwitchedWithTheirKeys() async throws {
         let controller = try await openLister(on: "short.txt")
         let pane = controller.pane
         #expect(await rowsShown(controller))
@@ -322,7 +331,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(pane.handleKey(key("q")) && plugin.windows.isEmpty)
     }
 
-    @Test func binaryUnicodeHtmlAndImagesOpenInTheirModes() async throws {
+    @Test
+    func binaryUnicodeHtmlAndImagesOpenInTheirModes() async throws {
         let binary = try await openLister(on: "tool.bin")
         #expect(binary.pane.mode == .binary && binary.pane.statusText.contains("Binary"))
         let wide = try await openLister(on: "wide.txt")
@@ -354,7 +364,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         )
     }
 
-    @Test func theConfigurationDecidesTheStartupMode() async throws {
+    @Test
+    func theConfigurationDecidesTheStartupMode() async throws {
         ui.formAnswers = [
             .values([
                 "viewer.startupMode": .index(3), "viewer.htmlAsText": .flag(false), "viewer.binaryWidth": .text("40")
@@ -380,7 +391,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
 
     // MARK: Search, selection, clipboard
 
-    @Test func findSearchesTheWholeFileAndRepeatsInBothDirections() async throws {
+    @Test
+    func findSearchesTheWholeFileAndRepeatsInBothDirections() async throws {
         let controller = try await openLister(on: "long.txt")
         let pane = controller.pane
         #expect(await rowsShown(controller))
@@ -428,7 +440,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(ui.log.contains("inform: Find"))
     }
 
-    @Test func theSelectionIsCopiedAsTextOrAsHex() async throws {
+    @Test
+    func theSelectionIsCopiedAsTextOrAsHex() async throws {
         let controller = try await openLister(on: "short.txt")
         let pane = controller.pane
         #expect(await rowsShown(controller))
@@ -455,7 +468,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(pane.pager.selection == 20..<27)
     }
 
-    @Test func positionsAreReachedByPercentOffsetAndLine() async throws {
+    @Test
+    func positionsAreReachedByPercentOffsetAndLine() async throws {
         let controller = try await openLister(on: "long.txt")
         let pane = controller.pane
         #expect(await rowsShown(controller))
@@ -488,7 +502,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
 
     // MARK: Quick view
 
-    @Test func theQuickViewCoversTheTargetPanelAndFollowsTheCursor() async throws {
+    @Test
+    func theQuickViewCoversTheTargetPanelAndFollowsTheCursor() async throws {
         bench.left.moveCursor(toName: "short.txt")
         #expect(commands.perform(.quickView))
         let quick = try #require(plugin.quickView)
@@ -526,7 +541,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         #expect(plugin.quickView == nil && host(bench.right).overlay == nil && !commands.isChecked(.quickView))
     }
 
-    @Test func switchingToTheCoveredPanelOrChangingItsPlaceEndsTheQuickView() async {
+    @Test
+    func switchingToTheCoveredPanelOrChangingItsPlaceEndsTheQuickView() async {
         bench.left.moveCursor(toName: "short.txt")
         commands.perform(.quickView)
         #expect(plugin.quickView != nil)
@@ -549,7 +565,8 @@ private final class FakeOverlayHost: PanelOverlayHost {
         plugin.stop()
     }
 
-    @Test func theSeparateQuickViewIsAWindowThatFollowsTheCursor() async throws {
+    @Test
+    func theSeparateQuickViewIsAWindowThatFollowsTheCursor() async throws {
         bench.left.moveCursor(toName: "short.txt")
         #expect(commands.perform(.separateQuickView))
         let controller = try #require(plugin.windows.last)

@@ -35,7 +35,8 @@ enum HTMLText {
     }
 
     /// White space as `Character.isWhitespace` and trimming know it.
-    @inline(__always) private static func isWhitespace(_ unit: UInt16) -> Bool {
+    @inline(__always)
+    private static func isWhitespace(_ unit: UInt16) -> Bool {
         switch unit {
         case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000:
             return true
@@ -62,7 +63,8 @@ enum HTMLText {
             for letter in name.utf8 { append(letter) }
         }
 
-        @inline(__always) mutating func append(_ letter: UInt8) {
+        @inline(__always)
+        mutating func append(_ letter: UInt8) {
             if length < 8 {
                 first |= UInt64(letter) << UInt64(length * 8)
             } else {
@@ -92,13 +94,15 @@ enum HTMLText {
             }
         }
 
-        @inline(__always) private static func slot(_ key: TagKey) -> Int {
+        @inline(__always)
+        private static func slot(_ key: TagKey) -> Int {
             let mixed =
                 (key.first &* 0x9E37_79B9_7F4A_7C15) ^ (key.second &* 0xC2B2_AE3D_27D4_EB4F) ^ UInt64(key.length)
             return Int(truncatingIfNeeded: (mixed &* 0xFF51_AFD7_ED55_8CCD) >> 57)
         }
 
-        @inline(__always) func kind(of key: TagKey) -> TagKind? {
+        @inline(__always)
+        func kind(of key: TagKey) -> TagKind? {
             var slot = Self.slot(key)
             while let entry = slots[slot] {
                 if entry.key == key {
@@ -131,7 +135,8 @@ enum HTMLText {
         return nil
     }
 
-    @inline(__always) private static func isASCII(_ units: UnsafeBufferPointer<UInt16>) -> Bool {
+    @inline(__always)
+    private static func isASCII(_ units: UnsafeBufferPointer<UInt16>) -> Bool {
         for unit in units where unit >= 0x80 { return false }
         return true
     }
@@ -288,7 +293,8 @@ enum HTMLText {
                 if !text.isEmpty, text.last != 0x0A { text.append(0x0A) }
                 endsInWhitespace = true
             }
-            @inline(__always) func emit(_ unit: UInt16) {
+            @inline(__always)
+            func emit(_ unit: UInt16) {
                 if preformatted > 0 {
                     text.append(unit)
                     endsInWhitespace = isWhitespace(unit)
@@ -304,7 +310,8 @@ enum HTMLText {
                 }
             }
             /// The first position at or after `from` that holds `unit`, or `count`.
-            @inline(__always) func find(_ unit: UInt16, from: Int) -> Int {
+            @inline(__always)
+            func find(_ unit: UInt16, from: Int) -> Int {
                 var position = from
                 while position < count, input[position] != unit { position += 1 }
                 return position

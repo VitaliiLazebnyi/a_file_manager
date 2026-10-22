@@ -78,8 +78,10 @@ final class FTPFixture: @unchecked Sendable {
 }
 
 /// The FTP client end to end, against the test server on 127.0.0.1.
-@Suite struct NetworkFTP {
-    @Test(arguments: [true, false]) func listsWithMLSDAndWithLIST(mlsd: Bool) throws {
+@Suite
+struct NetworkFTP {
+    @Test(arguments: [true, false])
+    func listsWithMLSDAndWithLIST(mlsd: Bool) throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = mlsd
         let fixture = try FTPFixture(options)
@@ -101,7 +103,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(throws: (any Error).self) { try fixture.names("/missing") }
     }
 
-    @Test func listsDOSFormatAndWithoutEPSV() throws {
+    @Test
+    func listsDOSFormatAndWithoutEPSV() throws {
         var options = TestFTPServer.Options()
         (options.offersMLSD, options.dosListing, options.offersEPSV) = (false, true, false)
         let fixture = try FTPFixture(options)
@@ -115,7 +118,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.server.commands.filter { $0 == "EPSV" }.count == 1)
     }
 
-    @Test func activeMode() throws {
+    @Test
+    func activeMode() throws {
         let fixture = try FTPFixture { $0.passiveByDefault = false }
         try fixture.box.file("srv/a.txt", "active")
         #expect(try fixture.names("/") == ["a.txt"])
@@ -123,7 +127,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.server.commands.contains { $0.hasPrefix("PORT") } && !fixture.server.commands.contains("EPSV"))
     }
 
-    @Test func downloadsUploadsAndResumes() throws {
+    @Test
+    func downloadsUploadsAndResumes() throws {
         let fixture = try FTPFixture()
         let content = Data((0..<300_000).map { UInt8(truncatingIfNeeded: $0 &* 31) })
         try content.write(to: fixture.box.url("srv/big.bin"))
@@ -143,7 +148,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(throws: (any Error).self) { _ = try fixture.download("/nothing.bin") }
     }
 
-    @Test func seeksWhileReading() throws {
+    @Test
+    func seeksWhileReading() throws {
         let fixture = try FTPFixture()
         let content = Data((0..<600_000).map { UInt8(truncatingIfNeeded: $0 / 7) })
         try content.write(to: fixture.box.url("srv/f.bin"))
@@ -165,7 +171,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.server.connectionsOpened == 1)
     }
 
-    @Test func makesRenamesAndDeletes() throws {
+    @Test
+    func makesRenamesAndDeletes() throws {
         let fixture = try FTPFixture()
         let fs = fixture.fileSystem
         try fixture.box.file("srv/a.txt", "a")
@@ -199,7 +206,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(throws: FileSystemError.self) { try fs.copy(fixture.url("/a"), to: fixture.url("/b")) { _ in true } }
     }
 
-    @Test func changesAttributes() throws {
+    @Test
+    func changesAttributes() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/a.txt", "a")
         let stamp = Date(timeIntervalSince1970: 1_400_000_000)
@@ -211,7 +219,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(item.modified == stamp && item.permissions == 0o640)
     }
 
-    @Test func itemWithoutMLST() throws {
+    @Test
+    func itemWithoutMLST() throws {
         var options = TestFTPServer.Options()
         options.offersMLSD = false
         let fixture = try FTPFixture(options)
@@ -225,7 +234,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.fileSystem.item(at: fixture.url("/d"))?.isDirectory == true)
     }
 
-    @Test func textModeConvertsLineEnds() throws {
+    @Test
+    func textModeConvertsLineEnds() throws {
         let fixture = try FTPFixture { $0.transferMode = .automatic }
         try fixture.upload("/note.txt", Data("one\ntwo\r\nthree\n".utf8))
         #expect(try Data(contentsOf: fixture.box.url("srv/note.txt")) == Data("one\r\ntwo\r\nthree\r\n".utf8))
@@ -236,7 +246,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.server.commands.contains("TYPE A") && fixture.server.commands.contains("TYPE I"))
     }
 
-    @Test func unicodeNames() throws {
+    @Test
+    func unicodeNames() throws {
         let fixture = try FTPFixture()
         try fixture.upload("/Grüße & 日本語.txt", Data("ü".utf8))
         #expect(try fixture.names("/") == ["Grüße & 日本語.txt"])
@@ -246,7 +257,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(!fixture.server.commands.contains("DELE x"))
     }
 
-    @Test func reconnectsAfterTheServerDroppedTheConnection() throws {
+    @Test
+    func reconnectsAfterTheServerDroppedTheConnection() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/a.txt", "a")
         #expect(try fixture.names("/") == ["a.txt"])
@@ -257,7 +269,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.server.connectionsOpened == 2)
     }
 
-    @Test func listsConcurrentlyOnSeveralConnections() throws {
+    @Test
+    func listsConcurrentlyOnSeveralConnections() throws {
         var options = TestFTPServer.Options()
         options.listDelay = 0.15
         let fixture = try FTPFixture(options) { $0.parallelConnections = 4 }
@@ -272,7 +285,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.fileSystem.totalSize(of: fixture.url("/"), cancellation: CancellationFlag()) == 8)
     }
 
-    @Test func aTransferDoesNotBlockCommands() throws {
+    @Test
+    func aTransferDoesNotBlockCommands() throws {
         let fixture = try FTPFixture { $0.parallelConnections = 1 }
         try fixture.box.file("srv/a.txt", String(repeating: "a", count: 100_000))
         let reader = try fixture.fileSystem.read(fixture.url("/a.txt"))
@@ -284,7 +298,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.box.read("srv/b.txt") == "b")
     }
 
-    @Test func asksForThePasswordAndRemembersTheRefusal() throws {
+    @Test
+    func asksForThePasswordAndRemembersTheRefusal() throws {
         var options = TestFTPServer.Options()
         (options.user, options.password) = ("anna", "s3cret")
         let fixture = try FTPFixture(options)
@@ -314,7 +329,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(try fixture.names("/") == ["a.txt"])
     }
 
-    @Test func placesAndPaths() throws {
+    @Test
+    func placesAndPaths() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/pub/a b.txt", "a")
         let fs = fixture.fileSystem
@@ -332,7 +348,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.server.commands.last == "QUIT" || fixture.server.openConnections >= 0)
     }
 
-    @Test func keepsIdleConnectionsAlive() throws {
+    @Test
+    func keepsIdleConnectionsAlive() throws {
         let fixture = try FTPFixture { $0.keepAliveInterval = 0.3 }
         try fixture.box.file("srv/a.txt", "a")
         // A command that arrives while the connection is being tested waits for it for a moment
@@ -346,7 +363,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(fixture.server.connectionsOpened == 1)
     }
 
-    @Test func timesOutAndCancelsOnAServerThatDoesNotAnswer() throws {
+    @Test
+    func timesOutAndCancelsOnAServerThatDoesNotAnswer() throws {
         // A port that accepts connections and never says a word.
         let silent = try TestFTPServer.listen()
         defer { close(silent) }
@@ -394,7 +412,8 @@ final class FTPFixture: @unchecked Sendable {
         }
     }
 
-    @Test func disconnectInterruptsARunningTransfer() throws {
+    @Test
+    func disconnectInterruptsARunningTransfer() throws {
         let fixture = try FTPFixture()
         try Data(count: 4_000_000).write(to: fixture.box.url("srv/big.bin"))
         let reader = try fixture.fileSystem.read(fixture.url("/big.bin"))
@@ -410,7 +429,8 @@ final class FTPFixture: @unchecked Sendable {
         #expect(failed && !fixture.center.isConnected(fixture.key))
     }
 
-    @Test func aCancelledCopyLeavesNothingBehind() throws {
+    @Test
+    func aCancelledCopyLeavesNothingBehind() throws {
         let fixture = try FTPFixture()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())

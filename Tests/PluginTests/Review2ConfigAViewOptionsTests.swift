@@ -11,7 +11,9 @@ import Testing
 /// the main thread.
 ///
 /// The test says when the background work and its return happen.
-@MainActor @Suite struct Review2ConfigAViewOptions {
+@MainActor
+@Suite
+struct Review2ConfigAViewOptions {
     /// Holds what the plugin hands to the background and back, until the test runs it.
     ///
     /// Unchecked: used on the main thread only; the plugin hands its steps over there and the test
@@ -26,7 +28,8 @@ import Testing
             work.forEach { $0() }
         }
 
-        @MainActor func runMain() {
+        @MainActor
+        func runMain() {
             let work = main
             main = []
             work.forEach { $0() }
@@ -54,7 +57,8 @@ import Testing
 
     /// (Before the model kept the wish, `PanelModel.requestSort`, the stale result sent the
     /// new list to the background a second time; now the reading brings the order with it.)
-    @Test func aListThatChangedWhileItWasSortedArrivesInTheOrderThatWasAskedFor() {
+    @Test
+    func aListThatChangedWhileItWasSortedArrivesInTheOrderThatWasAskedFor() {
         #expect(model.sort.key == .name && model.listedItems.count > ViewOptionsPlugin.backgroundSortThreshold)
         commands.perform(.sortBySize)
         #expect(steps.background.count == 1 && model.sort.key == .name)
@@ -71,7 +75,8 @@ import Testing
         #expect(commands.isChecked(.sortBySize))
     }
 
-    @Test func anOrderSetByAnotherRouteMeanwhileIsNotOverwritten() {
+    @Test
+    func anOrderSetByAnotherRouteMeanwhileIsNotOverwritten() {
         commands.perform(.sortBySize)
         // A click on a column sets the order directly.
         model.setSort(ListOrder(key: .ext, descending: false))
@@ -85,7 +90,8 @@ import Testing
         #expect(model.sort == ListOrder(key: .ext, descending: true))
     }
 
-    @Test func aLaterSortCommandTakesOver() {
+    @Test
+    func aLaterSortCommandTakesOver() {
         commands.perform(.sortBySize)
         commands.perform(.sortByTime)
         #expect(steps.background.count == 2)
@@ -94,7 +100,8 @@ import Testing
         #expect(model.sort.key == .date && steps.background.isEmpty)
     }
 
-    @Test func aLongListIsFilteredInTheBackground() {
+    @Test
+    func aLongListIsFilteredInTheBackground() {
         let all = model.items.count
         commands.perform(ViewOptionsPlugin.programs)
         #expect(steps.background.count == 1 && model.filter == nil && model.items.count == all)
@@ -117,7 +124,8 @@ import Testing
         #expect(model.filter == nil && model.items.count == all + 1)
     }
 
-    @Test func onlySelectedIsOfferedByTheNumberOfMarks() {
+    @Test
+    func onlySelectedIsOfferedByTheNumberOfMarks() {
         #expect(!commands.isEnabled(ViewOptionsPlugin.onlySelected))
         model.setSelected(true, names: ["tool", "f1.txt"])
         #expect(commands.isEnabled(ViewOptionsPlugin.onlySelected))

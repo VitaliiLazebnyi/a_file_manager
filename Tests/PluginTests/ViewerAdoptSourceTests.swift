@@ -146,10 +146,12 @@ final class ViewerRemoteLike: ByteSource {
 }
 
 /// Reading remote files without reading them again, and ending reads that wait.
-@Suite struct ViewerAdoptSource {
+@Suite
+struct ViewerAdoptSource {
     // MARK: Disk cache
 
-    @Test func blocksAreKeptOnDiskAndGivenBack() {
+    @Test
+    func blocksAreKeptOnDiskAndGivenBack() {
         let cache = DiskBlockCache(blockSize: 1_000, length: 4_500)
         #expect(!cache.isOpen && cache.read(0) == nil && !cache.contains(0))
         let first = Data((0..<1_000).map { UInt8($0 % 251) })
@@ -172,7 +174,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(cache.read(2) == first)
     }
 
-    @Test func aCacheStopsAtItsLimit() {
+    @Test
+    func aCacheStopsAtItsLimit() {
         let cache = DiskBlockCache(blockSize: 1_000, length: 10_000, limit: 3_000)
         for block in 0..<10 { cache.store(Int64(block), Data(repeating: UInt8(block), count: 1_000)) }
         #expect(cache.storedBytes == 3_000)
@@ -180,7 +183,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(cache.read(1) == Data(repeating: 1, count: 1_000))
     }
 
-    @Test func aBigFileOfASlowSourceIsNotFetchedAgainWhenItIsLaidOutAgain() throws {
+    @Test
+    func aBigFileOfASlowSourceIsNotFetchedAgainWhenItIsLaidOutAgain() throws {
         let data = ViewerRemoteLike.text(megabytes: 24)
         let remote = ViewerRemoteLike(data)
         let cached = CachedByteSource(
@@ -230,7 +234,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(again == data.subdata(in: 1 << 20..<(1 << 20) + 100) && remote.fetched > fetchedOnce)
     }
 
-    @Test func aSearchOfAFileThatIsOnDiskAsksTheServerForNothing() throws {
+    @Test
+    func aSearchOfAFileThatIsOnDiskAsksTheServerForNothing() throws {
         let data = ViewerRemoteLike.text(megabytes: 6)
         let remote = ViewerRemoteLike(data)
         let cached = CachedByteSource(
@@ -281,7 +286,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(remote.fetched == first)
     }
 
-    @Test func aSourceWhoseDiskIsFullGoesOnWithoutIt() throws {
+    @Test
+    func aSourceWhoseDiskIsFullGoesOnWithoutIt() throws {
         let data = ViewerRemoteLike.text(megabytes: 2)
         let remote = ViewerRemoteLike(data)
         let cached = CachedByteSource(
@@ -307,7 +313,8 @@ final class ViewerRemoteLike: ByteSource {
         return (registry, url)
     }
 
-    @Test func aReadThatWaitsForTheServerEndsWhenItsFlagIsSet() throws {
+    @Test
+    func aReadThatWaitsForTheServerEndsWhenItsFlagIsSet() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 100_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
@@ -333,7 +340,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(try source.read(at: 0, count: 13, cancellation: CancellationFlag()) == Data("line of text\n".utf8))
     }
 
-    @Test func aFlagOnlyEndsTheReadsItWasGiven() throws {
+    @Test
+    func aFlagOnlyEndsTheReadsItWasGiven() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 50_000)
         let source = CachedByteSource(
@@ -350,7 +358,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(try source.read(at: 20_000, count: 100).count == 100)
     }
 
-    @Test func indexingAFileThatNeverAnswersStopsWhenTheDocumentIsDropped() throws {
+    @Test
+    func indexingAFileThatNeverAnswersStopsWhenTheDocumentIsDropped() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 400_000)
         let source = CachedByteSource(try ProviderByteSource.open(url, fileSystems: registry))
@@ -368,7 +377,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(!document.isIndexComplete && document.readError == nil && memory.interruptions >= 1)
     }
 
-    @Test func fetchingRowsFromAFileThatNeverAnswersEndsWhenTheFetchIsOvertaken() throws {
+    @Test
+    func fetchingRowsFromAFileThatNeverAnswersEndsWhenTheFetchIsOvertaken() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 100_000)
         let source = try ProviderByteSource.open(url, fileSystems: registry)
@@ -405,7 +415,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(again.waitUntilFinished() && tied.flag.isCancelled)
     }
 
-    @Test func aSearchThroughAFileThatNeverAnswersEndsWithItsFlag() throws {
+    @Test
+    func aSearchThroughAFileThatNeverAnswersEndsWithItsFlag() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 300_000)
         let source = CachedByteSource(try ProviderByteSource.open(url, fileSystems: registry))
@@ -440,7 +451,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(found == nil && memory.interruptions >= 1)
     }
 
-    @Test func aCopyOfAFileThatNeverAnswersEndsWithItsFlagAndLeavesNothingBehind() throws {
+    @Test
+    func aCopyOfAFileThatNeverAnswersEndsWithItsFlagAndLeavesNothingBehind() throws {
         let memory = MemoryFileSystem()
         let (registry, url) = stalledFile(memory, size: 200_000)
         memory.stallsReads = true
@@ -474,7 +486,8 @@ final class ViewerRemoteLike: ByteSource {
         #expect(try Data(contentsOf: copy).count == 200_000 / 13 * 13)
     }
 
-    @Test func aLinkedFlagFollowsItsParentsAndLetsGoWhenReleased() {
+    @Test
+    func aLinkedFlagFollowsItsParentsAndLetsGoWhenReleased() {
         let first = CancellationFlag()
         let second = CancellationFlag()
         var linked: LinkedCancellation? = LinkedCancellation(first, second)

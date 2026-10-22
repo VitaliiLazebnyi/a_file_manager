@@ -24,10 +24,12 @@ private final class Record<Value>: @unchecked Sendable {
 
 /// The background work of one server never waits behind that of another (second pass: the
 /// cause of network tests that failed when they ran beside a test with a server that is dead).
-@Suite struct Review2NetworkP2Background {
+@Suite
+struct Review2NetworkP2Background {
     private final class Lane {}
 
-    @Test func aLaneThatIsStuckHoldsUpOnlyItself() {
+    @Test
+    func aLaneThatIsStuckHoldsUpOnlyItself() {
         let (stuck, free) = (Lane(), Lane())
         let release = DispatchSemaphore(value: 0)
         let started = Record<Int>()
@@ -54,7 +56,8 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(started.all.sorted() == Array(0..<pieces))
     }
 
-    @Test func aDeadServerDoesNotKeepAnotherServersConnectionFromComingBack() throws {
+    @Test
+    func aDeadServerDoesNotKeepAnotherServersConnectionFromComingBack() throws {
         // One server that never sends a byte of a file, with readers dropped in the middle:
         // each waits in the background for an answer that does not come.
         var dead = TestFTPServer.Options()
@@ -91,7 +94,8 @@ private final class Record<Value>: @unchecked Sendable {
 
 /// The calls that change something end on the caller's flag (N010, N026; kernel API of the
 /// first pass: `createDirectory`, `remove`, `move`, `setAttributes` with `cancellation`).
-@Suite struct Review2NetworkP2Cancelling {
+@Suite
+struct Review2NetworkP2Cancelling {
     /// A fixture whose first login sits at its password question until `answer` is signalled.
     private func heldAtLogin() throws -> (fixture: FTPFixture, answer: DispatchSemaphore, first: AdoptOutcome) {
         var options = TestFTPServer.Options()
@@ -111,7 +115,8 @@ private final class Record<Value>: @unchecked Sendable {
         return (fixture, answer, first)
     }
 
-    @Test func everyChangingCallOfAnFTPServerLeavesAWaitWhenItsFlagIsSet() throws {
+    @Test
+    func everyChangingCallOfAnFTPServerLeavesAWaitWhenItsFlagIsSet() throws {
         let (fixture, answer, first) = try heldAtLogin()
         let fs = fixture.fileSystem
         let calls: [(String, @Sendable (CancellationFlag) throws -> Void)] = [
@@ -169,7 +174,8 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(try fixture.names("/made").isEmpty)
     }
 
-    @Test func aChangingCallOnASecureShellServerThatDoesNotAnswerEndsOnItsFlag() throws {
+    @Test
+    func aChangingCallOnASecureShellServerThatDoesNotAnswerEndsOnItsFlag() throws {
         let environment = SessionEnvironment()
         var values = NetworkOptions.Values()
         values.timeout = 600
@@ -221,7 +227,8 @@ private final class Record<Value>: @unchecked Sendable {
         }
     }
 
-    @Test func aRequestThatIsNeverAnsweredEndsOnTheFlag() throws {
+    @Test
+    func aRequestThatIsNeverAnsweredEndsOnTheFlag() throws {
         guard FakeSFTPServer.isAvailable else {
             return
         }
@@ -240,7 +247,8 @@ private final class Record<Value>: @unchecked Sendable {
         suite.center.disconnectAll()
     }
 
-    @Test func eitherFlagEndsTheWaitAndNothingIsLeftRegistered() {
+    @Test
+    func eitherFlagEndsTheWaitAndNothingIsLeftRegistered() {
         let (own, callers) = (CancellationFlag(), CancellationFlag())
         // The caller's flag.
         withEither(own, callers) { both in
@@ -268,8 +276,11 @@ private final class Record<Value>: @unchecked Sendable {
 }
 
 /// An address the user typed is not asked about (N071; `ServerConsentService` of the kernel).
-@MainActor @Suite struct Review2NetworkP2Consent {
-    @Test func aServerTheUserNamedInPersonIsNotAskedAbout() throws {
+@MainActor
+@Suite
+struct Review2NetworkP2Consent {
+    @Test
+    func aServerTheUserNamedInPersonIsNotAskedAbout() throws {
         let fixture = try FTPFixture()
         try fixture.box.file("srv/a.txt", "a")
         let asked = Record<ServerKey>()
@@ -292,7 +303,8 @@ private final class Record<Value>: @unchecked Sendable {
 
     /// Off the main thread: the climb through 3,000 levels takes seconds of a debug build, which other tests waited
     /// for when it ran there.
-    @Test nonisolated func theTopOfAServerIsKnownFromTheAddressAlone() {
+    @Test
+    nonisolated func theTopOfAServerIsKnownFromTheAddressAlone() {
         let center = ConnectionCenter(environment: SessionEnvironment())
         let fs = RemoteFileSystem(scheme: "sftp", center: center)
         let key = ServerKey(scheme: "sftp", host: "files.example.com", port: 2_222)
@@ -306,7 +318,8 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(!center.isConnected(key))
     }
 
-    @Test func otherLocationsSayNothing() throws {
+    @Test
+    func otherLocationsSayNothing() throws {
         let fixture = try FTPFixture()
         let asked = Record<ServerKey>()
         fixture.environment.askToConnect = { profile in
@@ -324,7 +337,8 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(asked.all == [fixture.key])
     }
 
-    @Test func aLoginThatIsUnderWayIsNotDroppedByTheNews() throws {
+    @Test
+    func aLoginThatIsUnderWayIsNotDroppedByTheNews() throws {
         var options = TestFTPServer.Options()
         (options.user, options.password) = ("anna", "pw")
         let fixture = try FTPFixture(options)
@@ -347,7 +361,8 @@ private final class Record<Value>: @unchecked Sendable {
 
 /// The order of the Keychain calls when a password is stored (N100), with the Security
 /// framework's four calls replaced by a recording stand-in: no Keychain is touched.
-@Suite struct Review2NetworkP2Keychain {
+@Suite
+struct Review2NetworkP2Keychain {
     /// A Keychain that holds its items in memory and writes down what it was asked.
     private final class FakeKeychain: @unchecked Sendable {
         private let lock = NSLock()
@@ -414,7 +429,8 @@ private final class Record<Value>: @unchecked Sendable {
         }
     }
 
-    @Test func aStoredPasswordIsChangedInPlaceAndNeverRemovedFirst() {
+    @Test
+    func aStoredPasswordIsChangedInPlaceAndNeverRemovedFirst() {
         let keychain = FakeKeychain()
         let passwords = KeychainPasswords(service: "test", calls: keychain.calls)
         // Nothing there yet: looked for by the update, then added.
@@ -433,7 +449,8 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(passwords.password(for: "a") == nil)
     }
 
-    @Test func aChangeThatFailsLeavesTheOldPasswordThere() {
+    @Test
+    func aChangeThatFailsLeavesTheOldPasswordThere() {
         let keychain = FakeKeychain()
         let passwords = KeychainPasswords(service: "test", calls: keychain.calls)
         passwords.setPassword("kept", for: "a")
@@ -453,7 +470,8 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(passwords.password(for: "b") == nil && passwords.password(for: "a") == "kept")
     }
 
-    @Test func theVaultMovesAPasswordWithoutLosingItOnTheWay() {
+    @Test
+    func theVaultMovesAPasswordWithoutLosingItOnTheWay() {
         let keychain = FakeKeychain()
         let store = KeychainPasswords(service: "test", calls: keychain.calls)
         let vault = PasswordVault(store: store)
@@ -481,8 +499,10 @@ private final class Record<Value>: @unchecked Sendable {
 /// Mounting and ejecting through the system with the system's calls replaced (N066, N103):
 /// a mount that is never answered is taken back on Cancel, and an eject that is never
 /// answered is given up after its time.
-@Suite struct Review2NetworkP2Mounting {
-    @Test func aMountThatIsNeverAnsweredIsTakenBackWhenItIsCancelled() {
+@Suite
+struct Review2NetworkP2Mounting {
+    @Test
+    func aMountThatIsNeverAnsweredIsTakenBackWhenItIsCancelled() {
         let cancelled = Record<Int>()
         let answers = Record<(Int32, CFArray?) -> Void>()
         var calls = SystemVolumeMounter.Calls.mounting(request: 0x5EED) { _, answer in
@@ -507,7 +527,8 @@ private final class Record<Value>: @unchecked Sendable {
         answers.all.first?(0, ["/Volumes/share"] as CFArray)
     }
 
-    @Test func aMountIsAnsweredAndAFailureNamesNoPassword() throws {
+    @Test
+    func aMountIsAnsweredAndAFailureNamesNoPassword() throws {
         var calls = SystemVolumeMounter.Calls.mounting(request: 0) { _, answer in
             OtherThread.start { answer(0, ["/Volumes/share"] as CFArray) }
             return 0
@@ -543,7 +564,8 @@ private final class Record<Value>: @unchecked Sendable {
         }
     }
 
-    @Test func anEjectThatIsNeverAnsweredIsGivenUpAfterItsTime() throws {
+    @Test
+    func anEjectThatIsNeverAnsweredIsGivenUpAfterItsTime() throws {
         let answers = Record<((any Error)?) -> Void>()
         var calls = SystemVolumeMounter.Calls()
         calls.unmount = { _, answer in answers.add(answer) }
@@ -567,8 +589,10 @@ private final class Record<Value>: @unchecked Sendable {
 /// A certificate check that takes long holds up neither its own stream nor another's (N057).
 ///
 /// The check is made slow with a hook where it runs; the server is the local TLS test server.
-@Suite(.enabled(if: TLSServer.isAvailable)) struct Review2NetworkP2Certificates {
-    @Test func aSlowCheckHoldsUpNeitherItsOwnStreamNorAnother() throws {
+@Suite(.enabled(if: TLSServer.isAvailable))
+struct Review2NetworkP2Certificates {
+    @Test
+    func aSlowCheckHoldsUpNeitherItsOwnStreamNorAnother() throws {
         let box = try Sandbox()
         try box.folder("srv")
         let server = try TLSServer(mode: .implicit, box: box)
@@ -613,8 +637,10 @@ private final class Record<Value>: @unchecked Sendable {
 }
 
 /// The test server itself: what the tests lean on when they run side by side.
-@Suite struct Review2NetworkP2TestServer {
-    @Test func aStoppedServerTakesNoConnectionAndStoppingIsFinal() throws {
+@Suite
+struct Review2NetworkP2TestServer {
+    @Test
+    func aStoppedServerTakesNoConnectionAndStoppingIsFinal() throws {
         let box = try Sandbox()
         try box.folder("srv")
         // Servers started and stopped in a row while others run: a stopped server's port
@@ -640,7 +666,8 @@ private final class Record<Value>: @unchecked Sendable {
         #expect(steady.server.connectionsOpened == 1)
     }
 
-    @Test func aTransferTheClientGaveUpIsAnsweredWithoutWaitingForATimeLimit() throws {
+    @Test
+    func aTransferTheClientGaveUpIsAnsweredWithoutWaitingForATimeLimit() throws {
         // The client asks for a listing and never opens the data connection, then says something
         // else: the server answers 425 at once and goes on, whatever the machine's load.
         let box = try Sandbox()

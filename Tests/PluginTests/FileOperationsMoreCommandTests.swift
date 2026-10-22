@@ -7,7 +7,9 @@ import TestSupport
 import Testing
 
 /// The file-operation commands with their dialogs, driven through a kernel with fake panels.
-@MainActor @Suite struct FileOperationCommands {
+@MainActor
+@Suite
+struct FileOperationCommands {
     let memory = MemoryFileSystem()
     let settings = MemorySettings()
     let bench: TestBench
@@ -41,7 +43,8 @@ import Testing
 
     // MARK: Registration
 
-    @Test func commandsKeysPagesAndButtons() {
+    @Test
+    func commandsKeysPagesAndButtons() {
         let expected: [(CommandID, [Shortcut])] = [
             ("cm_Copy", [.f(5)]), ("cm_CopySamepanel", [.f(5, .shift)]), ("cm_CopyOtherpanel", []),
             ("cm_RenMov", [.f(6)]), ("cm_MoveOnly", []),
@@ -64,7 +67,8 @@ import Testing
 
     // MARK: Copy and move
 
-    @Test func theOptionsDialogCarriesFilterAndOverwriteMode() {
+    @Test
+    func theOptionsDialogCarriesFilterAndOverwriteMode() {
         left.model.selectAll()
         ui.formAnswers = [
             .values(["filter": .text("*.txt | docs/"), "overwrite": .index(OverwriteMode.skipAll.rawValue)])
@@ -83,7 +87,8 @@ import Testing
         #expect(left.model.selection == ["docs", "notes.bak", "one.txt"])
     }
 
-    @Test func theOptionsCanBecomeTheDefaultsAndAlwaysBeShown() {
+    @Test
+    func theOptionsCanBecomeTheDefaultsAndAlwaysBeShown() {
         left.moveCursor(toName: "two.txt")
         ui.formAnswers = [.values(["verify": .flag(true), "overwrite": .index(1)], button: 1)]
         commands.perform("afm_MoveWithOptions")
@@ -106,7 +111,8 @@ import Testing
         #expect(ui.log.last == "form: Copy")
     }
 
-    @Test func commandSwitchesStartWithoutADialog() {
+    @Test
+    func commandSwitchesStartWithoutADialog() {
         left.model.selectAll()
         commands.perform(.copy, .text("/O2 G W=\"*.txt\" T=\"mem:/B/sub/\""))
         #expect(ui.log.isEmpty)
@@ -122,7 +128,8 @@ import Testing
         #expect(ui.log == ["prompt: Rename/Move \"two.txt\" to [mem:/B/*.old]"])
     }
 
-    @Test func copyAndMoveWithoutAsking() {
+    @Test
+    func copyAndMoveWithoutAsking() {
         left.moveCursor(toName: "two.txt")
         commands.perform("afm_CopyNoAsk")
         #expect(memory.contents("/B/two.txt") == "2" && memory.exists("/A/two.txt") && ui.log.isEmpty)
@@ -136,7 +143,8 @@ import Testing
         #expect(ui.log.contains { $0.hasPrefix("choose: Overwrite:") } && memory.contents("/B/one.txt") == "old")
     }
 
-    @Test func theOverwriteDialogShowsBothFilesAndOffersEveryChoice() {
+    @Test
+    func theOverwriteDialogShowsBothFilesAndOffersEveryChoice() {
         left.moveCursor(toName: "one.txt")
         // Rename…: the new name is asked for.
         ui.promptAnswers = [.accept, .text("one copy.txt")]
@@ -174,7 +182,8 @@ import Testing
         #expect(memory.contents("/B/one.txt") == "newnew")
     }
 
-    @Test func aShorterTargetCanBeResumedButAMoveCannotAppend() {
+    @Test
+    func aShorterTargetCanBeResumedButAMoveCannotAppend() {
         memory.addFile("/B/two.txt", "")
         memory.addFile("/A/long.txt", "0123456789")
         memory.addFile("/B/long.txt", "0123")
@@ -192,7 +201,8 @@ import Testing
         #expect(memory.contents("/B/long.txt") == "0123456789" && !memory.exists("/A/long.txt"))
     }
 
-    @Test func keepingGoingOnErrorsReportsAtTheEnd() {
+    @Test
+    func keepingGoingOnErrorsReportsAtTheEnd() {
         settings.set(true, forKey: "fileOperations.keepGoingOnErrors")
         select("docs", "two.txt")
         memory.unreadable = ["/A/docs"]
@@ -204,7 +214,8 @@ import Testing
 
     // MARK: Rename
 
-    @Test func severalItemsAreRenamedWithAMaskOrOneByOne() {
+    @Test
+    func severalItemsAreRenamedWithAMaskOrOneByOne() {
         select("one.txt", "two.txt")
         ui.formAnswers = [.values(["mask": .text("*.old")])]
         commands.perform(.renameOnly)
@@ -232,7 +243,8 @@ import Testing
 
     // MARK: New folder and new file
 
-    @Test func newFoldersWithRangesPlaceholdersAndInTheOtherPanel() {
+    @Test
+    func newFoldersWithRangesPlaceholdersAndInTheOtherPanel() {
         left.moveCursor(toName: "docs")
         ui.promptAnswers = [.text("<1-3>part[C]")]
         commands.perform(.makeDirectory)
@@ -263,7 +275,8 @@ import Testing
         #expect(memory.exists("/A/[Q"))
     }
 
-    @Test func newFilesSeveralAtOnce() {
+    @Test
+    func newFilesSeveralAtOnce() {
         ui.promptAnswers = [.text("\"a 1.txt\" \"a 2.txt\"|sub/a3.txt")]
         commands.perform(.newTextFile)
         #expect(
@@ -283,7 +296,8 @@ import Testing
 
     // MARK: Delete
 
-    @Test func readOnlyFilesAreAskedAboutAgainWhenDeleting() {
+    @Test
+    func readOnlyFilesAreAskedAboutAgainWhenDeleting() {
         memory.addFile("/A/ro.txt", "r", permissions: 0o444)
         left.reload()
         left.moveCursor(toName: "ro.txt")
@@ -306,7 +320,8 @@ import Testing
         #expect(!memory.exists("/A/ro.txt"))
     }
 
-    @Test func theTrashKeyCanBeTurnedAround() throws {
+    @Test
+    func theTrashKeyCanBeTurnedAround() throws {
         let box = try Sandbox()
         try box.file("A/readme.md", "r")
         try box.folder("B")
@@ -332,7 +347,8 @@ import Testing
 
     // MARK: Log
 
-    @Test func operationsAreWrittenToTheLogFile() throws {
+    @Test
+    func operationsAreWrittenToTheLogFile() throws {
         let box = try Sandbox()
         settings.set(true, forKey: "fileOperations.log.enabled")
         settings.set(box.url("log/ops.log").path, forKey: "fileOperations.log.file")

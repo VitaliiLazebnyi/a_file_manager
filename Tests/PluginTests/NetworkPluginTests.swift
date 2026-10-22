@@ -47,7 +47,9 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
 
 /// The network plugin driven through its commands: the connection dialogs, the panels on a
 /// server, and the real copy job between the test server and the local disk.
-@MainActor @Suite struct NetworkPluginCommands {
+@MainActor
+@Suite
+struct NetworkPluginCommands {
     let box: Sandbox
     let server: TestFTPServer
     let passwords = MemoryPasswords()
@@ -100,7 +102,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
 
     // MARK: Registration
 
-    @Test func registersCommandsMenusAndFileSystems() throws {
+    @Test
+    func registersCommandsMenusAndFileSystems() throws {
         let net = try #require(bench.kernel.menus.menus.first { $0.title == "Net" })
         #expect(
             net.items == [
@@ -127,7 +130,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
 
     // MARK: Connecting and disconnecting
 
-    @Test func quickConnectShowsTheServerAndDisconnectReturns() {
+    @Test
+    func quickConnectShowsTheServerAndDisconnectReturns() {
         quickConnect()
         #expect(left.model.directory == url("/") && left.names == ["pub", "readme.txt"])
         #expect(left.model.volume?.isLocal == false)
@@ -149,7 +153,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(!commands.isEnabled(.ftpDisconnect) && plugin.connections.isEmpty)
     }
 
-    @Test func disconnectCanSaveTheQuickConnection() throws {
+    @Test
+    func disconnectCanSaveTheQuickConnection() throws {
         quickConnect("ftp://\(address)/pub")
         #expect(left.model.directory == url("/pub"))
         // Yes opens the connection details, filled in from the session.
@@ -167,7 +172,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(left.model.directory == box.url("local"), "a saved connection disconnects without asking")
     }
 
-    @Test func aFailedConnectionIsReportedAndLeavesThePanel() {
+    @Test
+    func aFailedConnectionIsReportedAndLeavesThePanel() {
         server.stop()
         quickConnect()
         #expect(left.model.directory == box.url("local"))
@@ -176,7 +182,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(ui.log.last == "inform: not a server address is not a server address.")
     }
 
-    @Test func savedConnectionsKeepTheirPasswordInThePasswordStore() throws {
+    @Test
+    func savedConnectionsKeepTheirPasswordInThePasswordStore() throws {
         server.options.user = "anna"
         server.options.password = "s3cret-pw"
         // Ctrl+F: New Connection…, fill in the details, then Connect on the new entry.
@@ -237,7 +244,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         )
     }
 
-    @Test func asksForAPasswordThatIsNotStored() {
+    @Test
+    func asksForAPasswordThatIsNotStored() {
         server.options.user = "anna"
         server.options.password = "pw"
         // Not anonymous and no user in the address: user name and password are asked while connecting.
@@ -261,7 +269,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(settings.value([String].self, forKey: "network.history")?.first == "ftp://anna@\(address)/pub")
     }
 
-    @Test func aTypedURLConnectsByItself() {
+    @Test
+    func aTypedURLConnectsByItself() {
         // `cd ftp://…` (spec 11 › Opening connections by command).
         // Nobody chose this server in a dialog of the program, so the user is asked first. (Answered
         // here without the dialog: the test's panel reads on the main thread, where the dialog
@@ -279,7 +288,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(plugin.center.isConnected(key))
     }
 
-    @Test func anAddressTheUserTypedInPersonIsNotAskedAbout() throws {
+    @Test
+    func anAddressTheUserTypedInPersonIsNotAskedAbout() throws {
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var asked: [ServerKey] = []
         plugin.center.environment.askToConnect = { profile in
@@ -299,7 +309,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(bench.kernel.settingsKeys.kind(of: "network.history") == .history)
     }
 
-    @Test func theQuestionsBeforeConnecting() {
+    @Test
+    func theQuestionsBeforeConnecting() {
         let environment = plugin.center.environment
         var profile = ConnectionProfile(key: key, anonymous: true)
         profile.asksBeforeConnecting = true
@@ -326,7 +337,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
 
     // MARK: File operations on the server
 
-    @Test func downloadsWithTheCopyJob() {
+    @Test
+    func downloadsWithTheCopyJob() {
         quickConnect("ftp://\(address)/pub")
         right.show(box.url("other"))
         // One file, then a folder with what is in it. The target is written as a `file:` URL:
@@ -343,7 +355,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(namesOnDisk(box.url("other")) == ["report.txt", "sub"], "no temporary file is left")
     }
 
-    @Test func uploadsRenamesAndDeletesWithTheUsualCommands() throws {
+    @Test
+    func uploadsRenamesAndDeletesWithTheUsualCommands() throws {
         quickConnect("ftp://\(address)/pub")
         bench.panelSet.source = right
         right.show(box.url("local"))
@@ -386,7 +399,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(!ui.log.contains { $0.hasPrefix("choose: Error") })
     }
 
-    @Test func movesBetweenServerAndDisk() {
+    @Test
+    func movesBetweenServerAndDisk() {
         quickConnect("ftp://\(address)/pub")
         left.moveCursor(toName: "report.txt")
         ui.promptAnswers = [.text(localTarget)]
@@ -402,7 +416,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
 
     // MARK: Options
 
-    @Test func hiddenFilesAndTransferMode() throws {
+    @Test
+    func hiddenFilesAndTransferMode() throws {
         try box.file("srv/.secret", "s")
         quickConnect()
         #expect(left.names == ["pub", "readme.txt"] && !commands.isChecked(.ftpHiddenFiles))
@@ -428,7 +443,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
 
     // MARK: Download list
 
-    @Test func downloadListIsWrittenAndWorkedThrough() throws {
+    @Test
+    func downloadListIsWrittenAndWorkedThrough() throws {
         quickConnect("ftp://\(address)/pub")
         let list = box.url("list.txt")
         left.moveCursor(toName: "report.txt")
@@ -455,7 +471,8 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
 
     // MARK: Network volumes
 
-    @Test func connectToServerMountsAndEjects() throws {
+    @Test
+    func connectToServerMountsAndEjects() throws {
         let volume = try box.folder("Volumes/Share")
         mounter.mountPoint = volume
         ui.promptAnswers = [.text("smb://nas.local/Share")]

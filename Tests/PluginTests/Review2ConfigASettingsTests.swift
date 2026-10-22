@@ -12,7 +12,9 @@ import Testing
 /// Export and import of the settings (review 2, C013 and its kin): a file is checked key by
 /// key, shown, and stored only on the user's word; what can run programs or change whom the
 /// program trusts needs a tick of its own.
-@MainActor @Suite struct Review2ConfigASettings {
+@MainActor
+@Suite
+struct Review2ConfigASettings {
     let box: Sandbox
     let settings = MemorySettings()
     let plugin: ConfigurationPlugin
@@ -77,7 +79,8 @@ import Testing
         "nobody.knows": 1, "": 2, "places.hotlist.unreadable.x": 3
         """
 
-    @Test func nothingIsImportedWithoutAnAnswerAndTheRiskyPartsOnlyWhenTicked() throws {
+    @Test
+    func nothingIsImportedWithoutAnAnswerAndTheRiskyPartsOnlyWhenTicked() throws {
         let url = try file(Self.hostile)
         // Asked for by a command with the file as its argument: the question comes all the same.
         commands.perform("afm_ImportSettings", .location(url))
@@ -162,7 +165,8 @@ import Testing
         )
     }
 
-    @Test func whatIsStoredAlreadyNeedsNoQuestion() throws {
+    @Test
+    func whatIsStoredAlreadyNeedsNoQuestion() throws {
         let own = UserCommand(name: "em_mine", title: "", action: CommandAction(command: "ls"))
         center.save(own)
         settings.set("BBEdit", forKey: "macIntegration.editor")
@@ -189,7 +193,8 @@ import Testing
         #expect(ui.log.last == "inform: Nothing to import")
     }
 
-    @Test func valuesOfTheWrongKindAreRefusedAndNumbersLimited() throws {
+    @Test
+    func valuesOfTheWrongKindAreRefusedAndNumbersLimited() throws {
         settings.set("keep", forKey: "extra.key")
         ui.formAnswers = Array(repeating: .accept, count: 20)
         for bad in [
@@ -224,7 +229,8 @@ import Testing
         #expect(label.contains("numbers were out of range"))
     }
 
-    @Test func aFileThatIsTooLargeOrNoSettingsFileIsRefused() throws {
+    @Test
+    func aFileThatIsTooLargeOrNoSettingsFileIsRefused() throws {
         let large = box.url("large.json")
         FileManager.default.createFile(atPath: large.path, contents: nil)
         let handle = try FileHandle(forWritingTo: large)
@@ -239,7 +245,8 @@ import Testing
         #expect(ui.log.count == 3 && ui.forms.isEmpty)
     }
 
-    @Test func anImportedConnectionNeverTakesOverAStoredPassword() throws {
+    @Test
+    func anImportedConnectionNeverTakesOverAStoredPassword() throws {
         let id = "11111111-2222-3333-4444-555555555555"
         let mine =
             #"[{"host":"mine.example","id":"\#(id)","name":"n","user":"u"},{"host":"two.example","id":"AAAAAAAA-2222-3333-4444-555555555555","name":"t","user":"u"}]"#
@@ -262,7 +269,8 @@ import Testing
         #expect(stored("network.lastUsed") == "\"\(fresh)\"")
     }
 
-    @Test func anExportIsForTheUserAloneAndLeavesPrivateThingsOut() throws {
+    @Test
+    func anExportIsForTheUserAloneAndLeavesPrivateThingsOut() throws {
         settings.set(["curl -u me:secret https://x"], forKey: "systemTools.history")
         settings.set(Data(#"[{"id":"x","host":"h"}]"#.utf8) as Data?, forKey: "network.connections")
         settings.set(Data("broken".utf8) as Data?, forKey: "configuration.userCommands.unreadable")
@@ -314,7 +322,8 @@ import Testing
         #expect(description.contains("Left out: typed command lines") && description.contains("saved connections"))
     }
 
-    @Test func storedListsAreBoundedAndUnreadableDataIsKeptTwice() async {
+    @Test
+    func storedListsAreBoundedAndUnreadableDataIsKeptTwice() async {
         let many = (0..<(ConfigurationStore.startMenuLimit + 100))
             .map {
                 #"{"title":"t\#($0)","action":{"command":"ls"}}"#

@@ -107,10 +107,12 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
     return box.exists("probe-case")
 }
 
-@Suite struct FileOpsFixJobs {
+@Suite
+struct FileOpsFixJobs {
     // MARK: F1
 
-    @Test func aCopyOfALockedFileLeavesNoTemporaryFileBehind() throws {
+    @Test
+    func aCopyOfALockedFileLeavesNoTemporaryFileBehind() throws {
         let box = try Sandbox()
         let source = try box.file("A/locked.txt", "l")
         try box.folder("B")
@@ -125,7 +127,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(!namesOnDisk(box.url("B")).contains { $0.hasPrefix(".afm-") })
     }
 
-    @Test func aFinderLockedFileIsCopiedWithItsLockByTheJobItself() throws {
+    @Test
+    func aFinderLockedFileIsCopiedWithItsLockByTheJobItself() throws {
         let box = try Sandbox()
         let source = try box.file("A/locked.txt", "locked content")
         try box.folder("B")
@@ -158,7 +161,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F4
 
-    @Test func aTargetInsideTheSourceThroughALinkIsRefused() throws {
+    @Test
+    func aTargetInsideTheSourceThroughALinkIsRefused() throws {
         let box = try Sandbox()
         try box.file("A/Foo/one.txt", "1")
         try FileManager.default.createSymbolicLink(at: box.url("A/link"), withDestinationURL: box.url("A/Foo"))
@@ -173,7 +177,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(result.completed.isEmpty && namesOnDisk(box.url("A/Foo")) == ["one.txt"])
     }
 
-    @Test func aCaseOnlyRenameIsNotAConflict() throws {
+    @Test
+    func aCaseOnlyRenameIsNotAConflict() throws {
         let box = try Sandbox()
         try box.file("A/readme.txt", "r")
         try box.file("A/Folder/in.txt", "i")
@@ -196,7 +201,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(box.read("A/README.txt") == "r" && box.read("A/FOLDER/in.txt") == "i")
     }
 
-    @Test func aCopyOntoItsOwnNameInOtherLetterCaseIsACopyOntoItself() throws {
+    @Test
+    func aCopyOntoItsOwnNameInOtherLetterCaseIsACopyOntoItself() throws {
         let box = try Sandbox()
         guard try isCaseInsensitive(box) else {
             return
@@ -213,7 +219,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(box.read("A/readme.txt") == "r")
     }
 
-    @Test func twoSourcesWhoseTargetNamesDifferInCaseOnlyAreOneConflict() throws {
+    @Test
+    func twoSourcesWhoseTargetNamesDifferInCaseOnlyAreOneConflict() throws {
         let box = try Sandbox()
         guard try isCaseInsensitive(box) else {
             return
@@ -234,7 +241,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F5
 
-    @Test func namesThatLeadOutOfTheirFolderAreNotTransferred() throws {
+    @Test
+    func namesThatLeadOutOfTheirFolderAreNotTransferred() throws {
         let box = try Sandbox()
         try box.folder("Target")
         let fileSystems = FileSystemRegistry()
@@ -259,7 +267,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(result.completed.isEmpty)
     }
 
-    @Test func aMoveKeepsAFolderWithARefusedName() throws {
+    @Test
+    func aMoveKeepsAFolderWithARefusedName() throws {
         let box = try Sandbox()
         try box.folder("Target")
         let fileSystems = FileSystemRegistry()
@@ -279,7 +288,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(result.completed.isEmpty && !odd.removed.contains(odd.base.url("/d")))
     }
 
-    @Test func deletingNeverFollowsAHostileName() {
+    @Test
+    func deletingNeverFollowsAHostileName() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -293,7 +303,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F6
 
-    @Test func onlyAPlaceWithoutATrashOffersPermanentDeletion() {
+    @Test
+    func onlyAPlaceWithoutATrashOffersPermanentDeletion() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -319,7 +330,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         )
     }
 
-    @Test func aFailedTrashCanBeRetried() {
+    @Test
+    func aFailedTrashCanBeRetried() {
         let fileSystems = FileSystemRegistry()
         let odd = OddFileSystem()
         fileSystems.register(odd)
@@ -339,7 +351,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F7
 
-    @Test func removingTheSourceOfAMoveIsRetriedWithoutCopyingAgain() throws {
+    @Test
+    func removingTheSourceOfAMoveIsRetriedWithoutCopyingAgain() throws {
         let box = try Sandbox()
         try box.folder("B")
         let fileSystems = FileSystemRegistry()
@@ -362,7 +375,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(namesOnDisk(box.url("B")) == ["one.txt"])
     }
 
-    @Test func aSourceThatCannotBeRemovedStaysAndIsNotReportedAsMoved() throws {
+    @Test
+    func aSourceThatCannotBeRemovedStaysAndIsNotReportedAsMoved() throws {
         let box = try Sandbox()
         try box.folder("B")
         let fileSystems = FileSystemRegistry()
@@ -384,7 +398,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F8
 
-    @Test func aFolderThatMovesByOneRenameIsNotWalked() throws {
+    @Test
+    func aFolderThatMovesByOneRenameIsNotWalked() throws {
         let box = try Sandbox()
         for index in 0..<30 { try box.file("A/docs/sub/f\(index).txt", "x") }
         try box.folder("B")
@@ -396,7 +411,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(last.itemsTotal == 1 && last.itemsDone == 1)
     }
 
-    @Test func aFolderMergedIntoAnExistingOneIsCountedInFull() throws {
+    @Test
+    func aFolderMergedIntoAnExistingOneIsCountedInFull() throws {
         let box = try Sandbox()
         for index in 0..<5 { try box.file("A/docs/f\(index).txt", "x") }
         try box.file("B/docs/keep.txt", "k")
@@ -407,7 +423,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(namesOnDisk(box.url("B/docs")).count == 6)
     }
 
-    @Test func aSkippedFolderAdvancesTheCounterToTheEnd() throws {
+    @Test
+    func aSkippedFolderAdvancesTheCounterToTheEnd() throws {
         let box = try Sandbox()
         for index in 0..<4 { try box.file("A/docs/f\(index).txt", "x") }
         try box.file("A/one.txt", "1")
@@ -429,7 +446,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F10
 
-    @Test func manyFilesAreDeletedBySeveralWorkersAndProtectedOnesAreAskedInOrder() throws {
+    @Test
+    func manyFilesAreDeletedBySeveralWorkersAndProtectedOnesAreAskedInOrder() throws {
         let box = try Sandbox()
         for index in 0..<200 { try box.file(String(format: "A/tree/f%03d.txt", index), "x") }
         for name in ["ro1", "ro2", "ro3"] {
@@ -449,7 +467,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(last.itemsDone == last.itemsTotal)
     }
 
-    @Test func aCancelDuringAParallelDeleteStopsAndReturns() throws {
+    @Test
+    func aCancelDuringAParallelDeleteStopsAndReturns() throws {
         let box = try Sandbox()
         for index in 0..<300 { try box.file(String(format: "A/tree/f%03d.txt", index), "x") }
         let replies = Replies()
@@ -459,7 +478,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(namesOnDisk(box.url("A/tree")).count < 300)
     }
 
-    @Test func aDeleteTreeWithoutAPoolStillDeletesEverything() throws {
+    @Test
+    func aDeleteTreeWithoutAPoolStillDeletesEverything() throws {
         let box = try Sandbox()
         for index in 0..<50 { try box.file("A/tree/d\(index % 5)/f\(index).txt", "x") }
         let replies = Replies()
@@ -471,7 +491,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F13
 
-    @Test func filesOfDifferentSizesAreDifferentWithoutReadingThem() throws {
+    @Test
+    func filesOfDifferentSizesAreDifferentWithoutReadingThem() throws {
         let box = try Sandbox()
         try box.file("a.txt", "short")
         try box.file("b.txt", "longer text")
@@ -485,7 +506,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(try Checksum.sameContents(box.url("a.txt"), box.url("c.txt"), in: fileSystems) == true)
     }
 
-    @Test func verifyingShowsProgressAndStillCatchesDamage() throws {
+    @Test
+    func verifyingShowsProgressAndStillCatchesDamage() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", String(repeating: "x", count: 3 << 20))
         try box.folder("B")
@@ -499,7 +521,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F14
 
-    @Test func olderMeansOlderByMoreThanTheGranularityOfTheTarget() {
+    @Test
+    func olderMeansOlderByMoreThanTheGranularityOfTheTarget() {
         let (fileSystems, memory) = makeFileSystems()
         let base = Date(timeIntervalSince1970: 1_000_000)
         memory.addFile("/a/near.txt", "new", modified: base.addingTimeInterval(1.5))
@@ -518,7 +541,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(memory.contents("/b/near.txt") == "old" && memory.contents("/b/far.txt") == "new")
     }
 
-    @Test func olderOrSameKeepsAnOlderTargetOnlyBeyondTheTolerance() {
+    @Test
+    func olderOrSameKeepsAnOlderTargetOnlyBeyondTheTolerance() {
         let (fileSystems, memory) = makeFileSystems()
         let base = Date(timeIntervalSince1970: 1_000_000)
         memory.addFile("/a/near.txt", "new", modified: base)
@@ -538,7 +562,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F20
 
-    @Test func hugeWidthsInNamesAreClamped() throws {
+    @Test
+    func hugeWidthsInNamesAreClamped() throws {
         var context = NameTemplate.Context()
         context.cursorName = "abc.txt"
         let counter = try NameTemplate.names(from: "<1-2>x[C:999999999]", context: context)
@@ -552,8 +577,10 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 }
 
 /// The operation log: bursts, the handle, the end of a job and the pruning of old copies.
-@Suite struct FileOpsFixLog {
-    @Test func linesAreWrittenWithoutAFlushAfterAShortWhile() throws {
+@Suite
+struct FileOpsFixLog {
+    @Test
+    func linesAreWrittenWithoutAFlushAfterAShortWhile() throws {
         let box = try Sandbox()
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
@@ -574,7 +601,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(lines.count == 51 && lines.last?.hasSuffix("Copy: /z -> /z") == true)
     }
 
-    @Test func aFileThatWasDeletedWhileTheLogWasOpenIsWrittenAgain() throws {
+    @Test
+    func aFileThatWasDeletedWhileTheLogWasOpenIsWrittenAgain() throws {
         let box = try Sandbox()
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
@@ -596,7 +624,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         log.flush()
     }
 
-    @Test func pruningLeavesOtherPeoplesFilesAlone() throws {
+    @Test
+    func pruningLeavesOtherPeoplesFilesAlone() throws {
         let box = try Sandbox()
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = true
@@ -618,7 +647,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         )
     }
 
-    @Test func theNamesOfRotatedCopiesAreRecognisedExactly() {
+    @Test
+    func theNamesOfRotatedCopiesAreRecognisedExactly() {
         #expect(OperationLog.isRotatedCopy("operations.2026-10-12.log", of: "operations.log"))
         #expect(OperationLog.isRotatedCopy("operations.2026-10-12-3.log", of: "operations.log"))
         #expect(OperationLog.isRotatedCopy("operations.7.log", of: "operations.log"))
@@ -630,10 +660,13 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 }
 
 /// The commands of the plugins, through a kernel with fake panels.
-@MainActor @Suite struct FileOpsFixCommands {
+@MainActor
+@Suite
+struct FileOpsFixCommands {
     // MARK: F3
 
-    @Test func aCaseOnlyRenameWorksAndNeverReplacesAnotherFile() throws {
+    @Test
+    func aCaseOnlyRenameWorksAndNeverReplacesAnotherFile() throws {
         let box = try Sandbox()
         try box.file("A/readme", "mine")
         try box.folder("B")
@@ -649,7 +682,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(!bench.interaction.log.contains { $0.hasPrefix("inform") })
     }
 
-    @Test func renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() {
+    @Test
+    func renamingOntoAnotherFileWhoseNameDiffersInCaseIsRefused() {
         // A file system that tells the two names apart, as a case-sensitive volume does.
         let memory = MemoryFileSystem()
         memory.addFile("/A/readme", "first")
@@ -668,7 +702,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F17
 
-    @Test func pasteIsOfferedWhileFilesAreOnTheClipboard() throws {
+    @Test
+    func pasteIsOfferedWhileFilesAreOnTheClipboard() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -686,7 +721,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(bench.commands.isEnabled(.pasteFromClipboard))
     }
 
-    @Test func theToolbarAsksWithoutBuildingTheListOfOperands() throws {
+    @Test
+    func theToolbarAsksWithoutBuildingTheListOfOperands() throws {
         let box = try Sandbox()
         for index in 0..<2_000 { try box.file("A/f\(index).txt", "x") }
         try box.folder("B")
@@ -716,7 +752,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F18
 
-    @Test func savingDetailsKeepsTheOldFileUntilTheNewOneIsThereAndNeverRemovesAFolder() throws {
+    @Test
+    func savingDetailsKeepsTheOldFileUntilTheNewOneIsThereAndNeverRemovesAFolder() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         try box.folder("A/details.txt")
@@ -744,7 +781,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F19
 
-    @Test func theTestRecordsOfTheMacPluginStayBounded() throws {
+    @Test
+    func theTestRecordsOfTheMacPluginStayBounded() throws {
         let box = try Sandbox()
         try box.file("A/notes.txt", "n")
         try box.folder("B")
@@ -768,7 +806,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F2
 
-    @Test func changingOnlyTheDateOfAFolderLeavesThePermissionsBelowAlone() throws {
+    @Test
+    func changingOnlyTheDateOfAFolderLeavesThePermissionsBelowAlone() throws {
         let box = try Sandbox()
         let inner = try box.file("A/docs/in.txt", "inside")
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: inner.path)
@@ -798,7 +837,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(year == 2_001)
     }
 
-    @Test func pressingOKOnALockedFileDoesNotUnlockIt() throws {
+    @Test
+    func pressingOKOnALockedFileDoesNotUnlockIt() throws {
         let box = try Sandbox()
         let file = try box.file("A/one.txt", "1")
         try box.folder("B")
@@ -816,7 +856,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(LocalInfo.details(file)?.flags ?? 0 & UInt32(UF_IMMUTABLE) != 0)
     }
 
-    @Test func permissionsTypedOrLoadedAreStillApplied() throws {
+    @Test
+    func permissionsTypedOrLoadedAreStillApplied() throws {
         let box = try Sandbox()
         let file = try box.file("A/one.txt", "1")
         try box.file("B/other.txt", "2")
@@ -837,7 +878,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F16
 
-    @Test func aCommentFileThatCannotBeReadIsNeverOverwritten() throws {
+    @Test
+    func aCommentFileThatCannotBeReadIsNeverOverwritten() throws {
         let box = try Sandbox()
         try box.file("A/one.txt", "1")
         let fileSystems = FileSystemRegistry()
@@ -872,7 +914,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
         #expect(box.read("B/descript.ion") == "two.txt keep me\r\n")
     }
 
-    @Test func anOversizedCommentFileIsNotOverwritten() throws {
+    @Test
+    func anOversizedCommentFileIsNotOverwritten() throws {
         let memory = MemoryFileSystem()
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
@@ -886,7 +929,8 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     // MARK: F12
 
-    @Test func theAllocatedSizeIsOnlyAskedForWhenItIsWanted() throws {
+    @Test
+    func theAllocatedSizeIsOnlyAskedForWhenItIsWanted() throws {
         let box = try Sandbox()
         let file = try box.file("A/small.txt", "x")
         let fileSystems = FileSystemRegistry()

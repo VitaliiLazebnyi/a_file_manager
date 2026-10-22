@@ -11,7 +11,8 @@ import Testing
 
 /// Hostile file names against the shell that runs a command line: the argv the shell builds
 /// must be exactly the names, in every quoting context.
-@Suite struct ConfigPlacesFixExpansion {
+@Suite
+struct ConfigPlacesFixExpansion {
     static let hostile = [
         "x'; touch pwned; '.txt", "a\"b$HOME`id`\\c.txt", "two words.txt", "line\nbreak.txt", "-rf", "!bang.txt",
         "$(id)"
@@ -45,7 +46,8 @@ import Testing
         ParameterExpander(context: context(name: name)).expand(text)
     }
 
-    @Test func unquotedPlaceholderIsOneWord() throws {
+    @Test
+    func unquotedPlaceholderIsOneWord() throws {
         for name in Self.hostile {
             let expanded = expand("%N", name: name).text
             let words = try argv(expanded)
@@ -55,7 +57,8 @@ import Testing
         }
     }
 
-    @Test func insideDoubleQuotes() throws {
+    @Test
+    func insideDoubleQuotes() throws {
         for name in Self.hostile {
             let expanded = expand("\"%N\"", name: name).text
             #expect(try argv(expanded) == [name.hasPrefix("-") ? "./" + name : name], "\(name) -> \(expanded)")
@@ -63,7 +66,8 @@ import Testing
         }
     }
 
-    @Test func insideSingleQuotes() throws {
+    @Test
+    func insideSingleQuotes() throws {
         for name in Self.hostile {
             let expanded = expand("'%N'", name: name).text
             #expect(try argv(expanded) == [name.hasPrefix("-") ? "./" + name : name], "\(name) -> \(expanded)")
@@ -74,7 +78,8 @@ import Testing
         #expect(try argv(expand("\"it's %N\"", name: "a'b").text) == ["it's a'b"])
     }
 
-    @Test func environmentValuesAreQuotedToo() throws {
+    @Test
+    func environmentValuesAreQuotedToo() throws {
         #expect(try argv(expand("%|EVIL|", name: nil).text) == ["e'v\"il $x `y`"])
         #expect(try argv(expand("'%|EVIL|'", name: nil).text) == ["e'v\"il $x `y`"])
         #expect(try argv(expand("\"%|EVIL|\"", name: nil).text) == ["e'v\"il $x `y`"])
@@ -85,14 +90,16 @@ import Testing
         )
     }
 
-    @Test func selectedNamesAreSeparateWords() throws {
+    @Test
+    func selectedNamesAreSeparateWords() throws {
         var context = context(name: nil)
         context.left.selection = ["-n", "b c", "d'e"]
         let text = ParameterExpander(context: context).expand("%S").text
         #expect(try argv(text) == ["./-n", "b c", "d'e"])
     }
 
-    @Test func aMissingNameIsReported() {
+    @Test
+    func aMissingNameIsReported() {
         #expect(expand("rm -rf %P%N", name: nil).missingName)
         #expect(
             expand("echo %V", name: nil).missingName && expand("%O.%E", name: nil).missingName
@@ -103,13 +110,16 @@ import Testing
 }
 
 /// Stored configuration read leniently.
-@MainActor @Suite struct ConfigPlacesFixStore {
+@MainActor
+@Suite
+struct ConfigPlacesFixStore {
     func store(_ json: String, in settings: MemorySettings = MemorySettings()) -> (ConfigurationStore, MemorySettings) {
         settings.set(Data(json.utf8) as Data?, forKey: "configuration.userCommands")
         return (ConfigurationStore(settings: settings), settings)
     }
 
-    @Test func missingAndUnknownKeysAndABadElement() async {
+    @Test
+    func missingAndUnknownKeysAndABadElement() async {
         let json = """
             [{"name":"em_a","title":"A","action":{"command":"ls"}},
              {"name":"em_b","future":{"x":1},"action":{"command":"ls","parameters":"p","startPath":"/","more":true}},
@@ -131,7 +141,8 @@ import Testing
         #expect(store.userCommands.count == 3 && told.count == 1)
     }
 
-    @Test func unreadableDataIsKept() async {
+    @Test
+    func unreadableDataIsKept() async {
         let (store, settings) = store("not json at all")
         var told: [String] = []
         store.onProblem = { told.append($0) }
@@ -145,7 +156,8 @@ import Testing
         #expect(store.userCommands.map(\.name) == ["em_new"])
     }
 
-    @Test func theDecodedListIsCachedUntilItIsReplaced() {
+    @Test
+    func theDecodedListIsCachedUntilItIsReplaced() {
         let (store, settings) = store(#"[{"name":"em_a"}]"#)
         #expect(store.userCommands.map(\.name) == ["em_a"])
         settings.set(Data(#"[{"name":"em_b"}]"#.utf8) as Data?, forKey: "configuration.userCommands")
@@ -154,7 +166,8 @@ import Testing
         #expect(store.userCommands.map(\.name) == ["em_b"])
     }
 
-    @Test func anImportIsCheckedBeforeItIsWritten() throws {
+    @Test
+    func anImportIsCheckedBeforeItIsWritten() throws {
         var archive = SettingsArchive()
         archive.values["configuration.userCommands"] = Data(#"[{"name":"em_a"},{"nope":1}]"#.utf8)
         #expect(throws: SettingsArchive.ArchiveError.self) { try archive.validate(keyBindingsKey: "keyBindings") }
@@ -167,7 +180,9 @@ import Testing
 }
 
 /// The runner: names that are not there, real paths of virtual listings, key bindings of deleted commands.
-@MainActor @Suite struct ConfigPlacesFixRunner {
+@MainActor
+@Suite
+struct ConfigPlacesFixRunner {
     let box: Sandbox
     let settings = MemorySettings()
     let plugin: ConfigurationPlugin
@@ -194,7 +209,8 @@ import Testing
 
     var center: ConfigurationCenter { plugin.center! }
 
-    @Test func aCommandWithANameCodeDoesNotRunWithoutAName() {
+    @Test
+    func aCommandWithANameCodeDoesNotRunWithoutAName() {
         center.save(
             UserCommand(name: "em_rm", title: "", action: CommandAction(command: "rm -rf", parameters: "%P%N"))
         )
@@ -209,7 +225,8 @@ import Testing
         }
     }
 
-    @Test func aDeletedUserCommandLeavesNoKeyBehind() {
+    @Test
+    func aDeletedUserCommandLeavesNoKeyBehind() {
         center.save(UserCommand(name: "em_k", title: "", action: CommandAction(command: "ls")))
         #expect(center.setShortcut("ctrl+shift+k", for: CommandID("em_k")))
         #expect(settings.value([String: [String]].self, forKey: KeyBindings.settingsKey)?["em_k"] == ["ctrl+shift+k"])
@@ -217,7 +234,8 @@ import Testing
         #expect(settings.data(forKey: KeyBindings.settingsKey) == nil)
     }
 
-    @Test func theKeyboardEditorKeepsBindingsStoredElsewhere() {
+    @Test
+    func theKeyboardEditorKeepsBindingsStoredElsewhere() {
         let editor = KeyBindingEditor(kernel: bench.kernel)
         editor.set([Shortcut(.character("j"), [.control])], for: CommandID("cm_SelectAll"))
         // The Start menu stores a key while the Keyboard page has an edit pending.
@@ -231,7 +249,9 @@ import Testing
 }
 
 /// Programs are started by the runner itself, not through the command line's job.
-@MainActor @Suite struct ConfigPlacesFixLaunching {
+@MainActor
+@Suite
+struct ConfigPlacesFixLaunching {
     let box: Sandbox
     let plugin: ConfigurationPlugin
     let bench: TestBench
@@ -260,7 +280,8 @@ import Testing
         while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 50_000_000) }
     }
 
-    @Test func aChainWaitsForTheProgramBeforeItsNextStep() async {
+    @Test
+    func aChainWaitsForTheProgramBeforeItsNextStep() async {
         let marker = box.url("marker").path
         let center = plugin.center!
         center.save(
@@ -279,7 +300,8 @@ import Testing
         #expect(existed == true)
     }
 
-    @Test func aLaunchIsNoJobAndNoHistoryEntry() async {
+    @Test
+    func aLaunchIsNoJobAndNoHistoryEntry() async {
         let marker = box.url("marker2").path
         plugin.center!
             .save(
@@ -292,7 +314,8 @@ import Testing
         #expect(bench.kernel.settings.data(forKey: "systemTools.history") == nil)
     }
 
-    @Test func aLaunchThatCannotStartIsReported() async {
+    @Test
+    func aLaunchThatCannotStartIsReported() async {
         plugin.center!
             .save(
                 UserCommand(

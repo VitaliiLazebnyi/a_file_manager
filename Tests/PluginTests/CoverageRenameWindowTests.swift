@@ -9,7 +9,9 @@ import Testing
 
 /// The window of the Multi-Rename Tool, driven through its controls, its keys and its menus, as
 /// the user would; menus and sheets it opens are closed again at once.
-@MainActor @Suite(.serialized) final class CoverageRenameWindow {
+@MainActor
+@Suite(.serialized)
+final class CoverageRenameWindow {
     let memory = MemoryFileSystem()
     let box: Sandbox
     let bench: TestBench
@@ -101,7 +103,8 @@ import Testing
 
     // MARK: Fields
 
-    @Test func typingInAFieldShowsAtOnce() throws {
+    @Test
+    func typingInAFieldShowsAtOnce() throws {
         nameMask.stringValue = "n[C]"
         controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: nameMask))
         #expect(session.settings.nameMask == "n[C]" && cell("new", 0)?.stringValue == "n1.txt")
@@ -118,7 +121,8 @@ import Testing
         #expect(session.settings.counter.step == 1)
     }
 
-    @Test func aHistoryEntryChosenInAComboBoxIsTaken() {
+    @Test
+    func aHistoryEntryChosenInAComboBoxIsTaken() {
         session.store.remember("[N]_old", in: .nameMask)
         session.settings.nameMask = "[N]2"
         #expect(nameMask.numberOfItems == 1)
@@ -135,7 +139,8 @@ import Testing
         #expect(session.settings.nameMask == "[N]_old")
     }
 
-    @Test func boxesPopUpsAndSteppersChangeTheSettings() throws {
+    @Test
+    func boxesPopUpsAndSteppersChangeTheSettings() throws {
         for title in ["^", "1x", "[E]", "RegEx", "Subst."] {
             let box = try #require(Controls.button(title, in: content))
             box.state = box.state == .on ? .off : .on
@@ -165,7 +170,8 @@ import Testing
         #expect(fields[1].stringValue == "7" && fields[2].stringValue == "3")
     }
 
-    @Test func settingsFromTheSessionFillTheFields() {
+    @Test
+    func settingsFromTheSessionFillTheFields() {
         var settings = RenameSettings()
         settings.counter = CounterDefinition(start: 4, step: 2, digits: 0)
         settings.extensionMask = "[E]x"
@@ -189,7 +195,8 @@ import Testing
 
     // MARK: The status line
 
-    @Test func theStatusLineSaysWhatIsWrong() {
+    @Test
+    func theStatusLineSaysWhatIsWrong() {
         session.settings.nameMask = "[Q]"
         #expect(status == "Invalid placeholder: [Q]")
         session.settings.nameMask = "[=tc.size]"
@@ -204,7 +211,8 @@ import Testing
         #expect(MultiRenameWindowController.describe(RenameMaskError.numberTooLarge) == "The rename mask is invalid.")
     }
 
-    @Test func theStatusLineCountsConflictsAndUnusableNames() {
+    @Test
+    func theStatusLineCountsConflictsAndUnusableNames() {
         session.loadNames(fromText: "same.txt\nsame.txt\n..\n")
         #expect(status == "2 name conflict(s), 1 name(s) cannot be used")
         session.loadNames(fromText: "taken.txt")
@@ -219,7 +227,8 @@ import Testing
 
     // MARK: The list
 
-    @Test func theCellsShowHowEachItemStands() {
+    @Test
+    func theCellsShowHowEachItemStands() {
         session.loadNames(fromText: "a.txt\nnew.txt\n..\n")
         #expect(cell("old", 0)?.stringValue == "a" && cell("ext", 0)?.stringValue == "txt")
         #expect(cell("new", 0)?.textColor == .secondaryLabelColor)
@@ -243,7 +252,8 @@ import Testing
         }
     }
 
-    @Test func clickingAHeaderSortsAndAgainTurnsTheOrder() throws {
+    @Test
+    func clickingAHeaderSortsAndAgainTurnsTheOrder() throws {
         let table = try #require(table)
         func click(_ id: String) {
             if let column = table.tableColumns.first(where: { $0.identifier.rawValue == id }) {
@@ -263,7 +273,8 @@ import Testing
         #expect(session.rows.map(\.entry.name) == order)
     }
 
-    @Test func rowsAreDraggedToAnotherPlace() throws {
+    @Test
+    func rowsAreDraggedToAnotherPlace() throws {
         let table = try #require(table)
         let scratch = ScratchPasteboard()
         let pasteboard = scratch.pasteboard
@@ -289,7 +300,8 @@ import Testing
 
     // MARK: Keys
 
-    @Test func keysOfTheList() throws {
+    @Test
+    func keysOfTheList() throws {
         let table = try #require(table)
         table.selectRowIndexes([1], byExtendingSelection: false)
         let second = session.rows[1].entry.name
@@ -318,7 +330,8 @@ import Testing
         #expect(session.rowCount == 0 && table.selectedRowIndexes.isEmpty)
     }
 
-    @Test func functionKeysOfTheWindow() {
+    @Test
+    func functionKeysOfTheWindow() {
         session.settings.nameMask = "[N]2"
         window.sendEvent(Controls.key(Controls.Code.f5))
         #expect(session.rows.first?.entry.name == "a2.txt" && session.settings == .unchanged)
@@ -334,7 +347,8 @@ import Testing
         #expect(nameMask.stringValue == "q")
     }
 
-    @Test func shiftDeleteDropsAnEntryFromAHistory() {
+    @Test
+    func shiftDeleteDropsAnEntryFromAHistory() {
         session.store.remember("old", in: .search)
         session.store.remember("older", in: .search)
         session.settings.search = "older"
@@ -355,7 +369,8 @@ import Testing
 
     // MARK: Placeholders
 
-    @Test func buttonsPutPlaceholdersIntoTheMasks() {
+    @Test
+    func buttonsPutPlaceholdersIntoTheMasks() {
         session.settings.nameMask = ""
         session.settings.extensionMask = ""
         for title in ["[N] Name", "[C] Counter", "[YMD] Date", "[hms] Time"] { press(title) }
@@ -370,7 +385,8 @@ import Testing
         #expect(session.settings.extensionMask == "[C]")
     }
 
-    @Test func moreFieldsComeFromMenus() throws {
+    @Test
+    func moreFieldsComeFromMenus() throws {
         session.settings.nameMask = ""
         var menus: [(NSMenu, NSView)] = []
         controller.popUpMenu = { menus.append(($0, $1)) }
@@ -388,7 +404,8 @@ import Testing
         #expect(nameMask.stringValue == "[P][A2-3]")
     }
 
-    @Test func theRangePickerAsksForPositions() {
+    @Test
+    func theRangePickerAsksForPositions() {
         session.settings.nameMask = ""
         session.settings.extensionMask = ""
         ui.formAnswers = [
@@ -406,7 +423,8 @@ import Testing
         #expect(fields[0].stringValue == "[E1-]")
     }
 
-    @Test func theRangePickerShowsTheFirstName() {
+    @Test
+    func theRangePickerShowsTheFirstName() {
         let folder = session.rows.firstIndex { $0.entry.item.isFolder } ?? 0
         session.move(IndexSet(integer: folder), to: 0)
         session.settings.nameMask = ""
@@ -425,7 +443,8 @@ import Testing
 
     // MARK: Menus
 
-    @Test func savedSettingsAreSavedLoadedAndDeleted() {
+    @Test
+    func savedSettingsAreSavedLoadedAndDeleted() {
         session.settings.nameMask = "s[C]"
         ui.promptAnswers = [.text(" Mine "), .cancel]
         choose("Save settings…", in: "F2 Load/save settings")
@@ -445,7 +464,8 @@ import Testing
         #expect(session.settings.nameMask == "s[C]")
     }
 
-    @Test func deletingOtherSavedSettingsKeepsTheLoadedName() {
+    @Test
+    func deletingOtherSavedSettingsKeepsTheLoadedName() {
         session.save(as: "One")
         session.save(as: "Two")
         // Nothing loaded yet: the first entry is proposed.
@@ -461,7 +481,8 @@ import Testing
         #expect(ui.log.last == "prompt: Save settings [Two]")
     }
 
-    @Test func namesComeFromTheNamesMenu() throws {
+    @Test
+    func namesComeFromTheNamesMenu() throws {
         ui.formAnswers = [.values(["names": .text("x\ny")])]
         choose("Edit names…", in: "F10 Names")
         #expect(session.givenNames == ["x", "y"])
@@ -493,7 +514,8 @@ import Testing
 
     // MARK: Buttons
 
-    @Test func startUndoResultListAndClose() {
+    @Test
+    func startUndoResultListAndClose() {
         session.settings.nameMask = "r[C]"
         press("Start!")
         #expect(session.rowCount == 0 && memory.allPaths.contains("/w/r1.txt"))
@@ -509,7 +531,8 @@ import Testing
     }
 
     /// A field that does not let go of the keyboard keeps the run from starting.
-    @Test func startWaitsForTheFieldsToLetGo() {
+    @Test
+    func startWaitsForTheFieldsToLetGo() {
         let stubborn = Stubborn(frame: NSRect(x: 0, y: 0, width: 10, height: 10))
         content?.addSubview(stubborn)
         #expect(window.makeFirstResponder(stubborn))
@@ -521,7 +544,8 @@ import Testing
         #expect(session.rows.first?.entry.name == "r1.txt")
     }
 
-    @Test func startIsRefusedWhileARunIsUnderWay() {
+    @Test
+    func startIsRefusedWhileARunIsUnderWay() {
         let jobs = CancellingJobService(moment: .held, panels: bench.panelSet)
         bench.kernel.attach(jobs)
         session.settings.nameMask = "r[C]"
@@ -539,13 +563,16 @@ import Testing
         override func resignFirstResponder() -> Bool { letsGo }
     }
 
-    @Test func theWindowIsNeverMadeFromAnArchive() {
+    @Test
+    func theWindowIsNeverMadeFromAnArchive() {
         #expect(MultiRenameWindowController(coder: NSCoder()) == nil)
     }
 }
 
 /// The tool opened through its command with a window, as the program opens it.
-@MainActor @Suite(.serialized) struct CoverageRenamePluginWindow {
+@MainActor
+@Suite(.serialized)
+struct CoverageRenamePluginWindow {
     let memory = MemoryFileSystem()
     let box: Sandbox
     let plugin: MultiRenamePlugin
@@ -565,7 +592,8 @@ import Testing
 
     var windows: [NSWindow] { presenter.open.filter { $0.title == "Multi-Rename Tool" } }
 
-    @Test func openingAgainReplacesTheWindowAndClosingKeepsTheSettings() async {
+    @Test
+    func openingAgainReplacesTheWindowAndClosingKeepsTheSettings() async {
         defer {
             plugin.stop()
             presenter.closeAll()
@@ -595,8 +623,11 @@ import Testing
 }
 
 /// The tool without a window, where the log goes when no folder is given.
-@MainActor @Suite struct CoverageRenamePluginDefaults {
-    @Test func theLogGoesToTheUsersLogsFolderAndTheClipboardIsEmpty() throws {
+@MainActor
+@Suite
+struct CoverageRenamePluginDefaults {
+    @Test
+    func theLogGoesToTheUsersLogsFolderAndTheClipboardIsEmpty() throws {
         let memory = MemoryFileSystem()
         memory.addFile("/d/a.txt")
         let plugin = MultiRenamePlugin(opensWindows: false)

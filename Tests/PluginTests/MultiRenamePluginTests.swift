@@ -11,7 +11,9 @@ import Testing
 /// memory and on the local disk.
 ///
 /// No window is involved.
-@MainActor @Suite struct MultiRenameRuns {
+@MainActor
+@Suite
+struct MultiRenameRuns {
     let memory = MemoryFileSystem()
     let box: Sandbox
     let settings = MemorySettings()
@@ -58,7 +60,8 @@ import Testing
 
     // MARK: Registration
 
-    @Test func commandMenuAndPreferences() {
+    @Test
+    func commandMenuAndPreferences() {
         #expect(bench.commands[.multiRename]?.title == "Multi-Rename Tool…")
         #expect(bench.kernel.keyBindings.command(for: Shortcut(.character("m"), .control)) == .multiRename)
         #expect(bench.kernel.menus.menus.first?.items == [.multiRename])
@@ -69,7 +72,8 @@ import Testing
         #expect(!bench.commands.isEnabled(.multiRename))
     }
 
-    @Test func operandsAreTheSelectionOrTheCursorItem() {
+    @Test
+    func operandsAreTheSelectionOrTheCursorItem() {
         #expect(open(["IMG_1002.jpg", "notes.txt"]).rows.map(\.entry.name) == ["IMG_1002.jpg", "notes.txt"])
         left.model.clearSelection()
         left.moveCursor(toName: "IMG_1003.jpg")
@@ -79,7 +83,8 @@ import Testing
 
     // MARK: Preview
 
-    @Test func previewFollowsTheSettings() {
+    @Test
+    func previewFollowsTheSettings() {
         let session = open(["IMG_*"])
         #expect(
             names(session) == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"]
@@ -99,7 +104,8 @@ import Testing
         #expect(photos == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg", "notes.txt"])
     }
 
-    @Test func previewMarksConflictsAndInvalidNames() {
+    @Test
+    func previewMarksConflictsAndInvalidNames() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "same"
         #expect(session.rows.allSatisfy { $0.status == .duplicate } && session.counts.conflicts == 3)
@@ -116,7 +122,8 @@ import Testing
         #expect(session.rows.allSatisfy { $0.status.isInvalid } && session.counts.errors == 3)
     }
 
-    @Test func previewInTheBackground() async {
+    @Test
+    func previewInTheBackground() async {
         let items = (0..<3_000)
             .map {
                 FileItem(url: memory.addFile("/many/f\($0).txt"), name: "f\($0).txt")
@@ -147,7 +154,8 @@ import Testing
 
     // MARK: Runs
 
-    @Test func renamesAndEmptiesTheList() {
+    @Test
+    func renamesAndEmptiesTheList() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "Photo_[C:2]"
         session.settings.letterCase = .upper
@@ -164,7 +172,8 @@ import Testing
         #expect(RenameStore(settings: settings).history(.nameMask) == ["Photo_[C:2]"])
     }
 
-    @Test func unchangedItemsStayInTheList() {
+    @Test
+    func unchangedItemsStayInTheList() {
         let session = open()
         session.settings.search = "IMG_"
         session.settings.replacement = "pic"
@@ -173,7 +182,8 @@ import Testing
         #expect(session.rows.map(\.entry.name) == ["notes.txt"])
     }
 
-    @Test func resultLog() throws {
+    @Test
+    func resultLog() throws {
         let session = open(["IMG_1001.jpg", "IMG_1002.jpg"])
         session.settings.nameMask = "[C]/pic"
         session.start()
@@ -186,7 +196,8 @@ import Testing
         #expect(ui.log.last == "form: Result list")
     }
 
-    @Test func slashesMoveIntoFoldersThatAreCreated() {
+    @Test
+    func slashesMoveIntoFoldersThatAreCreated() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "[C+1/2]/[N]"
         session.start()
@@ -200,7 +211,8 @@ import Testing
         #expect(photos == ["1", "2", "IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg", "notes.txt"])
     }
 
-    @Test func swapsAndShiftsThroughGivenNames() {
+    @Test
+    func swapsAndShiftsThroughGivenNames() {
         let session = open(["IMG_*"])
         session.loadNames(fromText: "IMG_1002.jpg\r\nIMG_1003.jpg\r\nIMG_1001.jpg\r\n")
         #expect(session.givenNames?.count == 3 && session.rows.allSatisfy { $0.status == .ready })
@@ -222,7 +234,8 @@ import Testing
         #expect(!memory.allPaths.contains { $0.contains("afm-rename") })
     }
 
-    @Test func counterShiftOnTheLocalDisk() throws {
+    @Test
+    func counterShiftOnTheLocalDisk() throws {
         for index in 1...4 { try box.file("A/\(index).txt", "content \(index)") }
         left.show(box.url("A"))
         let session = open()
@@ -239,7 +252,8 @@ import Testing
         #expect(box.read("A/1.txt") == "content 1" && box.read("A/4.txt") == "content 4")
     }
 
-    @Test func swapAndCaseOnlyRenameOnTheLocalDisk() throws {
+    @Test
+    func swapAndCaseOnlyRenameOnTheLocalDisk() throws {
         try box.file("A/one.txt", "1")
         try box.file("A/two.txt", "2")
         try box.file("A/readme.md", "r")
@@ -257,7 +271,8 @@ import Testing
         #expect(box.read("A/one.txt") == "1" && box.read("A/two.txt") == "2")
     }
 
-    @Test func allUppercaseOnTheLocalDisk() throws {
+    @Test
+    func allUppercaseOnTheLocalDisk() throws {
         try box.file("A/a.txt", "a")
         try box.file("A/b.txt", "b")
         left.show(box.url("A"))
@@ -270,7 +285,8 @@ import Testing
 
     // MARK: Conflicts
 
-    @Test func conflictsAreAutoRenamedWhenAsked() {
+    @Test
+    func conflictsAreAutoRenamedWhenAsked() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "notes"
         session.settings.extensionMask = "txt"
@@ -281,7 +297,8 @@ import Testing
         #expect(ui.log.contains { $0.hasPrefix("choose: Name conflict: 3 file(s)") })
     }
 
-    @Test func conflictsCanBeSkippedOrCancelTheRun() {
+    @Test
+    func conflictsCanBeSkippedOrCancelTheRun() {
         let session = open()
         session.settings.search = "IMG_1001.jpg|IMG_1002"
         session.settings.replacement = "notes.txt|pic"
@@ -294,7 +311,8 @@ import Testing
         #expect(session.rows.map(\.entry.name) == ["IMG_1001.jpg", "IMG_1003.jpg", "notes.txt"])
     }
 
-    @Test func aFileThatAppearsMeanwhileIsNotOverwritten() {
+    @Test
+    func aFileThatAppearsMeanwhileIsNotOverwritten() {
         let session = open(["IMG_1001.jpg", "IMG_1002.jpg"])
         session.settings.nameMask = "new[C]"
         // After the preview, behind the tool's back; the run finds it and asks.
@@ -305,7 +323,8 @@ import Testing
         #expect(memory.exists("/photos/IMG_1002.jpg"))
     }
 
-    @Test func failuresAreReportedAndStayInTheList() throws {
+    @Test
+    func failuresAreReportedAndStayInTheList() throws {
         try box.file("A/a.txt", "a")
         try box.file("A/b.txt", "b")
         try box.file("A/keep.txt", "k")
@@ -325,7 +344,8 @@ import Testing
 
     // MARK: Undo
 
-    @Test func undoAsksAndRestoresInReverseOrder() {
+    @Test
+    func undoAsksAndRestoresInReverseOrder() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "Photo_[C]"
         session.start()
@@ -344,7 +364,8 @@ import Testing
         #expect(bench.left.names == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg", "notes.txt"])
     }
 
-    @Test func undoWorksAfterTheToolWasClosedAndKeepsWhatFailed() {
+    @Test
+    func undoWorksAfterTheToolWasClosedAndKeepsWhatFailed() {
         var session = open(["IMG_*"])
         session.settings.nameMask = "a[C]"
         session.start()
@@ -368,7 +389,8 @@ import Testing
         #expect(ui.log.contains("inform: 1 file(s) could not be renamed back!"))
     }
 
-    @Test func undoHistoryIsLimited() {
+    @Test
+    func undoHistoryIsLimited() {
         settings.set("2", forKey: RenameStore.undoLimitKey)
         for round in 1...3 {
             let session = open(["notes*"])
@@ -385,7 +407,8 @@ import Testing
 
     // MARK: The list
 
-    @Test func orderDrivesTheCounter() {
+    @Test
+    func orderDrivesTheCounter() {
         let session = open()
         session.settings.nameMask = "[C]"
         #expect(names(session) == ["1.jpg", "2.jpg", "3.jpg", "4.txt"])
@@ -420,7 +443,8 @@ import Testing
         )
     }
 
-    @Test func nextStepChainsRules() {
+    @Test
+    func nextStepChainsRules() {
         let session = open(["IMG_*"])
         session.settings.search = "IMG_"
         session.settings.replacement = "holiday "
@@ -434,7 +458,8 @@ import Testing
         #expect(photos == ["Holiday-1.jpg", "Holiday-2.jpg", "Holiday-3.jpg", "notes.txt"])
     }
 
-    @Test func editNamesAndLoadNamesFromAFile() throws {
+    @Test
+    func editNamesAndLoadNamesFromAFile() throws {
         let session = open(["IMG_*"])
         session.settings.nameMask = "[N]x"
         ui.formAnswers = [.values(["names": .text("first.jpg\nsecond.jpg")])]
@@ -468,7 +493,8 @@ import Testing
 
     // MARK: Settings
 
-    @Test func savedSettings() {
+    @Test
+    func savedSettings() {
         var session = open(["IMG_*"])
         session.settings.nameMask = "[N]_[C]"
         session.settings.regularExpression = true
@@ -498,7 +524,8 @@ import Testing
         #expect(open(["IMG_*"]).settings.regularExpression)
     }
 
-    @Test func historiesAndTitleWords() {
+    @Test
+    func historiesAndTitleWords() {
         let store = RenameStore(settings: settings)
         store.remember(" a", in: .search)
         store.remember("b", in: .search)
@@ -520,8 +547,11 @@ import Testing
 }
 
 /// The window itself: built without being shown, to see that it holds together.
-@MainActor @Suite struct MultiRenameWindow {
-    @Test func windowShowsTheSessionAndFollowsIt() throws {
+@MainActor
+@Suite
+struct MultiRenameWindow {
+    @Test
+    func windowShowsTheSessionAndFollowsIt() throws {
         _ = NSApplication.shared
         let memory = MemoryFileSystem()
         memory.addFile("/w/a.txt")

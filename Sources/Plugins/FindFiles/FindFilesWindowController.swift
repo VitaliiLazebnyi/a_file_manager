@@ -351,11 +351,13 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
 
     var isSearching: Bool { search != nil }
 
-    @objc private func startPressed() {
+    @objc
+    private func startPressed() {
         if !isSearching { startSearch() }
     }
 
-    @objc private func cancelPressed() {
+    @objc
+    private func cancelPressed() {
         if isSearching { cancelSearch() } else { close() }
     }
 
@@ -510,7 +512,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
             /// that follows reports under the lock of `DuplicateFinder`.
             nonisolated(unsafe) var lastReport = Date.distantPast
             /// Whether a tenth of a second has passed since the status line last changed: if so, it changes now.
-            @Sendable func isDue() -> Bool {
+            @Sendable
+            func isDue() -> Bool {
                 guard Date().timeIntervalSince(lastReport) > 0.1 else {
                     return false
                 }
@@ -724,7 +727,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         updateButtons()
     }
 
-    @objc private func showEarlier() {
+    @objc
+    private func showEarlier() {
         guard !isSearching, earlierIndex > 0 else {
             return
         }
@@ -732,7 +736,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         show(earlier[earlierIndex])
     }
 
-    @objc private func showLater() {
+    @objc
+    private func showLater() {
         guard !isSearching, earlierIndex < earlier.count - 1 else {
             return
         }
@@ -741,7 +746,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     }
 
     /// New search: empties the list and goes back to the form.
-    @objc func newSearch() {
+    @objc
+    func newSearch() {
         guard !isSearching else {
             return
         }
@@ -756,7 +762,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// a new tab.
     ///
     /// A single result is taken even when it is not the selected line.
-    @objc func goToFile() {
+    @objc
+    func goToFile() {
         guard let url = selectedResult ?? (resultURLs.count == 1 ? resultURLs[0] : nil) else {
             return
         }
@@ -769,7 +776,8 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// plugin shows file lists as folders (spec 09 › Feed to listbox); with Shift in a new tab.
     ///
     /// The window closes and does not keep these results.
-    @objc func feedToListbox() {
+    @objc
+    func feedToListbox() {
         let urls = resultURLs
         guard !isSearching, !urls.isEmpty, let lists = kernel.services.find((any FileListService).self) else {
             return
@@ -784,11 +792,13 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         (earlier, earlierIndex) = ([], 0)
     }
 
-    @objc private func viewResult() {
+    @objc
+    private func viewResult() {
         if let url = selectedResult { kernel.commands.perform(.view, .location(url)) }
     }
 
-    @objc private func editResult() {
+    @objc
+    private func editResult() {
         if let url = selectedResult { kernel.commands.perform(.edit, .location(url)) }
     }
 

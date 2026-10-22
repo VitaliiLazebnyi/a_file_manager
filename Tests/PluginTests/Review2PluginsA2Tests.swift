@@ -22,7 +22,9 @@ import Testing
 
 // MARK: Selection
 
-@MainActor @Suite struct Review2PluginsA2Selection {
+@MainActor
+@Suite
+struct Review2PluginsA2Selection {
     typealias Ids = SelectionCommands
 
     let memory = MemoryFileSystem()
@@ -43,7 +45,8 @@ import Testing
         while !condition(), Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
     }
 
-    @Test func theByteMatcherGivesTheAnswersOfTheCharacterMatcher() {
+    @Test
+    func theByteMatcherGivesTheAnswersOfTheCharacterMatcher() {
         let patterns = ["*.txt", "*.*", "a*", "a?c", "*", "name.", "name.*", "?", "*a*b*", "ab", "A*Z", "é*", "*\r*"]
         let names = [
             "a.txt", "A.TXT", "abc", "ABC", "name", "name.", "name.x", "x", "", "ab", "aXb", "Az", "é", "éa", "a\r\nb",
@@ -69,7 +72,8 @@ import Testing
         )
     }
 
-    @Test func aListThatChangesWhileAMaskIsWorkedOutGetsTheMaskAfterwards() async {
+    @Test
+    func aListThatChangesWhileAMaskIsWorkedOutGetsTheMaskAfterwards() async {
         memory.addFile("/A/alpha.txt")
         let bench = makeBench(background: true)
         bench.left.show(memory.url("/A"), focus: nil, history: .keep, completion: nil)
@@ -81,7 +85,8 @@ import Testing
         #expect(bench.left.model.selection == ["alpha.txt", "alpine.txt"])
     }
 
-    @Test func aPanelThatGoesToAnotherFolderMeanwhileDropsTheResult() async {
+    @Test
+    func aPanelThatGoesToAnotherFolderMeanwhileDropsTheResult() async {
         memory.addFile("/A/alpha.txt")
         memory.addFile("/B/alpha.txt")
         let bench = makeBench(background: true)
@@ -92,7 +97,8 @@ import Testing
         #expect(bench.left.model.selectionCount == 0)
     }
 
-    @Test func selectingFilesOnlyAndInvertingThemLeavesTheFoldersAlone() {
+    @Test
+    func selectingFilesOnlyAndInvertingThemLeavesTheFoldersAlone() {
         for name in ["a.txt", "b.txt", "c.txt"] { memory.addFile("/A/" + name) }
         memory.addDirectory("/A/dir1")
         memory.addDirectory("/A/dir2")
@@ -110,7 +116,8 @@ import Testing
         #expect(model.selection == ["dir1", "dir2"])
     }
 
-    @Test func aStepSelectsEveryNthLineFromTheCursor() {
+    @Test
+    func aStepSelectsEveryNthLineFromTheCursor() {
         for name in ["a", "b", "c", "d", "e", "f"] { memory.addFile("/A/\(name).txt") }
         let bench = makeBench(background: false)
         let model = bench.left.model
@@ -123,7 +130,8 @@ import Testing
         #expect(model.selection == ["e.txt", "c.txt", "a.txt"])
     }
 
-    @Test func aLongListIsMarkedByTheModelsBulkCallsWithoutBlocking() async {
+    @Test
+    func aLongListIsMarkedByTheModelsBulkCallsWithoutBlocking() async {
         for index in 0..<(Selections.longList + 100) { memory.addFile("/A/f\(index).txt") }
         for index in 0..<50 { memory.addFile("/A/g\(index).md") }
         let bench = makeBench(background: true)
@@ -150,7 +158,8 @@ import Testing
         #expect(model.selectionCount == 50)
     }
 
-    @Test func theEntryWrittenLikeALineIsTheOneThatIsMarked() async {
+    @Test
+    func theEntryWrittenLikeALineIsTheOneThatIsMarked() async {
         let composed = "\u{E9}.txt"
         let decomposed = "e\u{301}.txt"
         memory.addFile("/A/" + composed)
@@ -165,7 +174,8 @@ import Testing
         #expect(bench.left.model.selectedNames.first?.utf8.elementsEqual(decomposed.utf8) == true)
     }
 
-    @Test func theIndexedComparisonIsTheComparisonByName() {
+    @Test
+    func theIndexedComparisonIsTheComparisonByName() {
         func file(_ name: String, size: Int64 = 1, seconds: TimeInterval = 0, folder: Bool = false) -> FileItem {
             FileItem(
                 url: URL(fileURLWithPath: "/x/" + name),
@@ -209,7 +219,8 @@ import Testing
         #expect(cancelled.left.isEmpty && cancelled.sameLeft.count < many.count)
     }
 
-    @Test func markNewerLeavesTheSameFilesOutAndMarksTheRest() async {
+    @Test
+    func markNewerLeavesTheSameFilesOutAndMarksTheRest() async {
         memory.addFile("/A/same.txt", "1", modified: Date(timeIntervalSince1970: 10))
         memory.addFile("/B/same.txt", "1", modified: Date(timeIntervalSince1970: 10))
         memory.addFile("/A/newer.txt", "1", modified: Date(timeIntervalSince1970: 500))
@@ -237,7 +248,9 @@ import Testing
 
 // MARK: ViewOptions
 
-@MainActor @Suite struct Review2PluginsA2ViewOptions {
+@MainActor
+@Suite
+struct Review2PluginsA2ViewOptions {
     /// Unchecked: used on the main thread only; the plugin hands its steps over there and the
     /// test runs them there.
     final class Steps: @unchecked Sendable {
@@ -250,7 +263,8 @@ import Testing
             work.forEach { $0() }
         }
 
-        @MainActor func runMain() {
+        @MainActor
+        func runMain() {
             let work = main
             main = []
             work.forEach { $0() }
@@ -274,7 +288,8 @@ import Testing
         plugin.onMain = { [steps] in steps.main.append($0) }
     }
 
-    @Test func aFolderThatChangesWhileItIsSortedGetsTheOrderWithItsReading() {
+    @Test
+    func aFolderThatChangesWhileItIsSortedGetsTheOrderWithItsReading() {
         bench.commands.perform(.sortBySize)
         // The wish is the model's; the list is sorted in the background.
         #expect(steps.background.count == 1 && model.sort.key == .name && model.requestedSort?.key == .size)
@@ -297,7 +312,8 @@ import Testing
         #expect(model.items.contains { $0.name == "new.txt" })
     }
 
-    @Test func aChangeThatBringsNoListLeavesTheSortToTheBackgroundAgain() {
+    @Test
+    func aChangeThatBringsNoListLeavesTheSortToTheBackgroundAgain() {
         bench.commands.perform(.sortBySize)
         // Another filter while the list is sorted: the result is stale, and no reading brought the order.
         model.setFilter(.mask("*.txt"))
@@ -316,7 +332,8 @@ import Testing
         )
     }
 
-    @Test func aWishForAnOrderSurvivesAListThatArrivesBeforeItIsMet() {
+    @Test
+    func aWishForAnOrderSurvivesAListThatArrivesBeforeItIsMet() {
         bench.commands.perform(.sortByTime)
         bench.commands.perform(.reversedOrder)
         // The second command starts from the order that was asked for, not from the one the panel has.
@@ -331,7 +348,8 @@ import Testing
         )
     }
 
-    @Test func unsortedAfterAnotherKeyReadsTheFolderAgain() {
+    @Test
+    func unsortedAfterAnotherKeyReadsTheFolderAgain() {
         let small = MemoryFileSystem()
         small.addFile("/S/zebra.txt")
         small.addFile("/S/apple.txt")
@@ -350,7 +368,8 @@ import Testing
         #expect(bench.left.model.sort.key == .unsorted && bench.left.names == arrival)
     }
 
-    @Test func onlySelectedFilesTakesTheNamesInTheBackground() {
+    @Test
+    func onlySelectedFilesTakesTheNamesInTheBackground() {
         model.setSelected(true, names: ["f1.txt", "f3.txt"])
         bench.commands.perform(ViewOptionsPlugin.onlySelected)
         #expect(steps.background.count == 1 && model.filter == nil)
@@ -362,7 +381,8 @@ import Testing
 
 // MARK: Configuration, SystemTools
 
-@Suite struct Review2PluginsA2Configuration {
+@Suite
+struct Review2PluginsA2Configuration {
     let context = ExpansionContext(
         left: PanelSnapshot(path: "/A dir/", cursorName: "my file.txt", selection: ["a.txt", "b\u{2028}c.txt"]),
         right: PanelSnapshot(path: "/B/", cursorName: "other.md"),
@@ -370,7 +390,8 @@ import Testing
         listName: "test"
     )
 
-    @Test func aSubstringOfTheLargestLengthDoesNotTrap() {
+    @Test
+    func aSubstringOfTheLargestLengthDoesNotTrap() {
         // The reproducer of the fuzzer (`pexpand-substring-length-overflow.bin`) and the same words by hand.
         let repro = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Fuzz/repro/misc/pexpand-substring-length-overflow.bin")
@@ -389,13 +410,15 @@ import Testing
         )
     }
 
-    @Test func aNameWithAnyKindOfLineEndIsNotPassedInAListFile() {
+    @Test
+    func aNameWithAnyKindOfLineEndIsNotPassedInAListFile() {
         // U+2028 ends a line for the programs that read the list with `splitlines`.
         let expanded = ParameterExpander(context: context).expand("%L")
         #expect(expanded.problem != nil)
     }
 
-    @Test func aUserCommandIsFoundByNameWithoutSearching() {
+    @Test
+    func aUserCommandIsFoundByNameWithoutSearching() {
         let settings = MemorySettings()
         let store = ConfigurationStore(settings: settings)
         var commands: [UserCommand] = []
@@ -418,8 +441,11 @@ import Testing
     }
 }
 
-@MainActor @Suite struct Review2PluginsA2SystemTools {
-    @Test func theLongestLineIsMeasuredWithoutCuttingEveryLineIntoCharacters() {
+@MainActor
+@Suite
+struct Review2PluginsA2SystemTools {
+    @Test
+    func theLongestLineIsMeasuredWithoutCuttingEveryLineIntoCharacters() {
         let pages = [[String(repeating: "e\u{301}", count: 40), "short"], ["x"]]
         let view = PagePrintView(pages: pages, linesPerPage: 60, printInfo: NSPrintInfo())
         var range = NSRange()
@@ -429,11 +455,13 @@ import Testing
 
 // MARK: Places
 
-@Suite struct Review2PluginsA2Places {
+@Suite
+struct Review2PluginsA2Places {
     let box = try! Sandbox()
     let root = URL(fileURLWithPath: "/tmp/tree-root/", isDirectory: true)
 
-    @Test func theHotlistLimitHoldsForWhatIsStored() throws {
+    @Test
+    func theHotlistLimitHoldsForWhatIsStored() throws {
         var hotlist = Hotlist()
         for index in 0..<(Hotlist.limit + 25) { hotlist.entries.append(.item("t\(index)", command: "cd /x\(index)")) }
         let data = try JSONEncoder().encode(hotlist)
@@ -456,7 +484,8 @@ import Testing
         #expect(reloaded.count == Hotlist.limit && reloaded.entries.count == 1)
     }
 
-    @Test func aFolderNotedLaterShowsAsNotReadYet() {
+    @Test
+    func aFolderNotedLaterShowsAsNotReadYet() {
         let cache = TreeCache(directory: nil)
         cache.store(["a", "b"], for: root)
         cache.noteFolder("a/new/deeper", below: root)
@@ -468,7 +497,8 @@ import Testing
         #expect(tree.node(at: "a/new/deeper")?.isScanned == false && tree.node(at: "b")?.isScanned == true)
     }
 
-    @Test func namesThatBeginWithACombiningMarkComeBackFromTheFile() {
+    @Test
+    func namesThatBeginWithACombiningMarkComeBackFromTheFile() {
         let paths = ["\u{301}start", "dir", "dir/\u{301}inside", "dir/\u{0300}\u{0301}x", "plain"]
         let cache = TreeCache(directory: box.url("cache"))
         cache.store(paths, unscanned: ["\u{301}start"], for: root)
@@ -483,7 +513,8 @@ import Testing
         #expect(tree.node(at: "dir/\u{301}inside") != nil && tree.count == 5)
     }
 
-    @Test func aTreeOfManyFoldersIsWrittenInPiecesForTheUserAlone() throws {
+    @Test
+    func aTreeOfManyFoldersIsWrittenInPiecesForTheUserAlone() throws {
         let paths = (0..<300_000).map { "folder-\($0)" }
         let cache = TreeCache(directory: box.url("big"))
         cache.store(paths, for: root)
@@ -494,7 +525,8 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: file.path + ".tmp\(getpid())"))
     }
 
-    @Test func aHugeSetOfTreesInMemoryIsTrimmedByTheNumberOfFolders() {
+    @Test
+    func aHugeSetOfTreesInMemoryIsTrimmedByTheNumberOfFolders() {
         let cache = TreeCache(directory: box.url("many"))
         for index in 0..<4 {
             cache.store(
@@ -508,7 +540,8 @@ import Testing
         }
     }
 
-    @Test func aFolderMadeMeanwhileIsNotLinkedTwiceAndKeepsItsNode() throws {
+    @Test
+    func aFolderMadeMeanwhileIsNotLinkedTwiceAndKeepsItsNode() throws {
         let tree = DirectoryTree(rootURL: root)
         let names = (0..<100).map { "a\($0)" }
         let nodes = DirectoryTree.makeNodes(names)
@@ -536,7 +569,8 @@ import Testing
         #expect(tree2.root.children.map(\.name) == ["x1", "x2", "x3"] && tree2.count == 3)
     }
 
-    @Test func aFolderThatHadChildrenIsRebuiltInTurnsOfLimitedSize() throws {
+    @Test
+    func aFolderThatHadChildrenIsRebuiltInTurnsOfLimitedSize() throws {
         let tree = DirectoryTree(rootURL: root)
         // The way to the folder the window opened is made beforehand, with a stale child.
         let chain = try #require(tree.node(at: "mid/x", creating: true))
@@ -568,15 +602,18 @@ extension TreeNode {
 
 // MARK: Navigation, VirtualFolders
 
-@Suite struct Review2PluginsA2Lists {
-    @Test func aPathIsTakenFromTheStartOfAVeryLongClipboardLine() {
+@Suite
+struct Review2PluginsA2Lists {
+    @Test
+    func aPathIsTakenFromTheStartOfAVeryLongClipboardLine() {
         let long = "/Users/me/Documents" + String(repeating: "x", count: 5_000_000)
         let path = NavigationPlugin.path(fromClipboard: long)
         #expect(path?.hasPrefix("/Users/me/Documents") == true && (path?.utf8.count ?? .max) <= 8_192)
         #expect(NavigationPlugin.path(fromClipboard: "\n\n  \"/a b\"  \nsecond") == "/a b")
     }
 
-    @Test func aListThatIsKnownToBeUniqueIsNotLookedThroughForDoubles() {
+    @Test
+    func aListThatIsKnownToBeUniqueIsNotLookedThroughForDoubles() {
         let fileSystems = FileSystemRegistry()
         let memory = MemoryFileSystem()
         fileSystems.register(memory)
@@ -591,8 +628,10 @@ extension TreeNode {
 
 // MARK: Find Files
 
-@Suite struct Review2PluginsA2Find {
-    @Test func aFolderOfManyFilesReportsItsFirstHitBeforeTheListingEnds() {
+@Suite
+struct Review2PluginsA2Find {
+    @Test
+    func aFolderOfManyFilesReportsItsFirstHitBeforeTheListingEnds() {
         let (fileSystems, memory) = makeFileSystems()
         for index in 0..<60 { memory.addFile(String(format: "/huge/f%02d.txt", index)) }
         memory.listBatchSize = 10
@@ -625,7 +664,8 @@ extension TreeNode {
         #expect(found == found.sorted())
     }
 
-    @Test func aFolderListedInPartsStillGivesEveryHitOfTheTestsInOrderOfParts() {
+    @Test
+    func aFolderListedInPartsStillGivesEveryHitOfTheTestsInOrderOfParts() {
         let (fileSystems, memory) = makeFileSystems()
         for index in 0..<45 { memory.addFile(String(format: "/parts/%@%02d.txt", index % 2 == 0 ? "a" : "b", index)) }
         memory.listBatchSize = 7
@@ -640,7 +680,8 @@ extension TreeNode {
         )
     }
 
-    @Test func oneShareMountedTwiceIsOnePlace() {
+    @Test
+    func oneShareMountedTwiceIsOnePlace() {
         let first = DuplicateFinder.Mount(from: "smbfs://me@server/share", on: "/Volumes/share")
         let second = DuplicateFinder.Mount(from: "smbfs://me@server/share", on: "/Volumes/share-1")
         #expect(first.place(of: "/Volumes/share/docs/a.txt") == second.place(of: "/Volumes/share-1/docs/a.txt"))
@@ -652,8 +693,10 @@ extension TreeNode {
 
 // MARK: Multi-Rename
 
-@Suite struct Review2PluginsA2Rename {
-    @Test func aPlanThatIsCancelledIsCutShort() {
+@Suite
+struct Review2PluginsA2Rename {
+    @Test
+    func aPlanThatIsCancelledIsCutShort() {
         let sources = (0..<40_000).map { URL(fileURLWithPath: "/x/f\($0).txt") }
         let targets: [URL?] = (0..<40_000).map { URL(fileURLWithPath: "/x/g\($0).txt") }
         let planner = RenamePlanner()
@@ -671,7 +714,8 @@ extension TreeNode {
         #expect(part.count < 40_000)
     }
 
-    @Test func aRingOfRenamesIsStillOpenedWithATemporaryName() {
+    @Test
+    func aRingOfRenamesIsStillOpenedWithATemporaryName() {
         let sources = ["1", "2", "3"].map { URL(fileURLWithPath: "/x/\($0).txt") }
         let targets: [URL?] = ["2", "3", "1"].map { URL(fileURLWithPath: "/x/\($0).txt") }
         let steps = RenamePlanner().steps(sources: sources, targets: targets)
@@ -681,7 +725,8 @@ extension TreeNode {
         )
     }
 
-    @Test func theFuzzerReproducersOfTheRenameMasksEnd() {
+    @Test
+    func theFuzzerReproducersOfTheRenameMasksEnd() {
         // `renamemask-wildcard-backtracking.bin` and `renameregex-catastrophic.bin`: the text after the
         // choice bytes is name mask, extension mask, search, replacement and the name, one to a line.
         let directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -720,7 +765,8 @@ extension TreeNode {
         }
     }
 
-    @Test func twoFilesAreTheSameFileOnlyWhenNothingElseCouldBeMeant() throws {
+    @Test
+    func twoFilesAreTheSameFileOnlyWhenNothingElseCouldBeMeant() throws {
         let box = try Sandbox()
         let one = try box.file("one.txt")
         let other = try box.file("other.txt")

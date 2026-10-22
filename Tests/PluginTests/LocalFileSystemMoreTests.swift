@@ -5,10 +5,12 @@ import TestSupport
 import Testing
 
 /// What the local file system keeps when it copies, and what it tells about its surroundings.
-@Suite struct LocalDiskExtras {
+@Suite
+struct LocalDiskExtras {
     let local = LocalFileSystem()
 
-    @Test func aCopyKeepsCreationDateExtendedAttributesAndFlags() throws {
+    @Test
+    func aCopyKeepsCreationDateExtendedAttributesAndFlags() throws {
         let box = try Sandbox()
         var source = try box.file("a.txt", "content", modified: Date(timeIntervalSince1970: 1_700_000_000))
         var values = URLResourceValues()
@@ -30,7 +32,8 @@ import Testing
         #expect(throws: (any Error).self) { try local.copy(source, to: box.url("b.txt")) { _ in true } }
     }
 
-    @Test func makingALockedFileWritableUnlocksIt() throws {
+    @Test
+    func makingALockedFileWritableUnlocksIt() throws {
         let box = try Sandbox()
         let file = try box.file("locked.txt", "l")
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: file.path)
@@ -45,7 +48,8 @@ import Testing
         #expect(!box.exists("locked.txt"))
     }
 
-    @Test func volumesAreFoundAlsoForPlacesThatDoNotExistYet() throws {
+    @Test
+    func volumesAreFoundAlsoForPlacesThatDoNotExistYet() throws {
         let box = try Sandbox()
         let here = try #require(local.volume(of: box.root))
         #expect(
@@ -59,7 +63,8 @@ import Testing
         #expect(local.volume(of: URL(fileURLWithPath: "/"))?.isLocal == true)
     }
 
-    @Test func placesListTheUsualFoldersAndTheVolumes() {
+    @Test
+    func placesListTheUsualFoldersAndTheVolumes() {
         let places = local.settledPlaces()
         #expect(places.first?.kind == .home && places.first?.name == "Home")
         let names = places.map(\.name)

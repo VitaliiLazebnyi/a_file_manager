@@ -202,7 +202,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
     return found
 }
 
-@Suite struct ArchiveFormats {
+@Suite
+struct ArchiveFormats {
     let bench: ArchiveBench
     var box: Sandbox { bench.box }
 
@@ -281,7 +282,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(!box.exists("tree." + format.defaultExtension))
     }
 
-    @Test func aLargeArchiveIsStreamedInsteadOfUnpackedToATemporaryFile() throws {
+    @Test
+    func aLargeArchiveIsStreamedInsteadOfUnpackedToATemporaryFile() throws {
         let tree = try bench.makeTree()
         let archive = box.url("tree.tar.gz")
         try bench.pack([tree], to: archive) { $0.format = .compressedTar(.gzip) }
@@ -313,7 +315,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
 
     // MARK: The system's tools
 
-    @Test func systemToolsReadWhatIsWritten() throws {
+    @Test
+    func systemToolsReadWhatIsWritten() throws {
         let tree = try bench.makeTree()
         let expected = snapshot(tree)
 
@@ -349,7 +352,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(try Data(contentsOf: box.url("copy.log")) == Data(contentsOf: big))
     }
 
-    @Test func archivesOfTheSystemToolsAreRead() throws {
+    @Test
+    func archivesOfTheSystemToolsAreRead() throws {
         let tree = try bench.makeTree()
         try FileManager.default.createSymbolicLink(
             atPath: tree.appendingPathComponent("link").path,
@@ -429,7 +433,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
 
     // MARK: ZIP details
 
-    @Test func zip64IsUsedExactlyWhereTheClassicFieldsEnd() throws {
+    @Test
+    func zip64IsUsedExactlyWhereTheClassicFieldsEnd() throws {
         // The rule itself, at the real limits.
         let limits = ZipLimits.standard
         #expect(limits.maxField == 0xFFFF_FFFE && limits.maxEntries == 0xFFFE)
@@ -484,7 +489,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(try bench.names(bench.inside(large.url)) == ["file0.txt", "file2.txt"])
     }
 
-    @Test func aHugeNumberOfEntriesIsListedFromTheDirectoryAlone() throws {
+    @Test
+    func aHugeNumberOfEntriesIsListedFromTheDirectoryAlone() throws {
         // More members than the classic end record can count: a real ZIP64 archive.
         let count = 70_000
         let url = box.url("many.zip")
@@ -519,7 +525,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(listed.status == 0 && listed.output.split(separator: "\n").count == count)
     }
 
-    @Test func encryptedZipsAskForThePassword() throws {
+    @Test
+    func encryptedZipsAskForThePassword() throws {
         let tree = try bench.makeTree()
         #expect(runTool("/usr/bin/zip", ["-qr", "-P", "sesame", "locked.zip", "tree"], in: box.root).status == 0)
         let locked = box.url("locked.zip")
@@ -570,7 +577,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         }
     }
 
-    @Test func aDamagedMemberIsFoundByTheTest() throws {
+    @Test
+    func aDamagedMemberIsFoundByTheTest() throws {
         let tree = try bench.makeTree()
         let archive = box.url("tree.zip")
         try bench.pack([tree], to: archive) { $0.level = 0 }
@@ -616,7 +624,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(throws: ArchiveError.self) { try bench.store.archive(at: box.url("tree.tar")) }
     }
 
-    @Test func namesDatesAndAttributesOfForeignZips() throws {
+    @Test
+    func namesDatesAndAttributesOfForeignZips() throws {
         // A ZIP as a DOS program writes it: backslashes, DOS attributes, a code-page name.
         let url = box.url("dos.zip")
         let output = try OutputFile(creating: url)
@@ -653,7 +662,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(runTool("/usr/bin/unzip", ["-z", url.path]).output.contains("a comment"))
     }
 
-    @Test func tarHeadersCarryLongNamesAndLargeSizes() throws {
+    @Test
+    func tarHeadersCarryLongNamesAndLargeSizes() throws {
         var header = TarHeader(
             path: "short.txt",
             size: 5,
@@ -685,7 +695,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         )
     }
 
-    @Test func parallelCompressionGivesOneValidStream() throws {
+    @Test
+    func parallelCompressionGivesOneValidStream() throws {
         // Enough data for several pieces per window, ending exactly on a piece boundary.
         var data = Data()
         var line = 0
@@ -725,7 +736,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(CRC32.of(Data("123456789".utf8)) == 0xCBF4_3926)
     }
 
-    @Test func aFileLargerThanOneWindowOfPiecesIsPackedInSeveralRounds() throws {
+    @Test
+    func aFileLargerThanOneWindowOfPiecesIsPackedInSeveralRounds() throws {
         // More than the compressors hold before they write: the member stays open across rounds.
         let megabytes = ProcessInfo.processInfo.activeProcessorCount * 2 + 3
         var block = Data()
@@ -767,7 +779,8 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         #expect(bench.monitor.reports.last?.bytesDone == Int64(megabytes << 20 + 4))
     }
 
-    @Test func aChildProcessIsStoppedWhenItsStreamIsClosed() throws {
+    @Test
+    func aChildProcessIsStoppedWhenItsStreamIsClosed() throws {
         let tree = try bench.makeTree()
         try bench.pack([tree], to: box.url("tree.tar.bz2")) { $0.format = .compressedTar(.bzip2) }
         let stream = try ProcessStream(Tool.bzip2, ["-dc", "--", box.url("tree.tar.bz2").path])

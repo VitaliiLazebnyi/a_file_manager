@@ -15,7 +15,9 @@ final class IntegrationConsent: ServerConsentService {
     func userChose(_ location: URL) { chosen.append(location) }
 }
 
-@MainActor @Suite struct Review2IntegrationTypedAddresses {
+@MainActor
+@Suite
+struct Review2IntegrationTypedAddresses {
     let memory = MemoryFileSystem()
     let server = MemoryFileSystem(scheme: "srv")
     let consent = IntegrationConsent()
@@ -34,7 +36,8 @@ final class IntegrationConsent: ServerConsentService {
         bench.kernel.services.register((any ServerConsentService).self, consent)
     }
 
-    @Test func onlyTextWithAnAddressThatWasNotTheProposalIsReported() {
+    @Test
+    func onlyTextWithAnAddressThatWasNotTheProposalIsReported() {
         let base = memory.url("/A")
         // An ordinary path, relative or not, is no address.
         bench.kernel.userTyped(location: "sub/folder", relativeTo: base)
@@ -47,7 +50,8 @@ final class IntegrationConsent: ServerConsentService {
         #expect(consent.chosen.map(\.scheme) == ["srv"])
     }
 
-    @Test func aTargetTypedIntoTheCopyDialogIsTheUsersOwnChoice() {
+    @Test
+    func aTargetTypedIntoTheCopyDialogIsTheUsersOwnChoice() {
         bench.left.moveCursor(toName: "one.txt")
         bench.interaction.promptAnswers = [.text("srv://in/")]
         bench.commands.perform(.copy)
@@ -55,7 +59,8 @@ final class IntegrationConsent: ServerConsentService {
         #expect(server.contents("/in/one.txt") == "one")
     }
 
-    @Test func aProposedTargetThatIsLeftAsItIsWasNotTyped() {
+    @Test
+    func aProposedTargetThatIsLeftAsItIsWasNotTyped() {
         // The other panel shows a place on the server (say, a tab that a file restored).
         bench.right.show(server.url("/in"))
         bench.left.moveCursor(toName: "one.txt")
@@ -69,8 +74,11 @@ final class IntegrationConsent: ServerConsentService {
 // A list of files from anywhere says that its entries can only be removed (`.removeOnly`,
 // fileops request 12): the commands that make something new in the panel's folder are
 // withheld there, and Delete is not.
-@MainActor @Suite struct Review2IntegrationLists {
-    @Test func nothingNewIsOfferedInAListOfFilesAndDeleteIs() {
+@MainActor
+@Suite
+struct Review2IntegrationLists {
+    @Test
+    func nothingNewIsOfferedInAListOfFilesAndDeleteIs() {
         let memory = MemoryFileSystem()
         memory.addFile("/A/one.txt", "one")
         memory.addFile("/A/two.txt", "two")

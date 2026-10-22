@@ -6,9 +6,12 @@ import Testing
 @testable import DirectorySyncPlugin
 
 /// What Synchronize directories keeps in the settings, when part of it cannot be read.
-@MainActor @Suite struct CoverageSyncSettings {
+@MainActor
+@Suite
+struct CoverageSyncSettings {
     /// A saved set without its options (written by another version) is left out; the others load.
-    @Test func aDamagedSetLeavesTheOthers() {
+    @Test
+    func aDamagedSetLeavesTheOthers() {
         let settings = MemorySettings()
         SettingsJSON.store(
             #"""

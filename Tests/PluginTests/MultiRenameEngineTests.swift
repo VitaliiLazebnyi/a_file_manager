@@ -6,7 +6,8 @@ import Testing
 
 /// The placeholder language, Search & Replace, the case conversions and the planner of the
 /// Multi-Rename Tool, without any file system.
-@Suite struct MultiRenameEngine {
+@Suite
+struct MultiRenameEngine {
     /// 2025-12-01 10:05:09.250 UTC.
     static let date = Date(timeIntervalSince1970: 1_764_583_509.25)
 
@@ -51,7 +52,8 @@ import Testing
 
     // MARK: Masks
 
-    @Test func literalsAndBrackets() {
+    @Test
+    func literalsAndBrackets() {
         #expect(name("[N]") == "IMG_1001.jpg")
         #expect(part("Photo") == "Photo")
         #expect(part("a[[]b[]]c") == "a[b]c")
@@ -62,7 +64,8 @@ import Testing
         #expect(part("[S]") == "4711")
     }
 
-    @Test func invalidPlaceholdersGiveAnError() {
+    @Test
+    func invalidPlaceholdersGiveAnError() {
         #expect(part("[Q]") == nil)
         #expect(part("[N") == nil)
         #expect(part("[]") == nil)
@@ -83,7 +86,8 @@ import Testing
         #expect(part(mask, RenameSubject(name: "abcdefghi.txt")) == expected)
     }
 
-    @Test func rangePadding() {
+    @Test
+    func rangePadding() {
         let short = RenameSubject(name: "abc.txt")
         #expect(part("[N02-9]", short) == "000000bc")
         #expect(part("[N 2-9]", short) == "      bc")
@@ -92,11 +96,13 @@ import Testing
         #expect(part("[A5-]", short) == "txt")
     }
 
-    @Test func rangesCountCharactersNotBytes() {
+    @Test
+    func rangesCountCharactersNotBytes() {
         #expect(part("[N2-3]", RenameSubject(name: "a😀éz.txt")) == "😀é")
     }
 
-    @Test func pathParts() {
+    @Test
+    func pathParts() {
         #expect(part("[P]") == "photos")
         #expect(part("[G]") == "work")
         #expect(part("[P1-3]") == "pho")
@@ -107,7 +113,8 @@ import Testing
         #expect(part("[-12-]") == "IMG_1001.jpg")
     }
 
-    @Test func foldersAndTheFolderDotSwitch() {
+    @Test
+    func foldersAndTheFolderDotSwitch() {
         let folder = RenameSubject(name: "release.v2", isFolder: true)
         #expect(name("[N]", ext: "[E]", folder) == "release.v2")
         #expect(name("[N]_x", ext: "[E]", folder) == "release_x.v2")
@@ -118,7 +125,8 @@ import Testing
         #expect(part("[N]", RenameSubject(name: ".zshrc")) == ".zshrc")
     }
 
-    @Test func counters() {
+    @Test
+    func counters() {
         #expect((0..<3).map { part("[C]", index: $0) } == ["1", "2", "3"])
         #expect((0..<3).map { part("[C10+5:3]", index: $0) } == ["010", "015", "020"])
         #expect(part("[C10]", index: 2) == "12")
@@ -133,7 +141,8 @@ import Testing
         #expect(part("File [C] of [c]", index: 4) == "File 5 of 12")
     }
 
-    @Test func definedCounter() {
+    @Test
+    func definedCounter() {
         func counted(_ mask: String, _ counter: CounterDefinition, index: Int) -> String? {
             name(mask, ext: "", index: index) { $0.counter = counter }
         }
@@ -152,7 +161,8 @@ import Testing
         #expect(counted("[C3]", definition, index: 1) == "4")
     }
 
-    @Test func dateAndTime() {
+    @Test
+    func dateAndTime() {
         #expect(part("[YMD]_[hms]") == "20251201_100509")
         #expect(part("[Y]-[M]-[D] [h].[m].[s].[v]") == "2025-12-01 10.05.09.250")
         #expect(part("[y][H][i][i1]") == "2510ama")
@@ -163,7 +173,8 @@ import Testing
         #expect(part("[H]", RenameSubject(name: "a", modified: Date(timeIntervalSince1970: 0))) == "12")
     }
 
-    @Test func timeSourcesAndOffsets() {
+    @Test
+    func timeSourcesAndOffsets() {
         #expect(part("[T2][Y]") == "1971")
         #expect(part("[Y][T3][Y][T1][Y]") == "202519722025")
         #expect(part("[T1+60m][hms]") == "110509")
@@ -178,7 +189,8 @@ import Testing
         #expect(part("[T4][Y]", context: context) == "1970")
     }
 
-    @Test func caseSwitches() {
+    @Test
+    func caseSwitches() {
         let subject = RenameSubject(name: "my Holiday PICS.JPG")
         #expect(part("[U][N]", subject) == "MY HOLIDAY PICS")
         #expect(part("[L][N]", subject) == "my holiday pics")
@@ -194,7 +206,8 @@ import Testing
         #expect(part("[u][N]", RenameSubject(name: "a\u{302}"))?.unicodeScalars.map(\.value) == [0xE2])
     }
 
-    @Test func environmentAndClipboard() {
+    @Test
+    func environmentAndClipboard() {
         #expect(part("[%USER%]") == "ada")
         #expect(part("[%USER%1-2]") == "ad")
         #expect(part("[%WORK%/]") == "Work:Files")
@@ -224,7 +237,8 @@ import Testing
         return RenameEngine(settings, context: context).newName(for: RenameSubject(name: name), index: 0)
     }
 
-    @Test func plainSearchAndReplace() {
+    @Test
+    func plainSearchAndReplace() {
         #expect(replaced("Holiday holiday.txt", "HOLIDAY", "trip") == "trip trip.txt")
         #expect(replaced("Holiday holiday.txt", "holiday", "trip") { $0.caseSensitive = true } == "Holiday trip.txt")
         #expect(replaced("Holiday holiday.txt", "holiday", "trip") { $0.firstOnly = true } == "trip holiday.txt")
@@ -235,7 +249,8 @@ import Testing
         #expect(replaced("abc.txt", "b", "") == "ac.txt")
     }
 
-    @Test func severalPairsAndWildcards() {
+    @Test
+    func severalPairsAndWildcards() {
         #expect(replaced("Bär Öl über.txt", "ä|ö|ü", "ae|oe|ue") == "Baer oel ueber.txt")
         #expect(replaced("Bär Öl.txt", "ä|Ö", "ae|OE") { $0.caseSensitive = true } == "Baer OEl.txt")
         #expect(replaced("a-b_c.txt", "-|_", " ") == "a bc.txt")
@@ -245,7 +260,8 @@ import Testing
         #expect(replaced("name - draft.txt", " - *", "") { $0.searchesExtension = false } == "name.txt")
     }
 
-    @Test func regularExpressions() {
+    @Test
+    func regularExpressions() {
         func regex(
             _ name: String,
             _ search: String,
@@ -271,7 +287,8 @@ import Testing
         #expect(regex("x.txt", "(", "y") == nil)
     }
 
-    @Test func regularExpressionSubstitutionAndDialect() {
+    @Test
+    func regularExpressionSubstitutionAndDialect() {
         func subst(_ name: String, _ search: String, _ replacement: String, ext: Bool = true) -> String? {
             replaced(name, search, replacement) { settings in
                 settings.regularExpression = true
@@ -296,7 +313,8 @@ import Testing
 
     // MARK: Case conversion and the pipeline
 
-    @Test func letterCases() {
+    @Test
+    func letterCases() {
         let rule = TitleCaseRule.standard
         #expect(LetterCase.unchanged.apply(to: "aB c.TXT") == "aB c.TXT")
         #expect(LetterCase.lower.apply(to: "aB c.TXT") == "ab c.txt")
@@ -314,7 +332,8 @@ import Testing
         #expect(TitleCaseRule.standard.words.contains("vs") && !TitleCaseRule.standard.allowsLowercaseLastWord)
     }
 
-    @Test func pipelineOrderAndGivenNames() {
+    @Test
+    func pipelineOrderAndGivenNames() {
         // Masks, then Search & Replace, then the case conversion over the whole name.
         #expect(
             name("[N]_new", ext: "[E]") {
@@ -335,7 +354,8 @@ import Testing
         #expect(RenameEngine.tidied("a\tb\u{1}c//") == "a b c")
     }
 
-    @Test func invalidNames() {
+    @Test
+    func invalidNames() {
         #expect(RenameEngine.invalidity(of: "") != nil)
         #expect(RenameEngine.invalidity(of: "a//b") != nil)
         #expect(RenameEngine.invalidity(of: "sub/../x") != nil)
@@ -346,7 +366,8 @@ import Testing
         #expect(RenameEngine.invalidity(of: ".hidden") == nil)
     }
 
-    @Test func nameLists() {
+    @Test
+    func nameLists() {
         #expect(RenameNameList.names(in: "a.txt\r\nb.txt\n\nc.txt\n\n") == ["a.txt", "b.txt", "", "c.txt"])
         #expect(RenameNameList.text(from: Data([0xEF, 0xBB, 0xBF] + Array("ä\n".utf8))) == "ä\n")
         #expect(RenameNameList.text(from: "ä b".data(using: .utf16) ?? Data()) == "ä b")
@@ -354,7 +375,8 @@ import Testing
         #expect(RenameNameList.text(from: Data([0x61, 0xE4])) == "aä")
     }
 
-    @Test func manyNamesOnAllCoresKeepTheirOrder() {
+    @Test
+    func manyNamesOnAllCoresKeepTheirOrder() {
         let registry = FileSystemRegistry()
         let entries = (0..<5_000)
             .map {
@@ -381,7 +403,8 @@ import Testing
 }
 
 /// Collisions and the order of a set of renames.
-@Suite struct MultiRenamePlanning {
+@Suite
+struct MultiRenamePlanning {
     func url(_ name: String) -> URL { URL(fileURLWithPath: "/d/" + name) }
     func urls(_ names: [String?]) -> [URL?] { names.map { $0.map(url) } }
 
@@ -413,13 +436,15 @@ import Testing
             )
     }
 
-    @Test func plainRenamesKeepListOrder() {
+    @Test
+    func plainRenamesKeepListOrder() {
         let steps = plan([("a", "x"), ("b", "b"), ("c", nil), ("d", "y")])
         #expect(steps.map(\.item) == [0, 3] && steps.allSatisfy { $0.kind == .direct && !$0.ontoItself })
         #expect(simulate(["a", "b", "c", "d"], steps) == ["x", "b", "c", "y"])
     }
 
-    @Test func chainsWaitForTheirPlace() {
+    @Test
+    func chainsWaitForTheirPlace() {
         // 1 → 2 → 3 → 4: the last has to move first.
         let steps = plan([("1", "2"), ("2", "3"), ("3", "4")])
         #expect(steps.map(\.item) == [2, 1, 0] && steps.allSatisfy { $0.kind == .direct })
@@ -428,7 +453,8 @@ import Testing
         #expect(reversed.map(\.item) == [0, 1, 2])
     }
 
-    @Test func swapsAndRingsGoThroughATemporaryName() {
+    @Test
+    func swapsAndRingsGoThroughATemporaryName() {
         let swap = plan([("1.txt", "2.txt"), ("2.txt", "1.txt")])
         #expect(swap.map(\.kind) == [.park, .direct, .unpark])
         #expect(swap.map(\.item) == [0, 1, 0] && swap[0].to.lastPathComponent == "tmp0")
@@ -448,14 +474,16 @@ import Testing
         )
     }
 
-    @Test func aLongChainNeedsNoRecursion() {
+    @Test
+    func aLongChainNeedsNoRecursion() {
         let count = 20_000
         let renames = (0..<count).map { (String($0), Optional(String($0 + 1))) }
         let steps = plan(renames)
         #expect(steps.count == count && steps.first?.item == count - 1 && steps.last?.item == 0)
     }
 
-    @Test func caseOnlyRenames() {
+    @Test
+    func caseOnlyRenames() {
         // Where case is not told apart the rename lands on the file itself…
         let folded = plan([("readme.TXT", "README.txt")], foldsCase: true)
         #expect(folded.count == 1 && folded[0].ontoItself)
@@ -478,7 +506,8 @@ import Testing
         )
     }
 
-    @Test func conflictDetection() {
+    @Test
+    func conflictDetection() {
         #expect(
             conflicts([("a", "x"), ("b", "x"), ("c", "y")], existing: ["a", "b", "c"]) == [
                 0: .duplicate, 1: .duplicate
@@ -493,7 +522,8 @@ import Testing
         #expect(conflicts([("a", "sub/x")], existing: ["a", "sub/x"]) == [0: .exists])
     }
 
-    @Test func conflictsAndLetterCase() {
+    @Test
+    func conflictsAndLetterCase() {
         #expect(conflicts([("a", "A")], existing: ["a"], foldsCase: true).isEmpty)
         #expect(
             conflicts([("a", "X"), ("b", "x")], existing: ["a", "b"], foldsCase: true) == [
@@ -505,7 +535,8 @@ import Testing
         #expect(conflicts([("a", "Z")], existing: ["a", "z"]).isEmpty)
     }
 
-    @Test func autoRename() {
+    @Test
+    func autoRename() {
         let planner = RenamePlanner()
         func resolved(_ renames: [(String, String?)], existing: [String], folders: Set<Int> = []) -> [String?] {
             planner.autoRenamed(
