@@ -252,7 +252,7 @@ internal final class CompareSession {
         CompareWorker.run("Compare") { [weak self] in
             let value = work(cancellation)
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.running === cancellation else {
+                guard let self, running === cancellation else {
                     return
                 }
                 finish(value, cancellation.isCancelled)
@@ -545,10 +545,10 @@ internal final class CompareSession {
             let found = Self.search(content, needle, from: row, forward: forward, cancellation: cancellation)
             DispatchQueue.main.async { [weak self] in
                 // Stale when another search started, or the texts changed, meanwhile.
-                guard let self, !cancellation.isCancelled, self.findGeneration == generation else {
+                guard let self, !cancellation.isCancelled, findGeneration == generation else {
                     return
                 }
-                self.searching = nil
+                searching = nil
                 completion(found)
             }
         }

@@ -288,11 +288,11 @@ internal final class SyncSession {
                 .async { [weak self] in
                     let names = Self.names(of: snapshots)
                     DispatchQueue.main.async { [weak self] in
-                        guard let self, self.selectionEpoch == epoch else {
+                        guard let self, selectionEpoch == epoch else {
                             return
                         }
-                        self.selectedNames = names
-                        self.changed()
+                        selectedNames = names
+                        changed()
                     }
                 }
         }
@@ -356,7 +356,7 @@ internal final class SyncSession {
             let whileCurrent: @Sendable (@escaping @MainActor @Sendable (SyncSession) -> Void) -> Void = {
                 [weak self] work in
                 DispatchQueue.main.async { [weak self] in
-                    guard let self, self.running === comparison else {
+                    guard let self, running === comparison else {
                         return
                     }
                     work(self)
@@ -455,11 +455,11 @@ internal final class SyncSession {
         startWorker("Synchronize directories: list") { [weak self] in
             let layout = Self.layout(rows: rows, show: show, sort: sort)
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.layoutGeneration == generation else {
+                guard let self, layoutGeneration == generation else {
                     return
                 }
                 // Actions set while the list was made are counted again.
-                self.apply(layout, recount: self.actionEpoch != epoch)
+                apply(layout, recount: actionEpoch != epoch)
             }
         }
     }
@@ -643,12 +643,12 @@ internal final class SyncSession {
                 guard let self else {
                     return
                 }
-                self.isPlanning = false
-                self.apply(self.currentLayout)
-                guard self.phase == .compared else {
+                isPlanning = false
+                apply(currentLayout)
+                guard phase == .compared else {
                     return
                 }
-                self.present(plan)
+                present(plan)
             }
         }
     }

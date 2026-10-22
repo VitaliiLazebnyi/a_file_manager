@@ -330,12 +330,12 @@ internal final class ScaledFrameCache {
             }
             let scaled = autoreleasepool { Self.scale(frame, width: width, height: height) }
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.generation == token else {
+                guard let self, generation == token else {
                     return
                 }
-                self.ready = scaled
-                self.made += 1
-                if scaled != nil { self.onReady() }
+                ready = scaled
+                made += 1
+                if scaled != nil { onReady() }
             }
         }
         return nil

@@ -322,11 +322,11 @@ internal final class MultiRenameSession {
             let preview = autoreleasepool { compute() }
             let counts = preview.counts
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.previewCancellation === cancellation, !cancellation.isCancelled else {
+                guard let self, previewCancellation === cancellation, !cancellation.isCancelled else {
                     return
                 }
-                self.isComputing = false
-                self.apply(preview, counts: counts)
+                isComputing = false
+                apply(preview, counts: counts)
             }
         }
     }
@@ -443,7 +443,7 @@ internal final class MultiRenameSession {
         sortQueue.async { [weak self] in
             let order = permutation()
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.listGeneration == generation, self.sortRequest == request else {
+                guard let self, listGeneration == generation, sortRequest == request else {
                     return
                 }
                 apply(order)
@@ -530,7 +530,7 @@ internal final class MultiRenameSession {
         sortQueue.async { [weak self] in
             let updated = renamed()
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.listGeneration == generation else {
+                guard let self, listGeneration == generation else {
                     return
                 }
                 finish(updated)
@@ -631,7 +631,7 @@ internal final class MultiRenameSession {
             .async { [weak self] in
                 let text = current.indices.map { names[$0] ?? current[$0].name }.joined(separator: "\n")
                 performOnMainLoop { [weak self] in
-                    guard let self, self.listGeneration == generation else {
+                    guard let self, listGeneration == generation else {
                         return
                     }
                     ask(text)

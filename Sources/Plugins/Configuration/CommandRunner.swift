@@ -652,15 +652,15 @@ internal final class CommandRunner {
                 guard let self else {
                     return
                 }
-                self.removeListFile(listURL, after: grace)
+                removeListFile(listURL, after: grace)
                 if let failure {
-                    self.kernel.interaction.inform("“\(program)” cannot be started!", detail: failure, style: .warning)
+                    kernel.interaction.inform("“\(program)” cannot be started!", detail: failure, style: .warning)
                 }
                 // A chain the user stopped meanwhile does not go on.
                 guard waits, generation == self.generation else {
                     return
                 }
-                self.waiting -= 1
+                waiting -= 1
                 completion(failure == nil)
             }
         }

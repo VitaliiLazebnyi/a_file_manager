@@ -530,8 +530,8 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
                     guard let self, self.search === search else {
                         return
                     }
-                    self.append(batch)
-                    if let directory { self.statusLabel.stringValue = self.kernel.fileSystems.displayPath(directory) }
+                    append(batch)
+                    if let directory { statusLabel.stringValue = kernel.fileSystems.displayPath(directory) }
                 }
             }
             search.run(
@@ -552,7 +552,7 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
                 guard let self, self.search === search else {
                     return
                 }
-                self.finish(built: nil, notes: self.notes(of: search))
+                finish(built: nil, notes: notes(of: search))
             }
         }
     }
@@ -573,7 +573,7 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
             guard let self, self.search === search else {
                 return
             }
-            self.statusLabel.stringValue = text
+            statusLabel.stringValue = text
         }
         BlockingCalls.run { [weak self] in
             /// Used by one thread at a time: the walk reports its folders first, and the comparing
@@ -608,7 +608,7 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
                 guard let self, self.search === search else {
                     return
                 }
-                self.finish(built: built, notes: self.notes(of: search))
+                finish(built: built, notes: notes(of: search))
             }
         }
     }
@@ -639,13 +639,13 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
                     guard let self, self.search === search else {
                         return
                     }
-                    var notes = self.notes(of: search)
+                    var notes = notes(of: search)
                     if truncated {
                         notes.append(
                             "Spotlight gave more than \(limit) files, the rest were left out"
                         )
                     }
-                    self.finish(built: built, notes: notes)
+                    finish(built: built, notes: notes)
                 }
             }
         }
@@ -876,12 +876,12 @@ internal final class FindFilesWindowController: NSWindowController, NSWindowDele
                     fileSystems: fileSystems
                 )
                 DispatchQueue.main.async { [weak self] in
-                    guard let self, self.copyRequest == request else {
+                    guard let self, copyRequest == request else {
                         return
                     }
                     put(text)
-                    if case .summary(let summary)? = self.rows.first, !self.isSearching {
-                        self.statusLabel.stringValue = summary
+                    if case .summary(let summary)? = self.rows.first, !isSearching {
+                        statusLabel.stringValue = summary
                     }
                 }
             }
