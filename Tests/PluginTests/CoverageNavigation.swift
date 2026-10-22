@@ -78,6 +78,21 @@ internal struct CoverageNavigation {
         #expect(left.model.directory.path == "/A/docs")
     }
 
+    /// A clipboard whose text has no path yet is asked again: a program may put the text there
+    /// after the change count was changed, and the path is followed once it is there.
+    @Test
+    internal func aPathPutOnTheClipboardAfterItsCountChangedIsFollowed() {
+        scratch.pasteboard.clearContents()
+        scratch.pasteboard.setString("  ", forType: .string)
+        let count = scratch.pasteboard.changeCount
+        commands.perform("afm_CdFromClipboard")
+        #expect(left.model.directory.path == "/A")
+        scratch.pasteboard.setString("docs", forType: .string)
+        #expect(scratch.pasteboard.changeCount == count)
+        commands.perform("afm_CdFromClipboard")
+        #expect(left.model.directory.path == "/A/docs")
+    }
+
     /// With one volume, and the panel on it, there is no next volume: the command is refused.
     @Test
     internal func theNextVolumeIsRefusedWhenThereIsNoOther() {
