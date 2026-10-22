@@ -691,7 +691,9 @@ extension MemoryFileSystem {
         }
 
         static func value(_ character: UInt8, xx isXX: Bool) -> UInt8? {
-            if isXX { return xx.firstIndex(of: character).map { UInt8($0) } }
+            if isXX {
+                return xx.firstIndex(of: character).map { UInt8($0) }
+            }
             return (32...96).contains(character) ? (character - 32) & 63 : nil
         }
 
@@ -719,14 +721,20 @@ extension MemoryFileSystem {
         }
 
         static func decode(_ line: ArraySlice<UInt8>, xx: Bool) -> [UInt8]? {
-            guard let first = line.first, let count = value(first, xx: xx).map(Int.init) else { return nil }
+            guard let first = line.first, let count = value(first, xx: xx).map(Int.init) else {
+                return nil
+            }
             var values: [UInt8] = []
             for character in line.dropFirst() {
-                guard let value = value(character, xx: xx) else { return nil }
+                guard let value = value(character, xx: xx) else {
+                    return nil
+                }
                 values.append(value)
             }
             let needed = (count + 2) / 3 * 4
-            guard values.count >= needed || (!xx && values.count + 3 >= needed) else { return nil }
+            guard values.count >= needed || (!xx && values.count + 3 >= needed) else {
+                return nil
+            }
             while values.count < needed { values.append(0) }
             var bytes: [UInt8] = []
             for group in stride(from: 0, to: needed, by: 4) {

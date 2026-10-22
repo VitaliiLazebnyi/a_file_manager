@@ -39,7 +39,9 @@ public struct BranchWalker: Sendable {
     /// mount point for them, not their own.
     static func isMountPoint(_ path: String) -> Bool {
         var info = statfs()
-        guard statfs(path, &info) == 0 else { return false }
+        guard statfs(path, &info) == 0 else {
+            return false
+        }
         // The system names the mount point by its real path.
         let real = realpath(path, nil)
             .map { pointer -> String in
@@ -83,12 +85,22 @@ public struct BranchWalker: Sendable {
     /// The start for a folder found in `parent`, or nil when it is not to be walked.
     private func enter(_ url: URL, name: String, from parent: Start, entered: inout Set<DirectoryKey>) -> Start? {
         var child = Start(url, prefix: name + "/")
-        guard url.isFileURL else { return child }
-        guard let info = volumes.identity(url.path, false), !Self.mountFolders.contains(url.path) else { return nil }
-        if let device = parent.device, info.device != device, !parent.crossesDisks { return nil }
+        guard url.isFileURL else {
+            return child
+        }
+        guard let info = volumes.identity(url.path, false), !Self.mountFolders.contains(url.path) else {
+            return nil
+        }
+        if let device = parent.device, info.device != device, !parent.crossesDisks {
+            return nil
+        }
         // Another device than the folder it lies in: a mounted volume, or a firmlink.
-        if let own = parent.ownDevice, info.device != own, volumes.isMountPoint(url.path) { return nil }
-        guard entered.insert(DirectoryKey(device: info.device, inode: info.inode)).inserted else { return nil }
+        if let own = parent.ownDevice, info.device != own, volumes.isMountPoint(url.path) {
+            return nil
+        }
+        guard entered.insert(DirectoryKey(device: info.device, inode: info.inode)).inserted else {
+            return nil
+        }
         child.device = parent.device
         child.ownDevice = info.device
         child.crossesDisks = parent.crossesDisks
@@ -135,7 +147,9 @@ public struct BranchWalker: Sendable {
         while !level.isEmpty, !isCancelled() {
             var next: [Start] = []
             for from in stride(from: 0, to: level.count, by: Self.directoriesPerBatch) {
-                if isCancelled() { return visited }
+                if isCancelled() {
+                    return visited
+                }
                 let chunk = Array(level[from..<min(from + Self.directoriesPerBatch, level.count)])
                 let listings = Parallel.map(chunk) { start in
                     Result {
@@ -153,7 +167,9 @@ public struct BranchWalker: Sendable {
                         return items
                     }
                 }
-                if isCancelled() { return visited }
+                if isCancelled() {
+                    return visited
+                }
                 var batch: [FileItem] = []
                 for (start, listing) in zip(chunk, listings) {
                     switch listing {
@@ -172,7 +188,9 @@ public struct BranchWalker: Sendable {
                         }
                     }
                 }
-                if !batch.isEmpty, !receive(batch) { return visited }
+                if !batch.isEmpty, !receive(batch) {
+                    return visited
+                }
             }
             level = next
             isFirstLevel = false

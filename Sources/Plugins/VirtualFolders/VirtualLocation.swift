@@ -26,24 +26,36 @@ public enum VirtualLocation: Equatable {
     /// Reads a URL of the virtual scheme; nil for every other URL and for what is not one of
     /// the forms above.
     public init?(_ url: URL) {
-        guard url.scheme == Self.scheme, let host = url.host else { return nil }
+        guard url.scheme == Self.scheme, let host = url.host else {
+            return nil
+        }
         let labels = host.split(separator: ".").map(String.init)
-        guard let kind = labels.first else { return nil }
+        guard let kind = labels.first else {
+            return nil
+        }
         let id = labels.dropFirst().first { $0.hasPrefix("n") }.flatMap { Int($0.dropFirst()) }
         let hex = labels.dropFirst().filter { $0.hasPrefix("h") }.map { $0.dropFirst() }.joined()
-        guard let prefix = Self.text(fromHex: hex) else { return nil }
+        guard let prefix = Self.text(fromHex: hex) else {
+            return nil
+        }
         let path = url.path.isEmpty ? "/" : url.path
         switch kind {
         case "branch":
-            guard let real = Self.realURL(prefix: prefix, path: path) else { return nil }
+            guard let real = Self.realURL(prefix: prefix, path: path) else {
+                return nil
+            }
             self = .branch(of: real)
 
         case "pick":
-            guard let id, let real = Self.realURL(prefix: prefix, path: path) else { return nil }
+            guard let id, let real = Self.realURL(prefix: prefix, path: path) else {
+                return nil
+            }
             self = .picked(id: id, in: real)
 
         case "list":
-            guard let id else { return nil }
+            guard let id else {
+                return nil
+            }
             // The path starts with a slash, so the folder is at least the root.
             let folder = (path as NSString).deletingLastPathComponent
             let origin = prefix.isEmpty ? nil : Self.realURL(prefix: prefix, path: folder)
@@ -80,15 +92,20 @@ public enum VirtualLocation: Equatable {
     }
 
     var isList: Bool {
-        if case .list = self { return true }
+        if case .list = self {
+            return true
+        }
         return false
     }
 
     /// The real directory `[..]` leads to; nil for a list that was not opened from a folder.
     public var realDirectory: URL? {
         switch self {
-        case .branch(let real), .picked(_, let real): return real
-        case .list(_, _, let origin): return origin
+        case .branch(let real), .picked(_, let real):
+            return real
+
+        case .list(_, _, let origin):
+            return origin
         }
     }
 
@@ -120,7 +137,9 @@ public enum VirtualLocation: Equatable {
     private static func realURL(prefix: String, path: String) -> URL? {
         // Written into a URL by anyone, so the path is made plain: no `..` leads out of the place.
         let path = Self.plain(path)
-        if prefix == "file://" { return URL(fileURLWithPath: path, isDirectory: false) }
+        if prefix == "file://" {
+            return URL(fileURLWithPath: path, isDirectory: false)
+        }
         // The prefix holds scheme, user, host and port only; anything else in it is not ours.
         guard var components = URLComponents(string: prefix), components.scheme != nil,
             components.path.isEmpty, components.query == nil, components.fragment == nil, components.password == nil
@@ -159,11 +178,15 @@ public enum VirtualLocation: Equatable {
     }
 
     private static func text(fromHex hex: String) -> String? {
-        guard hex.count % 2 == 0 else { return nil }
+        guard hex.count % 2 == 0 else {
+            return nil
+        }
         var bytes: [UInt8] = []
         var rest = Substring(hex)
         while !rest.isEmpty {
-            guard let byte = UInt8(rest.prefix(2), radix: 16) else { return nil }
+            guard let byte = UInt8(rest.prefix(2), radix: 16) else {
+                return nil
+            }
             bytes.append(byte)
             rest = rest.dropFirst(2)
         }

@@ -115,9 +115,13 @@ public final class SyncComparison: @unchecked Sendable {
     /// servers whatever theirs do, archives two seconds).
     static func needsTolerance(_ first: URL, _ second: URL, fileSystems _: FileSystemRegistry) -> Bool {
         func exact(_ url: URL) -> Bool {
-            guard url.isFileURL else { return false }
+            guard url.isFileURL else {
+                return false
+            }
             var info = statfs()
-            guard statfs(url.path, &info) == 0 else { return false }
+            guard statfs(url.path, &info) == 0 else {
+                return false
+            }
             let type = withUnsafeBytes(of: info.f_fstypename) {
                 String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self)
             }
@@ -144,9 +148,13 @@ public final class SyncComparison: @unchecked Sendable {
             func within(_ seconds: Double) -> Bool { seconds < 1 || seconds <= tolerance }
             let sameTime =
                 within(abs(difference)) || (options.ignoreOneHourDifference && within(abs(abs(difference) - 3_600)))
-            if !sameTime { return (difference > 0 ? .leftNewer : .rightNewer, false) }
+            if !sameTime {
+                return (difference > 0 ? .leftNewer : .rightNewer, false)
+            }
         }
-        guard left.size == right.size else { return (.different, false) }
+        guard left.size == right.size else {
+            return (.different, false)
+        }
         return options.byContent ? (.pending, true) : (.equal, false)
     }
 
@@ -175,7 +183,9 @@ public final class SyncComparison: @unchecked Sendable {
 
     /// The entries of one side that take part; nil when the folder cannot be read.
     private func list(_ side: Side, isTop: Bool, index: Int) -> [FileItem]? {
-        guard side.exists else { return [] }
+        guard side.exists else {
+            return []
+        }
         do {
             let items = try fileSystems.provider(for: side.url)
                 .list(
@@ -184,7 +194,9 @@ public final class SyncComparison: @unchecked Sendable {
                     cancellation: cancellation
                 )
             // A listing that was ended by the cancel is not an error of the folder.
-            if cancellation.isCancelled { return nil }
+            if cancellation.isCancelled {
+                return nil
+            }
             if isTop {
                 lock.lock()
                 topEntries[index] = items.count
@@ -207,7 +219,9 @@ public final class SyncComparison: @unchecked Sendable {
     /// A name asked for in one spelling also stands for the other spelling of it (NFC, NFD) when
     /// the folder holds only that one.
     private func asked(among items: [FileItem]) -> [FileItem] {
-        guard let onlyNames else { return items }
+        guard let onlyNames else {
+            return items
+        }
         let exact = Set(items.filter { onlyNames.contains(Array($0.name.utf8)) }.map(\.name))
         return items.filter {
             onlyNames.contains(Array($0.name.utf8)) || (onlyAlike.contains($0.name) && !exact.contains($0.name))
@@ -217,9 +231,13 @@ public final class SyncComparison: @unchecked Sendable {
     private func walk(_ left: Side, _ right: Side, relative: String, classifying: SyncOptions, isTop: Bool = false)
         -> [SyncRow]
     {
-        guard !cancellation.isCancelled else { return [] }
+        guard !cancellation.isCancelled else {
+            return []
+        }
         let listings = Parallel.map([(left, 0), (right, 1)]) { self.list($0.0, isTop: isTop, index: $0.1) }
-        guard let leftItems = listings[0], let rightItems = listings[1] else { return [] }
+        guard let leftItems = listings[0], let rightItems = listings[1] else {
+            return []
+        }
         update {
             $0.leftDirectories += left.exists ? 1 : 0
             $0.rightDirectories += right.exists ? 1 : 0
@@ -360,7 +378,9 @@ public final class SyncComparison: @unchecked Sendable {
     /// Reads the pairs that size and date could not tell apart, on all cores.
     private func compareContents(of rows: inout [SyncRow]) {
         let pending = rows.indices.filter { rows[$0].state == .pending }
-        guard !pending.isEmpty else { return }
+        guard !pending.isEmpty else {
+            return
+        }
         update {
             $0.filesToCompare = pending.count
             // (A pair waits for its contents only when both sides are there.)
@@ -376,7 +396,9 @@ public final class SyncComparison: @unchecked Sendable {
     }
 
     private func contentState(of row: SyncRow) -> SyncState {
-        guard !cancellation.isCancelled, let left = row.left, let right = row.right else { return .pending }
+        guard !cancellation.isCancelled, let left = row.left, let right = row.right else {
+            return .pending
+        }
         defer { update { $0.filesCompared += 1 } }
         do {
             let same = try Self.sameContent(
@@ -405,7 +427,9 @@ public final class SyncComparison: @unchecked Sendable {
         cancellation: CancellationFlag,
         progress: (Int) -> Void = { _ in }
     ) throws -> Bool? {
-        if cancellation.isCancelled { return nil }
+        if cancellation.isCancelled {
+            return nil
+        }
         var readers: [any FileReader] = []
         // A read blocked on a server ends as soon as the flag is set.
         var tokens: [AnyObject] = []
@@ -435,12 +459,16 @@ public final class SyncComparison: @unchecked Sendable {
                     // One side has ended: the files are the same only if the other has too.
                     return .some(buffers[0].isEmpty && buffers[1].isEmpty && ended[0] && ended[1])
                 }
-                guard buffers[0].prefix(count) == buffers[1].prefix(count) else { return .some(false) }
+                guard buffers[0].prefix(count) == buffers[1].prefix(count) else {
+                    return .some(false)
+                }
                 buffers = buffers.map { Data($0.dropFirst(count)) }
                 progress(count)
                 return nil
             }
-            if let verdict { return verdict }
+            if let verdict {
+                return verdict
+            }
         }
         return nil
     }

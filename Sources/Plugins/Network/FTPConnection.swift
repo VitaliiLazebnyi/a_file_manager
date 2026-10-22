@@ -10,19 +10,44 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .automatic: return "Auto-Detect (UTF-8 if possible)"
-        case .utf8: return "UTF-8"
-        case .windowsLatin1: return "Western Latin1 (1252)"
-        case .isoLatin1: return "Western ISO 8859-1"
-        case .windowsLatin2: return "Eastern Europe (1250)"
-        case .windowsCyrillic: return "Cyrillic Windows (1251)"
-        case .koi8R: return "Cyrillic KOI8-R (20866)"
-        case .macRoman: return "Mac Roman"
-        case .dosLatinUS: return "DOS-USA (437)"
-        case .shiftJIS: return "Japanese (932)"
-        case .gb18030: return "Chinese Main Land (936)"
-        case .big5: return "Chinese Taiwan (950)"
-        case .eucKR: return "Korean (949)"
+        case .automatic:
+            return "Auto-Detect (UTF-8 if possible)"
+
+        case .utf8:
+            return "UTF-8"
+
+        case .windowsLatin1:
+            return "Western Latin1 (1252)"
+
+        case .isoLatin1:
+            return "Western ISO 8859-1"
+
+        case .windowsLatin2:
+            return "Eastern Europe (1250)"
+
+        case .windowsCyrillic:
+            return "Cyrillic Windows (1251)"
+
+        case .koi8R:
+            return "Cyrillic KOI8-R (20866)"
+
+        case .macRoman:
+            return "Mac Roman"
+
+        case .dosLatinUS:
+            return "DOS-USA (437)"
+
+        case .shiftJIS:
+            return "Japanese (932)"
+
+        case .gb18030:
+            return "Chinese Main Land (936)"
+
+        case .big5:
+            return "Chinese Taiwan (950)"
+
+        case .eucKR:
+            return "Korean (949)"
         }
     }
 
@@ -32,19 +57,44 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
             String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(encoding.rawValue)))
         }
         switch self {
-        case .automatic: return nil
-        case .utf8: return .utf8
-        case .windowsLatin1: return .windowsCP1252
-        case .isoLatin1: return .isoLatin1
-        case .windowsLatin2: return .windowsCP1250
-        case .windowsCyrillic: return .windowsCP1251
-        case .koi8R: return named(.KOI8_R)
-        case .macRoman: return .macOSRoman
-        case .dosLatinUS: return named(.dosLatinUS)
-        case .shiftJIS: return .shiftJIS
-        case .gb18030: return named(.GB_18030_2000)
-        case .big5: return named(.big5)
-        case .eucKR: return named(.EUC_KR)
+        case .automatic:
+            return nil
+
+        case .utf8:
+            return .utf8
+
+        case .windowsLatin1:
+            return .windowsCP1252
+
+        case .isoLatin1:
+            return .isoLatin1
+
+        case .windowsLatin2:
+            return .windowsCP1250
+
+        case .windowsCyrillic:
+            return .windowsCP1251
+
+        case .koi8R:
+            return named(.KOI8_R)
+
+        case .macRoman:
+            return .macOSRoman
+
+        case .dosLatinUS:
+            return named(.dosLatinUS)
+
+        case .shiftJIS:
+            return .shiftJIS
+
+        case .gb18030:
+            return named(.GB_18030_2000)
+
+        case .big5:
+            return named(.big5)
+
+        case .eucKR:
+            return named(.EUC_KR)
         }
     }
 
@@ -65,7 +115,9 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
             return (text, encoding)
         }
         guard let text = String(data: data, encoding: .utf8) else {
-            if let text = String(data: data, encoding: .windowsCP1252) { return (text, .windowsCP1252) }
+            if let text = String(data: data, encoding: .windowsCP1252) {
+                return (text, .windowsCP1252)
+            }
             return (String(decoding: data, as: UTF8.self), .utf8)
         }
         return (text, .utf8)
@@ -138,7 +190,9 @@ final class NameMemory: @unchecked Sendable {
     /// Whether a name read with `encoding` needs to be remembered for a connection that
     /// writes names composed and in `sending`.
     static func needsRemembering(_ name: String, readAs encoding: String.Encoding, sending: String.Encoding) -> Bool {
-        if encoding != sending { return true }
+        if encoding != sending {
+            return true
+        }
         // A name in ASCII is the same composed or not.
         if name.utf8.contains(where: { $0 >= 0x80 }) {
             return !name.precomposedStringWithCanonicalMapping.utf8.elementsEqual(name.utf8)
@@ -319,9 +373,14 @@ final class FTPConnection: @unchecked Sendable {
         let report = ExplicitTLSReport()
         let security: NetStream.Security
         switch config.tls {
-        case .none: security = .none
-        case .implicit: security = .tls(settings)
-        case .explicit: security = .explicitFTP(settings, report)
+        case .none:
+            security = .none
+
+        case .implicit:
+            security = .tls(settings)
+
+        case .explicit:
+            security = .explicitFTP(settings, report)
         }
         let stream = NetStream(host: config.host, port: config.port, security: security)
         log?("Connect to: \(config.host):\(config.port)")
@@ -511,20 +570,26 @@ final class FTPConnection: @unchecked Sendable {
     ///
     /// A connection that a router dropped silently does not answer at all, so the wait is short.
     func isAlive(cancellation: CancellationFlag? = nil) -> Bool {
-        guard isUsable else { return false }
+        guard isUsable else {
+            return false
+        }
         return (try? send("NOOP", replyWithin: min(config.timeout, 5), cancellation: cancellation))?.isSuccess ?? false
     }
 
     func changeDirectory(_ path: String, cancellation: CancellationFlag? = nil) throws {
         let path = RemotePath.normalized(path)
-        if workingDirectory == path { return }
+        if workingDirectory == path {
+            return
+        }
         workingDirectory = nil
         try perform("CWD \(path)", cancellation: cancellation)
         workingDirectory = path
     }
 
     private func setType(_ type: Character, cancellation: CancellationFlag?) throws {
-        if currentType == type { return }
+        if currentType == type {
+            return
+        }
         try perform("TYPE \(type)", cancellation: cancellation)
         currentType = type
     }
@@ -651,8 +716,11 @@ final class FTPConnection: @unchecked Sendable {
         /// Gives the data connection up before it was used.
         func cancel() {
             switch self {
-            case .connecting(let stream): stream.close()
-            case .listening(let listener): listener.cancel()
+            case .connecting(let stream):
+                stream.close()
+
+            case .listening(let listener):
+                listener.cancel()
             }
         }
     }
@@ -683,7 +751,9 @@ final class FTPConnection: @unchecked Sendable {
             do {
                 let opened: NetStream
                 switch side {
-                case .connecting(let stream): opened = stream
+                case .connecting(let stream):
+                    opened = stream
+
                 case .listening(let listener):
                     opened = try listener.accept(timeout: config.timeout, cancellation: cancellation)
                 }
@@ -723,7 +793,9 @@ final class FTPConnection: @unchecked Sendable {
     /// Whether the reply is a server's complaint that a data connection did not resume the TLS
     /// session of the control connection (vsftpd `require_ssl_reuse`, ProFTPD, FileZilla Server).
     static func requiresSessionReuse(_ reply: FTPReply) -> Bool {
-        guard [421, 425, 426, 450, 522, 522, 550].contains(reply.code) else { return false }
+        guard [421, 425, 426, 450, 522, 522, 550].contains(reply.code) else {
+            return false
+        }
         let text = reply.text.lowercased()
         let mentionsSession = text.contains("session") || text.contains("reuse") || text.contains("re-use")
         let says =
@@ -734,7 +806,9 @@ final class FTPConnection: @unchecked Sendable {
 
     /// Ends a transfer whose data went through completely, and reads the server's verdict.
     func finishTransfer(cancellation: CancellationFlag? = nil) throws {
-        guard let channel = data else { return }
+        guard let channel = data else {
+            return
+        }
         // After a plain upload the end was already announced, and the data connection stays
         // open until the server has confirmed the file. An encrypted one announces its end
         // by closing (see `NetStream.finishWriting`).
@@ -761,7 +835,9 @@ final class FTPConnection: @unchecked Sendable {
     /// Drops a transfer without asking the server about it, for a server that is not answering:
     /// the connection cannot be used again.
     func abandonTransfer() {
-        guard let channel = data else { return }
+        guard let channel = data else {
+            return
+        }
         channel.close()
         setStreams(control: control, data: nil)
         isBroken = true
@@ -772,10 +848,14 @@ final class FTPConnection: @unchecked Sendable {
     /// The server answers the broken data connection with one reply (426 or 226); when it does not,
     /// the connection is not used again.
     func abortTransfer() {
-        guard let channel = data else { return }
+        guard let channel = data else {
+            return
+        }
         channel.close()
         setStreams(control: control, data: nil)
-        guard !isBroken, let control else { return }
+        guard !isBroken, let control else {
+            return
+        }
         if (try? readReply(timeout: min(config.timeout, 10), cancellation: nil)) == nil {
             isBroken = true
             return
@@ -888,7 +968,9 @@ final class FTPConnection: @unchecked Sendable {
             )
         }
         try finishTransfer(cancellation: cancellation)
-        guard wanted, !links.isEmpty, cancellation?.isCancelled != true else { return }
+        guard wanted, !links.isEmpty, cancellation?.isCancelled != true else {
+            return
+        }
         _ = receive(resolveLinks(links, in: path, cancellation: cancellation))
     }
 

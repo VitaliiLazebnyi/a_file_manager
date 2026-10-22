@@ -15,7 +15,9 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         var onCopy: (() -> Bool)?
 
         override func performKeyEquivalent(with event: NSEvent) -> Bool {
-            if Shortcut.cmd("c").matches(event), onCopy?() == true { return true }
+            if Shortcut.cmd("c").matches(event), onCopy?() == true {
+                return true
+            }
             return super.performKeyEquivalent(with: event)
         }
     }
@@ -66,11 +68,15 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
         primaryButton.keyEquivalent = "\r"
         userButtons = [
             ActionButton("New…") { [unowned self] in
-                guard let command = center.editUserCommand(nil) else { return }
+                guard let command = center.editUserCommand(nil) else {
+                    return
+                }
                 reload(selecting: command.id)
             },
             ActionButton("Edit…") { [unowned self] in
-                guard let existing = selectedUserCommand, let command = center.editUserCommand(existing) else { return }
+                guard let existing = selectedUserCommand, let command = center.editUserCommand(existing) else {
+                    return
+                }
                 reload(selecting: command.id)
             },
             ActionButton("Delete") { [unowned self] in deleteSelected() },
@@ -94,7 +100,9 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
 
     /// Runs the dialog for an editor; nil when the user cancelled.
     func pick() -> CommandRow? {
-        guard let window, !isPicking else { return nil }
+        guard let window, !isPicking else {
+            return nil
+        }
         window.orderOut(nil)
         prepare(picking: true, category: nil)
         window.makeFirstResponder(filter)
@@ -175,27 +183,35 @@ final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSe
 
     /// Cmd+C in the list copies the command's name (spec 14 › Elements).
     private func copyName() -> Bool {
-        guard let row = selected, window?.firstResponder === table.tableView else { return false }
+        guard let row = selected, window?.firstResponder === table.tableView else {
+            return false
+        }
         center.effects.pasteboard.clearContents()
         center.effects.pasteboard.setString(row.id.rawValue, forType: .string)
         return true
     }
 
     private func deleteSelected() {
-        guard let command = selectedUserCommand else { return }
+        guard let command = selectedUserCommand else {
+            return
+        }
         let answer = center.kernel.interaction.choose(
             "Delete the user command \(command.name)?",
             detail: "Buttons, menu entries and keys that use it stop working.",
             buttons: ["Delete", "Cancel"],
             style: .warning
         )
-        guard answer == 0 else { return }
+        guard answer == 0 else {
+            return
+        }
         center.removeUserCommand(named: command.name)
         reload()
     }
 
     private func renameOrCopy() {
-        guard let command = selectedUserCommand else { return }
+        guard let command = selectedUserCommand else {
+            return
+        }
         let ui = center.kernel.interaction
         guard
             let answer = ui.form(
@@ -231,7 +247,9 @@ extension ConfigurationCenter {
     }
 
     func browser() -> CommandBrowserController {
-        if let browserWindow { return browserWindow }
+        if let browserWindow {
+            return browserWindow
+        }
         let controller = CommandBrowserController(center: self)
         browserWindow = controller
         return controller

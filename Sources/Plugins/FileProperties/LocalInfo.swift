@@ -49,9 +49,13 @@ enum LocalInfo {
     ///
     /// Nil when nothing is there.
     static func details(_ url: URL) -> LocalDetails? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL else {
+            return nil
+        }
         var st = stat()
-        guard lstat(url.path, &st) == 0 else { return nil }
+        guard lstat(url.path, &st) == 0 else {
+            return nil
+        }
         return LocalDetails(
             mode: UInt16(st.st_mode & 0o7777),
             ownerID: st.st_uid,
@@ -67,7 +71,9 @@ enum LocalInfo {
 
     /// Whether the entry itself is a symbolic link, asked from the disk now.
     static func isSymlink(_ url: URL) -> Bool {
-        guard url.isFileURL else { return false }
+        guard url.isFileURL else {
+            return false
+        }
         var st = stat()
         return lstat(url.path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFLNK
     }
@@ -77,9 +83,13 @@ enum LocalInfo {
     ///
     /// True for everything else, and for what is not on a local disk.
     static func canBeRead(_ url: URL) -> Bool {
-        guard url.isFileURL else { return true }
+        guard url.isFileURL else {
+            return true
+        }
         var st = stat()
-        guard stat(url.path, &st) == 0 else { return true }
+        guard stat(url.path, &st) == 0 else {
+            return true
+        }
         let type = st.st_mode & S_IFMT
         return type == S_IFREG || type == S_IFDIR
     }
@@ -98,7 +108,9 @@ enum LocalInfo {
         let known = userNames[id]
         if known == nil { lookups += 1 }
         lock.unlock()
-        if let known { return known }
+        if let known {
+            return known
+        }
         var entry = passwd()
         var result: UnsafeMutablePointer<passwd>?
         var buffer = [CChar](repeating: 0, count: 4_096)
@@ -116,7 +128,9 @@ enum LocalInfo {
         let known = groupNames[id]
         if known == nil { lookups += 1 }
         lock.unlock()
-        if let known { return known }
+        if let known {
+            return known
+        }
         var entry = group()
         var result: UnsafeMutablePointer<group>?
         var buffer = [CChar](repeating: 0, count: 4_096)
@@ -131,7 +145,9 @@ enum LocalInfo {
 
     /// A user by name or number; nil when there is no such user.
     static func userID(_ text: String) -> uid_t? {
-        if let number = uid_t(text) { return number }
+        if let number = uid_t(text) {
+            return number
+        }
         var entry = passwd()
         var result: UnsafeMutablePointer<passwd>?
         var buffer = [CChar](repeating: 0, count: 4_096)
@@ -139,7 +155,9 @@ enum LocalInfo {
     }
 
     static func groupID(_ text: String) -> gid_t? {
-        if let number = gid_t(text) { return number }
+        if let number = gid_t(text) {
+            return number
+        }
         var entry = group()
         var result: UnsafeMutablePointer<group>?
         var buffer = [CChar](repeating: 0, count: 4_096)
@@ -148,10 +166,14 @@ enum LocalInfo {
 
     /// Where a symbolic link points, as it is written in the link.
     static func linkTarget(_ url: URL) -> String? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL else {
+            return nil
+        }
         var buffer = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
         let length = readlink(url.path, &buffer, Int(PATH_MAX))
-        guard length >= 0 else { return nil }
+        guard length >= 0 else {
+            return nil
+        }
         buffer[length] = 0
         return buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
     }
@@ -179,9 +201,13 @@ enum LocalInfo {
 
     /// The names of the item's extended attributes; a link is not followed.
     static func extendedAttributeNames(_ url: URL) -> [String] {
-        guard url.isFileURL else { return [] }
+        guard url.isFileURL else {
+            return []
+        }
         let length = listxattr(url.path, nil, 0, XATTR_NOFOLLOW)
-        guard length > 0 else { return [] }
+        guard length > 0 else {
+            return []
+        }
         var buffer = [CChar](repeating: 0, count: length)
         // The names may have gone meanwhile: what the second call fills is what there is.
         let filled = listxattr(url.path, &buffer, length, XATTR_NOFOLLOW)
@@ -192,7 +218,9 @@ enum LocalInfo {
     }
 
     static func tags(_ url: URL) -> [String] {
-        guard url.isFileURL else { return [] }
+        guard url.isFileURL else {
+            return []
+        }
         return (try? url.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
     }
 
@@ -205,8 +233,12 @@ enum LocalInfo {
         {
             return kind
         }
-        if item.isSymlink { return "Symbolic link" }
-        if item.isFolder { return "Folder" }
+        if item.isSymlink {
+            return "Symbolic link"
+        }
+        if item.isFolder {
+            return "Folder"
+        }
         let ext = FileItem.split(item.name).ext
         if !ext.isEmpty, let type = UTType(filenameExtension: ext), let description = type.localizedDescription {
             return description
@@ -219,7 +251,9 @@ enum LocalInfo {
         var st = stat()
         guard lstat(url.path, &st) == 0 else { throw posixError(errno, url) }
         let flags = isOn ? st.st_flags | flag : st.st_flags & ~flag
-        guard flags != st.st_flags else { return }
+        guard flags != st.st_flags else {
+            return
+        }
         if lchflags(url.path, flags) != 0 { throw posixError(errno, url) }
     }
 
@@ -231,9 +265,13 @@ enum LocalInfo {
 
     /// The allocation unit of the volume `url` is on; sizes on disk are multiples of it.
     static func clusterSize(at url: URL) -> Int64? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL else {
+            return nil
+        }
         var info = statfs()
-        guard statfs(url.path, &info) == 0, info.f_bsize > 0 else { return nil }
+        guard statfs(url.path, &info) == 0, info.f_bsize > 0 else {
+            return nil
+        }
         return Int64(info.f_bsize)
     }
 }

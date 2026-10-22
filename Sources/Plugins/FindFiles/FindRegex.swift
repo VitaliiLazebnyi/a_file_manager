@@ -90,10 +90,15 @@ enum FindRegex {
         budget: TimeInterval = defaultBudget,
         cancelled: () -> Bool
     ) -> Bool {
-        if trip?.isTripped == true { return false }
+        if trip?.isTripped == true {
+            return false
+        }
         switch firstMatch(regex, in: text, budget: budget, cancelled: cancelled) {
-        case .matched: return true
-        case .unmatched: return false
+        case .matched:
+            return true
+
+        case .unmatched:
+            return false
 
         case .timedOut:
             if !cancelled() { trip?.recordTimeout() }

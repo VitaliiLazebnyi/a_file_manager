@@ -39,14 +39,27 @@ public struct Age: Codable, Equatable, Sendable {
         let count = min(max(count, 0), Self.largestCount)
         var step = DateComponents()
         switch unit {
-        case .minutes: step.minute = -count
-        case .hours: step.hour = -count
-        case .days: step.day = -count
-        case .weeks: step.day = -7 * count
-        case .months: step.month = -count
-        case .years: step.year = -count
+        case .minutes:
+            step.minute = -count
+
+        case .hours:
+            step.hour = -count
+
+        case .days:
+            step.day = -count
+
+        case .weeks:
+            step.day = -7 * count
+
+        case .months:
+            step.month = -count
+
+        case .years:
+            step.year = -count
         }
-        guard let moment = calendar.date(byAdding: step, to: now) else { return .distantPast }
+        guard let moment = calendar.date(byAdding: step, to: now) else {
+            return .distantPast
+        }
         return unit.rawValue >= Unit.days.rawValue ? calendar.startOfDay(for: moment) : moment
     }
 }
@@ -82,9 +95,14 @@ public struct SizeRule: Codable, Equatable, Sendable {
     public func matches(_ size: Int64) -> Bool {
         let bytes = self.bytes
         switch comparison {
-        case .greater: return size > bytes
-        case .less: return size < bytes
-        case .equal: return unit == .bytes ? size == bytes : (bytes..<upperBytes).contains(size)
+        case .greater:
+            return size > bytes
+
+        case .less:
+            return size < bytes
+
+        case .equal:
+            return unit == .bytes ? size == bytes : (bytes..<upperBytes).contains(size)
         }
     }
 
@@ -92,7 +110,9 @@ public struct SizeRule: Codable, Equatable, Sendable {
     /// size can be, not trapped on.
     public var bytes: Int64 {
         let exact = (value * unit.factor).rounded()
-        guard !exact.isNaN else { return 0 }
+        guard !exact.isNaN else {
+            return 0
+        }
         return exact >= 9.2e18 ? Int64.max : exact <= -9.2e18 ? Int64.min : Int64(exact)
     }
 
@@ -174,11 +194,21 @@ public struct PreparedCriteria {
 
     public func matches(_ item: FileItem) -> Bool {
         let c = criteria
-        if let dateFrom = c.dateFrom, item.modified < dateFrom { return false }
-        if let dateTo = c.dateTo, item.modified > dateTo { return false }
-        if let notOlderCutoff, item.modified < notOlderCutoff { return false }
-        if let olderCutoff, item.modified >= olderCutoff { return false }
-        if let size = c.size, item.isDirectory || !size.matches(item.size) { return false }
+        if let dateFrom = c.dateFrom, item.modified < dateFrom {
+            return false
+        }
+        if let dateTo = c.dateTo, item.modified > dateTo {
+            return false
+        }
+        if let notOlderCutoff, item.modified < notOlderCutoff {
+            return false
+        }
+        if let olderCutoff, item.modified >= olderCutoff {
+            return false
+        }
+        if let size = c.size, item.isDirectory || !size.matches(item.size) {
+            return false
+        }
         return c.hidden.accepts(item.isHidden) && c.directory.accepts(item.isDirectory)
             && c.symbolicLink.accepts(item.isSymlink)
             && c.readOnly.accepts(item.permissions & 0o200 == 0)
@@ -268,25 +298,46 @@ public struct FieldRule: Codable, Equatable, Sendable {
     /// A value that is no expression never matches `regex` and always matches `!regex`.
     func matches(_ text: String, expression: NSRegularExpression?, trip: RegexTrip?, cancelled: () -> Bool) -> Bool {
         switch comparison {
-        case .contains: return text.range(of: value, options: .caseInsensitive) != nil
-        case .notContains: return text.range(of: value, options: .caseInsensitive) == nil
-        case .containsCase: return text.contains(value)
-        case .notContainsCase: return !text.contains(value)
-        case .equals: return text.caseInsensitiveCompare(value) == .orderedSame
-        case .notEquals: return text.caseInsensitiveCompare(value) != .orderedSame
-        case .equalsCase: return text == value
-        case .notEqualsCase: return text != value
+        case .contains:
+            return text.range(of: value, options: .caseInsensitive) != nil
+
+        case .notContains:
+            return text.range(of: value, options: .caseInsensitive) == nil
+
+        case .containsCase:
+            return text.contains(value)
+
+        case .notContainsCase:
+            return !text.contains(value)
+
+        case .equals:
+            return text.caseInsensitiveCompare(value) == .orderedSame
+
+        case .notEquals:
+            return text.caseInsensitiveCompare(value) != .orderedSame
+
+        case .equalsCase:
+            return text == value
+
+        case .notEqualsCase:
+            return text != value
 
         case .regex:
-            guard let expression else { return false }
+            guard let expression else {
+                return false
+            }
             return FindRegex.matches(expression, in: text, trip: trip, cancelled: cancelled)
 
         case .notRegex:
-            guard let expression else { return true }
+            guard let expression else {
+                return true
+            }
             return !FindRegex.matches(expression, in: text, trip: trip, cancelled: cancelled)
 
         case .greater, .less, .greaterOrEqual, .lessOrEqual:
-            guard !text.isEmpty else { return false }
+            guard !text.isEmpty else {
+                return false
+            }
             let order: ComparisonResult
             if let left = Self.number(text), let right = Self.number(value) {
                 order = left < right ? .orderedAscending : left > right ? .orderedDescending : .orderedSame
@@ -294,10 +345,17 @@ public struct FieldRule: Codable, Equatable, Sendable {
                 order = text.caseInsensitiveCompare(value)
             }
             switch comparison {
-            case .greater: return order == .orderedDescending
-            case .less: return order == .orderedAscending
-            case .greaterOrEqual: return order != .orderedAscending
-            default: return order != .orderedDescending
+            case .greater:
+                return order == .orderedDescending
+
+            case .less:
+                return order == .orderedAscending
+
+            case .greaterOrEqual:
+                return order != .orderedAscending
+
+            default:
+                return order != .orderedDescending
             }
         }
     }
@@ -352,10 +410,14 @@ struct PreparedFieldRules {
     }
 
     func matches(_ item: FileItem, fields: [String: SearchField], cancelled: () -> Bool = { false }) -> Bool {
-        guard rules.isActive else { return true }
+        guard rules.isActive else {
+            return true
+        }
         func holds(_ index: Int) -> Bool {
             let rule = rules.rules[index]
-            guard !cancelled() else { return false }
+            guard !cancelled() else {
+                return false
+            }
             return fields[rule.field]
                 .map {
                     rule.matches($0.value(item), expression: expressions[index], trip: trip, cancelled: cancelled)

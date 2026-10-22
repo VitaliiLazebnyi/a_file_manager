@@ -143,7 +143,9 @@ final class IntegrationReplies: FileJobDelegate {
         // moved aside and a link to another folder, with files of the same names, takes its place.
         var swapped = false
         racing.beforeRemoving = { url in
-            guard !swapped, url.deletingLastPathComponent().lastPathComponent == "sub" else { return }
+            guard !swapped, url.deletingLastPathComponent().lastPathComponent == "sub" else {
+                return
+            }
             swapped = true
             try? FileManager.default.moveItem(at: sub, to: aside)
             try? FileManager.default.createSymbolicLink(at: sub, withDestinationURL: outside)
@@ -250,7 +252,9 @@ final class IntegrationReplies: FileJobDelegate {
         job.delegate = replies
         var reportsOfTheCommit = 0
         replies.onProgress = { [weak job] progress in
-            guard progress.lines.first?.hasPrefix("Writing:") == true else { return }
+            guard progress.lines.first?.hasPrefix("Writing:") == true else {
+                return
+            }
             reportsOfTheCommit += 1
             // In the middle of the commit the user presses Cancel.
             if reportsOfTheCommit == 5 { job?.cancel() }

@@ -540,7 +540,9 @@ import Testing
         let window = try #require(controller.window)
         #expect(window.title == "Multi-Rename Tool")
         func views<View: NSView>(_ type: View.Type, in view: NSView?) -> [View] {
-            guard let view else { return [] }
+            guard let view else {
+                return []
+            }
             return ([view as? View].compactMap { $0 }) + view.subviews.flatMap { views(type, in: $0) }
         }
         let table = try #require(views(NSTableView.self, in: window.contentView).first)

@@ -45,7 +45,9 @@ private func tarData(_ text: String) -> Data {
 
 private func quarantine(of url: URL) -> String? {
     let size = getxattr(url.path, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW)
-    guard size > 0 else { return nil }
+    guard size > 0 else {
+        return nil
+    }
     var value = [UInt8](repeating: 0, count: size)
     let got = getxattr(url.path, "com.apple.quarantine", &value, size, 0, XATTR_NOFOLLOW)
     return got > 0 ? String(decoding: value.prefix(got), as: UTF8.self) : nil
@@ -662,7 +664,9 @@ private func quarantine(of url: URL) -> String? {
         var damaged = original
         let file = try RandomAccessFile(archive)
         let random = try #require(ZipDirectory.read(file).records.first { $0.name == "tree/sub/random.bin" })
-        guard case .archive(let offset, _) = random.source else { return }
+        guard case .archive(let offset, _) = random.source else {
+            return
+        }
         damaged[Int(try ZipDirectory.localHeader(of: random, at: offset, in: file).dataOffset) + 1_000] ^= 0xFF
         try damaged.write(to: archive)
         try box.file("extra/one.txt", "one")
@@ -1080,7 +1084,9 @@ private func quarantine(of url: URL) -> String? {
         // compressed data, which is nearly all of them (the encryption header is random: the few that start like it
         // differ from run to run).
         let record = try #require(ZipDirectory.read(RandomAccessFile(archive)).records.first)
-        guard case .archive(let offset, let file) = record.source else { return }
+        guard case .archive(let offset, let file) = record.source else {
+            return
+        }
         let start = try ZipDirectory.localHeader(of: record, at: offset, in: file).dataOffset
         // Whether `password` passes the check byte and what it decrypts to is not compressed data.
         func isNoCompressedData(_ password: String) -> Bool {

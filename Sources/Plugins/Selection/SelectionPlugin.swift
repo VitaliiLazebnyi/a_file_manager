@@ -288,9 +288,14 @@ enum SelectionScope {
 
     func contains(_ item: FileItem) -> Bool {
         switch self {
-        case .both: return true
-        case .files: return !item.isFolder
-        case .folders: return item.isFolder
+        case .both:
+            return true
+
+        case .files:
+            return !item.isFolder
+
+        case .folders:
+            return item.isFolder
         }
     }
 }
@@ -433,7 +438,9 @@ final class Selections {
                     guard !flag.isCancelled,
                         zip(models, directories).allSatisfy({ $0.directory.isSameLocation(as: $1) })
                     else { return finish() }
-                    if onMain.value.apply(frozen, result) { return finish() }
+                    if onMain.value.apply(frozen, result) {
+                        return finish()
+                    }
                     guard number < Self.attempts else {
                         finish()
                         return commands.onRejected()
@@ -501,11 +508,16 @@ final class Selections {
         let model = frozen.model
         switch change {
         case .replace:
-            if indices.isEmpty, model.selectionCount == 0 { return model.shownVersion == frozen.shownVersion }
+            if indices.isEmpty, model.selectionCount == 0 {
+                return model.shownVersion == frozen.shownVersion
+            }
             return model.setSelection(indices: indices, shownVersion: frozen.shownVersion)
 
-        case .add: return model.setSelected(true, indices: indices, shownVersion: frozen.shownVersion)
-        case .remove: return model.setSelected(false, indices: indices, shownVersion: frozen.shownVersion)
+        case .add:
+            return model.setSelected(true, indices: indices, shownVersion: frozen.shownVersion)
+
+        case .remove:
+            return model.setSelected(false, indices: indices, shownVersion: frozen.shownVersion)
         }
     }
 
@@ -535,7 +547,9 @@ final class Selections {
     /// Selects or unselects what a mask, or a selection type written `>name`, matches.
     func apply(_ text: String, select: Bool, scope: SelectionScope) {
         let text = text.trimmingCharacters(in: .whitespaces)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            return
+        }
         let rule: SelectionRule
         if text.hasPrefix(">") {
             let name = String(text.dropFirst()).trimmingCharacters(in: .whitespaces)
@@ -588,7 +602,9 @@ final class Selections {
             )
         else { return }
         let row = answer.index("row")
-        guard rows.indices.contains(row) else { return }
+        guard rows.indices.contains(row) else {
+            return
+        }
         switch answer.button {
         case 2:
             if row < types.count { store.removeType(named: types[row].name) } else { store.forget(mask: rows[row]) }
@@ -656,7 +672,9 @@ final class Selections {
         var unreadable: [String] = []
         func read<Value>(_ key: String, _ parse: (String) -> Value?) -> Value? {
             let text = answer.text(key).trimmingCharacters(in: .whitespaces)
-            guard !text.isEmpty else { return nil }
+            guard !text.isEmpty else {
+                return nil
+            }
             let value = parse(text)
             if value == nil { unreadable.append(text) }
             return value
@@ -691,7 +709,9 @@ final class Selections {
         let model = source
         let change: PanelModel.SelectionChange = select ? .add : .remove
         guard step != 0 else {
-            if scope == .both { return select ? model.selectAll() : model.clearSelection() }
+            if scope == .both {
+                return select ? model.selectAll() : model.clearSelection()
+            }
             mark(model, change, matching: { scope.contains($0) })
             return
         }
@@ -706,7 +726,9 @@ final class Selections {
                 var seen = 0
                 let every = abs(step)
                 func visit(_ index: Int) {
-                    guard scope.contains(items[index]) else { return }
+                    guard scope.contains(items[index]) else {
+                        return
+                    }
                     if seen % every == 0 { picked.append(index) }
                     seen += 1
                 }
@@ -770,10 +792,17 @@ final class Selections {
             select ? .add : .remove,
             matching: { item in
                 switch similarity {
-                case .ext: return !item.isFolder && !cursor.isFolder && same(item.ext, cursor.ext)
-                case .name: return same(item.baseName, cursor.baseName)
-                case .nameAndExt: return same(item.name, cursor.name)
-                case .path: return item.url.deletingLastPathComponent().locationKey == folder
+                case .ext:
+                    return !item.isFolder && !cursor.isFolder && same(item.ext, cursor.ext)
+
+                case .name:
+                    return same(item.baseName, cursor.baseName)
+
+                case .nameAndExt:
+                    return same(item.name, cursor.name)
+
+                case .path:
+                    return item.url.deletingLastPathComponent().locationKey == folder
                 }
             }
         )
@@ -783,7 +812,9 @@ final class Selections {
     /// a negative count works upward.
     func step(select: Bool, count: Int) {
         let model = source
-        guard count != 0, model.rowCount > 0 else { return }
+        guard count != 0, model.rowCount > 0 else {
+            return
+        }
         // A count beyond the list is the length of the list; the sum cannot overflow then.
         let count = max(-model.rowCount, min(count, model.rowCount))
         let last = max(0, min(model.cursor + (count > 0 ? count - 1 : count + 1), model.rowCount - 1))
@@ -803,7 +834,9 @@ final class Selections {
     private func file(from argument: CommandArgument, prompt: String, proposal: String, detail: String, directory: URL)
         -> URL?
     {
-        if let url = argument.location { return url }
+        if let url = argument.location {
+            return url
+        }
         guard
             let text = (argument.text ?? ui.prompt(prompt, value: proposal, detail: detail))?
                 .trimmingCharacters(
@@ -852,7 +885,9 @@ final class Selections {
                                 style: .warning
                             ) == 0
                         }
-                        guard replace else { return .cancelled }
+                        guard replace else {
+                            return .cancelled
+                        }
                         replaces = true
                     }
                     let data = SelectionFile.encode(operands.items(), as: encoding)
@@ -891,9 +926,14 @@ final class Selections {
             },
             completion: { [kernel] outcome in
                 switch outcome {
-                case .failed(let error): kernel.interaction.report(error, title: "The selection cannot be saved!")
-                case .done: kernel.panels.refresh([target.deletingLastPathComponent()])
-                case .cancelled: break
+                case .failed(let error):
+                    kernel.interaction.report(error, title: "The selection cannot be saved!")
+
+                case .done:
+                    kernel.panels.refresh([target.deletingLastPathComponent()])
+
+                case .cancelled:
+                    break
                 }
             }
         )
@@ -1005,7 +1045,9 @@ final class Selections {
 
     private func select(_ names: ListedNames, in model: PanelModel, directory: URL) {
         // The panel may have gone elsewhere while the names were found.
-        guard model.directory.isSameLocation(as: directory) else { return }
+        guard model.directory.isSameLocation(as: directory) else {
+            return
+        }
         if names.isEmpty {
             model.selectionCount == 0 ? () : model.clearSelection()
             return
@@ -1053,7 +1095,9 @@ final class Selections {
     /// (a stalled mount holds that thread, not this one); not for the main thread.
     nonisolated private static func foldsCase(_ folders: URL..., cancellation: CancellationFlag) -> Bool {
         folders.allSatisfy { folder in
-            guard folder.isFileURL else { return false }
+            guard folder.isFileURL else {
+                return false
+            }
             let key = "case " + folder.path
             let answer = BlockingCalls.answer(from: volumeQuestions, to: key, cancellation: cancellation) { _ in
                 (try? folder.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey]))?
@@ -1131,7 +1175,9 @@ final class Selections {
                 for (model, prepared) in zip(models, outcome.filters) where model.apply(prepared) == .stale {
                     fresh = false
                 }
-                guard fresh else { return false }
+                guard fresh else {
+                    return false
+                }
                 for ((model, title), marked) in zip(zip(models, titles), outcome.marked) {
                     restrictions = restrictions.filter { $0.value.model != nil }
                     restrictions[ObjectIdentifier(model)] = Restriction(
@@ -1158,7 +1204,9 @@ final class Selections {
     }
 
     private func end(_ view: RestrictedView, in model: PanelModel) {
-        guard shows(view, in: model) else { return }
+        guard shows(view, in: model) else {
+            return
+        }
         restrictions[ObjectIdentifier(model)] = nil
         model.setFilter(nil)
     }

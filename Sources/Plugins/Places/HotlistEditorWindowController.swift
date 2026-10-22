@@ -220,7 +220,9 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     @objc private func addSubmenu() {
-        guard let title = kernel.interaction.prompt("Title of the new submenu:"), !title.isEmpty else { return }
+        guard let title = kernel.interaction.prompt("Title of the new submenu:"), !title.isEmpty else {
+            return
+        }
         add(.submenu(title))
     }
 
@@ -229,7 +231,9 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     @objc private func deleteEntry() {
-        guard let path = selectedPath else { return }
+        guard let path = selectedPath else {
+            return
+        }
         let row = table.selectedRow
         hotlist.remove(at: path)
         rows = hotlist.rows
@@ -248,12 +252,16 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     @objc private func moveEntryDown() { move(1) }
 
     private func move(_ direction: Int) {
-        guard let path = selectedPath else { return }
+        guard let path = selectedPath else {
+            return
+        }
         reload(selecting: hotlist.move(at: path, by: direction))
     }
 
     @objc private func toggleHidden() {
-        guard let path = selectedPath else { return }
+        guard let path = selectedPath else {
+            return
+        }
         hotlist.toggleHideMark(at: path)
         reload(selecting: path)
     }
@@ -315,9 +323,14 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     nonisolated static func title(of row: Hotlist.Row) -> String {
         let indent = String(repeating: "      ", count: row.depth)
         switch row.entry.kind {
-        case .separator: return indent + HotlistMenu.separatorTitle
-        case .submenu: return indent + "▾ " + row.entry.title
-        case .item: return indent + row.entry.title
+        case .separator:
+            return indent + HotlistMenu.separatorTitle
+
+        case .submenu:
+            return indent + "▾ " + row.entry.title
+
+        case .item:
+            return indent + row.entry.title
         }
     }
 

@@ -20,9 +20,15 @@ enum ViewerDetection {
     /// A byte-order mark names the encoding outright.
     static func byteOrderMark(_ sample: Data) -> (encoding: ViewerEncoding, length: Int)? {
         let bytes = [UInt8](sample.prefix(3))
-        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) { return (.utf8, 3) }
-        if bytes.starts(with: [0xFF, 0xFE]) { return (.utf16LE, 2) }
-        if bytes.starts(with: [0xFE, 0xFF]) { return (.utf16BE, 2) }
+        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
+            return (.utf8, 3)
+        }
+        if bytes.starts(with: [0xFF, 0xFE]) {
+            return (.utf16LE, 2)
+        }
+        if bytes.starts(with: [0xFE, 0xFF]) {
+            return (.utf16BE, 2)
+        }
         return nil
     }
 
@@ -33,16 +39,27 @@ enum ViewerDetection {
     /// choice between the Windows and the DOS code page. `isWholeFile` says that the sample is not
     /// cut off, so a UTF-8 sequence may not end in the middle.
     static func guessText(_ sample: Data, isWholeFile: Bool) -> TextGuess {
-        if let mark = byteOrderMark(sample) { return TextGuess(encoding: mark.encoding, bomLength: mark.length) }
+        if let mark = byteOrderMark(sample) {
+            return TextGuess(encoding: mark.encoding, bomLength: mark.length)
+        }
         let bytes = [UInt8](sample)
-        guard !bytes.isEmpty else { return TextGuess(encoding: .utf8) }
-        if let utf16 = guessUTF16(bytes) { return TextGuess(encoding: utf16) }
-        if looksBinary(bytes) { return TextGuess(encoding: .ansi, isBinary: true) }
+        guard !bytes.isEmpty else {
+            return TextGuess(encoding: .utf8)
+        }
+        if let utf16 = guessUTF16(bytes) {
+            return TextGuess(encoding: utf16)
+        }
+        if looksBinary(bytes) {
+            return TextGuess(encoding: .ansi, isBinary: true)
+        }
         switch utf8Validity(bytes, mayBeCutOff: !isWholeFile) {
         // Plain ASCII reads the same in every code page; on a Mac, what follows the sample is
         // most likely UTF-8.
-        case .ascii, .multiByte: return TextGuess(encoding: .utf8)
-        case .invalid: return TextGuess(encoding: looksLikeDOS(bytes) ? .dos : .ansi)
+        case .ascii, .multiByte:
+            return TextGuess(encoding: .utf8)
+
+        case .invalid:
+            return TextGuess(encoding: looksLikeDOS(bytes) ? .dos : .ansi)
         }
     }
 
@@ -50,15 +67,21 @@ enum ViewerDetection {
     /// always on the same side.
     static func guessUTF16(_ bytes: [UInt8]) -> ViewerEncoding? {
         let pairs = bytes.count / 2
-        guard pairs >= 2 else { return nil }
+        guard pairs >= 2 else {
+            return nil
+        }
         var zeroEven = 0
         var zeroOdd = 0
         for pair in 0..<pairs {
             if bytes[pair * 2] == 0 { zeroEven += 1 }
             if bytes[pair * 2 + 1] == 0 { zeroOdd += 1 }
         }
-        if zeroOdd * 10 >= pairs * 4, zeroEven * 20 <= pairs { return .utf16LE }
-        if zeroEven * 10 >= pairs * 4, zeroOdd * 20 <= pairs { return .utf16BE }
+        if zeroOdd * 10 >= pairs * 4, zeroEven * 20 <= pairs {
+            return .utf16LE
+        }
+        if zeroEven * 10 >= pairs * 4, zeroOdd * 20 <= pairs {
+            return .utf16BE
+        }
         return nil
     }
 
@@ -67,7 +90,9 @@ enum ViewerDetection {
     static func looksBinary(_ bytes: [UInt8]) -> Bool {
         var controls = 0
         for byte in bytes {
-            if byte == 0 { return true }
+            if byte == 0 {
+                return true
+            }
             // Tab, line ends, form feed, the DOS end-of-file mark and Escape occur in text.
             if byte < 0x20, ![0x09, 0x0A, 0x0D, 0x0C, 0x1A, 0x1B].contains(byte) { controls += 1 }
         }
@@ -82,14 +107,20 @@ enum ViewerDetection {
         var text = DecodedText()
         let used = ViewerEncoding.utf8.decode(bytes, final: false, into: &text)
         // A sequence that only lacks its end is fine when the sample was cut off there.
-        if used < bytes.count, !(mayBeCutOff && bytes.count - used < 4) { return .invalid }
-        if text.units.contains(CodeTable.replacement), !containsReplacementCharacter(bytes) { return .invalid }
+        if used < bytes.count, !(mayBeCutOff && bytes.count - used < 4) {
+            return .invalid
+        }
+        if text.units.contains(CodeTable.replacement), !containsReplacementCharacter(bytes) {
+            return .invalid
+        }
         return text.units.count == used ? .ascii : .multiByte
     }
 
     /// Whether U+FFFD itself (EF BF BD) is in the bytes, in which case seeing it decoded proves nothing.
     private static func containsReplacementCharacter(_ bytes: [UInt8]) -> Bool {
-        guard bytes.count >= 3 else { return false }
+        guard bytes.count >= 3 else {
+            return false
+        }
         return (0..<bytes.count - 2).contains { bytes[$0] == 0xEF && bytes[$0 + 1] == 0xBF && bytes[$0 + 2] == 0xBD }
     }
 
@@ -143,22 +174,34 @@ enum ViewerDetection {
         func starts(_ signature: [UInt8], at offset: Int = 0) -> Bool {
             head.count >= offset + signature.count && Array(head[offset..<offset + signature.count]) == signature
         }
-        if starts(Array("%PDF-".utf8)) || ext == "pdf" { return .pdf }
-        if starts(Array("{\\rtf".utf8)) { return .rtf }
+        if starts(Array("%PDF-".utf8)) || ext == "pdf" {
+            return .pdf
+        }
+        if starts(Array("{\\rtf".utf8)) {
+            return .rtf
+        }
         if !vetoed.contains(ext) {
             let isImageByContent =
                 starts([0x89, 0x50, 0x4E, 0x47]) || starts([0xFF, 0xD8, 0xFF]) || starts(Array("GIF8".utf8))
                 || (starts(Array("BM".utf8)) && ext == "bmp")
                 || (starts(Array("RIFF".utf8)) && starts(Array("WEBP".utf8), at: 8))
-            if isImageByContent || imageExtensions.contains(ext) { return .image }
-            if mediaExtensions.contains(ext) || additionalMedia.contains(ext) { return .media }
+            if isImageByContent || imageExtensions.contains(ext) {
+                return .image
+            }
+            if mediaExtensions.contains(ext) || additionalMedia.contains(ext) {
+                return .media
+            }
         }
-        if htmlExtensions.contains(ext) { return .html }
+        if htmlExtensions.contains(ext) {
+            return .html
+        }
         let start = String(decoding: sample.prefix(256), as: UTF8.self).lowercased()
             .drop {
                 $0.isWhitespace || $0 == "\u{FEFF}"
             }
-        if start.hasPrefix("<!doctype html") || start.hasPrefix("<html") { return .html }
+        if start.hasPrefix("<!doctype html") || start.hasPrefix("<html") {
+            return .html
+        }
         return .other
     }
 
@@ -177,17 +220,28 @@ enum ViewerDetection {
     /// `http-equiv` form), if any (spec 10 › HTML text).
     static func htmlCharset(_ sample: Data) -> ViewerEncoding? {
         let head = String(decoding: sample.prefix(4_096), as: UTF8.self).lowercased()
-        guard let range = head.range(of: "charset=") else { return nil }
+        guard let range = head.range(of: "charset=") else {
+            return nil
+        }
         let name = head[range.upperBound...].drop { "\"' ".contains($0) }
             .prefix {
                 $0.isLetter || $0.isNumber || "-_".contains($0)
             }
         switch name {
-        case "utf-8", "utf8": return .utf8
-        case "utf-16", "utf-16le": return .utf16LE
-        case "utf-16be": return .utf16BE
-        case "iso-8859-1", "latin1": return .latin1
-        case "macintosh": return .macRoman
+        case "utf-8", "utf8":
+            return .utf8
+
+        case "utf-16", "utf-16le":
+            return .utf16LE
+
+        case "utf-16be":
+            return .utf16BE
+
+        case "iso-8859-1", "latin1":
+            return .latin1
+
+        case "macintosh":
+            return .macRoman
 
         default:
             if name.hasPrefix("windows-"), let number = Int(name.dropFirst(8)) {

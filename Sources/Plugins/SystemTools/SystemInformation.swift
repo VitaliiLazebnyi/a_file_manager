@@ -53,7 +53,9 @@ struct SystemInformation: Equatable {
 
     /// Free space of a volume as on the drive line: `1,439,946,852 k of 7,811,085,600 k free`.
     static func space(free: Int64?, total: Int64?) -> String {
-        guard let free, let total else { return "size unknown" }
+        guard let free, let total else {
+            return "size unknown"
+        }
         return "\(Format.bytes(free / 1_024)) k of \(Format.bytes(total / 1_024)) k free"
     }
 
@@ -231,10 +233,18 @@ enum VolumeName {
 
     /// Nil when the name is fine, else what is wrong with it.
     static func problem(with name: String) -> String? {
-        if name.isEmpty { return "The name must not be empty." }
-        if name.utf8.count > maximumLength { return "The name is too long." }
-        if name.contains("/") || name.contains(":") { return "The name must not contain / or :." }
-        if name.hasPrefix(".") { return "The name must not start with a dot." }
+        if name.isEmpty {
+            return "The name must not be empty."
+        }
+        if name.utf8.count > maximumLength {
+            return "The name is too long."
+        }
+        if name.contains("/") || name.contains(":") {
+            return "The name must not contain / or :."
+        }
+        if name.hasPrefix(".") {
+            return "The name must not start with a dot."
+        }
         return nil
     }
 }

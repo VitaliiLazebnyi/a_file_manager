@@ -166,9 +166,13 @@ public enum ServerSchemes {
 
     /// The volume a local path lies on, when it is one under /Volumes; nil for the startup disk.
     public static func mountedVolume(of url: URL) -> URL? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL else {
+            return nil
+        }
         let parts = url.standardizedFileURL.pathComponents
-        guard parts.count >= 3, parts[1] == "Volumes" else { return nil }
+        guard parts.count >= 3, parts[1] == "Volumes" else {
+            return nil
+        }
         return URL(fileURLWithPath: "/Volumes/" + parts[2], isDirectory: true)
     }
 }

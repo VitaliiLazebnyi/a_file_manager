@@ -89,9 +89,14 @@ final class JobBridge: FileJobDelegate, Sendable {
         monitor.ask { @MainActor @Sendable in
             let paths = "\(shown(source.url))\n\(shown(target.url))"
             switch same {
-            case true?: ui.inform("The two files have the same content!", detail: paths, style: .information)
-            case false?: ui.inform("The two files are different!", detail: paths, style: .information)
-            default: ui.inform("The two files could not be compared.", detail: paths, style: .warning)
+            case true?:
+                ui.inform("The two files have the same content!", detail: paths, style: .information)
+
+            case false?:
+                ui.inform("The two files are different!", detail: paths, style: .information)
+
+            default:
+                ui.inform("The two files could not be compared.", detail: paths, style: .warning)
             }
         }
         return resolve(job, target: target, source: source, detail: detail, more: more)
@@ -113,11 +118,20 @@ final class JobBridge: FileJobDelegate, Sendable {
             defaultButton: Self.overwriteDefault
         )
         switch button {
-        case 0: return .answer(.overwrite)
-        case 1: return .answer(.overwriteAll)
-        case 2: return .answer(.skip)
-        case 3: return .answer(.skipAll)
-        case 4: return .answer(.overwriteAllOlder)
+        case 0:
+            return .answer(.overwrite)
+
+        case 1:
+            return .answer(.overwriteAll)
+
+        case 2:
+            return .answer(.skip)
+
+        case 3:
+            return .answer(.skipAll)
+
+        case 4:
+            return .answer(.overwriteAllOlder)
 
         case 5:
             if let name = newName("New name for the file being copied:", proposing: target.name) {
@@ -131,7 +145,8 @@ final class JobBridge: FileJobDelegate, Sendable {
                 return step
             }
 
-        default: return .answer(.cancel)
+        default:
+            return .answer(.cancel)
         }
         return overwriteStep(target: target, detail: detail, more: more)
     }
@@ -142,20 +157,38 @@ final class JobBridge: FileJobDelegate, Sendable {
     @MainActor
     private func moreStep(_ option: MoreOption, target: FileItem) -> OverwriteStep? {
         switch option {
-        case .compare: return .compare
-        case .append: return .answer(.append)
-        case .resume: return .answer(.resume)
+        case .compare:
+            return .compare
+
+        case .append:
+            return .answer(.append)
+
+        case .resume:
+            return .answer(.resume)
+
         case .renameExisting:
             return newName("New name for the existing target file:", proposing: target.name)
                 .map {
                     .answer(.renameExisting($0))
                 }
-        case .autoRenameCopied: return .answer(.autoRenameCopied)
-        case .autoRenameExisting: return .answer(.autoRenameExisting)
-        case .renameOlderSkipNewer: return .answer(.renameOlderSkipNewer)
-        case .olderOrSame: return .answer(.overwriteAllOlderOrSame)
-        case .larger: return .answer(.copyAllLarger)
-        case .smaller: return .answer(.copyAllSmaller)
+
+        case .autoRenameCopied:
+            return .answer(.autoRenameCopied)
+
+        case .autoRenameExisting:
+            return .answer(.autoRenameExisting)
+
+        case .renameOlderSkipNewer:
+            return .answer(.renameOlderSkipNewer)
+
+        case .olderOrSame:
+            return .answer(.overwriteAllOlderOrSame)
+
+        case .larger:
+            return .answer(.copyAllLarger)
+
+        case .smaller:
+            return .answer(.copyAllSmaller)
         }
     }
 

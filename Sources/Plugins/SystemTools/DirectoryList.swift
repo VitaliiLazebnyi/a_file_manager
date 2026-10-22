@@ -128,14 +128,29 @@ struct DirectoryListFormatter {
                 continue
             }
             switch characters.next() {
-            case "p": result += String(page)
-            case "t": result += String(pages)
-            case "d": result += directory
-            case "D": result += DateFormatter.localizedString(from: now, dateStyle: .short, timeStyle: .none)
-            case "T": result += DateFormatter.localizedString(from: now, dateStyle: .none, timeStyle: .medium)
-            case "%": result.append("%")
-            case let other?: result += "%" + String(other)
-            case nil: result.append("%")
+            case "p":
+                result += String(page)
+
+            case "t":
+                result += String(pages)
+
+            case "d":
+                result += directory
+
+            case "D":
+                result += DateFormatter.localizedString(from: now, dateStyle: .short, timeStyle: .none)
+
+            case "T":
+                result += DateFormatter.localizedString(from: now, dateStyle: .none, timeStyle: .medium)
+
+            case "%":
+                result.append("%")
+
+            case let other?:
+                result += "%" + String(other)
+
+            case nil:
+                result.append("%")
             }
         }
         return result
@@ -151,7 +166,9 @@ struct DirectoryListFormatter {
 
     func line(_ row: ListRow, nameWidth: Int, sizeWidth: Int) -> String {
         let name = row.isFolder && !row.name.hasSuffix("/") ? row.name + "/" : row.name
-        guard isDetailed else { return name }
+        guard isDetailed else {
+            return name
+        }
         let size = row.isFolder ? "<DIR>" : Format.bytes(row.size)
         let padded = name.count < nameWidth ? name.padding(toLength: nameWidth, withPad: " ", startingAt: 0) : name
         return
@@ -181,7 +198,9 @@ struct DirectoryListFormatter {
             }
         return chunks.enumerated()
             .map { index, chunk in
-                guard hasHeader else { return chunk }
+                guard hasHeader else {
+                    return chunk
+                }
                 return [
                     Self.expand(
                         header,

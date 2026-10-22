@@ -37,8 +37,11 @@ enum HTMLText {
     /// White space as `Character.isWhitespace` and trimming know it.
     @inline(__always) private static func isWhitespace(_ unit: UInt16) -> Bool {
         switch unit {
-        case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000: return true
-        default: return false
+        case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000:
+            return true
+
+        default:
+            return false
         }
     }
 
@@ -98,7 +101,9 @@ enum HTMLText {
         @inline(__always) func kind(of key: TagKey) -> TagKind? {
             var slot = Self.slot(key)
             while let entry = slots[slot] {
-                if entry.key == key { return entry.kind }
+                if entry.key == key {
+                    return entry.kind
+                }
                 slot = (slot + 1) & 127
             }
             return nil
@@ -117,7 +122,9 @@ enum HTMLText {
     /// The text for an entity name given as units, when it is one of `commonEntities`.
     @inline(__always)
     private static func commonEntity(_ name: UnsafeBufferPointer<UInt16>) -> [UInt16]? {
-        guard name.count >= 2, name.count <= 4 else { return nil }
+        guard name.count >= 2, name.count <= 4 else {
+            return nil
+        }
         for entity in commonEntities where entity.name.count == name.count && entity.name.elementsEqual(name) {
             return entity.replacement
         }
@@ -168,7 +175,9 @@ enum HTMLText {
                     break
                 }
             }
-            if matches { return value }
+            if matches {
+                return value
+            }
         }
         return nil
     }
@@ -305,7 +314,9 @@ enum HTMLText {
                 var position = from
                 while position + 1 + name.count < count {
                     position = find(0x3C, from: position)
-                    guard position + 1 + name.count < count else { return nil }
+                    guard position + 1 + name.count < count else {
+                        return nil
+                    }
                     if input[position + 1] == 0x2F {
                         var matches = true
                         for (offset, letter) in name.enumerated() {
@@ -315,7 +326,9 @@ enum HTMLText {
                                 break
                             }
                         }
-                        if matches { return position + 2 + name.count }
+                        if matches {
+                            return position + 2 + name.count
+                        }
                     }
                     position += 1
                 }
@@ -427,7 +440,9 @@ enum HTMLText {
                     continue
                 }
                 let close = tagEnd(input, from: open)
-                guard close < count else { return }
+                guard close < count else {
+                    return
+                }
                 index = close + 1
                 var start = open + 1
                 let isClosing = start < close && input[start] == 0x2F
@@ -476,7 +491,9 @@ enum HTMLText {
                 }
             }
         }
-        if cancelled { return (Result(text: "", links: []), true) }
+        if cancelled {
+            return (Result(text: "", links: []), true)
+        }
         var lower = 0
         var upper = text.count
         while lower < upper, isWhitespace(text[lower]) { lower += 1 }
@@ -506,7 +523,9 @@ enum HTMLText {
     }
 
     static func decodeEntities(_ text: Substring) -> String {
-        guard text.contains("&") else { return String(text) }
+        guard text.contains("&") else {
+            return String(text)
+        }
         var result = ""
         var rest = text
         while let ampersand = rest.firstIndex(of: "&") {
@@ -537,9 +556,15 @@ enum HTMLText {
             in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "{}<>\"'()[],;"))
         )
         let lowered = trimmed.lowercased()
-        guard !trimmed.contains(" ") else { return nil }
-        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") { return URL(string: trimmed) }
-        if lowered.hasPrefix("www.") { return URL(string: "https://" + trimmed) }
+        guard !trimmed.contains(" ") else {
+            return nil
+        }
+        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") {
+            return URL(string: trimmed)
+        }
+        if lowered.hasPrefix("www.") {
+            return URL(string: "https://" + trimmed)
+        }
         return nil
     }
 }

@@ -222,7 +222,9 @@ private final class Record<Value>: @unchecked Sendable {
     }
 
     @Test func aRequestThatIsNeverAnsweredEndsOnTheFlag() throws {
-        guard FakeSFTPServer.isAvailable else { return }
+        guard FakeSFTPServer.isAvailable else {
+            return
+        }
         // Logged in, and the server answers everything but the question about this one path.
         let suite = try NetworkFixSFTP(mode: .hangingStat, timeout: 600)
         try Data("x".utf8).write(to: suite.box.url("srv/hang"))
@@ -364,7 +366,9 @@ private final class Record<Value>: @unchecked Sendable {
                 lock.lock()
                 defer { lock.unlock() }
                 log.append("copy \(account(query))")
-                guard let data = items[account(query)] else { return errSecItemNotFound }
+                guard let data = items[account(query)] else {
+                    return errSecItemNotFound
+                }
                 result?.pointee = data as CFData
                 return errSecSuccess
             }
@@ -372,8 +376,12 @@ private final class Record<Value>: @unchecked Sendable {
                 lock.lock()
                 defer { lock.unlock() }
                 log.append("update \(account(query))")
-                if let updateStatus { return updateStatus }
-                guard items[account(query)] != nil else { return errSecItemNotFound }
+                if let updateStatus {
+                    return updateStatus
+                }
+                guard items[account(query)] != nil else {
+                    return errSecItemNotFound
+                }
                 items[account(query)] = (changes as NSDictionary)[kSecValueData] as? Data
                 return errSecSuccess
             }
@@ -381,8 +389,12 @@ private final class Record<Value>: @unchecked Sendable {
                 lock.lock()
                 defer { lock.unlock() }
                 log.append("add \(account(item))")
-                guard addStatus == errSecSuccess else { return addStatus }
-                guard items[account(item)] == nil else { return errSecDuplicateItem }
+                guard addStatus == errSecSuccess else {
+                    return addStatus
+                }
+                guard items[account(item)] == nil else {
+                    return errSecDuplicateItem
+                }
                 items[account(item)] = (item as NSDictionary)[kSecValueData] as? Data
                 return errSecSuccess
             }

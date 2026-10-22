@@ -103,13 +103,17 @@ public final class MacIntegrationPlugin: Plugin {
             quickLook.follow(model.cursorItem.flatMap { $0.url.isFileURL ? [$0.url] : nil } ?? [])
             return
         }
-        if let followed, followed == state { return }
+        if let followed, followed == state {
+            return
+        }
         followed = state
         followTicket += 1
         let ticket = followTicket
         withLocalOperands(of: model, { $0 }) { [weak self] urls in
             // Something newer is being shown by now.
-            guard let self, followTicket == ticket, quickLook.isVisible else { return }
+            guard let self, followTicket == ticket, quickLook.isVisible else {
+                return
+            }
             quickLook.follow(urls)
         }
     }
@@ -176,7 +180,9 @@ public final class MacIntegrationPlugin: Plugin {
             return fm.fileExists(atPath: path) ? URL(fileURLWithPath: path) : fallback
         }
         let name = text.hasSuffix(".app") ? String(text.dropLast(4)) : text
-        guard !name.isEmpty else { return fallback }
+        guard !name.isEmpty else {
+            return fallback
+        }
         let folders = [
             "/Applications", "/System/Applications", "/Applications/Utilities", "/System/Applications/Utilities",
             fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path
@@ -191,7 +197,9 @@ public final class MacIntegrationPlugin: Plugin {
 
     private func open(_ urls: [URL], with application: URL?) {
         remember(opened: urls)
-        guard let desktop else { return }
+        guard let desktop else {
+            return
+        }
         if let application {
             desktop.open(urls, with: application)
         } else {
@@ -219,7 +227,9 @@ public final class MacIntegrationPlugin: Plugin {
         // The general opener: any local file goes to its application. Plugins that understand
         // particular files (archives) add openers with a higher priority.
         kernel.openers.add(priority: 0) { [self] file, _ in
-            guard file.url.isFileURL else { return false }
+            guard file.url.isFileURL else {
+                return false
+            }
             open([file.url], with: nil)
             return true
         }
@@ -229,14 +239,18 @@ public final class MacIntegrationPlugin: Plugin {
             Command(.edit, "Edit", [.f(4)], barLabel: "Edit", runsDuringJobs: true),
             enabled: { cursorFile() != nil },
             parameterized: { [self] argument in
-                guard let url = argument.location ?? cursorFile(), url.isFileURL else { return }
+                guard let url = argument.location ?? cursorFile(), url.isFileURL else {
+                    return
+                }
                 let editor = kernel.settings.text(
                     Self.editorKey,
                     default: Self.defaultEditor
                 )
                 remember(opened: [url])
                 remember("edit \(DisplayText.oneLine(editor, limit: 200)) \(url.path)")
-                guard let desktop else { return }
+                guard let desktop else {
+                    return
+                }
                 // (The system looks at the file and the application: on a thread of the kernel's own.)
                 BlockingCalls.run { desktop.open([url], with: Self.editorApplication(named: editor)) }
             }
@@ -283,7 +297,9 @@ public final class MacIntegrationPlugin: Plugin {
                 // Without operands, the folder itself.
                 let shown = urls.isEmpty ? [directory] : urls
                 remember("reveal " + Self.described(shown))
-                guard let desktop else { return }
+                guard let desktop else {
+                    return
+                }
                 // Finder is asked away from the main thread: it looks at every file it is to select.
                 BlockingCalls.run { desktop.reveal(shown) }
             }
@@ -417,7 +433,9 @@ public final class MacIntegrationPlugin: Plugin {
                 ) { _ in applications(url) }
             },
             completion: { [self] found in
-                guard let candidates = found else { return }
+                guard let candidates = found else {
+                    return
+                }
                 let rows = candidates.enumerated()
                     .map {
                         Self.applicationName($0.element) + ($0.offset == 0 ? " (default)" : "")
@@ -497,7 +515,9 @@ public final class MacIntegrationPlugin: Plugin {
     }
 
     private func editTags(of urls: [URL], in kernel: Kernel) {
-        guard let first = urls.first else { return }
+        guard let first = urls.first else {
+            return
+        }
         kernel.jobs.run(
             title: "Reading tags",
             work: { _ in Self.tags(of: first) },

@@ -58,8 +58,12 @@ final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
         }
 
         func read(upToCount count: Int) -> Data? {
-            guard let data else { return Data(repeating: 0x41, count: count) }
-            guard position < data.count else { return nil }
+            guard let data else {
+                return Data(repeating: 0x41, count: count)
+            }
+            guard position < data.count else {
+                return nil
+            }
             let block = data.subdata(in: position..<min(data.count, position + count))
             position += block.count
             return block

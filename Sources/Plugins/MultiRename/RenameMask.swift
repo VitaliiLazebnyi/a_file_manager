@@ -270,13 +270,17 @@ struct RenameMask {
         }
 
         mutating func next() -> Character? {
-            guard let character = peek() else { return nil }
+            guard let character = peek() else {
+                return nil
+            }
             position += 1
             return character
         }
 
         mutating func accept(_ character: Character) -> Bool {
-            guard peek() == character else { return false }
+            guard peek() == character else {
+                return false
+            }
             position += 1
             return true
         }
@@ -324,7 +328,9 @@ struct RenameMask {
                 return CharacterRange(pad: pad, first: first, end: .length(length))
             }
             if accept("-") {
-                if let last = signedPosition() { return CharacterRange(pad: pad, first: first, end: .position(last)) }
+                if let last = signedPosition() {
+                    return CharacterRange(pad: pad, first: first, end: .position(last))
+                }
                 return CharacterRange(pad: pad, first: first, end: .toEnd)
             }
             return CharacterRange(pad: pad, first: first, end: .single)
@@ -344,10 +350,14 @@ struct RenameMask {
         var tokens: [Token] = []
         let whole = "[" + String(content) + "]"
         func fail(_ error: RenameMaskError? = nil) -> [Token] { [.invalid(error ?? .invalidPlaceholder(whole))] }
-        guard !content.isEmpty else { return fail() }
+        guard !content.isEmpty else {
+            return fail()
+        }
         // A range without a letter takes its characters from the full path.
         if scanner.startsRange {
-            guard let range = scanner.range() else { return fail() }
+            guard let range = scanner.range() else {
+                return fail()
+            }
             tokens.append(.text(.fullPath, range))
         }
         while let character = scanner.next() {
@@ -367,10 +377,14 @@ struct RenameMask {
 
                 case "B":
                     let fromLeft = scanner.accept("+")
-                    guard let level = scanner.number() else { return fail() }
+                    guard let level = scanner.number() else {
+                        return fail()
+                    }
                     var range: CharacterRange?
                     if scanner.accept("_") {
-                        guard let parsed = scanner.range() else { return fail() }
+                        guard let parsed = scanner.range() else {
+                            return fail()
+                        }
                         range = parsed
                     }
                     tokens.append(.text(fromLeft ? .folderFromLeft(level) : .folderFromRight(level), range))
@@ -382,12 +396,16 @@ struct RenameMask {
                     tokens.append(.folderDot(scanner.accept("1") ? true : scanner.accept("0") ? false : nil))
 
                 case "C":
-                    guard let counter = inlineCounter(&scanner) else { return fail() }
+                    guard let counter = inlineCounter(&scanner) else {
+                        return fail()
+                    }
                     tokens.append(.counter(counter.isInline ? counter.definition : nil))
 
                 case "c":
                     let kind = scanner.number() ?? 1
-                    guard (1...3).contains(kind) else { return fail() }
+                    guard (1...3).contains(kind) else {
+                        return fail()
+                    }
                     tokens.append(.count(kind))
 
                 case "T":
@@ -414,7 +432,9 @@ struct RenameMask {
                         name.append(next)
                         scanner.position += 1
                     }
-                    guard !name.isEmpty, scanner.accept("%") else { return fail() }
+                    guard !name.isEmpty, scanner.accept("%") else {
+                        return fail()
+                    }
                     if scanner.startsRange {
                         tokens.append(.text(.environment(name, .whole), scanner.range()))
                     } else if let form = scanner.next() {
@@ -455,12 +475,16 @@ struct RenameMask {
         if scanner.peek() == "+" || (scanner.peek() == "-" && scanner.isDigit(1)) {
             var negative = scanner.next() == "-"
             if scanner.accept("-") { negative = true }
-            guard let step = scanner.number() else { return nil }
+            guard let step = scanner.number() else {
+                return nil
+            }
             counter.step = negative ? -step : step
             isInline = true
         }
         if scanner.accept("/") {
-            guard let divisor = scanner.number(), divisor > 0 else { return nil }
+            guard let divisor = scanner.number(), divisor > 0 else {
+                return nil
+            }
             counter.divisor = divisor
             isInline = true
         }
@@ -468,7 +492,9 @@ struct RenameMask {
             if scanner.accept("a") {
                 counter.digits = nil
             } else {
-                guard let digits = scanner.number() else { return nil }
+                guard let digits = scanner.number() else {
+                    return nil
+                }
                 counter.digits = digits
             }
             isInline = true
@@ -558,14 +584,18 @@ extension RenameMask {
             }
             var date: Date
             switch state.timeSource {
-            case 2: date = context.opened
-            case 3: date = context.changed
+            case 2:
+                date = context.opened
+
+            case 3:
+                date = context.changed
 
             case 4:
                 guard let found = context.contentDate?(subject) else { throw RenameMaskError.noContentDate }
                 date = found
 
-            default: date = subject.modified
+            default:
+                date = subject.modified
             }
             // An offset beyond what the calendar can count leaves the date as it is.
             if let offset = state.timeOffset,
@@ -611,26 +641,52 @@ extension RenameMask {
                         digits: Self.width(context.counter.digits, context)
                     )
 
-                default: text = String(context.count)
+                default:
+                    text = String(context.count)
                 }
 
             case .date(let field):
                 let moment = try moment()
                 let hour = moment.hour
                 switch field {
-                case .year4: text = String(format: "%04d", moment.year)
-                case .year2: text = twoDigits(moment.year % 100)
-                case .month: text = twoDigits(moment.month)
-                case .day: text = twoDigits(moment.day)
-                case .hour24: text = twoDigits(hour)
-                case .hour12: text = twoDigits(hour % 12 == 0 ? 12 : hour % 12)
-                case .minute: text = twoDigits(moment.minute)
-                case .second: text = twoDigits(moment.second)
-                case .millisecond: text = String(format: "%03d", min(999, moment.nanosecond / 1_000_000))
-                case .amPm: text = hour < 12 ? "am" : "pm"
-                case .amPmShort: text = hour < 12 ? "a" : "p"
-                case .date: text = Self.nameSafe(formats.date.string(from: moment.date))
-                case .time: text = Self.nameSafe(formats.time.string(from: moment.date))
+                case .year4:
+                    text = String(format: "%04d", moment.year)
+
+                case .year2:
+                    text = twoDigits(moment.year % 100)
+
+                case .month:
+                    text = twoDigits(moment.month)
+
+                case .day:
+                    text = twoDigits(moment.day)
+
+                case .hour24:
+                    text = twoDigits(hour)
+
+                case .hour12:
+                    text = twoDigits(hour % 12 == 0 ? 12 : hour % 12)
+
+                case .minute:
+                    text = twoDigits(moment.minute)
+
+                case .second:
+                    text = twoDigits(moment.second)
+
+                case .millisecond:
+                    text = String(format: "%03d", min(999, moment.nanosecond / 1_000_000))
+
+                case .amPm:
+                    text = hour < 12 ? "am" : "pm"
+
+                case .amPmShort:
+                    text = hour < 12 ? "a" : "p"
+
+                case .date:
+                    text = Self.nameSafe(formats.date.string(from: moment.date))
+
+                case .time:
+                    text = Self.nameSafe(formats.time.string(from: moment.date))
                 }
 
             case .timeSource(let source, let offset):
@@ -664,7 +720,9 @@ extension RenameMask {
     /// Name and extension as the masks see them: split at the last dot, also for folders
     /// unless `[I]` is on.
     static func parts(of subject: RenameSubject, _ state: MaskState) -> (name: String, ext: String) {
-        if subject.isFolder, state.foldersHaveNoExtension { return (subject.name, "") }
+        if subject.isFolder, state.foldersHaveNoExtension {
+            return (subject.name, "")
+        }
         // As in `FileItem.split`: a leading dot starts no extension, a trailing dot ends none
         // (`Acme Inc.` keeps its dot in the name).
         guard let dot = subject.name.lastIndex(of: "."), dot != subject.name.startIndex,
@@ -684,13 +742,26 @@ extension RenameMask {
             folders.indices.contains(folders.count - 1 - level) ? folders[folders.count - 1 - level] : ""
         }
         switch source {
-        case .name: return parts(of: subject, state).name
-        case .ext: return parts(of: subject, state).ext
-        case .nameWithExt: return subject.name
-        case .fullPath: return subject.fullPath
-        case .parent: return fromRight(0)
-        case .grandparent: return fromRight(1)
-        case .folderFromRight(let level): return fromRight(level)
+        case .name:
+            return parts(of: subject, state).name
+
+        case .ext:
+            return parts(of: subject, state).ext
+
+        case .nameWithExt:
+            return subject.name
+
+        case .fullPath:
+            return subject.fullPath
+
+        case .parent:
+            return fromRight(0)
+
+        case .grandparent:
+            return fromRight(1)
+
+        case .folderFromRight(let level):
+            return fromRight(level)
 
         // `[B+0]` is the drive letter on Windows; a Mac path has nothing in that place.
         case .folderFromLeft(let level):
@@ -698,7 +769,9 @@ extension RenameMask {
 
         case .clipboard(let optional):
             guard let text = context.clipboard ?? context.clipboardLoader?(), !text.isEmpty else {
-                if optional { return "" }
+                if optional {
+                    return ""
+                }
                 throw RenameMaskError.emptyClipboard
             }
             let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
@@ -707,8 +780,11 @@ extension RenameMask {
         case .environment(let name, let form):
             let value = context.environment[name] ?? ""
             switch form {
-            case .whole: return value
-            case .lastPart: return value.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
+            case .whole:
+                return value
+
+            case .lastPart:
+                return value.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
 
             case .separator(let separator):
                 return String(value.compactMap { $0 == ":" ? nil : ($0 == "/" || $0 == "\\") ? separator : $0 })
@@ -726,7 +802,9 @@ extension RenameMask {
     static let widestFill = 255
 
     private static func width(_ digits: Int?, _ context: RenameContext) -> Int {
-        guard let digits, digits > 0 else { return String(max(context.count, 1)).count }
+        guard let digits, digits > 0 else {
+            return String(max(context.count, 1)).count
+        }
         return min(digits, widestFill)
     }
 
@@ -753,7 +831,9 @@ extension RenameMask {
             )
         }
         let steps = try number(0, plus: inline.step, times: index / inline.divisor)
-        if let letters = inline.letters { return try alphabetic(letters, advancedBy: steps) }
+        if let letters = inline.letters {
+            return try alphabetic(letters, advancedBy: steps)
+        }
         return padded(try number(inline.start, plus: steps, times: 1), digits: width(inline.digits, context))
     }
 

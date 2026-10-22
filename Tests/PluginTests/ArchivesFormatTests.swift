@@ -185,7 +185,9 @@ func runTool(_ path: String, _ arguments: [String], in directory: URL? = nil) ->
 func snapshot(_ folder: URL) -> [String: Data?] {
     var found: [String: Data?] = [:]
     let base = folder.resolvingSymlinksInPath().path
-    guard let walker = FileManager.default.enumerator(atPath: base) else { return found }
+    guard let walker = FileManager.default.enumerator(atPath: base) else {
+        return found
+    }
     for case let path as String in walker {
         var isDirectory: ObjCBool = false
         FileManager.default.fileExists(atPath: base + "/" + path, isDirectory: &isDirectory)
@@ -561,7 +563,9 @@ func snapshot(_ folder: URL) -> [String: Data?] {
         let fresh = try ArchiveBench()
         fresh.passwords.set(["a", "b", "c"])
         #expect { try fresh.read(fresh.inside(strong, "tree/readme.txt")) } throws: { error in
-            if case ArchiveError.wrongPassword = error { return true }
+            if case ArchiveError.wrongPassword = error {
+                return true
+            }
             return false
         }
     }

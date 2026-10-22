@@ -68,7 +68,9 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
                 control = popUp
             }
             controls.append((preference, control))
-            if case .flag = preference.kind { return [NSGridCell.emptyContentView, control] }
+            if case .flag = preference.kind {
+                return [NSGridCell.emptyContentView, control]
+            }
             return [label, control]
         }
         let grid = NSGridView(views: rows)
@@ -93,8 +95,12 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
     @objc private func changed() {
         for (preference, control) in controls {
             switch preference.kind {
-            case .flag: model.set(.flag((control as? NSButton)?.state == .on), for: preference)
-            case .text: model.set(.text(control.stringValue), for: preference)
+            case .flag:
+                model.set(.flag((control as? NSButton)?.state == .on), for: preference)
+
+            case .text:
+                model.set(.text(control.stringValue), for: preference)
+
             case .choice:
                 if let popUp = control as? NSPopUpButton {
                     model.set(.index(popUp.indexOfSelectedItem), for: preference)
@@ -109,9 +115,14 @@ final class PreferencesPage: NSObject, OptionsPage, NSTextFieldDelegate {
     private func show() {
         for (preference, control) in controls {
             switch model.value(of: preference) {
-            case .flag(let isOn): (control as? NSButton)?.state = isOn ? .on : .off
-            case .text(let text): control.stringValue = text
-            case .index(let index): (control as? NSPopUpButton)?.selectItem(at: index)
+            case .flag(let isOn):
+                (control as? NSButton)?.state = isOn ? .on : .off
+
+            case .text(let text):
+                control.stringValue = text
+
+            case .index(let index):
+                (control as? NSPopUpButton)?.selectItem(at: index)
             }
         }
     }
@@ -216,7 +227,9 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
         status.stringValue = "Press the new shortcut for “\(row.title)”. Esc cancels."
         view.window?.makeFirstResponder(table.tableView)
         monitor = center.effects.monitorKeys { [weak self] event in
-            guard let self, event.window === view.window else { return event }
+            guard let self, event.window === view.window else {
+                return event
+            }
             stopRecording()
             var modifiers: KeyModifiers = []
             if event.modifierFlags.contains(.shift) { modifiers.insert(.shift) }
@@ -245,7 +258,9 @@ final class KeyboardPage: NSObject, OptionsPage, NSSearchFieldDelegate {
 
     func commit() {
         stopRecording()
-        guard editor.isChanged else { return }
+        guard editor.isChanged else {
+            return
+        }
         editor.commit(to: center.kernel.settings, keyBindings: center.kernel.keyBindings)
         center.refreshMenus()
         discard()
@@ -276,7 +291,9 @@ final class ButtonBarPage: NSObject, OptionsPage {
         table,
         buttons: [
             ActionButton("Add Command…") { [unowned self] in
-                guard let picked = center.pickCommand() else { return }
+                guard let picked = center.pickCommand() else {
+                    return
+                }
                 edited(selecting: editor.insert(picked.id, after: table.selectedRow))
             },
             ActionButton("Add Separator") { [unowned self] in
@@ -286,7 +303,9 @@ final class ButtonBarPage: NSObject, OptionsPage {
                 edited(selecting: editor.insert(ToolbarRegistry.lineBreak, after: table.selectedRow))
             },
             ActionButton("Remove") { [unowned self] in
-                guard let row = table.selectedRow else { return center.effects.beep() }
+                guard let row = table.selectedRow else {
+                    return center.effects.beep()
+                }
                 editor.remove(at: row)
                 edited(selecting: row)
             },
@@ -319,7 +338,9 @@ final class ButtonBarPage: NSObject, OptionsPage {
         let commands = center.kernel.commands
         table.show(
             editor.items.map { id in
-                guard let id else { return ["———", ""] }
+                guard let id else {
+                    return ["———", ""]
+                }
                 return id == ToolbarRegistry.lineBreak
                     ? ["═══ New line ═══", ""] : [commands[id]?.title ?? "(unknown command)", id.rawValue]
             },
@@ -393,7 +414,9 @@ final class StartMenuPage: NSObject, OptionsPage {
         buttons: [
             ActionButton("Add Item…") { [unowned self] in add(center.editStartMenuRow(nil)) },
             ActionButton("Add Command…") { [unowned self] in
-                guard let picked = center.pickCommand() else { return }
+                guard let picked = center.pickCommand() else {
+                    return
+                }
                 add(
                     center.editStartMenuRow(
                         nil,
@@ -405,7 +428,9 @@ final class StartMenuPage: NSObject, OptionsPage {
             ActionButton("Add Separator") { [unowned self] in add(StartMenuDraft.Row(entry: .separator)) },
             ActionButton("Change…") { [unowned self] in change() },
             ActionButton("Remove") { [unowned self] in
-                guard let row = table.selectedRow else { return center.effects.beep() }
+                guard let row = table.selectedRow else {
+                    return center.effects.beep()
+                }
                 draft.rows.remove(at: row)
                 edited(selecting: row)
             },
@@ -450,7 +475,9 @@ final class StartMenuPage: NSObject, OptionsPage {
     }
 
     private func add(_ row: StartMenuDraft.Row?) {
-        guard let row else { return }
+        guard let row else {
+            return
+        }
         edited(selecting: draft.insert(row, after: table.selectedRow))
     }
 
@@ -460,7 +487,9 @@ final class StartMenuPage: NSObject, OptionsPage {
             center.effects.beep()
             return
         }
-        guard let row = center.editStartMenuRow(draft.rows[index]) else { return }
+        guard let row = center.editStartMenuRow(draft.rows[index]) else {
+            return
+        }
         draft.rows[index] = row
         edited(selecting: index)
     }
@@ -474,7 +503,9 @@ final class StartMenuPage: NSObject, OptionsPage {
     }
 
     func commit() {
-        guard isChanged else { return }
+        guard isChanged else {
+            return
+        }
         center.commit(draft)
         discard()
     }
@@ -626,11 +657,20 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         }
         let index: Int
         switch section {
-        case .first: index = pageList.selectedRow ?? 0
-        case .keyboard: index = firstOwnPage
-        case .buttonBar: index = firstOwnPage + 1
-        case .startMenu: index = firstOwnPage + 2
-        case .settingsFile: index = firstOwnPage + 3
+        case .first:
+            index = pageList.selectedRow ?? 0
+
+        case .keyboard:
+            index = firstOwnPage
+
+        case .buttonBar:
+            index = firstOwnPage + 1
+
+        case .startMenu:
+            index = firstOwnPage + 2
+
+        case .settingsFile:
+            index = firstOwnPage + 3
         }
         pageList.selectedRow = index
         showSelectedPage()
@@ -639,7 +679,9 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
 
     private func showSelectedPage() {
         // (The list has a row for every page.)
-        guard let page = pageList.selectedRow.flatMap({ pages.dropFirst($0).first }) else { return }
+        guard let page = pageList.selectedRow.flatMap({ pages.dropFirst($0).first }) else {
+            return
+        }
         caption.stringValue = page.title
         container.subviews.forEach { $0.removeFromSuperview() }
         let view = page.view

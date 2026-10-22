@@ -26,7 +26,9 @@ private func mark(_ url: URL, with value: String) {
 
 private func markOf(_ url: URL) -> String? {
     let size = getxattr(url.path, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW)
-    guard size > 0 else { return nil }
+    guard size > 0 else {
+        return nil
+    }
     var value = [UInt8](repeating: 0, count: size)
     let got = getxattr(url.path, "com.apple.quarantine", &value, size, 0, XATTR_NOFOLLOW)
     return got > 0 ? String(decoding: value.prefix(got), as: UTF8.self) : nil

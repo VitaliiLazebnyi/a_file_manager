@@ -64,7 +64,9 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         /// A right click on a row outside the selection moves the selection there first.
         override func menu(for event: NSEvent) -> NSMenu? {
             let row = self.row(at: convert(event.locationInWindow, from: nil))
-            guard row >= 0 else { return nil }
+            guard row >= 0 else {
+                return nil
+            }
             if !selectedRowIndexes.contains(row) { selectRowIndexes([row], byExtendingSelection: false) }
             return super.menu(for: event)
         }
@@ -292,7 +294,9 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
 
     /// Esc: interrupts a running comparison and says so; false when nothing runs.
     func interruptComparison() -> Bool {
-        guard session.phase == .comparing else { return false }
+        guard session.phase == .comparing else {
+            return false
+        }
         session.cancelComparison()
         return true
     }
@@ -322,7 +326,9 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     @objc private func pickRight() { pickFolder(for: rightField) }
 
     private func pickFolder(for field: NSTextField) {
-        guard let window else { return }
+        guard let window else {
+            return
+        }
         effects.chooseFolder(window) { url in
             if let url { field.stringValue = url.path }
         }
@@ -389,7 +395,9 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     }
 
     private func jumpToHeader(forward: Bool) {
-        guard let position = session.header(after: max(0, table.selectedRow), forward: forward) else { return }
+        guard let position = session.header(after: max(0, table.selectedRow), forward: forward) else {
+            return
+        }
         let target = min(position + 1, session.entries.count - 1)
         table.selectRowIndexes([target], byExtendingSelection: false)
         table.scrollRowToVisible(min(position + 12, session.entries.count - 1))
@@ -558,12 +566,16 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     func numberOfRows(in _: NSTableView) -> Int { session.entries.count }
 
     func tableView(_: NSTableView, isGroupRow row: Int) -> Bool {
-        if case .header = session.entries[row] { return true }
+        if case .header = session.entries[row] {
+            return true
+        }
         return false
     }
 
     func tableView(_: NSTableView, shouldSelectRow row: Int) -> Bool {
-        if case .header = session.entries[row] { return false }
+        if case .header = session.entries[row] {
+            return false
+        }
         return true
     }
 
@@ -599,20 +611,40 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         func date(_ item: FileItem?) -> String { item.map { dateFormatter.string(from: $0.modified) } ?? "" }
         func name(_ item: FileItem?) -> String { item.map { row.isDirectory ? "[\($0.name)]" : $0.name } ?? "" }
         switch column {
-        case "leftName": return name(row.left)
-        case "leftSize": return size(row.left)
-        case "leftDate": return date(row.left)
-        case "rightName": return name(row.right)
-        case "rightSize": return size(row.right)
-        case "rightDate": return date(row.right)
+        case "leftName":
+            return name(row.left)
+
+        case "leftSize":
+            return size(row.left)
+
+        case "leftDate":
+            return date(row.left)
+
+        case "rightName":
+            return name(row.right)
+
+        case "rightSize":
+            return size(row.right)
+
+        case "rightDate":
+            return date(row.right)
 
         default:
-            if row.action != .none { return row.action.symbol }
+            if row.action != .none {
+                return row.action.symbol
+            }
             switch row.state {
-            case .equal: return "="
-            case .pending: return "?"
-            case .excluded: return "⊘"
-            default: return "≠"
+            case .equal:
+                return "="
+
+            case .pending:
+                return "?"
+
+            case .excluded:
+                return "⊘"
+
+            default:
+                return "≠"
             }
         }
     }
@@ -620,14 +652,22 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     /// The colour shows what the comparison proposed (spec 09 › Result list).
     static func color(of row: SyncRow) -> NSColor {
         switch row.defaultAction {
-        case .copyToRight: return .systemGreen
-        case .copyToLeft, .deleteRight: return .systemBlue
+        case .copyToRight:
+            return .systemGreen
+
+        case .copyToLeft, .deleteRight:
+            return .systemBlue
 
         default:
             switch row.state {
-            case .equal: return .labelColor
-            case .excluded, .pending: return .secondaryLabelColor
-            default: return .systemRed
+            case .equal:
+                return .labelColor
+
+            case .excluded, .pending:
+                return .secondaryLabelColor
+
+            default:
+                return .systemRed
             }
         }
     }
@@ -635,7 +675,9 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
     /// A click on a column header sorts by name, size or date of that side; again reverses.
     func tableView(_: NSTableView, didClick tableColumn: NSTableColumn) {
         let id = tableColumn.identifier.rawValue
-        guard id != "action" else { return }
+        guard id != "action" else {
+            return
+        }
         let side: SyncSide = id.hasPrefix("left") ? .left : .right
         let key: SyncSortKey = id.hasSuffix("Size") ? .size : (id.hasSuffix("Date") ? .date : .name)
         let same = session.sort.key == key && session.sort.side == side

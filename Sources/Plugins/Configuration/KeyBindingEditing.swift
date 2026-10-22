@@ -134,7 +134,9 @@ final class KeyBindingEditor {
                 buttons: ["Reassign", "Cancel"],
                 style: .warning
             )
-            guard answer == 0 else { return false }
+            guard answer == 0 else {
+                return false
+            }
         }
         if adding {
             add(shortcut, to: command)
@@ -281,7 +283,9 @@ enum ShortcutText {
     /// Nil when it names no key.
     static func parse(_ text: String) -> Shortcut? {
         var rest = text.trimmingCharacters(in: .whitespaces)
-        guard !rest.isEmpty else { return nil }
+        guard !rest.isEmpty else {
+            return nil
+        }
         var modifiers: KeyModifiers = []
         let symbols: [Character: KeyModifiers] = ["⌃": .control, "⌥": .option, "⇧": .shift, "⌘": .command]
         while rest.count > 1, let first = rest.first, let modifier = symbols[first] {
@@ -291,7 +295,9 @@ enum ShortcutText {
         if let named = namedKeys.first(where: { name(of: $0).lowercased() == rest.lowercased() }) {
             return Shortcut(named, modifiers)
         }
-        guard let shortcut = Shortcut(notation: rest) else { return nil }
+        guard let shortcut = Shortcut(notation: rest) else {
+            return nil
+        }
         return Shortcut(shortcut.key, shortcut.modifiers.union(modifiers))
     }
 
@@ -314,8 +320,12 @@ enum ShortcutText {
     ///
     /// Nil for a press that produces nothing.
     static func shortcut(keyCode: UInt16, characters: String?, modifiers: KeyModifiers) -> Shortcut? {
-        if let key = namedKeyCodes[keyCode] { return Shortcut(key, modifiers) }
-        guard let characters = characters?.lowercased(), !characters.isEmpty else { return nil }
+        if let key = namedKeyCodes[keyCode] {
+            return Shortcut(key, modifiers)
+        }
+        guard let characters = characters?.lowercased(), !characters.isEmpty else {
+            return nil
+        }
         return Shortcut(.character(characters), modifiers)
     }
 }
@@ -367,7 +377,9 @@ enum CommandCatalog {
     static func filter(_ rows: [CommandRow], text: String, category: String? = nil) -> [CommandRow] {
         let words = text.lowercased().split(separator: " ")
         return rows.filter { row in
-            guard category == nil || row.category == category else { return false }
+            guard category == nil || row.category == category else {
+                return false
+            }
             let haystack = (row.id.rawValue + " " + row.title + " " + row.keys).lowercased()
             return words.allSatisfy { haystack.contains($0) }
         }

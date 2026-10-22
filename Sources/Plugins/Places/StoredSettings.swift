@@ -41,12 +41,16 @@ enum StoredSettings {
         in settings: any SettingsStore,
         problem: (String) -> Void
     ) -> Value? {
-        guard let data = settings.data(forKey: key) else { return nil }
+        guard let data = settings.data(forKey: key) else {
+            return nil
+        }
         let report = DecodeReport()
         let decoder = JSONDecoder()
         decoder.userInfo[DecodeReport.key] = report
         let value = try? decoder.decode(type, from: data)
-        guard value == nil || report.skipped > 0 else { return value }
+        guard value == nil || report.skipped > 0 else {
+            return value
+        }
         let backup = key + ".unreadable"
         if settings.data(forKey: backup) == nil { settings.set(data as Data?, forKey: backup) }
         problem(

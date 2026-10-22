@@ -84,10 +84,16 @@ public struct CopyFilter: Equatable, Sendable {
         func matches(_ pattern: FolderPattern) -> Bool {
             (!pattern.anchored || position.depth == 0) && Wildcard.matches(pattern.name, name)
         }
-        if excludedFolders.contains(where: matches) { return nil }
+        if excludedFolders.contains(where: matches) {
+            return nil
+        }
         let next = position.depth + 1
-        if includedFolders.isEmpty { return Position(depth: next, admitted: true, wholeSubtree: true) }
-        if position.wholeSubtree { return Position(depth: next, admitted: true, wholeSubtree: true) }
+        if includedFolders.isEmpty {
+            return Position(depth: next, admitted: true, wholeSubtree: true)
+        }
+        if position.wholeSubtree {
+            return Position(depth: next, admitted: true, wholeSubtree: true)
+        }
         if let pattern = includedFolders.first(where: matches) {
             return Position(depth: next, admitted: true, wholeSubtree: pattern.recursive)
         }
@@ -97,8 +103,12 @@ public struct CopyFilter: Equatable, Sendable {
     }
 
     public func admitsFile(_ name: String, at position: Position) -> Bool {
-        guard position.admitted else { return false }
-        if excludedFiles.contains(where: { Wildcard.matches($0, name) }) { return false }
+        guard position.admitted else {
+            return false
+        }
+        if excludedFiles.contains(where: { Wildcard.matches($0, name) }) {
+            return false
+        }
         return includedFiles.isEmpty || includedFiles.contains { Wildcard.matches($0, name) }
     }
 
@@ -122,7 +132,9 @@ public struct CopyFilter: Equatable, Sendable {
     }
 
     private static func folderPattern(_ token: String) -> FolderPattern? {
-        guard token.hasSuffix("/"), token != "/", token != "**/" else { return nil }
+        guard token.hasSuffix("/"), token != "/", token != "**/" else {
+            return nil
+        }
         var name = String(token.dropLast())
         let recursive = name.hasSuffix("/**")
         if recursive { name = String(name.dropLast(3)) }
@@ -136,9 +148,13 @@ public struct CopyFilter: Equatable, Sendable {
 public enum Wildcard {
     public static func matches(_ pattern: String, _ name: String) -> Bool {
         let (pattern, name) = (pattern.lowercased(), name.lowercased())
-        if pattern == "*.*" || pattern == "*" { return true }
+        if pattern == "*.*" || pattern == "*" {
+            return true
+        }
         // `*.` and `name.` match names without an extension.
-        if pattern.hasSuffix("."), !name.contains(".") { return fnmatch(String(pattern.dropLast()), name, 0) == 0 }
+        if pattern.hasSuffix("."), !name.contains(".") {
+            return fnmatch(String(pattern.dropLast()), name, 0) == 0
+        }
         return fnmatch(pattern, name, 0) == 0
     }
 }

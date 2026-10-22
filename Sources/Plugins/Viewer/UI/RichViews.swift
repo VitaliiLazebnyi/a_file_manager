@@ -39,15 +39,19 @@ final class TemporaryCopies: @unchecked Sendable {
 
         var message: String {
             switch self {
-            case .cancelled: return ""
+            case .cancelled:
+                return ""
 
             case .tooLarge(let size, let limit):
                 return
                     "The file (\(Format.shortSize(size))) is too large to be copied from its file system for this mode (the limit is \(Format.shortSize(limit))). "
                     + "Choose a text mode (1, 2 or 3)."
 
-            case .noRoom: return "There is not enough free space on the disk to copy the file for this mode."
-            case .unreadable: return "The file cannot be shown in this mode."
+            case .noRoom:
+                return "There is not enough free space on the disk to copy the file for this mode."
+
+            case .unreadable:
+                return "The file cannot be shown in this mode."
             }
         }
     }
@@ -103,14 +107,24 @@ final class TemporaryCopies: @unchecked Sendable {
         owner: ObjectIdentifier = ObjectIdentifier(TemporaryCopies.self),
         cancellation: CancellationFlag
     ) -> Result<URL, Refusal> {
-        if url.isFileURL { return .success(url) }
-        guard let provider = try? fileSystems.provider(for: url) else { return .failure(.unreadable) }
+        if url.isFileURL {
+            return .success(url)
+        }
+        guard let provider = try? fileSystems.provider(for: url) else {
+            return .failure(.unreadable)
+        }
         let item = provider.item(at: url, cancellation: cancellation)
         let key = "\(url.locationKey)|\(item?.size ?? -1)|\(item?.modified.timeIntervalSince1970 ?? 0)"
-        if let known = use(key, by: owner) { return .success(known) }
-        if cancellation.isCancelled { return .failure(.cancelled) }
+        if let known = use(key, by: owner) {
+            return .success(known)
+        }
+        if cancellation.isCancelled {
+            return .failure(.cancelled)
+        }
         // A file of a server is not put on the disk without asking whether it fits.
-        if let size = item?.size, size > disk.sizeLimit { return .failure(.tooLarge(size, limit: disk.sizeLimit)) }
+        if let size = item?.size, size > disk.sizeLimit {
+            return .failure(.tooLarge(size, limit: disk.sizeLimit))
+        }
         let started = begin(owner)
         // Changes that a plugin still holds back for this file (an archive written after a delay) are written first.
         do { try fileSystems.flushPendingWrites(to: url, cancellation: cancellation) } catch {
@@ -120,7 +134,9 @@ final class TemporaryCopies: @unchecked Sendable {
             return .failure(cancellation.isCancelled ? .cancelled : .unreadable)
         }
         defer { reader.close() }
-        guard let folder = newFolder() else { return .failure(.unreadable) }
+        guard let folder = newFolder() else {
+            return .failure(.unreadable)
+        }
         if let size = item?.size, let free = disk.freeSpace(directory), free - size < Self.freeSpaceMargin {
             try? FileManager.default.removeItem(at: folder)
             return .failure(.noRoom)
@@ -142,7 +158,9 @@ final class TemporaryCopies: @unchecked Sendable {
             do {
                 while let block = try autoreleasepool(invoking: { try reader.read(upToCount: 1 << 20) }), !block.isEmpty
                 {
-                    guard !cancellation.isCancelled else { return false }
+                    guard !cancellation.isCancelled else {
+                        return false
+                    }
                     written += Int64(block.count)
                     // A size that the listing did not tell is limited as it is read.
                     guard written <= limit else {
@@ -199,7 +217,9 @@ final class TemporaryCopies: @unchecked Sendable {
             )
         )
         cleaned = cleaned.trimmingCharacters(in: .whitespaces)
-        if cleaned.isEmpty || cleaned.allSatisfy({ $0 == "." }) { return "file" }
+        if cleaned.isEmpty || cleaned.allSatisfy({ $0 == "." }) {
+            return "file"
+        }
         // A name is at most 255 bytes: keep the end, which holds the extension that picks the player.
         while cleaned.utf8.count > 200 { cleaned.remove(at: cleaned.index(after: cleaned.startIndex)) }
         return cleaned.first == "." ? "_" + cleaned : cleaned
@@ -219,7 +239,9 @@ final class TemporaryCopies: @unchecked Sendable {
 
     /// `use`, with the lock held.
     private func useLocked(_ key: String, by owner: ObjectIdentifier) -> URL? {
-        guard var copy = copies[key] else { return nil }
+        guard var copy = copies[key] else {
+            return nil
+        }
         clock += 1
         copy.owners.insert(owner)
         copy.lastUsed = clock
@@ -256,7 +278,9 @@ final class TemporaryCopies: @unchecked Sendable {
             }
         }
         lock.unlock()
-        guard !doomed.isEmpty else { return }
+        guard !doomed.isEmpty else {
+            return
+        }
         group.enter()
         ViewerCleanup.async { [group, doomed] in
             for folder in doomed { try? FileManager.default.removeItem(at: folder) }
@@ -349,7 +373,9 @@ final class TemporaryCopies: @unchecked Sendable {
 
     static func sweep(in directory: URL, now: Date = Date()) {
         let manager = FileManager.default
-        guard let names = try? manager.contentsOfDirectory(atPath: directory.path) else { return }
+        guard let names = try? manager.contentsOfDirectory(atPath: directory.path) else {
+            return
+        }
         for name in names where name.hasPrefix(prefix) {
             let folder = directory.appendingPathComponent(name, isDirectory: true)
             let rest = name.dropFirst(prefix.count)
@@ -397,13 +423,17 @@ final class MediaView: NSView {
         let asset = AVURLAsset(url: url)
         // Reading the tags may take a moment on a slow disk; it is not done on the main thread.
         Task { [weak self] in
-            guard let metadata = try? await asset.load(.commonMetadata) else { return }
+            guard let metadata = try? await asset.load(.commonMetadata) else {
+                return
+            }
             var values: [AVMetadataKey: String] = [:]
             for item in metadata {
                 guard let key = item.commonKey, let value = try? await item.load(.stringValue) else { continue }
                 values[key] = value
             }
-            guard let title = values[.commonKeyTitle] else { return }
+            guard let title = values[.commonKeyTitle] else {
+                return
+            }
             let text = values[.commonKeyArtist].map { "\(title) – \($0)" } ?? title
             await MainActor.run { self?.onTitle?(text) }
         }
@@ -434,7 +464,9 @@ final class MediaView: NSView {
     /// One video frame, or a tenth of a second of audio (key E).
     func step() {
         playback.pause()
-        guard playback.hasItem else { return }
+        guard playback.hasItem else {
+            return
+        }
         if playback.canStepForward { playback.stepForward() } else { seek(by: 0.1) }
     }
 
@@ -492,13 +524,17 @@ final class WebContentView: NSView, WKNavigationDelegate {
             } ?? false
         if isLinkClick {
             // A jump inside the page stays in the page.
-            if isMainFrame, isBlank, url?.fragment != nil { return .allow }
+            if isMainFrame, isBlank, url?.fragment != nil {
+                return .allow
+            }
             return url == nil ? .cancel : .followLink
         }
         // The page itself, the one time (WebKit names it `about:blank`, or has no name for it when
         // it comes from a string): anything later (a refresh, a redirect, a frame) is refused.
         let isString = url == nil || url?.scheme == "about" || url?.scheme == "applewebdata"
-        if expectsPage, isMainFrame, isString { return .allow }
+        if expectsPage, isMainFrame, isString {
+            return .allow
+        }
         return .cancel
     }
 
@@ -543,8 +579,12 @@ final class WebContentView: NSView, WKNavigationDelegate {
 /// `smb:`, `ftp:`, `sftp:`, the URL schemes of other programs) does nothing.
 enum LinkPolicy {
     static func opensInBrowser(_ url: URL) -> Bool {
-        guard let scheme = url.scheme?.lowercased() else { return false }
-        if scheme == "mailto" { return true }
+        guard let scheme = url.scheme?.lowercased() else {
+            return false
+        }
+        if scheme == "mailto" {
+            return true
+        }
         return (scheme == "http" || scheme == "https") && url.host?.isEmpty == false
     }
 
@@ -556,7 +596,9 @@ enum LinkPolicy {
     static func target(of link: URL, relativeTo base: URL) -> URL? {
         let text = link.relativeString.replacingOccurrences(of: "about:blank", with: "")
         // A link with a scheme of its own (an absolute one) is not relative.
-        if let own = URL(string: text)?.scheme, own.lowercased() != base.scheme?.lowercased() { return nil }
+        if let own = URL(string: text)?.scheme, own.lowercased() != base.scheme?.lowercased() {
+            return nil
+        }
         guard !text.isEmpty, let resolved = URL(string: text, relativeTo: base),
             var parts = URLComponents(url: resolved.absoluteURL, resolvingAgainstBaseURL: true)
         else { return nil }
@@ -572,7 +614,9 @@ enum LinkPolicy {
             return nil
         }
         let folder = base.deletingLastPathComponent()
-        guard target.isInside(folder) else { return nil }
+        guard target.isInside(folder) else {
+            return nil
+        }
         return target
     }
 }

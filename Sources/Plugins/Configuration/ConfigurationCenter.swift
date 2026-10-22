@@ -44,7 +44,9 @@ final class ConfigurationCenter {
         runner.userCommand = { [unowned self] in userCommand(named: $0) }
         runner.startMenuEntry = { [unowned self] id in
             let prefix = "cm_UserMenu"
-            guard id.hasPrefix(prefix), let number = Int(id.dropFirst(prefix.count)), number >= 1 else { return nil }
+            guard id.hasPrefix(prefix), let number = Int(id.dropFirst(prefix.count)), number >= 1 else {
+                return nil
+            }
             let entries = store.startMenu
             return entries.indices.contains(number - 1) && !entries[number - 1].isSeparator ? entries[number - 1] : nil
         }
@@ -66,7 +68,9 @@ final class ConfigurationCenter {
     /// in menus is the one it started with.
     func register(_ command: UserCommand) {
         let name = command.name
-        guard kernel.commands[command.id] == nil else { return }
+        guard kernel.commands[command.id] == nil else {
+            return
+        }
         kernel.commands.register(
             Command(command.id, DisplayText.oneLine(command.caption, limit: 120)),
             enabled: { [unowned self] in userCommand(named: name) != nil },
@@ -114,7 +118,9 @@ final class ConfigurationCenter {
     }
 
     private func applySymbol(of command: UserCommand) {
-        guard !command.symbol.isEmpty, store.symbols[command.name] == nil else { return }
+        guard !command.symbol.isEmpty, store.symbols[command.name] == nil else {
+            return
+        }
         kernel.toolbar.setSymbol(command.symbol, for: command.id)
         kernel.toolbar.onChange?()
     }
@@ -283,7 +289,9 @@ final class ConfigurationCenter {
             )
         else { return nil }
         let title = answer.text("title").trimmingCharacters(in: .whitespaces)
-        guard !title.isEmpty else { return nil }
+        guard !title.isEmpty else {
+            return nil
+        }
         var shortcut = answer.text("shortcut").trimmingCharacters(in: .whitespaces)
         if !shortcut.isEmpty, ShortcutText.parse(shortcut) == nil {
             kernel.interaction.inform(
@@ -314,10 +322,14 @@ final class ConfigurationCenter {
         let editor = KeyBindingEditor(kernel: kernel)
         let text = text.trimmingCharacters(in: .whitespaces)
         if text.isEmpty {
-            guard !editor.shortcuts(for: command).isEmpty else { return true }
+            guard !editor.shortcuts(for: command).isEmpty else {
+                return true
+            }
             editor.set([], for: command)
         } else if let shortcut = ShortcutText.parse(text) {
-            guard editor.assign(shortcut, to: command, adding: false, asking: kernel.interaction) else { return false }
+            guard editor.assign(shortcut, to: command, adding: false, asking: kernel.interaction) else {
+                return false
+            }
         } else {
             kernel.interaction.inform(
                 "“\(text)” is not a shortcut",
@@ -335,7 +347,9 @@ final class ConfigurationCenter {
     ///
     /// The shell builds its menus once; this changes the items in place.
     func refreshMenus() {
-        guard let menu = effects.mainMenu() else { return }
+        guard let menu = effects.mainMenu() else {
+            return
+        }
         LiveMenus.rebuildStartMenu(in: menu, entries: store.startMenu, target: startMenuTarget)
         LiveMenus.refreshKeys(in: menu, kernel: kernel)
     }
@@ -518,7 +532,9 @@ final class ConfigurationCenter {
             buttons: ["Reset", "Cancel"],
             style: .critical
         )
-        guard answer == 0 else { return false }
+        guard answer == 0 else {
+            return false
+        }
         SettingsArchive().restore(into: kernel.settings, replacing: settingsKeys())
         applyStoredSettings()
         return true

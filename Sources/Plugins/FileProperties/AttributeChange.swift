@@ -40,14 +40,18 @@ enum PermissionChange: Equatable {
                 .map {
                     Self.clause(String($0))
                 }
-            guard !clauses.contains(nil) else { return nil }
+            guard !clauses.contains(nil) else {
+                return nil
+            }
             self = .symbolic(clauses.compactMap { $0 })
         }
     }
 
     /// `rwxr-xr-x` → 0o755.
     private static func mode(fromLetters text: String) -> UInt16? {
-        guard text.count == 9 else { return nil }
+        guard text.count == 9 else {
+            return nil
+        }
         var mode: UInt16 = 0
         for (index, character) in text.enumerated() {
             let expected: Character = ["r", "w", "x"][index % 3]
@@ -62,15 +66,26 @@ enum PermissionChange: Equatable {
 
     private static func clause(_ text: String) -> Clause? {
         let text = text.trimmingCharacters(in: .whitespaces)
-        guard let operatorIndex = text.firstIndex(where: { "+-=".contains($0) }) else { return nil }
+        guard let operatorIndex = text.firstIndex(where: { "+-=".contains($0) }) else {
+            return nil
+        }
         var shifts: [UInt16] = []
         for who in text[..<operatorIndex] {
             switch who {
-            case "u": shifts.append(6)
-            case "g": shifts.append(3)
-            case "o": shifts.append(0)
-            case "a": shifts += [6, 3, 0]
-            default: return nil
+            case "u":
+                shifts.append(6)
+
+            case "g":
+                shifts.append(3)
+
+            case "o":
+                shifts.append(0)
+
+            case "a":
+                shifts += [6, 3, 0]
+
+            default:
+                return nil
             }
         }
         var clause = Clause(
@@ -81,11 +96,20 @@ enum PermissionChange: Equatable {
         )
         for permission in text[text.index(after: operatorIndex)...] {
             switch permission {
-            case "r": clause.bits |= 4
-            case "w": clause.bits |= 2
-            case "x": clause.bits |= 1
-            case "X": clause.conditionalExecute = true
-            default: return nil
+            case "r":
+                clause.bits |= 4
+
+            case "w":
+                clause.bits |= 2
+
+            case "x":
+                clause.bits |= 1
+
+            case "X":
+                clause.conditionalExecute = true
+
+            default:
+                return nil
             }
         }
         return clause
@@ -94,9 +118,14 @@ enum PermissionChange: Equatable {
     /// Whether the new mode depends on the mode the item has.
     var needsCurrentMode: Bool {
         switch self {
-        case .unchanged: return false
-        case .absolute(_, let keepingSpecialBits): return keepingSpecialBits
-        case .symbolic: return true
+        case .unchanged:
+            return false
+
+        case .absolute(_, let keepingSpecialBits):
+            return keepingSpecialBits
+
+        case .symbolic:
+            return true
         }
     }
 
@@ -107,7 +136,9 @@ enum PermissionChange: Equatable {
             return ""
 
         case .absolute(let mode, let keepingSpecialBits):
-            if !keepingSpecialBits { return PropertyText.octal(mode) }
+            if !keepingSpecialBits {
+                return PropertyText.octal(mode)
+            }
             return (0..<9).map { index in mode & (0o400 >> UInt16(index)) != 0 ? ["r", "w", "x"][index % 3] : "-" }
                 .joined()
 
@@ -141,9 +172,14 @@ enum PermissionChange: Equatable {
                 if clause.conditionalExecute, isDirectory || mode & 0o111 != 0 { bits |= 1 }
                 for shift in clause.shifts {
                     switch clause.operation {
-                    case "+": mode |= bits << shift
-                    case "-": mode &= ~(bits << shift)
-                    default: mode = (mode & ~(7 << shift)) | (bits << shift)
+                    case "+":
+                        mode |= bits << shift
+
+                    case "-":
+                        mode &= ~(bits << shift)
+
+                    default:
+                        mode = (mode & ~(7 << shift)) | (bits << shift)
                     }
                 }
             }
@@ -181,8 +217,12 @@ struct TimestampChange: Equatable {
 
     private static func fields(_ text: String, count: ClosedRange<Int>, limits: [ClosedRange<Int>]) -> [Int?]? {
         let tokens = text.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-        if tokens.isEmpty { return Array(repeating: nil, count: 3) }
-        guard count.contains(tokens.count) else { return nil }
+        if tokens.isEmpty {
+            return Array(repeating: nil, count: 3)
+        }
+        guard count.contains(tokens.count) else {
+            return nil
+        }
         var fields: [Int?] = []
         for (token, limit) in zip(tokens, limits) {
             if token.allSatisfy(\.isLetter) {
@@ -201,7 +241,9 @@ struct TimestampChange: Equatable {
     /// The new date of an item last changed at `original`; nil when the parts do not make a
     /// date (the 31st of a month with 30 days).
     func applied(to original: Date, now: Date, calendar: Calendar = .current) -> Date? {
-        if usesCurrentTime { return now }
+        if usesCurrentTime {
+            return now
+        }
         var components = calendar.dateComponents(
             [.year, .month, .day, .hour, .minute, .second, .nanosecond],
             from: original
@@ -276,10 +318,17 @@ struct AttributeChange: Equatable {
             }
             let value = String(token.dropFirst(2))
             switch letter {
-            case "h" where value.isEmpty: change.hidden = sign == "+"
-            case "r" where value.isEmpty: change.locked = sign == "+"
-            case "f" where value.isEmpty: change.recurse = sign == "+"
-            case "a" where value.isEmpty, "s" where value.isEmpty: break
+            case "h" where value.isEmpty:
+                change.hidden = sign == "+"
+
+            case "r" where value.isEmpty:
+                change.locked = sign == "+"
+
+            case "f" where value.isEmpty:
+                change.recurse = sign == "+"
+
+            case "a" where value.isEmpty, "s" where value.isEmpty:
+                break
 
             case "c" where value.isEmpty:
                 // Fills both fields; a later `+t` without a value empties the time again, so
@@ -287,18 +336,26 @@ struct AttributeChange: Equatable {
                 (date, time) = TimestampChange.fieldTexts(for: Date())
                 changesDate = true
 
-            case "d": (date, changesDate) = (value, true)
-            case "t": (time, changesDate) = (value, true)
+            case "d":
+                (date, changesDate) = (value, true)
+
+            case "t":
+                (time, changesDate) = (value, true)
 
             case "m":
-                guard let permissions = PermissionChange(value) else { return nil }
+                guard let permissions = PermissionChange(value) else {
+                    return nil
+                }
                 change.permissions = permissions
 
-            default: return nil
+            default:
+                return nil
             }
         }
         if changesDate {
-            guard let typed = TimestampChange(date: date, time: time) else { return nil }
+            guard let typed = TimestampChange(date: date, time: time) else {
+                return nil
+            }
             change.timestamp = typed
         }
         return (change, applyAtOnce)
@@ -377,7 +434,9 @@ final class AttributeJob: @unchecked Sendable {
     }
 
     private func process(_ item: FileItem) {
-        guard !cancellation.isCancelled else { return }
+        guard !cancellation.isCancelled else {
+            return
+        }
         guard change.recurse, item.isRealDirectory else {
             apply(to: item)
             return
@@ -397,13 +456,17 @@ final class AttributeJob: @unchecked Sendable {
         }
         var children = list()
         // A listing that ended because of the cancel says nothing about the folder.
-        guard !cancellation.isCancelled else { return }
+        guard !cancellation.isCancelled else {
+            return
+        }
         let changedFirst = children == nil
         if changedFirst {
             apply(to: item)
             children = list()
         }
-        guard !cancellation.isCancelled else { return }
+        guard !cancellation.isCancelled else {
+            return
+        }
         let contents = children ?? []
         each(contents.filter { !$0.isRealDirectory }, serialBelow: 64) { self.apply(to: $0) }
         each(contents.filter(\.isRealDirectory)) { self.process($0) }
@@ -411,7 +474,9 @@ final class AttributeJob: @unchecked Sendable {
     }
 
     private func apply(to item: FileItem) {
-        guard !cancellation.isCancelled else { return }
+        guard !cancellation.isCancelled else {
+            return
+        }
         do {
             try change(item)
             lock.lock()
@@ -419,7 +484,9 @@ final class AttributeJob: @unchecked Sendable {
             lock.unlock()
         } catch {
             // What ended because the job was stopped did not fail.
-            guard !cancellation.isCancelled else { return }
+            guard !cancellation.isCancelled else {
+                return
+            }
             lock.lock()
             outcome.failed += 1
             if outcome.failures.count < 20 {

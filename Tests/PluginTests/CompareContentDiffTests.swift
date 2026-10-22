@@ -38,7 +38,9 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         guard segment.a.lowerBound == i, segment.b.lowerBound == j, !(segment.a.isEmpty && segment.b.isEmpty) else {
             return false
         }
-        if segment.isEqual, Array(a[segment.a]) != Array(b[segment.b]) { return false }
+        if segment.isEqual, Array(a[segment.a]) != Array(b[segment.b]) {
+            return false
+        }
         (i, j) = (segment.a.upperBound, segment.b.upperBound)
     }
     return i == a.count && j == b.count && Myers.apply(segments, to: a, from: b) == b
@@ -180,10 +182,17 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         TextDiff.compute(left: lines(left), right: lines(right), options: options).rows
             .map { row in
                 switch row.kind {
-                case .equal: return "="
-                case .changed: return "~"
-                case .added: return "+"
-                case .removed: return "-"
+                case .equal:
+                    return "="
+
+                case .changed:
+                    return "~"
+
+                case .added:
+                    return "+"
+
+                case .removed:
+                    return "-"
                 }
             }
             .joined()

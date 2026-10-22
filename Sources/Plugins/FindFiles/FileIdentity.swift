@@ -17,7 +17,9 @@ struct FileIdentity: Hashable {
     ///
     /// Links are followed.
     static func of(_ url: URL) -> (identity: Self, isRegularFile: Bool)? {
-        guard let info = status(of: url) else { return nil }
+        guard let info = status(of: url) else {
+            return nil
+        }
         return (
             Self(device: UInt64(bitPattern: Int64(info.st_dev)), inode: UInt64(info.st_ino)),
             info.st_mode & S_IFMT == S_IFREG
@@ -25,7 +27,9 @@ struct FileIdentity: Hashable {
     }
 
     private static func status(of url: URL) -> stat? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL else {
+            return nil
+        }
         var info = stat()
         return stat(url.path, &info) == 0 ? info : nil
     }
@@ -36,8 +40,12 @@ struct FileIdentity: Hashable {
     ///
     /// A location that is not a local path is given the benefit of the doubt.
     static func canBeRead(_ url: URL) -> Bool {
-        guard url.isFileURL else { return true }
-        guard let info = status(of: url) else { return false }
+        guard url.isFileURL else {
+            return true
+        }
+        guard let info = status(of: url) else {
+            return false
+        }
         return info.st_mode & S_IFMT == S_IFREG && info.st_flags & datalessFlag == 0
     }
 }
@@ -64,9 +72,13 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
     /// Nil when the file cannot be opened or is not a plain file that is here. `systemRead`
     /// does the reading: the system's `read`, unless a test stands in for the disk.
     static func open(_ url: URL, systemRead: @escaping SystemRead = { Darwin.read($0, $1, $2) }) -> LocalFileReader? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL else {
+            return nil
+        }
         let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC)
-        guard descriptor >= 0 else { return nil }
+        guard descriptor >= 0 else {
+            return nil
+        }
         var info = stat()
         guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
             info.st_flags & FileIdentity.datalessFlag == 0
@@ -86,7 +98,9 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
         guard descriptor >= 0 else { throw CocoaError(.fileReadUnknown) }
         var data = Data(count: max(count, 0))
         let got = data.withUnsafeMutableBytes { buffer -> Int in
-            guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
+            guard let base = buffer.baseAddress, buffer.count > 0 else {
+                return 0
+            }
             var result: Int
             repeat {
                 result = systemRead(descriptor, base, buffer.count)
@@ -94,7 +108,9 @@ final class LocalFileReader: FileReader, @unchecked Sendable {
             return result
         }
         if got < 0 { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-        if got == 0 { return nil }
+        if got == 0 {
+            return nil
+        }
         data.removeSubrange(got...)
         return data
     }
@@ -127,7 +143,9 @@ extension FileSystemRegistry {
     /// A reader for a file a search or comparison is about to read through: local files by
     /// way of `LocalFileReader`, others through their file system.
     func searchReader(for url: URL, cancellation: CancellationFlag) -> any FileReader? {
-        if url.isFileURL { return LocalFileReader.open(url) }
+        if url.isFileURL {
+            return LocalFileReader.open(url)
+        }
         return try? provider(for: url).read(url, cancellation: cancellation)
     }
 }

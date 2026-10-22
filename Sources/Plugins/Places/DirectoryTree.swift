@@ -57,8 +57,12 @@ public final class TreeNode {
 
     fileprivate func child(named name: String) -> TreeNode? {
         // Trees are mostly built in order, so the folder asked for is usually the last one.
-        if let last = children.last, last.name == name { return last }
-        guard children.count > 8 else { return children.first { $0.name == name } }
+        if let last = children.last, last.name == name {
+            return last
+        }
+        guard children.count > 8 else {
+            return children.first { $0.name == name }
+        }
         if childIndex == nil {
             childIndex = Dictionary(children.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
         }
@@ -140,8 +144,12 @@ public final class DirectoryTree {
     }
 
     public static func relativePath(of url: URL, below root: URL) -> String? {
-        if url.isSameLocation(as: root) { return "" }
-        guard url.isInside(root) else { return nil }
+        if url.isSameLocation(as: root) {
+            return ""
+        }
+        guard url.isInside(root) else {
+            return nil
+        }
         let rootDepth = root.standardized.pathComponents.filter { $0 != "/" }.count
         return url.standardized.pathComponents.filter { $0 != "/" }.dropFirst(rootDepth).joined(separator: "/")
     }
@@ -166,7 +174,9 @@ public final class DirectoryTree {
 
     /// The node of a location, or of its deepest known ancestor.
     public func nearestNode(to url: URL) -> TreeNode? {
-        guard let path = relativePath(of: url) else { return nil }
+        guard let path = relativePath(of: url) else {
+            return nil
+        }
         var node = root
         for name in Self.components(of: path) {
             guard let child = node.child(named: name) else { break }
@@ -219,7 +229,9 @@ public final class DirectoryTree {
     /// dropped. Returns the folder's node; nil when the folder itself is no longer in the tree.
     @discardableResult
     public func setChildren(_ names: [String], ofPath path: String, sorted: Bool = false) -> TreeNode? {
-        guard let node = node(at: path) else { return nil }
+        guard let node = node(at: path) else {
+            return nil
+        }
         revision += 1
         if node.children.isEmpty {
             // The usual case while scanning: nothing is known yet, so nothing is compared.
@@ -278,7 +290,9 @@ public final class DirectoryTree {
     /// A folder that was read by someone else in between is left as it is.
     @discardableResult
     public func attach(_ nodes: [TreeNode], ofPath path: String, from start: Int = 0, limit: Int = .max) -> Int {
-        guard let node = node(at: path), start == 0 || !node.isScanned else { return nodes.count }
+        guard let node = node(at: path), start == 0 || !node.isScanned else {
+            return nodes.count
+        }
         revision += 1
         if start == 0 {
             // A folder that has children (the folders on the way to the one the window opened
@@ -318,7 +332,9 @@ public final class DirectoryTree {
             }
         }
         node.childIndex = nil
-        guard end == nodes.count else { return end }
+        guard end == nodes.count else {
+            return end
+        }
         finish(attach, of: node, with: nodes)
         return end
     }
@@ -339,7 +355,9 @@ public final class DirectoryTree {
             node.children = attach.built
             return
         }
-        guard !attach.known.isEmpty else { return }
+        guard !attach.known.isEmpty else {
+            return
+        }
         // Folders were made while the nodes were being linked: the list is the new nodes' order, with those nodes.
         var kept: [TreeNode] = []
         kept.reserveCapacity(nodes.count)
@@ -380,7 +398,9 @@ public final class DirectoryTree {
     /// around at the end; `forward: false` gives the one before.
     public func neighbour(of node: TreeNode, forward: Bool) -> TreeNode {
         if forward {
-            if let first = node.children.first { return first }
+            if let first = node.children.first {
+                return first
+            }
             var current = node
             while let parent = current.parent {
                 if current.indexInParent + 1 < parent.children.count {
@@ -390,8 +410,12 @@ public final class DirectoryTree {
             }
             return root
         }
-        guard let parent = node.parent else { return deepestLast(root) }
-        guard node.indexInParent > 0 else { return parent }
+        guard let parent = node.parent else {
+            return deepestLast(root)
+        }
+        guard node.indexInParent > 0 else {
+            return parent
+        }
         return deepestLast(parent.children[node.indexInParent - 1])
     }
 
@@ -418,8 +442,11 @@ public final class DirectoryTree {
         -> TreeNode?
     {
         switch search(typed, from: start, forward: forward, includingStart: includingStart, timeBudget: nil) {
-        case .found(let node): return node
-        case .none, .pending: return nil
+        case .found(let node):
+            return node
+
+        case .none, .pending:
+            return nil
         }
     }
 
@@ -438,7 +465,9 @@ public final class DirectoryTree {
         timeBudget: TimeInterval?
     ) -> SearchProgress {
         let pattern = TreeQuickSearch(typed)
-        guard !pattern.isEmpty, count > 0 else { return .none }
+        guard !pattern.isEmpty, count > 0 else {
+            return .none
+        }
         // A start that matched nothing anywhere is matched by no longer start either.
         if let failed = failedSearch, failed.revision == revision, !pattern.hasWildcards,
             pattern.text.hasPrefix(failed.text)
@@ -451,7 +480,9 @@ public final class DirectoryTree {
         let began = Date()
         var sinceClock = 0
         while left > 0 {
-            if node !== root, pattern.matches(folded: node.folded) { return .found(node) }
+            if node !== root, pattern.matches(folded: node.folded) {
+                return .found(node)
+            }
             node = neighbour(of: node, forward: forward)
             left -= 1
             sinceClock += 1
@@ -618,10 +649,14 @@ public final class TreeScanner: @unchecked Sendable {
             var next: [(path: String, url: URL)] = []
             for start in stride(from: 0, to: frontier.count, by: batchSize) {
                 if !reachedLimit, paths.count >= folderLimit || Date() > deadline { reachedLimit = true }
-                if cancellation.isCancelled || reachedLimit { return cancelled(frontier[start...], next) }
+                if cancellation.isCancelled || reachedLimit {
+                    return cancelled(frontier[start...], next)
+                }
                 let batch = Array(frontier[start..<min(start + batchSize, frontier.count)])
                 let listed = readFolders(batch)
-                if cancellation.isCancelled { return cancelled(frontier[start...], next) }
+                if cancellation.isCancelled {
+                    return cancelled(frontier[start...], next)
+                }
                 receive(zip(batch, listed).map { Level(path: $0.path, children: $1.map(\.name), isSorted: true) })
                 for (folder, children) in zip(batch, listed) {
                     for child in children {
@@ -649,7 +684,9 @@ public final class TreeScanner: @unchecked Sendable {
         @Sendable func read(_ folder: (path: String, url: URL)) -> [Subfolder] {
             Self.gently { Sorter.sorted(folders(of: folder.url, isScan: true), numeric: true, byName: \.name) }
         }
-        guard provider.scheme == "file", root.isFileURL else { return Parallel.map(batch, read) }
+        guard provider.scheme == "file", root.isFileURL else {
+            return Parallel.map(batch, read)
+        }
         /// Each piece writes its own place.
         nonisolated(unsafe) let results = UnsafeMutableBufferPointer<[Subfolder]>.allocate(capacity: batch.count)
         results.initialize(repeating: [])
@@ -744,15 +781,21 @@ public final class TreeScanner: @unchecked Sendable {
     /// folder the user opens is read whatever it is.
     private func folders(of directory: URL, isScan: Bool = false) -> [Subfolder] {
         // The local disk is read entry by entry, and given up at the first entry after a cancellation.
-        if directory.isFileURL, provider.scheme == "file" { return leanSubfolders(of: directory, isScan: isScan) }
-        guard !cancellation.isCancelled else { return [] }
+        if directory.isFileURL, provider.scheme == "file" {
+            return leanSubfolders(of: directory, isScan: isScan)
+        }
+        guard !cancellation.isCancelled else {
+            return []
+        }
         // Read piece by piece, so a huge or slow folder can be given up half-way.
         var items: [FileItem] = []
         let finished: Void? = try? provider.list(directory, showHidden: showHidden) { batch in
             items += batch
             return !cancellation.isCancelled
         }
-        guard finished != nil, !cancellation.isCancelled else { return [] }
+        guard finished != nil, !cancellation.isCancelled else {
+            return []
+        }
         // A name with a line break could not be written to the cache file, one with a slash
         // not into a relative path.
         return
@@ -768,14 +811,18 @@ public final class TreeScanner: @unchecked Sendable {
     /// Hidden folders and packages are left out as a listing leaves them out. A folder that cannot
     /// be opened counts as empty.
     private func leanSubfolders(of directory: URL, isScan: Bool) -> [Subfolder] {
-        guard let stream = opendir(directory.path) else { return [] }
+        guard let stream = opendir(directory.path) else {
+            return []
+        }
         defer { closedir(stream) }
         // The folder's own device; should it not be told, every subfolder is asked whether it is a mount point.
         var own = stat()
         _ = fstat(dirfd(stream), &own)
         var folders: [Subfolder] = []
         while let entry = readdir(stream) {
-            if cancellation.isCancelled { return [] }
+            if cancellation.isCancelled {
+                return []
+            }
             let name = withUnsafePointer(to: &entry.pointee.d_name) {
                 $0.withMemoryRebound(to: CChar.self, capacity: Int(entry.pointee.d_namlen) + 1) { String(cString: $0) }
             }
@@ -824,7 +871,9 @@ public final class TreeScanner: @unchecked Sendable {
     /// point for them, not their own.
     static func isMountPoint(_ path: String) -> Bool {
         // The system names the mount point by its real path; a path without one is none.
-        guard let pointer = realpath(path, nil) else { return false }
+        guard let pointer = realpath(path, nil) else {
+            return false
+        }
         let real = String(cString: pointer)
         free(pointer)
         var info = statfs()

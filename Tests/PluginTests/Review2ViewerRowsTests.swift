@@ -149,7 +149,9 @@ import Testing
         }
 
         func read(at offset: Int64, count: Int) -> Data {
-            guard offset < Int64(available) else { return Data() }
+            guard offset < Int64(available) else {
+                return Data()
+            }
             return Data(repeating: UInt8(ascii: "a"), count: min(count, available - Int(offset)))
         }
     }

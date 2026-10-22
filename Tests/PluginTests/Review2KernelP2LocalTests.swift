@@ -9,7 +9,9 @@ import Testing
 private func waitUntil(seconds: TimeInterval = Wait.ceiling, _ condition: () -> Bool) -> Bool {
     let end = Date(timeIntervalSinceNow: seconds)
     while !condition() {
-        if Date() > end { return false }
+        if Date() > end {
+            return false
+        }
         usleep(2_000)
     }
     return true
@@ -49,7 +51,9 @@ private final class Running<Value>: @unchecked Sendable {
 }
 
 private func wasCancelled<Value>(_ result: Result<Value, any Error>?) -> Bool {
-    guard case .failure(let error)? = result else { return false }
+    guard case .failure(let error)? = result else {
+        return false
+    }
     return (error as? CocoaError)?.code == .userCancelled
 }
 
@@ -70,7 +74,9 @@ private final class DeadVolume: @unchecked Sendable {
     func holds(_ path: String) -> Bool { path == root || path.hasPrefix(root + "/") }
 
     func willAsk(_ path: String) {
-        guard holds(path) else { return }
+        guard holds(path) else {
+            return
+        }
         condition.lock()
         askedSoFar += 1
         waitingNow += 1
@@ -407,7 +413,9 @@ private final class DeadVolume: @unchecked Sendable {
         nonisolated(unsafe) var steps = 0
         var probes = LocalProbes()
         probes.willAsk = { path in
-            guard path == file.path else { return }
+            guard path == file.path else {
+                return
+            }
             steps += 1
             // 1: looking at the item, 2: taking the lock off, 3: setting the date.
             if steps == 3 { flag.cancel() }
@@ -615,7 +623,9 @@ private final class DeadVolume: @unchecked Sendable {
             object: local,
             queue: nil
         ) { note in
-            guard let root = note.userInfo?[FileSystemRegistry.volumeRootKey] as? URL else { return }
+            guard let root = note.userInfo?[FileSystemRegistry.volumeRootKey] as? URL else {
+                return
+            }
             heard.lock.lock()
             heard.roots.append(root.path)
             heard.lock.unlock()

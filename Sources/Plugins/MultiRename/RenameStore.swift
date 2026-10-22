@@ -57,7 +57,9 @@ final class RenameStore {
         memoriesLock.lock()
         defer { memoriesLock.unlock() }
         memories = memories.filter { $0.value.settings != nil }
-        if let known = memories[ObjectIdentifier(settings)], known.settings === settings { return known }
+        if let known = memories[ObjectIdentifier(settings)], known.settings === settings {
+            return known
+        }
         let created = Memory(settings)
         memories[ObjectIdentifier(settings)] = created
         return created
@@ -92,7 +94,9 @@ final class RenameStore {
     /// Settings that cannot be read are left out; the others stay.
     var saved: [String: RenameSettings] {
         get {
-            if let known = memory.saved { return known }
+            if let known = memory.saved {
+                return known
+            }
             let loaded = (own.value([String: StoredElement<RenameSettings>].self, forKey: "saved") ?? [:])
                 .compactMapValues(\.value)
             memory.saved = loaded
@@ -114,7 +118,9 @@ final class RenameStore {
     // MARK: Histories
 
     func history(_ history: History) -> [String] {
-        if let known = memory.histories[history] { return known }
+        if let known = memory.histories[history] {
+            return known
+        }
         let loaded = own.value([String].self, forKey: history.rawValue) ?? []
         memory.histories[history] = loaded
         return loaded
@@ -130,7 +136,9 @@ final class RenameStore {
     ///
     /// Leading and trailing spaces are kept: they matter in Search & Replace.
     func remember(_ text: String, in history: History) {
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            return
+        }
         var entries = self.history(history).filter { $0 != text }
         entries.insert(text, at: 0)
         setHistory(Array(entries.prefix(Self.historyLimit)), history)
@@ -147,7 +155,9 @@ final class RenameStore {
     /// Kept in the settings, so Undo works after the tool, and the program, were closed.
     var undoHistory: [[RenamedItem]] {
         get {
-            if let known = memory.undo { return known }
+            if let known = memory.undo {
+                return known
+            }
             let loaded =
                 own.largeData(forKey: "undo").flatMap { try? JSONDecoder().decode([[RenamedItem]].self, from: $0) }
                 ?? []
@@ -163,8 +173,12 @@ final class RenameStore {
 
     /// The number of runs that can be undone; cheap, unlike decoding them: it is kept beside them.
     var undoCount: Int {
-        if let loaded = memory.undo { return loaded.count }
-        if let counted = own.value(Int.self, forKey: "undoCount") { return counted }
+        if let loaded = memory.undo {
+            return loaded.count
+        }
+        if let counted = own.value(Int.self, forKey: "undoCount") {
+            return counted
+        }
         // Runs saved without a count: there is something to undo if there is anything saved.
         return own.largeData(forKey: "undo") == nil ? 0 : 1
     }
@@ -193,7 +207,9 @@ final class RenameStore {
 
     /// Adds a run as the newest, as far as Undo is on.
     func appendUndo(_ run: [RenamedItem]) {
-        guard undoLimit > 0 else { return }
+        guard undoLimit > 0 else {
+            return
+        }
         var history = undoHistory
         history.append(run)
         undoHistory = history
@@ -236,7 +252,9 @@ final class RenameStore {
             let data = try? JSONEncoder().encode(kept)
             DispatchQueue.main.async {
                 // A newer change has its own write on the way (or was written at once).
-                guard memory.undoWrite == write else { return }
+                guard memory.undoWrite == write else {
+                    return
+                }
                 own.setLarge(data, forKey: "undo")
             }
         }
@@ -245,7 +263,9 @@ final class RenameStore {
     /// Writes the undo history now, e.g. when the program ends before the background write
     /// has been handed in.
     func flush() {
-        guard let runs = memory.undo else { return }
+        guard let runs = memory.undo else {
+            return
+        }
         memory.undoWrite += 1
         let kept = persistedRuns(of: runs)
         own.set(kept.count, forKey: "undoCount")
@@ -257,7 +277,9 @@ final class RenameStore {
 /// a byte-order mark, UTF-16, or the Western code page; Windows or Unix line ends.
 enum RenameNameList {
     static func text(from data: Data) -> String {
-        if data.starts(with: [0xEF, 0xBB, 0xBF]) { return String(decoding: data.dropFirst(3), as: UTF8.self) }
+        if data.starts(with: [0xEF, 0xBB, 0xBF]) {
+            return String(decoding: data.dropFirst(3), as: UTF8.self)
+        }
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
             return String(data: data, encoding: .utf16) ?? ""
         }

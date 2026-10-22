@@ -10,7 +10,9 @@ enum CoveragePlacesLoop {
     static func spin(seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let end = Date(timeIntervalSinceNow: seconds)
         while !condition() {
-            if Date() > end { return false }
+            if Date() > end {
+                return false
+            }
             turn()
             try? await Task.sleep(nanoseconds: 2_000_000)
         }

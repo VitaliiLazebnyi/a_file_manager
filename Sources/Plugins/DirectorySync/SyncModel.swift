@@ -90,12 +90,23 @@ public enum SyncAction: Equatable, Sendable {
     /// The symbol of the middle column (spec 09 › Result list).
     public var symbol: String {
         switch self {
-        case .none: return ""
-        case .copyToRight: return "→"
-        case .copyToLeft: return "←"
-        case .deleteLeft: return "✕←"
-        case .deleteRight: return "→✕"
-        case .deleteBoth: return "✕✕"
+        case .none:
+            return ""
+
+        case .copyToRight:
+            return "→"
+
+        case .copyToLeft:
+            return "←"
+
+        case .deleteLeft:
+            return "✕←"
+
+        case .deleteRight:
+            return "→✕"
+
+        case .deleteBoth:
+            return "✕✕"
         }
     }
 }
@@ -148,10 +159,17 @@ public struct SyncRow: Equatable, Sendable {
     /// deleted there, and a file that is newer on the right is left for the user to decide.
     public static func proposal(for state: SyncState, asymmetric: Bool) -> SyncAction {
         switch state {
-        case .leftOnly, .leftNewer: return .copyToRight
-        case .rightOnly: return asymmetric ? .deleteRight : .copyToLeft
-        case .rightNewer: return asymmetric ? .none : .copyToLeft
-        case .equal, .different, .pending, .excluded: return .none
+        case .leftOnly, .leftNewer:
+            return .copyToRight
+
+        case .rightOnly:
+            return asymmetric ? .deleteRight : .copyToLeft
+
+        case .rightNewer:
+            return asymmetric ? .none : .copyToLeft
+
+        case .equal, .different, .pending, .excluded:
+            return .none
         }
     }
 
@@ -164,21 +182,35 @@ public struct SyncRow: Equatable, Sendable {
     /// Whether the action makes sense for the row: something must exist to be copied or deleted,
     /// and excluded rows take nothing.
     public func accepts(_ action: SyncAction) -> Bool {
-        guard action == .none || state != .excluded else { return false }
+        guard action == .none || state != .excluded else {
+            return false
+        }
         switch action {
-        case .none: return true
-        case .copyToRight, .deleteLeft: return left != nil
-        case .copyToLeft, .deleteRight: return right != nil
-        case .deleteBoth: return isPair
+        case .none:
+            return true
+
+        case .copyToRight, .deleteLeft:
+            return left != nil
+
+        case .copyToLeft, .deleteRight:
+            return right != nil
+
+        case .deleteBoth:
+            return isPair
         }
     }
 
     /// The action with the copy direction turned round; others stay.
     public var reversedAction: SyncAction {
         switch action {
-        case .copyToRight where right != nil: return .copyToLeft
-        case .copyToLeft where left != nil: return .copyToRight
-        default: return action
+        case .copyToRight where right != nil:
+            return .copyToLeft
+
+        case .copyToLeft where left != nil:
+            return .copyToRight
+
+        default:
+            return action
         }
     }
 
@@ -191,7 +223,9 @@ public struct SyncRow: Equatable, Sendable {
             cycle.append(candidate)
         }
         // (Every row takes no action, so the cycle is never empty.)
-        guard let index = cycle.firstIndex(of: action) else { return cycle[0] }
+        guard let index = cycle.firstIndex(of: action) else {
+            return cycle[0]
+        }
         return cycle[(index + 1) % cycle.count]
     }
 }
@@ -214,9 +248,14 @@ public struct SyncShow: OptionSet, Codable, Equatable, Sendable {
     public func shows(_ row: SyncRow) -> Bool {
         let direction: Self
         switch row.defaultAction {
-        case .copyToRight: direction = .copyToRight
-        case .copyToLeft, .deleteRight: direction = .copyToLeft
-        default: direction = row.state == .equal ? .equal : .notEqual
+        case .copyToRight:
+            direction = .copyToRight
+
+        case .copyToLeft, .deleteRight:
+            direction = .copyToLeft
+
+        default:
+            direction = row.state == .equal ? .equal : .notEqual
         }
         return contains(direction) && contains(row.isPair ? .duplicates : .singles)
     }
@@ -232,10 +271,17 @@ public struct SyncSummary: Equatable, Sendable {
         for row in rows where !row.isDirectory {
             files += 1
             switch row.state {
-            case .leftOnly: uniqueLeft += 1
-            case .rightOnly: uniqueRight += 1
-            case .equal: identical += 1
-            default: different += 1
+            case .leftOnly:
+                uniqueLeft += 1
+
+            case .rightOnly:
+                uniqueRight += 1
+
+            case .equal:
+                identical += 1
+
+            default:
+                different += 1
             }
         }
     }

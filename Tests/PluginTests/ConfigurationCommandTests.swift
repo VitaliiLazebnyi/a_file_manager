@@ -159,7 +159,9 @@ import Testing
             context.listFolder = box.url("lists")
             change(&context)
             let result = ParameterExpander(context: context).expand(text)
-            guard let file = result.listFile else { return (result.text, nil) }
+            guard let file = result.listFile else {
+                return (result.text, nil)
+            }
             try FileManager.default.createDirectory(
                 at: file.url.deletingLastPathComponent(),
                 withIntermediateDirectories: true

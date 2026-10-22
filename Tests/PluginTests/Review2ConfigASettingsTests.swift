@@ -89,13 +89,17 @@ import Testing
         // The form names every part that needs a tick, with what it holds.
         let fields = try #require(ui.forms.last)
         let parts = fields.filter {
-            guard case .checkbox = $0.kind else { return false }
+            guard case .checkbox = $0.kind else {
+                return false
+            }
             return true
         }
         #expect(parts.map(\.key) == ["commands", "keys", "programs", "trust", "connections", "hotlist", "tabs"])
         #expect(
             parts.allSatisfy {
-                guard case .checkbox(let isOn) = $0.kind else { return false }
+                guard case .checkbox(let isOn) = $0.kind else {
+                    return false
+                }
                 return !isOn
             }
         )
@@ -171,7 +175,9 @@ import Testing
         let fields = try #require(ui.forms.last)
         #expect(
             !fields.contains {
-                guard case .checkbox = $0.kind else { return false }
+                guard case .checkbox = $0.kind else {
+                    return false
+                }
                 return true
             }
         )

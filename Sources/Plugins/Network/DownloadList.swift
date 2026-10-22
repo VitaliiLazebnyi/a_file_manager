@@ -39,13 +39,17 @@ public enum DownloadList {
                 let line = rawLine.trimmingCharacters(
                     in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\u{FEFF}"))
                 )
-                guard !line.isEmpty else { return nil }
+                guard !line.isEmpty else {
+                    return nil
+                }
                 let lowered = line.lowercased()
                 func body(after prefix: String) -> String {
                     String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
                 }
                 func pair(_ text: String) -> (String, String?) {
-                    guard let range = text.range(of: separator) else { return (text, nil) }
+                    guard let range = text.range(of: separator) else {
+                        return (text, nil)
+                    }
                     return (
                         String(text[..<range.lowerBound]).trimmingCharacters(in: .whitespaces),
                         String(text[range.upperBound...]).trimmingCharacters(in: .whitespaces)
@@ -56,7 +60,9 @@ public enum DownloadList {
                     // Not a number, below zero, or longer than anyone would wait: clamped.
                     return .pause(milliseconds.isFinite ? min(longestPause, max(0, milliseconds / 1_000)) : 0)
                 }
-                if lowered.hasPrefix("header:") || lowered.hasPrefix("copyflags:") { return .unsupported(line) }
+                if lowered.hasPrefix("header:") || lowered.hasPrefix("copyflags:") {
+                    return .unsupported(line)
+                }
                 if lowered.hasPrefix("move:") {
                     let (source, target) = pair(body(after: "move:"))
                     return source.isEmpty ? .unsupported(line) : .move(source: source, target: target)
@@ -84,7 +90,9 @@ public enum DownloadList {
                 }
                 && text == text.trimmingCharacters(in: .whitespaces)
         }
-        guard isOneLine(source), !source.contains(separator), target.map(isOneLine) ?? true else { return false }
+        guard isOneLine(source), !source.contains(separator), target.map(isOneLine) ?? true else {
+            return false
+        }
         // What is written must read back as the same download, not as a command of the list.
         return parse(line(source: source, target: target)) == [.download(source: source, target: target)]
     }

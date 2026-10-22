@@ -52,7 +52,9 @@ public struct DiffOptions: Equatable, Codable, Sendable {
         let hashed: Bool = text.withUTF8 { bytes in
             // Only ASCII is hashed as it is. Other text takes the slow path through `key`: it folds
             // case, and it is put in one form, so that a composed and a decomposed `é` are equal.
-            if bytes.contains(where: { $0 >= 0x80 }) { return false }
+            if bytes.contains(where: { $0 >= 0x80 }) {
+                return false
+            }
             var gap = false
             var started = false
             for var byte in bytes {
@@ -91,7 +93,9 @@ public struct DiffOptions: Equatable, Codable, Sendable {
     /// The hashes of many lines; long files are spread over all cores, because folding case
     /// and spaces is the expensive part of preparing a comparison.
     func hashes(_ lines: [TextLine]) -> [UInt64] {
-        guard lines.count >= 20_000 else { return lines.map(hash) }
+        guard lines.count >= 20_000 else {
+            return lines.map(hash)
+        }
         let size = max(2_000, lines.count / (ProcessInfo.processInfo.activeProcessorCount * 4))
         let ranges = stride(from: 0, to: lines.count, by: size).map { $0..<min($0 + size, lines.count) }
         return Parallel.map(ranges) { lines[$0].map(hash) }.flatMap { $0 }
@@ -242,8 +246,11 @@ public struct TextDiff: Equatable, Sendable {
     public func rebuiltRight<Line>(left _: [Line], right: [Line]) -> [Line] {
         rows.compactMap { row in
             switch row.kind {
-            case .equal, .changed, .added: return row.right.map { right[$0] }
-            case .removed: return nil
+            case .equal, .changed, .added:
+                return row.right.map { right[$0] }
+
+            case .removed:
+                return nil
             }
         }
     }
@@ -309,7 +316,9 @@ public struct TextDiff: Equatable, Sendable {
         var leftRanges: [Range<Int>] = []
         var rightRanges: [Range<Int>] = []
         func mark(_ range: Range<Int>, in ranges: inout [Range<Int>]) {
-            guard !range.isEmpty else { return }
+            guard !range.isEmpty else {
+                return
+            }
             if let last = ranges.last, last.upperBound == range.lowerBound {
                 ranges[ranges.count - 1] = last.lowerBound..<range.upperBound
             } else {
@@ -330,7 +339,9 @@ public struct TextDiff: Equatable, Sendable {
     /// are marked whole (a mark on its own would be drawn apart from its letter).
     private static func widened(_ ranges: [Range<Int>], in head: [UInt16]) -> [Range<Int>] {
         // Nothing below U+0300 combines, and a surrogate is above it as well.
-        guard !ranges.isEmpty, head.contains(where: { $0 >= 0x300 }) else { return ranges }
+        guard !ranges.isEmpty, head.contains(where: { $0 >= 0x300 }) else {
+            return ranges
+        }
         let text = String(decoding: head, as: UTF16.self) as NSString
         var result: [Range<Int>] = []
         for range in ranges {
@@ -435,7 +446,9 @@ public struct BinaryDiff: Equatable, Sendable {
     /// Empty past the file's end.
     public func text(of data: Data, row: Int) -> String {
         let from = row * bytesPerLine
-        guard from < data.count else { return "" }
+        guard from < data.count else {
+            return ""
+        }
         let bytes = data[(data.startIndex + from)..<(data.startIndex + min(from + bytesPerLine, data.count))]
         let digits = Array("0123456789ABCDEF".utf8)
         var text: [UInt8] = []
@@ -457,7 +470,9 @@ public struct BinaryDiff: Equatable, Sendable {
             .filter { offset in
                 let position = from + offset
                 let (inLeft, inRight) = (position < left.count, position < right.count)
-                if inLeft, inRight { return left[left.startIndex + position] != right[right.startIndex + position] }
+                if inLeft, inRight {
+                    return left[left.startIndex + position] != right[right.startIndex + position]
+                }
                 return inLeft != inRight
             }
     }

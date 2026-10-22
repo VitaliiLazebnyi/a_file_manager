@@ -169,7 +169,9 @@ final class CommandRunner {
     }
 
     private func removeListFile(_ url: URL?, after delay: TimeInterval = 0) {
-        guard let url, let listQueue else { return }
+        guard let url, let listQueue else {
+            return
+        }
         listQueue.asyncAfter(deadline: .now() + delay) { try? FileManager.default.removeItem(at: url) }
     }
 
@@ -194,7 +196,9 @@ final class CommandRunner {
         var snapshot = PanelSnapshot(path: path, cursorName: model.cursorItem.map(name(of:)))
         let count = model.selectionCount
         // The marked names cost a pass over the marks: only a text that asks for them gets them.
-        guard withSelection, count > 0 else { return (snapshot, nil) }
+        guard withSelection, count > 0 else {
+            return (snapshot, nil)
+        }
         // The marks and the list are taken as they are (nothing is copied); the marked items,
         // which are exactly those, are picked out here for a few and away from the main thread for many.
         let operands = model.operandsSnapshot()
@@ -319,7 +323,9 @@ final class CommandRunner {
             return
         }
         let steps = CommandLanguage.steps(action.command, environment: environment, resolve: resolve)
-        guard !steps.isEmpty else { return }
+        guard !steps.isEmpty else {
+            return
+        }
         let template: [ExpandedPiece] = action.parameters.isEmpty ? arguments : [.text(action.parameters)]
         expand(template, arguments: arguments) { [weak self] expanded in
             self?
@@ -356,7 +362,9 @@ final class CommandRunner {
         call: Call,
         completion: (@MainActor @Sendable () -> Void)?
     ) {
-        guard call.generation == generation else { return }
+        guard call.generation == generation else {
+            return
+        }
         var pieces = expanded.pieces
         // A name code with no name stands for the folder (`rm -rf %P%N`): nothing is run.
         if expanded.missingName {
@@ -388,7 +396,9 @@ final class CommandRunner {
             pieces = ShellLine.pieces(fromPrompt: edited, values: shown.values)
         }
         let isExternal = steps.contains {
-            guard case .external = $0 else { return false }
+            guard case .external = $0 else {
+                return false
+            }
             return true
         }
         // The line is checked before anything of the command runs. (A line with thousands of
@@ -462,7 +472,9 @@ final class CommandRunner {
         _ chain: Chain,
         then done: (@MainActor @Sendable () -> Void)? = nil
     ) {
-        guard chain.call.generation == generation else { return }
+        guard chain.call.generation == generation else {
+            return
+        }
         let outer = active
         active = chain.call.names
         defer { active = outer }
@@ -485,7 +497,9 @@ final class CommandRunner {
                 DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(milliseconds)) { [weak self] in
                     // The steps after the wait may ask a question: not from inside a block of the main queue.
                     MainLoop.perform {
-                        guard let self, chain.call.generation == self.generation else { return }
+                        guard let self, chain.call.generation == self.generation else {
+                            return
+                        }
                         self.waiting -= 1
                         self.perform(later, chain, then: done)
                     }
@@ -526,10 +540,14 @@ final class CommandRunner {
                 let waits = (!later.isEmpty || done != nil) && launchesApplications
                 launch(externalLine(chain.command, parameters: chain.parameters), chain, waits: waits) {
                     [weak self] started in
-                    guard started else { return }
+                    guard started else {
+                        return
+                    }
                     self?.perform(later, chain, then: done)
                 }
-                if waits { return }
+                if waits {
+                    return
+                }
 
             case .unknown(let command):
                 kernel.interaction.inform(
@@ -548,7 +566,9 @@ final class CommandRunner {
         if id.hasPrefix(UserCommand.prefix), let found = userCommand?(id) {
             return (found.action, found.name, found.caption)
         }
-        if let found = startMenuEntry?(id) { return (found.action, id, found.title) }
+        if let found = startMenuEntry?(id) {
+            return (found.action, id, found.title)
+        }
         return nil
     }
 
@@ -579,13 +599,17 @@ final class CommandRunner {
         if waits { waiting += 1 }
         let finished: @Sendable (String?) -> Void = { [weak self] failure in
             toMain { [weak self] in
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
                 self.removeListFile(listURL, after: grace)
                 if let failure {
                     self.kernel.interaction.inform("“\(program)” cannot be started!", detail: failure, style: .warning)
                 }
                 // A chain the user stopped meanwhile does not go on.
-                guard waits, generation == self.generation else { return }
+                guard waits, generation == self.generation else {
+                    return
+                }
                 self.waiting -= 1
                 completion(failure == nil)
             }
@@ -600,8 +624,11 @@ final class CommandRunner {
             }
             let script: ShellScript
             switch ShellLine.script(Self.applicationLine(for: line) ?? line) {
-            case .failure(let refusal): return finished(refusal.explanation)
-            case .success(let made): script = made
+            case .failure(let refusal):
+                return finished(refusal.explanation)
+
+            case .success(let made):
+                script = made
             }
             let shell = LoginShell.posix
             switch ChildProcess.spawn(
@@ -618,9 +645,14 @@ final class CommandRunner {
                 children.watch(pid, waitedFor: waits) { ending in
                     // The shell's own way of saying that it found no such program, or could not run it.
                     switch ending.status {
-                    case 127: finished("The shell found no program of that name (exit status 127).")
-                    case 126: finished("The shell could not run the program (exit status 126).")
-                    default: finished(nil)
+                    case 127:
+                        finished("The shell found no program of that name (exit status 127).")
+
+                    case 126:
+                        finished("The shell could not run the program (exit status 126).")
+
+                    default:
+                        finished(nil)
                     }
                 }
             }
@@ -636,7 +668,9 @@ final class CommandRunner {
         // The first word as a whole, also when it is quoted and has a space in it.
         let (word, rest) = ShellWords.firstWord(of: line)
         let first = ShellWords.unquoted(word)
-        guard !first.isEmpty, first.unicodeScalars.first != "-" else { return nil }
+        guard !first.isEmpty, first.unicodeScalars.first != "-" else {
+            return nil
+        }
         let fm = FileManager.default
         if first.lowercased().hasSuffix(".app") {
             let path = NSString(string: first).expandingTildeInPath
@@ -647,10 +681,14 @@ final class CommandRunner {
             return exists ? [.text("/usr/bin/open -a "), .value(path)] + rest : nil
         }
         let isAlone = rest.allSatisfy { piece in
-            if case .text(let text) = piece { return text.unicodeScalars.allSatisfy { $0 == " " || $0 == "\t" } }
+            if case .text(let text) = piece {
+                return text.unicodeScalars.allSatisfy { $0 == " " || $0 == "\t" }
+            }
             return false
         }
-        guard isAlone, !first.contains("/") else { return nil }
+        guard isAlone, !first.contains("/") else {
+            return nil
+        }
         guard
             applicationFolders.contains(where: { fm.fileExists(atPath: $0.appendingPathComponent(first + ".app").path) }
             )

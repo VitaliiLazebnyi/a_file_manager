@@ -49,7 +49,9 @@ enum RenameRegex {
         guardian: RenameRegexGuard,
         cancelled: () -> Bool
     ) -> [NSTextCheckingResult]? {
-        if guardian.isTripped || cancelled() { return nil }
+        if guardian.isTripped || cancelled() {
+            return nil
+        }
         // (Processor time of this thread, not the clock: see `ThreadTime`.)
         let deadline = ThreadTime.used + budget
         var found: [NSTextCheckingResult] = []
@@ -102,9 +104,14 @@ struct WildcardMatcher {
         var pieces: [Piece] = []
         for scalar in search.unicodeScalars {
             switch scalar {
-            case "*": pieces.append(Piece(isStar: true))
-            case "?": pieces.append(Piece())
-            default: pieces.append(Piece(value: caseSensitive ? scalar.value : Self.folded(scalar)))
+            case "*":
+                pieces.append(Piece(isStar: true))
+
+            case "?":
+                pieces.append(Piece())
+
+            default:
+                pieces.append(Piece(value: caseSensitive ? scalar.value : Self.folded(scalar)))
             }
         }
         // A lone `*` is the greedy kind (the whole name), not an anchored lazy one.
@@ -113,7 +120,9 @@ struct WildcardMatcher {
     }
 
     static func folded(_ scalar: Unicode.Scalar) -> UInt32 {
-        if scalar.isASCII { return scalar.value >= 0x41 && scalar.value <= 0x5A ? scalar.value + 32 : scalar.value }
+        if scalar.isASCII {
+            return scalar.value >= 0x41 && scalar.value <= 0x5A ? scalar.value + 32 : scalar.value
+        }
         let lower = scalar.properties.lowercaseMapping.unicodeScalars
         return lower.count == 1 ? lower.first!.value : scalar.value
     }
@@ -150,7 +159,9 @@ struct WildcardMatcher {
     /// cancelled, as `RenameRegex.matches` answers for a regular expression (a timeout is
     /// counted in `guardian`, and a search given up three times is not tried again).
     func matches(in text: String, firstOnly: Bool, guardian: RenameRegexGuard, cancelled: () -> Bool) -> [NSRange]? {
-        if guardian.isTripped || cancelled() { return nil }
+        if guardian.isTripped || cancelled() {
+            return nil
+        }
         let found = scan(text, firstOnly: firstOnly, budget: Self.budget, cancelled: cancelled)
         guard found.isComplete else {
             if !cancelled() { guardian.recordTimeout() }
@@ -163,7 +174,9 @@ struct WildcardMatcher {
     private func scan(_ text: String, firstOnly: Bool, budget: TimeInterval, cancelled: () -> Bool) -> (
         ranges: [NSRange], isComplete: Bool
     ) {
-        guard !pieces.isEmpty else { return ([], true) }
+        guard !pieces.isEmpty else {
+            return ([], true)
+        }
         let scalars = Array(text.unicodeScalars)
         var offsets = [Int](repeating: 0, count: scalars.count + 1)
         for (index, scalar) in scalars.enumerated() { offsets[index + 1] = offsets[index] + scalar.utf16.count }
@@ -175,7 +188,9 @@ struct WildcardMatcher {
         let deadline = budget.isFinite ? ThreadTime.used + budget : .infinity
         var (steps, isOver) = (0, false)
         func goesOn() -> Bool {
-            if isOver { return false }
+            if isOver {
+                return false
+            }
             steps += 1
             if steps & 0xFFF == 0, cancelled() || ThreadTime.used > deadline { isOver = true }
             return !isOver
@@ -193,12 +208,16 @@ struct WildcardMatcher {
 
     private func firstMatch(in subject: Subject, from: Int, goesOn: () -> Bool) -> (Int, Int)? {
         if isAnchored {
-            guard from == 0, let end = match(subject, at: 0, goesOn: goesOn) else { return nil }
+            guard from == 0, let end = match(subject, at: 0, goesOn: goesOn) else {
+                return nil
+            }
             return (0, end)
         }
         var start = from
         while start <= subject.count, goesOn() {
-            if let end = match(subject, at: start, goesOn: goesOn) { return (start, end) }
+            if let end = match(subject, at: start, goesOn: goesOn) {
+                return (start, end)
+            }
             start += 1
         }
         return nil
@@ -231,7 +250,9 @@ struct WildcardMatcher {
                 var end = index
                 while end < pieces.count, !pieces[end].isStar { end += 1 }
                 let run = pieces[index..<end]
-                guard fits(run, in: subject, at: position) else { return nil }
+                guard fits(run, in: subject, at: position) else {
+                    return nil
+                }
                 position += run.count
                 index = end
             }
@@ -240,11 +261,15 @@ struct WildcardMatcher {
     }
 
     private func fits(_ run: ArraySlice<Piece>, in subject: Subject, at position: Int) -> Bool {
-        guard position + run.count <= subject.count else { return false }
+        guard position + run.count <= subject.count else {
+            return false
+        }
         var place = position
         for piece in run {
             if let wanted = piece.value {
-                if subject.values[place] != wanted { return false }
+                if subject.values[place] != wanted {
+                    return false
+                }
             } else if subject.breaks[place] {
                 return false
             }
@@ -259,8 +284,12 @@ struct WildcardMatcher {
     {
         var position = from
         while position + run.count <= subject.count, goesOn() {
-            if fits(run, in: subject, at: position) { return position }
-            guard position < subject.count, !subject.breaks[position] else { return nil }
+            if fits(run, in: subject, at: position) {
+                return position
+            }
+            guard position < subject.count, !subject.breaks[position] else {
+                return nil
+            }
             position += 1
         }
         return nil

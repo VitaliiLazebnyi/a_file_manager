@@ -44,8 +44,11 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         let isVirtual = { (panel: (any PanelHandle)) in VirtualLocation(panel.model.directory) != nil }
         let isBranch = { (panel: (any PanelHandle)) -> Bool in
             switch VirtualLocation(panel.model.directory) {
-            case .branch, .picked: return true
-            default: return false
+            case .branch, .picked:
+                return true
+
+            default:
+                return false
             }
         }
 
@@ -136,7 +139,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
 
     /// With `isUnique` the list is not looked through for doubles (see `register(files:…isUnique:)`).
     public func show(_ files: [URL], title: String, in panel: any PanelHandle, isUnique: Bool) {
-        guard let fileSystem else { return }
+        guard let fileSystem else {
+            return
+        }
         let directory = panel.model.directory
         let origin = VirtualLocation(directory).map(\.realDirectory) ?? directory
         panel.show(fileSystem.register(files: files, title: title, origin: origin, isUnique: isUnique))
@@ -157,11 +162,18 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         let isOn = location != nil
         let wanted: Bool
         switch argument.index ?? argument.text.flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) }) ?? 0 {
-        case 1: wanted = true
-        case 2, -1: wanted = false
-        default: wanted = !isOn
+        case 1:
+            wanted = true
+
+        case 2, -1:
+            wanted = false
+
+        default:
+            wanted = !isOn
         }
-        guard wanted != isOn else { return }
+        guard wanted != isOn else {
+            return
+        }
         if let location {
             leave(panel, location, kernel: kernel, fileSystem: fileSystem)
         } else {
@@ -173,7 +185,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         let model = panel.model
         if selectedOnly {
             let items = model.operands()
-            guard !items.isEmpty else { return }
+            guard !items.isEmpty else {
+                return
+            }
             panel.show(fileSystem.registerPicked(items.map(\.url), in: model.directory))
         } else {
             panel.show(fileSystem.branch(of: model.directory))
@@ -204,7 +218,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         }
         func show(selecting names: [String]) {
             panel.show(directory, focus: names.last, history: .record) { worked in
-                guard worked, tab.directory.isSameLocation(as: directory) else { return }
+                guard worked, tab.directory.isSameLocation(as: directory) else {
+                    return
+                }
                 tab.setSelected(true, names: names)
             }
         }
@@ -246,7 +262,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
             },
             completion: { [self] result in
                 switch result {
-                case .success(let files): show(files, title: FileItem.split(file.lastPathComponent).base, in: panel)
+                case .success(let files):
+                    show(files, title: FileItem.split(file.lastPathComponent).base, in: panel)
+
                 case .failure(let error):
                     kernel.interaction.report(error, title: "The list of files could not be loaded.")
                 }
@@ -289,7 +307,9 @@ public enum FileListFile {
         return (text ?? "").split(whereSeparator: \.isNewline)
             .compactMap { raw in
                 let line = raw.trimmingCharacters(in: .whitespaces)
-                if line.isEmpty { return nil }
+                if line.isEmpty {
+                    return nil
+                }
                 return unquoted(line) ?? line
             }
     }
@@ -308,18 +328,29 @@ public enum FileListFile {
             index += 1
             guard scalar == "\\" else {
                 // An unescaped quote inside means the line is no quoted name.
-                if scalar == "\"" { return nil }
+                if scalar == "\"" {
+                    return nil
+                }
                 result.append(scalar)
                 continue
             }
-            guard index < body.count else { return nil }
+            guard index < body.count else {
+                return nil
+            }
             let escape = body[index]
             index += 1
             switch escape {
-            case "\\", "\"": result.append(escape)
-            case "n": result.append("\n")
-            case "r": result.append("\r")
-            case "t": result.append("\t")
+            case "\\", "\"":
+                result.append(escape)
+
+            case "n":
+                result.append("\n")
+
+            case "r":
+                result.append("\r")
+
+            case "t":
+                result.append("\t")
 
             case "u":
                 guard index < body.count, body[index] == "{", let close = body[index...].firstIndex(of: "}") else {
@@ -332,7 +363,8 @@ public enum FileListFile {
                 result.append(unicode)
                 index = close + 1
 
-            default: return nil
+            default:
+                return nil
             }
         }
         return String(result)
@@ -345,15 +377,26 @@ public enum FileListFile {
             scalars.first == "\"" || scalars.contains { isUnsafe($0) }
             || scalars.first.map({ $0.properties.isWhitespace }) == true
             || scalars.last.map({ $0.properties.isWhitespace }) == true
-        guard needsQuotes else { return name }
+        guard needsQuotes else {
+            return name
+        }
         var text = "\""
         for scalar in scalars {
             switch scalar {
-            case "\\": text += "\\\\"
-            case "\"": text += "\\\""
-            case "\n": text += "\\n"
-            case "\r": text += "\\r"
-            case "\t": text += "\\t"
+            case "\\":
+                text += "\\\\"
+
+            case "\"":
+                text += "\\\""
+
+            case "\n":
+                text += "\\n"
+
+            case "\r":
+                text += "\\r"
+
+            case "\t":
+                text += "\\t"
 
             default:
                 if isUnsafe(scalar) {
@@ -375,8 +418,11 @@ public enum FileListFile {
     /// paragraph break.
     private static func isUnsafe(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.properties.generalCategory {
-        case .control, .lineSeparator, .paragraphSeparator: return true
-        default: return false
+        case .control, .lineSeparator, .paragraphSeparator:
+            return true
+
+        default:
+            return false
         }
     }
 
@@ -401,7 +447,9 @@ public enum FileListFile {
     /// Whether a file named by a list file may be listed: a local file, or one on the very
     /// server (scheme, host, port) the list file itself was read from.
     static func isTrusted(_ url: URL, listedIn file: URL) -> Bool {
-        if url.isFileURL { return true }
+        if url.isFileURL {
+            return true
+        }
         return url.scheme == file.scheme && url.host == file.host && url.port == file.port
     }
 }

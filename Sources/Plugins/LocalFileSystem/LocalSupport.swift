@@ -61,7 +61,9 @@ final class Interruption: @unchecked Sendable {
         pthread_sigmask(SIG_UNBLOCK, &signals, nil)
         lock.lock()
         defer { lock.unlock() }
-        if interrupted { return false }
+        if interrupted {
+            return false
+        }
         thread = pthread_self()
         return true
     }
@@ -83,7 +85,9 @@ final class Interruption: @unchecked Sendable {
 
     /// The call may not have been entered yet when the first signal arrived.
     private func resend(attempt: Int) {
-        guard attempt <= 50 else { return }
+        guard attempt <= 50 else {
+            return
+        }
         schedule(0.1) { [self] in
             lock.lock()
             let target = thread
@@ -137,7 +141,9 @@ final class MountTable: @unchecked Sendable {
     /// Called with the lock held.
     private func refresh() {
         let now = DispatchTime.now().uptimeNanoseconds
-        guard read == 0 || now &- read > Self.lifetime else { return }
+        guard read == 0 || now &- read > Self.lifetime else {
+            return
+        }
         mounts = Self.readMounts()
         read = now
     }
@@ -251,7 +257,9 @@ final class LinkResolver: @unchecked Sendable {
             self.lock.unlock()
             done.signal()
         }
-        guard done.wait(timeout: .now() + patience) == .success else { return nil }
+        guard done.wait(timeout: .now() + patience) == .success else {
+            return nil
+        }
         answer.lock.lock()
         defer { answer.lock.unlock() }
         return answer.target
@@ -260,7 +268,9 @@ final class LinkResolver: @unchecked Sendable {
     /// What the link at `path` leads to, as the system says (`stat`); nil when nothing is there.
     internal static func lookup(_ path: String) -> LinkTarget? {
         var st = stat()
-        guard stat(path, &st) == 0 else { return nil }
+        guard stat(path, &st) == 0 else {
+            return nil
+        }
         let type = st.st_mode & S_IFMT
         return LinkTarget(
             isDirectory: type == S_IFDIR,
@@ -276,11 +286,15 @@ final class LinkResolver: @unchecked Sendable {
     private static func absoluteTarget(of path: String) -> String? {
         let text: String? = withUnsafeTemporaryAllocation(of: CChar.self, capacity: Int(PATH_MAX) + 1) { buffer in
             let length = readlink(path, buffer.baseAddress, Int(PATH_MAX))
-            guard length > 0 else { return nil }
+            guard length > 0 else {
+                return nil
+            }
             buffer[length] = 0
             return String(validatingCString: buffer.baseAddress!)
         }
-        guard let text else { return nil }
+        guard let text else {
+            return nil
+        }
         var absolute = text
         // By bytes, as the file system reads a path: a `/` with a combining mark after it is
         // one character that is not `/`, and a cut by characters would not see it.
@@ -486,7 +500,9 @@ final class RemoteChanges: @unchecked Sendable {
         let registration = cancellation.onCancel { done.signal() }
         defer { withExtendedLifetime(registration) {} }
         done.wait()
-        if let result = finished() { return try result.get() }
+        if let result = finished() {
+            return try result.get()
+        }
         // Cancelled. The call has been sent its signal; it gets a moment to come back.
         call.interruption.interrupt()
         _ = done.wait(timeout: .now() + patience)

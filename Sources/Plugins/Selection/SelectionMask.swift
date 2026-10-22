@@ -42,7 +42,9 @@ struct SelectionMask {
         init?(_ text: String) {
             let text = text.replacingOccurrences(of: "\\", with: "/").lowercased()
             var parts = text.split(separator: "/").map(String.init).filter { $0 != "." }
-            guard let last = parts.popLast() else { return nil }
+            guard let last = parts.popLast() else {
+                return nil
+            }
             folders = parts.map(Array.init)
             name = Array(last)
             nameBytes = last.utf8.allSatisfy { $0 < 0x80 && $0 != 0x0D } ? Array(last.utf8) : nil
@@ -54,16 +56,26 @@ struct SelectionMask {
 
         /// For a name of plain ASCII bytes and a mask with no folder part; nil when `nameBytes` is.
         func matches(bytes name: UnsafeBufferPointer<UInt8>, isFolder: Bool) -> Bool? {
-            guard let nameBytes, !usesPath else { return nil }
-            if foldersOnly, !isFolder { return false }
+            guard let nameBytes, !usesPath else {
+                return nil
+            }
+            if foldersOnly, !isFolder {
+                return false
+            }
             return Wildcard.matches(ascii: nameBytes, name)
         }
 
         /// `chain` is the folders leading to the entry, in lower case.
         func matches(_ name: [Character], isFolder: Bool, chain: [[Character]]) -> Bool {
-            if foldersOnly, !isFolder { return false }
-            guard Wildcard.matches(self.name, name) else { return false }
-            guard usesPath else { return true }
+            if foldersOnly, !isFolder {
+                return false
+            }
+            guard Wildcard.matches(self.name, name) else {
+                return false
+            }
+            guard usesPath else {
+                return true
+            }
             // Without a leading separator the chain may start below any subdirectory.
             let patterns = isAnchored ? folders : [Array("**")] + folders
             return Self.chain(patterns, matches: chain)
@@ -150,8 +162,12 @@ struct SelectionMask {
         if let expression {
             return SelectionRegex.matches(expression, entry.name, trip: trip, cancelled: cancelled)
         }
-        guard isValid else { return false }
-        if !needsDirectories, let answer = quickAnswer(entry) { return answer }
+        guard isValid else {
+            return false
+        }
+        if !needsDirectories, let answer = quickAnswer(entry) {
+            return answer
+        }
         let name = Array(entry.name.lowercased())
         let chain = needsDirectories ? entry.directory.map { Array($0.lowercased()) } : []
         func matching(_ token: Token) -> Bool { token.matches(name, isFolder: entry.isFolder, chain: chain) }
@@ -192,7 +208,9 @@ struct SelectionMask {
             // A cancelled run has no use for the rest.
             result.append(!cancelled() && matches(entry, cancelled: cancelled))
         }
-        guard let related else { return result }
+        guard let related else {
+            return result
+        }
         func key(_ directory: [String], _ name: String) -> String {
             directory.joined(separator: "/").lowercased() + "/" + name.lowercased()
         }
@@ -246,23 +264,37 @@ enum Wildcard {
     /// also match `name` without an extension, as they do under DOS.
     static func matches(_ pattern: [Character], _ name: [Character]) -> Bool {
         let (whole, wholeName) = (pattern[pattern.indices], name[name.indices])
-        if glob(whole, wholeName) { return true }
-        guard !name.contains(".") else { return false }
-        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] { return glob(pattern.dropLast(2), wholeName) }
-        if pattern.last == "." { return glob(pattern.dropLast(), wholeName) }
+        if glob(whole, wholeName) {
+            return true
+        }
+        guard !name.contains(".") else {
+            return false
+        }
+        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] {
+            return glob(pattern.dropLast(2), wholeName)
+        }
+        if pattern.last == "." {
+            return glob(pattern.dropLast(), wholeName)
+        }
         return false
     }
 
     /// The same for a plain ASCII pattern in lower case and a plain ASCII name (of any case).
     static func matches(ascii pattern: [UInt8], _ name: UnsafeBufferPointer<UInt8>) -> Bool {
-        if glob(pattern[pattern.indices], name) { return true }
-        guard !name.contains(UInt8(ascii: ".")) else { return false }
+        if glob(pattern[pattern.indices], name) {
+            return true
+        }
+        guard !name.contains(UInt8(ascii: ".")) else {
+            return false
+        }
         if pattern.count >= 2, pattern[pattern.count - 2] == UInt8(ascii: "."),
             pattern[pattern.count - 1] == UInt8(ascii: "*")
         {
             return glob(pattern.dropLast(2), name)
         }
-        if pattern.last == UInt8(ascii: ".") { return glob(pattern.dropLast(), name) }
+        if pattern.last == UInt8(ascii: ".") {
+            return glob(pattern.dropLast(), name)
+        }
         return false
     }
 

@@ -343,7 +343,9 @@ import Testing
             text.components(separatedBy: "\r\n").allSatisfy { $0.count <= 76 }
                 && !text.replacingOccurrences(of: "\r\n", with: "").contains("\n")
         )
-        guard let first = memory.item(at: encoded[0]) else { return }
+        guard let first = memory.item(at: encoded[0]) else {
+            return
+        }
         #expect(try Decoder.decode(first, into: box.url("B"), run: run) == [box.url("B/file.bin")])
         #expect(data("B/file.bin") == original)
     }

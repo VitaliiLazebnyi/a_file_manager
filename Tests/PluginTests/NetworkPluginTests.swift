@@ -229,7 +229,9 @@ private final class FakeMounter: VolumeMounter, @unchecked Sendable {
         #expect(
             ui.forms.last?.first
                 .map { field -> Bool in
-                    if case .list(let rows, _) = field.kind { return rows.count == 1 && rows[0].hasPrefix("Second") }
+                    if case .list(let rows, _) = field.kind {
+                        return rows.count == 1 && rows[0].hasPrefix("Second")
+                    }
                     return false
                 } == true
         )

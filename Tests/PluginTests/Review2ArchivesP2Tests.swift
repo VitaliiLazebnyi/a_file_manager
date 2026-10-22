@@ -281,7 +281,9 @@ private final class Collected<Value>: @unchecked Sendable {
             monitor: bench.monitor,
             options: UnpackOptions(),
             whileUnpacking: { entry in
-                guard entry.path == "dir/sub/planted.txt", swapped.all.isEmpty else { return }
+                guard entry.path == "dir/sub/planted.txt", swapped.all.isEmpty else {
+                    return
+                }
                 swapped.add(entry.path)
                 if renamex_np(target.appendingPathComponent("dir").path, link.path, UInt32(RENAME_SWAP)) == 0 {
                     try? FileManager.default.moveItem(at: link, to: target.appendingPathComponent("taken"))
@@ -607,7 +609,9 @@ private final class Collected<Value>: @unchecked Sendable {
                 DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), DispatchSemaphore(value: 0)
             )
             @Sendable func add(_ path: String) {
-                guard let writer = try? opened.write(path) else { return }
+                guard let writer = try? opened.write(path) else {
+                    return
+                }
                 try? writer.write(Data("added".utf8))
                 try? writer.close(attributes: FileAttributes())
             }

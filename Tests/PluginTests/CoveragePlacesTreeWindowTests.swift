@@ -144,7 +144,9 @@ import Testing
     @Test func rescanKeysReadTheTreeAgainWhereverTheFocusIs() async {
         let tree = await opened("/A/a1")
         defer { tree.controller.close() }
-        guard let window = tree.window else { return }
+        guard let window = tree.window else {
+            return
+        }
         // Before a rescan: a folder appears, one goes away.
         folders.add("/A/a1/new")
         folders.remove("/B")
@@ -404,7 +406,9 @@ import Testing
     @Test func keysInTheSearchFieldStepAndGo() async {
         let tree = await opened("/A/a1")
         defer { tree.controller.close() }
-        guard let field = tree.searchField else { return }
+        guard let field = tree.searchField else {
+            return
+        }
         tree.type("a")
         // Without a key press behind it (no event is being handled here) a command is the field's own.
         #expect(

@@ -85,7 +85,9 @@ struct FolderSummary: Equatable {
             let items = try? provider.list(directory, showHidden: true, cancellation: cancellation),
             !cancellation.isCancelled
         else { return Self() }
-        if let budget, !budget.take(items.count) { return Self() }
+        if let budget, !budget.take(items.count) {
+            return Self()
+        }
         var summary = Self()
         for item in items {
             if item.isRealDirectory {

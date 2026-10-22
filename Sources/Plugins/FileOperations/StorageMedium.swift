@@ -15,16 +15,24 @@ enum StorageMedium {
     /// Anything else, and anything the system cannot tell, counts as not spinning. Safe to call
     /// from any thread; asks the system once per device.
     static func isRotational(_ url: URL) -> Bool {
-        guard url.isFileURL else { return false }
+        guard url.isFileURL else {
+            return false
+        }
         var info = statfs()
-        guard statfs(url.path, &info) == 0 else { return false }
+        guard statfs(url.path, &info) == 0 else {
+            return false
+        }
         let device = withUnsafePointer(to: &info.f_mntfromname) {
             $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
         }
-        guard device.hasPrefix("/dev/") else { return false }
+        guard device.hasPrefix("/dev/") else {
+            return false
+        }
         lock.lock()
         defer { lock.unlock() }
-        if let answer = known[device] { return answer }
+        if let answer = known[device] {
+            return answer
+        }
         let answer = mediumIsRotational(bsdName: String(device.dropFirst(5)))
         known[device] = answer
         return answer

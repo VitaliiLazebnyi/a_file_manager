@@ -541,13 +541,21 @@ private func describe(_ rows: [SyncRow]) -> [String] {
         var changed = rows()
         for index in changed.indices {
             switch changed[index].name {
-            case "same.txt": changed[index].action = .deleteBoth
-            case "new.txt": changed[index].action = .deleteLeft
-            case "update.txt": changed[index].action = .copyToLeft
+            case "same.txt":
+                changed[index].action = .deleteBoth
+
+            case "new.txt":
+                changed[index].action = .deleteLeft
+
+            case "update.txt":
+                changed[index].action = .copyToLeft
 
             // What a row cannot do is not planned.
-            case "arrives.txt": changed[index].action = .copyToRight
-            default: changed[index].action = .none
+            case "arrives.txt":
+                changed[index].action = .copyToRight
+
+            default:
+                changed[index].action = .none
             }
         }
         let second = SyncPlan(rows: changed)

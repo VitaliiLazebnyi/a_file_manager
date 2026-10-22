@@ -63,26 +63,40 @@ struct ViewerEncoding: Hashable {
 
     /// Any code page the system knows, for "Other (enter code page manually)"; nil otherwise.
     static func codePage(_ number: Int) -> Self? {
-        if let known = ([utf8, utf16LE, utf16BE] + codePages).first(where: { $0.codePage == number }) { return known }
+        if let known = ([utf8, utf16LE, utf16BE] + codePages).first(where: { $0.codePage == number }) {
+            return known
+        }
         let encoding = Self(codePage: number, name: "Code page \(number)")
         return encoding.isAvailable ? encoding : nil
     }
 
     var kind: Kind {
         switch codePage {
-        case 65_001: return .utf8
-        case 1_200: return .utf16LE
-        case 1_201: return .utf16BE
-        default: return Self.multiBytePages.contains(codePage) ? .doubleByte : .singleByte
+        case 65_001:
+            return .utf8
+
+        case 1_200:
+            return .utf16LE
+
+        case 1_201:
+            return .utf16BE
+
+        default:
+            return Self.multiBytePages.contains(codePage) ? .doubleByte : .singleByte
         }
     }
 
     /// The layout of a character's bytes; `.doubleByte` for everything that is not EUC-JP or GB 18030.
     var shape: Shape {
         switch codePage {
-        case 51_932: return .eucJP
-        case 54_936: return .gb18030
-        default: return .doubleByte
+        case 51_932:
+            return .eucJP
+
+        case 54_936:
+            return .gb18030
+
+        default:
+            return .doubleByte
         }
     }
 
@@ -97,12 +111,16 @@ struct ViewerEncoding: Hashable {
 
     /// The encoding a layout really shows this one in.
     func forLayout(_ layout: ViewerLayout) -> Self {
-        if case .text = layout { return self }
+        if case .text = layout {
+            return self
+        }
         return byteOriented
     }
 
     fileprivate var coreFoundationEncoding: CFStringEncoding? {
-        guard codePage > 0, codePage <= Int(UInt32.max) else { return nil }
+        guard codePage > 0, codePage <= Int(UInt32.max) else {
+            return nil
+        }
         let encoding = CFStringConvertWindowsCodepageToEncoding(UInt32(codePage))
         guard encoding != kCFStringEncodingInvalidId, CFStringIsEncodingAvailable(encoding) else {
             return nil
@@ -115,8 +133,12 @@ struct ViewerEncoding: Hashable {
     /// (932, 936, 949, 950, EUC-JP 51932 and GB 18030 54936); the others (ISO-2022…) would show
     /// every byte above 0x7F as a replacement character, so they are not offered.
     var isAvailable: Bool {
-        if isUnicode { return true }
-        guard let encoding = coreFoundationEncoding else { return false }
+        if isUnicode {
+            return true
+        }
+        guard let encoding = coreFoundationEncoding else {
+            return false
+        }
         return Self.multiBytePages.contains(codePage) || CFStringGetMaximumSizeForEncoding(1, encoding) <= 1
     }
 
@@ -124,12 +146,19 @@ struct ViewerEncoding: Hashable {
     /// the encoding lacks.
     func encode(_ text: String) -> [UInt8]? {
         switch kind {
-        case .utf8: return Array(text.utf8)
-        case .utf16LE: return text.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] }
-        case .utf16BE: return text.utf16.flatMap { [UInt8($0 >> 8), UInt8($0 & 0xFF)] }
+        case .utf8:
+            return Array(text.utf8)
+
+        case .utf16LE:
+            return text.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] }
+
+        case .utf16BE:
+            return text.utf16.flatMap { [UInt8($0 >> 8), UInt8($0 & 0xFF)] }
 
         case .singleByte, .doubleByte:
-            guard let encoding = coreFoundationEncoding else { return nil }
+            guard let encoding = coreFoundationEncoding else {
+                return nil
+            }
             return text.data(using: String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(encoding)))
                 .map(
                     Array.init
@@ -280,12 +309,18 @@ final class CodeTable: Sendable {
     func characterLength(_ bytes: UnsafeBufferPointer<UInt8>, at index: Int) -> Int {
         let count = bytes.count
         let byte = bytes[index]
-        if byte < 0x80 { return 1 }
+        if byte < 0x80 {
+            return 1
+        }
         switch shape {
         case .doubleByte:
-            guard single[Int(byte)] == Self.leadByte else { return 1 }
+            guard single[Int(byte)] == Self.leadByte else {
+                return 1
+            }
             // A lead byte before something that cannot be a trail byte (a line end, a digit) is a stray byte.
-            guard index + 1 < count else { return 0 }
+            guard index + 1 < count else {
+                return 0
+            }
             guard bytes[index + 1] >= 0x40 else {
                 return 1
             }
@@ -294,23 +329,33 @@ final class CodeTable: Sendable {
         case .eucJP:
             switch byte {
             case 0x8E:
-                guard index + 1 < count else { return 0 }
+                guard index + 1 < count else {
+                    return 0
+                }
                 guard (0xA1...0xDF).contains(bytes[index + 1]) else {
                     return 1
                 }
                 return 2
 
             case 0x8F:
-                guard index + 1 < count else { return 0 }
-                guard (0xA1...0xFE).contains(bytes[index + 1]) else { return 1 }
-                guard index + 2 < count else { return 0 }
+                guard index + 1 < count else {
+                    return 0
+                }
+                guard (0xA1...0xFE).contains(bytes[index + 1]) else {
+                    return 1
+                }
+                guard index + 2 < count else {
+                    return 0
+                }
                 guard (0xA1...0xFE).contains(bytes[index + 2]) else {
                     return 1
                 }
                 return 3
 
             case 0xA1...0xFE:
-                guard index + 1 < count else { return 0 }
+                guard index + 1 < count else {
+                    return 0
+                }
                 guard (0xA1...0xFE).contains(bytes[index + 1]) else {
                     return 1
                 }
@@ -321,14 +366,28 @@ final class CodeTable: Sendable {
             }
 
         case .gb18030:
-            guard (0x81...0xFE).contains(byte) else { return 1 }
-            guard index + 1 < count else { return 0 }
+            guard (0x81...0xFE).contains(byte) else {
+                return 1
+            }
+            guard index + 1 < count else {
+                return 0
+            }
             let second = bytes[index + 1]
-            if (0x40...0xFE).contains(second), second != 0x7F { return 2 }
-            guard (0x30...0x39).contains(second) else { return 1 }
-            guard index + 2 < count else { return 0 }
-            guard (0x81...0xFE).contains(bytes[index + 2]) else { return 1 }
-            guard index + 3 < count else { return 0 }
+            if (0x40...0xFE).contains(second), second != 0x7F {
+                return 2
+            }
+            guard (0x30...0x39).contains(second) else {
+                return 1
+            }
+            guard index + 2 < count else {
+                return 0
+            }
+            guard (0x81...0xFE).contains(bytes[index + 2]) else {
+                return 1
+            }
+            guard index + 3 < count else {
+                return 0
+            }
             guard (0x30...0x39).contains(bytes[index + 3]) else {
                 return 1
             }
@@ -343,9 +402,14 @@ final class CodeTable: Sendable {
     /// ASCII range (GB 18030) that is a smaller set than "not a lead byte".
     func isSynchronizing(_ byte: UInt8) -> Bool {
         switch shape {
-        case .doubleByte: return single[Int(byte)] != Self.leadByte
-        case .eucJP: return byte < 0x80
-        case .gb18030: return byte < 0x30 || (0x3A...0x3F).contains(byte) || byte == 0x7F
+        case .doubleByte:
+            return single[Int(byte)] != Self.leadByte
+
+        case .eucJP:
+            return byte < 0x80
+
+        case .gb18030:
+            return byte < 0x30 || (0x3A...0x3F).contains(byte) || byte == 0x7F
         }
     }
 }
@@ -363,9 +427,14 @@ extension ViewerEncoding {
         text.units.reserveCapacity(bytes.count / unitSize + 1)
         if text.tracksOffsets { text.offsets.reserveCapacity(bytes.count / unitSize + 1) }
         switch kind {
-        case .utf8: return Self.decodeUTF8(bytes, final, &text)
-        case .utf16LE: return Self.decodeUTF16(bytes, final, littleEndian: true, &text)
-        case .utf16BE: return Self.decodeUTF16(bytes, final, littleEndian: false, &text)
+        case .utf8:
+            return Self.decodeUTF8(bytes, final, &text)
+
+        case .utf16LE:
+            return Self.decodeUTF16(bytes, final, littleEndian: true, &text)
+
+        case .utf16BE:
+            return Self.decodeUTF16(bytes, final, littleEndian: false, &text)
 
         case .singleByte, .doubleByte:
             let table = CodeTable.table(for: self)
@@ -513,14 +582,29 @@ extension ViewerEncoding {
             let following: Int
             let first: ClosedRange<UInt8>
             switch lead {
-            case 0xC2...0xDF: (following, first) = (1, 0x80...0xBF)
-            case 0xE0: (following, first) = (2, 0xA0...0xBF)
-            case 0xED: (following, first) = (2, 0x80...0x9F)
-            case 0xE1...0xEF: (following, first) = (2, 0x80...0xBF)
-            case 0xF0: (following, first) = (3, 0x90...0xBF)
-            case 0xF4: (following, first) = (3, 0x80...0x8F)
-            case 0xF1...0xF3: (following, first) = (3, 0x80...0xBF)
-            default: (following, first) = (0, 0x80...0xBF)
+            case 0xC2...0xDF:
+                (following, first) = (1, 0x80...0xBF)
+
+            case 0xE0:
+                (following, first) = (2, 0xA0...0xBF)
+
+            case 0xED:
+                (following, first) = (2, 0x80...0x9F)
+
+            case 0xE1...0xEF:
+                (following, first) = (2, 0x80...0xBF)
+
+            case 0xF0:
+                (following, first) = (3, 0x90...0xBF)
+
+            case 0xF4:
+                (following, first) = (3, 0x80...0x8F)
+
+            case 0xF1...0xF3:
+                (following, first) = (3, 0x80...0xBF)
+
+            default:
+                (following, first) = (0, 0x80...0xBF)
             }
             var valid = following > 0
             var scalar = UInt32(lead) & (following == 1 ? 0x1F : following == 2 ? 0x0F : 0x07)

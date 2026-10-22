@@ -42,7 +42,9 @@ public final class NavigationPlugin: Plugin {
     nonisolated static func neighbourPlace(of directory: URL, in places: [Place], delta: Int) -> Place? {
         let disks = places.filter { $0.kind == .internalDisk || $0.kind == .externalDisk }
         let candidates = disks.count > 1 ? disks : places
-        guard candidates.count > 1 else { return candidates.first { !$0.url.isSameLocation(as: directory) } }
+        guard candidates.count > 1 else {
+            return candidates.first { !$0.url.isSameLocation(as: directory) }
+        }
         // The place that holds the directory is the one with the longest path around it.
         let current = candidates.indices
             .filter {
@@ -50,7 +52,9 @@ public final class NavigationPlugin: Plugin {
                     || (candidates[$0].url.path == "/" && candidates[$0].url.scheme == directory.scheme)
             }
             .max { candidates[$0].url.path.count < candidates[$1].url.path.count }
-        guard let current else { return delta >= 0 ? candidates.first : candidates.last }
+        guard let current else {
+            return delta >= 0 ? candidates.first : candidates.last
+        }
         return candidates[((current + delta) % candidates.count + candidates.count) % candidates.count]
     }
 
@@ -87,8 +91,12 @@ public final class NavigationPlugin: Plugin {
 
         var hasText: Bool {
             let count = pasteboard.changeCount
-            if textCount == count { return true }
-            guard pasteboard.availableType(from: [.string]) != nil else { return false }
+            if textCount == count {
+                return true
+            }
+            guard pasteboard.availableType(from: [.string]) != nil else {
+                return false
+            }
             textCount = count
             return true
         }
@@ -96,7 +104,9 @@ public final class NavigationPlugin: Plugin {
         /// The path the clipboard's text starts with; the text is read once for each change.
         var path: String? {
             let count = pasteboard.changeCount
-            if let pathRead, pathRead.count == count { return pathRead.path }
+            if let pathRead, pathRead.count == count {
+                return pathRead.path
+            }
             let path = pasteboard.string(forType: .string).flatMap(NavigationPlugin.path(fromClipboard:))
             // An empty answer is asked again: the text may not have been put there yet.
             if path != nil { pathRead = (count, path) }
@@ -221,7 +231,9 @@ public final class NavigationPlugin: Plugin {
             Command(.changeDirectoryFromClipboard, "Go to Path from Clipboard"),
             enabled: { clipboard.hasText }
         ) {
-            guard let path = clipboard.path else { return }
+            guard let path = clipboard.path else {
+                return
+            }
             // The path of a file leads to its folder, with the cursor on the file.
             source().show(kernel.fileSystems.location(from: path, relativeTo: source().model.directory))
         }
@@ -262,7 +274,9 @@ public final class NavigationPlugin: Plugin {
                 },
                 // The registry is kept until the answer is in: the kernel may have gone by then.
                 completion: { [commands] place in
-                    guard let place else { return commands.onRejected() }
+                    guard let place else {
+                        return commands.onRejected()
+                    }
                     panel.show(place.url)
                 }
             )

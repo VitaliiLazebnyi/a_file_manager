@@ -27,15 +27,32 @@ public enum NetworkError: LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .timedOut(let what): return "The server did not answer in time (\(what))."
-        case .connectionFailed(let why): return "Connect call failed! \(why)"
-        case .connectionLost: return "The connection to the server was lost."
-        case .cancelled: return "The operation was cancelled."
-        case .refused(let reply): return "The server answered: \(reply.message)"
-        case .loginFailed(let why): return "Login failed. \(why)"
-        case .untrustedCertificate(let info): return "The server's certificate is not trusted: \(info.problem)"
-        case .unexpected(let what): return "Unexpected answer from the server: \(what)"
-        case .notConnected(let server): return "There is no connection to \(server)."
+        case .timedOut(let what):
+            return "The server did not answer in time (\(what))."
+
+        case .connectionFailed(let why):
+            return "Connect call failed! \(why)"
+
+        case .connectionLost:
+            return "The connection to the server was lost."
+
+        case .cancelled:
+            return "The operation was cancelled."
+
+        case .refused(let reply):
+            return "The server answered: \(reply.message)"
+
+        case .loginFailed(let why):
+            return "Login failed. \(why)"
+
+        case .untrustedCertificate(let info):
+            return "The server's certificate is not trusted: \(info.problem)"
+
+        case .unexpected(let what):
+            return "Unexpected answer from the server: \(what)"
+
+        case .notConnected(let server):
+            return "There is no connection to \(server)."
 
         case .sessionReuseRequired(let said):
             return
@@ -43,17 +60,25 @@ public enum NetworkError: LocalizedError, Sendable {
                 + "which this program does not support (the server said: \(said)). "
                 + "Turn off \"require session reuse\" on the server (vsftpd: require_ssl_reuse=NO) or use SFTP."
 
-        case .incomplete(let what): return what
-        case .busy(let what): return what
+        case .incomplete(let what):
+            return what
+
+        case .busy(let what):
+            return what
         }
     }
 
     /// True when the connection itself is gone, so the same command may work on a new one.
     var isConnectionLevel: Bool {
         switch self {
-        case .connectionLost, .timedOut, .connectionFailed: return true
-        case .refused(let reply): return reply.code == 421
-        default: return false
+        case .connectionLost, .timedOut, .connectionFailed:
+            return true
+
+        case .refused(let reply):
+            return reply.code == 421
+
+        default:
+            return false
         }
     }
 }
@@ -91,7 +116,9 @@ final class Pending<Value: Sendable>: @unchecked Sendable {
         while value == nil {
             if cancellation?.isCancelled == true { throw NetworkError.cancelled }
             let now = Date()
-            if now >= deadline { return nil }
+            if now >= deadline {
+                return nil
+            }
             // Woken a few times a second to notice a cancellation.
             condition.wait(until: min(deadline, now.addingTimeInterval(0.1)))
         }
@@ -141,7 +168,9 @@ public final class CertificateTrust: @unchecked Sendable {
         let loader = isLoaded ? nil : load
         isLoaded = true
         lock.unlock()
-        guard let stored = loader?() else { return }
+        guard let stored = loader?() else {
+            return
+        }
         lock.lock()
         for (host, fingerprints) in stored { accepted[host.lowercased(), default: []].formUnion(fingerprints) }
         lock.unlock()
@@ -251,7 +280,9 @@ final class TLSSettings: @unchecked Sendable {
         // IP addresses, and without it no name would be checked at all.
         SecTrustSetPolicies(trust, SecPolicyCreateSSL(true, host as CFString))
         var error: CFError?
-        if SecTrustEvaluateWithError(trust, &error) { return true }
+        if SecTrustEvaluateWithError(trust, &error) {
+            return true
+        }
         // A failed evaluation always says why (`SecTrustEvaluateWithError` sets the error whenever
         // it returns false), and the chain of an evaluated trust is never empty: it starts with
         // the server's own certificate, the one the trust was made with.
@@ -259,7 +290,9 @@ final class TLSSettings: @unchecked Sendable {
         let leaf = (SecTrustCopyCertificateChain(trust) as? [SecCertificate])!.first!
         // swiftlint:disable:next force_unwrapping
         let info = CertificateInfo(leaf: leaf, problem: CFErrorCopyDescription(error!) as String)
-        if self.trust.isAccepted(info.fingerprint, for: host) { return true }
+        if self.trust.isAccepted(info.fingerprint, for: host) {
+            return true
+        }
         rejected = info
         return false
     }
@@ -352,7 +385,9 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
             // A reply of several lines is complete with its last; 120 says the server is not ready yet.
             guard let reply = parser.feed(line), reply.code != 120 else { continue }
             if !askedForTLS {
-                guard reply.code == 220 else { return fail(framer, report, reply) }
+                guard reply.code == 220 else {
+                    return fail(framer, report, reply)
+                }
                 report?.greeting = reply
                 askedForTLS = true
                 framer.writeOutput(data: Data("AUTH TLS\r\n".utf8))
@@ -377,7 +412,9 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
     private static func nextLine(_ framer: NWProtocolFramer.Instance) -> String? {
         var line: String?
         _ = framer.parseInput(minimumIncompleteLength: 1, maximumLength: 16_384) { buffer, _ in
-            guard let buffer, let end = buffer.firstIndex(of: 0x0A) else { return 0 }
+            guard let buffer, let end = buffer.firstIndex(of: 0x0A) else {
+                return 0
+            }
             var bytes = Array(buffer[..<end])
             if bytes.last == 0x0D { bytes.removeLast() }
             line = String(decoding: bytes, as: UTF8.self)
@@ -483,7 +520,9 @@ final class NetStream: @unchecked Sendable {
     /// Starts connecting; `waitUntilReady` tells when it is done.
     func start() {
         connection.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             condition.lock()
             switch state {
             case .ready:
@@ -523,7 +562,9 @@ final class NetStream: @unchecked Sendable {
 
     /// The address of this end of the connection, for the PORT command; nil once the stream is closed.
     var localAddress: String? {
-        guard !wasClosed, case .hostPort(let host, _)? = connection.currentPath?.localEndpoint else { return nil }
+        guard !wasClosed, case .hostPort(let host, _)? = connection.currentPath?.localEndpoint else {
+            return nil
+        }
         let text = "\(host)"
         return text.split(separator: "%").first.map(String.init)
     }
@@ -535,9 +576,14 @@ final class NetStream: @unchecked Sendable {
             return nil
         }
         switch connection.currentPath?.remoteEndpoint {
-        case .hostPort(.ipv4(let address), _)?: return "\(address)"
-        case .hostPort(.ipv6(let address), _)?: return "\(address)"
-        default: return nil
+        case .hostPort(.ipv4(let address), _)?:
+            return "\(address)"
+
+        case .hostPort(.ipv6(let address), _)?:
+            return "\(address)"
+
+        default:
+            return nil
         }
     }
 
@@ -551,10 +597,14 @@ final class NetStream: @unchecked Sendable {
         let wanted = !isReceiving && !atEnd && !isClosed && buffered < Self.highWater
         if wanted { isReceiving = true }
         condition.unlock()
-        guard wanted else { return }
+        guard wanted else {
+            return
+        }
         connection.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1_024) {
             [weak self] data, _, isComplete, error in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             condition.lock()
             isReceiving = false
             // What comes after `close` is nobody's: a call that was cut off stays cut off.
@@ -600,7 +650,9 @@ final class NetStream: @unchecked Sendable {
         defer { condition.unlock() }
         var now = Date()
         repeat {
-            if let result = try ready() { return result }
+            if let result = try ready() {
+                return result
+            }
             if let failure { throw failure }
             if cancellation?.isCancelled == true { throw NetworkError.cancelled }
             now = Date()
@@ -801,7 +853,9 @@ final class DataListener {
 
     /// Starts listening and returns the port.
     func start(timeout: TimeInterval) throws -> Int {
-        if let port = try? begin(timeout: timeout) { return port }
+        if let port = try? begin(timeout: timeout) {
+            return port
+        }
         // The one address could not be listened on (an address with a zone, say): every
         // address then, with the same check of who connects.
         listener.cancel()
@@ -821,9 +875,14 @@ final class DataListener {
         }
         listener.stateUpdateHandler = { state in
             switch state {
-            case .ready: started.fulfill(true)
-            case .failed, .cancelled: started.fulfill(false)
-            default: break
+            case .ready:
+                started.fulfill(true)
+
+            case .failed, .cancelled:
+                started.fulfill(false)
+
+            default:
+                break
             }
         }
         listener.start(queue: queue)

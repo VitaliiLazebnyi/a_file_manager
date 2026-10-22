@@ -129,7 +129,9 @@ final class InflateStream: ByteStream {
     }
 
     private func refill() throws {
-        guard stream.pointee.avail_in == 0, !sourceEnded else { return }
+        guard stream.pointee.avail_in == 0, !sourceEnded else {
+            return
+        }
         guard let block = try source.read(upToCount: Self.inputSize) else {
             sourceEnded = true
             return
@@ -140,7 +142,9 @@ final class InflateStream: ByteStream {
     }
 
     func read(upToCount count: Int) throws -> Data? {
-        guard !isFinished, count > 0 else { return nil }
+        guard !isFinished, count > 0 else {
+            return nil
+        }
         let capacity = min(count, 1 << 20)
         // Decompressed straight into the block that is handed on, which is not cleared first.
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 1)
@@ -298,8 +302,12 @@ final class XZStream: ByteStream {
     /// reader that asks for one TAR header must get no more than that.
     func read(upToCount count: Int) throws -> Data? {
         if readyOffset >= ready.count {
-            guard let more = try decode(upToCount: count) else { return nil }
-            if more.count <= count { return more }
+            guard let more = try decode(upToCount: count) else {
+                return nil
+            }
+            if more.count <= count {
+                return more
+            }
             (ready, readyOffset) = (more, 0)
         }
         let end = min(ready.count, readyOffset + max(count, 1))
@@ -331,7 +339,9 @@ final class XZStream: ByteStream {
             } else if result.output.isEmpty, sourceEnded, pending.isEmpty {
                 throw ArchiveError.damaged("the compressed data ends too early")
             }
-            if !result.output.isEmpty { return result.output }
+            if !result.output.isEmpty {
+                return result.output
+            }
         }
         return nil
     }
@@ -456,7 +466,9 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
         process.standardError = errorPipe
         try process.run()
         Tool.collect(errorPipe.fileHandleForReading, group: errorsRead) { [weak self] text in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             lock.lock()
             errors = text
             lock.unlock()
@@ -476,7 +488,9 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
     deinit { close() }
 
     func read(upToCount count: Int) throws -> Data? {
-        guard !ended else { return nil }
+        guard !ended else {
+            return nil
+        }
         try control?.check()
         // A stream that was closed (its reader stopped) has given up its pipe: nothing can be read
         // from it, and what it gave is not the whole output.
@@ -489,7 +503,9 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
         let descriptor = output.fileHandleForReading.fileDescriptor
         if let buffer = malloc(capacity) {
             let got = retryingInterrupted { Darwin.read(descriptor, buffer, capacity) }
-            if got > 0 { return Data(bytesNoCopy: buffer, count: got, deallocator: .free) }
+            if got > 0 {
+                return Data(bytesNoCopy: buffer, count: got, deallocator: .free)
+            }
             free(buffer)
         }
         ended = true
@@ -509,7 +525,9 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
         let wasClosed = isClosed
         isClosed = true
         lock.unlock()
-        guard !wasClosed else { return }
+        guard !wasClosed else {
+            return
+        }
         if process.isRunning { process.terminate() }
         try? output.fileHandleForReading.close()
     }
@@ -535,7 +553,9 @@ enum CompressedSize {
                 end -= 4
                 continue
             }
-            guard footer[10] == 0x59, footer[11] == 0x5A else { return nil }
+            guard footer[10] == 0x59, footer[11] == 0x5A else {
+                return nil
+            }
             var reader = ByteReader(footer)
             _ = reader.u32()
             let indexSize = (UInt64(reader.u32()) + 1) * 4
@@ -550,20 +570,30 @@ enum CompressedSize {
                     let byte = index[position]
                     position += 1
                     value |= UInt64(byte & 0x7F) << shift
-                    if byte & 0x80 == 0 { return value }
+                    if byte & 0x80 == 0 {
+                        return value
+                    }
                     shift += 7
                 }
                 return nil
             }
-            guard let blocks = number(), blocks <= indexSize / 2 else { return nil }
+            guard let blocks = number(), blocks <= indexSize / 2 else {
+                return nil
+            }
             var packed: UInt64 = 0
             for _ in 0..<blocks {
-                guard let unpadded = number(), let unpacked = number(), unpadded <= end else { return nil }
+                guard let unpadded = number(), let unpacked = number(), unpadded <= end else {
+                    return nil
+                }
                 let (sum, overflow) = total.addingReportingOverflow(unpacked)
-                guard !overflow else { return nil }
+                guard !overflow else {
+                    return nil
+                }
                 total = sum
                 packed += (unpadded + 3) & ~3
-                guard packed <= end else { return nil }
+                guard packed <= end else {
+                    return nil
+                }
             }
             let streamSize = 12 + packed + indexSize + 12
             guard streamSize <= end, let head = try? file.read(at: end - streamSize, count: 6),
@@ -603,8 +633,11 @@ extension ArchiveFormat.Codec {
     /// With a `control`, the stream ends with an error once the request is set.
     func decompressing(_ file: RandomAccessFile, control: StreamInterrupt? = nil) throws -> any ByteStream {
         switch self {
-        case .gzip: return InflateStream(FileRangeStream(file), wrapping: .gzip, control: control)
-        case .xz: return try XZStream(FileRangeStream(file), control: control)
+        case .gzip:
+            return InflateStream(FileRangeStream(file), wrapping: .gzip, control: control)
+
+        case .xz:
+            return try XZStream(FileRangeStream(file), control: control)
 
         case .bzip2:
             // The child opens the file by its path: it must still be the file that was listed.
@@ -644,12 +677,18 @@ final class ParallelCompressor {
         self.output = output
         let cores = ProcessInfo.processInfo.activeProcessorCount
         switch method {
-        case .none: (pieceSize, windowSize) = (1 << 20, 1 << 20)
-        case .gzip: (pieceSize, windowSize) = (1 << 20, (1 << 20) * cores)
-        case .bzip2: (pieceSize, windowSize) = (4 << 20, (4 << 20) * cores)
+        case .none:
+            (pieceSize, windowSize) = (1 << 20, 1 << 20)
+
+        case .gzip:
+            (pieceSize, windowSize) = (1 << 20, (1 << 20) * cores)
+
+        case .bzip2:
+            (pieceSize, windowSize) = (4 << 20, (4 << 20) * cores)
 
         // The LZMA encoder needs a lot of memory per stream, so fewer run at once.
-        case .xz: (pieceSize, windowSize) = (8 << 20, (8 << 20) * min(cores, 4))
+        case .xz:
+            (pieceSize, windowSize) = (8 << 20, (8 << 20) * min(cores, 4))
         }
         if case .gzip = method {
             var header = Data([0x1F, 0x8B, 8, 0])
@@ -690,7 +729,9 @@ final class ParallelCompressor {
         buffer = Data(buffer[offset...])
         // An empty input still has to become a valid (empty) compressed file.
         if final, pieces.isEmpty, !wroteAnything || isDeflate { pieces = [Data()] }
-        guard !pieces.isEmpty else { return }
+        guard !pieces.isEmpty else {
+            return
+        }
         let method = self.method
         let lastIndex = pieces.count - 1
         let results = Parallel.map(Array(pieces.enumerated()), serialBelow: 2) {
@@ -706,8 +747,11 @@ final class ParallelCompressor {
                 case .bzip2(let level):
                     return (try Tool.filter(Tool.bzip2, ["-c", "-\(max(1, min(level, 9)))"], input: piece), 0)
 
-                case .xz: return (try XZCoder.compress(piece), 0)
-                case .none: return (piece, 0)
+                case .xz:
+                    return (try XZCoder.compress(piece), 0)
+
+                case .none:
+                    return (piece, 0)
                 }
             }
         }
@@ -721,7 +765,9 @@ final class ParallelCompressor {
     }
 
     private var isDeflate: Bool {
-        if case .gzip = method { return true }
+        if case .gzip = method {
+            return true
+        }
         return false
     }
 }

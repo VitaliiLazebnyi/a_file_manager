@@ -6,7 +6,9 @@ enum ViewerSave {
     /// Whether `target` is the file `viewed` (the same inode, or the same place when the target
     /// does not exist yet): saving onto it would replace what is being read.
     static func isSameFile(_ viewed: URL?, _ target: URL) -> Bool {
-        guard let viewed, viewed.isFileURL, target.isFileURL else { return false }
+        guard let viewed, viewed.isFileURL, target.isFileURL else {
+            return false
+        }
         var first = stat()
         var second = stat()
         if stat(viewed.path, &first) == 0, stat(target.path, &second) == 0 {

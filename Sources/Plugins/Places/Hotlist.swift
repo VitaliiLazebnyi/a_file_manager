@@ -88,7 +88,9 @@ public struct Hotlist: Codable, Equatable {
         var level = entries
         var found: HotlistEntry?
         for index in path {
-            guard level.indices.contains(index) else { return nil }
+            guard level.indices.contains(index) else {
+                return nil
+            }
             found = level[index]
             level = level[index].children
         }
@@ -152,8 +154,12 @@ public struct Hotlist: Codable, Equatable {
     /// Runs `body` on the entries of one level; nil when the level does not exist.
     private mutating func withChildren<Result>(of path: Path, _ body: (inout [HotlistEntry]) -> Result) -> Result? {
         func descend(_ level: inout [HotlistEntry], _ rest: ArraySlice<Int>) -> Result? {
-            guard let index = rest.first else { return body(&level) }
-            guard level.indices.contains(index), level[index].kind == .submenu else { return nil }
+            guard let index = rest.first else {
+                return body(&level)
+            }
+            guard level.indices.contains(index), level[index].kind == .submenu else {
+                return nil
+            }
             return descend(&level[index].children, rest.dropFirst())
         }
         return descend(&entries, ArraySlice(path))
@@ -164,7 +170,9 @@ public struct Hotlist: Codable, Equatable {
     /// Returns where it landed, or nil when the level does not exist or the list is full.
     @discardableResult
     public mutating func insert(_ entry: HotlistEntry, at path: Path) -> Path? {
-        guard let index = path.last, count < Self.limit else { return nil }
+        guard let index = path.last, count < Self.limit else {
+            return nil
+        }
         let parent = Array(path.dropLast())
         return withChildren(of: parent) { level in
             let position = min(max(index, 0), level.count)
@@ -187,7 +195,9 @@ public struct Hotlist: Codable, Equatable {
 
     @discardableResult
     public mutating func remove(at path: Path) -> HotlistEntry? {
-        guard let index = path.last else { return nil }
+        guard let index = path.last else {
+            return nil
+        }
         return withChildren(of: Array(path.dropLast())) { level in
             level.indices.contains(index) ? level.remove(at: index) : nil
         } ?? nil
@@ -196,9 +206,13 @@ public struct Hotlist: Codable, Equatable {
     /// Changes the entry at `path` in place; false when there is none.
     @discardableResult
     public mutating func update(at path: Path, _ change: (inout HotlistEntry) -> Void) -> Bool {
-        guard let index = path.last else { return false }
+        guard let index = path.last else {
+            return false
+        }
         return withChildren(of: Array(path.dropLast())) { level in
-            guard level.indices.contains(index) else { return false }
+            guard level.indices.contains(index) else {
+                return false
+            }
             change(&level[index])
             return true
         } ?? false
@@ -215,12 +229,16 @@ public struct Hotlist: Codable, Equatable {
     /// which the editor shows but which is no submenu).
     @discardableResult
     public mutating func move(at path: Path, by direction: Int) -> Path {
-        guard let index = path.last, direction != 0 else { return path }
+        guard let index = path.last, direction != 0 else {
+            return path
+        }
         let parent = Array(path.dropLast())
         let step = direction < 0 ? -1 : 1
         let inside = withChildren(of: parent) { level -> Path? in
             let neighbour = index + step
-            guard level.indices.contains(index), level.indices.contains(neighbour) else { return nil }
+            guard level.indices.contains(index), level.indices.contains(neighbour) else {
+                return nil
+            }
             guard level[neighbour].kind == .submenu else {
                 level.swapAt(index, neighbour)
                 return parent + [neighbour]
@@ -232,12 +250,18 @@ public struct Hotlist: Codable, Equatable {
             level[door].children.insert(entry, at: position)
             return parent + [door, position]
         }
-        if let moved = inside ?? nil { return moved }
+        if let moved = inside ?? nil {
+            return moved
+        }
         // At the edge of a submenu: out of it, right before or right after it.
-        guard let door = parent.last else { return path }
+        guard let door = parent.last else {
+            return path
+        }
         let outer = Array(parent.dropLast())
         return withChildren(of: outer) { level -> Path in
-            guard level.indices.contains(door), level[door].children.indices.contains(index) else { return path }
+            guard level.indices.contains(door), level[door].children.indices.contains(index) else {
+                return path
+            }
             let entry = level[door].children.remove(at: index)
             let position = step < 0 ? door : door + 1
             level.insert(entry, at: position)
@@ -248,10 +272,14 @@ public struct Hotlist: Codable, Equatable {
     /// A double click in the editor: adds or removes the hide character at the start of the
     /// title (spec 12 › Hiding entries).
     public mutating func toggleHideMark(at path: Path) {
-        guard !hideCharacter.isEmpty else { return }
+        guard !hideCharacter.isEmpty else {
+            return
+        }
         let mark = hideCharacter
         update(at: path) { entry in
-            guard entry.kind != .separator else { return }
+            guard entry.kind != .separator else {
+                return
+            }
             entry.title = entry.title.hasPrefix(mark) ? String(entry.title.dropFirst(mark.count)) : mark + entry.title
         }
     }
@@ -308,7 +336,9 @@ public enum HotlistAction: Equatable {
 
     /// The path of a target-path field, which may be written plain or as `cd path`.
     public static func targetPath(_ text: String) -> String? {
-        guard case .changeDirectory(let path, _) = Self(text), !path.isEmpty else { return nil }
+        guard case .changeDirectory(let path, _) = Self(text), !path.isEmpty else {
+            return nil
+        }
         return path
     }
 }

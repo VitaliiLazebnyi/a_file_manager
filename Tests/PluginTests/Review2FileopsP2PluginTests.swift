@@ -411,7 +411,9 @@ final class P2Bench: ShellServices {
     /// true.
     private func wait(for condition: () -> Bool) async -> Bool {
         for _ in 0..<12_000 {
-            if condition() { return true }
+            if condition() {
+                return true
+            }
             try? await Task.sleep(nanoseconds: 5_000_000)
         }
         return condition()

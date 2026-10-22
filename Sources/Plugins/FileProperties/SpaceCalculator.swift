@@ -57,7 +57,9 @@ final class ProgressMeter: @unchecked Sendable {
         defer { lock.unlock() }
         done += count
         let now = Date()
-        guard now.timeIntervalSince(lastReport) > 0.05 else { return }
+        guard now.timeIntervalSince(lastReport) > 0.05 else {
+            return
+        }
         lastReport = now
         monitor.report(JobProgress(lines: [title, location()], itemsDone: done, itemsTotal: total))
     }
@@ -101,7 +103,9 @@ struct SpaceCalculator {
     }
 
     static func round(_ size: Int64, to cluster: Int64?) -> Int64 {
-        guard let cluster, cluster > 1 else { return size }
+        guard let cluster, cluster > 1 else {
+            return size
+        }
         return size.addingSaturated(cluster - 1) / cluster * cluster
     }
 
@@ -109,7 +113,9 @@ struct SpaceCalculator {
     ///
     /// Links are counted as the links they are and never followed.
     func measure(directory: URL) -> SpaceTotals {
-        guard !cancellation.isCancelled else { return SpaceTotals() }
+        guard !cancellation.isCancelled else {
+            return SpaceTotals()
+        }
         // Listed with the flag: a folder on a server that has stopped answering ends when the
         // job is cancelled, and does not keep a thread of the pool.
         guard
@@ -123,7 +129,9 @@ struct SpaceCalculator {
             return cancellation.isCancelled ? SpaceTotals() : SpaceTotals(unreadable: 1)
         }
         // A listing that ended because of the cancel is not the whole folder.
-        guard !cancellation.isCancelled else { return SpaceTotals() }
+        guard !cancellation.isCancelled else {
+            return SpaceTotals()
+        }
         var totals = SpaceTotals()
         var folders: [URL] = []
         for item in items {

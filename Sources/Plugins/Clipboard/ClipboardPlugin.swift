@@ -241,7 +241,9 @@ public final class ClipboardPlugin: Plugin {
                 buttons: ["For This Program", "Also for Other Programs", "Cancel"],
                 style: .information
             )
-            guard answer == 0 || answer == 1 else { return }
+            guard answer == 0 || answer == 1 else {
+                return
+            }
             forOthers = answer == 1
         }
         let urls = operands.items().map(\.url)
@@ -273,11 +275,15 @@ public final class ClipboardPlugin: Plugin {
     private func hasFiles() -> Bool {
         let count = pasteboard.changeCount
         if let placed {
-            if placed.changeCount == count { return true }
+            if placed.changeCount == count {
+                return true
+            }
             // Somebody else wrote to the pasteboard: the remembered selection is let go.
             (self.placed, provider) = (nil, nil)
         }
-        if filesFoundAt == count { return true }
+        if filesFoundAt == count {
+            return true
+        }
         let found = pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
         filesFoundAt = found ? count : nil
         return found
@@ -349,10 +355,12 @@ public final class ClipboardPlugin: Plugin {
             },
             completion: { [self] (outcome: FileListReading.Outcome) in
                 switch outcome {
-                case .abandoned: break
+                case .abandoned:
+                    break
 
                 // Items that are not file locations one by one (an old program's list): asked for whole.
-                case .read(let urls): deliver(urls.isEmpty ? files() : urls)
+                case .read(let urls):
+                    deliver(urls.isEmpty ? files() : urls)
                 }
             }
         )
@@ -367,9 +375,13 @@ public final class ClipboardPlugin: Plugin {
     /// A yes is remembered for the state of the pasteboard it was found in, so that a menu that
     /// asks at every validation costs one question; a no is asked again, as for files.
     private func hasContent(in kernel: Kernel) -> Bool {
-        guard kernel.settings.flag(Self.pastesContentsKey, default: true) else { return false }
+        guard kernel.settings.flag(Self.pastesContentsKey, default: true) else {
+            return false
+        }
         let count = pasteboard.changeCount
-        if contentFoundAt == count { return true }
+        if contentFoundAt == count {
+            return true
+        }
         let found = pasteboard.availableType(from: Self.imageTypes + [.string]) != nil
         contentFoundAt = found ? count : nil
         return found
@@ -385,7 +397,9 @@ public final class ClipboardPlugin: Plugin {
         {
             return .image(data)
         }
-        if let text = pasteboard.string(forType: .string), !text.isEmpty { return .text(text) }
+        if let text = pasteboard.string(forType: .string), !text.isEmpty {
+            return .text(text)
+        }
         return nil
     }
 
@@ -399,7 +413,9 @@ public final class ClipboardPlugin: Plugin {
     private func pasteContent(into directory: URL, in kernel: Kernel) {
         let fileSystems = kernel.fileSystems
         // Read here, on the main thread (see Threading above); the job gets the data only.
-        guard let content = Self.content(of: pasteboard) else { return }
+        guard let content = Self.content(of: pasteboard) else {
+            return
+        }
         kernel.jobs.run(
             title: "Paste:",
             work: { monitor -> Result<URL, any Error> in
@@ -408,8 +424,11 @@ public final class ClipboardPlugin: Plugin {
                     let provider = try fileSystems.provider(for: directory)
                     let data: Data
                     switch content {
-                    case .text(let text): data = Data(text.utf8)
-                    case .image(let picture): data = try Self.png(from: picture)
+                    case .text(let text):
+                        data = Data(text.utf8)
+
+                    case .image(let picture):
+                        data = try Self.png(from: picture)
                     }
                     let name = PastedContent.freeName(extension: content.fileExtension) {
                         provider.item(at: directory.appending(name: $0), cancellation: cancellation) != nil
@@ -437,8 +456,12 @@ public final class ClipboardPlugin: Plugin {
             },
             completion: { result in
                 switch result {
-                case .success(let url): kernel.panels.refresh([directory], focus: url)
-                case .failure(is NothingToPaste): break
+                case .success(let url):
+                    kernel.panels.refresh([directory], focus: url)
+
+                case .failure(is NothingToPaste):
+                    break
+
                 case .failure(let error):
                     kernel.interaction.report(error, title: "The clipboard cannot be pasted as a file!")
                 }
@@ -454,7 +477,9 @@ public final class ClipboardPlugin: Plugin {
     ///
     /// Runs on a job's thread.
     nonisolated private static func png(from data: Data) throws -> Data {
-        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return data }
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+            return data
+        }
         guard let converted = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else {
             throw NotAPicture()
         }
@@ -552,7 +577,9 @@ public final class ClipboardPlugin: Plugin {
                     let provider = try fileSystems.provider(for: url)
                     let cancellation = monitor.cancellation
                     let existing = provider.item(at: url, cancellation: cancellation)
-                    if cancellation.isCancelled { return CocoaError(.userCancelled) }
+                    if cancellation.isCancelled {
+                        return CocoaError(.userCancelled)
+                    }
                     if let existing {
                         // Only a file is replaced; a folder of that name is not this command's to remove.
                         if existing.isDirectory { throw FileSystemError.alreadyExists(fileSystems.displayPath(url)) }
@@ -567,7 +594,9 @@ public final class ClipboardPlugin: Plugin {
                                 defaultButton: 1
                             ) == 0
                         }
-                        guard replace else { return CocoaError(.userCancelled) }
+                        guard replace else {
+                            return CocoaError(.userCancelled)
+                        }
                     }
                     // Written next to the target and moved into place when complete: a failed write
                     // leaves the old file as it was, and nothing is removed before there is a new one.
@@ -598,7 +627,9 @@ public final class ClipboardPlugin: Plugin {
             },
             completion: { error in
                 // Declining to overwrite is no failure and changes nothing.
-                if (error as? CocoaError)?.code == .userCancelled { return }
+                if (error as? CocoaError)?.code == .userCancelled {
+                    return
+                }
                 if let error { kernel.interaction.report(error, title: "The details cannot be saved!") }
                 kernel.panels.refresh([url.deletingLastPathComponent()], focus: error == nil ? url : nil)
             }
@@ -722,10 +753,14 @@ final class FileListReading: @unchecked Sendable {
 
     /// The file an item stands for, if it is one.
     static func fileURL(of item: NSPasteboardItem) -> URL? {
-        guard let text = item.string(forType: .fileURL), let url = URL(string: text), url.isFileURL else { return nil }
+        guard let text = item.string(forType: .fileURL), let url = URL(string: text), url.isFileURL else {
+            return nil
+        }
         // A reference to a file by its number instead of its path is turned into the path (newer
         // systems give the path when it is asked for, older ones the number).
-        if text.hasPrefix("file:///.file/") { return (url as NSURL).filePathURL }
+        if text.hasPrefix("file:///.file/") {
+            return (url as NSURL).filePathURL
+        }
         return url
     }
 }

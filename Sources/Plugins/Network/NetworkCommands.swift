@@ -26,7 +26,9 @@ final class NetworkCommands {
         self.store = store
         self.mounter = mounter
         panelSubscription = kernel.panelEvents.subscribe { [weak self] event, panel in
-            guard case .locationChanged = event, panel.model.directory.isFileURL else { return }
+            guard case .locationChanged = event, panel.model.directory.isFileURL else {
+                return
+            }
             self?.lastLocal[ObjectIdentifier(panel)] = panel.model.directory
         }
     }
@@ -86,7 +88,9 @@ final class NetworkCommands {
             }
         }
         environment.rememberPassword = { profile, password in
-            guard let id = profile.savedID, let user = profile.user else { return }
+            guard let id = profile.savedID, let user = profile.user else {
+                return
+            }
             DispatchQueue.main.async {
                 // Under the name of the connection as it is saved: a user name typed at the login
                 // fills an empty one in, and a password for another user is not stored for this one.
@@ -97,7 +101,9 @@ final class NetworkCommands {
                     (saved.user, saved.anonymous) = (user, false)
                     store.save(saved)
                 }
-                guard saved.user == user, saved.key == profile.key else { return }
+                guard saved.user == user, saved.key == profile.key else {
+                    return
+                }
                 vault.setPassword(password, for: saved)
             }
         }
@@ -292,7 +298,9 @@ final class NetworkCommands {
                 case .failure(let error):
                     // Returns at once: what waits for the server is done in the background.
                     center.disconnect(key)
-                    if case NetworkError.cancelled = error { return }
+                    if case NetworkError.cancelled = error {
+                        return
+                    }
                     kernel.interaction.report(error, title: "Connect failed!")
                 }
             }
@@ -532,7 +540,9 @@ final class NetworkCommands {
     /// the local folder they came from.
     func disconnect() {
         let connected = center.connected
-        guard !connected.isEmpty else { return }
+        guard !connected.isEmpty else {
+            return
+        }
         let panels = [source, kernel.panels.target]
         let shown = panels.lazy
             .compactMap { panel in
@@ -577,8 +587,11 @@ final class NetworkCommands {
                 // The password the connection was made with is kept only if the box in the dialog stays ticked.
                 edit(connection, isNew: true, offered: connection.anonymous ? nil : profile.password)
 
-            case 1: break
-            default: return
+            case 1:
+                break
+
+            default:
+                return
             }
         }
         for panel in kernel.panels.all where ServerKey(panel.model.directory) == key {
@@ -662,7 +675,9 @@ final class NetworkCommands {
     /// must not do.
     func addToDownloadList() {
         let items = source.model.operands()
-        guard !items.isEmpty, let list = askForList("File name of download list:") else { return }
+        guard !items.isEmpty, let list = askForList("File name of download list:") else {
+            return
+        }
         let fileSystems = kernel.fileSystems
         let targetDirectory = kernel.panels.target.model.directory
         kernel.jobs.run(
@@ -695,7 +710,9 @@ final class NetworkCommands {
             },
             completion: { [kernel] result in
                 switch result {
-                case .failure(NetworkError.cancelled): break
+                case .failure(NetworkError.cancelled):
+                    break
+
                 case .failure(let error):
                     kernel.interaction.report(error, title: "The download list cannot be written!")
 
@@ -706,7 +723,8 @@ final class NetworkCommands {
                         style: .warning
                     )
 
-                case .success: break
+                case .success:
+                    break
                 }
                 kernel.panels.refresh([list.deletingLastPathComponent()])
             }
@@ -721,7 +739,9 @@ final class NetworkCommands {
     /// A list file may come from anybody and says what is copied where, so nothing runs
     /// before the user has seen what the list would do and agreed (`ListPlan.preview`).
     func downloadFromList() {
-        guard let list = askForList("File name of download list:") else { return }
+        guard let list = askForList("File name of download list:") else {
+            return
+        }
         guard let transfers = kernel.services.find((any FileTransferService).self) else {
             ui.inform("Copying files is not available.", detail: "", style: .warning)
             return
@@ -736,7 +756,9 @@ final class NetworkCommands {
             completion: { [kernel] result in
                 let text: String
                 switch result {
-                case .success(let read): text = read
+                case .success(let read):
+                    text = read
+
                 case .failure(let error):
                     return kernel.interaction.report(error, title: "The download list cannot be read!")
                 }
@@ -809,7 +831,9 @@ final class NetworkCommands {
         }
         // The address is offered again next time; a password in it is not kept.
         kernel.settings.set(ServerAddress.removingPassword(from: text), forKey: NetworkSettings.lastServer)
-        guard let mounter else { return }
+        guard let mounter else {
+            return
+        }
         let panel = source
         kernel.jobs.run(
             title: "Connect to \(host)",
@@ -833,7 +857,9 @@ final class NetworkCommands {
 
     /// Ejects the volume the source panel shows; the panels leave it first.
     func ejectVolume() {
-        guard let mounter, let volume = ServerSchemes.mountedVolume(of: source.model.directory) else { return }
+        guard let mounter, let volume = ServerSchemes.mountedVolume(of: source.model.directory) else {
+            return
+        }
         let home = FileManager.default.homeDirectoryForCurrentUser
         let inside = kernel.panels.all.filter {
             $0.model.directory.isSameLocation(as: volume) || $0.model.directory.isInside(volume)
@@ -886,7 +912,9 @@ struct ListPlan {
 
     var steps: [Step] {
         items.compactMap { item in
-            if case .transfer(let step) = item { return step }
+            if case .transfer(let step) = item {
+                return step
+            }
             return nil
         }
     }
@@ -907,9 +935,14 @@ struct ListPlan {
                 skipped.append(line)
                 continue
 
-            case .download(let from, let to): (kind, source, target) = (.download, from, to)
-            case .copy(let from, let to): (kind, source, target) = (.copy, from, to)
-            case .move(let from, let to): (kind, source, target) = (.move, from, to)
+            case .download(let from, let to):
+                (kind, source, target) = (.download, from, to)
+
+            case .copy(let from, let to):
+                (kind, source, target) = (.copy, from, to)
+
+            case .move(let from, let to):
+                (kind, source, target) = (.move, from, to)
             }
             let from = fileSystems.location(from: source, relativeTo: base)
             let to =
@@ -1032,7 +1065,9 @@ private final class ListRun {
             transfers.transfer(step.kind == .move ? .move : .copy, [from], into: directory, renamingSelfCopies: false) {
                 [self] arrived in
                 // The list may name the file differently at its destination.
-                guard let arrived, arrived.lastPathComponent != to.lastPathComponent else { return next() }
+                guard let arrived, arrived.lastPathComponent != to.lastPathComponent else {
+                    return next()
+                }
                 rename(arrived, to: to, replacing: false)
             }
         }

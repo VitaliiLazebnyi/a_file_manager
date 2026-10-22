@@ -28,7 +28,9 @@ public enum SpotlightQuery {
     /// reliably: a "Case sensitive" search, one in other encodings and one for more than a word (a
     /// phrase, punctuation) are only narrowed down by it.
     public static func recheckingText(of query: SearchQuery) -> Bool {
-        guard handlesText(of: query) else { return false }
+        guard handlesText(of: query) else {
+            return false
+        }
         return query.caseSensitive || query.textOptions.encodings.contains { $0 != .utf8 }
             || TextPattern.unescape(query.text).contains { !$0.isLetter && !$0.isNumber }
     }
@@ -62,8 +64,11 @@ public enum SpotlightQuery {
         if let size = query.criteria.size {
             let bytes = size.bytes
             switch size.comparison {
-            case .greater: parts.append("kMDItemFSSize > \(bytes)")
-            case .less: parts.append("kMDItemFSSize < \(bytes)")
+            case .greater:
+                parts.append("kMDItemFSSize > \(bytes)")
+
+            case .less:
+                parts.append("kMDItemFSSize < \(bytes)")
 
             case .equal:
                 parts.append("(kMDItemFSSize >= \(bytes) && kMDItemFSSize < \(size.upperBytes))")
@@ -118,15 +123,21 @@ public enum SpotlightQuery {
             // Cut at the `/` bytes, as the file system reads the path (a `/` with a combining
             // mark after it is one character that is not `/`).
             let below = Array(path.dropFirst(prefixes[match].count).utf8).split(separator: 0x2F)
-            if let depth = query.maxDepth, below.count - 1 > depth { return nil }
-            if !query.includeHidden, below.contains(where: { $0.first == 0x2E }) { return nil }
+            if let depth = query.maxDepth, below.count - 1 > depth {
+                return nil
+            }
+            if !query.includeHidden, below.contains(where: { $0.first == 0x2E }) {
+                return nil
+            }
             guard let item = fileSystems.item(at: URL(fileURLWithPath: path, isDirectory: false)),
                 query.includeHidden || !item.isHidden,
                 search.accepts(item, checkingText: checkingText)
             else { return nil }
             return item
         }
-        guard !search.cancellation.isCancelled else { return [] }
+        guard !search.cancellation.isCancelled else {
+            return []
+        }
         return Sorter.sorted(hits.compactMap { $0 }, numeric: true) { $0.url.path }
     }
 }
@@ -244,7 +255,9 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
         lock.unlock()
         NotificationCenter.default.removeObserver(self)
         metadataQuery.stop()
-        guard let completion else { return }
+        guard let completion else {
+            return
+        }
         DispatchQueue.main.async { [paths] in completion(paths, total > count) }
     }
 }

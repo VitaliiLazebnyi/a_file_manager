@@ -13,8 +13,12 @@ enum LoginShell {
 
     /// The shell the user logs in with: `SHELL`, else the shell of the user's `account`, else zsh.
     static func usersShell(environment: [String: String], account: String?) -> String {
-        if let path = environment["SHELL"], !path.isEmpty { return path }
-        if let path = account, !path.isEmpty { return path }
+        if let path = environment["SHELL"], !path.isEmpty {
+            return path
+        }
+        if let path = account, !path.isEmpty {
+            return path
+        }
         return "/bin/zsh"
     }
 
@@ -65,7 +69,9 @@ enum LoginShell {
             process.terminate()
             return nil
         }
-        guard process.terminationStatus == 0 else { return nil }
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
         let data = pipe.fileHandleForReading.availableData
         // Start files may print lines of their own: the PATH is the last one.
         let line = String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline).last.map(String.init) ?? ""
@@ -134,10 +140,14 @@ enum ChildProcess {
         var attributes: posix_spawnattr_t?
         // The two return the number of the error; they do not set `errno`.
         let actionsMade = calls.initActions(&actions)
-        guard actionsMade == 0 else { return .failure(Failure(code: actionsMade)) }
+        guard actionsMade == 0 else {
+            return .failure(Failure(code: actionsMade))
+        }
         defer { posix_spawn_file_actions_destroy(&actions) }
         let attributesMade = calls.initAttributes(&attributes)
-        guard attributesMade == 0 else { return .failure(Failure(code: attributesMade)) }
+        guard attributesMade == 0 else {
+            return .failure(Failure(code: attributesMade))
+        }
         defer { posix_spawnattr_destroy(&attributes) }
 
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)

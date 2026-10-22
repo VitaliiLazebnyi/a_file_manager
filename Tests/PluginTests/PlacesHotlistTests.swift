@@ -318,7 +318,9 @@ import Testing
 
     /// The rows of the list that was shown last.
     var lastRows: [String] {
-        guard case .list(let rows, _)? = ui.forms.last?.first?.kind else { return [] }
+        guard case .list(let rows, _)? = ui.forms.last?.first?.kind else {
+            return []
+        }
         return rows
     }
 

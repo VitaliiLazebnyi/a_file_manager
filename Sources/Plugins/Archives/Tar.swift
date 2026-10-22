@@ -36,12 +36,16 @@ struct TarHeader {
 
     /// Whether a block looks like a TAR header: its checksum fits.
     static func looksLikeHeader(_ block: Data) -> Bool {
-        guard block.count >= blockSize else { return false }
+        guard block.count >= blockSize else {
+            return false
+        }
         return isHeader([UInt8](block.prefix(blockSize)))
     }
 
     private static func isHeader(_ bytes: [UInt8]) -> Bool {
-        guard bytes.contains(where: { $0 != 0 }), let stored = octal(bytes[148..<156]) else { return false }
+        guard bytes.contains(where: { $0 != 0 }), let stored = octal(bytes[148..<156]) else {
+            return false
+        }
         return checksum(bytes) == stored
     }
 
@@ -57,7 +61,9 @@ struct TarHeader {
             return field.dropFirst().reduce(UInt64(first & 0x7F)) { ($0 << 8) | UInt64($1) }
         }
         let digits = field.filter { $0 != 0 && $0 != 32 }
-        guard digits.allSatisfy({ (48...55).contains($0) }) else { return nil }
+        guard digits.allSatisfy({ (48...55).contains($0) }) else {
+            return nil
+        }
         return digits.reduce(UInt64(0)) { ($0 << 3) | UInt64($1 - 48) }
     }
 
@@ -69,10 +75,14 @@ struct TarHeader {
     /// The fixed fields of a header block; nil for a block that is not one. `typeFlag` is the
     /// raw type, which the reader needs for the extension records.
     static func parse(_ block: Data) -> (header: Self, typeFlag: UInt8)? {
-        guard block.count >= blockSize else { return nil }
+        guard block.count >= blockSize else {
+            return nil
+        }
         // The block is copied once, for the check and for the fields.
         let bytes = [UInt8](block.prefix(blockSize))
-        guard isHeader(bytes) else { return nil }
+        guard isHeader(bytes) else {
+            return nil
+        }
         var name = text(bytes[0..<100])
         // Only the POSIX format ("ustar" and a zero byte) has a path prefix there. Old GNU
         // headers ("ustar" and two spaces) keep access and change times in the same bytes.
@@ -83,7 +93,8 @@ struct TarHeader {
         let typeFlag = bytes[156]
         var header = Self(path: name)
         switch typeFlag {
-        case 0, 48, 55: header.kind = name.hasSuffix("/") ? .directory : .file
+        case 0, 48, 55:
+            header.kind = name.hasSuffix("/") ? .directory : .file
 
         case 83:
             header.kind = .file
@@ -91,10 +102,17 @@ struct TarHeader {
             header.realSize = octal(bytes[483..<495])
             header.hasSparseExtension = bytes[482] != 0
 
-        case 49: header.kind = .hardLink
-        case 50: header.kind = .symbolicLink
-        case 53: header.kind = .directory
-        default: header.kind = .other
+        case 49:
+            header.kind = .hardLink
+
+        case 50:
+            header.kind = .symbolicLink
+
+        case 53:
+            header.kind = .directory
+
+        default:
+            header.kind = .other
         }
         header.size = octal(bytes[124..<136]) ?? 0
         header.modified = date(TimeInterval(octal(bytes[136..<148]) ?? 0))
@@ -291,7 +309,9 @@ final class TarReader {
     private func block() throws -> Data? {
         let data = try stream.readFully(TarHeader.blockSize)
         position += UInt64(data.count)
-        if data.isEmpty { return nil }
+        if data.isEmpty {
+            return nil
+        }
         guard data.count == TarHeader.blockSize else {
             throw ArchiveError.damaged("the TAR archive ends in the middle of a header")
         }
@@ -320,18 +340,29 @@ final class TarReader {
         // The extension records in front of a member, then the member itself.
         records: while true {
             try control?.check()
-            guard let data = try block() else { return nil }
+            guard let data = try block() else {
+                return nil
+            }
             // An empty block ends the archive.
-            if data.allSatisfy({ $0 == 0 }) { return nil }
+            if data.allSatisfy({ $0 == 0 }) {
+                return nil
+            }
             guard let (parsed, typeFlag) = TarHeader.parse(data) else {
                 throw ArchiveError.damaged("a TAR header has a wrong checksum")
             }
             func text(_ data: Data) -> String { String(decoding: data.prefix { $0 != 0 }, as: UTF8.self) }
             switch typeFlag {
-            case 76: longName = text(try payload(parsed.size))  // GNU long name
-            case 75: longLink = text(try payload(parsed.size))  // GNU long link
-            case 120: pax.merge(TarHeader.paxRecords(try payload(parsed.size))) { _, new in new }
-            case 103: _ = try payload(parsed.size)  // pax global header
+            case 76:
+                longName = text(try payload(parsed.size))  // GNU long name
+
+            case 75:
+                longLink = text(try payload(parsed.size))  // GNU long link
+
+            case 120:
+                pax.merge(TarHeader.paxRecords(try payload(parsed.size))) { _, new in new }
+
+            case 103:
+                _ = try payload(parsed.size)  // pax global header
 
             default:
                 header = parsed
@@ -359,7 +390,9 @@ final class TarReader {
 
     /// The next block of the current member's data; nil at its end.
     func readData(upToCount count: Int) throws -> Data? {
-        guard pendingData > 0 else { return nil }
+        guard pendingData > 0 else {
+            return nil
+        }
         guard let data = try stream.read(upToCount: Int(min(UInt64(count), pendingData))) else {
             throw ArchiveError.damaged("the TAR archive ends in the middle of a file")
         }
@@ -371,7 +404,9 @@ final class TarReader {
     func skipData() throws {
         // Both are bounded when they are set (`maxSize`, one block), so the sum fits.
         let count = pendingData.plusClamped(pendingPadding)
-        guard count > 0 else { return }
+        guard count > 0 else {
+            return
+        }
         try stream.skip(count)
         position += count
         (pendingData, pendingPadding) = (0, 0)

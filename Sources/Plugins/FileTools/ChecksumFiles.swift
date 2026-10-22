@@ -24,14 +24,23 @@ enum ChecksumFile {
             let needsPrefix = name.first.map { $0 == ";" || $0 == "#" || $0.isWhitespace } ?? false
             return "\(needsPrefix ? "./" : "")\(name) \(digest.hex.uppercased())"
         }
-        guard hasLineBreak(name) else { return "\(digest.hex) *\(name)" }
+        guard hasLineBreak(name) else {
+            return "\(digest.hex) *\(name)"
+        }
         var escaped = String.UnicodeScalarView()
         for scalar in name.unicodeScalars {
             switch scalar {
-            case "\\": escaped.append(contentsOf: "\\\\".unicodeScalars)
-            case "\n": escaped.append(contentsOf: "\\n".unicodeScalars)
-            case "\r": escaped.append(contentsOf: "\\r".unicodeScalars)
-            default: escaped.append(scalar)
+            case "\\":
+                escaped.append(contentsOf: "\\\\".unicodeScalars)
+
+            case "\n":
+                escaped.append(contentsOf: "\\n".unicodeScalars)
+
+            case "\r":
+                escaped.append(contentsOf: "\\r".unicodeScalars)
+
+            default:
+                escaped.append(scalar)
             }
         }
         return "\\\(digest.hex) *\(String(escaped))"
@@ -102,7 +111,9 @@ enum ChecksumFile {
 
     /// The text of a checksum file: UTF-8 with or without a mark, UTF-16, or the Western code page.
     static func text(from data: Data) -> String {
-        if data.starts(with: [0xEF, 0xBB, 0xBF]) { return String(decoding: data.dropFirst(3), as: UTF8.self) }
+        if data.starts(with: [0xEF, 0xBB, 0xBF]) {
+            return String(decoding: data.dropFirst(3), as: UTF8.self)
+        }
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
             // Damaged UTF-16 is read as far as it goes; what it makes of the rest is not a checksum line and is reported as such.
             return String(data: data, encoding: .utf16) ?? String(decoding: data, as: UTF8.self)
@@ -111,7 +122,9 @@ enum ChecksumFile {
             if data[data.startIndex + 1] == 0, let text = String(data: data, encoding: .utf16LittleEndian) {
                 return text
             }
-            if data[data.startIndex] == 0, let text = String(data: data, encoding: .utf16BigEndian) { return text }
+            if data[data.startIndex] == 0, let text = String(data: data, encoding: .utf16BigEndian) {
+                return text
+            }
         }
         return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252)
             ?? String(decoding: data, as: UTF8.self)
@@ -132,7 +145,9 @@ enum ChecksumFile {
 
     /// The name of a GNU line that starts with a backslash: `\\` stands for a backslash and `\n` for a line feed.
     private static func unescaped(_ name: String) -> String {
-        guard name.contains("\\") else { return name }
+        guard name.contains("\\") else {
+            return name
+        }
         var result = ""
         var escaped = false
         for character in name {
@@ -178,10 +193,14 @@ enum ChecksumFile {
         }
         /// `name crc` at the end of a line, the SFV form.
         func sfvEntry(_ line: String) -> Entry? {
-            guard let space = line.lastIndex(where: { $0 == " " || $0 == "\t" }) else { return nil }
+            guard let space = line.lastIndex(where: { $0 == " " || $0 == "\t" }) else {
+                return nil
+            }
             let digest = line[line.index(after: space)...]
             let name = line[..<space].trimmingCharacters(in: .whitespaces)
-            guard isHex(digest), digest.count == 8, !name.isEmpty else { return nil }
+            guard isHex(digest), digest.count == 8, !name.isEmpty else {
+                return nil
+            }
             return Entry(name: name, digest: digest.lowercased(), method: .crc32)
         }
         var parsed = Parsed()
@@ -291,11 +310,20 @@ struct VerifyReport {
 
     static func row(_ name: String, _ result: VerifyResult) -> String {
         switch result {
-        case .ok: return "OK:  \(name)"
-        case .notFound: return "Cannot open input file \(name)!"
-        case .readError: return "Error reading file \(name)!"
-        case .wrongChecksum: return "Wrong checksum: \(name)!"
-        case .unreadable: return "Cannot read \(name)!"
+        case .ok:
+            return "OK:  \(name)"
+
+        case .notFound:
+            return "Cannot open input file \(name)!"
+
+        case .readError:
+            return "Error reading file \(name)!"
+
+        case .wrongChecksum:
+            return "Wrong checksum: \(name)!"
+
+        case .unreadable:
+            return "Cannot read \(name)!"
         }
     }
 
@@ -485,7 +513,9 @@ enum ChecksumRun {
     /// How a file is named inside a checksum file in `folder`: by its path from there when it
     /// lies below, else by its full path (a bare name would be ambiguous and lead nowhere).
     static func name(of file: URL, in folder: URL) -> String {
-        guard file.isInside(folder) else { return file.path }
+        guard file.isInside(folder) else {
+            return file.path
+        }
         return String(file.path.dropFirst(folder.path.count).drop { $0 == "/" })
     }
 
@@ -517,8 +547,11 @@ enum ChecksumRun {
         var entries: [(file: FileItem, digest: [UInt8])] = []
         for (file, result) in zip(files, digests) {
             switch result {
-            case .success(let found): entries.append((file, found[0]))
-            case .failure(let error): throw ToolError.failed("\(file.name): \(error.localizedDescription)")
+            case .success(let found):
+                entries.append((file, found[0]))
+
+            case .failure(let error):
+                throw ToolError.failed("\(file.name): \(error.localizedDescription)")
             }
         }
         /// The checksum files to write, in order, each with its entries.
@@ -616,7 +649,9 @@ enum ChecksumRun {
                 // A name is taken as written; a Windows path is tried with `/` when that finds nothing.
                 // An absolute path stands for itself, not below the checksum file's folder.
                 func resolve(_ name: String) -> URL {
-                    if name.hasPrefix("/"), folder.isFileURL { return URL(fileURLWithPath: name).standardized }
+                    if name.hasPrefix("/"), folder.isFileURL {
+                        return URL(fileURLWithPath: name).standardized
+                    }
                     return folder.appendingPathComponent(name, isDirectory: false).standardized
                 }
                 var url = resolve(entry.name)
@@ -651,8 +686,11 @@ enum ChecksumRun {
             var result = VerifyResult.notFound
             if file.size != nil, let outcome = hashed.next() {
                 switch outcome {
-                case .success(let found): result = found.contains { $0.hex == file.entry.digest } ? .ok : .wrongChecksum
-                case .failure: result = .readError
+                case .success(let found):
+                    result = found.contains { $0.hex == file.entry.digest } ? .ok : .wrongChecksum
+
+                case .failure:
+                    result = .readError
                 }
             }
             report.sections[file.section].rows.append((file.name, result))

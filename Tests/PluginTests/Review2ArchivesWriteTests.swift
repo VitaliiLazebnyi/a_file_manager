@@ -91,7 +91,9 @@ import Testing
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var fired = false
         bench.environment.whileWriting = { [bench] in
-            guard !fired else { return }
+            guard !fired else {
+                return
+            }
             fired = true
             try? bench.zip.remove(tree.appending(name: "new.txt"))
         }
@@ -111,7 +113,9 @@ import Testing
         // Used by the callbacks, which run one at a time while the calls below wait for them.
         nonisolated(unsafe) var fired = false
         bench.environment.whileWriting = { [bench] in
-            guard !fired else { return }
+            guard !fired else {
+                return
+            }
             fired = true
             try? bench.zip.remove(member)
             try? write("second version", to: member)
@@ -165,7 +169,9 @@ import Testing
         // Let go when idle (as eviction does), it takes no change any more…
         #expect(first.retireIfIdle() && !first.isCurrent())
         #expect { try first.write("tree/lost.txt") } throws: { error in
-            if case ArchiveError.retired = error { return true }
+            if case ArchiveError.retired = error {
+                return true
+            }
             return false
         }
         #expect(throws: ArchiveError.self) { try first.remove("tree/readme.txt") }
@@ -528,7 +534,9 @@ import Testing
         flag.cancel()
         // A second write (a commit, the quit) that is cancelled does not wait for the first.
         #expect { try open.flush(cancellation: flag) } throws: { error in
-            if case ArchiveError.cancelled = error { return true }
+            if case ArchiveError.cancelled = error {
+                return true
+            }
             return false
         }
         // And the rescue waits no longer than it is given.

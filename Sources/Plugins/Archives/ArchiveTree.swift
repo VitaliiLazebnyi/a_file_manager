@@ -122,13 +122,17 @@ struct ArchiveTree {
 
     static func name(of path: String) -> String {
         let bytes = path.utf8
-        guard let slash = bytes.lastIndex(of: 0x2F) else { return path }
+        guard let slash = bytes.lastIndex(of: 0x2F) else {
+            return path
+        }
         return String(decoding: bytes[bytes.index(after: slash)...], as: UTF8.self)
     }
 
     static func parent(of path: String) -> String {
         let bytes = path.utf8
-        guard let slash = bytes.lastIndex(of: 0x2F) else { return "" }
+        guard let slash = bytes.lastIndex(of: 0x2F) else {
+            return ""
+        }
         return String(decoding: bytes[..<slash], as: UTF8.self)
     }
 
@@ -145,7 +149,9 @@ struct ArchiveTree {
     ///
     /// Compared byte by byte: two paths that look alike but are written differently are two paths.
     static func relative(_ path: String, to folder: String) -> String? {
-        if folder.isEmpty { return path }
+        if folder.isEmpty {
+            return path
+        }
         let (bytes, prefix) = (path.utf8, folder.utf8)
         guard bytes.count > prefix.count + 1, bytes.starts(with: prefix),
             bytes[bytes.index(bytes.startIndex, offsetBy: prefix.count)] == 0x2F
@@ -169,17 +175,25 @@ struct ArchiveTree {
         for part in bytes.split(separator: 0x2F, omittingEmptySubsequences: true) {
             var dots = 0
             for byte in part {
-                if byte == 0 { return nil }
+                if byte == 0 {
+                    return nil
+                }
                 if byte >= 0x80 { isASCII = false }
                 dots = byte == 0x2E && dots >= 0 ? dots + 1 : -1
             }
             if dots == 1, part.count == 1 { continue }
-            if dots == 2, part.count == 2 { return nil }
+            if dots == 2, part.count == 2 {
+                return nil
+            }
             parts.append(part)
             total += part.count + 1
-            guard parts.count <= maxDepth, total - 1 <= maxPathBytes else { return nil }
+            guard parts.count <= maxDepth, total - 1 <= maxPathBytes else {
+                return nil
+            }
         }
-        guard !parts.isEmpty else { return nil }
+        guard !parts.isEmpty else {
+            return nil
+        }
         var joined: String
         if total - 1 == bytes.count {
             // Nothing was dropped: the path is the text as it came, and shares its storage.
@@ -189,7 +203,9 @@ struct ArchiveTree {
             joined = parts.map { String(decoding: $0, as: UTF8.self) }.joined(separator: "/")
         }
         // Plain ASCII has no character that joins its neighbour.
-        if !isASCII, joined.split(separator: "/", omittingEmptySubsequences: false).count != parts.count { return nil }
+        if !isASCII, joined.split(separator: "/", omittingEmptySubsequences: false).count != parts.count {
+            return nil
+        }
         return joined
     }
 
@@ -209,18 +225,24 @@ struct ArchiveTree {
     ///
     /// Every folder has a list of its own (`insert` makes it), the top folder from the start.
     func children(of path: String) -> [ArchiveEntry]? {
-        guard isDirectory(path), let folder = slot(of: path), let places = children[folder] else { return nil }
+        guard isDirectory(path), let folder = slot(of: path), let places = children[folder] else {
+            return nil
+        }
         return places.compactMap { slots[Int($0)] }
     }
 
     func hasChildren(_ path: String) -> Bool {
-        guard let folder = slot(of: path) else { return false }
+        guard let folder = slot(of: path) else {
+            return false
+        }
         return !(children[folder] ?? []).isEmpty
     }
 
     /// Everything below a folder, at any depth.
     func descendants(of path: String) -> [ArchiveEntry] {
-        guard isDirectory(path), let start = slot(of: path) else { return [] }
+        guard isDirectory(path), let start = slot(of: path) else {
+            return []
+        }
         var found: [ArchiveEntry] = []
         var pending = [start]
         // Folders only are pending, and every folder has a list of its own.
@@ -267,7 +289,9 @@ struct ArchiveTree {
     mutating func path(atOrder order: Int) -> String? {
         let listed = sort()
         let place = self.place(of: order, in: listed)
-        guard place < listed.count, let entry = slots[Int(listed[place])], entry.order == order else { return nil }
+        guard place < listed.count, let entry = slots[Int(listed[place])], entry.order == order else {
+            return nil
+        }
         return entry.path
     }
 
@@ -284,7 +308,9 @@ struct ArchiveTree {
     // The sequence is changed where it lies: no copy of it is ever held beside it. Both are
     // called while the entry stands in its place.
     private mutating func list(_ place: Int32) {
-        guard sequence != nil else { return }
+        guard sequence != nil else {
+            return
+        }
         let order = self.order(at: place)
         if let last = sequence!.last, self.order(at: last) >= order {
             let position = self.place(of: order, in: sequence!)
@@ -295,7 +321,9 @@ struct ArchiveTree {
     }
 
     private mutating func unlist(_ place: Int32) {
-        guard sequence != nil else { return }
+        guard sequence != nil else {
+            return
+        }
         // The entries that share its position stand together from here, and it is among them.
         let start = self.place(of: order(at: place), in: sequence!)
         let position = sequence![start...].firstIndex(of: place)
@@ -321,7 +349,9 @@ struct ArchiveTree {
     ///
     /// Path, kind and position are not to be changed this way.
     mutating func update(_ path: String, _ change: (inout ArchiveEntry) -> Void) {
-        guard let place = index[path], slots[Int(place)] != nil else { return }
+        guard let place = index[path], slots[Int(place)] != nil else {
+            return
+        }
         change(&slots[Int(place)]!)
     }
 
@@ -390,7 +420,9 @@ struct ArchiveTree {
     /// What lies below it stays; the callers remove only files and empty folders.
     @discardableResult
     mutating func remove(_ path: String) -> ArchiveEntry? {
-        guard let place = index[path], let entry = slots[Int(place)] else { return nil }
+        guard let place = index[path], let entry = slots[Int(place)] else {
+            return nil
+        }
         unlist(place)
         index[path] = nil
         slots[Int(place)] = nil
@@ -442,7 +474,9 @@ final class ArchiveMemberReader: FileReader, @unchecked Sendable {
     func read(upToCount count: Int) throws -> Data? {
         try checkInterrupted()
         if stream == nil { stream = try open(slot) }
-        guard let block = try stream?.read(upToCount: count) else { return nil }
+        guard let block = try stream?.read(upToCount: count) else {
+            return nil
+        }
         position += UInt64(block.count)
         return block
     }

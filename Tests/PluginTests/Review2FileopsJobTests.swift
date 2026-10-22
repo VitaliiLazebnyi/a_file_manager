@@ -146,7 +146,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
         work()
         done.signal()
     }
-    if done.wait(timeout: .now() + seconds) == .success { return true }
+    if done.wait(timeout: .now() + seconds) == .success {
+        return true
+    }
     rescue()
     _ = done.wait(timeout: .now() + 10)
     return false
@@ -568,7 +570,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     @Test func agesAreComparedExactlyWhereTheVolumesKeepThemExactly() throws {
         let (fileSystems, _) = makeFileSystems()
         // The scratch folder is on APFS on every Mac this runs on; on anything coarser the test says nothing.
-        guard FileIdentity.timestampGrain(of: box.root) == 0 else { return }
+        guard FileIdentity.timestampGrain(of: box.root) == 0 else {
+            return
+        }
         let base = Date(timeIntervalSince1970: 1_700_000_000)
         try box.file("s/newer.txt", "new", modified: base.addingTimeInterval(1.5))
         try box.file("t/newer.txt", "old", modified: base)
@@ -1047,7 +1051,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
             process.arguments = arguments
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
-            guard (try? process.run()) != nil else { return false }
+            guard (try? process.run()) != nil else {
+                return false
+            }
             process.waitUntilExit()
             return process.terminationStatus == 0
         }
@@ -1065,7 +1071,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     }
 
     private func detach() {
-        guard attached else { return }
+        guard attached else {
+            return
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
         process.arguments = ["detach", mount.path, "-force"]
@@ -1078,7 +1086,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
     // F012, F020
     @Test func deletingAFolderDoesNotGoIntoAVolumeMountedInsideIt() {
         defer { detach() }
-        guard attached else { return }
+        guard attached else {
+            return
+        }
         let fileSystems = makeFileSystems().0
         #expect(FileIdentity.isMountPoint(mount) && !FileIdentity.isMountPoint(box.url("tree")))
         // Nobody answers the question (the default says no): the volume is left alone and that is noted.
@@ -1105,7 +1115,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     @Test func movingAFolderDoesNotEmptyAVolumeMountedInsideIt() throws {
         defer { detach() }
-        guard attached else { return }
+        guard attached else {
+            return
+        }
         let fileSystems = makeFileSystems().0
         // The target folder exists, so the move goes item by item.
         try box.folder("t/tree")
@@ -1125,7 +1137,9 @@ private func finishes(within seconds: TimeInterval = 60, rescue: () -> Void, _ w
 
     @Test func withAnExplicitYesTheVolumeIsEntered() {
         defer { detach() }
-        guard attached else { return }
+        guard attached else {
+            return
+        }
         let fileSystems = makeFileSystems().0
         let replies = Review2Replies(volume: .proceed)
         let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], fileSystems: fileSystems)

@@ -10,17 +10,27 @@ enum EncodeMethod: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .mime: return "MIME (Base64)"
-        case .uue: return "UUEncode"
-        case .xxe: return "XXEncode"
+        case .mime:
+            return "MIME (Base64)"
+
+        case .uue:
+            return "UUEncode"
+
+        case .xxe:
+            return "XXEncode"
         }
     }
 
     var fileExtension: String {
         switch self {
-        case .mime: return "b64"
-        case .uue: return "uue"
-        case .xxe: return "xxe"
+        case .mime:
+            return "b64"
+
+        case .uue:
+            return "uue"
+
+        case .xxe:
+            return "xxe"
         }
     }
 
@@ -48,7 +58,9 @@ enum SixBitText {
     static func encode(_ data: Data, xx: Bool) -> Data {
         let (full, rest) = data.count.quotientAndRemainder(dividingBy: 45)
         var output = Data(count: full * 63 + (rest > 0 ? 3 + (rest + 2) / 3 * 4 : 0))
-        guard !output.isEmpty else { return output }
+        guard !output.isEmpty else {
+            return output
+        }
         let characters = xx ? xxAlphabet : uuCharacters
         output.withUnsafeMutableBytes { (out: UnsafeMutableRawBufferPointer) in
             data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
@@ -88,18 +100,24 @@ enum SixBitText {
         (xx ? xxValues : uuValues)
             .withUnsafeBufferPointer { table in
                 line.withUnsafeBufferPointer { text -> [UInt8]? in
-                    guard let first = text.first, table[Int(first)] != 255 else { return nil }
+                    guard let first = text.first, table[Int(first)] != 255 else {
+                        return nil
+                    }
                     let count = Int(table[Int(first)])
                     // Every character of the line must belong to the alphabet.
                     for index in 1..<max(text.count, 1) where table[Int(text[index])] == 255 { return nil }
                     let available = text.count - 1
                     let needed = (count + 2) / 3 * 4
                     // Programs that cut spaces off the end of a line leave UUEncode lines short.
-                    guard available >= needed || (!xx && available + 3 >= needed) else { return nil }
+                    guard available >= needed || (!xx && available + 3 >= needed) else {
+                        return nil
+                    }
                     // An empty array is never made with `unsafeUninitializedCapacity`: for a capacity of zero
                     // the standard library writes the count into the storage all empty arrays share, a write
                     // that races with any other thread reading an empty array.
-                    guard count > 0 else { return [] }
+                    guard count > 0 else {
+                        return []
+                    }
                     return [UInt8](unsafeUninitializedCapacity: count) { bytes, initialized in
                         func six(_ index: Int) -> UInt8 { index < available ? table[Int(text[index + 1])] : 0 }
                         var (group, written) = (0, 0)
@@ -124,7 +142,9 @@ enum Encoder {
     /// `name001.uue`, `name002.uue`, … which is what Decode looks for.
     static func outputNames(for name: String, method: EncodeMethod, parts: Int) -> [String] {
         let base = FileItem.split(name).base
-        guard parts > 1 else { return [base + "." + method.fileExtension] }
+        guard parts > 1 else {
+            return [base + "." + method.fileExtension]
+        }
         return (1...parts).map { base + String(format: "%03d", $0) + "." + method.fileExtension }
     }
 
@@ -133,7 +153,9 @@ enum Encoder {
     /// "Bytes per file" counts the encoded text without the header.
     static func linesPerFile(lines: Int, bytes: Int64, method: EncodeMethod) -> Int {
         let fromBytes = bytes > 0 ? max(1, Int(min(bytes / Int64(method.lineLength), Int64(Int32.max)))) : 0
-        if lines > 0, fromBytes > 0 { return min(lines, fromBytes) }
+        if lines > 0, fromBytes > 0 {
+            return min(lines, fromBytes)
+        }
         return max(lines, fromBytes)
     }
 
@@ -235,7 +257,8 @@ enum Encoder {
                         .lineLength76Characters, .endLineWithCarriageReturn, .endLineWithLineFeed
                     ]) + Data([13, 10])
 
-                case .uue, .xxe: return SixBitText.encode(data, xx: method == .xxe)
+                case .uue, .xxe:
+                    return SixBitText.encode(data, xx: method == .xxe)
                 }
             }
 
@@ -254,15 +277,22 @@ enum Encoder {
                 }
                 carry.append(block)
                 let whole = carry.count - carry.count % method.bytesPerLine
-                guard whole > 0 else { return }
+                guard whole > 0 else {
+                    return
+                }
                 try write(encoded(carry.prefix(whole)))
                 carry = Data(carry.dropFirst(whole))
             }
             if !carry.isEmpty { try write(encoded(carry)) }
             switch method {
-            case .mime: break
-            case .uue: try output?.write(Data("`\r\nend\r\nsum -r/size \(checksum)/\(size)\r\n".utf8))
-            case .xxe: try output?.write(Data("+\r\nend\r\nsum -r/size \(checksum)/\(size)\r\n".utf8))
+            case .mime:
+                break
+
+            case .uue:
+                try output?.write(Data("`\r\nend\r\nsum -r/size \(checksum)/\(size)\r\n".utf8))
+
+            case .xxe:
+                try output?.write(Data("+\r\nend\r\nsum -r/size \(checksum)/\(size)\r\n".utf8))
             }
             try output?.finish()
             return written
@@ -344,8 +374,12 @@ final class DecodeMachine {
 
     /// Whether a file is being decoded whose end has not come yet: the next part is needed.
     var isInsideFile: Bool {
-        if case .searching = state { return false }
-        if case .mimeHeaders = state { return false }
+        if case .searching = state {
+            return false
+        }
+        if case .mimeHeaders = state {
+            return false
+        }
         return true
     }
 
@@ -357,11 +391,16 @@ final class DecodeMachine {
     /// it ended.
     var needsMoreParts: Bool {
         switch state {
-        case .searching, .mimeHeaders: return false
-        case .sixBit, .yEnc: return true
+        case .searching, .mimeHeaders:
+            return false
+
+        case .sixBit, .yEnc:
+            return true
 
         case .base64(let endsAtMark, _):
-            if endsAtMark { return true }
+            if endsAtMark {
+                return true
+            }
             let fullLine = lastLineLength >= 76 || (bodyLines >= 2 && lastLineLength == firstLineLength)
             return sextets.count % 4 != 0 || fullLine
         }
@@ -384,7 +423,9 @@ final class DecodeMachine {
     static func startsNewFile(_ line: ArraySlice<UInt8>) -> Bool {
         func has(_ prefix: String, folded: Bool) -> Bool {
             let wanted = Array(prefix.utf8)
-            guard line.count >= wanted.count else { return false }
+            guard line.count >= wanted.count else {
+                return false
+            }
             return zip(line, wanted).allSatisfy { (folded && $0 >= 65 && $0 <= 90 ? $0 + 32 : $0) == $1 }
         }
         return has("mime-version:", folded: true) || has("content-", folded: true) || has("begin ", folded: false)
@@ -427,13 +468,17 @@ final class DecodeMachine {
     /// Ends what is open when the input is over, and says what was missing.
     func finish() throws {
         switch state {
-        case .sixBit: report("the end line is missing: the text is incomplete (a part may be missing)")
-        case .yEnc: report("the =yend line is missing: the text is incomplete (a part may be missing)")
+        case .sixBit:
+            report("the end line is missing: the text is incomplete (a part may be missing)")
+
+        case .yEnc:
+            report("the =yend line is missing: the text is incomplete (a part may be missing)")
 
         case .base64(let endsAtMark, _):
             if endsAtMark, !sawEndMark { report("the end mark is missing: the text is incomplete") }
 
-        case .searching, .mimeHeaders: break
+        case .searching, .mimeHeaders:
+            break
         }
         if isInsideFile { try close() }
         if let pending = awaitingTrailer { check(pending, against: nil) }
@@ -477,7 +522,9 @@ final class DecodeMachine {
 
     /// A value of a header line: `name="x"` or `name=x`.
     private func parameter(_ key: String, in line: String) -> String? {
-        guard let range = line.range(of: key + "=", options: .caseInsensitive) else { return nil }
+        guard let range = line.range(of: key + "=", options: .caseInsensitive) else {
+            return nil
+        }
         // `filename=` must not be found inside another word, nor `name=` inside `filename=`.
         if range.lowerBound > line.startIndex, case let before = line[line.index(before: range.lowerBound)],
             before.isLetter || before == "-"
@@ -493,7 +540,9 @@ final class DecodeMachine {
 
     /// The value of ` key=` in a yEnc line (up to the next space).
     private func yParameter(_ key: String, in line: String) -> String? {
-        guard let range = line.range(of: " " + key + "=") else { return nil }
+        guard let range = line.range(of: " " + key + "=") else {
+            return nil
+        }
         return line[range.upperBound...].split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false).first
             .map(String.init)
     }
@@ -501,9 +550,13 @@ final class DecodeMachine {
     /// `sum -r/size 12345/450`.
     private func trailer(_ line: ArraySlice<UInt8>) -> (sum: UInt32, size: Int64)? {
         let prefix = Array("sum -r/size ".utf8)
-        guard line.starts(with: prefix) else { return nil }
+        guard line.starts(with: prefix) else {
+            return nil
+        }
         let numbers = text(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces).split(separator: "/")
-        guard numbers.count == 2, let sum = UInt32(numbers[0]), let size = Int64(numbers[1]) else { return nil }
+        guard numbers.count == 2, let sum = UInt32(numbers[0]), let size = Int64(numbers[1]) else {
+            return nil
+        }
         return (sum, size)
     }
 
@@ -529,7 +582,9 @@ final class DecodeMachine {
     ///
     /// Returns true when the line was that one.
     private func resolveTrailer(with line: ArraySlice<UInt8>) -> Bool {
-        guard let pending = awaitingTrailer, !line.isEmpty else { return false }
+        guard let pending = awaitingTrailer, !line.isEmpty else {
+            return false
+        }
         if let found = trailer(line) {
             check(pending, against: found)
             return true
@@ -539,17 +594,23 @@ final class DecodeMachine {
     }
 
     func feed(_ line: ArraySlice<UInt8>) throws {
-        if awaitingTrailer != nil, case .searching = state, resolveTrailer(with: line) { return }
+        if awaitingTrailer != nil, case .searching = state, resolveTrailer(with: line) {
+            return
+        }
         switch state {
         case .searching:
-            guard !line.isEmpty else { return }
+            guard !line.isEmpty else {
+                return
+            }
             defer { sawText = true }
             if line.starts(with: Array("begin-base64 ".utf8)) {
                 let fields = text(line).split(separator: " ", maxSplits: 2).map(String.init)
                 try open(fields.count == 3 ? fields[2] : nil, .base64(endsAtMark: true, mime: false))
             } else if line.starts(with: Array("begin ".utf8)) {
                 let fields = text(line).split(separator: " ", maxSplits: 2).map(String.init)
-                guard fields.count >= 2, fields[1].allSatisfy({ ("0"..."7").contains($0) }) else { return }
+                guard fields.count >= 2, fields[1].allSatisfy({ ("0"..."7").contains($0) }) else {
+                    return
+                }
                 try open(fields.count == 3 ? fields[2] : nil, .sixBit(xx: nil))
             } else if line.starts(with: Array("=ybegin ".utf8)) {
                 let header = text(line)
@@ -635,7 +696,9 @@ final class DecodeMachine {
                 awaitingTrailer = finished
                 return
             }
-            guard !line.isEmpty else { return }
+            guard !line.isEmpty else {
+                return
+            }
             if xx == nil {
                 // A line that fits UUEncode exactly is UUEncode; XXEncode has no character below `+`.
                 let asUU = SixBitText.decode(line, xx: false)
@@ -650,7 +713,9 @@ final class DecodeMachine {
                 tally.skippedLines += 1
                 return
             }
-            guard !bytes.isEmpty else { return }
+            guard !bytes.isEmpty else {
+                return
+            }
             // Only the last line of a file is shorter than the others.
             if let last = tally.lastCount, let full = tally.fullCount, last < full { tally.shortLinesInside += 1 }
             tally.lastCount = bytes.count
@@ -686,7 +751,9 @@ final class DecodeMachine {
                 }
                 return
             }
-            if line.starts(with: Array("=ybegin".utf8)) { return }
+            if line.starts(with: Array("=ybegin".utf8)) {
+                return
+            }
             var bytes: [UInt8] = []
             bytes.reserveCapacity(line.count)
             var escaped = false
@@ -802,7 +869,9 @@ enum Decoder {
         }
 
         func write(_ bytes: [UInt8]) throws {
-            guard output != nil else { return }
+            guard output != nil else {
+                return
+            }
             pending.append(contentsOf: bytes)
             if pending.count >= ToolRun.blockSize { try flush() }
         }
@@ -826,9 +895,13 @@ enum Decoder {
     /// The path is cut on the code points (a `/` followed by a combining mark is one character to
     /// Swift, but a slash to the file system).
     static func safeName(_ name: String?, replacingColon: Bool = true) -> String? {
-        guard let scalars = name?.unicodeScalars else { return nil }
+        guard let scalars = name?.unicodeScalars else {
+            return nil
+        }
         let last = scalars.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last
-        guard let last else { return nil }
+        guard let last else {
+            return nil
+        }
         var cleaned = String.UnicodeScalarView()
         for scalar in last {
             cleaned.append(scalar.value < 32 || scalar.value == 127 || (replacingColon && scalar == ":") ? "_" : scalar)
@@ -836,7 +909,9 @@ enum Decoder {
         let result = String(cleaned).trimmingCharacters(in: .whitespaces)
         // A name longer than the file system takes is cut at a code point, not refused.
         let name = result.utf8.count > 255 ? trimmedToLimit(result) : result
-        guard !name.isEmpty, name != ".", name != ".." else { return nil }
+        guard !name.isEmpty, name != ".", name != ".." else {
+            return nil
+        }
         return name
     }
 
@@ -865,11 +940,15 @@ enum Decoder {
     /// (`IMG_0002.b64` next to `IMG_0001.b64`): the parts the encoder writes carry the header
     /// in the first one only.
     private static func startsFreshFile(_ part: FileItem, run: ToolRun) -> Bool {
-        guard let reader = try? run.openReader(part.url) else { return false }
+        guard let reader = try? run.openReader(part.url) else {
+            return false
+        }
         defer { reader.close() }
         let token = run.cancellation.interrupting(reader)
         defer { withExtendedLifetime(token) {} }
-        guard let head = try? reader.read(upToCount: 4_096) else { return false }
+        guard let head = try? reader.read(upToCount: 4_096) else {
+            return false
+        }
         for var line in head.split(separator: 10, omittingEmptySubsequences: true) {
             if line.last == 13 { line = line.dropLast() }
             if line.isEmpty { continue }

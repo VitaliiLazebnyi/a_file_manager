@@ -48,8 +48,11 @@ public enum NameTemplate {
 
         public var errorDescription: String? {
             switch self {
-            case .emptyClipboard: return "The clipboard holds no text for [X]."
-            case .noFreeName(let name): return "No free name was found for \(name)."
+            case .emptyClipboard:
+                return "The clipboard holds no text for [X]."
+
+            case .noFreeName(let name):
+                return "No free name was found for \(name)."
             }
         }
     }
@@ -58,7 +61,9 @@ public enum NameTemplate {
     /// reads `"a b.txt" "c.txt"` as several names (New file).
     public static func names(from text: String, context: Context, quotedLists: Bool = false) throws -> [String] {
         let text = text.trimmingCharacters(in: .whitespaces)
-        guard text.hasPrefix("<") else { return plainNames(text, quotedLists: quotedLists) }
+        guard text.hasPrefix("<") else {
+            return plainNames(text, quotedLists: quotedLists)
+        }
         var mask = String(text.dropFirst())
         // One set of date formatters for all the names of this text: making one costs more
         // than everything else an expansion does.
@@ -74,7 +79,9 @@ public enum NameTemplate {
         return try mask.split(separator: "|").map(String.init)
             .compactMap { part -> String? in
                 let part = part.trimmingCharacters(in: .whitespaces)
-                guard !part.isEmpty else { return nil }
+                guard !part.isEmpty else {
+                    return nil
+                }
                 guard hasCounter(part) else {
                     // A mask that comes to nothing (only a switch such as `[T2+1D]`) names nothing.
                     let name = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
@@ -82,10 +89,14 @@ public enum NameTemplate {
                 }
                 // The optional digit: the name without a number, then with 2, 3, … until one is free.
                 let plain = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
-                if !plain.isEmpty, !context.exists(plain) { return plain }
+                if !plain.isEmpty, !context.exists(plain) {
+                    return plain
+                }
                 for counter in 2...9_999 {
                     let name = try expand(part, context, dates, counter: counter, isFirst: false, width: 1)
-                    if !name.isEmpty, !context.exists(name) { return name }
+                    if !name.isEmpty, !context.exists(name) {
+                        return name
+                    }
                 }
                 throw Failure.noFreeName(plain)
             }
@@ -153,7 +164,9 @@ public enum NameTemplate {
 
     /// `1-10>` at the very start of the mask; removes it.
     private static func leadingRange(_ mask: inout String) -> ClosedRange<Int>? {
-        guard let close = mask.firstIndex(of: ">") else { return nil }
+        guard let close = mask.firstIndex(of: ">") else {
+            return nil
+        }
         let bounds = mask[..<close].split(separator: "-", omittingEmptySubsequences: false)
         guard bounds.count == 2, let from = Int(bounds[0]), let to = Int(bounds[1]), from >= 0, from <= to,
             to - from < 100_000
@@ -180,7 +193,9 @@ public enum NameTemplate {
 
     /// The `]` that ends a placeholder; `[]]` holds one itself.
     private static func closingBracket(_ text: Substring) -> Substring.Index? {
-        if text.hasPrefix("]]") { return text.index(after: text.startIndex) }
+        if text.hasPrefix("]]") {
+            return text.index(after: text.startIndex)
+        }
         var quoted = false
         return text.indices.first { index in
             if text[index] == "\"" { quoted.toggle() }
@@ -207,7 +222,9 @@ public enum NameTemplate {
         var mode = Case.original
         var moment = context.now
         func emit(_ text: String, as forced: Case? = nil) {
-            guard !text.isEmpty else { return }
+            guard !text.isEmpty else {
+                return
+            }
             let mode = forced ?? mode
             if let last = runs.last, last.mode == mode {
                 runs[runs.count - 1].text += text
@@ -226,13 +243,26 @@ public enum NameTemplate {
             let body = String(after[..<close])
             rest = after[after.index(after: close)...]
             switch body {
-            case "[": emit("[")
-            case "]": emit("]")
-            case "U": mode = .upper
-            case "L": mode = .lower
-            case "F": mode = .title
-            case "f": mode = .englishTitle
-            case "n": mode = .original
+            case "[":
+                emit("[")
+
+            case "]":
+                emit("]")
+
+            case "U":
+                mode = .upper
+
+            case "L":
+                mode = .lower
+
+            case "F":
+                mode = .title
+
+            case "f":
+                mode = .englishTitle
+
+            case "n":
+                mode = .original
 
             case "X", "X+":
                 let text = clipboardText(context.clipboard ?? "")
@@ -283,9 +313,14 @@ public enum NameTemplate {
 
     private static func cased(_ text: String, _ mode: Case) -> String {
         switch mode {
-        case .original, .untouched: return text
-        case .upper: return text.uppercased()
-        case .lower: return text.lowercased()
+        case .original, .untouched:
+            return text
+
+        case .upper:
+            return text.uppercased()
+
+        case .lower:
+            return text.lowercased()
 
         case .title, .englishTitle:
             let small: Set<String> =
@@ -326,7 +361,9 @@ public enum NameTemplate {
             suffix = String(core[core.index(after: start)..<core.index(before: core.endIndex)])
             core = String(core[..<start])
         }
-        guard core.hasPrefix("C") else { return nil }
+        guard core.hasPrefix("C") else {
+            return nil
+        }
         let options = core.dropFirst()
         guard options.allSatisfy({ $0.isNumber || $0 == "+" || $0 == "-" || $0 == ":" || $0 == "a" }) else {
             return nil
@@ -345,12 +382,18 @@ public enum NameTemplate {
             return nil
         }
         let offset = body.dropFirst(2)
-        if offset.isEmpty { return now }
-        guard let unit = offset.last, let amount = Int(offset.dropLast()) else { return nil }
+        if offset.isEmpty {
+            return now
+        }
+        guard let unit = offset.last, let amount = Int(offset.dropLast()) else {
+            return nil
+        }
         let components: [Character: Calendar.Component] = [
             "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
         ]
-        guard let component = components[unit] else { return nil }
+        guard let component = components[unit] else {
+            return nil
+        }
         return calendar.date(byAdding: component, value: amount, to: now)
     }
 
@@ -367,15 +410,32 @@ public enum NameTemplate {
         var characters = ArraySlice(body)
         while let letter = characters.popFirst() {
             switch letter {
-            case "Y": text += String(format: "%04d", year)
-            case "y": text += two(year % 100)
-            case "M": text += two(part(.month))
-            case "D": text += two(part(.day))
-            case "h": text += two(hour)
-            case "H": text += two(hour % 12 == 0 ? 12 : hour % 12)
-            case "m": text += two(part(.minute))
-            case "s": text += two(part(.second))
-            case "v": text += String(format: "%03d", part(.nanosecond) / 1_000_000)
+            case "Y":
+                text += String(format: "%04d", year)
+
+            case "y":
+                text += two(year % 100)
+
+            case "M":
+                text += two(part(.month))
+
+            case "D":
+                text += two(part(.day))
+
+            case "h":
+                text += two(hour)
+
+            case "H":
+                text += two(hour % 12 == 0 ? 12 : hour % 12)
+
+            case "m":
+                text += two(part(.minute))
+
+            case "s":
+                text += two(part(.second))
+
+            case "v":
+                text += String(format: "%03d", part(.nanosecond) / 1_000_000)
 
             case "i":
                 let short = characters.first == "1"
@@ -385,7 +445,8 @@ public enum NameTemplate {
             case "d", "t":
                 text += dates.text(letter, moment)
 
-            default: text.append(letter)
+            default:
+                text.append(letter)
             }
         }
         return text
@@ -397,24 +458,41 @@ public enum NameTemplate {
             let value = context.environment[String(body[body.index(after: body.startIndex)..<end])] ?? ""
             return slice(value, String(body[body.index(after: end)...]))
         }
-        guard let letter = body.first else { return nil }
+        guard let letter = body.first else {
+            return nil
+        }
         let split = context.cursorIsFolder ? (base: context.cursorName, ext: "") : FileItem.split(context.cursorName)
         let value: String
         switch letter {
-        case "N": value = split.base
-        case "E": value = split.ext
-        case "A": value = context.cursorName
-        case "P": value = context.parentName
-        case "G": value = context.grandparentName
-        case "S": value = String(context.cursorSize)
-        default: return nil
+        case "N":
+            value = split.base
+
+        case "E":
+            value = split.ext
+
+        case "A":
+            value = context.cursorName
+
+        case "P":
+            value = context.parentName
+
+        case "G":
+            value = context.grandparentName
+
+        case "S":
+            value = String(context.cursorSize)
+
+        default:
+            return nil
         }
         return slice(value, String(body.dropFirst()))
     }
 
     /// Applies a range (spec 18 › Range forms) to a value; nil when `range` is not one.
     private static func slice(_ value: String, _ range: String) -> String? {
-        if range.isEmpty { return value }
+        if range.isEmpty {
+            return value
+        }
         var text = Substring(range)
         var pad: Character?
         if let first = text.first, first == "0" || first == " ", text.count > 1 {
@@ -429,13 +507,17 @@ public enum NameTemplate {
             let negative = text.hasPrefix("-") || fromEnd
             if text.hasPrefix("-") { text = text.dropFirst() }
             let digits = text.prefix { $0.isASCII && $0.isNumber }
-            guard !digits.isEmpty, digits.count <= 18, let typed = Int(digits), typed > 0 else { return nil }
+            guard !digits.isEmpty, digits.count <= 18, let typed = Int(digits), typed > 0 else {
+                return nil
+            }
             let number = min(typed, positionLimit)
             text = text.dropFirst(digits.count)
             return negative ? characters.count - number : number - 1
         }
         let countsFromEnd = text.hasPrefix("-")
-        guard let start = position(&text) else { return nil }
+        guard let start = position(&text) else {
+            return nil
+        }
         var end = start
         var width: Int?
         if text.hasPrefix(",") {
@@ -453,7 +535,9 @@ public enum NameTemplate {
                 end = characters.count - 1
             } else {
                 // After a start counted from the end, the end is counted from there too: `[N-8-5]`.
-                guard let last = position(&text, fromEnd: countsFromEnd), text.isEmpty else { return nil }
+                guard let last = position(&text, fromEnd: countsFromEnd), text.isEmpty else {
+                    return nil
+                }
                 end = last
                 width = last - start + 1
             }
@@ -462,7 +546,9 @@ public enum NameTemplate {
         }
         let (from, to) = (max(0, start), min(characters.count - 1, end))
         let part = from <= to ? String(characters[from...to]) : ""
-        guard let pad, let width = width.map({ min($0, maxWidth) }), part.count < width else { return part }
+        guard let pad, let width = width.map({ min($0, maxWidth) }), part.count < width else {
+            return part
+        }
         return String(repeating: String(pad), count: width - part.count) + part
     }
 }

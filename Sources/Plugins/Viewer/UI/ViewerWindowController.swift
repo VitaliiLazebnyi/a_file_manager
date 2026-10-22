@@ -53,7 +53,9 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
         window.delegate = self
         // Esc is the pane's: it stops a search first and closes the window otherwise.
         window.onEscape = { [weak self] in
-            guard let self else { return false }
+            guard let self else {
+                return false
+            }
             if pane.activity != nil {
                 pane.activity?.cancel.cancel()
                 return true
@@ -86,14 +88,18 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
     /// (spec 10 › Multi-file sessions).
     func step(by delta: Int) {
         let target = index + delta
-        guard items.indices.contains(target), target != index else { return }
+        guard items.indices.contains(target), target != index else {
+            return
+        }
         index = target
         loadCurrent()
     }
 
     private func loadCurrent() {
         pane.fileCounter = (index, max(1, items.count))
-        guard items.indices.contains(index) else { return }
+        guard items.indices.contains(index) else {
+            return
+        }
         pane.load(items[index])
     }
 
@@ -160,7 +166,9 @@ final class CursorFollower {
         self.panel = panel
         self.show = show
         subscription = kernel.panelEvents.subscribe { [weak self] _, source in
-            guard let self, let followed = self.panel(), followed === source else { return }
+            guard let self, let followed = self.panel(), followed === source else {
+                return
+            }
             schedule(force: false)
         }
     }
@@ -172,9 +180,13 @@ final class CursorFollower {
         generation += 1
         let wanted = generation
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, generation == wanted, let panel = panel() else { return }
+            guard let self, generation == wanted, let panel = panel() else {
+                return
+            }
             let item = panel.model.cursorItem
-            if !force, let shown, shown == item { return }
+            if !force, let shown, shown == item {
+                return
+            }
             shown = .some(item)
             show(item)
         }

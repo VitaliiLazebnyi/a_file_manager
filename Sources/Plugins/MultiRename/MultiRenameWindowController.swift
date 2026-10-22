@@ -17,7 +17,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         var onKeyDown: ((NSEvent) -> Bool)?
 
         override func sendEvent(_ event: NSEvent) {
-            if event.type == .keyDown, onKeyDown?(event) == true { return }
+            if event.type == .keyDown, onKeyDown?(event) == true {
+                return
+            }
             super.sendEvent(event)
         }
     }
@@ -404,14 +406,20 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     /// What the status line says about a problem of the settings.
     static func describe(_ problem: any Error) -> String {
         switch problem {
-        case RenameMaskError.invalidPlaceholder(let text): return "Invalid placeholder: \(text)"
-        case RenameMaskError.contentPluginsUnavailable: return "Content-plugin fields [=…] are not available."
-        case SearchReplace.Problem.invalidExpression(let text): return "Invalid regular expression: \(text)"
+        case RenameMaskError.invalidPlaceholder(let text):
+            return "Invalid placeholder: \(text)"
+
+        case RenameMaskError.contentPluginsUnavailable:
+            return "Content-plugin fields [=…] are not available."
+
+        case SearchReplace.Problem.invalidExpression(let text):
+            return "Invalid regular expression: \(text)"
 
         case SearchReplace.Problem.tooSlow(let text):
             return "The regular expression takes too long for these names: \(text)"
 
-        default: return "The rename mask is invalid."
+        default:
+            return "The rename mask is invalid."
         }
     }
 
@@ -573,7 +581,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     // MARK: Menus
 
     @objc private func settingsChosen(_ sender: NSPopUpButton) {
-        guard let tag = sender.selectedItem?.representedObject as? String else { return }
+        guard let tag = sender.selectedItem?.representedObject as? String else {
+            return
+        }
         switch tag {
         case "default":
             loadedName = nil
@@ -610,7 +620,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     }
 
     @objc private func namesChosen(_ sender: NSPopUpButton) {
-        guard let tag = sender.selectedItem?.representedObject as? String else { return }
+        guard let tag = sender.selectedItem?.representedObject as? String else {
+            return
+        }
         switch tag {
         case "load":
             let panel = NSOpenPanel()
@@ -620,8 +632,11 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
                 self?.namesFileChosen(response == .OK ? urls.first : nil)
             }
 
-        case "edit": session.editNames()
-        default: session.clearGivenNames()
+        case "edit":
+            session.editNames()
+
+        default:
+            session.clearGivenNames()
         }
     }
 
@@ -637,7 +652,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     }
 
     @objc private func start() {
-        guard !session.isBusy, toolWindow.makeFirstResponder(nil) else { return }
+        guard !session.isBusy, toolWindow.makeFirstResponder(nil) else {
+            return
+        }
         session.settings = readFields()
         session.start { [weak self] _ in
             self?.update()
@@ -690,7 +707,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             table.selectRowIndexes(moved, byExtendingSelection: false)
             if let first = moved.first { table.scrollRowToVisible(first) }
         } else if Shortcut(.forwardDelete).matches(event) || Shortcut(.backspace).matches(event) {
-            guard let first = selection.first else { return true }
+            guard let first = selection.first else {
+                return true
+            }
             session.remove(selection)
             let next = min(first, session.rowCount - 1)
             if next >= 0 { table.selectRowIndexes([next], byExtendingSelection: false) }
@@ -708,7 +727,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     func numberOfRows(in _: NSTableView) -> Int { session.rowCount }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard let column = tableColumn?.identifier, row >= 0, row < session.rowCount else { return nil }
+        guard let column = tableColumn?.identifier, row >= 0, row < session.rowCount else {
+            return nil
+        }
         let cell =
             tableView.makeView(withIdentifier: column, owner: nil) as? NSTextField
             ?? {
@@ -725,29 +746,43 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
         cell.alignment = .left
         cell.toolTip = nil
         switch column.rawValue {
-        case "old": cell.stringValue = parts.base
-        case "ext": cell.stringValue = parts.ext
+        case "old":
+            cell.stringValue = parts.base
+
+        case "ext":
+            cell.stringValue = parts.ext
 
         case "new":
             cell.stringValue = shown.newName ?? RenameEngine.errorText
             switch status {
-            case .unchanged: cell.textColor = .secondaryLabelColor
-            case .ready: break
-            case .error: cell.textColor = .systemRed
-            case .invalid(let reason): (cell.textColor, cell.toolTip) = (.systemRed, reason)
+            case .unchanged:
+                cell.textColor = .secondaryLabelColor
+
+            case .ready:
+                break
+
+            case .error:
+                cell.textColor = .systemRed
+
+            case .invalid(let reason):
+                (cell.textColor, cell.toolTip) = (.systemRed, reason)
 
             case .duplicate:
                 (cell.textColor, cell.toolTip) = (.systemRed, "Another file in the list gets the same name.")
 
-            case .exists: (cell.textColor, cell.toolTip) = (.systemRed, "A file with this name already exists.")
+            case .exists:
+                (cell.textColor, cell.toolTip) = (.systemRed, "A file with this name already exists.")
             }
 
         case "size":
             cell.stringValue = entry.item.isFolder ? "<DIR>" : Format.bytes(entry.item.size)
             cell.alignment = .right
 
-        case "date": cell.stringValue = Self.dateFormatter.string(from: entry.item.modified)
-        default: cell.stringValue = kernel.fileSystems.displayPath(entry.directory) + "/"
+        case "date":
+            cell.stringValue = Self.dateFormatter.string(from: entry.item.modified)
+
+        default:
+            cell.stringValue = kernel.fileSystems.displayPath(entry.directory) + "/"
         }
         return cell
     }
@@ -755,7 +790,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     /// A click on a header sorts by that column; a second click turns the order.
     func tableView(_ tableView: NSTableView, didClick tableColumn: NSTableColumn) {
         let keys: [String: MultiRenameSession.SortKey] = ["old": .name, "ext": .ext, "size": .size, "date": .date]
-        guard let key = keys[tableColumn.identifier.rawValue] else { return }
+        guard let key = keys[tableColumn.identifier.rawValue] else {
+            return
+        }
         sortAscending = sortColumn == tableColumn.identifier.rawValue ? !sortAscending : true
         sortColumn = tableColumn.identifier.rawValue
         for column in tableView.tableColumns { tableView.setIndicatorImage(nil, in: column) }
@@ -793,7 +830,9 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
             .compactMap {
                 $0.string(forType: Self.rowType).flatMap(Int.init)
             }
-        guard !rows.isEmpty else { return false }
+        guard !rows.isEmpty else {
+            return false
+        }
         // A reordered list is no longer sorted by any column.
         for column in tableView.tableColumns { tableView.setIndicatorImage(nil, in: column) }
         sortColumn = nil

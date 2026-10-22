@@ -66,22 +66,36 @@ public struct TabFile: Equatable, Sendable {
         let scalars = text.unicodeScalars
         func unsafe(_ scalar: Unicode.Scalar) -> Bool {
             switch scalar.properties.generalCategory {
-            case .control, .lineSeparator, .paragraphSeparator: return true
-            default: return false
+            case .control, .lineSeparator, .paragraphSeparator:
+                return true
+
+            default:
+                return false
             }
         }
         let needsQuotes =
             scalars.first == "\"" || scalars.contains(where: unsafe)
             || scalars.first?.properties.isWhitespace == true || scalars.last?.properties.isWhitespace == true
-        guard needsQuotes else { return text }
+        guard needsQuotes else {
+            return text
+        }
         var quoted = "\""
         for scalar in scalars {
             switch scalar {
-            case "\\": quoted += "\\\\"
-            case "\"": quoted += "\\\""
-            case "\n": quoted += "\\n"
-            case "\r": quoted += "\\r"
-            case "\t": quoted += "\\t"
+            case "\\":
+                quoted += "\\\\"
+
+            case "\"":
+                quoted += "\\\""
+
+            case "\n":
+                quoted += "\\n"
+
+            case "\r":
+                quoted += "\\r"
+
+            case "\t":
+                quoted += "\\t"
 
             default:
                 if unsafe(scalar) {
@@ -98,25 +112,38 @@ public struct TabFile: Equatable, Sendable {
     /// not ours, is taken as it is (that is how files written by hand and by other programs read).
     static func unquoted(_ value: String) -> String {
         let scalars = Array(value.unicodeScalars)
-        guard scalars.count >= 2, scalars.first == "\"", scalars.last == "\"" else { return value }
+        guard scalars.count >= 2, scalars.first == "\"", scalars.last == "\"" else {
+            return value
+        }
         var result = String.UnicodeScalarView()
         var index = 1
         while index < scalars.count - 1 {
             let scalar = scalars[index]
             index += 1
             guard scalar == "\\" else {
-                if scalar == "\"" { return value }
+                if scalar == "\"" {
+                    return value
+                }
                 result.append(scalar)
                 continue
             }
-            guard index < scalars.count - 1 else { return value }
+            guard index < scalars.count - 1 else {
+                return value
+            }
             let escape = scalars[index]
             index += 1
             switch escape {
-            case "\\", "\"": result.append(escape)
-            case "n": result.append("\n")
-            case "r": result.append("\r")
-            case "t": result.append("\t")
+            case "\\", "\"":
+                result.append(escape)
+
+            case "n":
+                result.append("\n")
+
+            case "r":
+                result.append("\r")
+
+            case "t":
+                result.append("\t")
 
             case "u":
                 guard index < scalars.count - 1, scalars[index] == "{",
@@ -129,7 +156,8 @@ public struct TabFile: Equatable, Sendable {
                 result.append(unicode)
                 index = close + 1
 
-            default: return value
+            default:
+                return value
             }
         }
         return String(result)
@@ -141,7 +169,9 @@ public struct TabFile: Equatable, Sendable {
     /// Bytes that are none of these are read as UTF-8 as far as they go.
     public static func text(decoding data: Data) -> String {
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
-            if let text = String(data: data, encoding: .utf16) { return text }
+            if let text = String(data: data, encoding: .utf16) {
+                return text
+            }
         }
         return String(decoding: data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data, as: UTF8.self)
     }
@@ -164,7 +194,9 @@ public struct TabFile: Equatable, Sendable {
         }
 
         func state(_ name: String) -> PanelTabs.State? {
-            guard let keys = sections[name] else { return nil }
+            guard let keys = sections[name] else {
+                return nil
+            }
             let numbers = keys.keys
                 .compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil
                 }
@@ -197,7 +229,9 @@ public struct TabFile: Equatable, Sendable {
             return tabs.isEmpty ? nil : PanelTabs.State(tabs: tabs, active: active)
         }
 
-        guard let active = state("activetabs") ?? state("inactivetabs") else { return nil }
+        guard let active = state("activetabs") ?? state("inactivetabs") else {
+            return nil
+        }
         self.active = active
         inactive = sections["activetabs"] == nil ? nil : state("inactivetabs")
     }

@@ -120,7 +120,9 @@ import Testing
     // MARK: The reproducers of the fuzzer
 
     @Test func theChecksumFileWithAnEmptyNameYieldsNoEntryWithoutAName() {
-        guard let data = reproducer("checksum-empty-name.md5") else { return }
+        guard let data = reproducer("checksum-empty-name.md5") else {
+            return
+        }
         let text = ChecksumFile.text(from: data)
         for name in ["a.md5", "a.sfv", "a.sha1", "a.sha256", "a.bk3", "a.sha512"] {
             let parsed = ChecksumFile.parseLines(text, fileName: name)
@@ -130,7 +132,9 @@ import Testing
     }
 
     @Test func aStoredNameWithASlashAndACombiningMarkDoesNotLeadOutOfTheTargetFolder() throws {
-        guard let data = reproducer("combine-containment-slash-combining-mark.crc") else { return }
+        guard let data = reproducer("combine-containment-slash-combining-mark.crc") else {
+            return
+        }
         try box.file("in/data.001", "abc")
         try box.file("in/data.002", "def")
         try box.folder("out/target")
@@ -148,7 +152,9 @@ import Testing
     }
 
     @Test func aDecodedNameWithASlashAndACombiningMarkStaysInTheTargetFolder() throws {
-        guard let data = reproducer("decode-containment-slash-combining-mark.bin") else { return }
+        guard let data = reproducer("decode-containment-slash-combining-mark.bin") else {
+            return
+        }
         try box.folder("in")
         try box.folder("out/target")
         try data.write(to: box.url("in/part001.uue"))

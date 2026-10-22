@@ -9,36 +9,63 @@ public enum TextEncoding: Equatable, Sendable {
 
     public var name: String {
         switch self {
-        case .utf8(let bom): return bom ? "UTF-8 (BOM)" : "UTF-8"
-        case .utf16LittleEndian: return "UTF-16 LE"
-        case .utf16BigEndian: return "UTF-16 BE"
-        case .latin1: return "Latin-1"
+        case .utf8(let bom):
+            return bom ? "UTF-8 (BOM)" : "UTF-8"
+
+        case .utf16LittleEndian:
+            return "UTF-16 LE"
+
+        case .utf16BigEndian:
+            return "UTF-16 BE"
+
+        case .latin1:
+            return "Latin-1"
         }
     }
 
     var bom: [UInt8] {
         switch self {
-        case .utf8(true): return [0xEF, 0xBB, 0xBF]
-        case .utf16LittleEndian: return [0xFF, 0xFE]
-        case .utf16BigEndian: return [0xFE, 0xFF]
-        default: return []
+        case .utf8(true):
+            return [0xEF, 0xBB, 0xBF]
+
+        case .utf16LittleEndian:
+            return [0xFF, 0xFE]
+
+        case .utf16BigEndian:
+            return [0xFE, 0xFF]
+
+        default:
+            return []
         }
     }
 
     var stringEncoding: String.Encoding {
         switch self {
-        case .utf8: return .utf8
-        case .utf16LittleEndian: return .utf16LittleEndian
-        case .utf16BigEndian: return .utf16BigEndian
-        case .latin1: return .isoLatin1
+        case .utf8:
+            return .utf8
+
+        case .utf16LittleEndian:
+            return .utf16LittleEndian
+
+        case .utf16BigEndian:
+            return .utf16BigEndian
+
+        case .latin1:
+            return .isoLatin1
         }
     }
 
     /// By byte-order mark; without one, UTF-8 when the bytes are valid UTF-8, else Latin-1.
     public static func detect(_ data: Data) -> Self {
-        if data.starts(with: [0xEF, 0xBB, 0xBF]) { return .utf8(bom: true) }
-        if data.starts(with: [0xFF, 0xFE]) { return .utf16LittleEndian }
-        if data.starts(with: [0xFE, 0xFF]) { return .utf16BigEndian }
+        if data.starts(with: [0xEF, 0xBB, 0xBF]) {
+            return .utf8(bom: true)
+        }
+        if data.starts(with: [0xFF, 0xFE]) {
+            return .utf16LittleEndian
+        }
+        if data.starts(with: [0xFE, 0xFF]) {
+            return .utf16BigEndian
+        }
         return String(data: data, encoding: .utf8) != nil ? .utf8(bom: false) : .latin1
     }
 
@@ -50,17 +77,27 @@ public enum TextEncoding: Equatable, Sendable {
     static func decodeDetectedChecked(_ data: Data) -> (encoding: Self, text: String, isLossless: Bool) {
         if let marked = detect(prefixOf: data) {
             let body = data.dropFirst(marked.bom.count)
-            if let text = String(data: body, encoding: marked.stringEncoding) { return (marked, text, true) }
+            if let text = String(data: body, encoding: marked.stringEncoding) {
+                return (marked, text, true)
+            }
             return (marked, String(decoding: body, as: UTF8.self), false)
         }
-        if let text = String(data: data, encoding: .utf8) { return (.utf8(bom: false), text, true) }
+        if let text = String(data: data, encoding: .utf8) {
+            return (.utf8(bom: false), text, true)
+        }
         return (.latin1, Self.latin1.decode(data), true)
     }
 
     private static func detect(prefixOf data: Data) -> Self? {
-        if data.starts(with: [0xEF, 0xBB, 0xBF]) { return .utf8(bom: true) }
-        if data.starts(with: [0xFF, 0xFE]) { return .utf16LittleEndian }
-        if data.starts(with: [0xFE, 0xFF]) { return .utf16BigEndian }
+        if data.starts(with: [0xEF, 0xBB, 0xBF]) {
+            return .utf8(bom: true)
+        }
+        if data.starts(with: [0xFF, 0xFE]) {
+            return .utf16LittleEndian
+        }
+        if data.starts(with: [0xFE, 0xFF]) {
+            return .utf16BigEndian
+        }
         return nil
     }
 
@@ -225,7 +262,9 @@ public struct TextDocument: Equatable, Sendable {
     /// Files with a zero byte near the start are shown in hex; UTF-16 text is full of them
     /// and is recognised by its byte-order mark.
     public static func looksBinary(_ data: Data) -> Bool {
-        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) { return false }
+        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
+            return false
+        }
         return data.prefix(64 * 1_024).contains(0)
     }
 }

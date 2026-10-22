@@ -69,7 +69,9 @@ public final class ConfigurationPlugin: Plugin {
     /// The same, with the preferences kept in `domain` (the program's own is named by its
     /// bundle identifier); nothing is listed before anything was stored there.
     internal static func storedKeys(of settings: any SettingsStore, domain: String) -> [String] {
-        guard settings is UserDefaultsSettings else { return [] }
+        guard settings is UserDefaultsSettings else {
+            return []
+        }
         return storedKeys(in: UserDefaults.standard.persistentDomain(forName: domain) ?? [:])
     }
 
@@ -186,7 +188,9 @@ public final class ConfigurationPlugin: Plugin {
             parameterized: { argument in
                 // With a file given, the export holds the settings alone and says so afterwards.
                 if let url = argument.location {
-                    guard url.isFileURL else { return }
+                    guard url.isFileURL else {
+                        return
+                    }
                     return center.exportSettings(to: url)
                 }
                 guard let options = center.askExportOptions(),

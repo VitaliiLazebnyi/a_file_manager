@@ -396,9 +396,14 @@ private final class WatchableFileSystem: FileSystemProvider, @unchecked Sendable
 
     func list(_ directory: URL, showHidden _: Bool) throws -> [FileItem] {
         switch directory.path {
-        case "/top": return [FileItem(url: url("/top/sub"), name: "sub", kind: .directory)]
-        case "/top/sub": return [FileItem(url: url("/top/sub/f.txt"), name: "f.txt")]
-        default: throw FileSystemError.notSupported("Listing")
+        case "/top":
+            return [FileItem(url: url("/top/sub"), name: "sub", kind: .directory)]
+
+        case "/top/sub":
+            return [FileItem(url: url("/top/sub/f.txt"), name: "f.txt")]
+
+        default:
+            throw FileSystemError.notSupported("Listing")
         }
     }
 

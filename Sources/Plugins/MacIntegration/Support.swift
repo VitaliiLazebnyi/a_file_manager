@@ -16,9 +16,14 @@ enum DisplayText {
             }
             count += 1
             switch scalar {
-            case "\n": result.append(contentsOf: "\\n".unicodeScalars)
-            case "\r": result.append(contentsOf: "\\r".unicodeScalars)
-            case "\t": result.append(contentsOf: "\\t".unicodeScalars)
+            case "\n":
+                result.append(contentsOf: "\\n".unicodeScalars)
+
+            case "\r":
+                result.append(contentsOf: "\\r".unicodeScalars)
+
+            case "\t":
+                result.append(contentsOf: "\\t".unicodeScalars)
 
             default:
                 switch scalar.properties.generalCategory {

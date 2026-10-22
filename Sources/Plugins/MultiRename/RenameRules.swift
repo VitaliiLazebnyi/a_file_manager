@@ -36,12 +36,23 @@ enum LetterCase: Int, Codable, CaseIterable {
 
     var title: String {
         switch self {
-        case .unchanged: return "Unchanged"
-        case .lower: return "All lowercase"
-        case .upper: return "All UPPERCASE"
-        case .firstUpper: return "First letter uppercase"
-        case .words: return "First of each word uppercase"
-        case .titleWords: return "First of each word uppercase (English in Titles)"
+        case .unchanged:
+            return "Unchanged"
+
+        case .lower:
+            return "All lowercase"
+
+        case .upper:
+            return "All UPPERCASE"
+
+        case .firstUpper:
+            return "First letter uppercase"
+
+        case .words:
+            return "First of each word uppercase"
+
+        case .titleWords:
+            return "First of each word uppercase (English in Titles)"
         }
     }
 
@@ -52,12 +63,19 @@ enum LetterCase: Int, Codable, CaseIterable {
 
     func apply(to text: String, rule: TitleCaseRule = .standard) -> String {
         switch self {
-        case .unchanged: return text
-        case .lower: return text.lowercased()
-        case .upper: return text.uppercased()
+        case .unchanged:
+            return text
+
+        case .lower:
+            return text.lowercased()
+
+        case .upper:
+            return text.uppercased()
 
         case .firstUpper:
-            guard let first = text.firstIndex(where: { $0.isLetter || $0.isNumber }) else { return text }
+            guard let first = text.firstIndex(where: { $0.isLetter || $0.isNumber }) else {
+                return text
+            }
             return String(text[..<first]) + text[first...first].uppercased()
                 + text[text.index(after: first)...].lowercased()
 
@@ -188,7 +206,9 @@ struct SearchReplace {
             let replacements = settings.replacement.components(separatedBy: "|")
             pairs = searches.enumerated()
                 .compactMap { index, search in
-                    guard !search.isEmpty else { return nil }
+                    guard !search.isEmpty else {
+                        return nil
+                    }
                     return Pair(
                         finder: .wildcard(WildcardMatcher(search, caseSensitive: settings.caseSensitive)),
                         replacement: [.text(replacements.indices.contains(index) ? replacements[index] : "")]
@@ -266,10 +286,13 @@ struct SearchReplace {
     private func expand(_ parts: [Part], _ match: NSTextCheckingResult, _ source: NSString) -> String {
         parts.map { part -> String in
             switch part {
-            case .text(let text): return text
+            case .text(let text):
+                return text
 
             case .group(let number, let letterCase):
-                guard number < match.numberOfRanges, match.range(at: number).location != NSNotFound else { return "" }
+                guard number < match.numberOfRanges, match.range(at: number).location != NSNotFound else {
+                    return ""
+                }
                 return letterCase.apply(to: source.substring(with: match.range(at: number)))
             }
         }
@@ -289,9 +312,14 @@ struct SearchReplace {
         return characters.enumerated()
             .map { index, character -> String in
                 switch character {
-                case "*": return index == characters.count - 1 ? ".*" : index == 0 ? "^.*?" : ".*?"
-                case "?": return "."
-                default: return NSRegularExpression.escapedPattern(for: String(character))
+                case "*":
+                    return index == characters.count - 1 ? ".*" : index == 0 ? "^.*?" : ".*?"
+
+                case "?":
+                    return "."
+
+                default:
+                    return NSRegularExpression.escapedPattern(for: String(character))
                 }
             }
             .joined()
@@ -325,7 +353,9 @@ struct SearchReplace {
         var position = 0
         /// The value of the digit at `index`; nil where there is none.
         func digit(_ index: Int) -> Int? {
-            guard characters.indices.contains(index), characters[index].isASCII else { return nil }
+            guard characters.indices.contains(index), characters[index].isASCII else {
+                return nil
+            }
             return characters[index].wholeNumberValue
         }
         while position < characters.count {
@@ -410,7 +440,9 @@ struct RenameEngine {
     /// With `given`, that name (loaded from a file or typed by the user) takes the place of the
     /// masks' result. Nil is `<Error!>`.
     func newName(for subject: RenameSubject, index: Int, given: String? = nil) -> String? {
-        guard let searchReplace else { return nil }
+        guard let searchReplace else {
+            return nil
+        }
         var name: String
         var ext: String
         if let given {
@@ -443,7 +475,9 @@ struct RenameEngine {
             }
             full = replaced
         } else {
-            guard let replaced = searchReplace.replacing(in: name, cancelled: cancelled) else { return nil }
+            guard let replaced = searchReplace.replacing(in: name, cancelled: cancelled) else {
+                return nil
+            }
             full = joined(replaced, ext)
         }
         full = settings.letterCase.apply(to: full, rule: context.titleRule)
@@ -465,7 +499,9 @@ struct RenameEngine {
     ///
     /// A slash inside the name is fine: it moves the item into that folder.
     static func invalidity(of name: String) -> String? {
-        if name.isEmpty { return "The name is empty." }
+        if name.isEmpty {
+            return "The name is empty."
+        }
         // Cut at the `/` byte, not at the character: a combining mark after a slash makes one
         // character with it, and the file system reads the slash all the same.
         let components = name.utf8.split(separator: 0x2F, omittingEmptySubsequences: false)
@@ -473,11 +509,15 @@ struct RenameEngine {
                 name.utf8.first == 0x2F ? 1 : 0
             )
         for component in components {
-            if component.isEmpty { return "A folder name is empty." }
+            if component.isEmpty {
+                return "A folder name is empty."
+            }
             if component.elementsEqual(".".utf8) || component.elementsEqual("..".utf8) {
                 return "\(String(decoding: component, as: UTF8.self)) is not a name."
             }
-            if component.count > 255 { return "The name is too long." }
+            if component.count > 255 {
+                return "The name is too long."
+            }
         }
         return nil
     }

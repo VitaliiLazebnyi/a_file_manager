@@ -12,9 +12,14 @@ public enum TransferMode: Int, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .binary: return "Binary (archives, doc etc.)"
-        case .text: return "Text (plain text, html, etc.)"
-        case .automatic: return "Automatic"
+        case .binary:
+            return "Binary (archives, doc etc.)"
+
+        case .text:
+            return "Text (plain text, html, etc.)"
+
+        case .automatic:
+            return "Automatic"
         }
     }
 }
@@ -65,9 +70,14 @@ public final class NetworkOptions: @unchecked Sendable {
     func transfersAsText(_ name: String) -> Bool {
         let values = self.values
         switch values.transferMode {
-        case .binary: return false
-        case .text: return true
-        case .automatic: return FileMask(values.textFileMasks).matches(name)
+        case .binary:
+            return false
+
+        case .text:
+            return true
+
+        case .automatic:
+            return FileMask(values.textFileMasks).matches(name)
         }
     }
 }
@@ -458,7 +468,9 @@ enum Background {
         condition.lock()
         defer { condition.unlock() }
         while !isDone() {
-            guard Date() < deadline else { return false }
+            guard Date() < deadline else {
+                return false
+            }
             condition.wait(until: min(deadline, Date().addingTimeInterval(0.1)))
         }
         return true
@@ -481,7 +493,9 @@ func withEither<Result>(
     _ callers: CancellationFlag?,
     _ body: (CancellationFlag) throws -> Result
 ) rethrows -> Result {
-    guard let callers, callers !== own else { return try body(own) }
+    guard let callers, callers !== own else {
+        return try body(own)
+    }
     let both = CancellationFlag()
     // The registrations are released when the call is over; `both` outlives them.
     let registrations = [own.onCancel { both.cancel() }, callers.onCancel { both.cancel() }]
@@ -494,7 +508,9 @@ func withEither<Result>(
 /// which must never wait behind a login that may be asking the user something (the question is
 /// answered on the main thread).
 func lockPatiently(_ lock: NSLock, cancellation: CancellationFlag?, shouldGiveUp: () -> any Error?) throws {
-    if lock.try() { return }
+    if lock.try() {
+        return
+    }
     if Thread.isMainThread { throw NetworkError.busy("The connection is busy logging in.") }
     while !lock.lock(before: Date().addingTimeInterval(0.1)) {
         if cancellation?.isCancelled == true { throw NetworkError.cancelled }
@@ -514,7 +530,9 @@ struct LineEndConverter {
     mutating func toLocal(_ data: Data) -> Data {
         var result = Data(capacity: data.count)
         data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            guard let base = bytes.baseAddress, !bytes.isEmpty else { return }
+            guard let base = bytes.baseAddress, !bytes.isEmpty else {
+                return
+            }
             let count = bytes.count
             var start = 0
             if pendingCR {
@@ -551,7 +569,9 @@ struct LineEndConverter {
     mutating func toNetwork(_ data: Data) -> Data {
         var result = Data(capacity: data.count + data.count / 32)
         data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            guard let base = bytes.baseAddress, !bytes.isEmpty else { return }
+            guard let base = bytes.baseAddress, !bytes.isEmpty else {
+                return
+            }
             let count = bytes.count
             let pointer = base.assumingMemoryBound(to: UInt8.self)
             var start = 0

@@ -284,7 +284,9 @@ final class SystemTools {
     ///
     /// The job can be cancelled, which ends the child.
     func run(_ line: String) {
-        guard let typed = TypedCommand(line) else { return }
+        guard let typed = TypedCommand(line) else {
+            return
+        }
         // A line may hold a password (`curl -u name:secret`): one that begins with a blank is
         // not remembered, as in a shell, and remembering can be switched off altogether.
         if settings.flag(SystemToolsPlugin.recordHistoryKey, default: true), !CommandHistory.isPrivate(line) {
@@ -381,7 +383,9 @@ final class SystemTools {
             )
             return
         }
-        guard !typed.isDetached else { return }
+        guard !typed.isDetached else {
+            return
+        }
         let mode = settings.index(SystemToolsPlugin.showOutputKey, default: 0)
         var text = outcome.output
         if outcome.isTruncated {
@@ -393,7 +397,9 @@ final class SystemTools {
         } else if outcome.status != 0 {
             title += " (exit status \(outcome.status))"
         }
-        guard mode != 2, mode == 1 || !text.isEmpty || (outcome.status != 0 && !outcome.wasCancelled) else { return }
+        guard mode != 2, mode == 1 || !text.isEmpty || (outcome.status != 0 && !outcome.wasCancelled) else {
+            return
+        }
         if text.isEmpty {
             text =
                 outcome.status == 0
@@ -482,7 +488,9 @@ final class SystemTools {
             },
             completion: { [self] gathered in
                 // Nil: cancelled while a volume did not answer.
-                guard let information = gathered else { return }
+                guard let information = gathered else {
+                    return
+                }
                 let answer = ui.form(
                     "System Information",
                     detail: "",
@@ -529,7 +537,9 @@ final class SystemTools {
             },
             completion: { [self] answer in
                 // Nil: the question was cancelled.
-                guard let facts = answer else { return }
+                guard let facts = answer else {
+                    return
+                }
                 guard let volume = facts.url else {
                     return ui.inform("The volume of \(DisplayText.oneLine(directory.path)) cannot be determined.")
                 }
@@ -561,7 +571,9 @@ final class SystemTools {
                         }
                     },
                     completion: { [self] answer in
-                        guard let error = answer else { return }
+                        guard let error = answer else {
+                            return
+                        }
                         if let error {
                             return ui.report(
                                 error,
@@ -589,9 +601,14 @@ final class SystemTools {
 
         var title: String {
             switch self {
-            case .printer: return "Printer…"
-            case .textFile: return "Text file…"
-            case .viewer: return "Show as text"
+            case .printer:
+                return "Printer…"
+
+            case .textFile:
+                return "Text file…"
+
+            case .viewer:
+                return "Show as text"
             }
         }
     }
@@ -720,8 +737,12 @@ final class SystemTools {
                 let text = output == .printer ? "" : formatter.text(directory: base, rows: rows)
                 // Measured here: the view that prints would otherwise count every line on the main thread.
                 let longest = pages.reduce(0) { longest, page in page.reduce(longest) { max($0, $1.count) } }
-                if monitor.cancellation.isCancelled { return (pages, longest, text, nil, true) }
-                guard case .file(let file) = destination else { return (pages, longest, text, nil, false) }
+                if monitor.cancellation.isCancelled {
+                    return (pages, longest, text, nil, true)
+                }
+                guard case .file(let file) = destination else {
+                    return (pages, longest, text, nil, false)
+                }
                 do {
                     let provider = try fileSystems.provider(for: file)
                     let exists = provider.item(at: file) != nil
@@ -734,7 +755,9 @@ final class SystemTools {
                                 style: .warning
                             ) == 0
                         }
-                        guard replace else { return (pages, longest, text, CocoaError(.userCancelled), false) }
+                        guard replace else {
+                            return (pages, longest, text, CocoaError(.userCancelled), false)
+                        }
                     }
                     // Written beside the file and moved over it, so a failure leaves the old file whole.
                     let temporary = file.deletingLastPathComponent()
@@ -757,7 +780,9 @@ final class SystemTools {
             },
             completion: { [self] result in
                 // A cancelled read leaves a partial list, which is neither printed nor shown.
-                guard !result.cancelled else { return }
+                guard !result.cancelled else {
+                    return
+                }
                 switch destination {
                 case .printer:
                     print(result.pages, longestLine: result.longest, linesPerPage: formatter.linesPerPage, title: base)
@@ -881,8 +906,12 @@ final class SystemTools {
                 }
             },
             completion: { [self] found in
-                guard let applications = found else { return }
-                guard !applications.isEmpty else { return ui.inform("No application is known to open \(shownName).") }
+                guard let applications = found else {
+                    return
+                }
+                guard !applications.isEmpty else {
+                    return ui.inform("No application is known to open \(shownName).")
+                }
                 guard let row = ui.pickRow("Open \(shownName) with:", rows: applications.map(\.name), button: "Open")
                 else { return }
                 let application = applications[row].url

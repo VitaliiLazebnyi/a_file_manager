@@ -84,10 +84,14 @@ final class ZipPacker {
             piece -> Result<(data: Data, crc: UInt32, stored: Bool), any Error> in
             Result {
                 let crc = CRC32.of(piece.data)
-                if piece.stored || piece.data.isEmpty && piece.isFirst { return (piece.data, crc, true) }
+                if piece.stored || piece.data.isEmpty && piece.isFirst {
+                    return (piece.data, crc, true)
+                }
                 let deflated = try Deflater.piece(piece.data, level: level, final: piece.isLast)
                 // A small file that does not shrink is stored as it is.
-                if piece.isFirst, piece.isLast, deflated.count >= piece.data.count { return (piece.data, crc, true) }
+                if piece.isFirst, piece.isLast, deflated.count >= piece.data.count {
+                    return (piece.data, crc, true)
+                }
                 return (deflated, crc, false)
             }
         }
@@ -261,7 +265,9 @@ final class Packer {
     /// The name of the archive made for one operand: a folder or file gives `name.zip`; the
     /// single-file compressors keep the whole name (`a.txt` → `a.txt.gz`), spec 08 › Target string.
     static func archiveName(for source: FileItem, format: ArchiveFormat) -> String {
-        if case .compressedFile = format { return source.name + "." + format.defaultExtension }
+        if case .compressedFile = format {
+            return source.name + "." + format.defaultExtension
+        }
         return (source.isFolder || source.baseName.isEmpty ? source.name : source.baseName) + "."
             + format.defaultExtension
     }
@@ -272,7 +278,9 @@ final class Packer {
 
     private func report(force: Bool = false) {
         // A report for each of a hundred thousand small files would only slow the job down.
-        guard force || Date().timeIntervalSince(lastReport) > 0.05 else { return }
+        guard force || Date().timeIntervalSince(lastReport) > 0.05 else {
+            return
+        }
         lastReport = Date()
         monitor.report(
             JobProgress(
@@ -294,7 +302,9 @@ final class Packer {
             try checkCancelled()
             guard item.isRealDirectory else {
                 // A link to a folder on a file system that cannot say where it points is left out.
-                if item.isDirectory, !item.url.isFileURL { return }
+                if item.isDirectory, !item.url.isFileURL {
+                    return
+                }
                 members.append(Member(item: item, path: options.storesPaths ? path : item.name))
                 return
             }
@@ -323,7 +333,9 @@ final class Packer {
 
     /// Where a symbolic link on the local disk points; nil for everything else.
     private func linkTarget(of item: FileItem) -> String? {
-        guard item.isSymlink, item.url.isFileURL else { return nil }
+        guard item.isSymlink, item.url.isFileURL else {
+            return nil
+        }
         return try? FileManager.default.destinationOfSymbolicLink(atPath: item.url.path)
     }
 
@@ -335,7 +347,9 @@ final class Packer {
         var ended = false
         return (
             { [self] in
-                guard !ended else { return nil }
+                guard !ended else {
+                    return nil
+                }
                 try checkCancelled()
                 var block = Data()
                 while block.count < size {
@@ -441,9 +455,14 @@ final class Packer {
     private func method(for codec: ArchiveFormat.Codec) -> ParallelCompressor.Method {
         switch codec {
         // Deflate has no "store"; the fastest level is the least it can do.
-        case .gzip: return .gzip(level: max(1, options.level))
-        case .bzip2: return .bzip2(level: max(1, options.level))
-        case .xz: return .xz
+        case .gzip:
+            return .gzip(level: max(1, options.level))
+
+        case .bzip2:
+            return .bzip2(level: max(1, options.level))
+
+        case .xz:
+            return .xz
         }
     }
 
@@ -559,7 +578,9 @@ final class Packer {
                 isDirectory: false
             )
         store.environment.scratch.noteExternal(temporary)
-        guard store.environment.clonesArchives, clonefile(archive.path, temporary.path, 0) == 0 else { return false }
+        guard store.environment.clonesArchives, clonefile(archive.path, temporary.path, 0) == 0 else {
+            return false
+        }
         do {
             let output = try OutputFile(extending: temporary, from: contents.directoryOffset)
             do {
@@ -812,7 +833,9 @@ final class Packer {
     private func commit(_ archive: URL) throws {
         let archive = ArchiveURL.resolved(archive)
         let provider = try fileSystems.provider(for: archive)
-        guard provider.capabilities(for: archive).contains(.deferredWrites) else { return }
+        guard provider.capabilities(for: archive).contains(.deferredWrites) else {
+            return
+        }
         try provider.commit(archive, cancellation: monitor.cancellation)
         try checkCancelled()
     }

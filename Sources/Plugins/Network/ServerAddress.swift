@@ -53,7 +53,9 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     /// user typed and the key made from the panel's URL are the same server.
     static func canonical(_ host: String) -> String {
         let plain = bare(host).lowercased()
-        guard !plain.utf8.allSatisfy({ $0 < 0x80 }) else { return plain }
+        guard !plain.utf8.allSatisfy({ $0 < 0x80 }) else {
+            return plain
+        }
         var components = URLComponents()
         components.scheme = "ftp"
         components.host = plain
@@ -64,7 +66,9 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     ///
     /// It never carries a user name or password.
     public func validURL(path: String = "/") -> URL? {
-        guard !host.isEmpty, Self.schemes.contains(scheme) else { return nil }
+        guard !host.isEmpty, Self.schemes.contains(scheme) else {
+            return nil
+        }
         var components = URLComponents()
         components.scheme = scheme
         components.host = host.contains(":") ? "[\(host)]" : host
@@ -133,7 +137,9 @@ public enum RemotePath {
             if isASCII, name.contains(where: { $0 >= 0x80 }) { isASCII = false }
         }
         // Cut at an ASCII byte, every piece is still valid UTF-8.
-        if bytes.isEmpty { return "/" }
+        if bytes.isEmpty {
+            return "/"
+        }
         let joined = String(decoding: bytes, as: UTF8.self)
         return isASCII ? joined : separated(joined)
     }
@@ -171,23 +177,33 @@ public enum RemotePath {
     ///
     /// Such a path is not used: what it names cannot be told apart reliably from its neighbours.
     public static func hasSeparableNames(_ path: String) -> Bool {
-        if path.utf8.allSatisfy({ $0 < 0x80 }) { return true }
+        if path.utf8.allSatisfy({ $0 < 0x80 }) {
+            return true
+        }
         let scalars = Array(path.unicodeScalars)
         for (index, scalar) in scalars.enumerated() where scalar == "/" {
-            if index > 0, scalars[index - 1] != "/", !areApart(scalars[index - 1], scalar) { return false }
+            if index > 0, scalars[index - 1] != "/", !areApart(scalars[index - 1], scalar) {
+                return false
+            }
             if index + 1 < scalars.count, scalars[index + 1] != "/", !areApart(scalar, scalars[index + 1]) {
                 return false
             }
         }
         // The first and the last name have a slash next to them once the path is joined to another.
-        if let first = scalars.first, first != "/", !areApart("/", first) { return false }
-        if let last = scalars.last, last != "/", !areApart(last, "/") { return false }
+        if let first = scalars.first, first != "/", !areApart("/", first) {
+            return false
+        }
+        if let last = scalars.last, last != "/", !areApart(last, "/") {
+            return false
+        }
         return true
     }
 
     public static func parent(of path: String) -> String? {
         let names = names(path)
-        guard !names.isEmpty else { return nil }
+        guard !names.isEmpty else {
+            return nil
+        }
         var bytes: [UInt8] = []
         for name in names.dropLast() {
             bytes.append(0x2F)
@@ -235,11 +251,20 @@ public struct ServerAddress: Equatable, Sendable {
         if let range = rest.range(of: "://") {
             let prefix = rest[..<range.lowerBound].lowercased()
             switch prefix {
-            case "ftp", "sftp": scheme = prefix
-            case "ftps": scheme = "ftps"
-            case "ftpes": (scheme, explicitTLS) = ("ftps", .explicit)
-            case "ftpis": (scheme, explicitTLS) = ("ftps", .implicit)
-            default: return nil
+            case "ftp", "sftp":
+                scheme = prefix
+
+            case "ftps":
+                scheme = "ftps"
+
+            case "ftpes":
+                (scheme, explicitTLS) = ("ftps", .explicit)
+
+            case "ftpis":
+                (scheme, explicitTLS) = ("ftps", .implicit)
+
+            default:
+                return nil
             }
             rest = String(rest[range.upperBound...])
         }
@@ -268,13 +293,17 @@ public struct ServerAddress: Equatable, Sendable {
             host = String(authority[authority.index(after: authority.startIndex)..<close])
             let tail = authority[authority.index(after: close)...]
             if tail.hasPrefix(":") {
-                guard let number = Int(tail.dropFirst()) else { return nil }
+                guard let number = Int(tail.dropFirst()) else {
+                    return nil
+                }
                 port = number
             } else if !tail.isEmpty {
                 return nil
             }
         } else if authority.filter({ $0 == ":" }).count == 1, let colon = authority.firstIndex(of: ":") {
-            guard let number = Int(authority[authority.index(after: colon)...]) else { return nil }
+            guard let number = Int(authority[authority.index(after: colon)...]) else {
+                return nil
+            }
             host = String(authority[..<colon])
             port = number
         }
@@ -285,7 +314,9 @@ public struct ServerAddress: Equatable, Sendable {
         else { return nil }
         // A host that cannot be written in a URL (`%`, `#`, `?`, quotes, direction marks) has no
         // location a panel could show.
-        guard ServerKey(scheme: scheme, host: host, port: port).validURL() != nil else { return nil }
+        guard ServerKey(scheme: scheme, host: host, port: port).validURL() != nil else {
+            return nil
+        }
         self.scheme = scheme
         self.host = host
         if scheme == "ftps" {
@@ -311,7 +342,9 @@ public struct ServerAddress: Equatable, Sendable {
     /// The address as it may be remembered and shown: with the user name, never with the password.
     public var textWithoutPassword: String {
         let text = key.url(path: hasPath ? path : "/").absoluteString
-        guard let user, let range = text.range(of: "://") else { return text }
+        guard let user, let range = text.range(of: "://") else {
+            return text
+        }
         return text.replacingCharacters(in: range, with: "://" + Self.escaped(user) + "@")
     }
 
@@ -349,7 +382,9 @@ extension ServerAddress {
             let looksLikePort = !afterColon.isEmpty && afterColon.allSatisfy { $0.isASCII && $0.isNumber }
             if !looksLikePort { at = later }
         }
-        guard let at, let colon = rest[..<at].firstIndex(of: ":") else { return text }
+        guard let at, let colon = rest[..<at].firstIndex(of: ":") else {
+            return text
+        }
         var cleaned = text
         cleaned.removeSubrange(colon..<at)
         return cleaned

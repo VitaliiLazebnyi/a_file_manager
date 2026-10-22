@@ -49,7 +49,9 @@ import Testing
         }
 
         private static func insert(_ pointer: UInt) {
-            guard let table, pointer != 0 else { return }
+            guard let table, pointer != 0 else {
+                return
+            }
             guard entries < capacity / 2 else {
                 overflowed = true
                 return
@@ -61,7 +63,9 @@ import Testing
         }
 
         private static func remove(_ pointer: UInt) {
-            guard let table, pointer != 0 else { return }
+            guard let table, pointer != 0 else {
+                return
+            }
             var place = index(of: pointer)
             while table[place] != 0 {
                 if table[place] == pointer {
@@ -75,7 +79,9 @@ import Testing
 
         /// Called by the allocator on every thread, for every block; nothing here allocates.
         private static let logger: Logger = { type, _, argument, _, result, _ in
-            guard let thread = Self.thread, pthread_equal(pthread_self(), thread) != 0 else { return }
+            guard let thread = Self.thread, pthread_equal(pthread_self(), thread) != 0 else {
+                return
+            }
             Self.calls += 1
             let (allocates, frees) = (type & 2 != 0, type & 4 != 0)
             // A block that is resized: the old address goes, the new one comes.
@@ -94,7 +100,9 @@ import Testing
                 .contains(where: { (name: String) -> Bool in
                     dlsym(UnsafeMutableRawPointer(bitPattern: -2), name) != nil
                 })
-            guard !sanitized, let slot, slot.pointee == nil else { return (nil, try body()) }
+            guard !sanitized, let slot, slot.pointee == nil else {
+                return (nil, try body())
+            }
             let table = UnsafeMutablePointer<UInt>.allocate(capacity: capacity)
             table.initialize(repeating: 0, count: capacity)
             defer { table.deallocate() }
@@ -111,7 +119,9 @@ import Testing
             }
             slot.pointee = nil
             (thread, self.table) = (nil, nil)
-            guard calls > 0, !overflowed else { return (nil, value) }
+            guard calls > 0, !overflowed else {
+                return (nil, value)
+            }
             var bytes = 0
             for place in 0..<capacity where table[place] != 0 && table[place] != tombstone {
                 bytes += malloc_size(UnsafeRawPointer(bitPattern: table[place]))

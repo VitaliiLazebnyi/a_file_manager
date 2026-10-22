@@ -65,7 +65,9 @@ final class TypedAddresses: ServerConsentService {
     }
 
     func userChose(_ location: URL) {
-        guard let key = ServerKey(location), ServerKey.schemes.contains(key.scheme) else { return }
+        guard let key = ServerKey(location), ServerKey.schemes.contains(key.scheme) else {
+            return
+        }
         center.noteChosen(key)
     }
 }
@@ -142,9 +144,14 @@ public final class NetworkPlugin: Plugin {
         let transport = sftpTransport
         center.makeSession = { profile, environment in
             switch profile.key.scheme {
-            case "ftp", "ftps": return FTPSession(profile: profile, environment: environment)
-            case "sftp": return SFTPSession(profile: profile, environment: environment, transport: transport)
-            default: return nil
+            case "ftp", "ftps":
+                return FTPSession(profile: profile, environment: environment)
+
+            case "sftp":
+                return SFTPSession(profile: profile, environment: environment, transport: transport)
+
+            default:
+                return nil
             }
         }
         center.storedPassword = { vault.password(for: $0) }

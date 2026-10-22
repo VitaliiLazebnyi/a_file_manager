@@ -21,7 +21,9 @@ private final class RecordingViewer: Plugin, ViewerService {
 /// The text of the multi-line field of the form shown last.
 @MainActor private func shownText(_ ui: ScriptedInteraction) -> String? {
     for field in ui.forms.last ?? [] {
-        if case .multilineText(let text) = field.kind { return text }
+        if case .multilineText(let text) = field.kind {
+            return text
+        }
     }
     return nil
 }
@@ -31,7 +33,9 @@ private final class RecordingViewer: Plugin, ViewerService {
 @MainActor private func settle(until condition: () -> Bool) async -> Bool {
     let end = Date(timeIntervalSinceNow: Wait.ceiling)
     while !condition() {
-        guard Date() < end else { return false }
+        guard Date() < end else {
+            return false
+        }
         try? await Task.sleep(nanoseconds: 2_000_000)
     }
     return true

@@ -17,8 +17,11 @@ enum HTMLReference {
 
     @inline(__always) static func referenceIsWhitespace(_ unit: UInt16) -> Bool {
         switch unit {
-        case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000: return true
-        default: return false
+        case 0x09...0x0D, 0x20, 0x85, 0xA0, 0x1680, 0x2000...0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000:
+            return true
+
+        default:
+            return false
         }
     }
 
@@ -70,7 +73,9 @@ enum HTMLReference {
                 var position = from
                 while position + 1 + name.count < count {
                     position = find(0x3C, from: position)
-                    guard position + 1 + name.count < count else { return nil }
+                    guard position + 1 + name.count < count else {
+                        return nil
+                    }
                     if input[position + 1] == 0x2F {
                         var matches = true
                         for (offset, letter) in name.enumerated() {
@@ -80,7 +85,9 @@ enum HTMLReference {
                                 break
                             }
                         }
-                        if matches { return position + 2 + name.count }
+                        if matches {
+                            return position + 2 + name.count
+                        }
                     }
                     position += 1
                 }
@@ -173,7 +180,9 @@ enum HTMLReference {
                     scan += 1
                 }
                 if close == count { close = find(0x3E, from: open) }
-                guard close < count else { return }
+                guard close < count else {
+                    return
+                }
                 index = close + 1
                 var start = open + 1
                 let isClosing = start < close && input[start] == 0x2F

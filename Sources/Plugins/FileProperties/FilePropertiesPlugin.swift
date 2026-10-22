@@ -172,7 +172,9 @@ public final class FilePropertiesPlugin: Plugin {
     /// offered in local folders, the button of the Properties dialog for local items.
     private func showFinderInfo(_ urls: [URL]) {
         finderInfoRequests = Array((finderInfoRequests + urls).suffix(Self.finderInfoRequestLimit))
-        guard let runScript else { return }
+        guard let runScript else {
+            return
+        }
         let arguments = Self.finderInfoArguments(urls)
         // Starting a program waits for the system: on a thread for work that waits.
         BlockingCalls.run { runScript(arguments) }
@@ -279,9 +281,13 @@ final class PropertyActions {
             },
             completion: { [self] read in
                 let items = read.items
-                if let parsed, parsed.applyAtOnce { return apply(parsed.change, to: items, in: directory) }
+                if let parsed, parsed.applyAtOnce {
+                    return apply(parsed.change, to: items, in: directory)
+                }
                 // The panel may show something else by now; a dialog about what it showed would mislead.
-                guard model.directory.isSameLocation(as: directory) else { return }
+                guard model.directory.isSameLocation(as: directory) else {
+                    return
+                }
                 var draft = AttributeDraft(items: items)
                 if let parsed { draft.take(parsed.change) }
                 ask(draft, items: items, directory: directory, details: read.details)
@@ -333,7 +339,9 @@ final class PropertyActions {
     }
 
     private func apply(_ change: AttributeChange, to items: [FileItem], in directory: URL) {
-        guard !change.isEmpty else { return }
+        guard !change.isEmpty else {
+            return
+        }
         let model = source.model
         model.saveSelection()
         let fileSystems = self.fileSystems
@@ -522,7 +530,9 @@ final class PropertyActions {
                 return (sizes, sizes.isEmpty ? nil : PanelModel.prepare(basis, computedSizes: sizes))
             },
             completion: { result in
-                guard model.directory.isSameLocation(as: directory) else { return }
+                guard model.directory.isSameLocation(as: directory) else {
+                    return
+                }
                 Self.show(result.sizes, prepared: result.prepared, in: model)
             }
         )
@@ -534,8 +544,12 @@ final class PropertyActions {
     /// takes in one step; if its list is no longer the one the copy was made of, the sizes are set
     /// by name instead. Main thread.
     static func show(_ sizes: [(name: String, size: Int64)], prepared: PanelModel.Prepared?, in model: PanelModel) {
-        guard !sizes.isEmpty else { return }
-        if let prepared, model.apply(prepared) != .stale { return }
+        guard !sizes.isEmpty else {
+            return
+        }
+        if let prepared, model.apply(prepared) != .stale {
+            return
+        }
         model.setComputedSizes(sizes)
     }
 
@@ -558,9 +572,13 @@ final class PropertyActions {
                 return monitor.cancellation.isCancelled ? nil : text
             },
             completion: { [self] read in
-                guard let existing = read else { return }
+                guard let existing = read else {
+                    return
+                }
                 // Asked for in a folder the panel no longer shows: the dialog would come out of nowhere.
-                guard model.directory.isSameLocation(as: directory) else { return }
+                guard model.directory.isSameLocation(as: directory) else {
+                    return
+                }
                 var text = existing
                 while true {
                     guard
@@ -581,7 +599,9 @@ final class PropertyActions {
                         style: .warning
                     )
                 }
-                guard text != existing else { return }
+                guard text != existing else {
+                    return
+                }
                 save(text, for: name, in: folder)
             }
         )
@@ -608,7 +628,9 @@ final class PropertyActions {
             },
             completion: { [kernel] error in
                 // Stopped by the user: the old comments are as they were, and there is nothing to tell.
-                if (error as? CocoaError)?.code == .userCancelled { return }
+                if (error as? CocoaError)?.code == .userCancelled {
+                    return
+                }
                 if let error {
                     return kernel.interaction.report(
                         error,
@@ -663,7 +685,9 @@ final class PropertyActions {
         let text = answer.text("target").trimmingCharacters(in: .whitespaces)
         let kind = kinds.indices.contains(answer.index("kind")) ? kinds[answer.index("kind")] : .symbolic
         let relative = answer.flag("relative")
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            return
+        }
         let fileSystems = self.fileSystems
         kernel.jobs.run(
             title: "Creating links:",
@@ -723,7 +747,9 @@ final class PropertyActions {
             work: { _ in LocalInfo.resolvedLinkTarget(item.url) },
             completion: { [ui] target in
                 // The answer belongs to the folder it was asked in; elsewhere it would take the panel away.
-                guard panel.model.directory.isSameLocation(as: directory) else { return }
+                guard panel.model.directory.isSameLocation(as: directory) else {
+                    return
+                }
                 guard let target else {
                     return ui.inform(
                         "\(PropertyText.shown(item.name)) is not a link.",
@@ -778,7 +804,9 @@ struct AttributeDraft {
 
     /// One item shows its own permissions and date; several start with everything unchanged.
     init(items: [FileItem]) {
-        guard items.count == 1 else { return }
+        guard items.count == 1 else {
+            return
+        }
         permissions = PropertyText.octal(items[0].permissions)
         prefilledPermissions = permissions
         (date, time) = TimestampChange.fieldTexts(for: items[0].modified)
@@ -815,7 +843,9 @@ struct AttributeDraft {
 
     func fields(isLocal: Bool, details: LocalDetails?) -> [FormField] {
         func options(_ current: Bool?) -> [String] {
-            guard let current else { return Self.flagOptions }
+            guard let current else {
+                return Self.flagOptions
+            }
             return ["Unchanged (\(current ? "set" : "not set"))", "Set", "Clear"]
         }
         func now(_ name: String?) -> String { name.map { " (now \($0))" } ?? "" }

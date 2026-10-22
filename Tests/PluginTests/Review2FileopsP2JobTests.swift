@@ -292,7 +292,9 @@ func p2Finishes(within seconds: TimeInterval = 60, rescue: () -> Void = {}, _ wo
         work()
         done.signal()
     }
-    if done.wait(timeout: .now() + seconds) == .success { return true }
+    if done.wait(timeout: .now() + seconds) == .success {
+        return true
+    }
     rescue()
     _ = done.wait(timeout: .now() + 10)
     return false
@@ -313,7 +315,9 @@ func p2CancelSoon(_ flag: CancellationFlag, after seconds: TimeInterval = 0.2) {
 /// The origin mark of a file on the local disk, as text; nil when it has none.
 func p2Quarantine(_ url: URL) -> String? {
     let size = getxattr(url.path, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW)
-    guard size > 0 else { return nil }
+    guard size > 0 else {
+        return nil
+    }
     var bytes = [UInt8](repeating: 0, count: size)
     let read = getxattr(url.path, "com.apple.quarantine", &bytes, size, 0, XATTR_NOFOLLOW)
     return read > 0 ? String(decoding: bytes.prefix(read), as: UTF8.self) : nil
@@ -458,7 +462,9 @@ func p2Quarantine(_ url: URL) -> String? {
         let planted = box.url("t/dir")
         // Between the job's look ("nothing there") and its making the folder, a link appears.
         racing.beforeCreating = { url in
-            guard url.lastPathComponent == "dir", !FileManager.default.fileExists(atPath: planted.path) else { return }
+            guard url.lastPathComponent == "dir", !FileManager.default.fileExists(atPath: planted.path) else {
+                return
+            }
             try? FileManager.default.createSymbolicLink(at: planted, withDestinationURL: box.url("elsewhere"))
         }
         let replies = P2Replies()
@@ -639,7 +645,9 @@ func p2Quarantine(_ url: URL) -> String? {
         #expect(result.failureCount == 1 && result.failures.first?.contains("could not be marked") == true)
         #expect(
             records.contains { record in
-                if case .failed(let message) = record.status { return message.contains("marks are not kept here") }
+                if case .failed(let message) = record.status {
+                    return message.contains("marks are not kept here")
+                }
                 return false
             }
         )

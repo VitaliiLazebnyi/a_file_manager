@@ -52,7 +52,9 @@ final class ClipboardSource {
             }
             defer { condition.unlock() }
             // A clipboard that was waited for in vain is not waited for again by every name of the list.
-            if !isRead, let gaveUp = gaveUpAt, Date().timeIntervalSince(gaveUp) < Self.grace { return nil }
+            if !isRead, let gaveUp = gaveUpAt, Date().timeIntervalSince(gaveUp) < Self.grace {
+                return nil
+            }
             let deadline = Date(timeIntervalSinceNow: Self.patience)
             while !isRead, condition.wait(until: deadline) {}
             if !isRead { gaveUpAt = Date() }
@@ -76,9 +78,13 @@ final class ClipboardSource {
     /// Cheap: nothing is read until the snapshot is asked for its value, and a clipboard that has
     /// not changed since the last call gives the same snapshot.
     func snapshot() -> Snapshot {
-        guard let changeCount else { return Snapshot(read: read, queue: queue) }
+        guard let changeCount else {
+            return Snapshot(read: read, queue: queue)
+        }
         let count = changeCount()
-        if let last, last.count == count { return last.snapshot }
+        if let last, last.count == count {
+            return last.snapshot
+        }
         let fresh = Snapshot(read: read, queue: queue)
         last = (count, fresh)
         return fresh
@@ -159,7 +165,9 @@ final class MultiRenameSession {
 
     var settings: RenameSettings {
         didSet {
-            guard settings != oldValue else { return }
+            guard settings != oldValue else {
+                return
+            }
             optionsChanged = Date()
             scheduleRefresh()
         }
@@ -230,7 +238,9 @@ final class MultiRenameSession {
         refreshRequest += 1
         let request = refreshRequest
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.typingPause) { [weak self] in
-            guard let self, refreshRequest == request else { return }
+            guard let self, refreshRequest == request else {
+                return
+            }
             refresh()
         }
     }
@@ -265,11 +275,15 @@ final class MultiRenameSession {
         }
         isComputing = true
         queue.async { [weak self] in
-            guard !cancellation.isCancelled else { return }
+            guard !cancellation.isCancelled else {
+                return
+            }
             let preview = autoreleasepool { compute() }
             let counts = preview.counts
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.previewCancellation === cancellation, !cancellation.isCancelled else { return }
+                guard let self, self.previewCancellation === cancellation, !cancellation.isCancelled else {
+                    return
+                }
                 self.isComputing = false
                 self.apply(preview, counts: counts)
             }
@@ -320,7 +334,9 @@ final class MultiRenameSession {
     /// shows the new order when it is ready; a change of the list in the meantime drops the result,
     /// and of two sorts asked for in a row, the second wins).
     func sort(by key: SortKey, ascending: Bool) {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         struct Keys {
             var name: Sorter.NameKey
             var ext: Sorter.NameKey
@@ -347,18 +363,29 @@ final class MultiRenameSession {
         }
         @Sendable func inOrder(_ first: Keys, _ second: Keys) -> Bool {
             switch key {
-            case .name: return first.name < second.name
-            case .ext: return first.ext == second.ext ? first.name < second.name : first.ext < second.ext
-            case .size: return first.size < second.size
-            case .date: return first.modified < second.modified
+            case .name:
+                return first.name < second.name
+
+            case .ext:
+                return first.ext == second.ext ? first.name < second.name : first.ext < second.ext
+
+            case .size:
+                return first.size < second.size
+
+            case .date:
+                return first.modified < second.modified
             }
         }
         // A stable sort: equal items keep their order, also when the direction turns.
         @Sendable func permutation() -> [Int] {
             let keys = makeKeys()
             return keys.indices.sorted { first, second in
-                if inOrder(keys[first], keys[second]) { return ascending }
-                if inOrder(keys[second], keys[first]) { return !ascending }
+                if inOrder(keys[first], keys[second]) {
+                    return ascending
+                }
+                if inOrder(keys[second], keys[first]) {
+                    return !ascending
+                }
                 return first < second
             }
         }
@@ -378,7 +405,9 @@ final class MultiRenameSession {
         sortQueue.async { [weak self] in
             let order = permutation()
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.listGeneration == generation, self.sortRequest == request else { return }
+                guard let self, self.listGeneration == generation, self.sortRequest == request else {
+                    return
+                }
                 apply(order)
             }
         }
@@ -410,9 +439,13 @@ final class MultiRenameSession {
     /// Moves rows in front of the row that is at `destination` now (drag and drop).
     @discardableResult
     func move(_ indexes: IndexSet, to destination: Int) -> IndexSet {
-        guard !isBusy else { return indexes }
+        guard !isBusy else {
+            return indexes
+        }
         let moved = indexes.filter(entries.indices.contains)
-        guard !moved.isEmpty else { return [] }
+        guard !moved.isEmpty else {
+            return []
+        }
         let insertion = destination - indexes.filter { $0 < destination }.count
         var order = entries.indices.filter { !indexes.contains($0) }
         order.insert(contentsOf: moved, at: min(max(insertion, 0), order.count))
@@ -423,7 +456,9 @@ final class MultiRenameSession {
 
     /// Takes rows out of the rename set.
     func remove(_ indexes: IndexSet) {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         reorder(entries.indices.filter { !indexes.contains($0) })
         dropGivenNames()
         listChanged(keepingFolders: true)
@@ -434,7 +469,9 @@ final class MultiRenameSession {
     ///
     /// Nothing is renamed yet.
     func nextStep() {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         let (oldEntries, names) = (entries, newNames)
         @Sendable func renamed() -> [RenameEntry] {
             var entries = oldEntries
@@ -454,7 +491,9 @@ final class MultiRenameSession {
         sortQueue.async { [weak self] in
             let updated = renamed()
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.listGeneration == generation else { return }
+                guard let self, self.listGeneration == generation else {
+                    return
+                }
                 finish(updated)
             }
         }
@@ -480,7 +519,9 @@ final class MultiRenameSession {
 
     /// Takes the new names from a text, one per line, in list order.
     func loadNames(fromText text: String) {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         applyGivenNames(RenameNameList.names(in: text))
     }
 
@@ -492,7 +533,9 @@ final class MultiRenameSession {
     /// Reads a list of names from a file on any file system, off the main thread; the text is
     /// split into lines there too.
     func loadNames(from url: URL, completion: (@MainActor @Sendable () -> Void)? = nil) {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         let fileSystems = kernel.fileSystems
         @Sendable func read() -> Result<[String], any Error> {
             Result {
@@ -533,7 +576,9 @@ final class MultiRenameSession {
 
     /// "Edit names": the new names as text, one per line, for the user to change.
     func editNames() {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         // Weak: a long text is put together in the background, and the session may go meanwhile.
         let ask: @MainActor @Sendable (String) -> Void = { [weak self] in self?.askNames($0) }
         // The text of a long list is put together in the background.
@@ -546,7 +591,9 @@ final class MultiRenameSession {
             .async { [weak self] in
                 let text = current.indices.map { names[$0] ?? current[$0].name }.joined(separator: "\n")
                 performOnMainLoop { [weak self] in
-                    guard let self, self.listGeneration == generation else { return }
+                    guard let self, self.listGeneration == generation else {
+                        return
+                    }
                     ask(text)
                 }
             }
@@ -570,7 +617,9 @@ final class MultiRenameSession {
 
     /// Back to names made by the masks.
     func clearGivenNames() {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         givenNamesStorage = nil
         listChanged(keepingFolders: true)
     }
@@ -579,7 +628,9 @@ final class MultiRenameSession {
 
     func save(as name: String) {
         let name = String(name.trimmingCharacters(in: .whitespaces).prefix(252))
-        guard !name.isEmpty else { return }
+        guard !name.isEmpty else {
+            return
+        }
         store.saved[name] = settings
         onChange?()
     }
@@ -587,7 +638,9 @@ final class MultiRenameSession {
     /// False when there are no settings of that name.
     @discardableResult
     func load(_ name: String) -> Bool {
-        guard let saved = store.saved[name] else { return false }
+        guard let saved = store.saved[name] else {
+            return false
+        }
         settings = saved
         return true
     }
@@ -632,7 +685,9 @@ final class MultiRenameSession {
     /// whatever the preview has caught up with; the job ends when it is cancelled, also in the
     /// middle of a regular expression. `completion` runs on the main thread.
     func start(completion: (@MainActor (RenameRunResult) -> Void)? = nil) {
-        guard !entries.isEmpty, !isBusy else { return }
+        guard !entries.isEmpty, !isBusy else {
+            return
+        }
         rememberFields()
         isBusy = true
         // A sort or "next step" still under way would change the list the run is about to use.
@@ -738,7 +793,9 @@ final class MultiRenameSession {
                 var lastReport = Date.distantPast
                 runner.onProgress = { step, done in
                     // A list of a hundred thousand files must not flood the progress window.
-                    guard Date().timeIntervalSince(lastReport) > 0.05 else { return }
+                    guard Date().timeIntervalSince(lastReport) > 0.05 else {
+                        return
+                    }
                     lastReport = Date()
                     monitor.report(
                         JobProgress(
@@ -826,7 +883,9 @@ final class MultiRenameSession {
     /// Undoes the last run after asking, last renamed first. `completion` runs on the main
     /// thread with what could not be put back; it is not called when the user says no.
     func undo(completion: (@MainActor ([RenamedItem]) -> Void)? = nil) {
-        guard canUndo else { return }
+        guard canUndo else {
+            return
+        }
         // Pressed again while this one is under way, it would find the same run and undo it twice.
         isBusy = true
         listGeneration += 1
@@ -867,7 +926,9 @@ final class MultiRenameSession {
                 let runner = RenameRunner(fileSystems: fileSystems, cancellation: monitor.cancellation)
                 var lastReport = Date.distantPast
                 runner.onProgress = { step, done in
-                    guard Date().timeIntervalSince(lastReport) > 0.05 else { return }
+                    guard Date().timeIntervalSince(lastReport) > 0.05 else {
+                        return
+                    }
                     lastReport = Date()
                     monitor.report(
                         JobProgress(
@@ -931,7 +992,9 @@ final class MultiRenameSession {
 
     /// Shows the log of the last run in the viewer.
     func showResultList() {
-        guard hasResultList else { return }
+        guard hasResultList else {
+            return
+        }
         if let viewer = kernel.services.find((any ViewerService).self) {
             viewer.view(logURL)
         } else if kernel.commands[.view] != nil {
@@ -949,7 +1012,9 @@ final class MultiRenameSession {
 
 extension RenameStatus {
     var isInvalid: Bool {
-        if case .invalid = self { return true }
+        if case .invalid = self {
+            return true
+        }
         return false
     }
 }
@@ -972,14 +1037,18 @@ enum ContentDate {
         let text =
             exif?[kCGImagePropertyExifDateTimeOriginal] ?? exif?[kCGImagePropertyExifDateTimeDigitized]
             ?? tiff?[kCGImagePropertyTIFFDateTime]
-        guard let text = text as? String else { return nil }
+        guard let text = text as? String else {
+            return nil
+        }
         return formatter.date(from: text)
     }
 
     /// Whether the name is that of a picture (or a camera's raw file).
     static func isPicture(_ url: URL) -> Bool {
         let ext = url.pathExtension
-        guard !ext.isEmpty, let type = UTType(filenameExtension: ext) else { return false }
+        guard !ext.isEmpty, let type = UTType(filenameExtension: ext) else {
+            return false
+        }
         return type.conforms(to: .image) || type.conforms(to: .rawImage)
     }
 

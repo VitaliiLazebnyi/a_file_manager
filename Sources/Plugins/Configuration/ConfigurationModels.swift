@@ -31,7 +31,9 @@ final class PreferencePageModel {
     /// Apply: writes what was changed and tells the page's plugin, once, if anything was.
     func commit() {
         let changed = page.preferences.filter { pending[$0.key] != stored[$0.key] }
-        guard !changed.isEmpty else { return }
+        guard !changed.isEmpty else {
+            return
+        }
         for preference in changed {
             if let value = pending[preference.key] { settings.set(value, for: preference) }
         }
@@ -119,7 +121,9 @@ final class ConfigurationStore {
 
     var userCommands: [UserCommand] {
         get {
-            if let cachedUserCommands { return cachedUserCommands }
+            if let cachedUserCommands {
+                return cachedUserCommands
+            }
             let loaded = Array(
                 load(UserCommand.self, key: Self.userCommandsKey, what: "user commands")
                     .prefix(
@@ -137,7 +141,9 @@ final class ConfigurationStore {
 
     var startMenu: [StartMenuEntry] {
         get {
-            if let cachedStartMenu { return cachedStartMenu }
+            if let cachedStartMenu {
+                return cachedStartMenu
+            }
             let loaded = Array(
                 load(StartMenuEntry.self, key: Self.startMenuKey, what: "Start menu")
                     .prefix(
@@ -160,9 +166,13 @@ final class ConfigurationStore {
     /// from an earlier time moves to `<key>.unreadable.previous`, so the newest two are there. The
     /// copies are not exported; Reset All Settings removes them.
     private func load<Element: Decodable>(_: Element.Type, key: String, what: String) -> [Element] {
-        guard let data = settings.data(forKey: key) else { return [] }
+        guard let data = settings.data(forKey: key) else {
+            return []
+        }
         let list = try? JSONDecoder().decode(LenientList<Element>.self, from: data)
-        if let list, list.skipped == 0 { return list.elements }
+        if let list, list.skipped == 0 {
+            return list.elements
+        }
         let backup = key + ".unreadable"
         if let earlier = settings.data(forKey: backup), earlier != data {
             settings.set(earlier as Data?, forKey: backup + ".previous")
@@ -234,7 +244,9 @@ final class ToolbarEditor {
     }
 
     func remove(at row: Int) {
-        guard items.indices.contains(row) else { return }
+        guard items.indices.contains(row) else {
+            return
+        }
         items.remove(at: row)
         edited()
     }
@@ -243,7 +255,9 @@ final class ToolbarEditor {
     @discardableResult
     func move(_ row: Int, by offset: Int) -> Int {
         let target = row + offset
-        guard items.indices.contains(row), items.indices.contains(target) else { return row }
+        guard items.indices.contains(row), items.indices.contains(target) else {
+            return row
+        }
         items.swapAt(row, target)
         edited()
         return target
@@ -267,7 +281,9 @@ final class ToolbarEditor {
     }
 
     func commit() {
-        guard isChanged else { return }
+        guard isChanged else {
+            return
+        }
         store.symbols = symbols
         for (name, symbol) in symbols { toolbar.setSymbol(symbol, for: CommandID(rawValue: name)) }
         // Storing the layout also has the bar drawn again, with the new pictures.
@@ -302,7 +318,9 @@ struct StartMenuDraft: Equatable {
     @discardableResult
     mutating func move(_ index: Int, by offset: Int) -> Int {
         let target = index + offset
-        guard rows.indices.contains(index), rows.indices.contains(target) else { return index }
+        guard rows.indices.contains(index), rows.indices.contains(target) else {
+            return index
+        }
         rows.swapAt(index, target)
         return target
     }
@@ -321,8 +339,11 @@ struct SettingsArchive: Equatable {
 
         var errorDescription: String? {
             switch self {
-            case .notAnArchive: "This is not a settings file of this program."
-            case .unreadable(let key): "The value of “\(key)” in this file cannot be read, so nothing was imported."
+            case .notAnArchive:
+                "This is not a settings file of this program."
+
+            case .unreadable(let key):
+                "The value of “\(key)” in this file cannot be read, so nothing was imported."
             }
         }
     }
@@ -349,7 +370,9 @@ struct SettingsArchive: Equatable {
     /// before it replaces working settings.
     func validate(keyBindingsKey: String) throws {
         func check<Value: Decodable>(_ key: String, _ type: Value.Type, valid: (Value) -> Bool = { _ in true }) throws {
-            guard let data = values[key] else { return }
+            guard let data = values[key] else {
+                return
+            }
             guard let value = try? JSONDecoder().decode(type, from: data), valid(value) else {
                 throw ArchiveError.unreadable(key)
             }

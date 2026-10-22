@@ -139,9 +139,14 @@ import Testing
         var text = ""
         for _ in 0..<lines {
             switch next(10) {
-            case 0: break
-            case 1: text += String(repeating: "long line ", count: 5 + next(40))
-            default: for _ in 0..<(1 + next(8)) { text += words[next(words.count)] + " " }
+            case 0:
+                break
+
+            case 1:
+                text += String(repeating: "long line ", count: 5 + next(40))
+
+            default:
+                for _ in 0..<(1 + next(8)) { text += words[next(words.count)] + " " }
             }
             text += ends[next(ends.count)]
         }

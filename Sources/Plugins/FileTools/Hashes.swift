@@ -26,44 +26,95 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
     /// The place in the dialog.
     var dialogPosition: Int {
         switch self {
-        case .crc32: return 0
-        case .md5: return 1
-        case .sha1: return 2
-        case .blake3: return 3
-        case .sha224: return 4
-        case .sha256: return 5
-        case .sha384: return 6
-        case .sha512: return 7
-        case .sha3_224: return 8
-        case .sha3_256: return 9
-        case .sha3_384: return 10
-        case .sha3_512: return 11
+        case .crc32:
+            return 0
+
+        case .md5:
+            return 1
+
+        case .sha1:
+            return 2
+
+        case .blake3:
+            return 3
+
+        case .sha224:
+            return 4
+
+        case .sha256:
+            return 5
+
+        case .sha384:
+            return 6
+
+        case .sha512:
+            return 7
+
+        case .sha3_224:
+            return 8
+
+        case .sha3_256:
+            return 9
+
+        case .sha3_384:
+            return 10
+
+        case .sha3_512:
+            return 11
         }
     }
 
     var title: String {
         switch self {
-        case .crc32: return "CRC32 (SFV)"
-        case .md5: return "MD5"
-        case .sha1: return "SHA1"
-        case .sha256: return "SHA256"
-        case .sha512: return "SHA512"
-        case .sha224: return "SHA224"
-        case .sha384: return "SHA384"
-        case .sha3_256: return "SHA3_256"
-        case .sha3_512: return "SHA3_512"
-        case .sha3_224: return "SHA3_224"
-        case .sha3_384: return "SHA3_384"
-        case .blake3: return "BLAKE3"
+        case .crc32:
+            return "CRC32 (SFV)"
+
+        case .md5:
+            return "MD5"
+
+        case .sha1:
+            return "SHA1"
+
+        case .sha256:
+            return "SHA256"
+
+        case .sha512:
+            return "SHA512"
+
+        case .sha224:
+            return "SHA224"
+
+        case .sha384:
+            return "SHA384"
+
+        case .sha3_256:
+            return "SHA3_256"
+
+        case .sha3_512:
+            return "SHA3_512"
+
+        case .sha3_224:
+            return "SHA3_224"
+
+        case .sha3_384:
+            return "SHA3_384"
+
+        case .blake3:
+            return "BLAKE3"
         }
     }
 
     /// The name in the title of the Verify window: `MD5`, `SHA2_256` (spec 08 › Verify window).
     var reportName: String {
         switch self {
-        case .crc32: return "CRC32"
-        case .sha224, .sha256, .sha384, .sha512: return "SHA2_" + title.dropFirst(3)
-        default: return title
+        case .crc32:
+            return "CRC32"
+
+        case .sha224, .sha256, .sha384, .sha512:
+            return "SHA2_" + title.dropFirst(3)
+
+        default:
+            return title
         }
     }
 
@@ -73,11 +124,20 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
     /// pattern.
     var fileExtension: String {
         switch self {
-        case .crc32: return "sfv"
-        case .md5: return "md5"
-        case .sha1: return "sha"
-        case .blake3: return "bk3"
-        default: return title.lowercased()
+        case .crc32:
+            return "sfv"
+
+        case .md5:
+            return "md5"
+
+        case .sha1:
+            return "sha"
+
+        case .blake3:
+            return "bk3"
+
+        default:
+            return title.lowercased()
         }
     }
 
@@ -88,13 +148,26 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
 
     var digestLength: Int {
         switch self {
-        case .crc32: return 4
-        case .md5: return 16
-        case .sha1: return 20
-        case .sha224, .sha3_224: return 28
-        case .sha256, .sha3_256, .blake3: return 32
-        case .sha384, .sha3_384: return 48
-        case .sha512, .sha3_512: return 64
+        case .crc32:
+            return 4
+
+        case .md5:
+            return 16
+
+        case .sha1:
+            return 20
+
+        case .sha224, .sha3_224:
+            return 28
+
+        case .sha256, .sha3_256, .blake3:
+            return 32
+
+        case .sha384, .sha3_384:
+            return 48
+
+        case .sha512, .sha3_512:
+            return 64
         }
     }
 
@@ -107,19 +180,35 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
 
     func makeHasher() -> any StreamHasher {
         switch self {
-        case .crc32: return CRC32Hasher()
-        case .md5: return CryptoHasher<Insecure.MD5>()
-        case .sha1: return CryptoHasher<Insecure.SHA1>()
-        case .sha256: return CryptoHasher<SHA256>()
-        case .sha384: return CryptoHasher<SHA384>()
-        case .sha512: return CryptoHasher<SHA512>()
-        case .sha224: return SHA224Hasher()
+        case .crc32:
+            return CRC32Hasher()
+
+        case .md5:
+            return CryptoHasher<Insecure.MD5>()
+
+        case .sha1:
+            return CryptoHasher<Insecure.SHA1>()
+
+        case .sha256:
+            return CryptoHasher<SHA256>()
+
+        case .sha384:
+            return CryptoHasher<SHA384>()
+
+        case .sha512:
+            return CryptoHasher<SHA512>()
+
+        case .sha224:
+            return SHA224Hasher()
 
         // The own implementation on every system: CryptoKit has SHA-3 only from macOS 26 on, and
         // is about a sixth faster there (845 against 705 MB/s for SHA3-256 on one core), less
         // than the disks the files come from deliver.
-        case .sha3_224, .sha3_256, .sha3_384, .sha3_512: return SHA3Hasher(digestLength: digestLength)
-        case .blake3: return BLAKE3Hasher()
+        case .sha3_224, .sha3_256, .sha3_384, .sha3_512:
+            return SHA3Hasher(digestLength: digestLength)
+
+        case .blake3:
+            return BLAKE3Hasher()
         }
     }
 }
@@ -136,7 +225,9 @@ final class CRC32Hasher: StreamHasher, @unchecked Sendable {
 
     func update(_ data: Data) {
         data.withUnsafeBytes { buffer in
-            guard !buffer.isEmpty, var pointer = buffer.bindMemory(to: Bytef.self).baseAddress else { return }
+            guard !buffer.isEmpty, var pointer = buffer.bindMemory(to: Bytef.self).baseAddress else {
+                return
+            }
             var left = buffer.count
             // zlib counts in 32 bits.
             while left > 0 {
@@ -355,14 +446,18 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
 
     func update(_ data: Data) {
         data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
-            guard !input.isEmpty, let base = input.baseAddress else { return }
+            guard !input.isEmpty, let base = input.baseAddress else {
+                return
+            }
             var offset = 0
             if pendingCount > 0 {
                 let take = min(rate - pendingCount, input.count)
                 pending.advanced(by: pendingCount).copyMemory(from: base, byteCount: take)
                 pendingCount += take
                 offset = take
-                guard pendingCount == rate else { return }
+                guard pendingCount == rate else {
+                    return
+                }
                 absorb(pending)
                 pendingCount = 0
             }
@@ -664,7 +759,9 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
 
     func update(_ data: Data) {
         data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
-            guard let base = input.baseAddress, input.count > 0 else { return }
+            guard let base = input.baseAddress, input.count > 0 else {
+                return
+            }
             let size = Self.chunkSize
             var offset = 0
             // More input follows a full chunk that was held back.
@@ -674,7 +771,9 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
                 (buffer + bufferLength).copyMemory(from: base, byteCount: take)
                 bufferLength += take
                 offset = take
-                if offset == input.count { return }
+                if offset == input.count {
+                    return
+                }
                 closeBufferedChunk()
             }
             // Whole chunks that are followed by at least one more byte, as subtrees as large

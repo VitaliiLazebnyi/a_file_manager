@@ -23,7 +23,9 @@ private func isValid(_ segments: [DiffSegment], _ a: [Int], _ b: [Int]) -> Bool 
         guard segment.a.lowerBound == i, segment.b.lowerBound == j, !(segment.a.isEmpty && segment.b.isEmpty) else {
             return false
         }
-        if segment.isEqual, Array(a[segment.a]) != Array(b[segment.b]) { return false }
+        if segment.isEqual, Array(a[segment.a]) != Array(b[segment.b]) {
+            return false
+        }
         (i, j) = (segment.a.upperBound, segment.b.upperBound)
     }
     return i == a.count && j == b.count && Myers.apply(segments, to: a, from: b) == b

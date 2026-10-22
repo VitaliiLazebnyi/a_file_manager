@@ -77,7 +77,9 @@ struct RenamePlanner {
     /// Byte for byte: a name that differs only in how an accented letter is written (precomposed or
     /// not) is another name, though Swift calls the two equal.
     private func moves(_ source: URL, _ target: URL?) -> Bool {
-        guard let target else { return false }
+        guard let target else {
+            return false
+        }
         return !target.locationKey.utf8.elementsEqual(source.locationKey.utf8)
     }
 
@@ -197,11 +199,15 @@ struct RenamePlanner {
             folderKeys.insert(sourceKeys[index])
             shallowest = min(shallowest, sources[index].pathComponents.count)
         }
-        guard !folderKeys.isEmpty else { return moving }
+        guard !folderKeys.isEmpty else {
+            return moving
+        }
         var involved = Set<Int>()
         var holding = Set<String>()
         for (number, index) in moving.enumerated() {
-            if number & 0xFFF == 0, cancelled() { return moving }
+            if number & 0xFFF == 0, cancelled() {
+                return moving
+            }
             var url = sources[index]
             // Up to the shallowest folder there is.
             while url.pathComponents.count > shallowest {
@@ -213,7 +219,9 @@ struct RenamePlanner {
                 }
             }
         }
-        guard !involved.isEmpty else { return moving }
+        guard !involved.isEmpty else {
+            return moving
+        }
         for index in moving where holding.contains(sourceKeys[index]) { involved.insert(index) }
         let depth = { (index: Int) in involved.contains(index) ? sources[index].pathComponents.count : -1 }
         // Stable: the items of equal depth stay in list order.
@@ -247,7 +255,9 @@ struct RenamePlanner {
         let token = UUID().uuidString.prefix(8)
         let temporaryName = temporaryName ?? { ".afm-rename-\(token)-\($0).tmp" }
         var moving = sources.indices.filter { moves(sources[$0], targets[$0]) }
-        guard !moving.isEmpty, !cancelled() else { return [] }
+        guard !moving.isEmpty, !cancelled() else {
+            return []
+        }
         let sourceKeys = Parallel.map(sources, serialBelow: 512) { key($0) }
         let targetKeys: [String?] = Parallel.map(Array(targets), serialBelow: 512) { $0.map(key) }
         // Where each item goes; only those that move are looked at.
@@ -270,7 +280,9 @@ struct RenamePlanner {
         var steps: [RenameStep] = []
         steps.reserveCapacity(moving.count)
         for (number, root) in moving.enumerated() where states[root] == .waiting {
-            if number & 0xFFF == 0, cancelled() { return steps }
+            if number & 0xFFF == 0, cancelled() {
+                return steps
+            }
             // Followed with a stack of its own: a chain can be as long as the list.
             var stack = [root]
             while let index = stack.last {

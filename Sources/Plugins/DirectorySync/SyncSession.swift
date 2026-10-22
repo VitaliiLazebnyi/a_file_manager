@@ -138,7 +138,9 @@ final class SyncSession {
     ) {
         // While the files are being synchronized the window keeps showing that: the paths, rows and
         // phase are those of the run, and a second plan must not start under it.
-        guard phase != .synchronizing else { return }
+        guard phase != .synchronizing else {
+            return
+        }
         base = left.directory
         leftPath = kernel.fileSystems.displayPath(left.directory)
         rightPath = kernel.fileSystems.displayPath(right.directory)
@@ -159,7 +161,9 @@ final class SyncSession {
                 .async { [weak self] in
                     let names = Self.names(of: snapshots)
                     DispatchQueue.main.async { [weak self] in
-                        guard let self, self.selectionEpoch == epoch else { return }
+                        guard let self, self.selectionEpoch == epoch else {
+                            return
+                        }
                         self.selectedNames = names
                         self.changed()
                     }
@@ -198,7 +202,9 @@ final class SyncSession {
     // MARK: Comparing
 
     func compare() {
-        guard phase != .comparing, phase != .synchronizing, !isPlanning else { return }
+        guard phase != .comparing, phase != .synchronizing, !isPlanning else {
+            return
+        }
         var options = self.options
         options.onlyNames = onlySelected && !selectedNames.isEmpty ? selectedNames : nil
         rememberOptions()
@@ -225,14 +231,18 @@ final class SyncSession {
             let whileCurrent: @Sendable (@escaping @MainActor @Sendable (SyncSession) -> Void) -> Void = {
                 [weak self] work in
                 DispatchQueue.main.async { [weak self] in
-                    guard let self, self.running === comparison else { return }
+                    guard let self, self.running === comparison else {
+                        return
+                    }
                     work(self)
                 }
             }
             /// Belongs to the comparison's progress calls, which arrive one at a time.
             nonisolated(unsafe) var lastReport = Date.distantPast
             let result = comparison.run(left: left, right: right) { progress in
-                guard Date().timeIntervalSince(lastReport) >= interval else { return }
+                guard Date().timeIntervalSince(lastReport) >= interval else {
+                    return
+                }
                 lastReport = Date()
                 whileCurrent { $0.show(progress) }
             }
@@ -298,7 +308,9 @@ final class SyncSession {
 
     var visibleRows: [Int] {
         entries.compactMap { entry in
-            if case .row(let index) = entry { return index }
+            if case .row(let index) = entry {
+                return index
+            }
             return nil
         }
     }
@@ -355,7 +367,8 @@ final class SyncSession {
         layout.positions = [Int](repeating: -1, count: rows.count)
         for (position, entry) in layout.entries.enumerated() {
             switch entry {
-            case .header: layout.headerPositions.append(position)
+            case .header:
+                layout.headerPositions.append(position)
 
             case .row(let index):
                 layout.positions[index] = position
@@ -390,7 +403,9 @@ final class SyncSession {
         startWorker("Synchronize directories: list") { [weak self] in
             let layout = Self.layout(rows: rows, show: show, sort: sort)
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.layoutGeneration == generation else { return }
+                guard let self, self.layoutGeneration == generation else {
+                    return
+                }
                 // Actions set while the list was made are counted again.
                 self.apply(layout, recount: self.actionEpoch != epoch)
             }
@@ -431,10 +446,14 @@ final class SyncSession {
         by sort: (key: SyncSortKey, side: SyncSide, ascending: Bool)
     ) -> [Int] {
         // The comparison delivers the rows by name already.
-        if sort.key == .name { return sort.ascending ? indexes : indexes.reversed() }
+        if sort.key == .name {
+            return sort.ascending ? indexes : indexes.reversed()
+        }
         func key(_ index: Int) -> Int64 {
             let row = rows[index]
-            guard let item = sort.side == .left ? row.left ?? row.right : row.right ?? row.left else { return 0 }
+            guard let item = sort.side == .left ? row.left ?? row.right : row.right ?? row.left else {
+                return 0
+            }
             return sort.key == .size ? item.size : Int64((item.modified.timeIntervalSince1970 * 1_000_000).rounded())
         }
         let ordered = indexes.map { (key: key($0), index: $0) }.sorted { ($0.key, $0.index) < ($1.key, $1.index) }
@@ -447,7 +466,9 @@ final class SyncSession {
     /// The subdirectory indicator next to the Show buttons: `6/9 dups/sub`
     /// (spec 09 › Result list).
     func groupIndicator(atEntry position: Int) -> String {
-        guard !headerPositions.isEmpty else { return "" }
+        guard !headerPositions.isEmpty else {
+            return ""
+        }
         // The last caption at or before the position, found by bisection.
         var low = 0
         var high = headerPositions.count
@@ -494,7 +515,9 @@ final class SyncSession {
 
     private func change(_ indexes: [Int], _ action: (SyncRow) -> SyncAction) {
         // While the plan is made nothing may change under it.
-        guard !isPlanning else { return }
+        guard !isPlanning else {
+            return
+        }
         var touched: [Int] = []
         for index in indexes where rows.indices.contains(index) {
             let new = action(rows[index])
@@ -513,18 +536,24 @@ final class SyncSession {
     // MARK: Files of rows
 
     func url(_ side: SyncSide, row index: Int) -> URL? {
-        guard rows.indices.contains(index), !rows[index].isDirectory else { return nil }
+        guard rows.indices.contains(index), !rows[index].isDirectory else {
+            return nil
+        }
         return side == .left ? rows[index].left?.url : rows[index].right?.url
     }
 
     func view(_ side: SyncSide, row index: Int, command: CommandID = .view) {
-        guard let url = url(side, row: index) else { return }
+        guard let url = url(side, row: index) else {
+            return
+        }
         kernel.commands.perform(command, .location(url))
     }
 
     /// "Select for comparison": remembers a file of one side for "Compare left & right".
     func pick(_ side: SyncSide, row index: Int) {
-        guard let url = url(side, row: index) else { return }
+        guard let url = url(side, row: index) else {
+            return
+        }
         if side == .left { picked.left = url } else { picked.right = url }
         changed()
     }
@@ -537,10 +566,14 @@ final class SyncSession {
     func compareContents(row index: Int?) {
         var files = (left: picked.left, right: picked.right)
         if files.left == nil || files.right == nil {
-            guard let index else { return }
+            guard let index else {
+                return
+            }
             files = (url(.left, row: index), url(.right, row: index))
         }
-        guard files.left != nil || files.right != nil else { return }
+        guard files.left != nil || files.right != nil else {
+            return
+        }
         guard kernel.commands[.compareByContent] != nil else {
             kernel.interaction.inform("Compare by content is not available.")
             return
@@ -568,7 +601,9 @@ final class SyncSession {
     /// Shows the Synchronize dialog and runs what the user confirmed
     /// (spec 09 › The "Synchronize" dialog and the run).
     func synchronize() {
-        guard phase == .compared, !isPlanning else { return }
+        guard phase == .compared, !isPlanning else {
+            return
+        }
         if runsInline || rows.count < worksInBackgroundFrom {
             present(plan())
             return
@@ -585,10 +620,14 @@ final class SyncSession {
             for case .row(let index) in entries where rows.indices.contains(index) { visible.append(rows[index]) }
             let plan = SyncPlan(rows: visible, timeOffsetHours: offset)
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
                 self.isPlanning = false
                 self.apply(self.currentLayout)
-                guard self.phase == .compared else { return }
+                guard self.phase == .compared else {
+                    return
+                }
                 self.present(plan)
             }
         }
@@ -609,7 +648,9 @@ final class SyncSession {
     /// Only while the comparison's rows are shown (`phase` is `.compared`).
     private func present(_ plan: SyncPlan) {
         var plan = plan
-        guard !plan.isEmpty else { return }
+        guard !plan.isEmpty else {
+            return
+        }
         let asymmetric = options.asymmetric
         let hasDeletions = !plan.deleteLeft.isEmpty || !plan.deleteRight.isEmpty || asymmetric
         let (leftText, rightText) = (fileSystems.displayPath(roots.left), fileSystems.displayPath(roots.right))
@@ -761,7 +802,9 @@ final class SyncSession {
     /// Says what did not go well: failures (also those after "Skip All", which asked no more), a
     /// write that could not be made durable (the deletions were then not done), a run that was stopped.
     func report(_ outcome: SyncOutcome) {
-        guard !outcome.errors.isEmpty || outcome.commitFailed || outcome.wasCancelled else { return }
+        guard !outcome.errors.isEmpty || outcome.commitFailed || outcome.wasCancelled else {
+            return
+        }
         var lines = ["Copied: \(outcome.copied), deleted: \(outcome.deleted), left alone: \(outcome.skipped)."]
         if outcome.commitFailed {
             lines.append("What was written could not be made permanent, so nothing was deleted.")
@@ -811,7 +854,9 @@ final class SyncSession {
 
     @discardableResult
     func loadSet(named name: String) -> Bool {
-        guard phase != .synchronizing, let set = savedSets.first(where: { $0.name == name }) else { return false }
+        guard phase != .synchronizing, let set = savedSets.first(where: { $0.name == name }) else {
+            return false
+        }
         let includeHidden = options.includeHidden
         leftPath = set.left
         rightPath = set.right

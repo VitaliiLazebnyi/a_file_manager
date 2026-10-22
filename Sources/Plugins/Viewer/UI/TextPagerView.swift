@@ -44,7 +44,9 @@ private final class ProgressCoalescer: @unchecked Sendable {
         scheduled = true
         let wait = max(0, 0.05 - Double(DispatchTime.now().uptimeNanoseconds &- last.uptimeNanoseconds) / 1e9)
         lock.unlock()
-        guard schedule else { return }
+        guard schedule else {
+            return
+        }
         // (At most 50 ms: `wait` is what is left of them.)
         DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [self] in
             lock.lock()
@@ -294,7 +296,9 @@ final class TextPagerView: NSView {
     /// Finds the row of the text cursor kept across a new layout; asked again as the index grows
     /// when its part of the text is not indexed yet.
     private func restoreCaret() {
-        guard let offset = caretToRestore, let document, restoringCaretIn !== document else { return }
+        guard let offset = caretToRestore, let document, restoringCaretIn !== document else {
+            return
+        }
         restoringCaretIn = document
         queues.lookups.async { [weak self] in
             let row: Int?
@@ -303,9 +307,13 @@ final class TextPagerView: NSView {
                 row = nil
             }
             DispatchQueue.main.async {
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
                 self.restoringCaretIn = nil
-                guard self.document === document, self.caretToRestore == offset else { return }
+                guard self.document === document, self.caretToRestore == offset else {
+                    return
+                }
                 if let row {
                     self.caretToRestore = nil
                     self.caret = (offset, row)
@@ -358,7 +366,9 @@ final class TextPagerView: NSView {
 
     /// How far the indexing is, 0…1.
     var indexingProgress: Double {
-        guard let document = pending?.document ?? document, document.length > 0 else { return 1 }
+        guard let document = pending?.document ?? document, document.length > 0 else {
+            return 1
+        }
         return Double(document.indexedThrough) / Double(document.length)
     }
 
@@ -456,13 +466,17 @@ final class TextPagerView: NSView {
 
     /// Fetches the rows on screen and a page on either side, unless they are there already.
     private func ensureLoaded(force: Bool = false) {
-        guard let document else { return }
+        guard let document else {
+            return
+        }
         guard force || isVisibleRangeMissing else {
             runAfterLoad()
             return
         }
         // A text whose reading was stopped keeps what it shows.
-        guard !document.cancellation.isCancelled else { return }
+        guard !document.cancellation.isCancelled else {
+            return
+        }
         generation += 1
         let wanted = generation
         let first = max(0, topRow - pageRows)
@@ -472,7 +486,9 @@ final class TextPagerView: NSView {
         let request = newRequest(replacing: &fetchRequest, for: document)
         queues.rows.async { [weak self] in
             // Overtaken while it waited (the scroller dragged over a slow server): do not read.
-            guard latest.value == wanted else { return }
+            guard latest.value == wanted else {
+                return
+            }
             let rows: [DisplayRow]
             do {
                 rows = try autoreleasepool { try document.rows(from: first, count: count, cancellation: request.flag) }
@@ -481,9 +497,13 @@ final class TextPagerView: NSView {
                 rows = []
             }
             DispatchQueue.main.async {
-                guard let self, self.generation == wanted, self.document === document else { return }
+                guard let self, self.generation == wanted, self.document === document else {
+                    return
+                }
                 // A fetch that was stopped brought nothing: the rows on screen stay.
-                guard !request.flag.isCancelled else { return }
+                guard !request.flag.isCancelled else {
+                    return
+                }
                 self.loaded = rows
                 self.loadedFirst = first
                 // The lines of rows that are still shown are kept: making one costs a typesetting.
@@ -540,7 +560,9 @@ final class TextPagerView: NSView {
         let before = topRow
         topRow = row
         clampTopRow()
-        guard topRow != before else { return }
+        guard topRow != before else {
+            return
+        }
         ensureLoaded()
         updateScrollers()
         needsDisplay = true
@@ -581,9 +603,14 @@ final class TextPagerView: NSView {
     /// place of the knob.
     internal func scrollerMoved(_ part: NSScroller.Part) {
         switch part {
-        case .decrementPage: scroll(toRow: topRow - pageRows)
-        case .incrementPage: scroll(toRow: topRow + pageRows)
-        default: scroll(toRow: Int((verticalScroller.doubleValue * Double(max(0, rowCount - pageRows))).rounded()))
+        case .decrementPage:
+            scroll(toRow: topRow - pageRows)
+
+        case .incrementPage:
+            scroll(toRow: topRow + pageRows)
+
+        default:
+            scroll(toRow: Int((verticalScroller.doubleValue * Double(max(0, rowCount - pageRows))).rounded()))
         }
     }
 
@@ -625,7 +652,9 @@ final class TextPagerView: NSView {
     /// The end of the last visible row as a percentage of the file (spec 10 › Position and
     /// zoom item).
     var percent: Double {
-        guard let document, document.length > 0 else { return 100 }
+        guard let document, document.length > 0 else {
+            return 100
+        }
         let last = min(rowCount, topRow + pageRows) - 1
         guard let row = row(last) else {
             return rowCount > 0 ? Double(min(rowCount, topRow + pageRows)) / Double(rowCount) * 100 : 100
@@ -635,7 +664,9 @@ final class TextPagerView: NSView {
 
     /// The line and the offset the status line names: those of the text cursor, else of the top row.
     var position: (line: Int, offset: Int64)? {
-        if let caret, let row = row(caret.row) { return (row.line, caret.offset) }
+        if let caret, let row = row(caret.row) {
+            return (row.line, caret.offset)
+        }
         return row(topRow).map { ($0.line, $0.range.lowerBound) }
     }
 
@@ -645,13 +676,17 @@ final class TextPagerView: NSView {
     /// Backwards it is the place to end before.
     func searchStart(backwards: Bool) -> Int64 {
         let unit = Int64(document?.encoding.unitSize ?? 1)
-        if let selection { return backwards ? selection.lowerBound : selection.lowerBound + unit }
+        if let selection {
+            return backwards ? selection.lowerBound : selection.lowerBound + unit
+        }
         return caret?.offset ?? topOffset
     }
 
     /// Scrolls to the row that holds a byte offset; the row is looked up in the background.
     func reveal(offset: Int64, select: Range<Int64>? = nil, rowsAbove: Int = 0, keepingSelection: Bool = false) {
-        guard let document else { return }
+        guard let document else {
+            return
+        }
         revealGeneration += 1
         let wanted = revealGeneration
         outstandingReveal = (offset, select, rowsAbove, keepingSelection)
@@ -661,14 +696,18 @@ final class TextPagerView: NSView {
         let latest = latestReveal
         let request = newRequest(replacing: &revealRequest, for: document)
         queues.lookups.async { [weak self] in
-            guard latest.value == wanted else { return }
+            guard latest.value == wanted else {
+                return
+            }
             let row: Int?
             do { row = try document.row(containing: offset, cancellation: request.flag) } catch {
                 if !request.flag.isCancelled { document.record(error) }
                 row = nil
             }
             DispatchQueue.main.async {
-                guard let self, self.revealGeneration == wanted, self.document === document else { return }
+                guard let self, self.revealGeneration == wanted, self.document === document else {
+                    return
+                }
                 guard let row else {
                     if indexWasComplete {
                         // The offset is beyond the text.
@@ -712,7 +751,9 @@ final class TextPagerView: NSView {
     }
 
     func scroll(toPercent percent: Double) {
-        guard let document else { return }
+        guard let document else {
+            return
+        }
         let fraction = min(1, max(0, percent / 100))
         if document.isIndexComplete {
             scroll(toRow: Int((Double(rowCount) * fraction).rounded(.down)))
@@ -723,21 +764,27 @@ final class TextPagerView: NSView {
 
     /// Scrolls to a line (counted from 1); false is handed to `completion` when there is none.
     func scroll(toLine line: Int, completion: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
-        guard let document else { return }
+        guard let document else {
+            return
+        }
         revealGeneration += 1
         let wanted = revealGeneration
         outstandingReveal = nil
         let latest = latestReveal
         let request = newRequest(replacing: &revealRequest, for: document)
         queues.lookups.async { [weak self] in
-            guard latest.value == wanted else { return }
+            guard latest.value == wanted else {
+                return
+            }
             let row: Int?
             do { row = try document.row(ofLine: line, cancellation: request.flag) } catch {
                 if !request.flag.isCancelled { document.record(error) }
                 row = nil
             }
             DispatchQueue.main.async {
-                guard let self, self.revealGeneration == wanted, self.document === document else { return }
+                guard let self, self.revealGeneration == wanted, self.document === document else {
+                    return
+                }
                 if let row {
                     self.topRow = row
                     self.clampTopRow()
@@ -755,7 +802,9 @@ final class TextPagerView: NSView {
     // MARK: Selection
 
     func selectAll() {
-        guard let document else { return }
+        guard let document else {
+            return
+        }
         selection = document.content.isEmpty ? nil : document.content
         anchor = document.content.lowerBound
         needsDisplay = true
@@ -788,19 +837,40 @@ final class TextPagerView: NSView {
 
     /// Moves the text cursor, or scrolls when it is not shown (spec 10 › Text modes).
     func perform(_ motion: Motion, extending: Bool = false) {
-        guard let document, rowCount > 0 else { return }
+        guard let document, rowCount > 0 else {
+            return
+        }
         guard showsCaret else {
             switch motion {
-            case .up: scroll(toRow: topRow - 1)
-            case .down: scroll(toRow: topRow + 1)
-            case .pageUp: scroll(toRow: topRow - pageRows)
-            case .pageDown: scroll(toRow: topRow + pageRows)
-            case .rowStart, .fileStart: scroll(toRow: 0)
-            case .rowEnd, .fileEnd: scroll(toRow: rowCount)
-            case .left: scrollHorizontally(to: horizontalOffset - characterWidth * 4)
-            case .right: scrollHorizontally(to: horizontalOffset + characterWidth * 4)
-            case .wordLeft: scrollHorizontally(to: horizontalOffset - textArea.width / 2)
-            case .wordRight: scrollHorizontally(to: horizontalOffset + textArea.width / 2)
+            case .up:
+                scroll(toRow: topRow - 1)
+
+            case .down:
+                scroll(toRow: topRow + 1)
+
+            case .pageUp:
+                scroll(toRow: topRow - pageRows)
+
+            case .pageDown:
+                scroll(toRow: topRow + pageRows)
+
+            case .rowStart, .fileStart:
+                scroll(toRow: 0)
+
+            case .rowEnd, .fileEnd:
+                scroll(toRow: rowCount)
+
+            case .left:
+                scrollHorizontally(to: horizontalOffset - characterWidth * 4)
+
+            case .right:
+                scrollHorizontally(to: horizontalOffset + characterWidth * 4)
+
+            case .wordLeft:
+                scrollHorizontally(to: horizontalOffset - textArea.width / 2)
+
+            case .wordRight:
+                scrollHorizontally(to: horizontalOffset + textArea.width / 2)
             }
             return
         }
@@ -841,7 +911,9 @@ final class TextPagerView: NSView {
         case .left, .wordLeft:
             withRow(current.row) { pager, document, row in
                 if current.offset <= row.range.lowerBound {
-                    guard row.index > 0 else { return }
+                    guard row.index > 0 else {
+                        return
+                    }
                     pager.withRow(row.index - 1) { pager, document, previous in
                         // The end of a wrapped row is the same byte as the start of the next:
                         // step onto its last character instead.
@@ -871,7 +943,9 @@ final class TextPagerView: NSView {
         case .right, .wordRight:
             withRow(current.row) { pager, document, row in
                 if current.offset >= row.contentEnd {
-                    guard row.index + 1 < pager.rowCount else { return }
+                    guard row.index + 1 < pager.rowCount else {
+                        return
+                    }
                     pager.withRow(row.index + 1) { pager, _, next in
                         pager.setCaret(next.range.lowerBound, row: next.index, extending: extending)
                     }
@@ -918,7 +992,9 @@ final class TextPagerView: NSView {
     /// The word around a place in a text, for a double click.
     static func wordRange(around index: Int, in text: String) -> Range<Int> {
         let units = Array(text.utf16)
-        guard index < units.count, isWordUnit(units[index]) else { return index..<min(units.count, index + 1) }
+        guard index < units.count, isWordUnit(units[index]) else {
+            return index..<min(units.count, index + 1)
+        }
         var lower = index
         var upper = index
         while lower > 0, isWordUnit(units[lower - 1]) { lower -= 1 }
@@ -929,7 +1005,9 @@ final class TextPagerView: NSView {
     // MARK: Mouse
 
     private func line(for row: DisplayRow) -> CTLine {
-        if let line = lines[row.index] { return line }
+        if let line = lines[row.index] {
+            return line
+        }
         let line = CTLineCreateWithAttributedString(
             NSAttributedString(string: row.text, attributes: [.font: font, .foregroundColor: NSColor.textColor])
         )
@@ -951,13 +1029,17 @@ final class TextPagerView: NSView {
     /// The row and the place in its text under a point of the view.
     private func hit(_ point: NSPoint) -> (row: DisplayRow, index: Int)? {
         let number = max(topRow, min(rowCount - 1, topRow + Int(floor((point.y - inset) / lineHeight))))
-        guard let row = row(number) else { return nil }
+        guard let row = row(number) else {
+            return nil
+        }
         return (row, textIndex(in: row, atX: point.x - inset + horizontalOffset))
     }
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
-        guard let document, let hit = hit(convert(event.locationInWindow, from: nil)) else { return }
+        guard let document, let hit = hit(convert(event.locationInWindow, from: nil)) else {
+            return
+        }
         preferredX = nil
         if event.clickCount == 2 {
             let word = Self.wordRange(
@@ -981,11 +1063,15 @@ final class TextPagerView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let document else { return }
+        guard let document else {
+            return
+        }
         let point = convert(event.locationInWindow, from: nil)
         if point.y < 0 { scroll(toRow: topRow - 1) }
         if point.y > textArea.height { scroll(toRow: topRow + 1) }
-        guard let hit = hit(NSPoint(x: point.x, y: max(0, min(point.y, textArea.height - 1)))) else { return }
+        guard let hit = hit(NSPoint(x: point.x, y: max(0, min(point.y, textArea.height - 1)))) else {
+            return
+        }
         setCaret(document.byteOffset(in: hit.row, at: hit.index), row: hit.row.index, extending: true)
     }
 
@@ -1002,7 +1088,9 @@ final class TextPagerView: NSView {
     override func draw(_: NSRect) {
         NSColor.textBackgroundColor.setFill()
         bounds.fill()
-        guard let document, let context = NSGraphicsContext.current?.cgContext else { return }
+        guard let document, let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
         let area = textArea
         context.saveGState()
         context.clip(to: area)

@@ -91,7 +91,9 @@ internal final class SystemVolumes: VolumeAccess {
             done.signal()
         }
         done.wait()
-        guard let failure else { return nil }
+        guard let failure else {
+            return nil
+        }
         let error = failure as NSError
         let dissenter = (error.userInfo[NSFileManagerUnmountDissentingProcessIdentifierErrorKey] as? NSNumber)?
             .int32Value
@@ -169,7 +171,9 @@ final class VolumeEjection {
             work: { monitor in Self.ask("volume", of: directory, monitor) { access.facts(of: directory) } },
             completion: { [self] answer in
                 // Nil: the question was cancelled.
-                guard let facts = answer else { return }
+                guard let facts = answer else {
+                    return
+                }
                 guard let volume = facts.url, facts.canBeEjected else {
                     return ui.inform(
                         "\(DisplayText.oneLine(facts.name.isEmpty ? directory.path : facts.name)) cannot be ejected.",
@@ -211,7 +215,9 @@ final class VolumeEjection {
             },
             completion: { [self] answer in
                 // Cancelled: the panels stay where they went; the drive may still go.
-                guard let answer else { return }
+                guard let answer else {
+                    return
+                }
                 switch answer {
                 case .success:
                     note("eject: \(volume.path)")
@@ -273,7 +279,9 @@ final class VolumeEjection {
                 }
                 pending += 1
                 panel.show(to, focus: nil, history: .record) { [self] succeeded in
-                    guard !succeeded else { return finished() }
+                    guard !succeeded else {
+                        return finished()
+                    }
                     // The folder before is gone too: home.
                     departures[index].to = home()
                     panel.show(home(), focus: nil, history: .record) { _ in finished() }

@@ -506,9 +506,13 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         let panel = NSOpenPanel()
         (panel.canChooseDirectories, panel.canChooseFiles, panel.allowsMultipleSelection) = (true, false, true)
         panel.prompt = "Search here"
-        guard let window = tabView.window else { return }
+        guard let window = tabView.window else {
+            return
+        }
         presentOpenPanel(panel, window) { [weak self] response, urls in
-            guard response == .OK, !urls.isEmpty else { return }
+            guard response == .OK, !urls.isEmpty else {
+                return
+            }
             self?.searchInField.stringValue = urls.map(\.path).joined(separator: ";")
         }
     }
@@ -522,7 +526,9 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     }
 
     @objc private func loadSaved() {
-        guard saved.indices.contains(savedTable.selectedRow) else { return }
+        guard saved.indices.contains(savedTable.selectedRow) else {
+            return
+        }
         settings = saved[savedTable.selectedRow].settings.loaded(over: settings)
         tabView.selectTabViewItem(at: 0)
     }
@@ -539,7 +545,9 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     }
 
     @objc private func deleteSaved() {
-        guard saved.indices.contains(savedTable.selectedRow) else { return }
+        guard saved.indices.contains(savedTable.selectedRow) else {
+            return
+        }
         store.delete(named: saved[savedTable.selectedRow].name)
         reloadSaved()
     }

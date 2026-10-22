@@ -8,16 +8,30 @@ enum ViewMode: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .text: return "Text only"
-        case .binary: return "Binary (fixed line length)"
-        case .hex: return "Hex"
-        case .media: return "Image/Multimedia"
-        case .html: return "HTML text (strip tags)"
-        case .unicode: return "Unicode"
-        case .utf8: return "UTF-8"
+        case .text:
+            return "Text only"
+
+        case .binary:
+            return "Binary (fixed line length)"
+
+        case .hex:
+            return "Hex"
+
+        case .media:
+            return "Image/Multimedia"
+
+        case .html:
+            return "HTML text (strip tags)"
+
+        case .unicode:
+            return "Unicode"
+
+        case .utf8:
+            return "UTF-8"
 
         // The Mac's counterpart of the Explorer preview and of Lister plugins.
-        case .preview: return "Quick Look Preview"
+        case .preview:
+            return "Quick Look Preview"
         }
     }
 

@@ -49,7 +49,9 @@ final class CoverageRenameFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     func item(at url: URL) -> FileItem? {
-        if let found = base.item(at: url) { return found }
+        if let found = base.item(at: url) {
+            return found
+        }
         guard foldsCase, let listed = try? base.list(url.deletingLastPathComponent(), showHidden: true) else {
             return nil
         }

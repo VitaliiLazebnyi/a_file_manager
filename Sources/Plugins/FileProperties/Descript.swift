@@ -42,7 +42,9 @@ struct DescriptIon: Equatable {
 
     /// Nil when the bytes cannot be decoded in the encoding their start announces.
     init?(strict data: Data) {
-        guard let decoded = Self.decode(data) else { return nil }
+        guard let decoded = Self.decode(data) else {
+            return nil
+        }
         self.init(decoded: decoded)
     }
 
@@ -87,14 +89,18 @@ struct DescriptIon: Equatable {
         var rest: Substring.UnicodeScalarView
         if line.first == "\"" {
             let body = line.dropFirst()
-            guard let quote = body.firstIndex(of: "\"") else { return nil }
+            guard let quote = body.firstIndex(of: "\"") else {
+                return nil
+            }
             (name, rest) = (body[..<quote], body[body.index(after: quote)...])
         } else {
             let space = line.firstIndex(of: " ") ?? line.endIndex
             (name, rest) = (line[..<space], line[space...])
         }
         if rest.first == " " { rest = rest.dropFirst() }
-        guard !name.isEmpty else { return nil }
+        guard !name.isEmpty else {
+            return nil
+        }
         var comment = String(Substring(rest))
         let marker = Array(multilineMarker.unicodeScalars)
         if rest.count >= marker.count, Array(rest.suffix(marker.count)) == marker {
@@ -113,7 +119,9 @@ struct DescriptIon: Equatable {
     /// quote or a line break.
     static func canName(_ name: String) -> Bool {
         let scalars = name.unicodeScalars
-        if scalars.isEmpty || scalars.contains(where: { $0 == "\n" || $0 == "\r" }) { return false }
+        if scalars.isEmpty || scalars.contains(where: { $0 == "\n" || $0 == "\r" }) {
+            return false
+        }
         let hasQuote = scalars.contains("\"")
         return !(scalars.first == "\"" || (hasQuote && scalars.contains(" ")))
     }
@@ -136,10 +144,17 @@ struct DescriptIon: Equatable {
         let wanted = name.lowercased()
         let index = entries.firstIndex { $0.name.lowercased() == wanted }
         switch (index, comment.isEmpty) {
-        case (let index?, true): entries.remove(at: index)
-        case (let index?, false): entries[index].comment = comment
-        case (nil, false): entries.append(Entry(name: name, comment: comment))
-        case (nil, true): break
+        case (let index?, true):
+            entries.remove(at: index)
+
+        case (let index?, false):
+            entries[index].comment = comment
+
+        case (nil, false):
+            entries.append(Entry(name: name, comment: comment))
+
+        case (nil, true):
+            break
         }
     }
 
@@ -328,9 +343,13 @@ final class CommentStore: @unchecked Sendable {
         defer { withExtendedLifetime(token) {} }
         var data = Data()
         while let block = autoreleasepool(invoking: { try? reader.read(upToCount: 1 << 20) }) {
-            if cancellation.isCancelled { return DescriptIon() }
+            if cancellation.isCancelled {
+                return DescriptIon()
+            }
             data.append(block)
-            if data.count > Self.sizeLimit { return DescriptIon() }
+            if data.count > Self.sizeLimit {
+                return DescriptIon()
+            }
         }
         return cancellation.isCancelled ? DescriptIon() : DescriptIon(data: data)
     }
@@ -389,7 +408,9 @@ final class CommentStore: @unchecked Sendable {
         let before = file
         if !DescriptIon.normalized(comment).isEmpty, !DescriptIon.canName(name) { throw CommentFileError.unnameable }
         file.setComment(comment, for: name)
-        guard file != before else { return }
+        guard file != before else {
+            return
+        }
         defer { forget(directory) }
         // A comment file that is a link stays one: the file it points to is the one written.
         let url = LocalInfo.isSymlink(listed) ? listed.resolvingSymlinksInPath() : listed

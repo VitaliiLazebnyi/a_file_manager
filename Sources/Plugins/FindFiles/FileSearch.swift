@@ -77,7 +77,9 @@ public struct SearchMask: @unchecked Sendable {
     ///
     /// A name the expression takes too long for does not match.
     func matches(_ name: String, cancelled: () -> Bool) -> Bool {
-        guard isValid else { return false }
+        guard isValid else {
+            return false
+        }
         if let expression {
             return FindRegex.matches(expression, in: name, trip: trip, cancelled: cancelled)
         }
@@ -91,11 +93,21 @@ public struct SearchMask: @unchecked Sendable {
     /// decomposed `é` are the same, and `[` is just a bracket). `*.*` matches every name;
     /// `name.*` and `name.` also match `name` without an extension, as under DOS.
     static func wildcard(_ pattern: [Character], _ name: [Character]) -> Bool {
-        if pattern.count == 3, pattern == ["*", ".", "*"] { return true }
-        if glob(ArraySlice(pattern), ArraySlice(name)) { return true }
-        guard !name.contains(".") else { return false }
-        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] { return glob(pattern.dropLast(2), ArraySlice(name)) }
-        if pattern.last == "." { return glob(pattern.dropLast(), ArraySlice(name)) }
+        if pattern.count == 3, pattern == ["*", ".", "*"] {
+            return true
+        }
+        if glob(ArraySlice(pattern), ArraySlice(name)) {
+            return true
+        }
+        guard !name.contains(".") else {
+            return false
+        }
+        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] {
+            return glob(pattern.dropLast(2), ArraySlice(name))
+        }
+        if pattern.last == "." {
+            return glob(pattern.dropLast(), ArraySlice(name))
+        }
         return false
     }
 
@@ -333,7 +345,9 @@ public final class FileSearch: @unchecked Sendable {
     }
 
     private func runWalk(limit: Int?, onDirectory: (URL) -> Void, onMatch: (FileItem) -> Void) {
-        guard problem == nil else { return }
+        guard problem == nil else {
+            return
+        }
         let walk = Walk(self)
         var roots: [Walk.Node] = []
         // The tree is let go of on another thread: a cancelled search may hold a million entries.
@@ -345,11 +359,15 @@ public final class FileSearch: @unchecked Sendable {
         if let only = query.onlyItems {
             let items =
                 Parallel.map(only) { url -> FileItem? in
-                    guard !self.cancellation.isCancelled else { return nil }
+                    guard !self.cancellation.isCancelled else {
+                        return nil
+                    }
                     return (try? self.fileSystems.provider(for: url))?.item(at: url, cancellation: self.cancellation)
                 }
                 .compactMap { $0 }
-            guard !cancellation.isCancelled else { return }
+            guard !cancellation.isCancelled else {
+                return
+            }
             let searchedInside = { (item: FileItem) in item.isRealDirectory && self.query.maxDepth != 0 }
             let folders = items.filter(searchedInside)
             // A file listed beside a folder that holds it is found by searching the folder. With
@@ -358,11 +376,15 @@ public final class FileSearch: @unchecked Sendable {
             // each item's parents are walked up, not every item compared with every folder.
             let folderKeys = Set(folders.map { $0.url.locationKey })
             let reached = { (item: FileItem) -> Bool in
-                guard !folderKeys.isEmpty else { return false }
+                guard !folderKeys.isEmpty else {
+                    return false
+                }
                 var url = item.url
                 for _ in 0..<(self.query.maxDepth == nil ? max(url.pathComponents.count, 1) : 1) {
                     url = url.deletingLastPathComponent()
-                    if folderKeys.contains(url.locationKey) { return true }
+                    if folderKeys.contains(url.locationKey) {
+                        return true
+                    }
                 }
                 return false
             }
@@ -384,7 +406,9 @@ public final class FileSearch: @unchecked Sendable {
         var reported = Set<String>()
         var parents: [String: FileIdentity?] = [:]
         func reportKey(_ item: FileItem) -> String {
-            guard item.url.isFileURL else { return Self.locationKey(of: item.url) }
+            guard item.url.isFileURL else {
+                return Self.locationKey(of: item.url)
+            }
             let parent = item.url.deletingLastPathComponent()
             let identity: FileIdentity?
             if let known = parents[parent.path] {
@@ -393,14 +417,18 @@ public final class FileSearch: @unchecked Sendable {
                 identity = FileIdentity.of(parent)?.identity
                 parents[parent.path] = .some(identity)
             }
-            guard let identity else { return item.url.locationKey }
+            guard let identity else {
+                return item.url.locationKey
+            }
             return "\(identity.device):\(identity.inode)/\(item.url.lastPathComponent)"
         }
         let overlapping = query.onlyItems != nil || roots.count > 1
         var count = 0
         for root in roots {
             walk.deliver(root, onDirectory: onDirectory) { item in
-                if overlapping, !reported.insert(reportKey(item)).inserted { return }
+                if overlapping, !reported.insert(reportKey(item)).inserted {
+                    return
+                }
                 if let limit, count >= limit {
                     limitLock.lock()
                     limitReached = true
@@ -477,7 +505,9 @@ public final class FileSearch: @unchecked Sendable {
         guard !cancellation.isCancelled,
             fieldRules.matches(item, fields: fields, cancelled: { self.cancellation.isCancelled })
         else { return false }
-        guard checkingText, let pattern else { return true }
+        guard checkingText, let pattern else {
+            return true
+        }
         // A FIFO would block the open for good, /dev/zero would never end, a cloud stub would
         // be downloaded; a local file is opened without waiting and looked at once opened.
         guard !item.isSpecial, let reader = fileSystems.searchReader(for: item.url, cancellation: cancellation) else {
@@ -552,7 +582,9 @@ public final class FileSearch: @unchecked Sendable {
         }
 
         var isStopped: Bool {
-            if search.cancellation.isCancelled { return true }
+            if search.cancellation.isCancelled {
+                return true
+            }
             budgetLock.lock()
             defer { budgetLock.unlock() }
             return stopped
@@ -566,7 +598,9 @@ public final class FileSearch: @unchecked Sendable {
         /// A folder listing waits while a lot is listed and unreported already, unless the
         /// reporting thread is waiting for exactly this one.
         private func shouldHold(_ job: JobStack.Job) -> Bool {
-            guard job.isListing else { return false }
+            guard job.isListing else {
+                return false
+            }
             budgetLock.lock()
             defer { budgetLock.unlock() }
             return undelivered >= search.budget && job.node !== needed
@@ -630,7 +664,9 @@ public final class FileSearch: @unchecked Sendable {
                 let isListed = node.isListed
                 condition.unlock()
                 guard !isStopped, isListed else {
-                    if isStopped { return }
+                    if isStopped {
+                        return
+                    }
                     continue
                 }
                 if let url = node.url { onDirectory(url) }
@@ -652,14 +688,18 @@ public final class FileSearch: @unchecked Sendable {
                         let finished = node.isFinal && index >= total
                         if !finished, !isStopped { condition.wait(until: Date(timeIntervalSinceNow: 0.05)) }
                         condition.unlock()
-                        if isStopped { return }
+                        if isStopped {
+                            return
+                        }
                         if finished { break }
                         continue
                     }
                     condition.unlock()
                     adjust(undelivered: -(end - index))
                     for offset in 0..<(end - index) where flags.isEmpty || flags[offset] == 2 {
-                        if isStopped { return }
+                        if isStopped {
+                            return
+                        }
                         onMatch(batch[offset])
                     }
                     index = end
@@ -678,7 +718,9 @@ public final class FileSearch: @unchecked Sendable {
         /// road (a firmlink, an overlapping start directory) is left out, unless it is met
         /// nearer to a start directory, where a depth limit lets the search go deeper.
         private func claim(_ url: URL, depth: Int) -> Bool {
-            guard let identity = search.folderIdentity(url) else { return true }
+            guard let identity = search.folderIdentity(url) else {
+                return true
+            }
             visitedLock.lock()
             defer { visitedLock.unlock() }
             guard let before = visited[identity], search.query.maxDepth != nil else {
@@ -746,7 +788,9 @@ public final class FileSearch: @unchecked Sendable {
                     return !isStopped
                 }
             } catch {
-                guard isStreaming else { return finishJob(of: node) }
+                guard isStreaming else {
+                    return finishJob(of: node)
+                }
                 // What was reported stays; the folder ends here.
                 jobs.push(publish(node, candidates: [], children: []))
                 return
@@ -857,7 +901,9 @@ public final class FileSearch: @unchecked Sendable {
         /// After `close` nothing is kept: a worker that was still listing a folder must not bring
         /// the walk back to life.
         func push(_ jobs: [Job]) {
-            guard !jobs.isEmpty else { return }
+            guard !jobs.isEmpty else {
+                return
+            }
             condition.lock()
             if !isClosed {
                 stack.append(contentsOf: jobs.reversed())
@@ -906,10 +952,14 @@ public final class FileSearch: @unchecked Sendable {
     ///
     /// Works on the text alone.
     private func archiveRoot(of file: FileItem, in provider: any FileSystemProvider) -> URL? {
-        guard Self.archiveExtensions.contains(FileItem.split(file.name).ext.lowercased()) else { return nil }
+        guard Self.archiveExtensions.contains(FileItem.split(file.name).ext.lowercased()) else {
+            return nil
+        }
         let notations = [provider.displayPath(file.url), file.url.absoluteString]
         for other in fileSystems.all where other !== provider {
-            if let url = notations.lazy.compactMap({ other.location(from: $0) }).first { return url }
+            if let url = notations.lazy.compactMap({ other.location(from: $0) }).first {
+                return url
+            }
         }
         return nil
     }

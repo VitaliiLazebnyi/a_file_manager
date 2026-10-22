@@ -281,7 +281,9 @@ private func status(_ url: URL) -> stat {
 
     private func lock(_ url: URL) { chflags(url.path, UInt32(UF_IMMUTABLE)) }
     private func unlockAll(in box: Sandbox) {
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: box.root.path) else { return }
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: box.root.path) else {
+            return
+        }
         for name in names { lchflags(box.url(name).path, 0) }
     }
 
@@ -409,7 +411,9 @@ private func status(_ url: URL) -> stat {
             object: nil,
             queue: nil
         ) { note in
-            guard let sender = note.object as AnyObject? else { return }
+            guard let sender = note.object as AnyObject? else {
+                return
+            }
             heard.withValue { $0.append((ObjectIdentifier(sender), Thread.isMainThread)) }
         }
         defer { NotificationCenter.default.removeObserver(observer) }

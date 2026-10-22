@@ -106,7 +106,9 @@ public final class TreeCache: @unchecked Sendable {
         lock.lock()
         let remembered = memory[key]?.entry
         lock.unlock()
-        if let remembered { return remembered }
+        if let remembered {
+            return remembered
+        }
         guard let file = fileURL(for: root, showHidden: showHidden), let data = Self.read(file),
             let text = String(data: data, encoding: .utf8), let entry = Self.parseEntry(text, root: root)
         else { return nil }
@@ -135,9 +137,13 @@ public final class TreeCache: @unchecked Sendable {
 
     /// A cache file's bytes; nil when it is missing, unreadable or over `fileLimit`.
     private static func read(_ file: URL) -> Data? {
-        guard let handle = try? FileHandle(forReadingFrom: file) else { return nil }
+        guard let handle = try? FileHandle(forReadingFrom: file) else {
+            return nil
+        }
         defer { try? handle.close() }
-        guard let data = try? handle.read(upToCount: fileLimit + 1), data.count <= fileLimit else { return nil }
+        guard let data = try? handle.read(upToCount: fileLimit + 1), data.count <= fileLimit else {
+            return nil
+        }
         return data
     }
 
@@ -197,9 +203,13 @@ public final class TreeCache: @unchecked Sendable {
     }
 
     private func note(_ relativePath: String, below root: URL) {
-        guard !relativePath.isEmpty else { return }
+        guard !relativePath.isEmpty else {
+            return
+        }
         let names = DirectoryTree.components(of: relativePath)
-        guard !names.isEmpty else { return }
+        guard !names.isEmpty else {
+            return
+        }
         let chain = names.indices.map { names[...$0].joined(separator: "/") }
         // A tree without hidden folders has no place for a folder below a hidden one.
         let isHidden = names.contains { $0.utf8.first == UInt8(ascii: ".") }
@@ -219,7 +229,9 @@ public final class TreeCache: @unchecked Sendable {
             }
             slot.isDirty = slot.bytes <= Self.updateLimit
         }
-        guard !writeIsScheduled else { return }
+        guard !writeIsScheduled else {
+            return
+        }
         writeIsScheduled = true
         updates.asyncAfter(deadline: .now() + Self.writeDelay) { [self] in flush() }
     }
@@ -258,14 +270,18 @@ public final class TreeCache: @unchecked Sendable {
     }
 
     private func write(_ entry: Entry, for root: URL, showHidden: Bool, ticket: Int) {
-        guard let directory, let file = fileURL(for: root, showHidden: showHidden) else { return }
+        guard let directory, let file = fileURL(for: root, showHidden: showHidden) else {
+            return
+        }
         let key = Self.key(root, showHidden)
         writeLock.lock()
         defer { writeLock.unlock() }
         lock.lock()
         let isLatest = tickets[key] == ticket
         lock.unlock()
-        guard isLatest else { return }
+        guard isLatest else {
+            return
+        }
         // Private to the user: the folder and the file are made so from the start.
         try? FileManager.default.createDirectory(
             at: directory,
@@ -285,7 +301,9 @@ public final class TreeCache: @unchecked Sendable {
     static func writePrivately(_ entry: Entry, root: URL, to file: URL) -> Bool {
         let temporary = file.path + ".tmp\(getpid())"
         let descriptor = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
-        guard descriptor >= 0 else { return true }
+        guard descriptor >= 0 else {
+            return true
+        }
         var total = 0
         var fits = true
         var ok = true
@@ -299,7 +317,9 @@ public final class TreeCache: @unchecked Sendable {
             return ok
         }
         close(descriptor)
-        if fits, ok, rename(temporary, file.path) == 0 { return true }
+        if fits, ok, rename(temporary, file.path) == 0 {
+            return true
+        }
         unlink(temporary)
         return fits
     }
@@ -308,7 +328,9 @@ public final class TreeCache: @unchecked Sendable {
         var written = 0
         while written < buffer.count {
             let count = Darwin.write(descriptor, buffer.baseAddress! + written, buffer.count - written)
-            if count <= 0 { return false }
+            if count <= 0 {
+                return false
+            }
             written += count
         }
         return true
@@ -341,12 +363,22 @@ public final class TreeCache: @unchecked Sendable {
             piece.append(contentsOf: path.utf8)
             piece.append(close)
             piece.append(0x0A)
-            guard piece.count >= 1 << 20 else { return true }
+            guard piece.count >= 1 << 20 else {
+                return true
+            }
             defer { piece.removeAll(keepingCapacity: true) }
             return emit(piece)
         }
-        for path in entry.paths where isPlain(path) { if !line(0x5B, path, 0x5D) { return } }
-        for path in entry.unscanned where isPlain(path) { if !line(0x28, path, 0x29) { return } }
+        for path in entry.paths where isPlain(path) {
+            if !line(0x5B, path, 0x5D) {
+                return
+            }
+        }
+        for path in entry.unscanned where isPlain(path) {
+            if !line(0x28, path, 0x29) {
+                return
+            }
+        }
         if !piece.isEmpty { _ = emit(piece) }
     }
 

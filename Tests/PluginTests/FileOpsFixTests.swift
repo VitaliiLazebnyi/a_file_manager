@@ -52,7 +52,9 @@ final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
     }
     func parent(of directory: URL) -> URL? { base.parent(of: directory) }
     func read(_ url: URL) throws -> any FileReader {
-        if url.lastPathComponent.hasPrefix("hostile") { return try base.read(base.addFile("/hostile-data", "evil")) }
+        if url.lastPathComponent.hasPrefix("hostile") {
+            return try base.read(base.addFile("/hostile-data", "evil"))
+        }
         return try base.read(url)
     }
     func createDirectory(at url: URL) throws { base.createDirectory(at: url) }
@@ -196,7 +198,9 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     @Test func aCopyOntoItsOwnNameInOtherLetterCaseIsACopyOntoItself() throws {
         let box = try Sandbox()
-        guard try isCaseInsensitive(box) else { return }
+        guard try isCaseInsensitive(box) else {
+            return
+        }
         try box.file("A/readme.txt", "r")
         let replies = Replies()
         runJob(
@@ -211,7 +215,9 @@ private func isCaseInsensitive(_ box: Sandbox) throws -> Bool {
 
     @Test func twoSourcesWhoseTargetNamesDifferInCaseOnlyAreOneConflict() throws {
         let box = try Sandbox()
-        guard try isCaseInsensitive(box) else { return }
+        guard try isCaseInsensitive(box) else {
+            return
+        }
         try box.file("A/x.txt", "a")
         try box.file("B/X.txt", "b")
         try box.folder("C")

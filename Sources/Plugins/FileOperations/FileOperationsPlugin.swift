@@ -277,7 +277,9 @@ final class FileOperations: FileTransferService {
         logLock.lock()
         let log = sharedLog
         logLock.unlock()
-        guard let log else { return }
+        guard let log else {
+            return
+        }
         let file = log.configuration.file
         if file.isSameLocation(as: volume) || file.isInside(volume) { log.flush() }
     }
@@ -318,7 +320,9 @@ final class FileOperations: FileTransferService {
     /// Where a job's records go: nil while the log is switched off.
     private func recorder() -> (@Sendable (OperationRecord) -> Void)? {
         let configuration = OperationSettings.logConfiguration(from: kernel.settings)
-        guard configuration.isEnabled else { return nil }
+        guard configuration.isEnabled else {
+            return nil
+        }
         let current: OperationLog
         if let log, log.configuration == configuration {
             current = log
@@ -332,7 +336,9 @@ final class FileOperations: FileTransferService {
     /// Which records the log is going to keep, so that a job makes no others.
     private func recordFilter() -> (@Sendable (OperationRecord.Verb, OperationRecord.Status) -> Bool)? {
         let configuration = OperationSettings.logConfiguration(from: kernel.settings)
-        guard configuration.isEnabled else { return nil }
+        guard configuration.isEnabled else {
+            return nil
+        }
         return { configuration.wants($0, $1) }
     }
 
@@ -413,7 +419,9 @@ final class FileOperations: FileTransferService {
         /// `body` answers false: for a loop that asks about each and may be left early.
         func forEach(_ body: (FileItem) -> Bool) {
             for index in snapshot.shownItems.indices where snapshot.isMarked(at: index) {
-                if !body(snapshot.shownItems[index]) { return }
+                if !body(snapshot.shownItems[index]) {
+                    return
+                }
             }
         }
 
@@ -433,7 +441,9 @@ final class FileOperations: FileTransferService {
 
         init(_ completed: [URL], of picked: Picked) {
             shownVersion = picked.snapshot.shownVersion
-            guard !completed.isEmpty, picked.snapshot.markedCount > 0 else { return }
+            guard !completed.isEmpty, picked.snapshot.markedCount > 0 else {
+                return
+            }
             let wanted = Set(completed.map(\.locationKey))
             let shown = picked.snapshot.shownItems
             for index in picked.snapshot.markedIndices() where wanted.contains(shown[index].url.locationKey) {
@@ -444,7 +454,9 @@ final class FileOperations: FileTransferService {
 
         @MainActor
         func deselect(in model: PanelModel) {
-            guard !indices.isEmpty else { return }
+            guard !indices.isEmpty else {
+                return
+            }
             if !model.setSelected(false, indices: indices, shownVersion: shownVersion) { model.deselect(names) }
         }
     }
@@ -459,7 +471,9 @@ final class FileOperations: FileTransferService {
     /// own, the folder of the first item.
     private func base(of directory: URL, first: FileItem) -> URL {
         let real = RealLocation.resolve(directory, in: fileSystems)
-        if RealLocation.takesNames(real, in: fileSystems) { return real }
+        if RealLocation.takesNames(real, in: fileSystems) {
+            return real
+        }
         return first.url.deletingLastPathComponent()
     }
 
@@ -469,7 +483,9 @@ final class FileOperations: FileTransferService {
     /// the items are matched by URL.
     static func names(of processed: [URL], among items: [FileItem]) -> [String] {
         var wanted = Set(processed.map(\.locationKey))
-        guard !wanted.isEmpty else { return [] }
+        guard !wanted.isEmpty else {
+            return []
+        }
         var names: [String] = []
         for item in items where wanted.remove(item.url.locationKey) != nil { names.append(item.name) }
         return names
@@ -478,7 +494,9 @@ final class FileOperations: FileTransferService {
     /// With "keep going on errors" nobody was asked while the job ran; the user hears of the
     /// failures now.
     private func reportFailures(of result: JobResult, options: TransferOptions) {
-        guard options.skipsErrors, result.failureCount > 0 else { return }
+        guard options.skipsErrors, result.failureCount > 0 else {
+            return
+        }
         let more = result.failureCount > result.failures.count ? "\n…" : ""
         ui.inform(
             "\(result.failureCount) item(s) could not be processed.",
@@ -561,11 +579,15 @@ final class FileOperations: FileTransferService {
                 !hasTargetFolder
                 ? ""
                 : "A name or a mask such as *.bak renames. More choices: Files › \(kind == .copy ? "Copy" : "Rename/Move") with Options…"
-            guard let text = ui.prompt(heading, value: targetText, detail: hint) else { return }
+            guard let text = ui.prompt(heading, value: targetText, detail: hint) else {
+                return
+            }
             targetText = text
 
         case .options:
-            guard let answer = askForOptions(heading, kind: kind, target: targetText, options: &options) else { return }
+            guard let answer = askForOptions(heading, kind: kind, target: targetText, options: &options) else {
+                return
+            }
             targetText = answer
         }
         // A target the user typed into the dialog is the user's own choice of a server, if it names one.
@@ -588,7 +610,9 @@ final class FileOperations: FileTransferService {
                     fileSystems: fileSystems,
                     cancellation: cancellation
                 )
-                if cancellation.isCancelled { return .failure(JobRefusal(message: "")) }
+                if cancellation.isCancelled {
+                    return .failure(JobRefusal(message: ""))
+                }
                 let job = FileJob(
                     kind: .transfer(kind),
                     sources: picked.items().map(\.url),
@@ -597,7 +621,9 @@ final class FileOperations: FileTransferService {
                     cancellation: cancellation
                 )
                 job.options = jobOptions
-                if job.targetsSourceFolder { return .failure(JobRefusal(message: "You cannot copy a file to itself!")) }
+                if job.targetsSourceFolder {
+                    return .failure(JobRefusal(message: "You cannot copy a file to itself!"))
+                }
                 do {
                     // A target folder that does not exist is created silently.
                     try fileSystems.provider(for: spec.directory)
@@ -606,7 +632,9 @@ final class FileOperations: FileTransferService {
                             cancellation: cancellation
                         )
                 } catch {
-                    if cancellation.isCancelled { return .failure(JobRefusal(message: "")) }
+                    if cancellation.isCancelled {
+                        return .failure(JobRefusal(message: ""))
+                    }
                     return .failure(
                         JobRefusal(
                             message: "The given target path \(fileSystems.displayPath(spec.directory)) is invalid!"
@@ -721,7 +749,9 @@ final class FileOperations: FileTransferService {
             style: toTrash ? .information : .critical,
             defaultButton: toTrash ? 0 : 1
         )
-        guard answer == 0 else { return }
+        guard answer == 0 else {
+            return
+        }
         model.saveSelection()
         let fileSystems = self.fileSystems
         let options = OperationSettings.options(from: kernel.settings)
@@ -781,7 +811,9 @@ final class FileOperations: FileTransferService {
                     let key = real.locationKey
                     moved = sources.filter { $0.deletingLastPathComponent().locationKey != key }
                 }
-                guard !moved.isEmpty else { return .failure(JobRefusal(message: "")) }
+                guard !moved.isEmpty else {
+                    return .failure(JobRefusal(message: ""))
+                }
                 let job = FileJob(
                     kind: .transfer(kind),
                     sources: moved,
@@ -833,7 +865,9 @@ final class FileOperations: FileTransferService {
     /// Finishes an in-place rename; the cursor follows the renamed item.
     func renameCursorItem(to newName: String) {
         let model = source.model
-        guard let item = model.cursorItem, !newName.isEmpty, newName != item.name else { return }
+        guard let item = model.cursorItem, !newName.isEmpty, newName != item.name else {
+            return
+        }
         let directory = model.directory
         let destination = item.url.deletingLastPathComponent().appending(name: newName)
         let fileSystems = self.fileSystems
@@ -919,10 +953,14 @@ final class FileOperations: FileTransferService {
                 if name != old, FileJob.isSafeName(name) { names.append((item.url, name)) }
                 return true
             }
-            guard !wasGivenUp, !names.isEmpty else { return }
+            guard !wasGivenUp, !names.isEmpty else {
+                return
+            }
         } else {
             mask = answer.text("mask").trimmingCharacters(in: .whitespaces)
-            guard !mask.isEmpty, !mask.contains("/") else { return }
+            guard !mask.isEmpty, !mask.contains("/") else {
+                return
+            }
         }
         let typed = names
         model.saveSelection()
@@ -940,7 +978,9 @@ final class FileOperations: FileTransferService {
                         .filter { $0.0.lastPathComponent != $0.1 && FileJob.isSafeName($0.1) }
                     : typed
                 // Nothing gets another name: nothing to do and nothing to say.
-                guard !names.isEmpty else { return .failure(JobRefusal(message: "")) }
+                guard !names.isEmpty else {
+                    return .failure(JobRefusal(message: ""))
+                }
                 let job = FileJob(
                     kind: .move,
                     sources: names.map(\.0),
@@ -1006,7 +1046,9 @@ final class FileOperations: FileTransferService {
             else { return }
             typed = text
         }
-        guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard !typed.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return
+        }
         let context = nameContext(for: panel, typed: typed, openedAt: openedAt)
         let (fileSystems, clipboard) = (self.fileSystems, self.clipboard)
         let record = recorder()
@@ -1108,7 +1150,9 @@ final class FileOperations: FileTransferService {
                         do {
                             // An existing file is simply opened.
                             if !exists(url) {
-                                if cancellation.isCancelled { return (urls, nil) }
+                                if cancellation.isCancelled {
+                                    return (urls, nil)
+                                }
                                 let provider = try fileSystems.provider(for: url)
                                 try provider.createDirectory(
                                     at: url.deletingLastPathComponent(),
@@ -1119,7 +1163,9 @@ final class FileOperations: FileTransferService {
                             }
                             urls.append(url)
                         } catch {
-                            if cancellation.isCancelled { return (urls, nil) }
+                            if cancellation.isCancelled {
+                                return (urls, nil)
+                            }
                             record?(
                                 OperationRecord(
                                     .newFile,
@@ -1139,7 +1185,9 @@ final class FileOperations: FileTransferService {
                 if let (name, error) = result.failure {
                     kernel.interaction.report(error, title: "The file \(DisplayName.escaped(name)) cannot be created!")
                 }
-                guard let last = result.urls.last else { return }
+                guard let last = result.urls.last else {
+                    return
+                }
                 kernel.panels.refresh([directory], focus: last)
                 // One new file opens in the editor, when a plugin provides one.
                 if result.urls.count == 1, result.failure == nil, opensEditor, kernel.commands[.edit] != nil {

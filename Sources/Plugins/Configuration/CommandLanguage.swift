@@ -125,7 +125,9 @@ enum CommandLanguage {
         -> [CommandStep]
     {
         let command = expandingEnvironment(command, environment).trimmingCharacters(in: .whitespaces)
-        guard !command.isEmpty else { return [] }
+        guard !command.isEmpty else {
+            return []
+        }
         let items = ShellWords.split(command, at: ",").map { $0.trimmingCharacters(in: .whitespaces) }
             .filter {
                 !$0.isEmpty
@@ -140,9 +142,15 @@ enum CommandLanguage {
         let tail = String(item.dropFirst(head.count)).trimmingCharacters(in: .whitespaces)
         let lowered = head.lowercased()
         // `cd` alone takes its folder from the Parameters field.
-        if lowered == "cd" { return .changeDirectory(ShellWords.unquoted(tail)) }
-        if lowered == "cm_wait" { return .wait(milliseconds: min(max(0, Int(tail) ?? 0), longestWait)) }
-        if let id = resolve(head) { return .perform(id, parameter: tail) }
+        if lowered == "cd" {
+            return .changeDirectory(ShellWords.unquoted(tail))
+        }
+        if lowered == "cm_wait" {
+            return .wait(milliseconds: min(max(0, Int(tail) ?? 0), longestWait))
+        }
+        if let id = resolve(head) {
+            return .perform(id, parameter: tail)
+        }
         return internalPrefixes.contains(where: lowered.hasPrefix) ? .unknown(head) : nil
     }
 
@@ -151,8 +159,12 @@ enum CommandLanguage {
     /// (`cm_List /etc/hosts`), anything else text. `location` turns a path into a location.
     static func argument(from parameter: String, location: (String) -> URL) -> CommandArgument {
         let text = parameter.trimmingCharacters(in: .whitespaces)
-        guard !text.isEmpty else { return .nothing }
-        if let index = Int(text), text.allSatisfy(\.isNumber) { return .index(index) }
+        guard !text.isEmpty else {
+            return .nothing
+        }
+        if let index = Int(text), text.allSatisfy(\.isNumber) {
+            return .index(index)
+        }
         let plain = ShellWords.unquoted(text)
         let isOneWord = ShellWords.split(text).count == 1
         if isOneWord, plain.hasPrefix("/") || plain.hasPrefix("~") || plain.contains("://") {

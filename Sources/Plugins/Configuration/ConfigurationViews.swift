@@ -250,29 +250,62 @@ enum LiveMenus {
         // AppKit's characters of the special keys lie in one block of 16-bit code units.
         func special(_ value: Int) -> String { String(utf16CodeUnits: [UInt16(truncatingIfNeeded: value)], count: 1) }
         switch key {
-        case .character(let character): return character
-        case .function(let number): return special(NSF1FunctionKey + number - 1)
-        case .returnKey: return "\r"
-        case .tab: return "\t"
-        case .backspace: return "\u{8}"
-        case .forwardDelete: return special(NSDeleteFunctionKey)
-        case .home: return special(NSHomeFunctionKey)
-        case .end: return special(NSEndFunctionKey)
-        case .pageUp: return special(NSPageUpFunctionKey)
-        case .pageDown: return special(NSPageDownFunctionKey)
-        case .leftArrow: return special(NSLeftArrowFunctionKey)
-        case .rightArrow: return special(NSRightArrowFunctionKey)
-        case .upArrow: return special(NSUpArrowFunctionKey)
-        case .downArrow: return special(NSDownArrowFunctionKey)
-        default: return nil
+        case .character(let character):
+            return character
+
+        case .function(let number):
+            return special(NSF1FunctionKey + number - 1)
+
+        case .returnKey:
+            return "\r"
+
+        case .tab:
+            return "\t"
+
+        case .backspace:
+            return "\u{8}"
+
+        case .forwardDelete:
+            return special(NSDeleteFunctionKey)
+
+        case .home:
+            return special(NSHomeFunctionKey)
+
+        case .end:
+            return special(NSEndFunctionKey)
+
+        case .pageUp:
+            return special(NSPageUpFunctionKey)
+
+        case .pageDown:
+            return special(NSPageDownFunctionKey)
+
+        case .leftArrow:
+            return special(NSLeftArrowFunctionKey)
+
+        case .rightArrow:
+            return special(NSRightArrowFunctionKey)
+
+        case .upArrow:
+            return special(NSUpArrowFunctionKey)
+
+        case .downArrow:
+            return special(NSDownArrowFunctionKey)
+
+        default:
+            return nil
         }
     }
 
     /// Plain typing keys stay with text fields, so a menu owns only function keys and keys
     /// with Cmd, Ctrl or Option.
     private static func menuKey(_ shortcut: Shortcut) -> String? {
-        guard let key = menuEquivalent(shortcut.key) else { return nil }
-        if case .function = shortcut.key { return key }
+        guard let key = menuEquivalent(shortcut.key) else {
+            return nil
+        }
+        if case .function = shortcut.key {
+            return key
+        }
         return shortcut.modifiers.isDisjoint(with: [.command, .control, .option]) ? nil : key
     }
 
@@ -307,7 +340,9 @@ enum LiveMenus {
             return
         }
         let fixed = menu.items.filter { item in
-            guard let name = item.representedObject as? String else { return false }
+            guard let name = item.representedObject as? String else {
+                return false
+            }
             return !name.hasPrefix(slotPrefix)
         }
         menu.removeAllItems()

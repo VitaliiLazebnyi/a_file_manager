@@ -272,7 +272,9 @@ import Testing
     }
 
     func data(_ path: String) -> Data {
-        guard let reader = try? memory.read(memory.url(path)) else { return Data() }
+        guard let reader = try? memory.read(memory.url(path)) else {
+            return Data()
+        }
         return (try? reader.read(upToCount: 1 << 20)) ?? Data()
     }
 

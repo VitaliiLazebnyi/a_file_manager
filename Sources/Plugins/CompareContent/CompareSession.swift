@@ -145,7 +145,9 @@ final class CompareSession {
         CompareWorker.run("Compare") { [weak self] in
             let value = work(cancellation)
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.running === cancellation else { return }
+                guard let self, self.running === cancellation else {
+                    return
+                }
                 finish(value, cancellation.isCancelled)
             }
         }
@@ -318,33 +320,50 @@ final class CompareSession {
     // MARK: Rows
 
     var isBinary: Bool {
-        if case .binary = content { return true }
+        if case .binary = content {
+            return true
+        }
         return false
     }
 
     var rowCount: Int {
         switch content {
-        case .none: return 0
-        case .text(_, _, let diff, _): return diff.rows.count
-        case .binary(_, _, let diff): return diff.rowCount
+        case .none:
+            return 0
+
+        case .text(_, _, let diff, _):
+            return diff.rows.count
+
+        case .binary(_, _, let diff):
+            return diff.rowCount
         }
     }
 
     /// The differences as ranges of rows.
     var blocks: [Range<Int>] {
         switch content {
-        case .none: return []
-        case .text(_, _, let diff, _): return diff.blocks
-        case .binary(_, _, let diff): return diff.blocks
+        case .none:
+            return []
+
+        case .text(_, _, let diff, _):
+            return diff.blocks
+
+        case .binary(_, _, let diff):
+            return diff.blocks
         }
     }
 
     /// The length of the longest line in characters, for the width of the panes.
     var width: Int {
         switch content {
-        case .none: return 0
-        case .text(_, _, _, let width): return width
-        case .binary(_, _, let diff): return diff.bytesPerLine * 4 + 1
+        case .none:
+            return 0
+
+        case .text(_, _, _, let width):
+            return width
+
+        case .binary(_, _, let diff):
+            return diff.bytesPerLine * 4 + 1
         }
     }
 
@@ -361,9 +380,14 @@ final class CompareSession {
 
     func kind(ofRow row: Int) -> DiffRow.Kind {
         switch content {
-        case .none: return .equal
-        case .text(_, _, let diff, _): return diff.rows.indices.contains(row) ? diff.rows[row].kind : .equal
-        case .binary: return block(containing: row) == nil ? .equal : .changed
+        case .none:
+            return .equal
+
+        case .text(_, _, let diff, _):
+            return diff.rows.indices.contains(row) ? diff.rows[row].kind : .equal
+
+        case .binary:
+            return block(containing: row) == nil ? .equal : .changed
         }
     }
 
@@ -381,8 +405,11 @@ final class CompareSession {
     /// Empty where the side has no line.
     func label(_ side: CompareSide, row: Int) -> String {
         switch content {
-        case .none: return ""
-        case .text: return line(side, row: row).map { String($0.number) } ?? ""
+        case .none:
+            return ""
+
+        case .text:
+            return line(side, row: row).map { String($0.number) } ?? ""
 
         case .binary(let left, let right, let diff):
             return row * diff.bytesPerLine < (side == .left ? left.count : right.count) ? diff.offsetText(row: row) : ""
@@ -392,8 +419,11 @@ final class CompareSession {
     /// The text of a row on one side; nil where the side has no line.
     func text(_ side: CompareSide, row: Int) -> String? {
         switch content {
-        case .none: return nil
-        case .text: return line(side, row: row)?.text
+        case .none:
+            return nil
+
+        case .text:
+            return line(side, row: row)?.text
 
         case .binary(let left, let right, let diff):
             let text = diff.text(of: side == .left ? left : right, row: row)
@@ -404,7 +434,8 @@ final class CompareSession {
     /// The parts of a row's text that differ from the other side, in UTF-16 units.
     func highlights(_ side: CompareSide, row: Int) -> [Range<Int>] {
         switch content {
-        case .none: return []
+        case .none:
+            return []
 
         case .text:
             guard kind(ofRow: row) == .changed, let left = line(.left, row: row), let right = line(.right, row: row)
@@ -420,7 +451,9 @@ final class CompareSession {
             return side == .left ? ranges.left : ranges.right
 
         case .binary(let left, let right, let diff):
-            guard kind(ofRow: row) == .changed else { return [] }
+            guard kind(ofRow: row) == .changed else {
+                return []
+            }
             return diff.differingOffsets(left: left, right: right, row: row).flatMap(diff.textRanges)
         }
     }
@@ -454,7 +487,9 @@ final class CompareSession {
             let found = Self.search(content, needle, from: row, forward: forward, cancellation: cancellation)
             DispatchQueue.main.async { [weak self] in
                 // Stale when another search started, or the texts changed, meanwhile.
-                guard let self, !cancellation.isCancelled, self.findGeneration == generation else { return }
+                guard let self, !cancellation.isCancelled, self.findGeneration == generation else {
+                    return
+                }
                 self.searching = nil
                 completion(found)
             }
@@ -492,9 +527,13 @@ final class CompareSession {
                 return text.isEmpty ? nil : text
             }
         }
-        guard count > 0, !needle.isEmpty else { return nil }
+        guard count > 0, !needle.isEmpty else {
+            return nil
+        }
         for step in 1...count {
-            if step & 0x3FF == 0, cancellation?.isCancelled == true { return nil }
+            if step & 0x3FF == 0, cancellation?.isCancelled == true {
+                return nil
+            }
             let candidate = ((row + (forward ? step : -step)) % count + count) % count
             for side in [CompareSide.left, .right]
             where sides(candidate, side)?.range(of: needle, options: .caseInsensitive) != nil {
@@ -519,7 +558,9 @@ final class CompareSession {
     }
 
     func clearResync() {
-        guard !anchors.isEmpty else { return }
+        guard !anchors.isEmpty else {
+            return
+        }
         anchors = []
         recompute()
     }
@@ -533,7 +574,8 @@ final class CompareSession {
         anchors = anchors.map { ($0.right, $0.left) }
         undoStack = []
         switch content {
-        case .none: onChange()
+        case .none:
+            onChange()
 
         case .text(let left, let right, _, _):
             content = .text(left: right, right: left, diff: TextDiff(rows: [], blocks: []), width: 0)
@@ -587,7 +629,9 @@ final class CompareSession {
                 let index = side == .left ? diff.rows[row].left : diff.rows[row].right
             else { return [] }
             let apply = { (document: inout TextDocument) -> [Splice] in
-                guard document.lines.indices.contains(index), document.lines[index].text != text else { return [] }
+                guard document.lines.indices.contains(index), document.lines[index].text != text else {
+                    return []
+                }
                 let old = document.lines[index]
                 document.lines[index].text = text
                 document.lines[index].number = 0
@@ -603,7 +647,9 @@ final class CompareSession {
     func copy(rows: Range<Int>, to side: CompareSide) {
         edit { left, right, diff in
             let rows = rows.clamped(to: 0..<diff.rows.count)
-            guard !rows.isEmpty else { return [] }
+            guard !rows.isEmpty else {
+                return []
+            }
             func index(_ row: DiffRow, _ of: CompareSide) -> Int? { of == .left ? row.left : row.right }
             let source = side == .left ? right : left
             var target = side == .left ? left : right
@@ -753,7 +799,9 @@ final class CompareSession {
     ///
     /// Returns whether everything was saved; errors are reported.
     func saveNow() -> Bool {
-        guard case .text(let left, let right, _, _) = content, hasUnsavedChanges else { return true }
+        guard case .text(let left, let right, _, _) = content, hasUnsavedChanges else {
+            return true
+        }
         var ok = true
         for (side, url, document, expected, isModified) in [
             (CompareSide.left, leftURL, left, loaded.left, modified.left),

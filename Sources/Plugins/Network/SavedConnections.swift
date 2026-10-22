@@ -63,7 +63,9 @@ public final class KeychainPasswords: PasswordStore {
         }
         let data = Data(password.utf8)
         let status = calls.update(query(account) as CFDictionary, [kSecValueData: data] as CFDictionary)
-        guard status == errSecItemNotFound else { return }
+        guard status == errSecItemNotFound else {
+            return
+        }
         var item = query(account)
         item[kSecValueData] = data
         item[kSecAttrLabel] = service
@@ -120,9 +122,13 @@ public final class PasswordVault: @unchecked Sendable {
         let isFirst = accounts.isEmpty
         accounts = current
         lock.unlock()
-        guard isFirst, !current.isEmpty else { return }
+        guard isFirst, !current.isEmpty else {
+            return
+        }
         queue.async { [store, current] in
-            guard store.password(for: Self.boundAccount) == nil else { return }
+            guard store.password(for: Self.boundAccount) == nil else {
+                return
+            }
             for (id, account) in current {
                 guard let old = store.password(for: id.uuidString) else { continue }
                 if store.password(for: account) == nil { store.setPassword(old, for: account) }
@@ -144,7 +150,9 @@ public final class PasswordVault: @unchecked Sendable {
     ///
     /// Waits for the store: for connecting threads, never the main thread.
     public func password(for profile: ConnectionProfile) -> String? {
-        guard let id = profile.savedID, let account = account(of: id) else { return nil }
+        guard let id = profile.savedID, let account = account(of: id) else {
+            return nil
+        }
         return queue.sync { store.password(for: account) }
     }
 
@@ -162,7 +170,9 @@ public final class PasswordVault: @unchecked Sendable {
     /// With `removing`, the original's is removed afterwards. Returns at once.
     public func carryPassword(from original: SavedConnection, to connection: SavedConnection, removing: Bool) {
         let (from, to) = (Self.account(of: original), Self.account(of: connection))
-        guard from != to else { return }
+        guard from != to else {
+            return
+        }
         queue.async { [store] in
             if let password = store.password(for: from) { store.setPassword(password, for: to) }
             if removing { store.setPassword(nil, for: from) }
@@ -251,34 +261,56 @@ public struct SavedConnection: Codable, Equatable, Sendable {
 
         public var title: String {
             switch self {
-            case .ftp: return "FTP"
-            case .ftpExplicitTLS: return "FTP over TLS (explicit, AUTH TLS)"
-            case .ftpImplicitTLS: return "FTP over TLS (implicit)"
-            case .sftp: return "SFTP (secure shell)"
+            case .ftp:
+                return "FTP"
+
+            case .ftpExplicitTLS:
+                return "FTP over TLS (explicit, AUTH TLS)"
+
+            case .ftpImplicitTLS:
+                return "FTP over TLS (implicit)"
+
+            case .sftp:
+                return "SFTP (secure shell)"
             }
         }
 
         public var scheme: String {
             switch self {
-            case .ftp: return "ftp"
-            case .ftpExplicitTLS, .ftpImplicitTLS: return "ftps"
-            case .sftp: return "sftp"
+            case .ftp:
+                return "ftp"
+
+            case .ftpExplicitTLS, .ftpImplicitTLS:
+                return "ftps"
+
+            case .sftp:
+                return "sftp"
             }
         }
 
         public var tls: TLSMode {
             switch self {
-            case .ftpExplicitTLS: return .explicit
-            case .ftpImplicitTLS: return .implicit
-            default: return .none
+            case .ftpExplicitTLS:
+                return .explicit
+
+            case .ftpImplicitTLS:
+                return .implicit
+
+            default:
+                return .none
             }
         }
 
         public var defaultPort: Int {
             switch self {
-            case .ftpImplicitTLS: return 990
-            case .sftp: return 22
-            default: return 21
+            case .ftpImplicitTLS:
+                return 990
+
+            case .sftp:
+                return 22
+
+            default:
+                return 21
             }
         }
 
@@ -295,9 +327,14 @@ public struct SavedConnection: Codable, Equatable, Sendable {
 
         public var title: String {
             switch self {
-            case .automatic: return "Auto-detect (MLSD if offered)"
-            case .mlsd: return "Always MLSD"
-            case .list: return "Always LIST"
+            case .automatic:
+                return "Auto-detect (MLSD if offered)"
+
+            case .mlsd:
+                return "Always MLSD"
+
+            case .list:
+                return "Always LIST"
             }
         }
     }
@@ -385,7 +422,9 @@ public struct SavedConnection: Codable, Equatable, Sendable {
     ///
     /// False when it is none of these.
     public mutating func setHost(_ text: String, kind chosen: Kind) -> Bool {
-        guard let address = ServerAddress(text, defaultScheme: chosen.scheme) else { return false }
+        guard let address = ServerAddress(text, defaultScheme: chosen.scheme) else {
+            return false
+        }
         let hasScheme = text.contains("://")
         kind = hasScheme ? Kind(scheme: address.scheme, tls: address.tls) : chosen
         host = address.host

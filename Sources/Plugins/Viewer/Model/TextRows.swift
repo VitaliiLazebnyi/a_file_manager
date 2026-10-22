@@ -102,7 +102,9 @@ struct RowSplitter {
                 column = 0
                 lastBreak = -1
                 joined = false
-                if !goOn { return rowStart }
+                if !goOn {
+                    return rowStart
+                }
                 continue
             }
             let isSpace = unit == 0x20 || unit == 0x09
@@ -130,7 +132,9 @@ struct RowSplitter {
                 column = 0
                 lastBreak = -1
                 joined = false
-                if !goOn { return rowStart }
+                if !goOn {
+                    return rowStart
+                }
                 continue
             }
             column += width
@@ -149,13 +153,16 @@ struct RowSplitter {
     /// and joiners.
     @inline(__always)
     private static func takesNoColumn(_ unit: UInt16) -> Bool {
-        guard unit >= 0x0300 else { return false }
+        guard unit >= 0x0300 else {
+            return false
+        }
         switch unit {
         case 0x0300...0x036F, 0x1AB0...0x1AFF, 0x1DC0...0x1DFF, 0x200B...0x200F, 0x20D0...0x20FF, 0x3099...0x309A,
             0xFE00...0xFE0F, 0xFE20...0xFE2F:
             return true
 
-        default: return false
+        default:
+            return false
         }
     }
 
@@ -191,7 +198,9 @@ struct RowSplitter {
                 index = end
                 column = 0
                 lastBreak = -1
-                if !goOn { return rowStart }
+                if !goOn {
+                    return rowStart
+                }
                 continue
             }
             let isSpace = unit == 0x20 || unit == 0x09
@@ -204,7 +213,9 @@ struct RowSplitter {
                 index = cut
                 column = 0
                 lastBreak = -1
-                if !goOn { return rowStart }
+                if !goOn {
+                    return rowStart
+                }
                 continue
             }
             column += width
@@ -327,14 +338,18 @@ final class TextRowIndex: @unchecked Sendable {
         /// than `maximumCheckpoints`.
         mutating func thin(spanning bytes: Int64) {
             let count = checkpoints.count
-            guard count > 1 else { return }
+            guard count > 1 else {
+                return
+            }
             let span = max(1, bytes)
             // (A number of checkpoints, which are in memory, times 4 KB does not overflow.)
             let product = Int64(count) * Int64(TextRowIndex.minimumCheckpointDistance)
             let byDistance = Int((product + span - 1) / span)
             let byCount = (count + TextRowIndex.maximumCheckpoints - 1) / TextRowIndex.maximumCheckpoints
             let wanted = max(byDistance, byCount)
-            guard wanted > 1 else { return }
+            guard wanted > 1 else {
+                return
+            }
             // A power of two, and never more than the checkpoints there are: the first is kept.
             var step = 2
             while step < wanted, step < count { step *= 2 }
@@ -508,7 +523,9 @@ final class TextRowIndex: @unchecked Sendable {
         let reusable: [Int: Segment]? = synchronized {
             parameters = now
             defer { previous = nil }
-            guard let before = previous, rawScan else { return nil }
+            guard let before = previous, rawScan else {
+                return nil
+            }
             return before.takeOverable(for: now)
         }
         var cuts: [Range<Int64>] = []
@@ -527,7 +544,9 @@ final class TextRowIndex: @unchecked Sendable {
             // thread: the threads of a parallel loop live on, and a search or an index build of
             // a big file would otherwise keep every buffer until they are idle.
             autoreleasepool {
-                guard !cancellation.isCancelled else { return }
+                guard !cancellation.isCancelled else {
+                    return
+                }
                 if let start = lineStart, bounds[number].upperBound < start || start >= content.upperBound {
                     // No line begins in this segment: a line of an earlier one goes through it.
                     var empty = Segment()
@@ -572,7 +591,9 @@ final class TextRowIndex: @unchecked Sendable {
                     if !cancellation.isCancelled { recordFailure(error) }
                     failed = true
                 }
-                guard !cancellation.isCancelled else { return }
+                guard !cancellation.isCancelled else {
+                    return
+                }
                 synchronized { scanned[number] = segment }
                 if finish(number, segment, end: bounds[number].upperBound, failed: failed) { progress() }
             }
@@ -588,7 +609,9 @@ final class TextRowIndex: @unchecked Sendable {
                 if let known = entry?.nextStart { lineStart = known } else if entry != nil { lineStart = nil }
             }
         }
-        guard !cancellation.isCancelled else { return }
+        guard !cancellation.isCancelled else {
+            return
+        }
         synchronized {
             self.reused = reused.value
             complete = true
@@ -602,7 +625,9 @@ final class TextRowIndex: @unchecked Sendable {
     /// are: those of the same bytes cut the same way; nil when it is not the same text.
     private func takeOverable(for other: Parameters) -> [Int: Segment]? {
         synchronized {
-            guard complete, firstFailure == nil, parameters == other else { return nil }
+            guard complete, firstFailure == nil, parameters == other else {
+                return nil
+            }
             return scanned
         }
     }
@@ -642,7 +667,9 @@ final class TextRowIndex: @unchecked Sendable {
     /// Returns whether anything was published.
     private func publishPartial(_ number: Int, _ segment: Segment, coveredEnd covered: Int64) -> Bool {
         synchronized {
-            guard number == nextToPublish else { return false }
+            guard number == nextToPublish else {
+                return false
+            }
             dropPartial()
             var next = segment
             next.firstRow = rows
@@ -658,7 +685,9 @@ final class TextRowIndex: @unchecked Sendable {
     }
 
     private func dropPartial() {
-        guard hasPartial, let last = published.popLast() else { return }
+        guard hasPartial, let last = published.popLast() else {
+            return
+        }
         rows -= last.rowCount
         lines -= last.lineCount
         hasPartial = false
@@ -723,7 +752,9 @@ final class TextRowIndex: @unchecked Sendable {
                 stopped = true
                 return false
             }
-            if skipping { return true }
+            if skipping {
+                return true
+            }
             lastOffset = offset
             if result.rowCount % result.stride == 0 {
                 addCheckpoint(Checkpoint(offset: offset, linesBefore: result.lineCount, startsLine: startsLine))
@@ -766,7 +797,9 @@ final class TextRowIndex: @unchecked Sendable {
                 // that a line began there, made a row of its own out of that line's tail.
                 result.nextStart = offset + Int64(count)
             }
-            guard count > 0 else { return }
+            guard count > 0 else {
+                return
+            }
             skipping = false
             lastOffset = offset + Int64(count)
             let first = result.rowCount
@@ -798,7 +831,9 @@ final class TextRowIndex: @unchecked Sendable {
             index += 8
         }
         while index < count {
-            if start[index] >= 0x80 { return false }
+            if start[index] >= 0x80 {
+                return false
+            }
             index += 1
         }
         return true
@@ -875,14 +910,18 @@ final class TextRowIndex: @unchecked Sendable {
             if ended { changed?() }
             let atEnd = ended || readPosition >= content.upperBound
             let consumed = bytes.withUnsafeBufferPointer { buffer -> Int in
-                guard rawScan else { return cut(buffer, 0..<buffer.count, final: atEnd) }
+                guard rawScan else {
+                    return cut(buffer, 0..<buffer.count, final: atEnd)
+                }
                 // Most lines are short and plain: they are one row each, and a row is all that
                 // is wanted of them, so only the line ends are looked for in the raw bytes.
                 // Decoding is left to the lines that may need more than one row (longer than a
                 // row, or with tabs) and to the ends of unfinished lines.
                 let count = buffer.count
                 let columns = options.columns
-                guard !buffer.isEmpty, let start = buffer.baseAddress else { return 0 }
+                guard !buffer.isEmpty, let start = buffer.baseAddress else {
+                    return 0
+                }
                 @inline(__always) func load(_ at: Int) -> UInt64 {
                     UnsafeRawPointer(start + at).loadUnaligned(as: UInt64.self)
                 }
@@ -891,7 +930,9 @@ final class TextRowIndex: @unchecked Sendable {
                     var position = from
                     while position < count, let found = memchr(start + position, Int32(byte), count - position) {
                         let at = start.distance(to: found.assumingMemoryBound(to: UInt8.self))
-                        if unit == 1 { return at }
+                        if unit == 1 {
+                            return at
+                        }
                         // A 16-bit unit: the byte is its low half and the other one is zero.
                         let first = bigEndian ? at - 1 : at
                         if first >= from, first % 2 == 0, first + 1 < count, buffer[bigEndian ? first : first + 1] == 0
@@ -1100,7 +1141,9 @@ enum EastAsianWidth {
 
     /// Whether the code point takes two columns.
     static func isWide(_ scalar: UInt32) -> Bool {
-        guard scalar >= 0x1100 else { return false }
+        guard scalar >= 0x1100 else {
+            return false
+        }
         var low = 0
         var high = wide.count
         while low < high {
@@ -1116,7 +1159,9 @@ enum EastAsianWidth {
     static func isWide(_ units: UnsafeBufferPointer<UInt16>, at index: Int) -> Bool {
         let unit = units[index]
         if (0xD800...0xDBFF).contains(unit) {
-            guard index + 1 < units.count, (0xDC00...0xDFFF).contains(units[index + 1]) else { return false }
+            guard index + 1 < units.count, (0xDC00...0xDFFF).contains(units[index + 1]) else {
+                return false
+            }
             return isWide(0x10000 + (UInt32(unit) - 0xD800) << 10 + (UInt32(units[index + 1]) - 0xDC00))
         }
         return isWide(UInt32(unit))

@@ -313,9 +313,14 @@ import Testing
         DispatchQueue.concurrentPerform(iterations: 200) { index in
             let root = roots[index % roots.count]
             switch index % 3 {
-            case 0: cache.noteFolder("base/n\(index)", below: root)
-            case 1: _ = cache.paths(for: root)
-            default: cache.store((cache.paths(for: root) ?? []) + ["s\(index)"], for: root)
+            case 0:
+                cache.noteFolder("base/n\(index)", below: root)
+
+            case 1:
+                _ = cache.paths(for: root)
+
+            default:
+                cache.store((cache.paths(for: root) ?? []) + ["s\(index)"], for: root)
             }
         }
         cache.waitForUpdates()

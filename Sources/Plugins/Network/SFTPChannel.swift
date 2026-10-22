@@ -26,12 +26,21 @@ public struct SFTPError: LocalizedError, Sendable {
     static let noSuchFile: UInt32 = 2
 
     public var errorDescription: String? {
-        if !message.isEmpty, message != "Failure" { return "The server answered: \(message)" }
+        if !message.isEmpty, message != "Failure" {
+            return "The server answered: \(message)"
+        }
         switch code {
-        case 2: return "The file or folder does not exist on the server."
-        case 3: return "The server does not permit this."
-        case 8: return "The server does not support this operation."
-        default: return "The server reported an error (\(code))."
+        case 2:
+            return "The file or folder does not exist on the server."
+
+        case 3:
+            return "The server does not permit this."
+
+        case 8:
+            return "The server does not support this operation."
+
+        default:
+            return "The server reported an error (\(code))."
         }
     }
 }
@@ -161,7 +170,9 @@ struct SFTPDecoder {
     /// again.
     mutating func name() throws -> (text: String, encoding: String.Encoding) {
         let raw = Data(try bytes())
-        if let text = String(data: raw, encoding: .utf8) { return (text, .utf8) }
+        if let text = String(data: raw, encoding: .utf8) {
+            return (text, .utf8)
+        }
         // Latin 1 is the first 256 code points, one byte each.
         var text = String.UnicodeScalarView()
         text.append(contentsOf: raw.map { Unicode.Scalar($0) })
@@ -214,7 +225,9 @@ struct SFTPPacket {
 
     /// The status code when this is a status packet.
     var statusCode: UInt32? {
-        guard kind == .status else { return nil }
+        guard kind == .status else {
+            return nil
+        }
         var decoder = SFTPDecoder(body)
         return try? decoder.u32()
     }
@@ -357,11 +370,15 @@ final class AskpassHelper {
             }
         }
         let text = String(decoding: received, as: UTF8.self)
-        guard let end = text.range(of: "\n" + endMarker + "\n") else { return nil }
+        guard let end = text.range(of: "\n" + endMarker + "\n") else {
+            return nil
+        }
         received = Data(text[end.upperBound...].utf8)
         // The number, what ssh wants, and the question, which may have lines of its own.
         let parts = text[..<end.lowerBound].split(separator: "\n", maxSplits: 2, omittingEmptySubsequences: false)
-        guard parts.count == 3 else { return nil }
+        guard parts.count == 3 else {
+            return nil
+        }
         let kind: Kind = parts[1] == "confirm" ? .confirm : parts[1] == "none" ? .notice : .entry
         return Question(id: String(parts[0]), kind: kind, text: String(parts[2]))
     }
@@ -478,7 +495,9 @@ final class SFTPChannel: @unchecked Sendable {
             errorReading.lock()
             defer { errorReading.unlock() }
             let data = handle.availableData
-            guard let self, !data.isEmpty else { return handle.readabilityHandler = nil }
+            guard let self, !data.isEmpty else {
+                return handle.readabilityHandler = nil
+            }
             lock.lock()
             errorText.append(data)
             if errorText.count > 8_192 { errorText = Data(errorText.suffix(4_096)) }
@@ -562,7 +581,9 @@ final class SFTPChannel: @unchecked Sendable {
             // held), so a descriptor that is ready has bytes or its end: a read that does not
             // block is not interrupted, and finds what `poll` saw.
             let count = read(descriptor, &buffer, buffer.count)
-            guard count > 0 else { return }
+            guard count > 0 else {
+                return
+            }
             lock.lock()
             errorText.append(buffer, count: count)
             if errorText.count > 8_192 { errorText = Data(errorText.suffix(4_096)) }
@@ -583,7 +604,9 @@ final class SFTPChannel: @unchecked Sendable {
         func readExactly(_ count: Int) -> Data? {
             var data = Data()
             while data.count < count {
-                guard let piece = try? input.read(upToCount: count - data.count), !piece.isEmpty else { return nil }
+                guard let piece = try? input.read(upToCount: count - data.count), !piece.isEmpty else {
+                    return nil
+                }
                 data.append(piece)
             }
             return data
@@ -596,7 +619,9 @@ final class SFTPChannel: @unchecked Sendable {
                 let kind = SFTPPacket.Kind(rawValue: payload[0])
             else { return }
             // The body is a view of the payload; nothing is copied.
-            if !handle(SFTPPacket(kind: kind, body: payload.dropFirst())) { return }
+            if !handle(SFTPPacket(kind: kind, body: payload.dropFirst())) {
+                return
+            }
         }
     }
 
@@ -608,7 +633,9 @@ final class SFTPChannel: @unchecked Sendable {
             return true
         }
         var decoder = SFTPDecoder(packet.body)
-        guard let id = try? decoder.u32() else { return false }
+        guard let id = try? decoder.u32() else {
+            return false
+        }
         lock.lock()
         lastReceived = Date()
         let waiter = waiting.removeValue(forKey: id)

@@ -50,7 +50,9 @@ final class FTPFixture: @unchecked Sendable {
     /// Of this session only: the tests run side by side, and the work of another test's server,
     /// which may be one that never answers, is not waited for.
     func settle(_ session: (any RemoteSession)? = nil, timeout: TimeInterval = Wait.ceiling) -> Bool {
-        guard let session = session ?? center.existingSession(for: key) else { return true }
+        guard let session = session ?? center.existingSession(for: key) else {
+            return true
+        }
         return Background.waitUntilIdle(lane: session, timeout: timeout)
     }
     func url(_ path: String) -> URL { key.url(path: path) }
@@ -352,7 +354,9 @@ final class FTPFixture: @unchecked Sendable {
         let key = ServerKey(scheme: "ftp", host: "127.0.0.1", port: TestFTPServer.port(of: silent))
         var started = Date()
         #expect { try fixture.fileSystem.list(key.url(), showHidden: true) } throws: { error in
-            if case NetworkError.timedOut = error { return true }
+            if case NetworkError.timedOut = error {
+                return true
+            }
             return false
         }
         // After the time limit, and not much later (the fault would be a wait without end).
@@ -372,7 +376,9 @@ final class FTPFixture: @unchecked Sendable {
         canceller.start()
         started = Date()
         #expect { try fixture.center.connect(key, cancellation: cancellation) } throws: { error in
-            if case NetworkError.cancelled = error { return true }
+            if case NetworkError.cancelled = error {
+                return true
+            }
             return false
         }
         #expect(Date().timeIntervalSince(started) < 120)

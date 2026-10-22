@@ -17,8 +17,11 @@ enum SelectionFile {
     static func encode(_ items: [FileItem], as encoding: Encoding) -> Data {
         let text = items.map { $0.isFolder ? $0.name + "\\" : $0.name }.joined(separator: "\r\n")
         switch encoding {
-        case .unicode: return Data([0xFF, 0xFE]) + Data(text.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] })
-        case .ansi: return windows1252(text)
+        case .unicode:
+            return Data([0xFF, 0xFE]) + Data(text.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] })
+
+        case .ansi:
+            return windows1252(text)
         }
     }
 
@@ -60,8 +63,12 @@ enum SelectionFile {
         if data.starts(with: [0xFF, 0xFE]) {
             return String(data: data.dropFirst(2), encoding: .utf16LittleEndian) ?? ""
         }
-        if data.starts(with: [0xFE, 0xFF]) { return String(data: data.dropFirst(2), encoding: .utf16BigEndian) ?? "" }
-        if data.starts(with: [0xEF, 0xBB, 0xBF]) { return String(data: data.dropFirst(3), encoding: .utf8) ?? "" }
+        if data.starts(with: [0xFE, 0xFF]) {
+            return String(data: data.dropFirst(2), encoding: .utf16BigEndian) ?? ""
+        }
+        if data.starts(with: [0xEF, 0xBB, 0xBF]) {
+            return String(data: data.dropFirst(3), encoding: .utf8) ?? ""
+        }
         return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) ?? ""
     }
 
@@ -225,14 +232,18 @@ enum DirectoryComparison {
         var exactOthers: [NameBytes: Int] = [:]
         exactOthers.reserveCapacity(right.count)
         for (index, item) in right.enumerated() {
-            if index & 0xFFF == 0, cancelled() { return marks }
+            if index & 0xFFF == 0, cancelled() {
+                return marks
+            }
             let bytes = exact(item.name)
             if exactOthers[bytes] == nil { exactOthers[bytes] = index }
         }
         var partner = [Int?](repeating: nil, count: left.count)
         var taken = Set<Int>()
         for (index, item) in left.enumerated() {
-            if index & 0xFFF == 0, cancelled() { return marks }
+            if index & 0xFFF == 0, cancelled() {
+                return marks
+            }
             if let other = exactOthers[exact(item.name)], taken.insert(other).inserted { partner[index] = other }
         }
         // Only what found no partner by its bytes is looked at again by the way it reads.
@@ -254,7 +265,9 @@ enum DirectoryComparison {
             marks.sameRight.append(other)
         }
         for (position, item) in left.enumerated() {
-            if position & 0xFFF == 0, cancelled() { return marks }
+            if position & 0xFFF == 0, cancelled() {
+                return marks
+            }
             // A file and a folder of the same name have nothing in common.
             guard let index = partner[position], right[index].isFolder == item.isFolder else {
                 if !item.isFolder || withSubdirectories { marks.left.append(position) }

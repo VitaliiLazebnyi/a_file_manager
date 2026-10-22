@@ -22,7 +22,9 @@ struct CoveragePlacesEditorParts {
             .map { ($0 as? NSTextField)?.stringValue ?? "" } ?? ""
     }
     var titles: [String] {
-        guard let table, let controller else { return [] }
+        guard let table, let controller else {
+            return []
+        }
         return (0..<controller.numberOfRows(in: table))
             .map {
                 (controller.tableView(table, viewFor: nil, row: $0) as? NSTextField)?.stringValue ?? ""
@@ -197,7 +199,9 @@ struct CoveragePlacesEditorParts {
 
     @Test func aDoubleClickMarksAnEntryHiddenAndTheBoxHidesThem() {
         let result = edit(sample) { parts in
-            guard let table = parts.table, let action = table.doubleAction else { return }
+            guard let table = parts.table, let action = table.doubleAction else {
+                return
+            }
             NSApp.sendAction(action, to: table.target, from: table)
             table.deselectAll(nil)
             NSApp.sendAction(action, to: table.target, from: table)

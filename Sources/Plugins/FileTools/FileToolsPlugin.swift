@@ -182,8 +182,12 @@ final class FileTools {
             completion: { [kernel] result in
                 kernel.panels.refresh(folders(try? result.get()))
                 switch result {
-                case .success(let value): done(value)
-                case .failure(ToolError.cancelled): break
+                case .success(let value):
+                    done(value)
+
+                case .failure(ToolError.cancelled):
+                    break
+
                 case .failure(let error):
                     kernel.interaction.inform(title, detail: error.localizedDescription, style: .warning)
                 }
@@ -211,7 +215,9 @@ final class FileTools {
             .choice("preset", "or a standard size:", presets),
             .note("A size is a number of bytes, or a number with k, M or G (1 k = 1024 bytes).")
         ]
-        guard let answer = ui.form("Split", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = ui.form("Split", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
         let preset = answer.index("preset")
         guard let size = preset > 0 ? Splitter.presets[preset - 1].bytes : Splitter.size(from: answer.text("size"))
         else {
@@ -246,7 +252,9 @@ final class FileTools {
             .note("Combine \(file.name) and all files with ascending names to the following directory:"),
             .text("target", "", targetProposal)
         ]
-        guard let answer = ui.form("Combine", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = ui.form("Combine", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
         let target = folder(from: answer.text("target"), relativeTo: directory)
         run(
             "Combine",
@@ -302,7 +310,9 @@ final class FileTools {
             .text("bytes", "Bytes per file:", ""),
             .note("(Note: header size is not counted)")
         ]
-        guard let answer = ui.form("Encode", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = ui.form("Encode", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
         let method = EncodeMethod(rawValue: answer.index("method")) ?? .mime
         let lines = max(0, Int(answer.text("lines").trimmingCharacters(in: .whitespaces)) ?? 0)
         let bytes = Splitter.size(from: answer.text("bytes")) ?? 0
@@ -334,7 +344,9 @@ final class FileTools {
             .note("Decode the file \(file.name) to directory:"), .text("target", "", targetProposal),
             .checkbox("autoRename", "Auto-rename decoded files")
         ]
-        guard let answer = ui.form("Decode", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = ui.form("Decode", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
         let target = folder(from: answer.text("target"), relativeTo: directory)
         let autoRename = answer.flag("autoRename")
         run(
@@ -350,7 +362,9 @@ final class FileTools {
             },
             then: { [ui, fileSystems] outcome in
                 // The files are kept; what the encoded text itself shows to be wrong is said.
-                guard !outcome.problems.isEmpty else { return }
+                guard !outcome.problems.isEmpty else {
+                    return
+                }
                 let shown = outcome.problems.prefix(8).map { "- " + $0 }.joined(separator: "\n")
                 let more = outcome.problems.count > 8 ? "\n... and \(outcome.problems.count - 8) more" : ""
                 let folder = fileSystems.displayPath(target)
@@ -456,8 +470,12 @@ final class FileTools {
             job: "Creating checksums:",
             refreshing: { [kernel] (created: Created?) in
                 // A panel shows one folder, so with very many folders only those it shows need reading again.
-                guard let folders = created?.folders else { return [directory] }
-                guard folders.count > 256 else { return [directory] + folders.map(\.url) }
+                guard let folders = created?.folders else {
+                    return [directory]
+                }
+                guard folders.count > 256 else {
+                    return [directory] + folders.map(\.url)
+                }
                 let shown = Set(kernel.panels.all.map { $0.model.directory.locationKey })
                 return [directory] + folders.filter { shown.contains($0.key) }.map(\.url)
             },
@@ -503,7 +521,9 @@ final class FileTools {
             let isChecksumFile = ChecksumFile.checksumFileTest(extraMasks: extraMasks)
             let operands = operands.items()
             let checksumFiles = operands.filter { !$0.isDirectory && isChecksumFile($0.name) }
-            if !checksumFiles.isEmpty { return try ChecksumRun.verify(checksumFiles: checksumFiles, run: run) }
+            if !checksumFiles.isEmpty {
+                return try ChecksumRun.verify(checksumFiles: checksumFiles, run: run)
+            }
             if let cursor, !cursor.isDirectory,
                 let digest = ChecksumRun.checksum(fromClipboard: kernel.askUser { _ in self.clipboardText() })
             {
@@ -536,7 +556,9 @@ final class FileTools {
             job: "Verifying checksums:",
             refreshing: { (_: Verified??) in [] },
             { run -> Verified? in
-                guard let report = try work(run) else { return nil }
+                guard let report = try work(run) else {
+                    return nil
+                }
                 // Text and names are made here, not in the completion on the main thread.
                 return Verified(
                     title: report.title,

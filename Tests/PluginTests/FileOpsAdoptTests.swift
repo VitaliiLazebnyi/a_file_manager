@@ -181,9 +181,13 @@ private func setTag(_ url: URL, _ value: String = "tagvalue") {
 
 private func tag(_ url: URL) -> String? {
     let size = getxattr(url.path, tagName, nil, 0, 0, XATTR_NOFOLLOW)
-    guard size > 0 else { return nil }
+    guard size > 0 else {
+        return nil
+    }
     var bytes = [UInt8](repeating: 0, count: size)
-    guard getxattr(url.path, tagName, &bytes, size, 0, XATTR_NOFOLLOW) == size else { return nil }
+    guard getxattr(url.path, tagName, &bytes, size, 0, XATTR_NOFOLLOW) == size else {
+        return nil
+    }
     return String(decoding: bytes, as: UTF8.self)
 }
 
@@ -256,9 +260,14 @@ private func created(_ url: URL) -> Date? {
         let reads = CallCounter()
         probe.onRead = {
             switch reads.next() {
-            case 2: base.stallsReads = true
-            case 3: gate.signal()
-            default: break
+            case 2:
+                base.stallsReads = true
+
+            case 3:
+                gate.signal()
+
+            default:
+                break
             }
         }
         let source = base.addFile("/src/big.bin", "some data")

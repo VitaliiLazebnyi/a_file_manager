@@ -26,16 +26,35 @@ extension Shortcut {
         if modifiers.contains(.shift) { text += "⇧" }
         if modifiers.contains(.command) { text += "⌘" }
         switch key {
-        case .character(let character): return text + character.uppercased()
-        case .function(let number): return text + "F\(number)"
-        case .returnKey, .enter: return text + "↩"
-        case .keypadPlus: return text + "Num +"
-        case .keypadMinus: return text + "Num −"
-        case .leftArrow: return text + "←"
-        case .rightArrow: return text + "→"
-        case .upArrow: return text + "↑"
-        case .downArrow: return text + "↓"
-        default: return text + notation
+        case .character(let character):
+            return text + character.uppercased()
+
+        case .function(let number):
+            return text + "F\(number)"
+
+        case .returnKey, .enter:
+            return text + "↩"
+
+        case .keypadPlus:
+            return text + "Num +"
+
+        case .keypadMinus:
+            return text + "Num −"
+
+        case .leftArrow:
+            return text + "←"
+
+        case .rightArrow:
+            return text + "→"
+
+        case .upArrow:
+            return text + "↑"
+
+        case .downArrow:
+            return text + "↓"
+
+        default:
+            return text + notation
         }
     }
 }
@@ -174,7 +193,9 @@ extension ViewerPane {
                     isEnabled: showsText && mode != .binary && mode != .hex,
                     isChecked: settings.wrap
                 ) { [weak self] in
-                    guard let self else { return }
+                    guard let self else {
+                        return
+                    }
                     settings.wrap.toggle()
                     relayout()
                 },
@@ -184,7 +205,9 @@ extension ViewerPane {
                     isEnabled: showsText,
                     isChecked: settings.caret
                 ) { [weak self] in
-                    guard let self else { return }
+                    guard let self else {
+                        return
+                    }
                     settings.caret.toggle()
                     pager.showsCaret = settings.caret
                 },
@@ -228,7 +251,9 @@ extension ViewerPane {
                     isEnabled: isImage,
                     isChecked: settings.centersImages
                 ) { [weak self] in
-                    guard let self else { return }
+                    guard let self else {
+                        return
+                    }
                     settings.centersImages.toggle()
                     imageView?.centered = settings.centersImages
                 },
@@ -335,7 +360,9 @@ extension ViewerPane {
                 activity.cancel.cancel()
                 return true
             }
-            guard !isEmbedded else { return false }
+            guard !isEmbedded else {
+                return false
+            }
             onClose()
             return true
         }
@@ -405,7 +432,9 @@ extension ViewerPane {
             return true
         }
         // Shown text is always in the pager, which is then the content.
-        guard showsText else { return false }
+        guard showsText else {
+            return false
+        }
         let motion: TextPagerView.Motion
         if named(.upArrow) {
             motion = jump && flags.contains(.command) ? .fileStart : .up
@@ -446,7 +475,9 @@ extension ViewerPane {
 
     /// The Encoding menu: a code page for text mode, or one of the Unicode modes.
     func setEncoding(_ encoding: ViewerEncoding?) {
-        guard loaded != nil else { return }
+        guard loaded != nil else {
+            return
+        }
         switch encoding?.kind {
         case .utf8:
             mode = .utf8
@@ -533,8 +564,12 @@ extension ViewerPane {
     /// A byte offset as the user types it: decimal, or hexadecimal with `0x` or `$`.
     static func offset(in text: String) -> Int64? {
         let text = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "").lowercased()
-        if text.hasPrefix("0x") { return Int64(text.dropFirst(2), radix: 16) }
-        if text.hasPrefix("$") { return Int64(text.dropFirst(), radix: 16) }
+        if text.hasPrefix("0x") {
+            return Int64(text.dropFirst(2), radix: 16)
+        }
+        if text.hasPrefix("$") {
+            return Int64(text.dropFirst(), radix: 16)
+        }
         return Int64(text)
     }
 
@@ -555,7 +590,9 @@ extension ViewerPane {
             let line = Int(answer.trimmingCharacters(in: .whitespaces))
         else { return }
         pager.scroll(toLine: line) { [weak self] found in
-            guard let self, !found else { return }
+            guard let self, !found else {
+                return
+            }
             kernel.interaction.inform(
                 pager.isIndexing
                     ? "Line \(line) has not been read yet; try again in a moment." : "There is no line \(line)."
@@ -571,7 +608,9 @@ extension ViewerPane {
 
     /// The Find dialog (spec 10 › Find dialog).
     func find() {
-        guard showsText else { return }
+        guard showsText else {
+            return
+        }
         let options = lastSearch?.options ?? settings.searchOptions
         let history = settings.searchHistory
         var fields: [FormField] = [.text("text", "Enter search text:", lastSearch?.text ?? history.first ?? "")]
@@ -585,7 +624,9 @@ extension ViewerPane {
             .checkbox("hex", "Search hex string", options.hex),
             .checkbox("regex", "RegEx", options.regex)
         ]
-        guard let answer = kernel.interaction.form("Find", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = kernel.interaction.form("Find", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
         let picked = answer.index("history")
         let text = picked > 0 && picked <= history.count ? history[picked - 1] : answer.text("text")
         let chosen = SearchOptions(
@@ -595,7 +636,9 @@ extension ViewerPane {
             hex: answer.flag("hex"),
             regex: answer.flag("regex")
         )
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            return
+        }
         lastSearch = (text, chosen)
         settings.searchOptions = chosen
         settings.searchHistory = [text] + history.filter { $0 != text }
@@ -609,16 +652,23 @@ extension ViewerPane {
             return
         }
         switch direction {
-        case .same: search(backwards: lastSearch.options.backwards)
-        case .backwards: search(backwards: true)
-        case .reversed: search(backwards: !lastSearchWentBackwards)
+        case .same:
+            search(backwards: lastSearch.options.backwards)
+
+        case .backwards:
+            search(backwards: true)
+
+        case .reversed:
+            search(backwards: !lastSearchWentBackwards)
         }
     }
 
     /// Searches the whole file from the current place on, off the main thread, with progress
     /// in the status line; Esc or Cancel stops it.
     func search(backwards: Bool) {
-        guard let lastSearch, let document = pager.document, let loaded, activity == nil else { return }
+        guard let lastSearch, let document = pager.document, let loaded, activity == nil else {
+            return
+        }
         let pattern: SearchPattern
         do {
             pattern = try SearchPattern(lastSearch.text, options: lastSearch.options, encoding: document.encoding)
@@ -648,10 +698,14 @@ extension ViewerPane {
                     cancellation: cancel,
                     boundaries: boundaries
                 ) { fraction in
-                    guard Date().timeIntervalSince(lastReport) > 0.1 else { return }
+                    guard Date().timeIntervalSince(lastReport) > 0.1 else {
+                        return
+                    }
                     lastReport = Date()
                     DispatchQueue.main.async {
-                        guard let self, self.activity?.cancel === cancel else { return }
+                        guard let self, self.activity?.cancel === cancel else {
+                            return
+                        }
                         self.activity?.progress = fraction
                     }
                 }
@@ -678,8 +732,11 @@ extension ViewerPane {
         case .success(let match?):
             pager.reveal(offset: match.lowerBound, select: match, rowsAbove: settings.searchGoBack)
 
-        case .success(nil): kernel.interaction.inform("\"\(text)\" was not found.")
-        case .failure(let error): kernel.interaction.report(error, title: "Find")
+        case .success(nil):
+            kernel.interaction.inform("\"\(text)\" was not found.")
+
+        case .failure(let error):
+            kernel.interaction.report(error, title: "Find")
         }
     }
 
@@ -694,7 +751,9 @@ extension ViewerPane {
     ///
     /// The bytes are read in the background.
     func copySelection(asHex: Bool, completion: @escaping @MainActor @Sendable () -> Void = {}) {
-        guard let document = pager.document, let selection = pager.selection else { return }
+        guard let document = pager.document, let selection = pager.selection else {
+            return
+        }
         // Hex is three characters a byte; the string is made on the main thread for the clipboard.
         let limit = asHex ? Self.copyLimit / 2 : Self.copyLimit
         guard selection.upperBound - selection.lowerBound <= limit else {
@@ -724,11 +783,15 @@ extension ViewerPane {
     /// The context menu (spec 10 › Context menu rules): with a selection, the copy commands
     /// and what can be done with a link; without one, only on a link.
     func makeContextMenu() -> NSMenu? {
-        guard showsText, let window else { return nil }
+        guard showsText, let window else {
+            return nil
+        }
         var link: URL?
         if pager.selection == nil, let hit = pager.text(at: window.mouseLocationOutsideOfEventStream) {
             link = Self.link(in: hit.text, at: hit.index)
-            guard link != nil else { return nil }
+            guard link != nil else {
+                return nil
+            }
         }
         var entries: [ViewerAction?] = []
         if pager.selection != nil {
@@ -787,9 +850,13 @@ extension ViewerPane {
     }
 
     private func withSelectedText(_ action: @escaping @MainActor @Sendable (String) -> Void) {
-        guard let document = pager.document, let selection = pager.selection, selection.count <= 4_096 else { return }
+        guard let document = pager.document, let selection = pager.selection, selection.count <= 4_096 else {
+            return
+        }
         workQueue.async {
-            guard let text = try? document.text(in: selection) else { return }
+            guard let text = try? document.text(in: selection) else {
+                return
+            }
             DispatchQueue.main.async { action(text) }
         }
     }
@@ -797,7 +864,9 @@ extension ViewerPane {
     // MARK: File menu
 
     private func openFile() {
-        guard let url = dialogs.fileToOpen() else { return }
+        guard let url = dialogs.fileToOpen() else {
+            return
+        }
         load(ViewerItem(source: .file(url), title: kernel.fileSystems.displayPath(url)))
     }
 
@@ -806,7 +875,9 @@ extension ViewerPane {
     ///
     /// Runs as a job with a progress window.
     private func saveAs() {
-        guard let loaded else { return }
+        guard let loaded else {
+            return
+        }
         guard let target = dialogs.saveTarget(proposing: loaded.item.url?.lastPathComponent ?? loaded.item.title)
         else { return }
         // The file that is shown is read while the copy is written: it is not replaced.
@@ -851,12 +922,16 @@ extension ViewerPane {
     /// F4 opens the editor, for files that are files and are shown as text (spec 10 › F4
     /// inside Lister).
     private var canEdit: Bool {
-        guard let url = item?.url, mode.isTextual, !isEmbedded else { return false }
+        guard let url = item?.url, mode.isTextual, !isEmbedded else {
+            return false
+        }
         return url.isFileURL && kernel.commands[.edit] != nil
     }
 
     private func edit() {
-        guard let url = item?.url else { return }
+        guard let url = item?.url else {
+            return
+        }
         kernel.commands.perform(.edit, .location(url))
     }
 
@@ -884,7 +959,9 @@ extension ViewerPane {
     /// File › Page Setup (the specification's Print setup): paper and margins.
     func pageSetup() {
         let info = printInfo()
-        guard dialogs.pageLayout(info) else { return }
+        guard dialogs.pageLayout(info) else {
+            return
+        }
         NSPrintInfo.shared = info
         settings.printMargins = [info.leftMargin, info.rightMargin, info.topMargin, info.bottomMargin]
     }
@@ -1001,8 +1078,12 @@ extension ViewerPane {
             let rows = try? document.rows(from: row, count: 512, cancellation: cancellation), !rows.isEmpty
         {
             for line in rows {
-                if line.range.lowerBound >= range.upperBound { return PrintableText(lines: lines, truncated: false) }
-                if lines.count >= maxRows { return PrintableText(lines: lines, truncated: true) }
+                if line.range.lowerBound >= range.upperBound {
+                    return PrintableText(lines: lines, truncated: false)
+                }
+                if lines.count >= maxRows {
+                    return PrintableText(lines: lines, truncated: true)
+                }
                 lines.append(line.text)
             }
             row += rows.count
@@ -1087,10 +1168,14 @@ final class TextPrintView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        guard !lines.isEmpty else { return }
+        guard !lines.isEmpty else {
+            return
+        }
         let first = max(0, Int(dirtyRect.minY / lineHeight))
         let last = min(lines.count - 1, Int(dirtyRect.maxY / lineHeight))
-        guard first <= last else { return }
+        guard first <= last else {
+            return
+        }
         for index in first...last {
             (lines[index] as NSString)
                 .draw(

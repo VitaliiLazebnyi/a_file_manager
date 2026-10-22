@@ -58,7 +58,9 @@ final class QuickViewPanel {
             [weak self] in self?.show($0)
         }
         subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
-            guard let self, panel === self.covered else { return }
+            guard let self, panel === self.covered else {
+                return
+            }
             // Switching to the covered panel, or showing another place in it, ends the quick view.
             if event == .becameSource || event == .locationChanged { onDismiss() }
         }

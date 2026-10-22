@@ -24,7 +24,9 @@ final class QuickLookController: NSResponder, @preconcurrency QLPreviewPanelData
             panel?.close()
             return
         }
-        guard !urls.isEmpty else { return }
+        guard !urls.isEmpty else {
+            return
+        }
         self.urls = urls
         panel?.show(for: self)
     }
@@ -41,7 +43,9 @@ final class QuickLookController: NSResponder, @preconcurrency QLPreviewPanelData
 
     /// Follows the cursor: the open panel shows other files.
     func follow(_ urls: [URL]) {
-        guard isVisible, urls != self.urls else { return }
+        guard isVisible, urls != self.urls else {
+            return
+        }
         self.urls = urls
         panel?.reload()
     }

@@ -123,7 +123,9 @@ struct ZipRecord {
     /// encoding).
     var name: String {
         if nameRaw.isEmpty {
-            if flags & Self.flagUTF8 != 0 || nameText.utf8.allSatisfy({ $0 < 0x80 }) { return nameText }
+            if flags & Self.flagUTF8 != 0 || nameText.utf8.allSatisfy({ $0 < 0x80 }) {
+                return nameText
+            }
             if let field = Self.field(0x7075, in: extra), field.count > 5,
                 let text = String(data: field.dropFirst(5), encoding: .utf8)
             {
@@ -142,7 +144,9 @@ struct ZipRecord {
         {
             return text
         }
-        if let text = String(data: nameBytes, encoding: .utf8) { return text }
+        if let text = String(data: nameBytes, encoding: .utf8) {
+            return text
+        }
         // Every byte has a character in the DOS set, so the text is always made.
         return [UInt8](nameBytes)
             .withUnsafeBufferPointer {
@@ -174,7 +178,9 @@ struct ZipRecord {
     /// Without the bits that make a program run as its owner or group: what comes out of an
     /// archive must not gain rights that way.
     var permissions: UInt16 {
-        if unixMode & 0o7777 != 0 { return UInt16(unixMode & 0o1777) }
+        if unixMode & 0o7777 != 0 {
+            return UInt16(unixMode & 0o1777)
+        }
         // DOS attributes know only "read-only".
         let writable: UInt16 = externalAttributes & 1 != 0 ? 0 : 0o200
         return isDirectory ? 0o555 | writable : 0o444 | writable
@@ -258,9 +264,13 @@ struct ZipRecord {
         var reader = ByteReader(extra)
         while reader.remaining >= 4 {
             let (fieldID, size) = (reader.u16(), Int(reader.u16()))
-            guard size <= reader.remaining else { return nil }
+            guard size <= reader.remaining else {
+                return nil
+            }
             let data = reader.bytes(size)
-            if fieldID == id { return data }
+            if fieldID == id {
+                return data
+            }
         }
         return nil
     }
@@ -270,7 +280,9 @@ struct ZipRecord {
     /// Extra data is optional: an entry whose fields grew past what a header can hold loses the
     /// last ones instead of becoming unwritable.
     static func fitting(_ extra: Data, into room: Int) -> Data {
-        guard extra.count > room else { return extra }
+        guard extra.count > room else {
+            return extra
+        }
         var reader = ByteReader(extra)
         var kept = Data()
         while reader.remaining >= 4 {
@@ -298,7 +310,9 @@ struct ZipRecord {
             scan.position += size
             found = fieldID == id
         }
-        if !found, scan.remaining == 0 { return extra }
+        if !found, scan.remaining == 0 {
+            return extra
+        }
         var reader = ByteReader(extra)
         var kept = Data()
         while reader.remaining >= 4 {
@@ -332,11 +346,15 @@ enum DOSTime {
     }
 
     static func encode(_ date: Date) -> (time: UInt16, date: UInt16) {
-        guard date.timeIntervalSince1970.isFinite else { return (0, 0x21) }
+        guard date.timeIntervalSince1970.isFinite else {
+            return (0, 0x21)
+        }
         let calendar = Calendar(identifier: .gregorian)
         func part(_ component: Calendar.Component) -> UInt16 { UInt16(calendar.component(component, from: date)) }
         let year = calendar.component(.year, from: date)
-        guard year >= 1_980 else { return (0, 0x21) }
+        guard year >= 1_980 else {
+            return (0, 0x21)
+        }
         let day = UInt16(min(year - 1_980, 127)) << 9 | part(.month) << 5 | part(.day)
         let time = part(.hour) << 11 | part(.minute) << 5 | part(.second) / 2
         return (time, day)
@@ -384,13 +402,17 @@ enum ZipAES {
         }
 
         init?(extra: Data) {
-            guard let field = ZipRecord.field(ZipAES.extraID, in: extra), field.count >= 7 else { return nil }
+            guard let field = ZipRecord.field(ZipAES.extraID, in: extra), field.count >= 7 else {
+                return nil
+            }
             var reader = ByteReader(field)
             version = reader.u16()
             _ = reader.u16()
             strength = reader.u8()
             method = reader.u16()
-            guard (1...3).contains(strength), version == 1 || version == 2 else { return nil }
+            guard (1...3).contains(strength), version == 1 || version == 2 else {
+                return nil
+            }
         }
 
         var encoded: Data {
@@ -704,7 +726,9 @@ final class ZipDecryptStream: ByteStream {
     }
 
     func read(upToCount count: Int) throws -> Data? {
-        guard var block = try source.read(upToCount: count) else { return nil }
+        guard var block = try source.read(upToCount: count) else {
+            return nil
+        }
         crypto.decrypt(&block)
         return block
     }

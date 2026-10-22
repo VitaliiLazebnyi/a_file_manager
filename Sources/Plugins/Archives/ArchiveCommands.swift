@@ -118,7 +118,9 @@ final class ArchiveCommands {
     /// The key itself belongs to "Open Directory", which sends files to the openers like Enter
     /// does; this is how the opener tells the two apart.
     private var isForcedOpen: Bool {
-        guard let event = currentEvent(), event.type == .keyDown else { return false }
+        guard let event = currentEvent(), event.type == .keyDown else {
+            return false
+        }
         return event.keyCode == 121 && event.modifierFlags.contains(.control)
     }
 
@@ -132,9 +134,13 @@ final class ArchiveCommands {
     /// The opener for Enter: archives are entered like folders.
     func open(_ file: FileItem, in panel: any PanelHandle) -> Bool {
         let options = environment.options
-        guard !file.isDirectory else { return false }
+        guard !file.isDirectory else {
+            return false
+        }
         let known = options.opensAsFolders && options.extensions.contains(file.ext.lowercased())
-        guard known || (options.entersAnyFile && isForcedOpen) else { return false }
+        guard known || (options.entersAnyFile && isForcedOpen) else {
+            return false
+        }
         panel.show(archiveRoot(for: file.url))
         return true
     }
@@ -142,7 +148,9 @@ final class ArchiveCommands {
     /// Enter on a file inside an archive shows what the archive knows about it
     /// (spec 08 › Enter on a file inside an archive).
     func showMember(_ file: FileItem, in _: any PanelHandle) -> Bool {
-        guard let location = ArchiveURL.location(of: file.url), !file.isDirectory else { return false }
+        guard let location = ArchiveURL.location(of: file.url), !file.isDirectory else {
+            return false
+        }
         let store = self.store
         kernel.jobs.run(
             title: "Reading:",
@@ -153,7 +161,9 @@ final class ArchiveCommands {
                     )
             },
             completion: { [self] entry in
-                guard let entry else { return }
+                guard let entry else {
+                    return
+                }
                 // Both sizes are what the archive claims; the quotient may be anything.
                 let percent = entry.size > 0 ? (Double(entry.packedSize) / Double(entry.size) * 100).rounded() : -1
                 let ratio = (0...100_000).contains(percent) ? "\(Int(percent))%" : "–"
@@ -167,11 +177,18 @@ final class ArchiveCommands {
                 var buttons = ["Unpack and Open", "Close"]
                 if kernel.commands[.view] != nil { buttons.insert("View", at: 0) }
                 let answer = ui.choose(entry.name, detail: detail, buttons: buttons, style: .information)
-                guard buttons.indices.contains(answer) else { return }
+                guard buttons.indices.contains(answer) else {
+                    return
+                }
                 switch buttons[answer] {
-                case "View": kernel.commands.perform(.view, .location(file.url))
-                case "Unpack and Open": unpackAndOpen(file)
-                default: break
+                case "View":
+                    kernel.commands.perform(.view, .location(file.url))
+
+                case "Unpack and Open":
+                    unpackAndOpen(file)
+
+                default:
+                    break
                 }
             }
         )
@@ -213,9 +230,14 @@ final class ArchiveCommands {
             },
             completion: { [self] result in
                 switch result {
-                case .success(let local): _ = openFile?(local)
-                case .failure(ArchiveError.cancelled): break
-                case .failure(let error): ui.report(error, title: "\(file.name) cannot be unpacked!")
+                case .success(let local):
+                    _ = openFile?(local)
+
+                case .failure(ArchiveError.cancelled):
+                    break
+
+                case .failure(let error):
+                    ui.report(error, title: "\(file.name) cannot be unpacked!")
                 }
             }
         )
@@ -226,7 +248,9 @@ final class ArchiveCommands {
     /// The first bytes are read in the background to see whether it is a ZIP, which can be changed.
     func openAsArchive() {
         let panel = source
-        guard let file = panel.model.cursorFile else { return }
+        guard let file = panel.model.cursorFile else {
+            return
+        }
         let fileSystems = self.fileSystems
         kernel.jobs.run(
             title: "Opening:",
@@ -266,7 +290,9 @@ final class ArchiveCommands {
     /// The file name a new archive gets: the typed name with the ending of the chosen format.
     nonisolated static func archiveName(_ typed: String, format: ArchiveFormat) -> String {
         let ext = (typed as NSString).pathExtension.lowercased()
-        if format == .zip, ArchiveFileSystem.zipExtensions.contains(ext) { return typed }
+        if format == .zip, ArchiveFileSystem.zipExtensions.contains(ext) {
+            return typed
+        }
         if let split = ArchiveFormat.splitKnownExtension(typed) {
             return format.extensions.contains(split.ext.lowercased())
                 ? typed : split.base + "." + format.defaultExtension
@@ -325,7 +351,9 @@ final class ArchiveCommands {
             .checkbox("tarFirst", "Create a TAR archive first, then compress (GZ, BZ2, XZ)"),
             .checkbox("encrypt", "Encrypt with a password (ZIP only)")
         ]
-        guard let answer = ui.form("Pack files", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = ui.form("Pack files", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
 
         var options = PackOptions()
         let (prefixFormat, path) = Self.splitPrefix(
@@ -357,7 +385,9 @@ final class ArchiveCommands {
                 ui.inform("Only ZIP archives can be encrypted.", detail: "", style: .warning)
                 return
             }
-            guard let secret = askNewPassword(detail: Self.encryptionNote) else { return }
+            guard let secret = askNewPassword(detail: Self.encryptionNote) else {
+                return
+            }
             (options.password, options.encryption) = (secret.password, secret.encryption)
         }
 
@@ -448,7 +478,9 @@ final class ArchiveCommands {
             .password("password", "Password:"), .password("repeat", "Repeat password:"),
             .checkbox("legacy", Self.legacyLabel)
         ]
-        guard let answer = ui.form("Encrypt", detail: detail, fields: fields, buttons: ["OK"]) else { return nil }
+        guard let answer = ui.form("Encrypt", detail: detail, fields: fields, buttons: ["OK"]) else {
+            return nil
+        }
         let password = answer.text("password")
         if !password.isEmpty, password == answer.text("repeat") {
             return (password, answer.flag("legacy") ? .legacy : .aes256)
@@ -492,7 +524,9 @@ final class ArchiveCommands {
                 settings.flag(ArchiveSettings.unpackOverwrite, default: false)
             )
         ]
-        guard let answer = ui.form("Unpack files", detail: "", fields: fields, buttons: ["OK"]) else { return }
+        guard let answer = ui.form("Unpack files", detail: "", fields: fields, buttons: ["OK"]) else {
+            return
+        }
         var options = UnpackOptions()
         options.mask = answer.text("mask").trimmingCharacters(in: .whitespaces).isEmpty ? "*.*" : answer.text("mask")
         options.keepsPaths = answer.flag("paths")

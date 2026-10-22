@@ -172,7 +172,9 @@ public final class FolderTabsPlugin: Plugin {
             enabled: hasSeveralTabs
         ) { [self] in
             let others = tabs().tabs.indices.filter { $0 != tabs().activeIndex && !tabs().tabs[$0].isLocked }
-            guard !others.isEmpty else { return }
+            guard !others.isEmpty else {
+                return
+            }
             if settings.flag(Self.confirmCloseAllKey, default: true),
                 kernel.interaction.choose(
                     "Close all tabs?",
@@ -408,8 +410,12 @@ public final class FolderTabsPlugin: Plugin {
     /// Whether showing the tab would connect to a server (or look in a place that may): the
     /// file system of the location says so itself; the list of schemes holds for the others.
     func connects(_ location: String) -> Bool {
-        guard let url = URL(string: location), let scheme = url.scheme?.lowercased() else { return false }
-        if let provider = try? fileSystems?.provider(for: url), provider.connectsToServer { return true }
+        guard let url = URL(string: location), let scheme = url.scheme?.lowercased() else {
+            return false
+        }
+        if let provider = try? fileSystems?.provider(for: url), provider.connectsToServer {
+            return true
+        }
         return Self.connectingSchemes.contains(scheme)
     }
 
@@ -487,7 +493,9 @@ public final class FolderTabsPlugin: Plugin {
     static func duplicates(in tabs: PanelTabs) -> [Int] {
         var seen: Set<String> = [tabs.active.directory.locationKey]
         return tabs.tabs.indices.filter { index in
-            guard index != tabs.activeIndex else { return false }
+            guard index != tabs.activeIndex else {
+                return false
+            }
             return !seen.insert(tabs.tabs[index].directory.locationKey).inserted && !tabs.tabs[index].isLocked
         }
     }
@@ -530,7 +538,9 @@ public final class FolderTabsPlugin: Plugin {
     /// A name without an extension gets `.tab`.
     private func tabFile(_ argument: CommandArgument, question: String, kernel: Kernel) -> URL? {
         let directory = kernel.panels.source.model.directory
-        if let location = argument.location { return location }
+        if let location = argument.location {
+            return location
+        }
         guard
             let text = argument.text
                 ?? kernel.interaction.prompt(
@@ -552,8 +562,11 @@ public final class FolderTabsPlugin: Plugin {
 
         var errorDescription: String? {
             switch self {
-            case .notAFile(let path): return "\(path) is not a file."
-            case .tooLarge(let path): return "\(path) is too large to be a tab file."
+            case .notAFile(let path):
+                return "\(path) is not a file."
+
+            case .tooLarge(let path):
+                return "\(path) is too large to be a tab file."
             }
         }
     }
@@ -564,7 +577,9 @@ public final class FolderTabsPlugin: Plugin {
     }
 
     private func save(_ argument: CommandArgument, bothSides: Bool, kernel: Kernel) {
-        guard let file = tabFile(argument, question: "Save tabs to file:", kernel: kernel) else { return }
+        guard let file = tabFile(argument, question: "Save tabs to file:", kernel: kernel) else {
+            return
+        }
         let contents = TabFile(
             active: kernel.panels.source.tabs.state,
             inactive: bothSides ? kernel.panels.target.tabs.state : nil
@@ -591,7 +606,9 @@ public final class FolderTabsPlugin: Plugin {
                                 style: .warning
                             ) == 0
                         }
-                        guard overwrite else { return .declined }
+                        guard overwrite else {
+                            return .declined
+                        }
                     }
                     // Written under another name and renamed when complete: the old file is
                     // there until the new one is, and a failure leaves it as it was.
@@ -612,16 +629,23 @@ public final class FolderTabsPlugin: Plugin {
             },
             completion: { outcome in
                 switch outcome {
-                case .saved: kernel.panels.refresh([file.deletingLastPathComponent()], focus: file)
-                case .failed(let error): kernel.interaction.report(error, title: "The tabs could not be saved.")
-                case .declined: break
+                case .saved:
+                    kernel.panels.refresh([file.deletingLastPathComponent()], focus: file)
+
+                case .failed(let error):
+                    kernel.interaction.report(error, title: "The tabs could not be saved.")
+
+                case .declined:
+                    break
                 }
             }
         )
     }
 
     private func load(_ argument: CommandArgument, replacing: Bool, kernel: Kernel) {
-        guard let file = tabFile(argument, question: "Load tabs from file:", kernel: kernel) else { return }
+        guard let file = tabFile(argument, question: "Load tabs from file:", kernel: kernel) else {
+            return
+        }
         let fileSystems = kernel.fileSystems
         let (source, target) = (kernel.panels.source, kernel.panels.target)
         let base = source.model.directory

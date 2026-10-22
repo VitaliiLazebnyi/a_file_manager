@@ -60,7 +60,9 @@ import Testing
         #expect {
             try local.copy(source, to: box.url("b.txt")) { _ in true }
         } throws: { error in
-            if case FileSystemError.alreadyExists = error { return true }
+            if case FileSystemError.alreadyExists = error {
+                return true
+            }
             return false
         }
         #expect(box.read("b.txt") == "theirs")

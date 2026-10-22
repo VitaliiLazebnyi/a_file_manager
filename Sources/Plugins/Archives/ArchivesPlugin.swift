@@ -260,14 +260,16 @@ public final class ArchivesPlugin: Plugin {
                 for failure in failures {
                     var text = failure.error.localizedDescription
                     switch outcomes[ObjectIdentifier(failure.archive)] {
-                    case .saved(let url): text += "\n\nThe files that were added are in \(url.path)."
+                    case .saved(let url):
+                        text += "\n\nThe files that were added are in \(url.path)."
 
                     case .kept(let folder):
                         text +=
                             "\n\nThe files that were added could not be saved elsewhere. Their compressed data is in \(folder.path)"
                             + " (index.txt there says which file is which)."
 
-                    case .nothingToSave, nil: break
+                    case .nothingToSave, nil:
+                        break
                     }
                     reports.append((ArchiveError.unsaved(text), failure.name))
                 }

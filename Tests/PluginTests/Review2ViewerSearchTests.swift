@@ -156,7 +156,9 @@ import Testing
     private final class Shrunk: ByteSource {
         let length: Int64 = 200_000
         func read(at offset: Int64, count: Int) -> Data {
-            guard offset < 50_000 else { return Data() }
+            guard offset < 50_000 else {
+                return Data()
+            }
             return Data(
                 (0..<min(count, 50_000 - Int(offset))).map { ($0 + Int(offset)) % 2 == 0 ? UInt8(0x81) : UInt8(0x41) }
             )

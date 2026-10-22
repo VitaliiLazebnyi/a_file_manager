@@ -10,7 +10,9 @@ public enum CompareContent: Sendable {
     case binary(left: Data, right: Data, diff: BinaryDiff)
 
     var isNone: Bool {
-        if case .none = self { return true }
+        if case .none = self {
+            return true
+        }
         return false
     }
 }
@@ -206,7 +208,9 @@ public enum CompareLoader {
         cancellation: CancellationFlag = CancellationFlag(),
         stretch: Int = Self.stretch
     ) throws -> Bool? {
-        if cancellation.isCancelled { return nil }
+        if cancellation.isCancelled {
+            return nil
+        }
         try fileSystems.flushPendingWrites(to: first, cancellation: cancellation)
         try fileSystems.flushPendingWrites(to: second, cancellation: cancellation)
         let systems = [try fileSystems.provider(for: first), try fileSystems.provider(for: second)]
@@ -221,7 +225,9 @@ public enum CompareLoader {
                 return try sameStream(first, second, systems: systems, cancellation: cancellation)
             } catch {
                 // A read that the cancel ended is the cancel, not a failure.
-                if cancellation.isCancelled { return nil }
+                if cancellation.isCancelled {
+                    return nil
+                }
                 throw error
             }
         }
@@ -237,7 +243,9 @@ public enum CompareLoader {
         @Sendable func take() -> Int? {
             lock.lock()
             defer { lock.unlock() }
-            guard !differs, failure == nil, next < stretches, !cancellation.isCancelled else { return nil }
+            guard !differs, failure == nil, next < stretches, !cancellation.isCancelled else {
+                return nil
+            }
             next += 1
             return next - 1
         }
@@ -276,7 +284,9 @@ public enum CompareLoader {
             }
         }
         // A cancelled check has no answer, also when the reads it cut short came back different.
-        if cancellation.isCancelled { return nil }
+        if cancellation.isCancelled {
+            return nil
+        }
         if let failure { throw failure }
         return !differs
     }
@@ -316,7 +326,9 @@ public enum CompareLoader {
         while verdict == nil, !cancellation.isCancelled {
             verdict = try autoreleasepool {
                 let blocks = [try exactly(1 << 20, from: readers[0]), try exactly(1 << 20, from: readers[1])]
-                if blocks[0] != blocks[1] { return false }
+                if blocks[0] != blocks[1] {
+                    return false
+                }
                 return blocks[0].isEmpty ? true : nil
             }
         }
@@ -435,7 +447,9 @@ public enum CompareLoader {
         -> Bool
     {
         var st = stat()
-        guard stat(url.path, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink > 1 else { return false }
+        guard stat(url.path, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink > 1 else {
+            return false
+        }
         let writer = try fileSystem.append(to: url, at: 0, cancellation: CancellationFlag())
         for start in stride(from: 0, to: data.count, by: 1 << 20) {
             try writer.write(data.subdata(in: start..<min(start + (1 << 20), data.count)))

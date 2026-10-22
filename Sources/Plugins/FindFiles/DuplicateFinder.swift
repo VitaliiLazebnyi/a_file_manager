@@ -46,7 +46,9 @@ public enum DuplicateFinder {
         cancellation: CancellationFlag = CancellationFlag(),
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) -> [[FileItem]] {
-        guard options.isActive else { return [] }
+        guard options.isActive else {
+            return []
+        }
         func key(_ item: FileItem) -> Key {
             // Equal contents imply equal sizes, so the size narrows the candidates for free.
             Key(
@@ -82,7 +84,9 @@ public enum DuplicateFinder {
                     }
             )
         }
-        guard !cancellation.isCancelled else { return [] }
+        guard !cancellation.isCancelled else {
+            return []
+        }
         let groups = Dictionary(grouping: keyed, by: \.key).values
             .map { group in
                 Sorter.sorted(group.map(\.item), numeric: true) { $0.url.path }
@@ -102,7 +106,9 @@ public enum DuplicateFinder {
                 if options.sameName, first.lowered != second.lowered, let a = first.name, let b = second.name {
                     return a < b
                 }
-                if first.group[0].size != second.group[0].size { return first.group[0].size < second.group[0].size }
+                if first.group[0].size != second.group[0].size {
+                    return first.group[0].size < second.group[0].size
+                }
                 return first.path < second.path
             }
             .map { $0.group }
@@ -137,7 +143,9 @@ public enum DuplicateFinder {
                 mount = mountOf(url)
                 mounts[device] = .some(mount)
             }
-            guard let mount else { return true }
+            guard let mount else {
+                return true
+            }
             return seenPlaces.insert(mount.place(of: url.path)).inserted
         }
         var result: [(key: Entry, item: FileItem)] = []
@@ -213,12 +221,18 @@ public enum DuplicateFinder {
         do {
             while true {
                 let more: Bool? = try autoreleasepool {
-                    guard let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else { return false }
-                    if cancellation.isCancelled { return nil }
+                    guard let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else {
+                        return false
+                    }
+                    if cancellation.isCancelled {
+                        return nil
+                    }
                     hash.update(data: block)
                     return true
                 }
-                guard let more else { return nil }
+                guard let more else {
+                    return nil
+                }
                 if !more { break }
             }
         } catch {

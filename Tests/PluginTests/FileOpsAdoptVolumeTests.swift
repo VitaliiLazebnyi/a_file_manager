@@ -62,7 +62,9 @@ final class LocalProbe: FileSystemProvider, @unchecked Sendable {
     }
     func remove(_ url: URL) throws {
         let fails: Bool = lock.withLock {
-            guard failsOnce.remove(url.lastPathComponent) != nil else { return false }
+            guard failsOnce.remove(url.lastPathComponent) != nil else {
+                return false
+            }
             removalsFailed += 1
             return true
         }

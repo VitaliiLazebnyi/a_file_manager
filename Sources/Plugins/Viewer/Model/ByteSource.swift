@@ -21,8 +21,11 @@ enum ViewerError: LocalizedError, Equatable {
         case .notAFile(let name):
             return "\(name) is not a regular file (a pipe, device or socket), and cannot be shown."
 
-        case .endless(let name): return "\(name) does not end, and cannot be shown."
-        case .busy: return "Too many reads are still waiting for a volume that does not answer; this file was not read."
+        case .endless(let name):
+            return "\(name) does not end, and cannot be shown."
+
+        case .busy:
+            return "Too many reads are still waiting for a volume that does not answer; this file was not read."
         }
     }
 }
@@ -41,12 +44,16 @@ enum ViewerCleanup {
 
     /// Closes the source off the calling thread.
     static func close(_ source: any ByteSource?) {
-        guard let source else { return }
+        guard let source else {
+            return
+        }
         queue.async { source.close() }
     }
 
     static func close(_ readers: [any FileReader]) {
-        guard !readers.isEmpty else { return }
+        guard !readers.isEmpty else {
+            return
+        }
         queue.async { readers.forEach { $0.close() } }
     }
 
@@ -83,7 +90,9 @@ extension ByteSource {
 
     /// `read(at:count:)`, interruptible when there is a flag.
     func read(at offset: Int64, count: Int, interruptedBy cancellation: CancellationFlag?) throws -> Data {
-        guard let cancellation else { return try read(at: offset, count: count) }
+        guard let cancellation else {
+            return try read(at: offset, count: count)
+        }
         return try read(at: offset, count: count, cancellation: cancellation)
     }
 
@@ -245,7 +254,9 @@ final class ProviderByteSource: ByteSource, @unchecked Sendable {
     }
 
     private func read(at offset: Int64, count: Int, flag: CancellationFlag?) throws -> Data {
-        guard count > 0, offset < length else { return Data() }
+        guard count > 0, offset < length else {
+            return Data()
+        }
         try flag?.throwIfCancelled()
         // The buffers a read leaves behind are freed at once: the threads that read live long.
         return try autoreleasepool {
@@ -282,7 +293,9 @@ final class ProviderByteSource: ByteSource, @unchecked Sendable {
         let reader = idle.popLast()
         let epoch = closes
         lock.unlock()
-        if let reader { return (reader, epoch) }
+        if let reader {
+            return (reader, epoch)
+        }
         return (try flag.map { try provider.read(url, cancellation: $0) } ?? provider.read(url), epoch)
     }
 
@@ -400,7 +413,9 @@ final class DiskBlockCache: @unchecked Sendable {
     func read(_ block: Int64) -> Data? {
         lock.lock()
         defer { lock.unlock() }
-        guard descriptor >= 0, isPresent(block) else { return nil }
+        guard descriptor >= 0, isPresent(block) else {
+            return nil
+        }
         let wanted = size(of: block)
         var data = Data(count: wanted)
         let got = data.withUnsafeMutableBytes {
@@ -533,8 +548,12 @@ final class CachedByteSource: ByteSource, @unchecked Sendable {
         try flag?.throwIfCancelled()
         // Four blocks or more is a scan, not a look at what is shown.
         if upper - lower >= Int64(blockSize) * 4 {
-            if keepsWholeFile { return try readAndKeep(lower, upper, flag) }
-            if let spill { return try readThroughDisk(lower, upper, spill, flag) }
+            if keepsWholeFile {
+                return try readAndKeep(lower, upper, flag)
+            }
+            if let spill {
+                return try readThroughDisk(lower, upper, spill, flag)
+            }
             return try fetch(lower, Int(upper - lower), flag)
         }
         var result = Data(capacity: Int(upper - lower))
@@ -655,7 +674,9 @@ final class CachedByteSource: ByteSource, @unchecked Sendable {
         spill?.store(number, data)
         // Only a whole block, or the short last one of the file, is kept: a block cut short by a
         // read that failed in the middle would end later reads early until it is pushed out.
-        guard data.count == blockSize || number * Int64(blockSize) + Int64(data.count) == length else { return data }
+        guard data.count == blockSize || number * Int64(blockSize) + Int64(data.count) == length else {
+            return data
+        }
         lock.lock()
         if blocks[number] == nil {
             blocks[number] = data

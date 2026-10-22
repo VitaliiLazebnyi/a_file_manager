@@ -88,7 +88,9 @@ enum ImageDecoder {
         cancellation: CancellationFlag,
         firstFrame: ((DecodedImage) -> Void)?
     ) -> DecodedImage? {
-        guard let source, CGImageSourceGetCount(source) > 0 else { return nil }
+        guard let source, CGImageSourceGetCount(source) > 0 else {
+            return nil
+        }
         var count = CGImageSourceGetCount(source)
         // Only a file that is an animation plays as one; the images of an icon file, a TIFF of
         // several pages or a collection are alternatives or pages, and the biggest is shown.
@@ -104,7 +106,9 @@ enum ImageDecoder {
         let properties = properties(of: source, at: first)
         var width = number(kCGImagePropertyPixelWidth, in: properties)
         var height = number(kCGImagePropertyPixelHeight, in: properties)
-        guard width * height <= pixelLimit else { return nil }
+        guard width * height <= pixelLimit else {
+            return nil
+        }
         if let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue, orientation >= 5 {
             swap(&width, &height)
         }
@@ -113,7 +117,9 @@ enum ImageDecoder {
         var memory = 0
         var dropped = 0
         for index in first..<count {
-            guard !cancellation.isCancelled else { return nil }
+            guard !cancellation.isCancelled else {
+                return nil
+            }
             guard let frame = CGImageSourceCreateThumbnailAtIndex(source, index, options as CFDictionary) else {
                 continue
             }
@@ -135,7 +141,9 @@ enum ImageDecoder {
                 break
             }
         }
-        guard !frames.isEmpty else { return nil }
+        guard !frames.isEmpty else {
+            return nil
+        }
         return DecodedImage(
             frames: frames.map { (image: $0.0, delay: $0.1) },
             pixelSize: CGSize(width: width, height: height),
@@ -283,7 +291,9 @@ final class ScaledFrameCache {
     /// made in the background when `building` and the frame is shown smaller than it is.
     func image(for frame: CGImage, width: Int, height: Int, building: Bool = true) -> CGImage? {
         let wanted = Key(frame: ObjectIdentifier(frame), width: width, height: height)
-        if key == wanted { return ready }
+        if key == wanted {
+            return ready
+        }
         guard building, width > 0, height > 0, width * height < frame.width * frame.height * 9 / 10,
             width * height <= Self.pixelLimit
         else {
@@ -296,10 +306,14 @@ final class ScaledFrameCache {
         let latest = latest
         queue.asyncAfter(deadline: .now() + Self.settle) { [weak self] in
             // Overtaken while it waited: another size is wanted now.
-            guard latest.value == token else { return }
+            guard latest.value == token else {
+                return
+            }
             let scaled = autoreleasepool { Self.scale(frame, width: width, height: height) }
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.generation == token else { return }
+                guard let self, self.generation == token else {
+                    return
+                }
                 self.ready = scaled
                 self.made += 1
                 if scaled != nil { self.onReady() }
@@ -350,7 +364,9 @@ final class ImageCanvasView: NSScrollView {
         let scaled = ScaledFrameCache()
 
         override func draw(_: NSRect) {
-            guard let frameImage, let context = NSGraphicsContext.current?.cgContext else { return }
+            guard let frameImage, let context = NSGraphicsContext.current?.cgContext else {
+                return
+            }
             context.saveGState()
             context.interpolationQuality = isAnimated || inLiveResize ? .low : .high
             context.translateBy(x: imageRect.midX, y: imageRect.midY)
@@ -435,7 +451,9 @@ final class ImageCanvasView: NSScrollView {
     /// Takes the complete animation in place of its first frame, which was shown early; zoom and
     /// turns stay.
     func replaceFrames(with image: DecodedImage) {
-        guard self.image != nil else { return }
+        guard self.image != nil else {
+            return
+        }
         timer?.invalidate()
         canvas.scaled.invalidate()
         self.image = image
@@ -450,7 +468,9 @@ final class ImageCanvasView: NSScrollView {
     /// The size of the turned image at 100 %, in points: one pixel of the image on one pixel
     /// of the screen.
     private var turnedSize: CGSize {
-        guard let size = image?.size else { return .zero }
+        guard let size = image?.size else {
+            return .zero
+        }
         let scale = Self.pixelsPerPoint(window: window, screen: NSScreen.main)
         return quarterTurns % 2 != 0
             ? CGSize(width: size.height / scale, height: size.width / scale)
@@ -464,10 +484,14 @@ final class ImageCanvasView: NSScrollView {
 
     /// The factor the image is drawn with; 1 is actual size.
     var zoom: CGFloat {
-        if let manualZoom { return manualZoom }
+        if let manualZoom {
+            return manualZoom
+        }
         let size = turnedSize
         let area = contentSize
-        guard size.width > 0, size.height > 0, fit != .none else { return 1 }
+        guard size.width > 0, size.height > 0, fit != .none else {
+            return 1
+        }
         let fitting = min(area.width / size.width, area.height / size.height)
         return fit == .window ? fitting : min(1, fitting)
     }
@@ -518,7 +542,9 @@ final class ImageCanvasView: NSScrollView {
     var scalingQueue: DispatchQueue { canvas.scaled.queue }
 
     private func arrange() {
-        guard image != nil else { return }
+        guard image != nil else {
+            return
+        }
         let factor = zoom
         let size = turnedSize
         let area = contentSize
@@ -543,7 +569,9 @@ final class ImageCanvasView: NSScrollView {
     }
 
     private func scheduleNextFrame() {
-        guard let image, image.frames.count > 1 else { return }
+        guard let image, image.frames.count > 1 else {
+            return
+        }
         timer = Timer.scheduledTimer(withTimeInterval: image.frames[frameIndex].delay, repeats: false) {
             [weak self] _ in
             // A scheduled timer fires on the main run loop.

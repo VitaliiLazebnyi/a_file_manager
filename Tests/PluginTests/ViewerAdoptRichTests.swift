@@ -48,10 +48,17 @@ import Testing
         var units: [UInt16] = []
         for _ in 0..<count {
             switch next(40) {
-            case 0: units.append(UInt16(0xD800 + next(0x400)))
-            case 1: units.append(UInt16(0xDC00 + next(0x400)))
-            case 2: units.append(UInt16(next(0x20)))
-            default: units.append(contentsOf: pieces[next(pieces.count)].utf16)
+            case 0:
+                units.append(UInt16(0xD800 + next(0x400)))
+
+            case 1:
+                units.append(UInt16(0xDC00 + next(0x400)))
+
+            case 2:
+                units.append(UInt16(next(0x20)))
+
+            default:
+                units.append(contentsOf: pieces[next(pieces.count)].utf16)
             }
         }
         return units

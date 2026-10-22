@@ -17,12 +17,14 @@ enum SearchError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .empty: return "There is nothing to search for."
+        case .empty:
+            return "There is nothing to search for."
 
         case .badHex(let text):
             return "\"\(text)\" is not a hex string. Write bytes as 00 FF 12, literal text in quotes: \"PK\"0102."
 
-        case .badExpression(let reason): return "The regular expression cannot be used: \(reason)"
+        case .badExpression(let reason):
+            return "The regular expression cannot be used: \(reason)"
         }
     }
 }
@@ -92,11 +94,20 @@ struct SearchPattern {
                 continue
             }
             switch characters.next() {
-            case "t": result.append("\t")
-            case "n": result.append(lineBreak)
-            case "\\": result.append("\\")
-            case let other?: result.append("\\\(other)")
-            case nil: result.append("\\")
+            case "t":
+                result.append("\t")
+
+            case "n":
+                result.append(lineBreak)
+
+            case "\\":
+                result.append("\\")
+
+            case let other?:
+                result.append("\\\(other)")
+
+            case nil:
+                result.append("\\")
             }
         }
         return result
@@ -188,7 +199,9 @@ enum ViewerSearch {
         let origin =
             backwards ? start + (start - content.lowerBound) % unit : start - (start - content.lowerBound) % unit
         let total = backwards ? origin - content.lowerBound : content.upperBound - origin
-        guard total > 0 else { return nil }
+        guard total > 0 else {
+            return nil
+        }
         let chunkCount = Int((total + size - 1) / size)
         var next = 0
         while next < chunkCount, !cancellation.isCancelled {
@@ -207,10 +220,14 @@ enum ViewerSearch {
             }
             for result in results {
                 do {
-                    if let match = try result.get() { return match }
+                    if let match = try result.get() {
+                        return match
+                    }
                 } catch {
                     // A read that the flag ended is no failure.
-                    if cancellation.isCancelled { return nil }
+                    if cancellation.isCancelled {
+                        return nil
+                    }
                     throw error
                 }
             }
@@ -305,7 +322,9 @@ enum ViewerSearch {
                         stop.pointee = true
                         return
                     }
-                    guard let match else { return }
+                    guard let match else {
+                        return
+                    }
                     if match.range.location >= end {
                         stop.pointee = true
                     } else if match.range.length > 0, !pattern.wholeWords || isWholeWord(match.range, in: text) {
@@ -349,7 +368,9 @@ enum ViewerSearch {
             }
             return low
         }
-        guard !text.units.isEmpty else { return nil }
+        guard !text.units.isEmpty else {
+            return nil
+        }
         let string = text.units.withUnsafeBufferPointer { NSString(characters: $0.baseAddress!, length: $0.count) }
         guard
             let found = match(
@@ -417,8 +438,12 @@ enum ViewerSearch {
 
         /// What a character folds to; nil when it folds to itself.
         private static func fold(_ value: UInt32, _ cache: inout [UInt32: [UInt16]]) -> [UInt16]? {
-            guard let scalar = Unicode.Scalar(value), scalar.properties.changesWhenCaseFolded else { return nil }
-            if let known = cache[value] { return known }
+            guard let scalar = Unicode.Scalar(value), scalar.properties.changesWhenCaseFolded else {
+                return nil
+            }
+            if let known = cache[value] {
+                return known
+            }
             let folded = Array(String(Character(scalar)).folding(options: [.caseInsensitive], locale: nil).utf16)
             cache[value] = folded
             return folded
@@ -432,17 +457,23 @@ enum ViewerSearch {
             let count = units.count
             let length = needle.count
             while matched < length {
-                guard index < count else { return nil }
+                guard index < count else {
+                    return nil
+                }
                 let unit = units[index]
                 if unit < 0x80 {
-                    guard needle[matched] == (unit >= 0x41 && unit <= 0x5A ? unit | 0x20 : unit) else { return nil }
+                    guard needle[matched] == (unit >= 0x41 && unit <= 0x5A ? unit | 0x20 : unit) else {
+                        return nil
+                    }
                     matched += 1
                     index += 1
                     continue
                 }
                 let (value, width) = Self.character(units, at: index)
                 if let folded = Self.fold(value, &cache) {
-                    guard matched + folded.count <= length else { return nil }
+                    guard matched + folded.count <= length else {
+                        return nil
+                    }
                     for offset in 0..<folded.count where needle[matched + offset] != folded[offset] { return nil }
                     matched += folded.count
                 } else {
@@ -461,16 +492,22 @@ enum ViewerSearch {
         func find(in units: [UInt16], from first: Int, before end: Int, last: Bool, accepts: (NSRange) -> Bool)
             -> NSRange?
         {
-            guard !needle.isEmpty, first >= 0, first < end, first < units.count else { return nil }
+            guard !needle.isEmpty, first >= 0, first < end, first < units.count else {
+                return nil
+            }
             let end = min(end, units.count)
             if caseSensitive {
                 let length = needle.count
-                guard units.count >= length else { return nil }
+                guard units.count >= length else {
+                    return nil
+                }
                 var position = last ? min(end - 1, units.count - length) : first
                 while last ? position >= first : position < end && position + length <= units.count {
                     if units[position] == needle[0], matches(units, at: position) {
                         let range = NSRange(location: position, length: length)
-                        if accepts(range) { return range }
+                        if accepts(range) {
+                            return range
+                        }
                     }
                     position += last ? -1 : 1
                 }
@@ -488,7 +525,9 @@ enum ViewerSearch {
                         let stop = self.end(ofMatchAt: index, in: units, &cache)
                     {
                         let range = NSRange(location: index, length: stop - index)
-                        if accepts(range) { return range }
+                        if accepts(range) {
+                            return range
+                        }
                     }
                 } else if last, unit >= 0xDC00, unit <= 0xDFFF, index > first, units[index - 1] >= 0xD800,
                     units[index - 1] <= 0xDBFF
@@ -500,7 +539,9 @@ enum ViewerSearch {
                     width = Self.character(units, at: index).width
                     if let stop = self.end(ofMatchAt: index, in: units, &cache) {
                         let range = NSRange(location: index, length: stop - index)
-                        if accepts(range) { return range }
+                        if accepts(range) {
+                            return range
+                        }
                     }
                 }
                 index += last ? -1 : width
@@ -536,7 +577,9 @@ enum ViewerSearch {
     private static func hasCaseFolded(utf8 data: Data) -> Bool {
         data.withUnsafeBytes { raw in
             let count = raw.count
-            guard count > 0, let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return false }
+            guard count > 0, let start = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return false
+            }
             var index = 0
             while index < count {
                 if index + 8 <= count,
@@ -550,13 +593,17 @@ enum ViewerSearch {
                     let second = start[index + 1]
                     let third = index + 2 < count ? start[index + 2] : 0
                     switch byte {
-                    case 0xC3 where second == 0x9F, 0xC5 where second == 0xBF: return true
+                    case 0xC3 where second == 0x9F, 0xC5 where second == 0xBF:
+                        return true
 
                     case 0xE1 where second == 0xBA && third == 0x9E, 0xE2 where second == 0x84 && third == 0xAA:
                         return true
 
-                    case 0xEF where second == 0xAC && (0x80...0x86).contains(third): return true
-                    default: break
+                    case 0xEF where second == 0xAC && (0x80...0x86).contains(third):
+                        return true
+
+                    default:
+                        break
                     }
                 }
                 index += 1
@@ -590,7 +637,9 @@ enum ViewerSearch {
             let hasOne = data.withUnsafeBytes { raw in
                 folded.contains { memchr(raw.baseAddress, Int32($0), raw.count) != nil }
             }
-            if hasOne { return .undecided }
+            if hasOne {
+                return .undecided
+            }
         } else if hasCaseFolded(utf8: data) {
             return .undecided
         }
@@ -607,15 +656,21 @@ enum ViewerSearch {
             }
             /// The classification of the character that ends at `end`, or begins at `begin`.
             func isWordUnit(_ unit: UInt16) -> Bool {
-                guard let scalar = Unicode.Scalar(unit) else { return false }
+                guard let scalar = Unicode.Scalar(unit) else {
+                    return false
+                }
                 return wordCharacters.contains(scalar)
             }
             func characterBefore(_ end: Int) -> Bool {
-                guard end > 0 else { return false }
+                guard end > 0 else {
+                    return false
+                }
                 let byte = start[end - 1]
                 // Beyond ASCII: by the table of the code page, or decoded as UTF-8.
                 if byte >= 0x80 {
-                    if let table { return isWordUnit(table.single[Int(byte)]) }
+                    if let table {
+                        return isWordUnit(table.single[Int(byte)])
+                    }
                     var begin = end - 1
                     while begin > 0, end - begin < 4, start[begin] & 0xC0 == 0x80 { begin -= 1 }
                     var text = DecodedText()
@@ -631,11 +686,15 @@ enum ViewerSearch {
                 return isWordUnit(UInt16(byte))
             }
             func characterAfter(_ begin: Int) -> Bool {
-                guard begin < count else { return false }
+                guard begin < count else {
+                    return false
+                }
                 let byte = start[begin]
                 // Beyond ASCII: by the table of the code page, or decoded as UTF-8.
                 if byte >= 0x80 {
-                    if let table { return isWordUnit(table.single[Int(byte)]) }
+                    if let table {
+                        return isWordUnit(table.single[Int(byte)])
+                    }
                     var text = DecodedText()
                     text.tracksOffsets = false
                     _ = ViewerEncoding.utf8.decode(
@@ -654,7 +713,9 @@ enum ViewerSearch {
             var nextLower = -1
             var nextUpper = -1
             func find(_ byte: UInt8, from: Int) -> Int {
-                guard from < count, let found = memchr(start + from, Int32(byte), count - from) else { return count }
+                guard from < count, let found = memchr(start + from, Int32(byte), count - from) else {
+                    return count
+                }
                 return start.distance(to: found.assumingMemoryBound(to: UInt8.self))
             }
             while position < limit, position + needle.count <= count {
@@ -671,7 +732,9 @@ enum ViewerSearch {
                     !pattern.wholeWords || !(characterBefore(position) || characterAfter(position + needle.count))
                 {
                     result = lower + Int64(position)..<lower + Int64(position + needle.count)
-                    if !last { return }
+                    if !last {
+                        return
+                    }
                 }
                 position += 1
             }
@@ -697,7 +760,9 @@ enum ViewerSearch {
         Int64
     >? {
         data.withUnsafeBytes { (haystack: UnsafeRawBufferPointer) -> Range<Int64>? in
-            guard !needle.isEmpty, haystack.count >= needle.count, let start = haystack.baseAddress else { return nil }
+            guard !needle.isEmpty, haystack.count >= needle.count, let start = haystack.baseAddress else {
+                return nil
+            }
             var position = Int(max(0, accepted.lowerBound - base))
             var result: Range<Int64>?
             while position + needle.count <= haystack.count,

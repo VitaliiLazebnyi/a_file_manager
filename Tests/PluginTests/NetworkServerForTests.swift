@@ -85,7 +85,9 @@ final class TestFTPServer: @unchecked Sendable {
             let wasStopped = stopped
             stopped = true
             lock.unlock()
-            guard !wasStopped else { return }
+            guard !wasStopped else {
+                return
+            }
             ended.wait()
         }
 
@@ -127,7 +129,9 @@ final class TestFTPServer: @unchecked Sendable {
         port = Self.port(of: listener)
         acceptor = Acceptor(listener: listener)
         acceptor.run { [weak self] client in
-            guard let self else { return false }
+            guard let self else {
+                return false
+            }
             lock.lock()
             // Stopped between the accept and here: `stop` has cut the connections it knew.
             if stopped {
@@ -198,7 +202,9 @@ final class TestFTPServer: @unchecked Sendable {
         let wasStopped = stopped
         stopped = true
         lock.unlock()
-        guard !wasStopped else { return }
+        guard !wasStopped else {
+            return
+        }
         acceptor.stop()
         dropConnections()
     }
@@ -232,7 +238,9 @@ final class TestFTPServer: @unchecked Sendable {
     fileprivate func refusesGreeting() -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        guard busy < currentOptions.busyGreetings else { return false }
+        guard busy < currentOptions.busyGreetings else {
+            return false
+        }
         busy += 1
         return true
     }
@@ -308,7 +316,9 @@ final class TestFTPServer: @unchecked Sendable {
             var sent = 0
             while sent < buffer.count {
                 let count = send(descriptor, buffer.baseAddress! + sent, buffer.count - sent, 0)
-                if count <= 0 { return false }
+                if count <= 0 {
+                    return false
+                }
                 sent += count
             }
             return true
@@ -320,7 +330,9 @@ final class TestFTPServer: @unchecked Sendable {
         var buffer = [UInt8](repeating: 0, count: 65_536)
         while true {
             let count = recv(descriptor, &buffer, buffer.count, 0)
-            if count <= 0 { return data }
+            if count <= 0 {
+                return data
+            }
             data.append(buffer, count: count)
         }
     }
@@ -343,7 +355,9 @@ final class TestFTPServer: @unchecked Sendable {
                 let client = accept(listener, nil, nil)
                 return client >= 0 ? client : nil
             }
-            if descriptors[1].revents != 0 { return nil }
+            if descriptors[1].revents != 0 {
+                return nil
+            }
         }
         return nil
     }
@@ -411,13 +425,17 @@ private final class Session {
                 return text
             }
             let count = recv(socket, &buffer, buffer.count, 0)
-            if count <= 0 { return nil }
+            if count <= 0 {
+                return nil
+            }
             pending.append(buffer, count: count)
         }
     }
 
     private func reply(_ text: String) {
-        if muted { return }
+        if muted {
+            return
+        }
         _ = TestFTPServer.sendAll(socket, Data((text + "\r\n").utf8))
     }
 
@@ -471,7 +489,8 @@ private final class Session {
             return true
         }
         switch verb {
-        case "SYST": reply("215 UNIX Type: L8")
+        case "SYST":
+            reply("215 UNIX Type: L8")
 
         case "FEAT":
             guard options.offersFeatures else {
@@ -486,9 +505,14 @@ private final class Session {
             lines.append("211 End")
             reply(lines.joined(separator: "\r\n"))
 
-        case "OPTS": reply("200 OK")
-        case "NOOP": reply("200 OK")
-        case "PWD": reply("257 \"\(directory.replacingOccurrences(of: "\"", with: "\"\""))\" is the current directory")
+        case "OPTS":
+            reply("200 OK")
+
+        case "NOOP":
+            reply("200 OK")
+
+        case "PWD":
+            reply("257 \"\(directory.replacingOccurrences(of: "\"", with: "\"\""))\" is the current directory")
 
         case "CWD", "CDUP":
             guard let url = local(verb == "CDUP" ? ".." : argument), isDirectory(url) else {
@@ -498,7 +522,8 @@ private final class Session {
             directory = virtual(url)
             reply("250 OK")
 
-        case "TYPE": reply("200 Type set")
+        case "TYPE":
+            reply("200 Type set")
 
         case "PASV", "EPSV":
             guard verb == "PASV" || options.offersEPSV else {
@@ -659,7 +684,9 @@ private final class Session {
             }
             let offset = restart
             restart = 0
-            if options.stallSTOR { return stalled() }
+            if options.stallSTOR {
+                return stalled()
+            }
             transfer { connection in
                 var received = TestFTPServer.receiveAll(connection)
                 if let kept = options.keepsOfUploads { received = received.prefix(kept) }
@@ -668,7 +695,9 @@ private final class Session {
                 }
                 // Continuing: like most servers, nothing beyond the new data is cut off.
                 if !self.fm.fileExists(atPath: url.path) { self.fm.createFile(atPath: url.path, contents: nil) }
-                guard let handle = try? FileHandle(forWritingTo: url) else { return false }
+                guard let handle = try? FileHandle(forWritingTo: url) else {
+                    return false
+                }
                 defer { try? handle.close() }
                 do {
                     if verb == "APPE" { try handle.seekToEnd() } else { try handle.seek(toOffset: offset) }

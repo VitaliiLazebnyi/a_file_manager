@@ -59,7 +59,9 @@ import Testing
         let fields = try #require(bench.interaction.forms.last)
         let parts =
             fields.filter {
-                guard case .checkbox = $0.kind else { return false }
+                guard case .checkbox = $0.kind else {
+                    return false
+                }
                 return true
             }
             .map(\.key)

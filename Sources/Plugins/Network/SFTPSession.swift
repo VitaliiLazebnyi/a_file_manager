@@ -21,10 +21,14 @@ enum SSHQuestion: Equatable {
         let text = question.trimmingCharacters(in: .whitespacesAndNewlines)
         /// `user@host`, cut at the last `@`: a host has none, a user name may.
         func login(_ text: Substring) -> (user: String, host: String)? {
-            guard let at = text.lastIndex(of: "@") else { return nil }
+            guard let at = text.lastIndex(of: "@") else {
+                return nil
+            }
             let host = String(text[text.index(after: at)...]).trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
                 .lowercased()
-            guard at > text.startIndex, !host.isEmpty, !host.contains(where: { $0.isWhitespace }) else { return nil }
+            guard at > text.startIndex, !host.isEmpty, !host.contains(where: { $0.isWhitespace }) else {
+                return nil
+            }
             return (String(text[..<at]), host)
         }
         if text.hasPrefix("("), let close = text.range(of: ") "),
@@ -179,13 +183,17 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
 
         case .server(let asked, let server, let text):
             let lowered = text.lowercased()
-            guard lowered.contains("password"), !lowered.contains("passphrase") else { return false }
+            guard lowered.contains("password"), !lowered.contains("passphrase") else {
+                return false
+            }
             (user, host) = (asked, server)
 
         case .passphrase, .hostKey, .other:
             return false
         }
-        if let own = profile.user, !own.isEmpty, own != user { return false }
+        if let own = profile.user, !own.isEmpty, own != user {
+            return false
+        }
         return host == ServerKey.bare(profile.key.host).lowercased()
     }
 
@@ -206,7 +214,9 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         try lockPatiently(connectLock, cancellation: cancellation) {
             self.lock.lock()
             defer { self.lock.unlock() }
-            if self.isClosed { return NetworkError.notConnected(self.currentProfile.key.description) }
+            if self.isClosed {
+                return NetworkError.notConnected(self.currentProfile.key.description)
+            }
             // The time the user takes to answer a question does not count.
             if !self.isAsking, Date().timeIntervalSince(began) > patience {
                 return NetworkError.busy("Another login to \(self.currentProfile.key.description) is still under way.")
@@ -221,7 +231,9 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         let profile = currentProfile
         lock.unlock()
         if closed { throw NetworkError.notConnected(profile.key.description) }
-        if let existing, !existing.isClosed { return existing }
+        if let existing, !existing.isClosed {
+            return existing
+        }
         if let recent, Date().timeIntervalSince(recent.at) < environment.declineMemory { throw recent.error }
 
         func asking<Answer>(_ question: () -> Answer) -> Answer {
@@ -361,7 +373,9 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         do {
             // ssh has its own time limit for reaching the server; ours is for a login that hangs.
             try created.start(timeout: options.timeout + 30, cancellation: cancellation ?? closing) {
-                guard let askpass, let question = askpass.pendingQuestion() else { return true }
+                guard let askpass, let question = askpass.pendingQuestion() else {
+                    return true
+                }
                 return answer(askpass, question)
             }
             let packet = try created.request(
@@ -426,7 +440,9 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         let packet = try channel.request(following ? .stat : .lstat, timeout: timeout, cancellation: cancellation) {
             $0.string(path)
         }
-        if packet.statusCode == SFTPError.noSuchFile { return nil }
+        if packet.statusCode == SFTPError.noSuchFile {
+            return nil
+        }
         var decoder = try packet.expect(.attributes)
         return try decoder.attributes()
     }
@@ -697,7 +713,9 @@ private struct TransferWindow {
     func limit(block: Int) -> Int {
         let elapsed = Date().timeIntervalSince(started)
         // Nothing is known in the first moments; the caller's own slow start applies.
-        guard elapsed > 0.25, bytes > 0 else { return SFTPSession.window }
+        guard elapsed > 0.25, bytes > 0 else {
+            return SFTPSession.window
+        }
         let wanted = Double(bytes) / elapsed * Self.seconds / Double(max(1, block))
         return max(Self.least, min(SFTPSession.window, Int(wanted.rounded(.up))))
     }
@@ -764,7 +782,9 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
 
     deinit {
         // Dropped without `close`: the handle is closed all the same, which never waits.
-        guard let handle else { return }
+        guard let handle else {
+            return
+        }
         abandonRequests()
         session.closeHandle(handle, on: channel)
     }
@@ -802,7 +822,9 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
 
     func read(upToCount count: Int) throws -> Data? {
         if abort.isCancelled { throw NetworkError.cancelled }
-        guard let handle, count > 0 else { return nil }
+        guard let handle, count > 0 else {
+            return nil
+        }
         // Read ahead only for a caller that reads on, and no further than the line carries.
         var ahead = 0
         if readsInARow > 0 {
@@ -897,7 +919,9 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
 
     func seek(to offset: UInt64) throws {
         if abort.isCancelled { throw NetworkError.cancelled }
-        if offset == position { return }
+        if offset == position {
+            return
+        }
         if offset > position, offset - position <= UInt64(leftover.count) {
             leftover = leftover.dropFirst(Int(offset - position))
             position = offset
@@ -910,7 +934,9 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
     }
 
     func close() {
-        guard let handle else { return }
+        guard let handle else {
+            return
+        }
         self.handle = nil
         abandonRequests()
         session.closeHandle(handle, on: channel)
@@ -962,7 +988,9 @@ private final class SFTPFileWriter: FileWriter, @unchecked Sendable {
 
     deinit {
         // Dropped without `close`: like a failure, and the handle is closed, which never waits.
-        guard let handle else { return }
+        guard let handle else {
+            return
+        }
         if failure == nil {
             fail(NetworkError.cancelled, firstUnconfirmed: outstanding.first?.offset ?? position, handle: handle)
         }
@@ -975,7 +1003,9 @@ private final class SFTPFileWriter: FileWriter, @unchecked Sendable {
     /// The cut is put in line behind the writes that are under way and is not waited for: the
     /// server may not be answering.
     private func fail(_ error: any Error, firstUnconfirmed: UInt64, handle: Data) {
-        guard failure == nil else { return }
+        guard failure == nil else {
+            return
+        }
         failure = error
         outstanding.forEach { channel.abandon($0.ticket) }
         outstanding = []
@@ -1043,7 +1073,9 @@ private final class SFTPFileWriter: FileWriter, @unchecked Sendable {
     }
 
     func close(attributes: FileAttributes) throws {
-        guard let handle else { return }
+        guard let handle else {
+            return
+        }
         do {
             try collect(keeping: 0, handle: handle)
         } catch {

@@ -56,7 +56,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
         override func drawBackground(in dirtyRect: NSRect) {
             super.drawBackground(in: dirtyRect)
-            guard let fill else { return }
+            guard let fill else {
+                return
+            }
             fill.setFill()
             bounds.intersection(dirtyRect).fill(using: .sourceOver)
         }
@@ -99,7 +101,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     /// Esc: stops a comparison that runs, and says so; false when none runs (Esc then closes the window).
     func stopsComparison() -> Bool {
-        guard session.phase == .working else { return false }
+        guard session.phase == .working else {
+            return false
+        }
         session.cancel()
         return true
     }
@@ -325,7 +329,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     private func pickFile(for field: NSTextField) {
         effects.chooseFile(toolWindow) { [weak self] url in
-            guard let self, let url else { return }
+            guard let self, let url else {
+                return
+            }
             field.stringValue = url.path
             if !leftField.stringValue.isEmpty, !rightField.stringValue.isEmpty { compare() }
         }
@@ -339,7 +345,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
 
     /// Called by the font panel.
     @objc func changeFont(_ sender: NSFontManager?) {
-        guard let sender else { return }
+        guard let sender else {
+            return
+        }
         font = sender.convert(font)
         settings.set(font.fontName, forKey: CompareSettingsKey.fontName)
         settings.set(String(Double(font.pointSize)), forKey: CompareSettingsKey.fontSize)
@@ -432,7 +440,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     }
 
     @objc private func paneScrolled(_ notification: Notification) {
-        guard !isMirroring, let moved = notification.object as? NSClipView else { return }
+        guard !isMirroring, let moved = notification.object as? NSClipView else {
+            return
+        }
         isMirroring = true
         for table in [leftTable, rightTable] {
             guard let clip = table.enclosingScrollView?.contentView, clip !== moved,
@@ -445,7 +455,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
-        guard !isMirroring, let changed = notification.object as? NSTableView else { return }
+        guard !isMirroring, let changed = notification.object as? NSTableView else {
+            return
+        }
         isMirroring = true
         let other = changed === leftTable ? rightTable : leftTable
         other.selectRowIndexes(changed.selectedRowIndexes, byExtendingSelection: false)
@@ -458,8 +470,12 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     /// cursor is in, else the cursor's row.
     private var rowsToCopy: Range<Int>? {
         let selection = leftTable.selectedRowIndexes
-        guard let first = selection.first, let last = selection.last else { return nil }
-        if selection.count > 1 { return first..<(last + 1) }
+        guard let first = selection.first, let last = selection.last else {
+            return nil
+        }
+        if selection.count > 1 {
+            return first..<(last + 1)
+        }
         return session.block(containing: first) ?? first..<(first + 1)
     }
 
@@ -569,7 +585,8 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
             }()
         let hasLine = session.text(side(of: tableView), row: row) != nil
         switch session.kind(ofRow: row) {
-        case .equal: view.fill = nil
+        case .equal:
+            view.fill = nil
 
         case .changed:
             view.fill =
@@ -631,7 +648,9 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
     // MARK: Window
 
     func windowShouldClose(_: NSWindow) -> Bool {
-        guard session.hasUnsavedChanges else { return true }
+        guard session.hasUnsavedChanges else {
+            return true
+        }
         // Closing this way does not ask again; whatever was not saved is given up.
         whenChangesAreSettled { [weak self] in self?.close() }
         return false

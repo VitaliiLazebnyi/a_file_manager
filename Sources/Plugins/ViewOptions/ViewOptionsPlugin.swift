@@ -139,7 +139,9 @@ public final class ViewOptionsPlugin: Plugin {
         let known = Set(offered.map(\.id))
         let kept = panel.extraColumns.filter { chosen.contains($0) || !known.contains($0) }
         let columns = kept + offered.map(\.id).filter { chosen.contains($0) && !kept.contains($0) }
-        guard columns != panel.extraColumns else { return }
+        guard columns != panel.extraColumns else {
+            return
+        }
         panel.extraColumns = columns
         if !chosen.isEmpty, kernel.settings.flag(Self.columnsSwitchToFullKey, default: true) {
             panel.viewMode = .full
@@ -299,8 +301,12 @@ public final class ViewOptionsPlugin: Plugin {
             let prepared = PanelModel.prepare(basis, filter: make())
             onMain { [self] in
                 // A later filter has taken over.
-                guard filterTickets[id] == ticket else { return }
-                if model.apply(prepared) != .stale { return }
+                guard filterTickets[id] == ticket else {
+                    return
+                }
+                if model.apply(prepared) != .stale {
+                    return
+                }
                 if model.listedItems.count < Self.backgroundFilterThreshold
                     || tries >= Self.staleTries
                 {
@@ -325,8 +331,12 @@ public final class ViewOptionsPlugin: Plugin {
     ///
     /// Folders stay.
     nonisolated static func isProgram(_ item: FileItem, masks: FileMask) -> Bool {
-        if item.isFolder { return true }
-        if masks.matches(item.name) { return true }
+        if item.isFolder {
+            return true
+        }
+        if masks.matches(item.name) {
+            return true
+        }
         return !item.isDirectory && item.permissions & 0o111 != 0
     }
 
@@ -384,7 +394,9 @@ public final class ViewOptionsPlugin: Plugin {
             let prepared = PanelModel.prepare(basis, sort: order)
             onMain { [self] in
                 // A later command has taken over.
-                guard pendingOrders[id] == order else { return }
+                guard pendingOrders[id] == order else {
+                    return
+                }
                 if model.apply(prepared) != .stale || model.sort == order {
                     // Sorted here, or brought in this order by a reading meanwhile.
                     pendingOrders[id] = nil

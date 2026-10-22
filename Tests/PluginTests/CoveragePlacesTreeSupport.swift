@@ -91,7 +91,9 @@ final class CoveragePlacesFolders: FileSystemProvider, @unchecked Sendable {
 
     private func pass(_ path: String) {
         condition.withLock {
-            guard holding.remove(path) != nil else { return }
+            guard holding.remove(path) != nil else {
+                return
+            }
             waiting[path, default: 0] += 1
             while !letGo.contains(path) { condition.wait() }
             letGo.remove(path)
@@ -170,17 +172,23 @@ struct CoveragePlacesTreeParts {
 
     /// The titles of the rows as they are drawn.
     var rows: [String] {
-        guard let outline else { return [] }
+        guard let outline else {
+            return []
+        }
         return (0..<outline.numberOfRows).map(title(ofRow:))
     }
 
     var selected: String? {
-        guard let outline, outline.selectedRow >= 0 else { return nil }
+        guard let outline, outline.selectedRow >= 0 else {
+            return nil
+        }
         return title(ofRow: outline.selectedRow)
     }
 
     func title(ofRow row: Int) -> String {
-        guard let outline, let item = outline.item(atRow: row) else { return "" }
+        guard let outline, let item = outline.item(atRow: row) else {
+            return ""
+        }
         return (controller.outlineView(outline, viewFor: nil, item: item) as? NSTextField)?.stringValue ?? ""
     }
 
@@ -199,7 +207,9 @@ struct CoveragePlacesTreeParts {
     var isIdle: Bool { status.hasSuffix("directories") || status.hasSuffix("F2 reads the rest") }
 
     func click(_ title: String) {
-        guard let button = CoveragePlacesLoop.button(title, in: stack), let action = button.action else { return }
+        guard let button = CoveragePlacesLoop.button(title, in: stack), let action = button.action else {
+            return
+        }
         NSApp.sendAction(action, to: button.target, from: button)
     }
 
@@ -213,7 +223,9 @@ struct CoveragePlacesTreeParts {
     }
 
     func chooseRoot(_ index: Int) {
-        guard let popup, let action = popup.action else { return }
+        guard let popup, let action = popup.action else {
+            return
+        }
         if index < 0 { popup.select(nil) } else { popup.selectItem(at: index) }
         NSApp.sendAction(action, to: popup.target, from: popup)
     }

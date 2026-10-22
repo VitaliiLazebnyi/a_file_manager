@@ -81,7 +81,9 @@ final class CharacterBoundaries: @unchecked Sendable {
         let offset = min(max(offset, content.lowerBound), content.upperBound)
         let block = (offset - content.lowerBound) / spacing
         let from = try boundary(ofBlock: block, cancellation)
-        guard offset > from else { return from }
+        guard offset > from else {
+            return from
+        }
         let data = try read(
             at: from,
             count: Int(offset - from) + table.longestCharacter,
@@ -115,16 +117,22 @@ final class CharacterBoundaries: @unchecked Sendable {
 
     /// The last character start at or before the first byte of `block`.
     private func boundary(ofBlock block: Int64, _ cancellation: CancellationFlag?) throws -> Int64 {
-        if let hit = cached(block) { return hit }
+        if let hit = cached(block) {
+            return hit
+        }
         // One thread at a time works its way back, the others then find the result.
         // A thread that waits for the one at work can still be stopped.
         while !computing.try() {
             try cancellation?.throwIfCancelled()
-            if let hit = cached(block) { return hit }
+            if let hit = cached(block) {
+                return hit
+            }
             usleep(2_000)
         }
         defer { computing.unlock() }
-        if let hit = cached(block) { return hit }
+        if let hit = cached(block) {
+            return hit
+        }
         // Back to a block with a known boundary, or to one that has a byte which is no lead
         // byte, and so a boundary right after it.
         // The boundary of block 0, the start of the text, is always known: the walk back ends
@@ -164,7 +172,9 @@ final class CharacterBoundaries: @unchecked Sendable {
     /// the boundary `from`, which is before that.
     private func advance(from: Int64, toBlock block: Int64, _ cancellation: CancellationFlag?) throws -> Int64 {
         let target = min(content.upperBound, start(ofBlock: block))
-        guard target > from else { return from }
+        guard target > from else {
+            return from
+        }
         let data = try read(
             at: from,
             count: Int(target - from) + table.longestCharacter,

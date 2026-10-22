@@ -43,7 +43,9 @@ import Testing
 
     func checkbox(_ key: String) -> Bool? {
         for field in ui.forms.last ?? [] where field.key == key {
-            if case .checkbox(let isOn) = field.kind { return isOn }
+            if case .checkbox(let isOn) = field.kind {
+                return isOn
+            }
         }
         return nil
     }
@@ -291,7 +293,9 @@ import Testing
         }
         let layout = SyncSession.layout(rows: items, show: .all, sort: (.size, .left, true))
         let sizes = layout.entries.compactMap { entry -> Int64? in
-            if case .row(let index) = entry { return items[index].left?.size }
+            if case .row(let index) = entry {
+                return items[index].left?.size
+            }
             return nil
         }
         #expect(sizes == sizes.sorted() && sizes.count == 50)

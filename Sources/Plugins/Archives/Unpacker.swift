@@ -63,7 +63,9 @@ enum Quarantine {
 
     /// Marks a file or folder on the local disk; other places cannot carry the mark.
     static func apply(_ value: Data?, to url: URL) {
-        guard let value, url.isFileURL else { return }
+        guard let value, url.isFileURL else {
+            return
+        }
         _ = value.withUnsafeBytes { setxattr(url.path, name, $0.baseAddress, $0.count, 0, XATTR_NOFOLLOW) }
     }
 }
@@ -145,7 +147,9 @@ final class UnpackFolder: Sendable {
     }
 
     private static func mark(_ descriptor: Int32, _ quarantine: Data?) {
-        guard let quarantine else { return }
+        guard let quarantine else {
+            return
+        }
         _ = quarantine.withUnsafeBytes {
             fsetxattr(descriptor, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0)
         }
@@ -298,7 +302,9 @@ enum ArchiveTester {
         let members = archive.entries.filter { !$0.isDirectory && only?.contains($0.path) != false }
         /// What `work` found wrong with `entry`; nothing once the test is cancelled.
         @Sendable func problem(with entry: ArchiveEntry, _ work: () throws -> Void) -> String? {
-            guard !cancellation.isCancelled else { return nil }
+            guard !cancellation.isCancelled else {
+                return nil
+            }
             do {
                 try work()
                 return nil
@@ -497,7 +503,9 @@ final class Unpacker: @unchecked Sendable {
         var entries: [ArchiveEntry]
         if let selection = source.selection {
             entries = selection.flatMap { path -> [ArchiveEntry] in
-                guard let entry = archive.entry(path) else { return [] }
+                guard let entry = archive.entry(path) else {
+                    return []
+                }
                 return [entry] + (entry.isDirectory ? archive.descendants(of: path) : [])
             }
         } else {
@@ -563,15 +571,21 @@ final class Unpacker: @unchecked Sendable {
     /// The paths are taken as they are written, as the file system takes them when it writes: a
     /// `..` in the target leads wherever the disk says, not where the text would.
     private static func refuseLinks(from root: URL, to url: URL) throws {
-        guard url.isFileURL, root.isFileURL else { return }
+        guard url.isFileURL, root.isFileURL else {
+            return
+        }
         let (names, base) = (url.pathComponents, root.pathComponents)
-        guard names.count > base.count, Array(names[..<base.count]) == base else { return }
+        guard names.count > base.count, Array(names[..<base.count]) == base else {
+            return
+        }
         var current = root
         for name in names[base.count...] {
             current = current.appending(name: name)
             var status = stat()
             // What does not exist yet is made here, as a folder.
-            guard lstat(current.path, &status) == 0 else { return }
+            guard lstat(current.path, &status) == 0 else {
+                return
+            }
             if status.st_mode & S_IFMT == S_IFLNK {
                 throw ArchiveError.unsupported("Unpacking through the symbolic link \(current.path)")
             }
@@ -579,22 +593,29 @@ final class Unpacker: @unchecked Sendable {
     }
 
     private func mayOverwrite(_ existing: FileItem, with entry: ArchiveEntry) throws -> Bool {
-        if overwriteAll { return true }
-        if skipAll { return false }
+        if overwriteAll {
+            return true
+        }
+        if skipAll {
+            return false
+        }
         switch askConflict(existing, entry) {
-        case .overwrite: return true
+        case .overwrite:
+            return true
 
         case .overwriteAll:
             overwriteAll = true
             return true
 
-        case .skip: return false
+        case .skip:
+            return false
 
         case .skipAll:
             skipAll = true
             return false
 
-        case .cancel: throw ArchiveError.cancelled
+        case .cancel:
+            throw ArchiveError.cancelled
         }
     }
 
@@ -606,11 +627,17 @@ final class Unpacker: @unchecked Sendable {
     private var roots: [String: UnpackFolder] = [:]
 
     private func openRoot(_ root: URL) throws -> UnpackFolder? {
-        if let known = roots[root.locationKey] { return known }
-        guard root.isFileURL else { return nil }
+        if let known = roots[root.locationKey] {
+            return known
+        }
+        guard root.isFileURL else {
+            return nil
+        }
         // Made as it is: only what lies below it comes from the archive.
         try fileSystems.provider(for: root).createDirectory(at: root, cancellation: monitor.cancellation)
-        guard isOnLocalVolume(Durable.realFile(root).path) else { return nil }
+        guard isOnLocalVolume(Durable.realFile(root).path) else {
+            return nil
+        }
         let folder = try UnpackFolder(root)
         roots[root.locationKey] = folder
         return folder
@@ -625,7 +652,9 @@ final class Unpacker: @unchecked Sendable {
         /// (The route by path, for a target that is not a disk of this machine: a server,
         /// another archive, a network volume.)
         func makeFolder(_ url: URL, below root: URL) throws {
-            guard !made.contains(url.locationKey) else { return }
+            guard !made.contains(url.locationKey) else {
+                return
+            }
             try Self.refuseLinks(from: root, to: url)
             let provider = try fileSystems.provider(for: url)
             // The folders between the target and this one that are not known yet, top first.
@@ -720,7 +749,9 @@ final class Unpacker: @unchecked Sendable {
                 { [self] in
                     let one: @Sendable ((task: Task, root: UnpackFolder?)) -> String? = { file in
                         let (task, root) = file
-                        guard !cancellation.isCancelled else { return "" }
+                        guard !cancellation.isCancelled else {
+                            return ""
+                        }
                         do {
                             // Cancel also ends the opening of a member, and a read that hangs.
                             let slot = InterruptSlot()
@@ -814,7 +845,9 @@ final class Unpacker: @unchecked Sendable {
         }
         if entry.isSymbolicLink {
             // A link can only be made on the local disk; elsewhere it is left out.
-            guard target.isFileURL else { return }
+            guard target.isFileURL else {
+                return
+            }
             let destination = String(decoding: try stream.readFully(1 << 16), as: UTF8.self)
             if task.replaces { try provider.remove(target, cancellation: monitor.cancellation) }
             try FileManager.default.createSymbolicLink(atPath: target.path, withDestinationPath: destination)

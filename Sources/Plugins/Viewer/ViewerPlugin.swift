@@ -196,7 +196,9 @@ public final class ViewerPlugin: Plugin, ViewerService {
     // MARK: ViewerService
 
     public func view(_ url: URL) {
-        guard let kernel = owner else { return }
+        guard let kernel = owner else {
+            return
+        }
         open([ViewerItem(source: .file(url), title: kernel.fileSystems.displayPath(url))], internalOnly: false)
     }
 
@@ -209,7 +211,9 @@ public final class ViewerPlugin: Plugin, ViewerService {
     /// Opens a Lister window on the files of a session; it fills when the first has been read.
     @discardableResult
     func open(_ items: [ViewerItem], internalOnly: Bool, followsCursor: Bool = false) -> ViewerWindowController? {
-        guard let kernel = owner, let settings else { return nil }
+        guard let kernel = owner, let settings else {
+            return nil
+        }
         let controller = ViewerWindowController(
             kernel: kernel,
             settings: settings,
@@ -273,7 +277,9 @@ public final class ViewerPlugin: Plugin, ViewerService {
     /// quick view of one shows nothing until the cursor moves on.
     func letGo(of volume: URL) {
         func isOnVolume(_ url: URL?) -> Bool {
-            guard let url, url.isFileURL else { return false }
+            guard let url, url.isFileURL else {
+                return false
+            }
             return url.isSameLocation(as: volume) || url.isInside(volume)
         }
         for window in windows

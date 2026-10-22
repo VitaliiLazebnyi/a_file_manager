@@ -5,7 +5,9 @@ public import AppKit
 public enum Controls {
     /// Every view of the given type in `view` and below, in the order of the view tree.
     public static func all<View: NSView>(_ type: View.Type, in view: NSView?) -> [View] {
-        guard let view else { return [] }
+        guard let view else {
+            return []
+        }
         return [view as? View].compactMap(\.self) + view.subviews.flatMap { all(type, in: $0) }
     }
 

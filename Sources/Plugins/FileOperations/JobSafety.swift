@@ -48,7 +48,9 @@ enum RealLocation {
     ///
     /// A list of files from anywhere is not such a place.
     static func takesNames(_ directory: URL, in fileSystems: FileSystemRegistry) -> Bool {
-        if directory.isFileURL { return true }
+        if directory.isFileURL {
+            return true
+        }
         let typed = fileSystems.displayPath(directory)
         // Read from somewhere else: a path that only means something relative to where one
         // stands is not the name of this place.
@@ -77,15 +79,21 @@ extension FileIdentity {
     /// Device and inode of the entry itself (a link is not followed); nil for what is not a
     /// local path or is not there.
     static func id(of url: URL, followingLinks: Bool = false) -> (device: dev_t, inode: ino_t)? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL else {
+            return nil
+        }
         var info = stat()
-        guard (followingLinks ? stat(url.path, &info) : lstat(url.path, &info)) == 0 else { return nil }
+        guard (followingLinks ? stat(url.path, &info) : lstat(url.path, &info)) == 0 else {
+            return nil
+        }
         return (info.st_dev, info.st_ino)
     }
 
     /// True when both locations are known to be one and the same file on disk right now.
     static func sameFile(_ a: URL, _ b: URL) -> Bool {
-        guard let first = id(of: a), let second = id(of: b) else { return false }
+        guard let first = id(of: a), let second = id(of: b) else {
+            return false
+        }
         return first.device == second.device && first.inode == second.inode
     }
 
@@ -94,15 +102,21 @@ extension FileIdentity {
     ///
     /// False for what is not a local path or is not there.
     static func isSpecialNode(_ url: URL, followingLinks: Bool) -> Bool {
-        guard url.isFileURL else { return false }
+        guard url.isFileURL else {
+            return false
+        }
         var info = stat()
-        guard (followingLinks ? stat(url.path, &info) : lstat(url.path, &info)) == 0 else { return false }
+        guard (followingLinks ? stat(url.path, &info) : lstat(url.path, &info)) == 0 else {
+            return false
+        }
         let type = info.st_mode & S_IFMT
         return type != S_IFREG && type != S_IFDIR && type != S_IFLNK
     }
 
     static func isSymlink(_ url: URL) -> Bool {
-        guard url.isFileURL else { return false }
+        guard url.isFileURL else {
+            return false
+        }
         var info = stat()
         return lstat(url.path, &info) == 0 && (info.st_mode & S_IFMT) == S_IFLNK
     }
@@ -112,9 +126,13 @@ extension FileIdentity {
     ///
     /// Nil for what is not a local path: there nobody knows.
     static func isLocked(_ url: URL) -> Bool? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL else {
+            return nil
+        }
         var info = stat()
-        guard lstat(url.path, &info) == 0 else { return nil }
+        guard lstat(url.path, &info) == 0 else {
+            return nil
+        }
         return info.st_flags & UInt32(UF_IMMUTABLE | UF_APPEND | SF_IMMUTABLE | SF_APPEND) != 0
     }
 
@@ -132,7 +150,9 @@ extension FileIdentity {
     /// the time of last change, in seconds: 0 where it keeps it exactly.
     static func timestampGrain(of url: URL) -> TimeInterval {
         // A server or an archive: FTP lists minutes, ZIP stores even seconds.
-        guard url.isFileURL else { return 2 }
+        guard url.isFileURL else {
+            return 2
+        }
         var folder = url
         var info = statfs()
         // The nearest folder that is there: the root always is.

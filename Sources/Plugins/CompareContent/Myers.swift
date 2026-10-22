@@ -51,7 +51,9 @@ public enum Myers {
     ) -> [DiffSegment] {
         var numbers: [Element: Int32] = [:]
         func number(_ element: Element) -> Int32 {
-            if let known = numbers[element] { return known }
+            if let known = numbers[element] {
+                return known
+            }
             let next = Int32(numbers.count)
             numbers[element] = next
             return next
@@ -209,7 +211,9 @@ public enum Myers {
                     k1Start += 2
                 } else if front {
                     let other = offset + delta - k1
-                    if other >= 0, other < length, v2[other] != -1, x1 >= n - v2[other] { return (x1, y1, true) }
+                    if other >= 0, other < length, v2[other] != -1, x1 >= n - v2[other] {
+                        return (x1, y1, true)
+                    }
                 }
                 k1 += 2
             }
@@ -232,7 +236,9 @@ public enum Myers {
                     if other >= 0, other < length, v1[other] != -1 {
                         let x1 = v1[other]
                         let y1 = offset + x1 - other
-                        if x1 >= n - x2 { return (x1, y1, true) }
+                        if x1 >= n - x2 {
+                            return (x1, y1, true)
+                        }
                     }
                 }
                 k2 += 2
@@ -259,7 +265,9 @@ public enum Myers {
                     }
                     k += 2
                 }
-                if let best { return (best.x, best.y, false) }
+                if let best {
+                    return (best.x, best.y, false)
+                }
             }
         }
         return nil
@@ -331,7 +339,9 @@ public enum Myers {
             let v = Int(b[j])
             counts.inB[v] = 0
         }
-        guard var current = tailIndex.last else { return [] }
+        guard var current = tailIndex.last else {
+            return []
+        }
         var anchors: [(a: Int, b: Int)] = []
         while current >= 0 {
             anchors.append((candidates[current].a, candidates[current].b))

@@ -138,7 +138,9 @@ private func tarBody(_ text: String) -> Data {
         }
         let many = try writeZip("chains.zip", names: names)
         #expect { try bench.store.archive(at: many) } throws: { error in
-            if case ArchiveError.unsupported = error { return true }
+            if case ArchiveError.unsupported = error {
+                return true
+            }
             return false
         }
         // An archive with more entries than the memory is to hold is refused, not read.
@@ -155,8 +157,11 @@ private func tarBody(_ text: String) -> Data {
         for round in 0..<400 {
             let path = "d\(Int.random(in: 0..<7, using: &generator))/f\(Int.random(in: 0..<60, using: &generator))"
             switch round % 3 {
-            case 0: tree.insert(ArchiveEntry(path: path, isDirectory: false))
-            case 1: tree.remove(path)
+            case 0:
+                tree.insert(ArchiveEntry(path: path, isDirectory: false))
+
+            case 1:
+                tree.remove(path)
 
             default:
                 // A rename: out, and in again elsewhere with the position it had.
@@ -213,7 +218,9 @@ private func tarBody(_ text: String) -> Data {
             let url = box.url(name)
             try Data((head + "photo.jpg type=file contents=\(secret.path)\n").utf8).write(to: url)
             #expect { try bench.store.archive(at: url) } throws: { error in
-                if case ArchiveError.notAnArchive = error { return true }
+                if case ArchiveError.notAnArchive = error {
+                    return true
+                }
                 return false
             }
         }
@@ -500,7 +507,9 @@ private func tarBody(_ text: String) -> Data {
         try writer.write(try Data(contentsOf: box.url("tree.zip")))
         try writer.close(attributes: FileAttributes())
         #expect { try bench.store.archive(at: onServer) } throws: { error in
-            if case ArchiveError.noScratchRoom = error { return true }
+            if case ArchiveError.noScratchRoom = error {
+                return true
+            }
             return false
         }
         // That says nothing about the file: with room it opens at once.

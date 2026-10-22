@@ -17,7 +17,9 @@ import Testing
 
     private func attribute(_ name: String, of url: URL) -> Data? {
         let size = getxattr(url.path, name, nil, 0, 0, XATTR_NOFOLLOW)
-        guard size >= 0 else { return nil }
+        guard size >= 0 else {
+            return nil
+        }
         var value = Data(count: size)
         let got = value.withUnsafeMutableBytes { getxattr(url.path, name, $0.baseAddress, size, 0, XATTR_NOFOLLOW) }
         return got >= 0 ? value.prefix(got) : nil

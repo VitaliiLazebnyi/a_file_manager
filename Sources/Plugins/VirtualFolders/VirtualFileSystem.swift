@@ -69,7 +69,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         func prepared(_ make: ([URL]) -> Prepared) -> Prepared {
             lock.lock()
             defer { lock.unlock() }
-            if let result { return result }
+            if let result {
+                return result
+            }
             let made = make(raw)
             result = made
             return made
@@ -79,7 +81,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         ///
         /// Never waits.
         var preparedIfReady: Prepared? {
-            guard lock.try() else { return nil }
+            guard lock.try() else {
+                return nil
+            }
             defer { lock.unlock() }
             return result
         }
@@ -153,7 +157,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             return fileSystems.capabilities(for: real)
 
         case .list(let id, _, _):
-            guard let list = registered(id, as: VirtualLocation(url)!) else { return capabilities }
+            guard let list = registered(id, as: VirtualLocation(url)!) else {
+                return capabilities
+            }
             // A list that is not prepared yet is judged by its first file; this is asked on the
             // main thread, which must not wait for the work on a long list.
             let examples = list.preparedIfReady?.examples ?? Array(list.raw.prefix(1))
@@ -303,10 +309,15 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     ///
     /// Waits for a long list to be worked through: not for the main thread.
     public func entries(of url: URL) -> [URL]? {
-        guard let location = VirtualLocation(url) else { return nil }
+        guard let location = VirtualLocation(url) else {
+            return nil
+        }
         switch location {
-        case .picked(let id, _), .list(let id, _, _): return registered(id, as: location).map { prepared($0).entries }
-        default: return nil
+        case .picked(let id, _), .list(let id, _, _):
+            return registered(id, as: location).map { prepared($0).entries }
+
+        default:
+            return nil
         }
     }
 
@@ -316,8 +327,11 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     /// Nil for every other URL and for a list (whose entries keep their real locations).
     public func realLocation(of url: URL) -> URL? {
         switch VirtualLocation(url) {
-        case .branch(let real), .picked(_, let real): return real
-        case .list, nil: return nil
+        case .branch(let real), .picked(_, let real):
+            return real
+
+        case .list, nil:
+            return nil
         }
     }
 
@@ -406,8 +420,12 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
                 if isWalked { starts.append(BranchWalker.Start(item.url, prefix: name + "/")) }
                 if !isWalked || options.listsFolders { files.append(name == item.name ? item : item.named(name)) }
             }
-            if cancellation?.isCancelled == true { return }
-            if !files.isEmpty, !receive(files) { return }
+            if cancellation?.isCancelled == true {
+                return
+            }
+            if !files.isEmpty, !receive(files) {
+                return
+            }
             let visited = try walker.walk(
                 starts,
                 keeping: Self.watchLimit,
@@ -422,20 +440,26 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             let entries = prepared.entries
             noteCapabilities(of: prepared.examples, for: directory)
             for from in stride(from: 0, to: entries.count, by: Self.entriesPerBatch) {
-                if cancellation?.isCancelled == true { return }
+                if cancellation?.isCancelled == true {
+                    return
+                }
                 let chunk = Array(entries[from..<min(from + Self.entriesPerBatch, entries.count)])
                 // Each file is asked for on its own file system; what has vanished is left out.
                 let items = Parallel.map(chunk) { url in
                     self.realItem(at: url, cancellation: cancellation)?.named(self.fileSystems.displayPath(url))
                 }
-                if cancellation?.isCancelled == true || !receive(items.compactMap { $0 }) { return }
+                if cancellation?.isCancelled == true || !receive(items.compactMap { $0 }) {
+                    return
+                }
             }
         }
     }
 
     /// The file on its own file system.
     private func realItem(at url: URL, cancellation: CancellationFlag?) -> FileItem? {
-        guard let provider = try? fileSystems.provider(for: url) else { return nil }
+        guard let provider = try? fileSystems.provider(for: url) else {
+            return nil
+        }
         return cancellation.map { provider.item(at: url, cancellation: $0) } ?? provider.item(at: url)
     }
 
@@ -500,7 +524,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     private func virtualItem(at url: URL, cancellation: CancellationFlag?) -> FileItem? {
         switch VirtualLocation(url) {
         case .branch(let real), .picked(_, let real):
-            guard let item = realItem(at: real, cancellation: cancellation) else { return nil }
+            guard let item = realItem(at: real, cancellation: cancellation) else {
+                return nil
+            }
             // A directory is the virtual folder itself; anything else is simply the real file.
             return item.isDirectory
                 ? FileItem(
@@ -532,9 +558,14 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
 
     private func real(_ url: URL) throws -> (provider: any FileSystemProvider, url: URL) {
         switch VirtualLocation(url) {
-        case .branch(let real), .picked(_, let real): return (try fileSystems.provider(for: real), real)
-        case .list: throw FileSystemError.notSupported("Changing a list of files")
-        case nil: throw FileSystemError.noProvider(url)
+        case .branch(let real), .picked(_, let real):
+            return (try fileSystems.provider(for: real), real)
+
+        case .list:
+            throw FileSystemError.notSupported("Changing a list of files")
+
+        case nil:
+            throw FileSystemError.noProvider(url)
         }
     }
 
@@ -602,22 +633,31 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         let target = try real(destination)
         let origin: URL
         switch VirtualLocation(source) {
-        case .branch(let real), .picked(_, let real): origin = real
-        case .list: throw FileSystemError.notSupported("Copying metadata")
-        case nil: origin = source
+        case .branch(let real), .picked(_, let real):
+            origin = real
+
+        case .list:
+            throw FileSystemError.notSupported("Copying metadata")
+
+        case nil:
+            origin = source
         }
         try target.provider.copyMetadata(from: origin, to: target.url)
     }
 
     /// A list has nothing written to it, so there is nothing to make durable.
     public func commit(_ url: URL, cancellation: CancellationFlag) throws {
-        guard VirtualLocation(url)?.isList == false else { return }
+        guard VirtualLocation(url)?.isList == false else {
+            return
+        }
         let target = try real(url)
         try target.provider.commit(target.url, cancellation: cancellation)
     }
 
     public func quarantine(of url: URL) -> Data? {
-        guard let target = try? real(url) else { return nil }
+        guard let target = try? real(url) else {
+            return nil
+        }
         return target.provider.quarantine(of: target.url)
     }
 
@@ -638,10 +678,17 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     /// `/Users/x/dir (branch)`, `/Users/x/dir (selected branch 3)`, `Search result (list 7)`.
     public func displayPath(_ url: URL) -> String {
         switch VirtualLocation(url) {
-        case .branch(let real): return fileSystems.displayPath(real) + " (branch)"
-        case .picked(let id, let real): return fileSystems.displayPath(real) + " (selected branch \(id))"
-        case .list(let id, let title, _): return "\(title) (list \(id))"
-        case nil: return url.absoluteString
+        case .branch(let real):
+            return fileSystems.displayPath(real) + " (branch)"
+
+        case .picked(let id, let real):
+            return fileSystems.displayPath(real) + " (selected branch \(id))"
+
+        case .list(let id, let title, _):
+            return "\(title) (list \(id))"
+
+        case nil:
+            return url.absoluteString
         }
     }
 
@@ -650,15 +697,21 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         if text.lowercased().hasPrefix(scheme + ":") {
             return URL(string: text).flatMap { VirtualLocation($0) == nil ? nil : $0 }
         }
-        guard text.hasSuffix(")"), let open = text.range(of: " (", options: .backwards) else { return nil }
+        guard text.hasSuffix(")"), let open = text.range(of: " (", options: .backwards) else {
+            return nil
+        }
         let note = text[open.upperBound...].dropLast()
         let front = String(text[..<open.lowerBound])
         if note == "branch" {
-            guard !front.isEmpty else { return nil }
+            guard !front.isEmpty else {
+                return nil
+            }
             return branch(of: fileSystems.location(from: front, relativeTo: URL(fileURLWithPath: "/")))
         }
         for kind in ["selected branch ", "list "] where note.hasPrefix(kind) {
-            guard let id = Int(note.dropFirst(kind.count)), let list = synchronized({ lists[id] }) else { return nil }
+            guard let id = Int(note.dropFirst(kind.count)), let list = synchronized({ lists[id] }) else {
+                return nil
+            }
             // It must be what `displayPath` writes for the list: another text that merely ends
             // alike is not this list.
             return displayPath(list.location.url) == text ? list.location.url : nil
@@ -701,9 +754,14 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             var real: [URL]
             let location = VirtualLocation(virtual)
             switch location {
-            case .picked(let id, _): shownLists.append(id)
-            case .list(let id, _, _): shownLists.append(id)
-            default: break
+            case .picked(let id, _):
+                shownLists.append(id)
+
+            case .list(let id, _, _):
+                shownLists.append(id)
+
+            default:
+                break
             }
             switch location {
             case .branch(let root), .picked(_, let root):
@@ -740,7 +798,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         synchronized { for id in shownLists { watchedLists[id, default: 0] += 1 } }
         return Watchers(watchers, coalescers: coalescers) { [weak self, shownLists] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             synchronized {
                 for id in shownLists {
                     if let count = self.watchedLists[id] { self.watchedLists[id] = count > 1 ? count - 1 : nil }
@@ -826,7 +886,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             }
             let delay = wait
             lock.unlock()
-            guard again else { return }
+            guard again else {
+                return
+            }
             fire()
             schedule(after: delay)
         }

@@ -60,7 +60,9 @@ final class ArchiveStore: @unchecked Sendable {
         let known = opened[key]
         if known != nil { slots[key]?.lastUsed = clock }
         lock.unlock()
-        if let known, known.isCurrent(cancellation: cancellation) { return known }
+        if let known, known.isCurrent(cancellation: cancellation) {
+            return known
+        }
         return try archiveInTurn(at: url, key: key, cancellation: cancellation)
     }
 
@@ -134,8 +136,11 @@ final class ArchiveStore: @unchecked Sendable {
 
     private static func isAboutTheFile(_ error: any Error) -> Bool {
         switch error {
-        case ArchiveError.notAnArchive, ArchiveError.damaged, ArchiveError.unsupported: return true
-        default: return false
+        case ArchiveError.notAnArchive, ArchiveError.damaged, ArchiveError.unsupported:
+            return true
+
+        default:
+            return false
         }
     }
 
@@ -244,7 +249,9 @@ final class ArchiveStore: @unchecked Sendable {
         var excess = candidates.count - capacity + 1
         var bytes = archives.reduce(UInt64(0)) { $0.plusClamped($1.scratchBytes) }
         let budget = environment.scratchBudget
-        guard excess > 0 || bytes > budget else { return }
+        guard excess > 0 || bytes > budget else {
+            return
+        }
         for (candidate, slot, _) in candidates {
             guard excess > 0 || bytes > budget else { break }
             // Never while it is being opened; and an archive goes only by `retireIfIdle`,
@@ -538,7 +545,9 @@ final class ArchiveFileSystem: FileSystemProvider {
     private func listing(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag?) throws -> [FileItem] {
         switch try resolve(directory, cancellation: cancellation) {
         case .outside(let provider, let outer):
-            guard let cancellation else { return try provider.list(outer, showHidden: showHidden) }
+            guard let cancellation else {
+                return try provider.list(outer, showHidden: showHidden)
+            }
             return try provider.list(outer, showHidden: showHidden, cancellation: cancellation)
 
         case .inside(let archive, let path, _):
@@ -567,7 +576,9 @@ final class ArchiveFileSystem: FileSystemProvider {
         }
         switch target {
         case .outside(let provider, let outer):
-            guard let cancellation else { return provider.item(at: outer) }
+            guard let cancellation else {
+                return provider.item(at: outer)
+            }
             return provider.item(at: outer, cancellation: cancellation)
 
         case .inside(let archive, let path, _):
@@ -586,10 +597,14 @@ final class ArchiveFileSystem: FileSystemProvider {
     func parent(of directory: URL) -> URL? {
         // Only URLs of this scheme have a parent here; the folder that holds the archive
         // belongs to another file system, and there the climb ends.
-        guard directory.scheme == scheme, let place = ArchiveURL.parse(directory) else { return nil }
+        guard directory.scheme == scheme, let place = ArchiveURL.parse(directory) else {
+            return nil
+        }
         switch place {
         case .inside(let location):
-            if location.isRoot { return location.archive.deletingLastPathComponent() }
+            if location.isRoot {
+                return location.archive.deletingLastPathComponent()
+            }
             return ArchiveURL.make(
                 scheme: scheme,
                 archive: location.archive,
@@ -613,8 +628,11 @@ final class ArchiveFileSystem: FileSystemProvider {
             guard current.scheme == scheme, let place = ArchiveURL.parse(current) else { break }
             let above: URL?
             switch place {
-            case .inside(let location): above = location.archive.deletingLastPathComponent()
-            case .outside(let outer): above = (try? outerProvider(for: outer))?.parent(of: outer)
+            case .inside(let location):
+                above = location.archive.deletingLastPathComponent()
+
+            case .outside(let outer):
+                above = (try? outerProvider(for: outer))?.parent(of: outer)
             }
             guard let above else { break }
             current = above
@@ -637,7 +655,9 @@ final class ArchiveFileSystem: FileSystemProvider {
     private func reading(_ url: URL, cancellation: CancellationFlag?) throws -> any FileReader {
         switch try resolve(url, cancellation: cancellation) {
         case .outside(let provider, let outer):
-            guard let cancellation else { return try provider.read(outer) }
+            guard let cancellation else {
+                return try provider.read(outer)
+            }
             return try provider.read(outer, cancellation: cancellation)
 
         case .inside(let archive, let path, _):
@@ -697,8 +717,11 @@ final class ArchiveFileSystem: FileSystemProvider {
     func write(_ url: URL) throws -> any FileWriter {
         try changing {
             switch try resolve(url) {
-            case .outside(let provider, let outer): return try provider.write(outer)
-            case .inside(let archive, let path, _): return try archive.write(path)
+            case .outside(let provider, let outer):
+                return try provider.write(outer)
+
+            case .inside(let archive, let path, _):
+                return try archive.write(path)
             }
         }
     }
@@ -706,7 +729,8 @@ final class ArchiveFileSystem: FileSystemProvider {
     func write(_ url: URL, cancellation: CancellationFlag) throws -> any FileWriter {
         try changing {
             switch try resolve(url, cancellation: cancellation) {
-            case .outside(let provider, let outer): return try provider.write(outer, cancellation: cancellation)
+            case .outside(let provider, let outer):
+                return try provider.write(outer, cancellation: cancellation)
 
             case .inside(let archive, let path, _):
                 if cancellation.isCancelled { throw ArchiveError.cancelled }
@@ -721,7 +745,8 @@ final class ArchiveFileSystem: FileSystemProvider {
         case .outside(let provider, let outer):
             return try provider.append(to: outer, at: offset, cancellation: cancellation)
 
-        case .inside: throw FileSystemError.notSupported("Continuing a file inside an archive")
+        case .inside:
+            throw FileSystemError.notSupported("Continuing a file inside an archive")
         }
     }
 
@@ -756,9 +781,14 @@ final class ArchiveFileSystem: FileSystemProvider {
     /// Decided from the URLs, before any archive is opened.
     private func requireSameVolume(_ source: URL, _ destination: URL) throws {
         switch (ArchiveURL.parse(source), ArchiveURL.parse(destination)) {
-        case (.inside(let from), .inside(let to)) where from.archive.isSameLocation(as: to.archive): return
-        case (.outside, .outside): return
-        default: throw FileSystemError.crossesVolumes
+        case (.inside(let from), .inside(let to)) where from.archive.isSameLocation(as: to.archive):
+            return
+
+        case (.outside, .outside):
+            return
+
+        default:
+            throw FileSystemError.crossesVolumes
         }
     }
 
@@ -866,7 +896,9 @@ final class ArchiveFileSystem: FileSystemProvider {
     func capabilities(for url: URL) -> FileSystemCapabilities {
         switch ArchiveURL.parse(url) {
         case .inside(let location):
-            guard !capabilities.isEmpty else { return [] }
+            guard !capabilities.isEmpty else {
+                return []
+            }
             // What is known of the archive if it is open; the scheme's word until then.
             return store.openArchive(at: location.archive)?.capabilities ?? capabilities
 
@@ -933,8 +965,11 @@ final class ArchiveFileSystem: FileSystemProvider {
             // Of the archive that is open, without waiting; it is opened only when it is not.
             return (store.openArchive(at: location.archive) ?? (try? store.archive(at: location.archive)))?.quarantine
 
-        case .outside(let outer): return (try? outerProvider(for: outer))?.quarantine(of: outer)
-        case nil: return nil
+        case .outside(let outer):
+            return (try? outerProvider(for: outer))?.quarantine(of: outer)
+
+        case nil:
+            return nil
         }
     }
 
@@ -956,7 +991,9 @@ final class ArchiveFileSystem: FileSystemProvider {
     ///
     /// Works on the URL alone.
     func realLocation(of url: URL) -> URL? {
-        if case .outside(let outer)? = ArchiveURL.parse(url) { return outer }
+        if case .outside(let outer)? = ArchiveURL.parse(url) {
+            return outer
+        }
         return nil
     }
 
@@ -973,7 +1010,9 @@ final class ArchiveFileSystem: FileSystemProvider {
     /// members are then read in the order given. Not for the main thread all the same (it
     /// takes the archive's lock for the look-ups).
     func readOrder(of urls: [URL]) -> [URL] {
-        guard urls.count > 1 else { return urls }
+        guard urls.count > 1 else {
+            return urls
+        }
         var archives: [String: OpenArchive?] = [:]
         var places: [String: [(index: Int, order: Int)]] = [:]
         for (index, url) in urls.enumerated() {
@@ -988,7 +1027,9 @@ final class ArchiveFileSystem: FileSystemProvider {
             }
             places[key, default: []].append((index, entry.order))
         }
-        guard !places.isEmpty else { return urls }
+        guard !places.isEmpty else {
+            return urls
+        }
         var result = urls
         for members in places.values where members.count > 1 {
             // The members of one archive change places among themselves only.
@@ -1027,10 +1068,14 @@ final class ArchiveFileSystem: FileSystemProvider {
     /// finds that out in the background and shows the folder); a path that ends with the name
     /// is the file itself, as it is for a new archive that Pack is to write.
     func location(from text: String) -> URL? {
-        if text.lowercased().hasPrefix(scheme + "://"), let url = URL(string: text), url.scheme == scheme { return url }
+        if text.lowercased().hasPrefix(scheme + "://"), let url = URL(string: text), url.scheme == scheme {
+            return url
+        }
         var path = text
         if path == "~" || path.hasPrefix("~/") { path = NSString(string: path).expandingTildeInPath }
-        guard path.hasPrefix("/") else { return nil }
+        guard path.hasPrefix("/") else {
+            return nil
+        }
         let names = ArchiveTree.names(of: path)
         let known = store.environment.options.extensions.union(Self.zipExtensions)
             .union(
@@ -1042,13 +1087,24 @@ final class ArchiveFileSystem: FileSystemProvider {
             let ext = (name as NSString).pathExtension.lowercased()
             guard !ext.isEmpty, known.contains(ext) else { continue }
             switch pathKind(prefix) {
-            case .regularFile: break
-            case .directory, .other: continue
-            case .missing: return nil
-            case .unasked: if index == names.count - 1 { return nil }
+            case .regularFile:
+                break
+
+            case .directory, .other:
+                continue
+
+            case .missing:
+                return nil
+
+            case .unasked:
+                if index == names.count - 1 {
+                    return nil
+                }
             }
             let archive = URL(fileURLWithPath: prefix, isDirectory: false)
-            guard Self.scheme(forArchive: archive, fileSystems: fileSystems) == scheme else { return nil }
+            guard Self.scheme(forArchive: archive, fileSystems: fileSystems) == scheme else {
+                return nil
+            }
             let inner = ArchiveTree.normalized(names[(index + 1)...].joined(separator: "/")) ?? ""
             return ArchiveURL.make(scheme: scheme, archive: archive, innerPath: inner)
         }
@@ -1057,20 +1113,27 @@ final class ArchiveFileSystem: FileSystemProvider {
 
     func volume(of url: URL) -> VolumeInfo? {
         switch ArchiveURL.parse(url) {
-        case .inside(let location): return VolumeInfo(name: location.archive.lastPathComponent)
-        case .outside(let outer): return (try? outerProvider(for: outer))?.volume(of: outer)
-        case nil: return nil
+        case .inside(let location):
+            return VolumeInfo(name: location.archive.lastPathComponent)
+
+        case .outside(let outer):
+            return (try? outerProvider(for: outer))?.volume(of: outer)
+
+        case nil:
+            return nil
         }
     }
 
     func volume(of url: URL, cancellation: CancellationFlag) -> VolumeInfo? {
         switch ArchiveURL.parse(url) {
-        case .inside(let location): return VolumeInfo(name: location.archive.lastPathComponent)
+        case .inside(let location):
+            return VolumeInfo(name: location.archive.lastPathComponent)
 
         case .outside(let outer):
             return (try? outerProvider(for: outer))?.volume(of: outer, cancellation: cancellation)
 
-        case nil: return nil
+        case nil:
+            return nil
         }
     }
 }

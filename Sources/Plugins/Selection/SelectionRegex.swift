@@ -43,8 +43,12 @@ enum SelectionRegex {
     static func matches(_ regex: NSRegularExpression, _ name: String, trip: SelectionRegexTrip, cancelled: () -> Bool)
         -> Bool
     {
-        if trip.isTripped || cancelled() { return false }
-        guard !name.isEmpty else { return regex.firstMatch(in: name, range: NSRange(location: 0, length: 0)) != nil }
+        if trip.isTripped || cancelled() {
+            return false
+        }
+        guard !name.isEmpty else {
+            return regex.firstMatch(in: name, range: NSRange(location: 0, length: 0)) != nil
+        }
         // (Processor time of this thread, not the clock: see `ThreadTime`.)
         let deadline = ThreadTime.used + budget
         var found = false

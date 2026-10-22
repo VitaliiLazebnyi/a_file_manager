@@ -33,7 +33,9 @@ public enum Checksum {
             // large file would otherwise all be kept until the thread ends.
             var stopped = false
             while try autoreleasepool(invoking: { () throws -> Bool in
-                guard let block = try reader.read(upToCount: 1 << 20) else { return false }
+                guard let block = try reader.read(upToCount: 1 << 20) else {
+                    return false
+                }
                 if isCancelled() {
                     stopped = true
                     return false
@@ -41,9 +43,13 @@ public enum Checksum {
                 hash.update(data: block)
                 return true
             }) {}
-            if stopped { return nil }
+            if stopped {
+                return nil
+            }
         } catch {
-            if flags.contains(where: \.isCancelled) { return nil }
+            if flags.contains(where: \.isCancelled) {
+                return nil
+            }
             throw error
         }
         return Data(hash.finalize())
@@ -70,7 +76,9 @@ public enum Checksum {
             if let special = [first, second].first(where: \.isSpecial) {
                 throw FileJobError.specialFile(fileSystems.displayPath(special.url))
             }
-            if first.size != second.size { return false }
+            if first.size != second.size {
+                return false
+            }
         }
         let digests = try withoutActuallyEscaping(isCancelled) { isCancelled in
             try Parallel.map([a, b]) { url in
@@ -78,7 +86,9 @@ public enum Checksum {
             }
             .map { try $0.get() }
         }
-        guard let first = digests[0], let second = digests[1] else { return nil }
+        guard let first = digests[0], let second = digests[1] else {
+            return nil
+        }
         return first == second
     }
 }

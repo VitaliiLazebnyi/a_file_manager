@@ -135,12 +135,14 @@ enum OperationSettings {
         configuration.logsErrors = settings.flag(logErrors, default: true)
         configuration.logsSkipped = settings.flag(logSkipped, default: true)
         switch settings.index(logRotation, default: 0) {
-        case 1: configuration.rotation = .daily
+        case 1:
+            configuration.rotation = .daily
 
         case 2:
             configuration.rotation = .size(max(1, Int(settings.text(logSizeLimit, default: "1000")) ?? 1_000) * 1_024)
 
-        default: configuration.rotation = .never
+        default:
+            configuration.rotation = .never
         }
         configuration.keepCount = max(0, Int(settings.text(logKeepCount, default: "30")) ?? 30)
         return configuration

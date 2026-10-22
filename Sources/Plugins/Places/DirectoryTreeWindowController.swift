@@ -168,7 +168,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         window.delegate = self
         // Esc aborts a running scan; when idle it closes the window.
         window.onEscape = { [weak self] in
-            guard let self, scanner != nil, let tree else { return false }
+            guard let self, scanner != nil, let tree else {
+                return false
+            }
             stopScanning(tree)
             return true
         }
@@ -238,7 +240,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     /// Shows the tree of the volume `directory` is on, with the cursor on `directory`.
     func show(for directory: URL, showHidden: Bool) {
-        guard let provider = try? kernel.fileSystems.provider(for: directory) else { return }
+        guard let provider = try? kernel.fileSystems.provider(for: directory) else {
+            return
+        }
         isShown = true
         present(self)
         window?.makeFirstResponder(outline)
@@ -252,7 +256,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             let providerRoot = provider.root(of: directory)
             let places = providers.flatMap { $0.places() }
             DispatchQueue.main.async { [weak self] in
-                guard let self, showCounter == counter else { return }
+                guard let self, showCounter == counter else {
+                    return
+                }
                 finishShowing(directory, showHidden: showHidden, providerRoot: providerRoot, places: places)
             }
         }
@@ -294,7 +300,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     }
 
     @objc private func rootChosen() {
-        guard roots.indices.contains(rootPopup.indexOfSelectedItem) else { return }
+        guard roots.indices.contains(rootPopup.indexOfSelectedItem) else {
+            return
+        }
         searchField.stringValue = ""
         let root = roots[rootPopup.indexOfSelectedItem].url
         load(root, selecting: root, rescanning: false)
@@ -302,7 +310,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     }
 
     @objc private func rescan() {
-        guard let tree else { return }
+        guard let tree else {
+            return
+        }
         load(tree.rootURL, selecting: selectedNode.map(tree.url(of:)) ?? tree.rootURL, rescanning: true)
     }
 
@@ -328,7 +338,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             // The tree is built here and let go of: from now on it belongs to the main thread.
             let built = Handover(entry.map { DirectoryTree(rootURL: root, paths: $0.paths, unscanned: $0.unscanned) })
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.generation == generation else { return }
+                guard let self, self.generation == generation else {
+                    return
+                }
                 guard let cached = built.value, let entry else {
                     return scan(root, selecting: directory, generation: generation, rescanning: false)
                 }
@@ -411,7 +423,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
                 // The scan made the levels and their nodes for the main thread and lets go of them.
                 let levels = Handover(levels)
                 DispatchQueue.main.async { [weak self] in
-                    guard let self, self.generation == generation else { return }
+                    guard let self, self.generation == generation else {
+                        return
+                    }
                     waiting += levels.value.map { ($0, generation) }
                     linkWaiting()
                 }
@@ -432,7 +446,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
                 }
             }
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.generation == generation else { return }
+                guard let self, self.generation == generation else {
+                    return
+                }
                 self.scanner = nil
                 isComplete = completed
                 treeIsInCache = stored
@@ -443,7 +459,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     /// The cache has what the tree has: the tree goes while no window shows it.
     private func releaseTreeIfCached() {
-        guard scanner == nil, treeIsInCache, !isShown else { return }
+        guard scanner == nil, treeIsInCache, !isShown else {
+            return
+        }
         releaseTree()
         outline.reloadData()
     }
@@ -543,7 +561,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     /// A folder whose children changed has its rows loaded again, once, in a coming turn.
     private func queueReload(_ node: TreeNode) {
-        guard reloadQueued.insert(ObjectIdentifier(node)).inserted else { return }
+        guard reloadQueued.insert(ObjectIdentifier(node)).inserted else {
+            return
+        }
         reloadQueue.append(node)
     }
 
@@ -553,7 +573,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     /// children, and one that is not on screen is shown anew when its parent is opened. The cursor
     /// is put back on its folder afterwards, once, because rows may have come in above it.
     private func reloadQueuedRows(_ tree: DirectoryTree, until stop: () -> Bool) {
-        guard !reloadQueue.isEmpty else { return }
+        guard !reloadQueue.isEmpty else {
+            return
+        }
         let selected = selectedNode
         var handled = 0
         while handled < reloadQueue.count, !stop() || handled == 0 {
@@ -594,7 +616,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         let (generation, path, url) = (generation, tree.relativePath(of: node), tree.url(of: node))
         let reader = TreeScanner(root: url, provider: provider, showHidden: showHidden)
         let id = ObjectIdentifier(node)
-        guard demanded.insert(id).inserted else { return }
+        guard demanded.insert(id).inserted else {
+            return
+        }
         // Only carried through the background thread: they are used on the main thread again.
         let shown = Handover((tree, node))
         demand.async { [weak self] in
@@ -606,7 +630,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
                 let level = level.value
                 self?.demanded.remove(id)
                 // A scan that got here first has the same answer.
-                guard let self, self.generation == generation || self.tree === tree, !node.isScanned else { return }
+                guard let self, self.generation == generation || self.tree === tree, !node.isScanned else {
+                    return
+                }
                 apply(level)
                 if scanner == nil { showCount() }
             }
@@ -646,7 +672,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     /// goes on in later turns, and a new key press or a new tree ends the one that is going on.
     private func search(forward: Bool = true, includingStart: Bool = false) {
         searchCounter += 1
-        guard let tree, !searchField.stringValue.isEmpty else { return }
+        guard let tree, !searchField.stringValue.isEmpty else {
+            return
+        }
         continueSearch(
             in: tree,
             text: searchField.stringValue,
@@ -667,7 +695,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         remaining: Int?,
         number: Int
     ) {
-        guard number == searchCounter, tree === self.tree else { return }
+        guard number == searchCounter, tree === self.tree else {
+            return
+        }
         switch tree.search(
             text,
             from: start,
@@ -677,8 +707,11 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             timeBudget: Self.turnBudget
         )
         {
-        case .found(let match): reveal(match)
-        case .none: beep()
+        case .found(let match):
+            reveal(match)
+
+        case .none:
+            beep()
 
         case .pending(let node, let left):
             DispatchQueue.main.async { [weak self] in
@@ -708,12 +741,16 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     /// The key press behind a command of the quick-search field, if it was one.
     func handleFieldKey(_ event: NSEvent?) -> Bool {
-        guard let event, event.type == .keyDown else { return false }
+        guard let event, event.type == .keyDown else {
+            return false
+        }
         if Shortcut(.returnKey).matches(event) || Shortcut(.enter).matches(event) {
             accept()
             return true
         }
-        if handleStepKey(event) { return true }
+        if handleStepKey(event) {
+            return true
+        }
         if Shortcut(.upArrow).matches(event) || Shortcut(.downArrow).matches(event) {
             outline.keyDown(with: event)
             return true
@@ -734,7 +771,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
     /// Keys in the tree: Enter goes there, F2 rescans, and typing fills the quick search.
     private func handleKey(_ event: NSEvent) -> Bool {
-        if handleStepKey(event) { return true }
+        if handleStepKey(event) {
+            return true
+        }
         if Self.isRescanKey(event) {
             rescan()
         } else if Shortcut(.returnKey).matches(event) || Shortcut(.enter).matches(event) {
@@ -765,7 +804,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     // MARK: Result
 
     @objc private func accept() {
-        guard let tree, let node = selectedNode else { return }
+        guard let tree, let node = selectedNode else {
+            return
+        }
         let url = tree.url(of: node)
         close()
         // While a job runs the panels stay where they are, as for every command that moves them.
@@ -788,7 +829,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             let current = generation
             DispatchQueue.main.asyncAfter(deadline: .now() + hiddenScanLimit) {
                 [weak self] in
-                guard let self, generation == current, !isShown, scanner != nil, let tree else { return }
+                guard let self, generation == current, !isShown, scanner != nil, let tree else {
+                    return
+                }
                 stopScanning(tree)
                 releaseTreeIfCached()
             }
@@ -800,12 +843,16 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     // MARK: Outline
 
     func outlineView(_: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-        guard let node = item as? TreeNode else { return tree == nil ? 0 : 1 }
+        guard let node = item as? TreeNode else {
+            return tree == nil ? 0 : 1
+        }
         return node.children.count
     }
 
     func outlineView(_: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-        guard let node = item as? TreeNode else { return tree?.root as Any }
+        guard let node = item as? TreeNode else {
+            return tree?.root as Any
+        }
         return node.children[index]
     }
 

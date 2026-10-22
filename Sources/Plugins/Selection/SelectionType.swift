@@ -35,17 +35,36 @@ struct SelectionType: Codable, Equatable {
     /// The conditions beyond the mask.
     func accepts(_ item: FileItem, now: Date = Date()) -> Bool {
         switch kind {
-        case .any: break
-        case .files: if item.isFolder { return false }
-        case .folders: if !item.isFolder { return false }
+        case .any:
+            break
+
+        case .files:
+            if item.isFolder {
+                return false
+            }
+
+        case .folders:
+            if !item.isFolder {
+                return false
+            }
         }
         if minSize != nil || maxSize != nil {
-            guard !item.isFolder else { return false }
-            if let minSize, item.size < minSize { return false }
-            if let maxSize, item.size > maxSize { return false }
+            guard !item.isFolder else {
+                return false
+            }
+            if let minSize, item.size < minSize {
+                return false
+            }
+            if let maxSize, item.size > maxSize {
+                return false
+            }
         }
-        if let modifiedFrom, item.modified < modifiedFrom { return false }
-        if let modifiedTo, item.modified > modifiedTo { return false }
+        if let modifiedFrom, item.modified < modifiedFrom {
+            return false
+        }
+        if let modifiedTo, item.modified > modifiedTo {
+            return false
+        }
         if let notOlderThanDays, item.modified < now.addingTimeInterval(-Double(notOlderThanDays) * 86_400) {
             return false
         }
@@ -57,23 +76,31 @@ struct SelectionType: Codable, Equatable {
     /// `1500`, `10k`, `1.5 M`, `2g`; nil for anything else.
     static func size(from text: String) -> Int64? {
         var text = text.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !text.isEmpty else { return nil }
+        guard !text.isEmpty else {
+            return nil
+        }
         var factor = 1.0
         if let unit = text.last, let power = ["b": 0, "k": 1, "m": 2, "g": 3, "t": 4][unit] {
             factor = pow(1_024, Double(power))
             text = String(text.dropLast()).trimmingCharacters(in: .whitespaces)
         }
-        guard let number = Double(text.replacingOccurrences(of: ",", with: "")), number >= 0 else { return nil }
+        guard let number = Double(text.replacingOccurrences(of: ",", with: "")), number >= 0 else {
+            return nil
+        }
         // `1e30` or `inf` is a size larger than any file, not a crash.
         let bytes = number * factor
         return bytes.isFinite && bytes < 9.2e18 ? Int64(bytes) : Int64.max
     }
 
     static func text(ofSize size: Int64?) -> String {
-        guard let size else { return "" }
+        guard let size else {
+            return ""
+        }
         for (unit, power) in [("G", 3), ("M", 2), ("k", 1)] {
             let factor = Int64(pow(1_024, Double(power)))
-            if size >= factor, size % factor == 0 { return "\(size / factor)\(unit)" }
+            if size >= factor, size % factor == 0 {
+                return "\(size / factor)\(unit)"
+            }
         }
         return String(size)
     }
@@ -91,8 +118,12 @@ struct SelectionType: Codable, Equatable {
     /// 2026-10-11" includes that day.
     static func date(from text: String, endOfDay: Bool = false) -> Date? {
         let text = text.trimmingCharacters(in: .whitespaces)
-        if let date = formatter("yyyy-MM-dd HH:mm").date(from: text) { return date }
-        guard let day = formatter("yyyy-MM-dd").date(from: text) else { return nil }
+        if let date = formatter("yyyy-MM-dd HH:mm").date(from: text) {
+            return date
+        }
+        guard let day = formatter("yyyy-MM-dd").date(from: text) else {
+            return nil
+        }
         return endOfDay ? day.addingTimeInterval(86_399) : day
     }
 
@@ -178,7 +209,9 @@ struct SelectionRule {
             // by path; the mask is tried against the file's own name, and the selection is
             // still keyed by the entry's name, which is unique in such a list.
             let name = item.name.utf8.contains(UInt8(ascii: "/")) ? item.url.lastPathComponent : item.name
-            guard needsDirectories else { return MaskEntry(name: name, isFolder: item.isFolder) }
+            guard needsDirectories else {
+                return MaskEntry(name: name, isFolder: item.isFolder)
+            }
             let parts = item.url.deletingLastPathComponent().pathComponents.filter { $0 != "/" }
             // Entries of a list gathered from elsewhere (a search result) keep their whole path.
             let directory = parts.starts(with: baseParts) ? Array(parts.dropFirst(baseParts.count)) : parts

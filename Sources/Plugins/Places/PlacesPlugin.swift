@@ -212,7 +212,9 @@ public final class PlacesPlugin: Plugin {
     ///
     /// The data itself is kept aside.
     private func storedDataProblem(_ message: String, in kernel: Kernel) {
-        guard reportedKeys.insert(message).inserted else { return }
+        guard reportedKeys.insert(message).inserted else {
+            return
+        }
         performOnMainLoop {
             kernel.interaction.inform(
                 "Some saved data could not be read",
@@ -262,7 +264,9 @@ public final class PlacesPlugin: Plugin {
 
     /// Whether choosing the entry would lead to `directory`.
     private func leads(_ entry: HotlistEntry, to directory: URL, in kernel: Kernel) -> Bool {
-        guard case .changeDirectory(let path, false) = HotlistAction(entry.command), !path.isEmpty else { return false }
+        guard case .changeDirectory(let path, false) = HotlistAction(entry.command), !path.isEmpty else {
+            return false
+        }
         return kernel.fileSystems.location(from: path, relativeTo: directory).isSameLocation(as: directory)
     }
 
@@ -309,9 +313,14 @@ public final class PlacesPlugin: Plugin {
         else {
             // Leaving a submenu shows the level above again.
             switch level {
-            case .user(let path) where !path.isEmpty: showHotlist(in: kernel, level: .user(Array(path.dropLast())))
-            case .favorites: showHotlist(in: kernel)
-            case .user: break
+            case .user(let path) where !path.isEmpty:
+                showHotlist(in: kernel, level: .user(Array(path.dropLast())))
+
+            case .favorites:
+                showHotlist(in: kernel)
+
+            case .user:
+                break
             }
             return
         }

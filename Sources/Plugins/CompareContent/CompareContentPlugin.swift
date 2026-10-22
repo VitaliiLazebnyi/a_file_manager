@@ -110,7 +110,9 @@ public final class CompareContentPlugin: Plugin {
         }
         windows.append(controller)
         session.compare { [weak controller, weak session] hasContent in
-            guard let controller, let session else { return }
+            guard let controller, let session else {
+                return
+            }
             if !(hasContent && !session.isIdentical || files.left == nil || files.right == nil) { controller.close() }
         }
         controller.show()
@@ -126,7 +128,9 @@ public final class CompareContentPlugin: Plugin {
     }
 
     private func askAboutUnsavedChanges(allowCancel: Bool) -> Bool {
-        guard let kernel = owner else { return true }
+        guard let kernel = owner else {
+            return true
+        }
         for session in sessions where session.hasUnsavedChanges {
             let names = [
                 session.modified.left ? session.displayPath(.left) : nil,
@@ -142,9 +146,16 @@ public final class CompareContentPlugin: Plugin {
                 style: .warning
             )
             {
-            case 0: if !session.saveNow(), allowCancel { return false }
-            case 1: session.discardChanges()
-            default: return false
+            case 0:
+                if !session.saveNow(), allowCancel {
+                    return false
+                }
+
+            case 1:
+                session.discardChanges()
+
+            default:
+                return false
             }
         }
         return true
@@ -169,7 +180,9 @@ enum CompareOperands {
         /// The first `limit` marked files in list order. Nothing marked is known at once, and the walk over the
         /// marks (a bit each) stops at the limit, so a selection of 300,000 does not cost a pass over them.
         func selectedFiles(_ model: PanelModel, limit: Int) -> [FileItem] {
-            guard model.selectionCount > 0 else { return [] }
+            guard model.selectionCount > 0 else {
+                return []
+            }
             let snapshot = model.operandsSnapshot()
             var found: [FileItem] = []
             for index in snapshot.shownItems.indices
@@ -186,11 +199,15 @@ enum CompareOperands {
             return match.url
         }
         let selected = selectedFiles(source, limit: 2)
-        if selected.count >= 2 { return (selected[0].url, selected[1].url) }
+        if selected.count >= 2 {
+            return (selected[0].url, selected[1].url)
+        }
         if let only = selected.first {
             return (only.url, selectedFiles(target, limit: 1).first?.url ?? sameName(as: only))
         }
-        guard let cursor = source.cursorItem, !cursor.isDirectory else { return (nil, nil) }
+        guard let cursor = source.cursorItem, !cursor.isDirectory else {
+            return (nil, nil)
+        }
         return (cursor.url, sameName(as: cursor))
     }
 
@@ -198,14 +215,20 @@ enum CompareOperands {
     static func parse(_ argument: CommandArgument, fileSystems: FileSystemRegistry, base: URL) -> (
         left: URL?, right: URL?
     )? {
-        if let location = argument.location { return (location, nil) }
-        guard let text = argument.text else { return nil }
+        if let location = argument.location {
+            return (location, nil)
+        }
+        guard let text = argument.text else {
+            return nil
+        }
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
             .map {
                 $0.trimmingCharacters(in: .whitespaces)
             }
         func location(_ line: String?) -> URL? {
-            guard let line, !line.isEmpty else { return nil }
+            guard let line, !line.isEmpty else {
+                return nil
+            }
             if let url = URL(string: line), let scheme = url.scheme, (try? fileSystems.provider(for: url)) != nil,
                 scheme.count > 1
             {

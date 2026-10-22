@@ -5,17 +5,23 @@ public import Foundation
 /// Target masks of Copy and Move (spec 07 › Wildcard target names).
 public enum TargetMask {
     public static func apply(_ mask: String, to sourceName: String) -> String {
-        if mask.isEmpty || mask == "*.*" || mask == "*" { return sourceName }
+        if mask.isEmpty || mask == "*.*" || mask == "*" {
+            return sourceName
+        }
         let source = splitAtLastDot(sourceName)
         let parts = splitAtLastDot(mask)
         let name = expand(source.name, mask: parts.name)
-        guard let extMask = parts.ext else { return name }
+        guard let extMask = parts.ext else {
+            return name
+        }
         let ext = expand(source.ext ?? "", mask: extMask)
         return ext.isEmpty ? name : name + "." + ext
     }
 
     private static func splitAtLastDot(_ text: String) -> (name: String, ext: String?) {
-        guard let dot = text.lastIndex(of: "."), dot != text.startIndex else { return (text, nil) }
+        guard let dot = text.lastIndex(of: "."), dot != text.startIndex else {
+            return (text, nil)
+        }
         return (String(text[..<dot]), String(text[text.index(after: dot)...]))
     }
 
@@ -93,7 +99,9 @@ public struct TargetSpec: Equatable, Sendable {
         cancellation: CancellationFlag? = nil
     ) -> Self {
         let text = text.trimmingCharacters(in: .whitespaces)
-        if text.isEmpty { return Self(directory: sourceDirectory) }
+        if text.isEmpty {
+            return Self(directory: sourceDirectory)
+        }
         let last = (text as NSString).lastPathComponent
         if last.contains("*") || last.contains("?") {
             let folder = String(text.dropLast(last.count))
@@ -129,13 +137,17 @@ public enum UniqueName {
 
     /// What is at a location, asked so that the question ends with `cancellation` when there is one.
     static func item(at url: URL, in fileSystems: FileSystemRegistry, _ cancellation: CancellationFlag?) -> FileItem? {
-        guard let cancellation else { return fileSystems.item(at: url) }
+        guard let cancellation else {
+            return fileSystems.item(at: url)
+        }
         return (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation)
     }
 
     /// The same with the question "is this name in use?" left to the caller.
     public static func available(for url: URL, exists: (URL) -> Bool) -> URL {
-        guard exists(url) else { return url }
+        guard exists(url) else {
+            return url
+        }
         let (base, ext) = FileItem.split(url.lastPathComponent)
         let folder = url.deletingLastPathComponent()
         func candidate(_ counter: Int) -> URL {
@@ -159,7 +171,9 @@ public enum OperationText {
     /// The same for whoever knows how many items there are without having the list of them;
     /// `single` is the item when there is exactly one.
     public static func heading(_ verb: String, count: Int, single: FileItem?) -> String {
-        if let single, count == 1, !single.isFolder { return "\(verb) \"\(DisplayName.escaped(single.name))\" to" }
+        if let single, count == 1, !single.isFolder {
+            return "\(verb) \"\(DisplayName.escaped(single.name))\" to"
+        }
         return "\(verb) \(count) file(s) to"
     }
 
@@ -172,7 +186,9 @@ public enum OperationText {
 
     public static func targetProposal(count: Int, single: FileItem?, targetPath: String?) -> String {
         let prefix = targetPath.map { $0.hasSuffix("/") ? $0 : $0 + "/" } ?? ""
-        if let single, count == 1, !single.isFolder || targetPath == nil { return prefix + single.name }
+        if let single, count == 1, !single.isFolder || targetPath == nil {
+            return prefix + single.name
+        }
         return prefix + "*.*"
     }
 
@@ -223,9 +239,14 @@ public enum OperationText {
             state = "is LOCKED!"
         }
         switch question.purpose {
-        case .overwrite: return ("The file \(path) \(state)", "Do you want to overwrite it anyway?", "Overwrite")
-        case .delete: return ("Delete: \(path) \(state)", "Delete anyway?", "Delete")
-        case .move: return ("Move: \(path) \(state)", "Move anyway?", "Move")
+        case .overwrite:
+            return ("The file \(path) \(state)", "Do you want to overwrite it anyway?", "Overwrite")
+
+        case .delete:
+            return ("Delete: \(path) \(state)", "Delete anyway?", "Delete")
+
+        case .move:
+            return ("Move: \(path) \(state)", "Move anyway?", "Move")
         }
     }
 }

@@ -59,8 +59,12 @@ struct SettingsSchema {
     /// What the user did, as opposed to what the user set up: typed command lines, visited
     /// folders, search texts, the files renamed last.
     func isHistory(_ key: String) -> Bool {
-        guard preferences[key] == nil else { return false }
-        if declaredKind(key) == .history { return true }
+        guard preferences[key] == nil else {
+            return false
+        }
+        if declaredKind(key) == .history {
+            return true
+        }
         let lowered = key.lowercased()
         return lowered.contains("history") || lowered.contains("undo") || lowered.contains("lastserver")
     }
@@ -84,19 +88,34 @@ struct SettingsSchema {
     /// The group a key belongs to; nil for an ordinary setting. `value` is the value in the
     /// file, where the group depends on it.
     func group(of key: String, value: Any?) -> Group? {
-        if key == Self.userCommandsKey || key == Self.startMenuKey { return .commands }
-        if key == keyBindingsKey { return .keys }
-        if key == Self.hotlistKey { return .hotlist }
-        if key == Self.connectionsKey || key == Self.lastConnectionKey { return .connections }
+        if key == Self.userCommandsKey || key == Self.startMenuKey {
+            return .commands
+        }
+        if key == keyBindingsKey {
+            return .keys
+        }
+        if key == Self.hotlistKey {
+            return .hotlist
+        }
+        if key == Self.connectionsKey || key == Self.lastConnectionKey {
+            return .connections
+        }
         // What its own plugin says a key is: a key that decides whom the program trusts is
         // asked about whatever it is called (the list of servers a password may be sent to
         // without protection has none of the words looked for below in its name), and so is
         // one that holds something that is run.
         switch declaredKind(key) {
-        case .trust: return .trust
-        case .connection: return .connections
-        case .runsCode: return .programs
-        default: break
+        case .trust:
+            return .trust
+
+        case .connection:
+            return .connections
+
+        case .runsCode:
+            return .programs
+
+        default:
+            break
         }
         let lowered = key.lowercased()
         if lowered.hasPrefix("network."), ["certificate", "trust", "tls"].contains(where: lowered.contains) {
@@ -104,7 +123,9 @@ struct SettingsSchema {
         }
         if Self.tabKeys.contains(key) {
             // Tabs on this Mac's disks are ordinary; one on a server makes the program connect.
-            guard let state = value as? [String: Any], let tabs = state["tabs"] as? [[String: Any]] else { return nil }
+            guard let state = value as? [String: Any], let tabs = state["tabs"] as? [[String: Any]] else {
+                return nil
+            }
             let isRemote = tabs.contains { tab in
                 (tab["location"] as? String).map { !$0.lowercased().hasPrefix("file:") } ?? false
             }
@@ -115,7 +136,9 @@ struct SettingsSchema {
             let name = lowered.split(separator: ".").last.map(String.init) ?? lowered
             let namesAProgram = ["editor", "terminal", "program", "command", "tool", "shell", "exec", "path", "file"]
                 .contains(where: name.contains)
-            if namesAProgram, !isHistory(key) { return .programs }
+            if namesAProgram, !isHistory(key) {
+                return .programs
+            }
         }
         return nil
     }
@@ -198,12 +221,20 @@ struct CheckedSettings: @unchecked Sendable {
     private static func isBoolean(_ number: NSNumber) -> Bool { CFGetTypeID(number) == CFBooleanGetTypeID() }
 
     private static func limitingNumbers(_ object: Any, _ limited: inout Int) -> Any {
-        if let list = object as? [Any] { return list.map { limitingNumbers($0, &limited) } }
-        if let dictionary = object as? [String: Any] { return dictionary.mapValues { limitingNumbers($0, &limited) } }
-        guard let number = object as? NSNumber, !isBoolean(number) else { return object }
+        if let list = object as? [Any] {
+            return list.map { limitingNumbers($0, &limited) }
+        }
+        if let dictionary = object as? [String: Any] {
+            return dictionary.mapValues { limitingNumbers($0, &limited) }
+        }
+        guard let number = object as? NSNumber, !isBoolean(number) else {
+            return object
+        }
         // (JSON has no NaN.)
         let value = number.doubleValue
-        guard abs(value) > numberLimit else { return object }
+        guard abs(value) > numberLimit else {
+            return object
+        }
         limited += 1
         return NSNumber(value: value < 0 ? -Int64(numberLimit) : Int64(numberLimit))
     }
@@ -214,9 +245,13 @@ struct CheckedSettings: @unchecked Sendable {
             return object
         }
         frequent["counts"] = counts.mapValues { value -> Any in
-            guard let number = value as? NSNumber, !isBoolean(number) else { return value }
+            guard let number = value as? NSNumber, !isBoolean(number) else {
+                return value
+            }
             let count = number.doubleValue
-            guard count < 0 || count > Double(frequentCountLimit) else { return value }
+            guard count < 0 || count > Double(frequentCountLimit) else {
+                return value
+            }
             limited += 1
             return NSNumber(value: count < 0 ? 0 : frequentCountLimit)
         }
@@ -233,8 +268,11 @@ struct CheckedSettings: @unchecked Sendable {
         }
         if let kind = schema.preferences[key] {
             switch kind {
-            case .flag: try require(object is NSNumber && isBoolean(object as! NSNumber))
-            case .text: try require((object as? String).map { $0.utf8.count <= textLimit } ?? false)
+            case .flag:
+                try require(object is NSNumber && isBoolean(object as! NSNumber))
+
+            case .text:
+                try require((object as? String).map { $0.utf8.count <= textLimit } ?? false)
 
             case .choice(let options, _):
                 guard let number = object as? NSNumber, !isBoolean(number), let index = Int(exactly: number.doubleValue)
@@ -327,8 +365,12 @@ struct SettingsImportPlan {
                     as? [[String: Any]]) ?? []
             var renumbered: [String: String] = [:]
             let fresh = imported.map { connection -> [String: Any] in
-                guard let id = connection["id"] as? String else { return connection }
-                if stored.contains(where: { ($0 as NSDictionary).isEqual(to: connection) }) { return connection }
+                guard let id = connection["id"] as? String else {
+                    return connection
+                }
+                if stored.contains(where: { ($0 as NSDictionary).isEqual(to: connection) }) {
+                    return connection
+                }
                 var connection = connection
                 let new = UUID().uuidString
                 renumbered[id.uppercased()] = new
@@ -380,7 +422,9 @@ struct SettingsImportPlan {
             }
             .sorted()
         parts = SettingsSchema.Group.allCases.compactMap { group in
-            guard let keys = grouped[group]?.sorted(), !keys.isEmpty else { return nil }
+            guard let keys = grouped[group]?.sorted(), !keys.isEmpty else {
+                return nil
+            }
             return Self.part(group, keys: keys, objects: objects)
         }
     }
@@ -454,7 +498,9 @@ struct SettingsImportPlan {
                     list.forEach(walk)
                     return
                 }
-                guard let entry = object as? [String: Any] else { return }
+                guard let entry = object as? [String: Any] else {
+                    return
+                }
                 if let command = entry["command"] as? String, !command.isEmpty {
                     lines.append("\(show(entry["title"] ?? entry["name"])):  \(show(command))")
                 }
@@ -537,9 +583,15 @@ struct SettingsExportOptions: Equatable {
     /// The keys of `keys` that go into the file.
     func included(_ keys: [String], schema: SettingsSchema) -> [String] {
         keys.filter { key in
-            if schema.isBackup(key) { return false }
-            if schema.isConnectionData(key) { return includesConnections }
-            if schema.isHistory(key) { return includesHistory }
+            if schema.isBackup(key) {
+                return false
+            }
+            if schema.isConnectionData(key) {
+                return includesConnections
+            }
+            if schema.isHistory(key) {
+                return includesHistory
+            }
             return true
         }
     }

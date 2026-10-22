@@ -21,7 +21,9 @@ struct TypedCommand: Equatable {
         // `&&` at the end is an unfinished line, not a request to run in the background.
         let detached = text.hasSuffix("&") && !text.hasSuffix("&&")
         if detached { text = String(text.dropLast()).trimmingCharacters(in: .whitespaces) }
-        guard !text.isEmpty else { return nil }
+        guard !text.isEmpty else {
+            return nil
+        }
         command = text
         isDetached = detached
         (firstWord, arguments) = Self.split(text)
@@ -83,16 +85,22 @@ struct TypedCommand: Equatable {
         }
         if firstWord.lowercased().hasSuffix(".app") {
             let here = Self.location(of: firstWord, relativeTo: directory)
-            if firstWord.contains("/") || firstWord.hasPrefix("~") { return bundle(at: here) }
+            if firstWord.contains("/") || firstWord.hasPrefix("~") {
+                return bundle(at: here)
+            }
             return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(firstWord)) }.first
                 ?? bundle(at: here)
         }
         // A bare name is an application only when nothing else is asked of it; `open -a` and
         // the like stay with the shell.
-        guard arguments.isEmpty, !firstWord.contains("/"), !firstWord.isEmpty else { return nil }
+        guard arguments.isEmpty, !firstWord.contains("/"), !firstWord.isEmpty else {
+            return nil
+        }
         // A program of that name on the PATH wins: on a case-insensitive disk `mail` would
         // otherwise open Mail.app instead of /usr/bin/mail.
-        if Self.isOnPath(firstWord, path: path) { return nil }
+        if Self.isOnPath(firstWord, path: path) {
+            return nil
+        }
         return folders.lazy.compactMap { bundle(at: $0.appendingPathComponent(firstWord + ".app")) }.first
     }
 

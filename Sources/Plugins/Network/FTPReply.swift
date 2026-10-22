@@ -55,7 +55,9 @@ public struct FTPReplyParser {
 
     private mutating func keep(_ line: String) {
         linesOfOpenReply += 1
-        guard lines.count < FTPLimits.replyLines, bytes + line.utf8.count <= FTPLimits.replyBytes else { return }
+        guard lines.count < FTPLimits.replyLines, bytes + line.utf8.count <= FTPLimits.replyBytes else {
+            return
+        }
         bytes += line.utf8.count
         lines.append(line)
     }
@@ -85,7 +87,9 @@ public struct FTPReplyParser {
             keep(number == open && separator == 0x2D ? text() : line)
             return nil
         }
-        guard let number else { return nil }
+        guard let number else {
+            return nil
+        }
         if separator == 0x2D {
             code = number
             (lines, bytes, linesOfOpenReply) = ([], 0, 0)
@@ -147,7 +151,9 @@ struct LineSplitter {
     /// What is left when the data ends without a line end.
     mutating func finish() -> Data? {
         defer { (partial, isSkipping) = (Data(), false) }
-        if isSkipping || partial.isEmpty { return nil }
+        if isSkipping || partial.isEmpty {
+            return nil
+        }
         return partial.last == 0x0D ? Data(partial.dropLast()) : partial
     }
 }
@@ -156,11 +162,17 @@ struct LineSplitter {
 public enum FTPSyntax {
     /// The port in the reply to EPSV: `229 Entering Extended Passive Mode (|||6446|)`.
     public static func extendedPassivePort(_ text: String) -> Int? {
-        guard let open = text.lastIndex(of: "("), let close = text[open...].firstIndex(of: ")") else { return nil }
+        guard let open = text.lastIndex(of: "("), let close = text[open...].firstIndex(of: ")") else {
+            return nil
+        }
         let inner = text[text.index(after: open)..<close]
-        guard let delimiter = inner.first else { return nil }
+        guard let delimiter = inner.first else {
+            return nil
+        }
         let fields = inner.split(separator: delimiter, omittingEmptySubsequences: false)
-        guard fields.count >= 5, let port = Int(fields[3]), (1...65_535).contains(port) else { return nil }
+        guard fields.count >= 5, let port = Int(fields[3]), (1...65_535).contains(port) else {
+            return nil
+        }
         return port
     }
 
@@ -186,16 +198,22 @@ public enum FTPSyntax {
                 }
             }
         }
-        guard best.count == 6, best.allSatisfy({ (0...255).contains($0) }) else { return nil }
+        guard best.count == 6, best.allSatisfy({ (0...255).contains($0) }) else {
+            return nil
+        }
         let port = best[4] * 256 + best[5]
-        guard port > 0 else { return nil }
+        guard port > 0 else {
+            return nil
+        }
         return (best[0..<4].map(String.init).joined(separator: "."), port)
     }
 
     /// The argument of PORT for an IPv4 address: `h1,h2,h3,h4,p1,p2`.
     public static func portArgument(host: String, port: Int) -> String? {
         let parts = host.split(separator: ".")
-        guard parts.count == 4, parts.allSatisfy({ UInt8($0) != nil }) else { return nil }
+        guard parts.count == 4, parts.allSatisfy({ UInt8($0) != nil }) else {
+            return nil
+        }
         return (parts.map(String.init) + [String(port / 256), String(port % 256)]).joined(separator: ",")
     }
 
@@ -219,7 +237,9 @@ public enum FTPSyntax {
 
     /// The directory in the reply to PWD or MKD: `257 "/a ""quoted"" name" created`.
     public static func quotedPath(_ text: String) -> String? {
-        guard let open = text.firstIndex(of: "\"") else { return nil }
+        guard let open = text.firstIndex(of: "\"") else {
+            return nil
+        }
         var path = ""
         var index = text.index(after: open)
         while index < text.endIndex {
@@ -227,7 +247,9 @@ public enum FTPSyntax {
             let next = text.index(after: index)
             if character == "\"" {
                 // A doubled quote stands for one quote inside the name.
-                guard next < text.endIndex, text[next] == "\"" else { return path }
+                guard next < text.endIndex, text[next] == "\"" else {
+                    return path
+                }
                 path.append("\"")
                 index = text.index(after: next)
             } else {
@@ -241,7 +263,9 @@ public enum FTPSyntax {
     /// A time as MDTM, MFMT and MLSD write it: `YYYYMMDDHHMMSS[.sss]`, in UTC.
     public static func time(_ text: String) -> Date? {
         let digits = text.prefix(14)
-        guard digits.count == 14, digits.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+        guard digits.count == 14, digits.allSatisfy({ $0.isASCII && $0.isNumber }) else {
+            return nil
+        }
         // Fourteen ASCII digits, read as numbers one by one.
         let values = digits.compactMap(\.wholeNumberValue)
         func number(_ from: Int, _ length: Int) -> Int {

@@ -349,7 +349,9 @@ import Testing
     func spin(until done: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !done() {
-            guard Date() < deadline else { return false }
+            guard Date() < deadline else {
+                return false
+            }
             try? await Task.sleep(nanoseconds: 5_000_000)
         }
         return true

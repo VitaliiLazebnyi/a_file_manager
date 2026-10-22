@@ -95,7 +95,9 @@ enum ShellWords {
 
     static func needsQuoting(_ text: String) -> Bool {
         text.unicodeScalars.contains { scalar in
-            if scalar.isASCII { return !plain.contains(scalar) }
+            if scalar.isASCII {
+                return !plain.contains(scalar)
+            }
             switch scalar.properties.generalCategory {
             case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter, .nonspacingMark,
                 .spacingMark, .decimalNumber:
@@ -256,8 +258,11 @@ enum ShellWords {
     static func unquoted(_ word: [ExpandedPiece]) -> String {
         word.map { piece -> String in
             switch piece {
-            case .text(let text): return unquoted(text)
-            case .value(let value), .raw(let value): return value
+            case .text(let text):
+                return unquoted(text)
+
+            case .value(let value), .raw(let value):
+                return value
             }
         }
         .joined()
@@ -421,7 +426,9 @@ struct ParameterExpander {
         private var next: Unicode.Scalar? { scalar(at: position) }
 
         private func scalar(at index: Int) -> Unicode.Scalar? {
-            guard index < tokens.count, case .scalar(let scalar) = tokens[index] else { return nil }
+            guard index < tokens.count, case .scalar(let scalar) = tokens[index] else {
+                return nil
+            }
             return scalar
         }
 
@@ -443,22 +450,53 @@ struct ParameterExpander {
                 }
                 position += 1
                 switch code {
-                case "%": literal("%")
-                case "|": environmentVariable()
-                case "P", "p": single(first.path, isPath: true)
-                case "T", "t": single(second.path, isPath: true)
-                case "N", "n", "v": single(requiring(first.cursorName) ?? "", isName: true)
-                case "V": single(requiring(first.cursorName).map { first.path + $0 } ?? "")
-                case "M", "m": single(requiring(second.cursorName) ?? "", isName: true)
-                case "O", "o": single(FileItem.split(requiring(first.cursorName) ?? "").base, isName: true)
-                case "E", "e": single(FileItem.split(requiring(first.cursorName) ?? "").ext)
-                case "S", "s": names(of: first)
-                case "R", "r": names(of: second)
-                case "B", "b": directoryName()
-                case "C", "c": comparedFile(code)
-                case "A": arguments()
-                case "L", "l", "D": list(withPath: true, encoding: .plain)
-                case "F", "f", "d": list(withPath: false, encoding: .plain)
+                case "%":
+                    literal("%")
+
+                case "|":
+                    environmentVariable()
+
+                case "P", "p":
+                    single(first.path, isPath: true)
+
+                case "T", "t":
+                    single(second.path, isPath: true)
+
+                case "N", "n", "v":
+                    single(requiring(first.cursorName) ?? "", isName: true)
+
+                case "V":
+                    single(requiring(first.cursorName).map { first.path + $0 } ?? "")
+
+                case "M", "m":
+                    single(requiring(second.cursorName) ?? "", isName: true)
+
+                case "O", "o":
+                    single(FileItem.split(requiring(first.cursorName) ?? "").base, isName: true)
+
+                case "E", "e":
+                    single(FileItem.split(requiring(first.cursorName) ?? "").ext)
+
+                case "S", "s":
+                    names(of: first)
+
+                case "R", "r":
+                    names(of: second)
+
+                case "B", "b":
+                    directoryName()
+
+                case "C", "c":
+                    comparedFile(code)
+
+                case "A":
+                    arguments()
+
+                case "L", "l", "D":
+                    list(withPath: true, encoding: .plain)
+
+                case "F", "f", "d":
+                    list(withPath: false, encoding: .plain)
 
                 case "U", "W":
                     guard let kind = next, kind == "L" || kind == "F" else {
@@ -469,10 +507,17 @@ struct ParameterExpander {
                     position += 1
                     list(withPath: kind == "L", encoding: code == "U" ? .utf8WithMark : .utf16WithMark)
 
-                case "X": leftRight = true
-                case "x": leftRight = false
-                case "q": stripsQuotes.toggle()
-                case "Y", "y", "Z", "Q", "a": break
+                case "X":
+                    leftRight = true
+
+                case "x":
+                    leftRight = false
+
+                case "q":
+                    stripsQuotes.toggle()
+
+                case "Y", "y", "Z", "Q", "a":
+                    break
 
                 default:
                     literal("%")
@@ -497,7 +542,9 @@ struct ParameterExpander {
                 opened = (pieces.count, lexer)
             }
             write(character)
-            guard character == "\"" else { return }
+            guard character == "\"" else {
+                return
+            }
             if !wasInside, isInsideDoubleQuotes {
                 openQuote = opened
             } else if wasInside, !isInsideDoubleQuotes {
@@ -515,7 +562,9 @@ struct ParameterExpander {
         }
 
         private mutating func flushLiteral() {
-            guard !literal.isEmpty else { return }
+            guard !literal.isEmpty else {
+                return
+            }
             pieces.append(.text(String(literal)))
             literal = String.UnicodeScalarView()
         }
@@ -534,7 +583,8 @@ struct ParameterExpander {
 
         private mutating func emit(_ piece: ExpandedPiece) {
             switch piece {
-            case .text(let text): write(text)
+            case .text(let text):
+                write(text)
 
             case .value(let value):
                 flushLiteral()
@@ -569,7 +619,9 @@ struct ParameterExpander {
         }
 
         private mutating func flushWord() {
-            guard let value = word else { return }
+            guard let value = word else {
+                return
+            }
             word = nil
             wordIsPath = false
             emit(value: value)
@@ -598,15 +650,21 @@ struct ParameterExpander {
             func fromTheEnd(_ index: Int) -> Int { index > items.count ? 0 : items.count - index + 1 }
             let from = fromEnd ? fromTheEnd(start) : start
             let to = open ? items.count : end.map { fromEnd ? fromTheEnd($0) : $0 } ?? from
-            guard from >= 1, from <= min(to, items.count) else { return [] }
+            guard from >= 1, from <= min(to, items.count) else {
+                return []
+            }
             return Array(items[(from - 1)..<min(to, items.count)])
         }
 
         /// `-<m>` or an open `-` after a position; restores the position when there is neither.
         private mutating func rangeEnd(openWith openers: Set<Unicode.Scalar>) -> (end: Int?, open: Bool) {
-            guard let character = next, openers.contains(character) else { return (nil, false) }
+            guard let character = next, openers.contains(character) else {
+                return (nil, false)
+            }
             position += 1
-            if character == "-", let end = number() { return (end, false) }
+            if character == "-", let end = number() {
+                return (end, false)
+            }
             return (nil, true)
         }
 
@@ -614,7 +672,9 @@ struct ParameterExpander {
         private mutating func selectionRange() -> ([String]) -> [String] {
             let start = position
             guard let sign = next, sign == "+" || sign == "-" else {
-                guard let count = number() else { return { $0 } }
+                guard let count = number() else {
+                    return { $0 }
+                }
                 return { Array($0.prefix(count)) }
             }
             position += 1
@@ -628,7 +688,9 @@ struct ParameterExpander {
 
         /// The cmd.exe-style suffix `:~start,length` (spec 18 › Substrings).
         private mutating func substring() -> (String) -> String {
-            guard scalar(at: position) == ":", scalar(at: position + 1) == "~" else { return { $0 } }
+            guard scalar(at: position) == ":", scalar(at: position + 1) == "~" else {
+                return { $0 }
+            }
             let begin = position
             position += 2
             let startIsNegative = next == "-"
@@ -652,7 +714,9 @@ struct ParameterExpander {
                 if startIsNegative, start == 0 {
                     // `-0` cuts the name without its extension, or the extension alone.
                     let parts = FileItem.split(text)
-                    guard let length else { return parts.base }
+                    guard let length else {
+                        return parts.base
+                    }
                     return String((lengthIsNegative ? parts.ext : parts.base).prefix(length))
                 }
                 let all = Array(text)
@@ -684,20 +748,33 @@ struct ParameterExpander {
         /// The names `%S` and `%R` stand for (spec 18 › Empty-selection and archive modifiers):
         /// the marked ones, else the one under the cursor, unless `%Y` alone asks for none.
         private func chosen(of panel: PanelSnapshot) -> [String] {
-            if !panel.selection.isEmpty { return panel.selection }
-            if emptyWhenUnselected, !dropsListWhenUnselected { return [] }
+            if !panel.selection.isEmpty {
+                return panel.selection
+            }
+            if emptyWhenUnselected, !dropsListWhenUnselected {
+                return []
+            }
             return panel.cursorName.map { [$0] } ?? []
         }
 
         /// The names a list file holds; nil when the list parameter is to be dropped.
         private func listed(of panel: PanelSnapshot) -> [String]? {
-            if !panel.selection.isEmpty { return panel.selection }
+            if !panel.selection.isEmpty {
+                return panel.selection
+            }
             let cursor = panel.cursorName.map { [$0] }
             switch (emptyWhenUnselected, dropsListWhenUnselected) {
-            case (true, true): return cursor
-            case (true, false): return []
-            case (false, true): return nil
-            case (false, false): return cursor ?? []
+            case (true, true):
+                return cursor
+
+            case (true, false):
+                return []
+
+            case (false, true):
+                return nil
+
+            case (false, false):
+                return cursor ?? []
             }
         }
 
@@ -865,7 +942,9 @@ struct ParameterExpander {
 
         /// `%q` takes the double quotes out of what the user typed; a value has none of its own.
         private func stripped(_ piece: ExpandedPiece) -> ExpandedPiece {
-            if case .text(let text) = piece { return .text(stripped(text)) }
+            if case .text(let text) = piece {
+                return .text(stripped(text))
+            }
             return piece
         }
 
@@ -877,10 +956,14 @@ struct ParameterExpander {
         ///
         /// Only the first list of a command counts.
         private mutating func list(withPath: Bool, encoding: ListEncoding) {
-            guard !listWasRequested else { return }
+            guard !listWasRequested else {
+                return
+            }
             listWasRequested = true
             let panel = first
-            guard let names = listed(of: panel) else { return }
+            guard let names = listed(of: panel) else {
+                return
+            }
             // Without a path a name that begins with `-` would be an option to whoever reads the list.
             func line(_ name: String, of panel: PanelSnapshot) -> String {
                 withPath ? panel.path + name : protected(name)
@@ -893,8 +976,11 @@ struct ParameterExpander {
             // knows these) counts as one.
             func endsALine(_ scalar: Unicode.Scalar) -> Bool {
                 switch scalar.value {
-                case 0x0A...0x0D, 0x1C...0x1E, 0x85, 0x2028, 0x2029: return true
-                default: return false
+                case 0x0A...0x0D, 0x1C...0x1E, 0x85, 0x2028, 0x2029:
+                    return true
+
+                default:
+                    return false
                 }
             }
             if let broken = lines.first(where: { $0.unicodeScalars.contains(where: endsALine) }) {
@@ -904,8 +990,12 @@ struct ParameterExpander {
             let text = lines.map { $0 + "\n" }.joined()
             var contents = Data()
             switch encoding {
-            case .plain: contents = Data(text.utf8)
-            case .utf8WithMark: contents = Data([0xEF, 0xBB, 0xBF]) + Data(text.utf8)
+            case .plain:
+                contents = Data(text.utf8)
+
+            case .utf8WithMark:
+                contents = Data([0xEF, 0xBB, 0xBF]) + Data(text.utf8)
+
             case .utf16WithMark:
                 contents = Data([0xFF, 0xFE] + text.utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] })
             }
@@ -921,7 +1011,9 @@ struct ParameterExpander {
     /// value or a quote.).
     fileprivate static func withoutEmptyTexts(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
         pieces.filter { piece in
-            guard case .text(let text) = piece else { return true }
+            guard case .text(let text) = piece else {
+                return true
+            }
             return !text.isEmpty
         }
     }
@@ -954,9 +1046,14 @@ enum DisplayText {
             }
             count += 1
             switch scalar {
-            case "\n": result.append(contentsOf: "\\n".unicodeScalars)
-            case "\r": result.append(contentsOf: "\\r".unicodeScalars)
-            case "\t": result.append(contentsOf: "\\t".unicodeScalars)
+            case "\n":
+                result.append(contentsOf: "\\n".unicodeScalars)
+
+            case "\r":
+                result.append(contentsOf: "\\r".unicodeScalars)
+
+            case "\t":
+                result.append(contentsOf: "\\t".unicodeScalars)
 
             default:
                 switch scalar.properties.generalCategory {

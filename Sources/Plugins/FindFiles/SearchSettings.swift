@@ -154,7 +154,9 @@ public final class SearchStore {
 
     /// Puts an entry at the front of a field's history, which keeps `limit` entries.
     public func remember(_ text: String, in field: Field, limit: Int = 20) {
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            return
+        }
         settings.set(
             Array(([text] + history(field).filter { $0 != text }).prefix(max(limit, 1))),
             forKey: "history." + field.rawValue

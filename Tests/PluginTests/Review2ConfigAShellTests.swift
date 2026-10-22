@@ -160,9 +160,14 @@ import Testing
                 #expect(outcome.created.isEmpty, "\(shell) \(template): created \(outcome.created)")
                 let wanted = names.map { name -> [String] in
                     switch template {
-                    case "%N": return [protected(name)]
-                    case "x%Ny": return ["x" + name + "y"]
-                    default: return ["a " + name + " b"]
+                    case "%N":
+                        return [protected(name)]
+
+                    case "x%Ny":
+                        return ["x" + name + "y"]
+
+                    default:
+                        return ["a " + name + " b"]
                     }
                 }
                 #expect(same(outcome.arguments, wanted), "\(shell) \(template)")
@@ -241,7 +246,9 @@ import Testing
             #expect(
                 inner.pieces.contains(.value("%Q$(touch M) %N"))
                     && !inner.pieces.contains {
-                        guard case .raw = $0 else { return false }
+                        guard case .raw = $0 else {
+                            return false
+                        }
                         return true
                     }
             )

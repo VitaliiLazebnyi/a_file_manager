@@ -71,16 +71,22 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     public func list(_ directory: URL, showHidden: Bool, cancellation: CancellationFlag, receive: ([FileItem]) -> Bool)
         throws
     {
-        if try listInBulk(directory, showHidden: showHidden, cancellation: cancellation, receive: receive) { return }
+        if try listInBulk(directory, showHidden: showHidden, cancellation: cancellation, receive: receive) {
+            return
+        }
         // A volume without bulk reads: every entry is examined on its own, on all cores.
         let names = try fm.contentsOfDirectory(atPath: directory.path)
         let pieceSize = 4_000
         for start in stride(from: 0, to: names.count, by: pieceSize) {
-            if cancellation.isCancelled { return }
+            if cancellation.isCancelled {
+                return
+            }
             let piece = Array(names[start..<min(start + pieceSize, names.count)])
             let items = Parallel.map(piece, serialBelow: 512) { name in self.item(at: directory.appending(name: name)) }
                 .compactMap { item in item.flatMap { $0.isHidden && !showHidden ? nil : $0 } }
-            if !receive(items) { return }
+            if !receive(items) {
+                return
+            }
         }
     }
 
@@ -223,7 +229,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             // The end of the directory.
             if count == 0 { break }
             if count < 0 {
-                if !deliveredAny, errno == ENOTSUP || errno == EINVAL { return false }
+                if !deliveredAny, errno == ENOTSUP || errno == EINVAL {
+                    return false
+                }
                 throw Self.posixError(errno, directory)
             }
             var entries: [Entry] = []
@@ -237,7 +245,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
                 entries.append(read)
             }
             deliveredAny = true
-            if !receive(items(of: entries, in: directory, showHidden: showHidden)) { return true }
+            if !receive(items(of: entries, in: directory, showHidden: showHidden)) {
+                return true
+            }
         }
         return true
     }
@@ -272,7 +282,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         if entry.failed {
             // The bulk read knows no more than the name; the entry may still answer for itself.
             // One that does not (it was removed since) is not there: the lean listing drops it too.
-            guard let item = item(at: url) else { return nil }
+            guard let item = item(at: url) else {
+                return nil
+            }
             return showHidden || !item.isHidden ? item : nil
         }
         let (isRegular, isSymlink) = (entry.type == VREG.rawValue, entry.type == VLNK.rawValue)
@@ -314,9 +326,13 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     /// to read, is looked up for each folder.
     internal func isPackage(_ url: URL) -> Bool {
         let pathExtension = url.pathExtension
-        guard !pathExtension.isEmpty else { return false }
+        guard !pathExtension.isEmpty else {
+            return false
+        }
         // A folder that is a share's mount point is not asked: the share may not answer.
-        guard MountTable.shared.isLocal(url.path) else { return false }
+        guard MountTable.shared.isLocal(url.path) else {
+            return false
+        }
         let key = pathExtension.lowercased()
         func ask() -> Bool? { try? url.resourceValues(forKeys: [.isPackageKey]).isPackage }
         packageLock.lock()
@@ -325,12 +341,16 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
                 DispatchTime.now().uptimeNanoseconds - $0.learned < 60_000_000_000 ? $0.isPackage : nil
             }
         packageLock.unlock()
-        if known == true { return true }
+        if known == true {
+            return true
+        }
         if known == false {
             // Not a package by its extension; the mark can still make it one.
             return Self.hasBundleBit(url.path) ?? ask() ?? false
         }
-        guard let answer = ask() else { return false }
+        guard let answer = ask() else {
+            return false
+        }
         // The answer speaks for the extension unless the folder's own mark gave it.
         if !answer || Self.hasBundleBit(url.path) == false {
             packageLock.lock()
@@ -356,7 +376,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         // The answer: its length, then the 32 bytes of Finder information. For a folder the
         // flags are the two bytes after the window rectangle, high byte first.
         var reply = [UInt8](repeating: 0, count: 36)
-        guard getattrlist(path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else { return nil }
+        guard getattrlist(path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else {
+            return nil
+        }
         let flags = UInt16(reply[12]) << 8 | UInt16(reply[13])
         return flags & 0x2000 != 0
     }
@@ -368,7 +390,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     public func item(at url: URL) -> FileItem? {
         var st = stat()
         probes.willAsk?(url.path)
-        guard lstat(url.path, &st) == 0 else { return nil }
+        guard lstat(url.path, &st) == 0 else {
+            return nil
+        }
         let name = url.lastPathComponent
         let type = st.st_mode & S_IFMT
         let isSymlink = type == S_IFLNK
@@ -505,7 +529,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
 
         func read(upToCount count: Int) throws -> Data? {
             guard descriptor >= 0 else { throw LocalFileSystem.posixError(EBADF, url) }
-            guard count > 0 else { return nil }
+            guard count > 0 else {
+                return nil
+            }
             var data = Data(count: count)
             var code: Int32 = 0
             let descriptor = self.descriptor
@@ -517,7 +543,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
                 }
             }
             guard got >= 0 else { throw LocalFileSystem.posixError(code, url) }
-            guard got > 0 else { return nil }
+            guard got > 0 else {
+                return nil
+            }
             if got < count { data.removeSubrange(got...) }
             return data
         }
@@ -530,7 +558,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         }
 
         func close() {
-            guard descriptor >= 0 else { return }
+            guard descriptor >= 0 else {
+                return
+            }
             Darwin.close(descriptor)
             descriptor = -1
         }
@@ -623,15 +653,19 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             code = try make(path)
         }
         switch code {
-        case 0: return
+        case 0:
+            return
 
         case EEXIST, EISDIR:
             if exclusive { throw FileSystemError.alreadyExists(path) }
             var st = stat()
-            if try call.run(path, { stat(path, &st) }) == 0, (st.st_mode & S_IFMT) == S_IFDIR { return }
+            if try call.run(path, { stat(path, &st) }) == 0, (st.st_mode & S_IFMT) == S_IFDIR {
+                return
+            }
             throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: path, NSURLErrorKey: url])
 
-        default: throw Self.posixError(code, url)
+        default:
+            throw Self.posixError(code, url)
         }
     }
 
@@ -757,7 +791,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         }
 
         func close(attributes: FileAttributes) throws {
-            guard descriptor >= 0 else { return }
+            guard descriptor >= 0 else {
+                return
+            }
             var failure: any Error?
             if let modified = attributes.modified {
                 let seconds = modified.timeIntervalSince1970.rounded(.down)
@@ -819,7 +855,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         }
         func changed(_ code: Int32, _ name: String) -> any Error {
             // ELOOP and ENOTDIR are what the system says to a link or a file where a folder was.
-            guard code == ELOOP || code == ENOTDIR else { return Self.posixError(code, url) }
+            guard code == ELOOP || code == ENOTDIR else {
+                return Self.posixError(code, url)
+            }
             return NSError(
                 domain: NSPOSIXErrorDomain,
                 code: Int(code),
@@ -914,8 +952,12 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
                     ? probes.system("rename", from) { Darwin.rename(from, to) }
                     : probes.system("renamex_np", from) { renamex_np(from, to, UInt32(RENAME_EXCL)) }
             }
-            guard result != 0 else { return nil }
-            guard errno == ENOTSUP, !replacing else { return errno }
+            guard result != 0 else {
+                return nil
+            }
+            guard errno == ENOTSUP, !replacing else {
+                return errno
+            }
             // A volume that cannot rename exclusively: check, then rename.
             var st = stat()
             if try call.run(to, { lstat(to, &st) }) == 0 { throw FileSystemError.alreadyExists(to) }
@@ -951,10 +993,17 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             guard probes.system("unlink", from, { unlink(from) }) == 0 else { throw Self.posixError(errno, source) }
         }
         switch code {
-        case nil: forgetLockedCopy(source)
-        case EXDEV: throw FileSystemError.crossesVolumes
-        case EEXIST: throw FileSystemError.alreadyExists(to)
-        case let code?: throw Self.posixError(code, source)
+        case nil:
+            forgetLockedCopy(source)
+
+        case EXDEV:
+            throw FileSystemError.crossesVolumes
+
+        case EEXIST:
+            throw FileSystemError.alreadyExists(to)
+
+        case let code?:
+            throw Self.posixError(code, source)
         }
     }
 
@@ -968,7 +1017,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             repeating: 0,
             count: 4 + MemoryLayout<attribute_set_t>.size + MemoryLayout<attrreference_t>.size + Int(NAME_MAX) * 4 + 8
         )
-        guard getattrlist(url.path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else { return nil }
+        guard getattrlist(url.path, &request, &reply, reply.count, UInt32(FSOPT_NOFOLLOW)) == 0 else {
+            return nil
+        }
         return reply.withUnsafeBytes { raw in
             let at = 4 + MemoryLayout<attribute_set_t>.size
             let reference = raw.loadUnaligned(fromByteOffset: at, as: attrreference_t.self)
@@ -1008,7 +1059,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     private func rememberLockedCopy(_ url: URL, _ st: stat) {
-        guard Self.isTemporaryName(url) else { return }
+        guard Self.isTemporaryName(url) else {
+            return
+        }
         lockedLock.lock()
         defer { lockedLock.unlock() }
         let now = DispatchTime.now().uptimeNanoseconds
@@ -1041,7 +1094,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         lockedLock.lock()
         let known = lockedCopies[url.path]
         lockedLock.unlock()
-        guard let known else { return nil }
+        guard let known else {
+            return nil
+        }
         if DispatchTime.now().uptimeNanoseconds &- known.made > Self.lockedCopyLifetime {
             forgetLockedCopy(url)
             return nil
@@ -1132,8 +1187,11 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             throw Self.posixError(errno, source)
         }
         switch st.st_mode & S_IFMT {
-        case S_IFREG, S_IFLNK: break
-        case S_IFDIR: throw Self.posixError(EISDIR, source)
+        case S_IFREG, S_IFLNK:
+            break
+
+        case S_IFDIR:
+            throw Self.posixError(EISDIR, source)
 
         default:
             throw NSError(
@@ -1163,7 +1221,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             let progress = Unmanaged<Progress>.fromOpaque(context.unsafelyUnwrapped).takeUnretainedValue()
             // A write that failed ends the copy, with its error. Going on would have the system try
             // the same write again, and on a full or vanished disk it would do so for ever.
-            if what == COPYFILE_COPY_DATA, stage == COPYFILE_ERR { return COPYFILE_QUIT }
+            if what == COPYFILE_COPY_DATA, stage == COPYFILE_ERR {
+                return COPYFILE_QUIT
+            }
             if what == COPYFILE_COPY_DATA, stage == COPYFILE_PROGRESS {
                 var copied: off_t = 0
                 copyfile_state_get(state, UInt32(COPYFILE_STATE_COPIED), &copied)
@@ -1213,7 +1273,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
                 ? CocoaError(.userCancelled) : Self.posixError(code, source)
         }
         var copied = stat()
-        guard probes.system("lstat", destination.path, { lstat(destination.path, &copied) }) == 0 else { return }
+        guard probes.system("lstat", destination.path, { lstat(destination.path, &copied) }) == 0 else {
+            return
+        }
         // A clone keeps the creation date by itself; a block copy to another volume does not.
         // (A locked copy cannot be changed any more, and is unlocked for the moment.)
         if copied.st_birthtimespec.tv_sec != st.st_birthtimespec.tv_sec {
@@ -1319,7 +1381,8 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         // Opening a pipe or a device to copy from or to it could wait for ever.
         for (st, url) in [(from, source), (to, destination)] {
             switch st.st_mode & S_IFMT {
-            case S_IFREG, S_IFDIR, S_IFLNK: break
+            case S_IFREG, S_IFDIR, S_IFLNK:
+                break
 
             default:
                 throw NSError(
@@ -1377,7 +1440,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     public func quarantine(of url: URL) -> Data? {
         let path = url.path
         let size = getxattr(path, Self.quarantineName, nil, 0, 0, XATTR_NOFOLLOW)
-        guard size > 0 else { return nil }
+        guard size > 0 else {
+            return nil
+        }
         var value = Data(count: size)
         let got = value.withUnsafeMutableBytes { buffer in
             probes.system("getxattr", path) {
@@ -1530,7 +1595,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         placesLock.unlock()
         if isNew {
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
                 NotificationCenter.default.post(name: Self.placesDidChange, object: self)
             }
         }
@@ -1663,7 +1730,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     static func volumeKind(path: String, isInternal: Bool?, isLocal: Bool?, isRemovable: Bool?, isEjectable: Bool?)
         -> Place.Kind
     {
-        if path == "/" { return .internalDisk }
+        if path == "/" {
+            return .internalDisk
+        }
         let fixed = isLocal == true && isInternal == true && isRemovable != true && isEjectable != true
         return fixed ? .internalDisk : .externalDisk
     }
@@ -1694,7 +1763,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     private func volume(of url: URL, waitingUnless cancellation: CancellationFlag?) -> VolumeInfo? {
-        if cancellation?.isCancelled == true { return nil }
+        if cancellation?.isCancelled == true {
+            return nil
+        }
         let path = url.standardizedFileURL.path
         let isProbed = probes.isLocal != nil || probes.willAsk != nil
         let mount = isProbed ? volumeKey(path) : MountTable.shared.mount(containing: path).path
@@ -1750,8 +1821,11 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             }
         }
         switch question.wait(until: question.asked &+ patience, cancellation) {
-        case .answered(let info): return info
-        case .cancelled: return nil
+        case .answered(let info):
+            return info
+
+        case .cancelled:
+            return nil
 
         case .late:
             volumeLock.lock()
@@ -1801,7 +1875,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             defer { condition.unlock() }
             while cancellation?.isCancelled != true, !isOver {
                 let now = DispatchTime.now().uptimeNanoseconds
-                guard now < deadline else { return .late }
+                guard now < deadline else {
+                    return .late
+                }
                 _ = condition.wait(until: Date(timeIntervalSinceNow: TimeInterval(deadline - now) / 1_000_000_000))
             }
             // A caller that has cancelled is not given the answer, even one that came in time.
@@ -1896,7 +1972,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             // A share says 0: it does not know.
             return important.flatMap { $0 > 0 ? $0 : nil }
         }
-        guard let available else { return measure(url) }
+        guard let available else {
+            return measure(url)
+        }
         let now = DispatchTime.now().uptimeNanoseconds
         spareLock.lock()
         // What was measured of another volume that once was mounted here is of no use.
@@ -1953,7 +2031,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
             spareSpace[mountPoint] = nil
         }
         spareLock.unlock()
-        guard after != before else { return }
+        guard after != before else {
+            return
+        }
         DispatchQueue.main.async { [volume] in
             NotificationCenter.default.post(
                 name: FileSystemRegistry.volumeInfoDidChange,
@@ -1994,7 +2074,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         probes.willAsk?(path)
         let descriptor = Self.openDirectory(path)
         // As when listing: a folder that cannot be read counts as nothing.
-        guard descriptor >= 0 else { return (0, []) }
+        guard descriptor >= 0 else {
+            return (0, [])
+        }
         defer { close(descriptor) }
         var request = attrlist()
         request.bitmapcount = UInt16(ATTR_BIT_MAP_COUNT)
@@ -2008,7 +2090,9 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
         while !cancellation.isCancelled {
             let count = readBulk(descriptor, path, &request, buffer, capacity)
             if count == 0 { break }
-            if count < 0 { return isFirst && (errno == ENOTSUP || errno == EINVAL) ? nil : (0, []) }
+            if count < 0 {
+                return isFirst && (errno == ENOTSUP || errno == EINVAL) ? nil : (0, [])
+            }
             isFirst = false
             var entry = UnsafeRawPointer(buffer)
             for _ in 0..<count {
@@ -2030,28 +2114,40 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     ///
     /// Nil for what is neither (a link, a pipe) and for an entry that cannot be asked about.
     internal static func measured(_ entry: Entry, in path: String) -> (folder: String?, size: Int64)? {
-        guard !entry.name.isEmpty else { return nil }
+        guard !entry.name.isEmpty else {
+            return nil
+        }
         let child = path.hasSuffix("/") ? path + entry.name : path + "/" + entry.name
         var (type, size) = (entry.type, entry.size)
         if entry.failed {
             // The entry is asked by itself, as the listing does.
             var st = stat()
-            guard lstat(child, &st) == 0 else { return nil }
+            guard lstat(child, &st) == 0 else {
+                return nil
+            }
             type =
                 (st.st_mode & S_IFMT) == S_IFDIR
                 ? VDIR.rawValue : ((st.st_mode & S_IFMT) == S_IFREG ? VREG.rawValue : 0)
             size = Int64(st.st_size)
         }
-        guard type == VDIR.rawValue || type == VREG.rawValue else { return nil }
+        guard type == VDIR.rawValue || type == VREG.rawValue else {
+            return nil
+        }
         return type == VDIR.rawValue ? (child, 0) : (nil, size)
     }
 
     /// Nil when the volume has no bulk reads; the tree is then measured by listing it.
     private func totalSize(ofPath path: String, _ cancellation: CancellationFlag) -> Int64? {
-        guard !cancellation.isCancelled else { return 0 }
+        guard !cancellation.isCancelled else {
+            return 0
+        }
         // A folder that is only on a server (iCloud Drive) is not fetched to be measured.
-        guard let level = Self.withoutMaterializing({ measureLevel(path, cancellation) }) else { return nil }
-        guard !cancellation.isCancelled else { return 0 }
+        guard let level = Self.withoutMaterializing({ measureLevel(path, cancellation) }) else {
+            return nil
+        }
+        guard !cancellation.isCancelled else {
+            return 0
+        }
         return
             Parallel.map(level.folders) { folder in
                 self.totalSize(ofPath: folder, cancellation)

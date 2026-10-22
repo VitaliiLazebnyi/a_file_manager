@@ -53,13 +53,21 @@ public struct SyncPlan: Equatable, Sendable {
                 list.append(Deletion(url: item.url, isDirectory: row.isDirectory))
             }
             switch row.action {
-            case .none: break
+            case .none:
+                break
 
             // Left plus nothing is right plus the offset: a copy to the right is dated back, one to the left forward.
-            case .copyToRight: if let left = row.left { toRight.append(copy(left, to: row.rightURL, shift: -offset)) }
-            case .copyToLeft: if let right = row.right { toLeft.append(copy(right, to: row.leftURL, shift: offset)) }
-            case .deleteLeft: if let left = row.left { deletion(left, into: &deleteLeft) }
-            case .deleteRight: if let right = row.right { deletion(right, into: &deleteRight) }
+            case .copyToRight:
+                if let left = row.left { toRight.append(copy(left, to: row.rightURL, shift: -offset)) }
+
+            case .copyToLeft:
+                if let right = row.right { toLeft.append(copy(right, to: row.leftURL, shift: offset)) }
+
+            case .deleteLeft:
+                if let left = row.left { deletion(left, into: &deleteLeft) }
+
+            case .deleteRight:
+                if let right = row.right { deletion(right, into: &deleteRight) }
 
             case .deleteBoth:
                 if let left = row.left { deletion(left, into: &deleteLeft) }
@@ -78,7 +86,9 @@ public struct SyncPlan: Equatable, Sendable {
             // place below the new folder and is left out.
             copies.compactMap { copy in
                 let names = PathSafety.components(ofRelativePath: copy.relativePath)
-                guard !names.isEmpty else { return nil }
+                guard !names.isEmpty else {
+                    return nil
+                }
                 var copy = copy
                 copy.target = names.reduce(root) { $0.appending(name: $1) }
                 return copy
@@ -278,13 +288,16 @@ public final class SyncExecutor: @unchecked Sendable {
             } catch {
                 outcome.errors.append("\(fileSystems.displayPath(url)): \(error.localizedDescription)")
                 outcome.skipped += 1
-                if skipAllErrors { return true }
+                if skipAllErrors {
+                    return true
+                }
                 switch onError(url, error) {
                 case .retry:
                     outcome.errors.removeLast()
                     outcome.skipped -= 1
 
-                case .skip: return true
+                case .skip:
+                    return true
 
                 case .skipAll:
                     skipAllErrors = true
@@ -320,18 +333,26 @@ public final class SyncExecutor: @unchecked Sendable {
         let existing = targetSystem.item(at: copy.target)
         if let existing {
             if existing.isDirectory { throw FileSystemError.alreadyExists(fileSystems.displayPath(copy.target)) }
-            if skipAllExisting { return false }
+            if skipAllExisting {
+                return false
+            }
             if options.confirmOverwrites, !overwriteAll {
                 switch onOverwrite(existing, copy) {
-                case .overwrite: break
-                case .overwriteAll: overwriteAll = true
-                case .skip: return false
+                case .overwrite:
+                    break
+
+                case .overwriteAll:
+                    overwriteAll = true
+
+                case .skip:
+                    return false
 
                 case .skipAll:
                     skipAllExisting = true
                     return false
 
-                case .cancel: throw Cancelled()
+                case .cancel:
+                    throw Cancelled()
                 }
             }
         }
@@ -405,7 +426,9 @@ public final class SyncExecutor: @unchecked Sendable {
 
     /// Remembers that something was written to a file system that keeps writes back.
     private func noteWrite(to url: URL, in provider: any FileSystemProvider) {
-        guard provider.capabilities(for: url).contains(.deferredWrites) else { return }
+        guard provider.capabilities(for: url).contains(.deferredWrites) else {
+            return
+        }
         let root = provider.root(of: url)
         uncommitted[root.locationKey] = (provider, root)
     }
@@ -474,7 +497,9 @@ public final class SyncExecutor: @unchecked Sendable {
         var written: Int64 = 0
         do {
             while try autoreleasepool(invoking: { () throws -> Bool in
-                guard let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else { return false }
+                guard let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else {
+                    return false
+                }
                 if cancellation.isCancelled { throw Cancelled() }
                 try writer.write(block)
                 written += Int64(block.count)
@@ -532,7 +557,9 @@ public final class SyncExecutor: @unchecked Sendable {
             let contents = try fileSystem.list(deletion.url, showHidden: true, cancellation: cancellation)
             // A listing that the cancel cut short is not an empty folder.
             if cancellation.isCancelled { throw Cancelled() }
-            if !contents.isEmpty { return false }
+            if !contents.isEmpty {
+                return false
+            }
         }
         try remove(deletion.url, in: fileSystem)
         outcome.deleted += 1

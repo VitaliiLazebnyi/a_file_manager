@@ -104,7 +104,9 @@ public final class MultiRenamePlugin: Plugin {
             clipboardChangeCount: changeCount
         )
         self.session = session
-        guard opensWindows else { return }
+        guard opensWindows else {
+            return
+        }
         // The tool that is open is closed first, and its closing is not told to anyone: it
         // would find the new session and let go of it.
         if let old = window {

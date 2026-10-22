@@ -16,7 +16,9 @@ struct ViewerItem {
     let title: String
 
     var url: URL? {
-        if case .file(let url) = source { return url }
+        if case .file(let url) = source {
+            return url
+        }
         return nil
     }
 }
@@ -256,7 +258,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// Whether the keyboard is somewhere inside the pane.
     var hasKeyboard: Bool {
-        guard let responder = window?.firstResponder as? NSView else { return false }
+        guard let responder = window?.firstResponder as? NSView else {
+            return false
+        }
         return responder === self || responder.isDescendant(of: self)
     }
 
@@ -270,7 +274,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         keyMonitor = nil
-        guard window != nil else { return }
+        guard window != nil else {
+            return
+        }
         // A Quick Look view closed when the pane left its window is made anew in this one.
         if mode == .preview, previewView == nil { present() }
         // The Lister keys are plain letters and keys the main window uses for other things;
@@ -320,7 +326,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
         updateChrome()
         workQueue.async { [weak self] in
             // Moved on before this got a thread (the cursor ran over many files): nothing to read.
-            guard !cancellation.isCancelled else { return }
+            guard !cancellation.isCancelled else {
+                return
+            }
             /// Opens and samples the file. `flag` ends it: the pane's own, or, for a file system, the one
             /// `BlockingCalls` hands over once nobody waits for the answer.
             @Sendable func open(_ item: ViewerItem, _ flag: CancellationFlag) -> Result<Loaded, any Error> {
@@ -394,7 +402,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
                 ) { flag in
                     open(item, flag)
                 }
-                guard let answer else { return }
+                guard let answer else {
+                    return
+                }
                 result = answer
             } else {
                 result = open(item, cancellation)
@@ -461,7 +471,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
         let cancellation = cancellation
         let fileSystems = kernel.fileSystems
         workQueue.async { [weak self] in
-            guard !cancellation.isCancelled, let provider = try? fileSystems.provider(for: url) else { return }
+            guard !cancellation.isCancelled, let provider = try? fileSystems.provider(for: url) else {
+                return
+            }
             // A tree on a server is a trip per folder: the quick view counts a part of it only.
             let isLocal = provider.volume(of: url, cancellation: cancellation)?.isLocal ?? true
             let summary = FolderSummary.measure(
@@ -471,7 +483,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
                 limit: isLocal ? nil : Self.remoteFolderEntryLimit
             )
             DispatchQueue.main.async {
-                guard let self, self.loadGeneration == generation, !cancellation.isCancelled else { return }
+                guard let self, self.loadGeneration == generation, !cancellation.isCancelled else {
+                    return
+                }
                 self.folderSummary = summary
                 self.showMessage("\(name)\n\n\(summary.text)")
             }
@@ -503,7 +517,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
-        guard previewView != nil, newWindow !== window else { return }
+        guard previewView != nil, newWindow !== window else {
+            return
+        }
         closePreview()
         showMessage("")
     }
@@ -512,13 +528,22 @@ final class ViewerPane: NSView, NSMenuDelegate {
     private func chooseStartupMode(for loaded: Loaded) {
         let ext = loaded.item.url?.pathExtension.lowercased() ?? ""
         switch settings.startupFont {
-        case 1: fontSlot = .ansi
-        case 2: fontSlot = .ascii
-        case 3: fontSlot = .variable
-        default: fontSlot = loaded.guess.encoding == .dos ? .ascii : .ansi
+        case 1:
+            fontSlot = .ansi
+
+        case 2:
+            fontSlot = .ascii
+
+        case 3:
+            fontSlot = .variable
+
+        default:
+            fontSlot = loaded.guess.encoding == .dos ? .ascii : .ansi
         }
         mode = startupTextMode(for: loaded)
-        guard !internalOnly, loaded.item.url != nil else { return }
+        guard !internalOnly, loaded.item.url != nil else {
+            return
+        }
         if settings.loadsGraphics, loaded.content == .image || loaded.content == .pdf {
             mode = .media
         } else if settings.playsMultimedia, loaded.content == .media {
@@ -534,15 +559,25 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     private func startupTextMode(for loaded: Loaded) -> ViewMode {
         switch settings.startupMode {
-        case 2: return .binary
-        case 3: return .hex
-        case 0 where loaded.guess.isBinary: return .binary
+        case 2:
+            return .binary
+
+        case 3:
+            return .hex
+
+        case 0 where loaded.guess.isBinary:
+            return .binary
 
         default:
             switch loaded.guess.encoding.kind {
-            case .utf8: return .utf8
-            case .utf16LE, .utf16BE: return .unicode
-            default: return .text
+            case .utf8:
+                return .utf8
+
+            case .utf16LE, .utf16BE:
+                return .unicode
+
+            default:
+                return .text
             }
         }
     }
@@ -551,7 +586,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// Switches the display mode (Options › 1…8).
     func setMode(_ newMode: ViewMode) {
-        guard loaded != nil else { return }
+        guard loaded != nil else {
+            return
+        }
         // 4 again goes on to the next way of showing the file (the specification cycles
         // through the plugins; here that is Quick Look).
         mode = newMode == .media && mode == .media && settings.usesQuickLook && !internalOnly ? .preview : newMode
@@ -560,16 +597,24 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// The encoding the current mode shows text in.
     var encoding: ViewerEncoding {
-        guard let loaded else { return .utf8 }
+        guard let loaded else {
+            return .utf8
+        }
         switch mode {
-        case .utf8: return .utf8
+        case .utf8:
+            return .utf8
 
         case .unicode:
-            if let codePage, codePage.unitSize == 2 { return codePage }
+            if let codePage, codePage.unitSize == 2 {
+                return codePage
+            }
             return loaded.guess.encoding.unitSize == 2 ? loaded.guess.encoding : .utf16LE
 
-        case .html where strippedHTML != nil: return .utf8
-        default: return codePage ?? fontSlot.encoding
+        case .html where strippedHTML != nil:
+            return .utf8
+
+        default:
+            return codePage ?? fontSlot.encoding
         }
     }
 
@@ -577,15 +622,20 @@ final class ViewerPane: NSView, NSMenuDelegate {
         let slot: FontSlot = fontSlot == .variable && mode != .binary && mode != .hex ? .variable : .ansi
         let chosen = settings.font(slot)
         let size = CGFloat(min(96, max(6, chosen.size + fontSizeChange)))
-        if let name = chosen.name, let font = NSFont(name: name, size: size) { return font }
+        if let name = chosen.name, let font = NSFont(name: name, size: size) {
+            return font
+        }
         return slot == .variable ? .systemFont(ofSize: size) : .monospacedSystemFont(ofSize: size, weight: .regular)
     }
 
     /// How the current mode lays out its rows.
     var layout: ViewerLayout {
         switch mode {
-        case .binary: return .binary(width: settings.binaryWidth)
-        case .hex: return .hex
+        case .binary:
+            return .binary(width: settings.binaryWidth)
+
+        case .hex:
+            return .hex
 
         default:
             guard settings.wrap else {
@@ -600,7 +650,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// Shows the loaded file in the current mode.
     func present(keeping offset: Int64? = nil) {
-        guard let loaded else { return }
+        guard let loaded else {
+            return
+        }
         presentGeneration += 1
         presentCancellation.cancel()
         presentCancellation = CancellationFlag()
@@ -662,7 +714,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
                 data = try loaded.source.read(range, cancellation: cancel)
                 if Int64(data.count) < range.upperBound - range.lowerBound { throw ViewerError.fileChanged }
             } catch {
-                guard !cancel.isCancelled else { return }
+                guard !cancel.isCancelled else {
+                    return
+                }
                 DispatchQueue.main.async {
                     guard let self, self.loadGeneration == generation, self.presentGeneration == token,
                         self.mode == .html
@@ -759,7 +813,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
                 // An animation shows its first frame while the others are still being decoded.
                 let early: (DecodedImage) -> Void = { first in
                     DispatchQueue.main.async {
-                        guard let self, isCurrent(self), self.imageView == nil else { return }
+                        guard let self, isCurrent(self), self.imageView == nil else {
+                            return
+                        }
                         self.showImage(first)
                     }
                 }
@@ -802,14 +858,19 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
             case .media, .other:
                 switch copies.localCopy(for: url, fileSystems: fileSystems, owner: owner, cancellation: presentCancel) {
-                case .success(let local): ready = .local(local)
-                case .failure(let refusal): ready = refusal.isCancelled ? ready : .failed(refusal.message)
+                case .success(let local):
+                    ready = .local(local)
+
+                case .failure(let refusal):
+                    ready = refusal.isCancelled ? ready : .failed(refusal.message)
                 }
             }
             // Made on this thread, which does not touch it again.
             let made = Handover(ready)
             DispatchQueue.main.async {
-                guard let self, isCurrent(self) else { return }
+                guard let self, isCurrent(self) else {
+                    return
+                }
                 switch made.value {
                 case .image(let image):
                     if let view = self.imageView {
@@ -876,8 +937,12 @@ final class ViewerPane: NSView, NSMenuDelegate {
         limit: Int64,
         cancellation: CancellationFlag
     ) -> Data? {
-        guard source.length <= limit else { return nil }
-        if url.isFileURL { return try? Data(contentsOf: url, options: .mappedIfSafe) }
+        guard source.length <= limit else {
+            return nil
+        }
+        if url.isFileURL {
+            return try? Data(contentsOf: url, options: .mappedIfSafe)
+        }
         return try? source.read(0..<source.length, cancellation: cancellation)
     }
 
@@ -939,7 +1004,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     /// Shows the text again after an option changed, keeping the place.
     func relayout() {
-        guard mode.isTextual, loaded != nil else { return }
+        guard mode.isTextual, loaded != nil else {
+            return
+        }
         present(keeping: pager.document != nil ? pager.topOffset : nil)
     }
 
@@ -968,7 +1035,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
     // MARK: Menu strip and status line
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        guard let index = menuButtons.firstIndex(where: { $0.menu === menu }) else { return }
+        guard let index = menuButtons.firstIndex(where: { $0.menu === menu }) else {
+            return
+        }
         while menu.items.count > 1 { menu.removeItem(at: 1) }
         fill(menu, with: menuEntries(Self.menuTitles[index]))
     }
@@ -984,14 +1053,22 @@ final class ViewerPane: NSView, NSMenuDelegate {
     /// What the percent item shows: the position in a text, the zoom of an image (spec 10 ›
     /// Position and zoom item).
     var percentText: String {
-        if let imageView { return String(format: "%.1f %%", imageView.zoom * 100) }
-        if contentView === pager, pager.document != nil { return String(format: "%.0f %%", pager.percent) }
+        if let imageView {
+            return String(format: "%.1f %%", imageView.zoom * 100)
+        }
+        if contentView === pager, pager.document != nil {
+            return String(format: "%.0f %%", pager.percent)
+        }
         return ""
     }
 
     var statusText: String {
-        if let activity { return activity.text }
-        guard let loaded else { return item == nil ? "" : failure ?? "Reading…" }
+        if let activity {
+            return activity.text
+        }
+        guard let loaded else {
+            return item == nil ? "" : failure ?? "Reading…"
+        }
         var parts: [String] = []
         if let imageView {
             parts.append("\(Int(imageView.imageSize.width)) × \(Int(imageView.imageSize.height))")

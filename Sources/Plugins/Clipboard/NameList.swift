@@ -31,9 +31,14 @@ struct NameList {
     func entry(_ item: FileItem, _ style: Style) -> String {
         let text: String
         switch style {
-        case .name: text = item.name
-        case .fullPath: text = displayPath(item.url)
-        case .url: text = item.url.absoluteString
+        case .name:
+            text = item.name
+
+        case .fullPath:
+            text = displayPath(item.url)
+
+        case .url:
+            text = item.url.absoluteString
         }
         return item.isFolder && !text.hasSuffix("/") ? text + "/" : text
     }
@@ -91,8 +96,11 @@ enum PastedContent: Equatable {
 
     var fileExtension: String {
         switch self {
-        case .text: return "txt"
-        case .image: return "png"
+        case .text:
+            return "txt"
+
+        case .image:
+            return "png"
         }
     }
 

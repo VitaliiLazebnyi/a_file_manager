@@ -56,7 +56,9 @@ public struct DirectoryHistory: Codable, Equatable {
     @discardableResult
     public mutating func record(_ directory: URL, stayedInPrevious: Bool) -> Bool {
         let key = directory.locationKey
-        if let last = visits.last, last.key == key { return false }
+        if let last = visits.last, last.key == key {
+            return false
+        }
         if stayedInPrevious, !visits.isEmpty { visits[visits.count - 1].isVisible = true }
         let earlier = visits.firstIndex { $0.key == key }
         let wasVisible = earlier.map { visits.remove(at: $0).isVisible } ?? false
@@ -144,7 +146,9 @@ public struct FrequentFolders: Codable, Equatable {
         // A stored count can be anything (settings are imported): it stops at the top.
         let before = counts[own] ?? 0
         counts[own] = before == Int.max ? before : before + 1
-        guard counts.count > Self.storedLimit else { return }
+        guard counts.count > Self.storedLimit else {
+            return
+        }
         // The least visited folder makes room; the one just counted stays.
         if let rarest = counts.filter({ $0.key != own }).min(by: { ($0.value, $0.key) < ($1.value, $1.key) }) {
             counts[rarest.key] = nil
@@ -176,8 +180,11 @@ public struct HistoryMenu {
 
         public var directory: URL? {
             switch self {
-            case .visit(let url), .frequent(let url): return url
-            case .separator: return nil
+            case .visit(let url), .frequent(let url):
+                return url
+
+            case .separator:
+                return nil
             }
         }
     }
@@ -271,7 +278,9 @@ public final class DirectoryHistoryTracker {
         var history = history(of: side)
         let time = now()
         let stayed = entered[side].map { time.timeIntervalSince($0) >= Self.thinningDelta } ?? false
-        guard history.record(directory.standardized, stayedInPrevious: stayed) else { return }
+        guard history.record(directory.standardized, stayedInPrevious: stayed) else {
+            return
+        }
         entered[side] = time
         histories[side] = history
         frequent.record(directory.standardized)
@@ -292,10 +301,14 @@ public final class DirectoryHistoryTracker {
 
     /// Notes what changed and has it written shortly, off the path of the navigation.
     private func changed(_ side: Side?, frequent isFrequent: Bool) {
-        guard savesChanges() else { return }
+        guard savesChanges() else {
+            return
+        }
         if let side { changedSides.insert(side) }
         if isFrequent { frequentChanged = true }
-        guard !writeIsScheduled else { return }
+        guard !writeIsScheduled else {
+            return
+        }
         writeIsScheduled = true
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.writeDelay) { [weak self] in
             // The main queue runs its blocks on the main thread.
@@ -308,7 +321,9 @@ public final class DirectoryHistoryTracker {
 
     private func writeChanges() {
         writeIsScheduled = false
-        guard savesChanges() else { return }
+        guard savesChanges() else {
+            return
+        }
         for side in changedSides { settings.set(history(of: side), forKey: Self.key(side)) }
         if frequentChanged { settings.set(frequent, forKey: Self.frequentKey) }
         changedSides = []

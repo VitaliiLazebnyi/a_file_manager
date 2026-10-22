@@ -52,10 +52,17 @@ struct RenamePreview {
         var counts = Counts()
         for status in statuses {
             switch status {
-            case .ready: counts.changing += 1
-            case .duplicate, .exists: counts.conflicts += 1
-            case .error, .invalid: counts.errors += 1
-            case .unchanged: break
+            case .ready:
+                counts.changing += 1
+
+            case .duplicate, .exists:
+                counts.conflicts += 1
+
+            case .error, .invalid:
+                counts.errors += 1
+
+            case .unchanged:
+                break
             }
         }
         return counts
@@ -76,7 +83,9 @@ final class ContentDateStore: @unchecked Sendable {
         lock.lock()
         let known = dates[url]
         lock.unlock()
-        if let known { return known }
+        if let known {
+            return known
+        }
         let found = ContentDate.read(url)
         lock.lock()
         dates[url] = .some(found)
@@ -132,7 +141,9 @@ final class RenameCache: @unchecked Sendable {
         lock.lock()
         let known = rows
         lock.unlock()
-        if let known, known.subjects.count == entries.count { return known }
+        if let known, known.subjects.count == entries.count {
+            return known
+        }
         let built = Parallel.map(entries, serialBelow: RenameComputation.parallelThreshold) {
             entry -> (RenameSubject, URL, String) in
             let directory = entry.directory
@@ -256,7 +267,9 @@ enum RenameComputation {
         return withoutActuallyEscaping(isCancelled) { cancelled in
             let engine = RenameEngine(settings, context: context, cancelled: cancelled)
             let names = Parallel.map(Array(entries.indices), serialBelow: parallelThreshold) { index -> String? in
-                if cancelled() { return nil }
+                if cancelled() {
+                    return nil
+                }
                 // A list of given names may be shorter than the list of files; the rest keep their masks.
                 let given = given.flatMap { $0.indices.contains(index) ? $0[index] : nil }
                 return engine.newName(
@@ -297,11 +310,17 @@ enum RenameComputation {
         )
         let placed = Parallel.map(Array(entries.indices), serialBelow: parallelThreshold) {
             index -> (RenameStatus, URL?) in
-            guard let name = names[index] else { return (.error, nil) }
-            if let reason = RenameEngine.invalidity(of: name) { return (.invalid(reason), nil) }
+            guard let name = names[index] else {
+                return (.error, nil)
+            }
+            if let reason = RenameEngine.invalidity(of: name) {
+                return (.invalid(reason), nil)
+            }
             // Compared byte for byte: a name that differs from the file's only in how an accented
             // letter is written (`[u]`, precomposing) is a rename, though Swift calls the two equal.
-            if name.utf8.elementsEqual(entries[index].diskName.utf8) { return (.unchanged, entries[index].item.url) }
+            if name.utf8.elementsEqual(entries[index].diskName.utf8) {
+                return (.unchanged, entries[index].item.url)
+            }
             return (.ready, target(of: entries[index], named: name))
         }
         var statuses = placed.map(\.0)
@@ -315,7 +334,9 @@ enum RenameComputation {
             existing: [],
             problem: problem
         )
-        guard !isCancelled(), statuses.contains(.ready) else { return preview }
+        guard !isCancelled(), statuses.contains(.ready) else {
+            return preview
+        }
 
         let survey = RenameSurvey(fileSystems: fileSystems, cache: cache, cancellation: cancellation)
         // The folders the items go to: their own, unless the new name says otherwise.
@@ -329,7 +350,9 @@ enum RenameComputation {
             }
         }
         let planner = survey.planner(for: entries, rows: rows, targetFolders: folders)
-        guard !isCancelled() else { return preview }
+        guard !isCancelled() else {
+            return preview
+        }
         let existing = survey.existingKeys(in: folders, planner: planner, isCancelled: isCancelled)
         for (index, status) in planner.conflicts(sources: sources, targets: targets, existing: existing) {
             statuses[index] = status
@@ -366,18 +389,24 @@ struct RenameSurvey {
         isCancelled: @Sendable () -> Bool
     ) -> Set<String> {
         let listed = Parallel.map(Array(folders)) { folderKey, folder -> Set<String> in
-            if let known = cache?.existingKeys(folderKey: folderKey) { return known }
+            if let known = cache?.existingKeys(folderKey: folderKey) {
+                return known
+            }
             guard !isCancelled(), let provider = try? fileSystems.provider(for: folder),
                 let items = try? cancellation.map({ try provider.list(folder, showHidden: true, cancellation: $0) })
                     ?? provider.list(folder, showHidden: true)
             else { return [] }
             // A listing that was cut short by the cancellation is not what the folder holds.
-            guard cancellation?.isCancelled != true else { return [] }
+            guard cancellation?.isCancelled != true else {
+                return []
+            }
             let found = Set(items.map { planner.key($0.url) })
             cache?.setExistingKeys(found, folderKey: folderKey)
             return found
         }
-        guard listed.count > 1 else { return listed.first ?? [] }
+        guard listed.count > 1 else {
+            return listed.first ?? []
+        }
         return listed.reduce(into: Set<String>()) { $0.formUnion($1) }
     }
 
@@ -398,8 +427,12 @@ struct RenameSurvey {
         }
         var verdicts: [String: Bool] = [:]
         func verdict(_ key: String) -> Bool? {
-            if let found = verdicts[key] ?? cache?.foldsCase(folderKey: key) { return found }
-            guard let items = samples[key] else { return nil }
+            if let found = verdicts[key] ?? cache?.foldsCase(folderKey: key) {
+                return found
+            }
+            guard let items = samples[key] else {
+                return nil
+            }
             let found = foldsCase(items)
             cache?.setFoldsCase(found, folderKey: key)
             verdicts[key] = found
@@ -427,7 +460,9 @@ struct RenameSurvey {
 
     /// What a local volume says about letter case in names; nil for anything else or when it does not say.
     static func volumeFoldsCase(_ folder: URL) -> Bool? {
-        guard folder.isFileURL else { return nil }
+        guard folder.isFileURL else {
+            return nil
+        }
         // The nearest folder that exists answers for one that does not exist yet (the top always exists).
         var current = folder
         while !FileManager.default.fileExists(atPath: current.path) { current.deleteLastPathComponent() }
@@ -446,7 +481,9 @@ struct RenameSurvey {
             let swapped = name == name.uppercased() ? name.lowercased() : name.uppercased()
             guard swapped != name, let provider = try? fileSystems.provider(for: item.url) else { continue }
             let directory = item.url.deletingLastPathComponent()
-            if cancellation?.isCancelled == true { return false }
+            if cancellation?.isCancelled == true {
+                return false
+            }
             guard
                 let found = cancellation.map({
                     provider.item(at: directory.appending(name: swapped), cancellation: $0)
@@ -521,13 +558,19 @@ final class RenameRunner {
     /// word. A target that is not there is no file at all: the volume tells upper from lower case
     /// after all, and the rename is an ordinary one that replaces nothing.
     static func isSameFile(_ first: URL, _ second: URL) -> Bool {
-        guard first.isFileURL, second.isFileURL else { return true }
+        guard first.isFileURL, second.isFileURL else {
+            return true
+        }
         func identity(_ url: URL) -> (dev_t, ino_t)? {
             var info = stat()
             return lstat(url.path, &info) == 0 ? (info.st_dev, info.st_ino) : nil
         }
-        guard let target = identity(second) else { return false }
-        guard let source = identity(first) else { return false }
+        guard let target = identity(second) else {
+            return false
+        }
+        guard let source = identity(first) else {
+            return false
+        }
         return source == target
     }
 
@@ -539,8 +582,12 @@ final class RenameRunner {
             var info = stat()
             return lstat(url.path, &info) == 0 ? (info.st_dev, info.st_ino, info.st_nlink) : nil
         }
-        guard let one = identity(first), let other = identity(second) else { return nil }
-        guard one.0 == other.0, one.1 == other.1 else { return false }
+        guard let one = identity(first), let other = identity(second) else {
+            return nil
+        }
+        guard one.0 == other.0, one.1 == other.1 else {
+            return false
+        }
         return one.2 > 1 ? nil : true
     }
 

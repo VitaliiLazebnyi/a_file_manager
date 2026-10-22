@@ -62,14 +62,18 @@ enum ArchiveURL {
 
     /// Nil for URLs of other schemes and for hosts this code did not write.
     static func parse(_ url: URL) -> Place? {
-        guard isArchiveURL(url), let host = url.host else { return nil }
+        guard isArchiveURL(url), let host = url.host else {
+            return nil
+        }
         let parts = host.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
         guard parts.count == 2 || parts.count == 3, parts[0].hasPrefix("d"), let depth = Int(parts[0].dropFirst()),
             depth > 0
         else { return nil }
         let prefix: String
         if parts.count == 3 {
-            guard let text = unhex(parts[2]) else { return nil }
+            guard let text = unhex(parts[2]) else {
+                return nil
+            }
             prefix = text
         } else {
             prefix = "file://"
@@ -97,14 +101,18 @@ enum ArchiveURL {
 
     /// The location inside an archive; nil for anything else.
     static func location(of url: URL) -> ArchiveLocation? {
-        if case .inside(let location)? = parse(url) { return location }
+        if case .inside(let location)? = parse(url) {
+            return location
+        }
         return nil
     }
 
     /// What a URL means outside this plugin: a place that only passes through an archive
     /// scheme becomes the place on the real file system; everything else stays as it is.
     static func resolved(_ url: URL) -> URL {
-        if case .outside(let outer)? = parse(url) { return outer }
+        if case .outside(let outer)? = parse(url) {
+            return outer
+        }
         return url
     }
 
@@ -125,8 +133,12 @@ enum ArchiveURL {
     }
 
     private static func outerURL(prefix: String, path: String) -> URL? {
-        if prefix == "file://" { return URL(fileURLWithPath: path, isDirectory: false) }
-        guard var components = URLComponents(string: prefix) else { return nil }
+        if prefix == "file://" {
+            return URL(fileURLWithPath: path, isDirectory: false)
+        }
+        guard var components = URLComponents(string: prefix) else {
+            return nil
+        }
         components.path = path
         return components.url
     }
@@ -144,12 +156,16 @@ enum ArchiveURL {
     }
 
     private static func unhex(_ text: String) -> String? {
-        guard text.count % 2 == 0 else { return nil }
+        guard text.count % 2 == 0 else {
+            return nil
+        }
         var bytes: [UInt8] = []
         var index = text.startIndex
         while index < text.endIndex {
             let next = text.index(index, offsetBy: 2)
-            guard let byte = UInt8(text[index..<next], radix: 16) else { return nil }
+            guard let byte = UInt8(text[index..<next], radix: 16) else {
+                return nil
+            }
             bytes.append(byte)
             index = next
         }
@@ -178,19 +194,33 @@ enum ArchiveFormat: Equatable {
 
     var title: String {
         switch self {
-        case .zip: return "ZIP"
-        case .tar: return "TAR"
-        case .compressedTar(let codec): return "TAR." + Self.suffix(codec).uppercased()
-        case .compressedFile(let codec): return Self.suffix(codec).uppercased()
-        case .foreign: return "archive"
+        case .zip:
+            return "ZIP"
+
+        case .tar:
+            return "TAR"
+
+        case .compressedTar(let codec):
+            return "TAR." + Self.suffix(codec).uppercased()
+
+        case .compressedFile(let codec):
+            return Self.suffix(codec).uppercased()
+
+        case .foreign:
+            return "archive"
         }
     }
 
     static func suffix(_ codec: Codec) -> String {
         switch codec {
-        case .gzip: return "gz"
-        case .bzip2: return "bz2"
-        case .xz: return "xz"
+        case .gzip:
+            return "gz"
+
+        case .bzip2:
+            return "bz2"
+
+        case .xz:
+            return "xz"
         }
     }
 
@@ -203,34 +233,63 @@ enum ArchiveFormat: Equatable {
     /// The extension a new archive of this format gets.
     var defaultExtension: String {
         switch self {
-        case .zip: return "zip"
-        case .tar: return "tar"
-        case .compressedTar(let codec): return "tar." + Self.suffix(codec)
-        case .compressedFile(let codec): return Self.suffix(codec)
-        case .foreign: return ""
+        case .zip:
+            return "zip"
+
+        case .tar:
+            return "tar"
+
+        case .compressedTar(let codec):
+            return "tar." + Self.suffix(codec)
+
+        case .compressedFile(let codec):
+            return Self.suffix(codec)
+
+        case .foreign:
+            return ""
         }
     }
 
     /// Every way a file of this format may end, longest first.
     var extensions: [String] {
         switch self {
-        case .zip: return ["zip"]
-        case .tar: return ["tar"]
-        case .compressedTar(.gzip): return ["tar.gz", "tgz", "taz"]
-        case .compressedTar(.bzip2): return ["tar.bz2", "tbz2", "tbz"]
-        case .compressedTar(.xz): return ["tar.xz", "txz"]
-        case .compressedFile(let codec): return [Self.suffix(codec)]
-        case .foreign: return []
+        case .zip:
+            return ["zip"]
+
+        case .tar:
+            return ["tar"]
+
+        case .compressedTar(.gzip):
+            return ["tar.gz", "tgz", "taz"]
+
+        case .compressedTar(.bzip2):
+            return ["tar.bz2", "tbz2", "tbz"]
+
+        case .compressedTar(.xz):
+            return ["tar.xz", "txz"]
+
+        case .compressedFile(let codec):
+            return [Self.suffix(codec)]
+
+        case .foreign:
+            return []
         }
     }
 
     /// The prefix of a Pack target (`tgz:/path/name`), spec 08 › Target string.
     var prefix: String {
         switch self {
-        case .compressedTar(.gzip): return "tgz"
-        case .compressedTar(.bzip2): return "tbz"
-        case .compressedTar(.xz): return "txz"
-        default: return defaultExtension
+        case .compressedTar(.gzip):
+            return "tgz"
+
+        case .compressedTar(.bzip2):
+            return "tbz"
+
+        case .compressedTar(.xz):
+            return "txz"
+
+        default:
+            return defaultExtension
         }
     }
 
@@ -264,10 +323,16 @@ enum ArchiveFormat: Equatable {
             : starts([0x42, 0x5A, 0x68])
                 ? .bzip2
                 : starts([0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00]) ? .xz : nil
-        if let codec { return tarInside(codec) ? .compressedTar(codec) : .compressedFile(codec) }
-        if TarHeader.looksLikeHeader(head) { return .tar }
+        if let codec {
+            return tarInside(codec) ? .compressedTar(codec) : .compressedFile(codec)
+        }
+        if TarHeader.looksLikeHeader(head) {
+            return .tar
+        }
         // A ZIP with something in front of it (a self-extracting program) has its directory at the end as usual.
-        if lower.hasSuffix(".zip") { return .zip }
+        if lower.hasSuffix(".zip") {
+            return .zip
+        }
         return .foreign
     }
 }
@@ -290,12 +355,16 @@ enum ForeignArchive {
     }
 
     static func kind(of file: RandomAccessFile) -> Kind? {
-        guard let head = try? file.read(at: 0, count: 512), head.count >= 8 else { return nil }
+        guard let head = try? file.read(at: 0, count: 512), head.count >= 8 else {
+            return nil
+        }
         let bytes = [UInt8](head)
         func starts(_ signature: [UInt8], at offset: Int = 0) -> Bool {
             bytes.count >= offset + signature.count && Array(bytes[offset..<(offset + signature.count)]) == signature
         }
-        if starts([0x1F, 0x9D]) { return .compressedTar }
+        if starts([0x1F, 0x9D]) {
+            return .compressedTar
+        }
         var known =
             starts([0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C])  // 7z
             || starts([0x52, 0x61, 0x72, 0x21, 0x1A, 0x07])  // RAR 4 and 5
@@ -315,7 +384,9 @@ enum ForeignArchive {
                 known = (try? file.read(at: UInt64(sector) * 2_048 + 1, count: 5)) == Data("CD001".utf8)
             }
         }
-        guard known else { return nil }
+        guard known else {
+            return nil
+        }
         let line = bytes.prefix { $0 != 0x0A }
         return line.contains(0) ? .libarchive : nil
     }
@@ -346,20 +417,38 @@ enum ArchiveError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notAnArchive(let name): return "\(name) is not an archive, or its format is not supported."
-        case .damaged(let what): return "The archive is damaged: \(what)."
-        case .unsupported(let what): return "\(what) is not supported."
-        case .wrongPassword(let name): return "Wrong password for \(name)."
-        case .passwordNeeded(let name): return "\(name) is encrypted and no password was given."
-        case .crcMismatch(let name): return "CRC error in \(name): the data is damaged."
-        case .notFound(let path): return "\(path) does not exist in the archive."
-        case .notADirectory(let path): return "\(path) is not a folder."
-        case .readOnly(let name): return "Archives of this type cannot be changed (\(name))."
+        case .notAnArchive(let name):
+            return "\(name) is not an archive, or its format is not supported."
+
+        case .damaged(let what):
+            return "The archive is damaged: \(what)."
+
+        case .unsupported(let what):
+            return "\(what) is not supported."
+
+        case .wrongPassword(let name):
+            return "Wrong password for \(name)."
+
+        case .passwordNeeded(let name):
+            return "\(name) is encrypted and no password was given."
+
+        case .crcMismatch(let name):
+            return "CRC error in \(name): the data is damaged."
+
+        case .notFound(let path):
+            return "\(path) does not exist in the archive."
+
+        case .notADirectory(let path):
+            return "\(path) is not a folder."
+
+        case .readOnly(let name):
+            return "Archives of this type cannot be changed (\(name))."
 
         case .changedOutside(let name):
             return "\(name) was changed by another program; the changes made here were not written."
 
-        case .noRoom(let name): return "There is not enough room on the disk to write the changes into \(name)."
+        case .noRoom(let name):
+            return "There is not enough room on the disk to write the changes into \(name)."
 
         case .noScratchRoom(let name):
             return "There is not enough room on the startup disk to open \(name): it has to be copied there first."
@@ -368,10 +457,17 @@ enum ArchiveError: LocalizedError {
             return
                 "Several files would be stored under the name \(name). Pack with path names, or pack them one by one."
 
-        case .unsaved(let what): return what
-        case .toolFailed(let message): return message
-        case .cancelled: return "The operation was cancelled."
-        case .retired: return "The archive was read again; please repeat the operation."
+        case .unsaved(let what):
+            return what
+
+        case .toolFailed(let message):
+            return message
+
+        case .cancelled:
+            return "The operation was cancelled."
+
+        case .retired:
+            return "The archive was read again; please repeat the operation."
         }
     }
 }

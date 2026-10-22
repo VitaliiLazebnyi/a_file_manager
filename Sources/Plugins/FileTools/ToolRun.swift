@@ -8,8 +8,11 @@ enum ToolError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .cancelled: return "The operation was cancelled."
-        case .failed(let message): return message
+        case .cancelled:
+            return "The operation was cancelled."
+
+        case .failed(let message):
+            return message
         }
     }
 }
@@ -102,7 +105,9 @@ final class ToolRun: @unchecked Sendable {
     }
 
     private func noteOrigin(of url: URL, in provider: any FileSystemProvider) {
-        guard carriesOrigin, originMark == nil, let mark = provider.quarantine(of: url) else { return }
+        guard carriesOrigin, originMark == nil, let mark = provider.quarantine(of: url) else {
+            return
+        }
         lock.lock()
         if origin == nil { origin = mark }
         lock.unlock()
@@ -143,11 +148,15 @@ final class ToolRun: @unchecked Sendable {
             bytesDone += bytes
             itemsDone += items
             let now = Date()
-            guard force || now.timeIntervalSince(lastReport) > 0.05 else { return false }
+            guard force || now.timeIntervalSince(lastReport) > 0.05 else {
+                return false
+            }
             lastReport = now
             return true
         }
-        guard due else { return }
+        guard due else {
+            return
+        }
         // One report at a time; the state is read after the turn has come, so that a later
         // report never shows less than an earlier one. A paused job blocks inside the report
         // of the thread whose turn it is, and every report after it queues up behind it.
@@ -208,7 +217,9 @@ final class ToolRun: @unchecked Sendable {
             // Every block is read and handled in a pool of its own: a long file would otherwise
             // keep all its blocks (and what the provider allocated around them) until it ends.
             while try autoreleasepool(invoking: { () throws -> Bool in
-                guard let block = try reader.read(upToCount: blockSize), !block.isEmpty else { return false }
+                guard let block = try reader.read(upToCount: blockSize), !block.isEmpty else {
+                    return false
+                }
                 try checkCancelled()
                 try body(block)
                 if counted { advance(Int64(block.count)) }
@@ -233,7 +244,9 @@ final class ToolRun: @unchecked Sendable {
         defer { withExtendedLifetime(token) {} }
         do {
             while try autoreleasepool(invoking: { () throws -> Bool in
-                guard let block = try reader.read(upToCount: Self.blockSize), !block.isEmpty else { return false }
+                guard let block = try reader.read(upToCount: Self.blockSize), !block.isEmpty else {
+                    return false
+                }
                 data.append(block)
                 return true
             }) {
@@ -364,7 +377,9 @@ final class ToolRun: @unchecked Sendable {
     /// Writes a small file in one go.
     @discardableResult
     func write(_ data: Data, to url: URL, deferred: Bool = false) throws -> URL? {
-        guard let output = try create(url, deferred: deferred) else { return nil }
+        guard let output = try create(url, deferred: deferred) else {
+            return nil
+        }
         do {
             try output.write(data)
             try output.finish()
@@ -438,7 +453,9 @@ final class ToolOutput {
     ///
     /// One that replaces another takes its place now, or, when the output is deferred, at `commit`.
     func finish() throws {
-        guard state == .open else { return }
+        guard state == .open else {
+            return
+        }
         do {
             try writer.close(attributes: FileAttributes())
             // Before the file appears under its name. A file system that keeps no such mark does without.
@@ -455,7 +472,9 @@ final class ToolOutput {
 
     /// Puts a finished, deferred output in the place of the file it replaces.
     func commit() throws {
-        guard state == .closed, let temporary else { return }
+        guard state == .closed, let temporary else {
+            return
+        }
         do {
             try provider.move(temporary, to: url, replacing: true)
             state = .done
@@ -468,7 +487,9 @@ final class ToolOutput {
 
     /// Drops an output that is not finished.
     func abandon() {
-        guard state == .open else { return }
+        guard state == .open else {
+            return
+        }
         state = .undone
         try? writer.close(attributes: FileAttributes())
         try? provider.remove(partial)

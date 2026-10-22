@@ -87,7 +87,9 @@ final class RandomAccessFile: Sendable {
 
     /// Up to `count` bytes; fewer only at the end of the file.
     func read(at offset: UInt64, count: Int) throws -> Data {
-        guard count > 0, offset < size else { return Data() }
+        guard count > 0, offset < size else {
+            return Data()
+        }
         let wanted = Int(min(UInt64(count), size - offset))
         // Read straight into the block that is handed on: nothing is cleared first or copied after.
         guard let buffer = malloc(wanted) else { throw posixError(ENOMEM, path) }
@@ -227,9 +229,13 @@ final class FileRangeStream: SeekableStream {
     }
 
     func read(upToCount count: Int) throws -> Data? {
-        guard position < end else { return nil }
+        guard position < end else {
+            return nil
+        }
         let data = try file.read(at: position, count: Int(min(UInt64(count), end - position)))
-        guard !data.isEmpty else { return nil }
+        guard !data.isEmpty else {
+            return nil
+        }
         position += UInt64(data.count)
         return data
     }
@@ -253,7 +259,9 @@ final class DataStream: SeekableStream {
     }
 
     func read(upToCount count: Int) -> Data? {
-        guard !data.isEmpty else { return nil }
+        guard !data.isEmpty else {
+            return nil
+        }
         let block = data.prefix(count)
         data = data.dropFirst(block.count)
         return Data(block)
@@ -290,7 +298,9 @@ final class SizeGuardStream: ByteStream {
     }
 
     func read(upToCount count: Int) throws -> Data? {
-        guard let block = try source.read(upToCount: count) else { return nil }
+        guard let block = try source.read(upToCount: count) else {
+            return nil
+        }
         guard UInt64(block.count) <= left else {
             throw ArchiveError.damaged("\(name) holds more data than its entry says")
         }
@@ -322,7 +332,9 @@ final class TeeStream: ByteStream {
     }
 
     func read(upToCount count: Int) throws -> Data? {
-        guard let block = try source.read(upToCount: count) else { return nil }
+        guard let block = try source.read(upToCount: count) else {
+            return nil
+        }
         if isComplete {
             if output.position.plusClamped(UInt64(block.count)) > limit || room?.allows(UInt64(block.count)) == false {
                 isComplete = false
@@ -421,7 +433,9 @@ final class OutputFile {
     }
 
     private func flush() throws {
-        guard !buffer.isEmpty else { return }
+        guard !buffer.isEmpty else {
+            return
+        }
         try writeOut(buffer, at: nil)
         flushed += UInt64(buffer.count)
         buffer.removeAll(keepingCapacity: true)
@@ -446,7 +460,9 @@ final class OutputFile {
     /// `durably` returns only when the disk holds the data: for a file that is about to take
     /// the place of another, which a rename after a loss of power must not leave half-written.
     func close(durably: Bool = false) throws {
-        guard !isClosed else { return }
+        guard !isClosed else {
+            return
+        }
         try flush()
         if durably, !Durable.sync(descriptor) {
             let code = errno
@@ -467,14 +483,18 @@ enum Durable {
     ///
     /// File systems that do not know it get a plain `fsync`.
     static func sync(_ descriptor: Int32) -> Bool {
-        if fcntl(descriptor, F_BARRIERFSYNC) == 0 { return true }
+        if fcntl(descriptor, F_BARRIERFSYNC) == 0 {
+            return true
+        }
         return fsync(descriptor) == 0
     }
 
     /// After a rename: the folder's entry is what makes the new file the file.
     static func syncFolder(of url: URL) {
         let descriptor = open(url.deletingLastPathComponent().path, O_RDONLY)
-        guard descriptor >= 0 else { return }
+        guard descriptor >= 0 else {
+            return
+        }
         _ = fsync(descriptor)
         Darwin.close(descriptor)
     }
@@ -482,7 +502,9 @@ enum Durable {
     /// Where a path leads once every symbolic link in it is followed: an archive that is
     /// reached through a link is rewritten where it really lies, and the link stays a link.
     static func realFile(_ url: URL) -> URL {
-        guard let real = realpath(url.path, nil) else { return url }
+        guard let real = realpath(url.path, nil) else {
+            return url
+        }
         defer { free(real) }
         return URL(fileURLWithPath: String(cString: real), isDirectory: false)
     }
@@ -556,9 +578,13 @@ final class SpaceWatch {
 
     /// False once writing `count` more bytes would eat into the reserve.
     func allows(_ count: UInt64) -> Bool {
-        guard !full else { return false }
+        guard !full else {
+            return false
+        }
         sinceCheck = sinceCheck.plusClamped(count)
-        guard sinceCheck >= step else { return true }
+        guard sinceCheck >= step else {
+            return true
+        }
         sinceCheck = 0
         full = !hasRoom(reserve.plusClamped(step), folder)
         return !full
@@ -626,7 +652,9 @@ final class ScratchFolder: @unchecked Sendable {
         let (made, kept) = (isMade, isKept)
         if !kept { Self.folders[url.path] = Paths(externals: externals, list: listPath) }
         Self.lock.unlock()
-        if made, FileManager.default.fileExists(atPath: url.path) { return }
+        if made, FileManager.default.fileExists(atPath: url.path) {
+            return
+        }
         try FileManager.default.createDirectory(
             at: url,
             withIntermediateDirectories: true,
@@ -649,7 +677,9 @@ final class ScratchFolder: @unchecked Sendable {
     }
 
     private static func removeExternal(_ path: String) {
-        guard isOwnExternalName((path as NSString).lastPathComponent) else { return }
+        guard isOwnExternalName((path as NSString).lastPathComponent) else {
+            return
+        }
         try? FileManager.default.removeItem(atPath: path)
     }
 
@@ -658,7 +688,9 @@ final class ScratchFolder: @unchecked Sendable {
     /// It is removed with the folder if it is still there then, and by the next start if the
     /// program dies before.
     func noteExternal(_ url: URL) {
-        guard Self.isOwnExternalName(url.lastPathComponent) else { return }
+        guard Self.isOwnExternalName(url.lastPathComponent) else {
+            return
+        }
         try? prepare()
         Self.lock.lock()
         externals.append(url.path)
@@ -666,7 +698,9 @@ final class ScratchFolder: @unchecked Sendable {
         Self.lock.unlock()
         // One short line appended; a list that cannot be written only means no sweep later.
         let descriptor = open(listPath, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW, 0o600)
-        guard descriptor >= 0 else { return }
+        guard descriptor >= 0 else {
+            return
+        }
         let line = Array((url.path + "\n").utf8)
         _ = line.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress, $0.count) }
         Darwin.close(descriptor)
@@ -680,7 +714,9 @@ final class ScratchFolder: @unchecked Sendable {
             Self.folders[url.path] = nil
         }
         Self.lock.unlock()
-        guard !stays else { return }
+        guard !stays else {
+            return
+        }
         try? FileManager.default.removeItem(at: url)
         for path in outside { Self.removeExternal(path) }
         unlink(listPath)
@@ -711,7 +747,9 @@ final class ScratchFolder: @unchecked Sendable {
     /// Folders that were kept on purpose stay. Touches the disk; meant for a background thread,
     /// once at the start.
     static func sweepLeftovers(in parent: URL = FileManager.default.temporaryDirectory) {
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else { return }
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else {
+            return
+        }
         for name in names where name.hasPrefix(prefix) {
             let rest = name.dropFirst(prefix.count)
             guard let pid = pid_t(rest.prefix { $0 != "-" }), pid > 0, pid != getpid() else { continue }

@@ -12,16 +12,35 @@ public enum OverwriteMode: Int, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .ask: return "Ask user"
-        case .overwriteAll: return "Overwrite all"
-        case .skipAll: return "Skip all"
-        case .overwriteOlder: return "Overwrite all older"
-        case .autoRenameCopied: return "Auto-rename copied"
-        case .autoRenameExisting: return "Auto-rename target files"
-        case .copyLarger: return "Copy all larger files (overwrite smaller)"
-        case .copySmaller: return "Copy all smaller files (overwrite larger)"
-        case .renameOlderSkipNewer: return "Rename older target files, skip newer"
-        case .overwriteOlderOrSame: return "Overwrite all older and of the same age"
+        case .ask:
+            return "Ask user"
+
+        case .overwriteAll:
+            return "Overwrite all"
+
+        case .skipAll:
+            return "Skip all"
+
+        case .overwriteOlder:
+            return "Overwrite all older"
+
+        case .autoRenameCopied:
+            return "Auto-rename copied"
+
+        case .autoRenameExisting:
+            return "Auto-rename target files"
+
+        case .copyLarger:
+            return "Copy all larger files (overwrite smaller)"
+
+        case .copySmaller:
+            return "Copy all smaller files (overwrite larger)"
+
+        case .renameOlderSkipNewer:
+            return "Rename older target files, skip newer"
+
+        case .overwriteOlderOrSame:
+            return "Overwrite all older and of the same age"
         }
     }
 }

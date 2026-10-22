@@ -173,7 +173,9 @@ enum PartSeries {
             return .digits(first..<name.index(after: last))
         }
         // A name without digits and without an extension counts in its last two letters.
-        guard dot == nil, name.count >= 2 else { return nil }
+        guard dot == nil, name.count >= 2 else {
+            return nil
+        }
         let start = name.index(name.endIndex, offsetBy: -2)
         return name[start...].allSatisfy { $0.isASCII && $0.isLowercase } ? .letters(start..<name.endIndex) : nil
     }
@@ -186,9 +188,13 @@ enum PartSeries {
         switch counter(in: name) {
         case .digits(let range):
             let digits = name[range]
-            guard digits.count <= 18, let value = Int(digits) else { return nil }
+            guard digits.count <= 18, let value = Int(digits) else {
+                return nil
+            }
             let next = String(value + 1)
-            guard next.count <= digits.count else { return nil }
+            guard next.count <= digits.count else {
+                return nil
+            }
             return name.replacingCharacters(
                 in: range,
                 with: String(repeating: "0", count: digits.count - next.count) + next
@@ -214,10 +220,13 @@ enum PartSeries {
 
     /// The name of the whole when no `.crc` file tells it: the part's name without its counter.
     static func combinedName(forPart name: String) -> String {
-        guard let counter = counter(in: name) else { return name }
+        guard let counter = counter(in: name) else {
+            return name
+        }
         var range: Range<String.Index>
         switch counter {
-        case .digits(let found), .letters(let found): range = found
+        case .digits(let found), .letters(let found):
+            range = found
         }
         // The dot in front of the counter goes with it: `file.001` → `file`.
         if range.lowerBound > name.startIndex, name[name.index(before: range.lowerBound)] == "." {
@@ -288,7 +297,9 @@ enum Combiner {
     /// after the last `/` or `\\` (found on the bytes, so that a slash with a combining mark
     /// after it is a slash all the same), never empty, `.` or `..`.
     static func storedName(_ name: String) -> String? {
-        guard let name = Decoder.safeName(name, replacingColon: false) else { return nil }
+        guard let name = Decoder.safeName(name, replacingColon: false) else {
+            return nil
+        }
         return name
     }
 

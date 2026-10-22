@@ -351,7 +351,9 @@ private final class MemoryReader: FileReader, @unchecked Sendable {
     init(_ data: Data) { self.data = data }
 
     func read(upToCount count: Int) -> Data? {
-        guard position < data.count else { return nil }
+        guard position < data.count else {
+            return nil
+        }
         let end = min(position + count, data.count)
         defer { position = end }
         return data.subdata(in: position..<end)

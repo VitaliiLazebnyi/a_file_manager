@@ -242,7 +242,9 @@ struct PropertySheet {
         guard let volume = (try? fileSystems.provider(for: url))?.volume(of: url, cancellation: cancellation) else {
             return nil
         }
-        guard let free = volume.freeBytes, let total = volume.totalBytes else { return volume.name }
+        guard let free = volume.freeBytes, let total = volume.totalBytes else {
+            return volume.name
+        }
         return "\(volume.name): \(Format.shortSize(free)) of \(Format.shortSize(total)) free"
     }
 }
@@ -254,9 +256,14 @@ enum LinkKind: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .symbolic: return "Symbolic link"
-        case .alias: return "Finder alias"
-        case .hard: return "Hard link"
+        case .symbolic:
+            return "Symbolic link"
+
+        case .alias:
+            return "Finder alias"
+
+        case .hard:
+            return "Hard link"
         }
     }
 }

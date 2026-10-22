@@ -52,14 +52,24 @@ public final class OperationLog: @unchecked Sendable {
         public func wants(_ verb: OperationRecord.Verb, _ status: OperationRecord.Status) -> Bool {
             let kind: Bool
             switch verb {
-            case .copy, .move, .append, .rename, .newFile: kind = logsTransfers
-            case .delete, .trash: kind = logsDeletes
-            case .makeFolder, .removeFolder: kind = logsFolders
+            case .copy, .move, .append, .rename, .newFile:
+                kind = logsTransfers
+
+            case .delete, .trash:
+                kind = logsDeletes
+
+            case .makeFolder, .removeFolder:
+                kind = logsFolders
             }
             switch status {
-            case .done: return kind && logsSuccess
-            case .failed: return kind && logsErrors
-            case .skipped: return kind && logsSkipped
+            case .done:
+                return kind && logsSuccess
+
+            case .failed:
+                return kind && logsErrors
+
+            case .skipped:
+                return kind && logsSkipped
             }
         }
     }
@@ -98,11 +108,15 @@ public final class OperationLog: @unchecked Sendable {
 
     /// Any thread.
     public func write(_ record: OperationRecord) {
-        guard configuration.isEnabled, configuration.wants(record) else { return }
+        guard configuration.isEnabled, configuration.wants(record) else {
+            return
+        }
         let time = now()
         queue.async {
             self.pending.append((Self.line(for: record, at: self.stamp.string(from: time)), time))
-            guard !self.drainIsScheduled else { return }
+            guard !self.drainIsScheduled else {
+                return
+            }
             self.drainIsScheduled = true
             self.queue.asyncAfter(deadline: .now() + Self.delay) { self.drain() }
         }
@@ -195,9 +209,14 @@ public final class OperationLog: @unchecked Sendable {
             record.verb.rawValue + ": " + DisplayName.escaped(record.source)
             + (record.target.map { " -> " + DisplayName.escaped($0) } ?? "")
         switch record.status {
-        case .done: return "\(time): \(what)\n"
-        case .failed(let message): return "\(time): Error: \(what): \(DisplayName.escaped(message))\n"
-        case .skipped: return "\(time): Skipped: \(what)\n"
+        case .done:
+            return "\(time): \(what)\n"
+
+        case .failed(let message):
+            return "\(time): Error: \(what): \(DisplayName.escaped(message))\n"
+
+        case .skipped:
+            return "\(time): Skipped: \(what)\n"
         }
     }
 
@@ -211,7 +230,9 @@ public final class OperationLog: @unchecked Sendable {
 
     private func drain() {
         drainIsScheduled = false
-        guard !pending.isEmpty else { return }
+        guard !pending.isEmpty else {
+            return
+        }
         let lines = pending
         pending.removeAll(keepingCapacity: true)
         let file = configuration.file
@@ -265,7 +286,9 @@ public final class OperationLog: @unchecked Sendable {
 
     private func writeChunk(_ chunk: inout Data) {
         defer { chunk.removeAll(keepingCapacity: true) }
-        guard !chunk.isEmpty else { return }
+        guard !chunk.isEmpty else {
+            return
+        }
         let file = configuration.file
         if handle == nil {
             // Opened for appending: every write goes to the end of the file as it is then,
@@ -274,7 +297,9 @@ public final class OperationLog: @unchecked Sendable {
             // opening, and with it the log's queue, until a reader came. Only a plain file is
             // written to.
             let descriptor = open(file.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NONBLOCK | O_NOCTTY, 0o644)
-            guard descriptor >= 0 else { return }
+            guard descriptor >= 0 else {
+                return
+            }
             var info = stat()
             guard fstat(descriptor, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG else {
                 close(descriptor)
@@ -312,7 +337,9 @@ public final class OperationLog: @unchecked Sendable {
     /// Moves the log to its rotated name and removes the oldest copies beyond the limit.
     private func rotate(at written: Date) {
         let file = configuration.file
-        guard fm.fileExists(atPath: file.path) else { return }
+        guard fm.fileExists(atPath: file.path) else {
+            return
+        }
         let (base, ext) = (file.deletingPathExtension().lastPathComponent, file.pathExtension)
         func copy(_ tag: String) -> URL {
             file.deletingLastPathComponent()
@@ -334,7 +361,9 @@ public final class OperationLog: @unchecked Sendable {
             while fm.fileExists(atPath: copy(String(counter)).path) { counter += 1 }
             try? fm.moveItem(at: file, to: copy(String(counter)))
         }
-        guard configuration.keepCount > 0 else { return }
+        guard configuration.keepCount > 0 else {
+            return
+        }
         // The oldest copies beyond the limit go. Only files named the way this log names its
         // copies: a neighbour such as `operations.backup.log` is somebody else's.
         let folder = file.deletingLastPathComponent()

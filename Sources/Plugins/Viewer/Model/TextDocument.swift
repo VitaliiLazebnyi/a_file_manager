@@ -157,14 +157,19 @@ final class TextDocument: @unchecked Sendable {
 
     private var bytesPerRow: Int {
         switch layout {
-        case .binary(let width): return max(1, width)
-        default: return HexFormat.bytesPerRow
+        case .binary(let width):
+            return max(1, width)
+
+        default:
+            return HexFormat.bytesPerRow
         }
     }
 
     /// The rows known so far; for text it grows while the index is being built.
     var rowCount: Int {
-        if let index { return index.rowCount }
+        if let index {
+            return index.rowCount
+        }
         // (The length is what a file system says, and a server may say anything: the sum must not overflow.)
         return Int(max(0, length).addingSaturated(Int64(bytesPerRow) - 1) / Int64(bytesPerRow))
     }
@@ -189,7 +194,9 @@ final class TextDocument: @unchecked Sendable {
         rawScan: Bool = true,
         progress: @escaping @Sendable () -> Void = {}
     ) {
-        guard let index, case .text(let options) = layout else { return }
+        guard let index, case .text(let options) = layout else {
+            return
+        }
         index.build(
             source: source,
             content: content,
@@ -222,7 +229,9 @@ final class TextDocument: @unchecked Sendable {
     /// Kept for as long as the document is, so the next search finds the boundaries of the last
     /// one.
     var characterBoundaries: CharacterBoundaries? {
-        guard encoding.kind == .doubleByte else { return nil }
+        guard encoding.kind == .doubleByte else {
+            return nil
+        }
         boundariesLock.lock()
         defer { boundariesLock.unlock() }
         if boundaries == nil { boundaries = CharacterBoundaries(source: source, content: content, encoding: encoding) }
@@ -254,7 +263,9 @@ final class TextDocument: @unchecked Sendable {
     /// Up to `count` rows from row `first` on; fewer at the end of what is known.
     func rows(from first: Int, count: Int, cancellation: CancellationFlag? = nil) throws -> [DisplayRow] {
         let available = rowCount
-        guard first >= 0, first < available, count > 0 else { return [] }
+        guard first >= 0, first < available, count > 0 else {
+            return []
+        }
         let wanted = min(count, available - first)
         guard let index, case .text(let options) = layout else {
             return try fixedRows(from: first, count: wanted, cancellation)
@@ -268,8 +279,12 @@ final class TextDocument: @unchecked Sendable {
             let next = first + rows.count
             let before = rows.count
             try walk(from: position, options, cancellation) { row, bytes, startsLine, line, text, units, base in
-                if let end = position.endRow, row >= end { return false }
-                guard row >= next else { return true }
+                if let end = position.endRow, row >= end {
+                    return false
+                }
+                guard row >= next else {
+                    return true
+                }
                 rows.append(makeRow(options, row, bytes, startsLine, line, text, units, base))
                 return rows.count < wanted
             }
@@ -289,7 +304,9 @@ final class TextDocument: @unchecked Sendable {
         }
         var found = position.row
         try walk(from: position, options, cancellation) { row, bytes, _, _, _, _, _ in
-            if let end = position.endRow, row >= end { return false }
+            if let end = position.endRow, row >= end {
+                return false
+            }
             found = row
             return bytes.upperBound <= offset
         }
@@ -301,10 +318,14 @@ final class TextDocument: @unchecked Sendable {
         guard let index, case .text(let options) = layout else {
             return line >= 1 && line <= rowCount ? line - 1 : nil
         }
-        guard let position = index.position(beforeLine: line - 1) else { return nil }
+        guard let position = index.position(beforeLine: line - 1) else {
+            return nil
+        }
         var found: Int?
         try walk(from: position, options, cancellation) { row, _, startsLine, number, _, _, _ in
-            if let end = position.endRow, row >= end { return false }
+            if let end = position.endRow, row >= end {
+                return false
+            }
             if startsLine, number == line { found = row }
             return found == nil && number <= line
         }
@@ -462,7 +483,9 @@ final class TextDocument: @unchecked Sendable {
                 : (textIndex - hexFormat.hexColumn(0) + 1) / 3
             return row.range.lowerBound + Int64(min(max(position, 0), count))
         }
-        guard textIndex < row.offsets.count else { return row.contentEnd }
+        guard textIndex < row.offsets.count else {
+            return row.contentEnd
+        }
         return row.range.lowerBound + Int64(row.offsets[max(0, textIndex)])
     }
 
@@ -492,7 +515,9 @@ final class TextDocument: @unchecked Sendable {
     func textRanges(in row: DisplayRow, for selection: Range<Int64>) -> [Range<Int>] {
         let lower = max(selection.lowerBound, row.range.lowerBound)
         let upper = min(selection.upperBound, row.range.upperBound)
-        guard lower < upper else { return [] }
+        guard lower < upper else {
+            return []
+        }
         if layout == .hex {
             let first = Int(lower - row.range.lowerBound)
             let last = Int(upper - row.range.lowerBound)

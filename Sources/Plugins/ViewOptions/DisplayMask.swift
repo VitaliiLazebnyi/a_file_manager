@@ -39,7 +39,9 @@ struct DisplayMask: Sendable {
     }
 
     func matches(_ item: FileItem) -> Bool {
-        if item.isFolder { return !(folderExcludes?.matches(item.name) ?? false) }
+        if item.isFolder {
+            return !(folderExcludes?.matches(item.name) ?? false)
+        }
         return (includes?.matches(item.name) ?? true) && !(excludes?.matches(item.name) ?? false)
     }
 

@@ -10,18 +10,28 @@ public enum TextEncoding: String, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .utf8: return "UTF-8"
-        case .western: return "Western (Windows ANSI)"
-        case .dos: return "ASCII (DOS)"
-        case .utf16: return "Unicode UTF-16"
+        case .utf8:
+            return "UTF-8"
+
+        case .western:
+            return "Western (Windows ANSI)"
+
+        case .dos:
+            return "ASCII (DOS)"
+
+        case .utf16:
+            return "Unicode UTF-16"
         }
     }
 
     /// The encoding of 8-bit text; UTF-16 is handled in both byte orders by the pattern.
     var stringEncoding: String.Encoding {
         switch self {
-        case .utf8: return .utf8
-        case .western: return .windowsCP1252
+        case .utf8:
+            return .utf8
+
+        case .western:
+            return .windowsCP1252
 
         case .dos:
             return String.Encoding(
@@ -30,7 +40,8 @@ public enum TextEncoding: String, Codable, CaseIterable, Sendable {
                 )
             )
 
-        case .utf16: return .utf16LittleEndian
+        case .utf16:
+            return .utf16LittleEndian
         }
     }
 }
@@ -78,10 +89,17 @@ public struct TextPattern: Sendable {
 
         public var errorDescription: String? {
             switch self {
-            case .emptyText: return "There is no text to find."
-            case .badHex(let text): return "\"\(text)\" is not a string of hex bytes such as 00 FF 12 or \"PK\" 03 04."
-            case .badRegex(let reason): return "The regular expression cannot be used: \(reason)"
-            case .notRepresentable(let text): return "\"\(text)\" cannot be written in any of the chosen encodings."
+            case .emptyText:
+                return "There is no text to find."
+
+            case .badHex(let text):
+                return "\"\(text)\" is not a string of hex bytes such as 00 FF 12 or \"PK\" 03 04."
+
+            case .badRegex(let reason):
+                return "The regular expression cannot be used: \(reason)"
+
+            case .notRepresentable(let text):
+                return "\"\(text)\" cannot be written in any of the chosen encodings."
             }
         }
     }
@@ -123,7 +141,9 @@ public struct TextPattern: Sendable {
         /// judged with the piece before; with `isLast` false, a hit that touches the end of
         /// the piece is left to the next one when the character after it matters.
         func occurs(in hay: UnsafeRawBufferPointer, skip: Int, isLast: Bool) -> Bool {
-            guard minLength > 0, hay.count >= minLength, let base = hay.baseAddress else { return false }
+            guard minLength > 0, hay.count >= minLength, let base = hay.baseAddress else {
+                return false
+            }
             if let literal {
                 return literal.withUnsafeBytes { memmem(base, hay.count, $0.baseAddress, $0.count) != nil }
             }
@@ -167,7 +187,9 @@ public struct TextPattern: Sendable {
             // Back before the first element, every way to write the text was tried.
             while element >= 0 {
                 if element == count {
-                    if accept(positions[count]) { return true }
+                    if accept(positions[count]) {
+                        return true
+                    }
                     // Not accepted (a word continues): look for another way to write the text.
                     // (There is at least one element, so there is one to go back to.)
                     element -= 1
@@ -217,7 +239,9 @@ public struct TextPattern: Sendable {
         }
 
         private func isBoundary(_ bytes: UnsafeBufferPointer<UInt8>, after end: Int, isLast: Bool) -> Bool {
-            guard end + unit <= bytes.count else { return isLast }
+            guard end + unit <= bytes.count else {
+                return isLast
+            }
             return !isWordUnit(bytes, at: end)
         }
     }
@@ -288,9 +312,14 @@ public struct TextPattern: Sendable {
         for character in text {
             if escaped {
                 switch character {
-                case "t": result.append("\t")
-                case "n": result.append("\n")
-                case "\\": result.append("\\")
+                case "t":
+                    result.append("\t")
+
+                case "n":
+                    result.append("\n")
+
+                case "\\":
+                    result.append("\\")
 
                 default:
                     result.append("\\")
@@ -390,7 +419,9 @@ public struct TextPattern: Sendable {
     public func accepts(_ reader: any FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20)
         -> Bool
     {
-        guard let found = search(reader, cancellation: cancellation, blockSize: blockSize) else { return false }
+        guard let found = search(reader, cancellation: cancellation, blockSize: blockSize) else {
+            return false
+        }
         return found != notContaining
     }
 
@@ -408,7 +439,8 @@ public struct TextPattern: Sendable {
     /// Nil when the search was cancelled or the file could not be read to its end.
     private func search(_ reader: any FileReader, cancellation: CancellationFlag?, blockSize: Int) -> Bool? {
         switch matcher {
-        case .bytes(let needles): return Self.search(needles, reader, cancellation, blockSize)
+        case .bytes(let needles):
+            return Self.search(needles, reader, cancellation, blockSize)
 
         case .regex(let regex, let encodings):
             return Self.search(regex, encodings, reader, cancellation, blockSize, trip)
@@ -431,7 +463,9 @@ public struct TextPattern: Sendable {
         do {
             var current = try reader.read(upToCount: blockSize)
             while let block = current {
-                if cancellation?.isCancelled == true { return nil }
+                if cancellation?.isCancelled == true {
+                    return nil
+                }
                 // The blocks are big and short-lived: a search thread frees them as it goes.
                 let outcome: Bool? = try autoreleasepool {
                     let next = try reader.read(upToCount: blockSize)
@@ -441,14 +475,18 @@ public struct TextPattern: Sendable {
                     let found = buffer.withUnsafeBytes { hay in
                         needles.contains { $0.occurs(in: hay, skip: isStart ? 0 : $0.unit, isLast: isLast) }
                     }
-                    if found { return true }
+                    if found {
+                        return true
+                    }
                     carryStartsFile = carryStartsFile && buffer.count <= overlap
                     carry = Data(buffer.suffix(overlap))
                     // After the last block the loop ends, as it does at once for an empty file.
                     current = isLast ? nil : next
                     return nil
                 }
-                if let outcome { return outcome }
+                if let outcome {
+                    return outcome
+                }
             }
         } catch {
             return nil
@@ -473,7 +511,9 @@ public struct TextPattern: Sendable {
         var decoders = encodings.map { LineDecoder(encoding: $0) }
         var gaveUp = false
         func matches(_ text: String?) -> Bool {
-            guard let text, !text.isEmpty, !gaveUp else { return false }
+            guard let text, !text.isEmpty, !gaveUp else {
+                return false
+            }
             if trip.isTripped {
                 gaveUp = true
                 return false
@@ -485,8 +525,11 @@ public struct TextPattern: Sendable {
                 cancelled: { cancellation?.isCancelled == true }
             )
             {
-            case .matched: return true
-            case .unmatched: return false
+            case .matched:
+                return true
+
+            case .unmatched:
+                return false
 
             case .timedOut:
                 gaveUp = true
@@ -498,16 +541,27 @@ public struct TextPattern: Sendable {
         do {
             reading: while true {
                 let step: Step = try autoreleasepool {
-                    guard let block = try reader.read(upToCount: blockSize), !block.isEmpty else { return .end }
-                    if cancellation?.isCancelled == true { return .stop }
+                    guard let block = try reader.read(upToCount: blockSize), !block.isEmpty else {
+                        return .end
+                    }
+                    if cancellation?.isCancelled == true {
+                        return .stop
+                    }
                     for index in decoders.indices where matches(decoders[index].feed(block)) { return .hit }
                     return gaveUp ? .stop : .more
                 }
                 switch step {
-                case .hit: return true
-                case .more: continue reading
-                case .stop: return nil
-                case .end: break reading
+                case .hit:
+                    return true
+
+                case .more:
+                    continue reading
+
+                case .stop:
+                    return nil
+
+                case .end:
+                    break reading
                 }
             }
         } catch {
@@ -559,7 +613,9 @@ public struct TextPattern: Sendable {
                 pending.removeFirst(cut)
                 return text
             }
-            guard pending.count > Self.longestLine else { return nil }
+            guard pending.count > Self.longestLine else {
+                return nil
+            }
             // A line without a break that is too long: handed out in pieces, cut between
             // characters, with the end of each piece repeated at the start of the next.
             let cut = boundary(atOrBefore: pending.count)
@@ -609,7 +665,9 @@ public struct TextPattern: Sendable {
                 guard encoding == .utf16 else {
                     var index = bytes.count - 1
                     while index >= 0 {
-                        if bytes[index] == 0x0A { return index + 1 }
+                        if bytes[index] == 0x0A {
+                            return index + 1
+                        }
                         index -= 1
                     }
                     return nil
@@ -617,7 +675,9 @@ public struct TextPattern: Sendable {
                 var index = bytes.count / 2 * 2 - 2
                 while index >= 0 {
                     let (line, zero) = bigEndian ? (bytes[index + 1], bytes[index]) : (bytes[index], bytes[index + 1])
-                    if line == 0x0A, zero == 0 { return index + 2 }
+                    if line == 0x0A, zero == 0 {
+                        return index + 2
+                    }
                     index -= 2
                 }
                 return nil
@@ -626,7 +686,8 @@ public struct TextPattern: Sendable {
 
         private func decode(_ data: Data) -> String? {
             switch encoding {
-            case .utf8: return String(decoding: data, as: UTF8.self)
+            case .utf8:
+                return String(decoding: data, as: UTF8.self)
 
             case .utf16:
                 return String(
@@ -650,7 +711,9 @@ public struct TextPattern: Sendable {
         init(_ data: Data) { self.data = data }
 
         func read(upToCount count: Int) -> Data? {
-            guard position < data.count else { return nil }
+            guard position < data.count else {
+                return nil
+            }
             let end = min(position + count, data.count)
             defer { position = end }
             return data.subdata(in: position..<end)
