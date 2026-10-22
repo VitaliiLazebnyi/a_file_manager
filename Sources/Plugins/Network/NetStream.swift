@@ -154,6 +154,7 @@ public final class CertificateTrust: @unchecked Sendable {
     /// module.
     public let load: (@Sendable () -> [String: [String]])?
 
+    @preconcurrency
     public init(accepted: [String: [String]] = [:], load: (@Sendable () -> [String: [String]])? = nil) {
         self.load = load
         self.accepted = [:]

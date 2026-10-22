@@ -891,6 +891,7 @@ public final class FileSearch: @unchecked Sendable {
     ///
     /// The files are all held while they are compared, so a search stops at
     /// `duplicateCandidateLimit` of them and says so (`reachedResultLimit`).
+    @preconcurrency
     public func runForDuplicates(
         onDirectory: (URL) -> Void = { _ in },
         onHashing: (@Sendable (Int, Int) -> Void)? = nil

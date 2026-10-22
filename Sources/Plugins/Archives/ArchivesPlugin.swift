@@ -246,6 +246,7 @@ public final class ArchivesPlugin: Plugin {
     /// was set: the user did not want to wait. Nothing is lost by that: what was not written still
     /// waits, and `stop()`, which then no longer tries to write it, keeps it on the disk and says
     /// where.
+    @preconcurrency
     public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         let (store, environment) = (self.store, self.environment)
         guard store.hasPendingChanges else {
@@ -346,6 +347,7 @@ public final class ArchivesPlugin: Plugin {
     /// For a shell that wants to show "Saving archives…" before it lets the program quit;
     /// `cancellation` ends the writes early, and nothing is lost by that: what was not written
     /// keeps waiting (and `stop()` deals with it).
+    @preconcurrency
     public func writePendingChanges(
         cancellation: CancellationFlag,
         completion: @escaping @MainActor @Sendable ([String]) -> Void

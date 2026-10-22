@@ -654,6 +654,7 @@ public final class TreeScanner: @unchecked Sendable {
     ///
     /// Folders on the local disk that are a mount point themselves are left unread as well,
     /// whatever `isExcluded` says. It is called on several threads at once.
+    @preconcurrency
     public init(
         root: URL,
         provider: any FileSystemProvider,

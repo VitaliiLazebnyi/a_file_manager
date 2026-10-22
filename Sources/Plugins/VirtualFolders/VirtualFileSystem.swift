@@ -851,6 +851,7 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     /// the files of a list.
     ///
     /// Any change in them is reported as a change of the virtual folder, on the main thread.
+    @preconcurrency
     public func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (
         any WatchToken
     )? {

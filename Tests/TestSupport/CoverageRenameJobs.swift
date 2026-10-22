@@ -90,6 +90,7 @@ public final class CancellingJobService: JobService, ShellServices {
 
     /// Runs `work` on this thread and calls `completion` with its result, before returning; a
     /// held job does so in `runHeld()`.
+    @preconcurrency
     public func run<Result: Sendable>(
         title: String,
         work: @escaping @Sendable (any JobMonitor) -> Result,

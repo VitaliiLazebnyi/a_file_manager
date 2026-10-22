@@ -1,6 +1,7 @@
 public import AppKit
 
 /// Finding the controls of a window that keeps them to itself, and pressing keys on them.
+@preconcurrency
 @MainActor
 public enum Controls {
     /// The key codes of the named keys the tests press.

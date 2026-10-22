@@ -68,6 +68,7 @@ public enum DuplicateFinder {
     ///
     /// Groups are in the order of the first ticked criterion (name, then size), the files of a
     /// group in path order. A cancelled run returns nothing, so no half-compared files are shown.
+    @preconcurrency
     public static func groups(
         of items: [FileItem],
         options: DuplicateOptions,

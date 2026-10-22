@@ -60,6 +60,7 @@ public final class MacIntegrationPlugin: Plugin {
 
     /// Tests pass a pasteboard of their own and say which applications open a file; with
     /// `launchesApplications` off they start nothing and show no system panel.
+    @preconcurrency
     public convenience init(
         launchesApplications: Bool = true,
         pasteboard: NSPasteboard = .general,

@@ -91,6 +91,7 @@ public final class OperationLog: @unchecked Sendable {
     private var handleFile: UInt64?
 
     /// `now` is the clock; tests bring their own.
+    @preconcurrency
     public init(_ configuration: Configuration, now: @escaping @Sendable () -> Date = { Date() }) {
         self.configuration = configuration
         self.now = now
@@ -190,6 +191,7 @@ public final class OperationLog: @unchecked Sendable {
     /// answering).
     ///
     /// The writing itself goes on on the log's queue either way. Any thread.
+    @preconcurrency
     public func flush(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         /// Unchecked `Sendable`: all state is guarded by `lock`. What it lets go of (the
         /// registration, whose release takes the flag's lock) is released outside the lock.

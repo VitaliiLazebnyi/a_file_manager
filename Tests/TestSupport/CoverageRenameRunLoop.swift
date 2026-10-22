@@ -3,6 +3,7 @@ public import Foundation
 /// Waits on the main thread for work that is handed to it: blocks of the main queue, which run
 /// while the test is suspended, and blocks handed to the main run loop, which run while the
 /// loop is run here.
+@preconcurrency
 @MainActor
 public enum RunLoopWait {
     /// Lets the main thread work until `condition` holds; false when it still does not after

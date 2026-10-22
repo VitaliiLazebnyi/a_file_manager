@@ -259,6 +259,7 @@ public final class SyncComparison: @unchecked Sendable {
         return nil
     }
 
+    @preconcurrency
     public func run(left: URL, right: URL, progress: @escaping @Sendable (SyncProgress) -> Void = { _ in })
         -> SyncResult
     {

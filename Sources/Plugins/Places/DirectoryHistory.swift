@@ -214,6 +214,7 @@ public struct HistoryMenu {
 /// Follows the panels and keeps their histories (spec 13 › Operation › History).
 ///
 /// Main thread only; it is fed from `PanelEvents` and never touches a file system.
+@preconcurrency
 @MainActor
 public final class DirectoryHistoryTracker {
     public enum Side: String, CaseIterable {

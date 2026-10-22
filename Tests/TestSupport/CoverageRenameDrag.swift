@@ -4,6 +4,7 @@ public import AppKit
 /// else.
 ///
 /// For dropping rows on a list without a mouse.
+@preconcurrency
 @MainActor
 public final class FakeDrag: NSObject, NSDraggingInfo {
     /// The pasteboard the drag carries.

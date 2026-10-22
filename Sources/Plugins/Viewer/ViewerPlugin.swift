@@ -186,6 +186,7 @@ public final class ViewerPlugin: Plugin, ViewerService {
 
     /// Closes the windows and deletes the temporary copies of remote files in the background, so the
     /// program does not wait for the disk on the main thread when it quits.
+    @preconcurrency
     public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         hideQuickView()
         windows.forEach { $0.close() }

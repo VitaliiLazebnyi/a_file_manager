@@ -327,6 +327,7 @@ public final class TreeCache: @unchecked Sendable {
 
     /// The same for a folder whose root is worked out on the cache's queue (asking the disks
     /// for it takes a while): `resolve` gives the path below the root, or nil.
+    @preconcurrency
     public func noteFolder(resolving resolve: @escaping @Sendable () -> (path: String, root: URL)?) {
         updates.async { [self] in
             if let found = resolve() { note(found.path, below: found.root) }

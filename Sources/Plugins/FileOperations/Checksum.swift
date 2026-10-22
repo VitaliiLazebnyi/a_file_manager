@@ -59,6 +59,7 @@ public enum Checksum {
     ///
     /// Files of different sizes are different without a byte being read; otherwise the two are read
     /// side by side on two cores.
+    @preconcurrency
     public static func sameContents(
         _ a: URL,
         _ b: URL,

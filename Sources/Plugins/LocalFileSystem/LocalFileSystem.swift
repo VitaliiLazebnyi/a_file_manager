@@ -2088,6 +2088,7 @@ public final class LocalFileSystem: FileSystemProvider, @unchecked Sendable {
     ///
     /// Returns at once: the folders are resolved and the stream is made in the background (a share
     /// that does not answer must not hold up the caller).
+    @preconcurrency
     public func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (
         any WatchToken
     )? {

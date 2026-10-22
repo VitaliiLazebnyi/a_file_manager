@@ -448,6 +448,7 @@ public struct SavedConnection: Codable, Equatable, Sendable {
 /// of the settings (`network.`).
 ///
 /// Passwords go to the `PasswordStore`. Main thread only.
+@preconcurrency
 @MainActor
 public final class ConnectionStore {
     private static let connectionsKey = "connections"
