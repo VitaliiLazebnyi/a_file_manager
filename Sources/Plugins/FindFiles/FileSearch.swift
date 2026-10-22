@@ -505,7 +505,8 @@ public final class FileSearch: @unchecked Sendable {
                 }
             } catch {
                 guard isStreaming else {
-                    return finishJob(of: node)
+                    finishJob(of: node)
+                    return
                 }
                 // What was reported stays; the folder ends here.
                 jobs.push(publish(node, candidates: [], children: []))

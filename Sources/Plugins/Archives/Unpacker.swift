@@ -817,7 +817,8 @@ internal final class Unpacker: @unchecked Sendable {
         if let root {
             if entry.isSymbolicLink {
                 let destination = String(decoding: try stream.readFully(1 << 16), as: UTF8.self)
-                return try root.makeLink(task.names, to: destination, replacing: task.replaces)
+                try root.makeLink(task.names, to: destination, replacing: task.replaces)
+                return
             }
             let (cancellation, bytesDone, hook) = (monitor.cancellation, self.bytesDone, whileUnpacking)
             try root.write(

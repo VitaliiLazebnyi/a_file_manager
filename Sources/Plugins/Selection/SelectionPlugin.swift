@@ -772,7 +772,8 @@ internal final class Selections {
         let change: PanelModel.SelectionChange = select ? .add : .remove
         guard step != 0 else {
             if scope == .both {
-                return select ? model.selectAll() : model.clearSelection()
+                select ? model.selectAll() : model.clearSelection()
+                return
             }
             mark(model, change, matching: { scope.contains($0) })
             return

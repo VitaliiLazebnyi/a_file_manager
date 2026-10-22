@@ -1053,14 +1053,16 @@ public final class FileJob: @unchecked Sendable {
         if item.isRealDirectory {
             guard let inside = options.filter.entering(item.name, from: position) else {
                 add(measuredBefore(item))
-                return batch.set(slot, .skipped)
+                batch.set(slot, .skipped)
+                return
             }
             guard depth < depthLimit else {
                 add(measuredBefore(item))
                 _ = try attempt(isMove ? .move : .copy, at: item.url) {
                     throw FileJobError.nestedTooDeep(self.display(item.url))
                 }
-                return batch.set(slot, .skipped)
+                batch.set(slot, .skipped)
+                return
             }
             batch.set(
                 slot,
