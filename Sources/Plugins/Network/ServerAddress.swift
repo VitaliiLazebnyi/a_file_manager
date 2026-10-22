@@ -95,7 +95,7 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     public func url(path: String = "/") -> URL {
         // `host.invalid` of a known scheme always has a URL, so the second call ends there.
         validURL(path: path)
-            ?? ServerKey(scheme: Self.schemes.contains(scheme) ? scheme : "ftp", host: "host.invalid").url(path: path)
+            ?? Self(scheme: Self.schemes.contains(scheme) ? scheme : "ftp", host: "host.invalid").url(path: path)
     }
 }
 
