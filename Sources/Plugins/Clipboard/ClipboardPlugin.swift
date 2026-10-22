@@ -2,8 +2,9 @@ import AFMContracts
 public import AFMKernel
 public import AppKit
 
-/// The commands only this plugin provides (spec 17 › Clipboard). The `Net` variants write
-/// URLs, which is what a UNC path is on the Mac.
+/// The commands only this plugin provides (spec 17 › Clipboard).
+///
+/// The `Net` variants write URLs, which is what a UNC path is on the Mac.
 public enum ClipboardCommands {
     public static let copyNames: CommandID = "cm_CopyNamesToClip"
     public static let copyNetNames: CommandID = "cm_CopyNetNamesToClip"
@@ -23,9 +24,10 @@ public enum ClipboardCommands {
 }
 
 /// Files on the clipboard, shared with Finder, and the names of files as text
-/// (spec 07 › File clipboard and name lists). The system clipboard carries files of the local
-/// disks only, so cut and copy are offered there and nowhere else. A text or a picture on the
-/// clipboard is pasted as a new file.
+/// (spec 07 › File clipboard and name lists).
+///
+/// The system clipboard carries files of the local disks only, so cut and copy are offered there
+/// and nowhere else. A text or a picture on the clipboard is pasted as a new file.
 ///
 /// **Threading.** The panels are used on the main thread only, and so is the pasteboard for
 /// everything else: `NSPasteboard` is not safe to use from another thread, so even the data of
@@ -224,6 +226,7 @@ public final class ClipboardPlugin: Plugin {
     }
 
     /// Puts the operands on the clipboard; the selection stays and nothing visible happens.
+    ///
     /// Cut and Copy are offered only where there are operands.
     private func place(_ operands: PanelModel.Operands, cut: Bool, ui: any UserInteraction) {
         let count = Self.count(of: operands)
@@ -260,12 +263,13 @@ public final class ClipboardPlugin: Plugin {
         cutChangeCount = cut ? pasteboard.changeCount : nil
     }
 
-    /// Whether files are on the clipboard. The menus ask this at every validation, and with
-    /// many files on the pasteboard the question is not cheap: a yes is remembered for as long
-    /// as the pasteboard stays in the state it was found in. A no is asked again each time:
-    /// it is cheap, and it cannot be remembered, because files written after the pasteboard
-    /// was cleared arrive in the same state of it (the count moves when it is cleared, not
-    /// when something is added).
+    /// Whether files are on the clipboard.
+    ///
+    /// The menus ask this at every validation, and with many files on the pasteboard the question
+    /// is not cheap: a yes is remembered for as long as the pasteboard stays in the state it was
+    /// found in. A no is asked again each time: it is cheap, and it cannot be remembered, because
+    /// files written after the pasteboard was cleared arrive in the same state of it (the count
+    /// moves when it is cleared, not when something is added).
     private func hasFiles() -> Bool {
         let count = pasteboard.changeCount
         if let placed {
@@ -289,8 +293,10 @@ public final class ClipboardPlugin: Plugin {
         return pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
     }
 
-    /// Pastes into the source panel's folder at once, without a dialog. Files are transferred
-    /// by whichever plugin offers the file-transfer service; a text or picture becomes a file.
+    /// Pastes into the source panel's folder at once, without a dialog.
+    ///
+    /// Files are transferred by whichever plugin offers the file-transfer service; a text or
+    /// picture becomes a file.
     private func paste(in kernel: Kernel) {
         let directory = kernel.panels.source.model.directory
         let isMove = cutChangeCount == pasteboard.changeCount
@@ -314,10 +320,12 @@ public final class ClipboardPlugin: Plugin {
         }
     }
 
-    /// The files on the clipboard, handed over on the main thread. What this program put
-    /// there, and a short list, at once; a long list from another program after it was read
-    /// slice by slice, with a job that shows the reading and lets it be cancelled. Nothing is
-    /// handed over when the reading was cancelled or the clipboard changed meanwhile.
+    /// The files on the clipboard, handed over on the main thread.
+    ///
+    /// What this program put there, and a short list, at once; a long list from another program
+    /// after it was read slice by slice, with a job that shows the reading and lets it be
+    /// cancelled. Nothing is handed over when the reading was cancelled or the clipboard changed
+    /// meanwhile.
     private func readFiles(in kernel: Kernel, then deliver: @escaping ([URL]?) -> Void) {
         if let placed, placed.changeCount == pasteboard.changeCount {
             deliver(placed.urls)
@@ -355,8 +363,9 @@ public final class ClipboardPlugin: Plugin {
     private static let imageTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
 
     /// Whether a picture or text is there to paste; looks at the kinds only, so menus can ask often.
-    /// A yes is remembered for the state of the pasteboard it was found in, so that a menu
-    /// that asks at every validation costs one question; a no is asked again, as for files.
+    ///
+    /// A yes is remembered for the state of the pasteboard it was found in, so that a menu that
+    /// asks at every validation costs one question; a no is asked again, as for files.
     private func hasContent(in kernel: Kernel) -> Bool {
         guard kernel.settings.flag(Self.pastesContentsKey, default: true) else { return false }
         let count = pasteboard.changeCount
@@ -366,9 +375,10 @@ public final class ClipboardPlugin: Plugin {
         return found
     }
 
-    /// The picture or text on the clipboard. A picture wins over a text, because programs that
-    /// copy a picture often add its name. Reads the data, which the program that owns it may
-    /// make only now. Main thread.
+    /// The picture or text on the clipboard.
+    ///
+    /// A picture wins over a text, because programs that copy a picture often add its name. Reads
+    /// the data, which the program that owns it may make only now. Main thread.
     private static func content(of pasteboard: NSPasteboard) -> PastedContent? {
         if let type = pasteboard.availableType(from: imageTypes), let data = pasteboard.data(forType: type),
             !data.isEmpty
@@ -383,8 +393,9 @@ public final class ClipboardPlugin: Plugin {
 
     /// Writes the content as `Clipboard.txt` or `Clipboard.png` (with a number when the name
     /// is taken) through the folder's file system, in a job; the cursor goes to the new file.
-    /// The file is written under a temporary name and gets its own when it is complete, so a
-    /// write that fails leaves no half of it behind.
+    ///
+    /// The file is written under a temporary name and gets its own when it is complete, so a write
+    /// that fails leaves no half of it behind.
     private func pasteContent(into directory: URL, in kernel: Kernel) {
         let fileSystems = kernel.fileSystems
         // Read here, on the main thread (see Threading above); the job gets the data only.
@@ -439,7 +450,9 @@ public final class ClipboardPlugin: Plugin {
         var errorDescription: String? { "The picture on the clipboard cannot be read." }
     }
 
-    /// PNG data stays as it is; anything else is converted. Runs on a job's thread.
+    /// PNG data stays as it is; anything else is converted.
+    ///
+    /// Runs on a job's thread.
     nonisolated private static func png(from data: Data) throws -> Data {
         if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return data }
         guard let converted = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else {
@@ -450,8 +463,10 @@ public final class ClipboardPlugin: Plugin {
 
     // MARK: Names and details
 
-    /// Puts a text on the clipboard. Whatever list of names is still being put together for
-    /// an earlier command is overtaken by this: it must not replace the text later.
+    /// Puts a text on the clipboard.
+    ///
+    /// Whatever list of names is still being put together for an earlier command is overtaken by
+    /// this: it must not replace the text later.
     private func put(_ text: String) {
         listRequest += 1
         write(text)
@@ -462,10 +477,12 @@ public final class ClipboardPlugin: Plugin {
         pasteboard.setString(text, forType: .string)
     }
 
-    /// Puts the text `make` returns on the clipboard. For a few items at once; for a very
-    /// large selection the text is put together on a background queue (it is megabytes of
-    /// paths) and only handed to the pasteboard here. The latest request wins: a text that
-    /// arrives after something newer went to the clipboard (another text, or files) is dropped.
+    /// Puts the text `make` returns on the clipboard.
+    ///
+    /// For a few items at once; for a very large selection the text is put together on a background
+    /// queue (it is megabytes of paths) and only handed to the pasteboard here. The latest request
+    /// wins: a text that arrives after something newer went to the clipboard (another text, or
+    /// files) is dropped.
     private func putText(for count: Int, _ make: @escaping @Sendable () -> String) {
         guard count > Self.listedAtOnce else {
             put(make())
@@ -516,7 +533,9 @@ public final class ClipboardPlugin: Plugin {
     }
 
     /// Writes the details lines to a file through its file system (spec 03 › Selection files,
-    /// `cm_SaveDetailsToFile`). An existing file is replaced only after a question.
+    /// `cm_SaveDetailsToFile`).
+    ///
+    /// An existing file is replaced only after a question.
     private func saveDetails(headers: Bool, to proposed: String?, in kernel: Kernel) {
         let directory = kernel.panels.source.model.directory
         guard let text = proposed ?? kernel.interaction.prompt("Save details to file:", value: "details.txt"),
@@ -609,8 +628,9 @@ final class FileListProvider: NSObject, NSPasteboardItemDataProvider {
 
 /// Reads a long list of files that another program put on the pasteboard without holding up
 /// the main thread: the pasteboard may only be read there, and every file is a question to
-/// the system (see `ClipboardPlugin`). The items are asked a few milliseconds' worth per turn
-/// of the main run loop.
+/// the system (see `ClipboardPlugin`).
+///
+/// The items are asked a few milliseconds' worth per turn of the main run loop.
 ///
 /// **Threading.** `run` is called on a job's thread and waits there; the reading happens on
 /// the main thread in slices it schedules. Called on the main thread itself (a job service
@@ -663,7 +683,9 @@ final class FileListReading: @unchecked Sendable {
         return lock.withLock { outcome }
     }
 
-    /// One slice. Main thread.
+    /// One slice.
+    ///
+    /// Main thread.
     private func step(_ cancellation: CancellationFlag, sliced: Bool) {
         guard !cancellation.isCancelled, pasteboard.changeCount == changeCount else {
             finish(.abandoned)

@@ -342,6 +342,7 @@ import Testing
 }
 
 /// A reader over bytes in memory.
+///
 /// Unchecked: used by one thread at a time, as the protocol allows.
 private final class MemoryReader: FileReader, @unchecked Sendable {
     private let data: Data

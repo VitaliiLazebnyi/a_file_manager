@@ -235,8 +235,9 @@ enum ArchiveFormat: Equatable {
     }
 
     /// Splits a name into what is in front of a known archive ending and that ending:
-    /// `backup.tar.gz` → (`backup`, `tar.gz`). Nil when the name does not end like an archive
-    /// that Pack can write.
+    /// `backup.tar.gz` → (`backup`, `tar.gz`).
+    ///
+    /// Nil when the name does not end like an archive that Pack can write.
     static func splitKnownExtension(_ name: String) -> (base: String, ext: String)? {
         let lower = name.lowercased()
         let endings = writable.flatMap(\.extensions).sorted { $0.count > $1.count }

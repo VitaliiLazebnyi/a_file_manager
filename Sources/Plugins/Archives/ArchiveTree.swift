@@ -59,9 +59,11 @@ struct ArchiveEntry {
     }
 }
 
-/// The members of an archive as a tree of folders. Archives list their members as a flat
-/// sequence of paths; folders that have no entry of their own are made up from the paths of
-/// what lies in them (spec 08 › The archive panel). A value type: whoever owns it guards it.
+/// The members of an archive as a tree of folders.
+///
+/// Archives list their members as a flat sequence of paths; folders that have no entry of their own
+/// are made up from the paths of what lies in them (spec 08 › The archive panel). A value type:
+/// whoever owns it guards it.
 ///
 /// **Paths.** A path is cut into names at the byte `/`, never at the character: a `/` that is
 /// followed by a combining mark is one character to Swift and still a separator to the disk.
@@ -72,15 +74,18 @@ struct ArchiveTree {
     static let maxPathBytes = 4_096
     /// …nor have more names than this: every name is a folder that has to be kept.
     static let maxDepth = 256
-    /// The paths of the folders that were made up may take this many bytes together. Every
-    /// folder above a member is kept under its whole path, so deep paths cost the square of
+    /// The paths of the folders that were made up may take this many bytes together.
+    ///
+    /// Every folder above a member is kept under its whole path, so deep paths cost the square of
     /// their length; an archive made of them is refused rather than allowed to fill the memory.
     static let maxImplicitBytes = 48 << 20
 
     /// The entries, each in a place of its own that it keeps for as long as it is in the
-    /// tree; a place that was given up is used again. Everything else speaks of an entry by
-    /// the number of its place, which is four bytes, where its path would be a string: an
-    /// archive of millions of members is kept in a few hundred bytes per member.
+    /// tree; a place that was given up is used again.
+    ///
+    /// Everything else speaks of an entry by the number of its place, which is four bytes, where
+    /// its path would be a string: an archive of millions of members is kept in a few hundred bytes
+    /// per member.
     private var slots: ContiguousArray<ArchiveEntry?> = []
     private var freeSlots: [Int32] = []
     /// The place of the entry at each path.
@@ -88,8 +93,9 @@ struct ArchiveTree {
     /// The places of the entries directly inside each folder, by the folder's place.
     private var children: [Int32: Set<Int32>] = [Self.top: []]
     private var nextOrder = 0
-    /// The entries' places in archive order, kept up while entries come and go. Nil until
-    /// it is first asked for.
+    /// The entries' places in archive order, kept up while entries come and go.
+    ///
+    /// Nil until it is first asked for.
     private var sequence: [Int32]?
     /// The bytes of the paths of the folders that were made up.
     private(set) var implicitBytes = 0
@@ -135,8 +141,9 @@ struct ArchiveTree {
         path.utf8.split(separator: 0x2F, omittingEmptySubsequences: true).map { String(decoding: $0, as: UTF8.self) }
     }
 
-    /// The part of `path` below `folder`; nil when it does not lie below it. Compared byte by
-    /// byte: two paths that look alike but are written differently are two paths.
+    /// The part of `path` below `folder`; nil when it does not lie below it.
+    ///
+    /// Compared byte by byte: two paths that look alike but are written differently are two paths.
     static func relative(_ path: String, to folder: String) -> String? {
         if folder.isEmpty { return path }
         let (bytes, prefix) = (path.utf8, folder.utf8)
@@ -148,10 +155,11 @@ struct ArchiveTree {
         return String(decoding: bytes.dropFirst(prefix.count + 1), as: UTF8.self)
     }
 
-    /// A member's path as the tree keys it; nil for a path that is not shown. Leading slashes
-    /// and `.` are dropped. A path is refused altogether when it has a `..` or a NUL byte, is
-    /// longer or deeper than the limits above, or holds a `/` that Swift would not see as a
-    /// character of its own (one followed by a combining mark, or preceded by a character that
+    /// A member's path as the tree keys it; nil for a path that is not shown.
+    ///
+    /// Leading slashes and `.` are dropped. A path is refused altogether when it has a `..` or a
+    /// NUL byte, is longer or deeper than the limits above, or holds a `/` that Swift would not see
+    /// as a character of its own (one followed by a combining mark, or preceded by a character that
     /// binds what follows): no member can then name a place outside the folder an archive is
     /// unpacked into, whichever way its path is taken apart.
     static func normalized(_ raw: String) -> String? {
@@ -197,8 +205,9 @@ struct ArchiveTree {
         path.isEmpty || entry(path)?.isDirectory == true
     }
 
-    /// The entries directly inside a folder; nil when the path is not a folder. Every folder
-    /// has a list of its own (`insert` makes it), the top folder from the start.
+    /// The entries directly inside a folder; nil when the path is not a folder.
+    ///
+    /// Every folder has a list of its own (`insert` makes it), the top folder from the start.
     func children(of path: String) -> [ArchiveEntry]? {
         guard isDirectory(path), let folder = slot(of: path), let places = children[folder] else { return nil }
         return places.compactMap { slots[Int($0)] }
@@ -244,8 +253,10 @@ struct ArchiveTree {
         return places
     }
 
-    /// Every entry in archive order. Sorted once; after that the order is kept up as entries
-    /// come and go, so a write that follows a change does not sort the whole archive again.
+    /// Every entry in archive order.
+    ///
+    /// Sorted once; after that the order is kept up as entries come and go, so a write that follows
+    /// a change does not sort the whole archive again.
     var ordered: [ArchiveEntry] {
         mutating get {
             sort().compactMap { slots[Int($0)] }
@@ -306,14 +317,18 @@ struct ArchiveTree {
         return place
     }
 
-    /// Changes an entry where it is. Path, kind and position are not to be changed this way.
+    /// Changes an entry where it is.
+    ///
+    /// Path, kind and position are not to be changed this way.
     mutating func update(_ path: String, _ change: (inout ArchiveEntry) -> Void) {
         guard let place = index[path], slots[Int(place)] != nil else { return }
         change(&slots[Int(place)]!)
     }
 
     /// Adds an entry, or replaces the one at the same path; missing folders above it are made
-    /// up. With `keepingOrder` the entry keeps the position it carries.
+    /// up.
+    ///
+    /// With `keepingOrder` the entry keeps the position it carries.
     mutating func insert(_ entry: ArchiveEntry, keepingOrder: Bool = false) {
         var entry = entry
         let taken = index[entry.path]
@@ -370,8 +385,9 @@ struct ArchiveTree {
         }
     }
 
-    /// Takes one entry out. What lies below it stays; the callers remove only files and
-    /// empty folders.
+    /// Takes one entry out.
+    ///
+    /// What lies below it stays; the callers remove only files and empty folders.
     @discardableResult
     mutating func remove(_ path: String) -> ArchiveEntry? {
         guard let place = index[path], let entry = slots[Int(place)] else { return nil }
@@ -386,10 +402,12 @@ struct ArchiveTree {
     }
 }
 
-/// A `FileReader` over a member of an archive. Members are streams: reading on is cheap,
-/// going back means starting again from the front, and a member behind a long stretch of
-/// decompression is a long way off. Used by one thread; only `interrupt()` may be called from
-/// another, which ends the read or seek that is under way and every later one.
+/// A `FileReader` over a member of an archive.
+///
+/// Members are streams: reading on is cheap, going back means starting again from the front, and a
+/// member behind a long stretch of decompression is a long way off. Used by one thread; only
+/// `interrupt()` may be called from another, which ends the read or seek that is under way and
+/// every later one.
 ///
 /// Unchecked: used by one thread at a time, as `FileReader` allows; `interrupt` touches only
 /// `slot`, which is safe from any thread.

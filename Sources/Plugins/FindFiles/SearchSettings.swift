@@ -1,8 +1,9 @@
 public import AFMKernel
 public import Foundation
 
-/// Everything the Find Files window holds in its four tabs, as the user entered it. This is
-/// what a saved search stores and what a search is made from (spec 09 › Load/Save tab).
+/// Everything the Find Files window holds in its four tabs, as the user entered it.
+///
+/// This is what a saved search stores and what a search is made from (spec 09 › Load/Save tab).
 public struct SearchSettings: Codable, Equatable, Sendable {
     public var searchFor = ""
     /// One or more start directories, separated by `;`, as typed; empty means the panel's.
@@ -34,8 +35,10 @@ public struct SearchSettings: Codable, Equatable, Sendable {
         return typed.isEmpty ? [base] : typed.map { fileSystems.location(from: $0, relativeTo: base) }
     }
 
-    /// The search these settings describe. `selected` are the panel's marked items, used with
-    /// "Only search in selected directories/files". Works on the text alone.
+    /// The search these settings describe.
+    ///
+    /// `selected` are the panel's marked items, used with "Only search in selected
+    /// directories/files". Works on the text alone.
     public func query(relativeTo base: URL, fileSystems: FileSystemRegistry, includeHidden: Bool, selected: [URL] = [])
         -> SearchQuery
     {
@@ -102,7 +105,9 @@ public struct SavedSearch: Codable, Equatable, Sendable {
 }
 
 /// The saved searches and the histories of the window's fields, kept in the plugin's corner
-/// of the settings (spec 09 › What is remembered). Main thread only.
+/// of the settings (spec 09 › What is remembered).
+///
+/// Main thread only.
 public final class SearchStore {
     public enum Field: String {
         case searchFor, searchIn, text
@@ -115,7 +120,9 @@ public final class SearchStore {
         self.settings = settings.scoped(to: "findFiles")
     }
 
-    /// In name order. A search that cannot be read is left out; the others stay.
+    /// In name order.
+    ///
+    /// A search that cannot be read is left out; the others stay.
     public var searches: [SavedSearch] {
         (settings.value([StoredElement<SavedSearch>].self, forKey: Self.searchesKey) ?? []).compactMap(\.value)
             .sorted { Sorter.compare($0.name, $1.name) == .orderedAscending }

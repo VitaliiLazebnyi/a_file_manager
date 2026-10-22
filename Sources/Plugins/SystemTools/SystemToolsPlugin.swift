@@ -39,8 +39,9 @@ public final class SystemToolsPlugin: Plugin {
     /// Main thread only.
     public var log: [String] { tools?.log ?? [] }
 
-    /// Tests turn `launchesApplications` off, so they do not start other applications. Then
-    /// only harmless lines such as `echo` are really run (by `/bin/sh`, without the user's
+    /// Tests turn `launchesApplications` off, so they do not start other applications.
+    ///
+    /// Then only harmless lines such as `echo` are really run (by `/bin/sh`, without the user's
     /// profile); nothing is printed, opened, renamed, ejected or quit (`ToolsDesktop.quiet`).
     /// `volumes` stands in for the volumes of the Mac when a test ejects one.
     public convenience init(launchesApplications: Bool = true, volumes: any VolumeAccess? = nil) {
@@ -279,7 +280,9 @@ final class SystemTools {
 
     /// Runs a typed line in the source panel's folder (spec 02 › Executing a line): an
     /// application is opened, anything else goes to the shell as a child process whose output
-    /// is collected and shown. The job can be cancelled, which ends the child.
+    /// is collected and shown.
+    ///
+    /// The job can be cancelled, which ends the child.
     func run(_ line: String) {
         guard let typed = TypedCommand(line) else { return }
         // A line may hold a password (`curl -u name:secret`): one that begins with a blank is
@@ -410,8 +413,9 @@ final class SystemTools {
 
     // MARK: Terminal
 
-    /// Finds an application by path, name or bundle identifier (`identified`). Asks the disk:
-    /// background only.
+    /// Finds an application by path, name or bundle identifier (`identified`).
+    ///
+    /// Asks the disk: background only.
     nonisolated static func application(named name: String, identified: (String) -> URL?) -> URL? {
         let fm = FileManager.default
         if name.contains("/") {
@@ -497,10 +501,11 @@ final class SystemTools {
     /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
     nonisolated private static let volumes = CallOwner()
 
-    /// Asks something of a volume from a job. A volume that has stopped answering (a share
-    /// whose server is gone) may never return: the question then goes on alone on a thread
-    /// of the kernel's, and the job ends, with nil, as soon as it is cancelled, so the
-    /// commands of the program are not held up by it.
+    /// Asks something of a volume from a job.
+    ///
+    /// A volume that has stopped answering (a share whose server is gone) may never return: the
+    /// question then goes on alone on a thread of the kernel's, and the job ends, with nil, as soon
+    /// as it is cancelled, so the commands of the program are not held up by it.
     nonisolated private static func ask<Answer: Sendable>(
         _ question: String,
         of url: URL,
@@ -599,8 +604,9 @@ final class SystemTools {
     }
 
     /// Files › Print › File list (spec 12 › Printing): the selected items, or the whole list
-    /// when the cursor is on `[..]` and nothing is selected; Brief prints names only. With
-    /// subfolders, the depth and the files to include are asked first.
+    /// when the cursor is on `[..]` and nothing is selected; Brief prints names only.
+    ///
+    /// With subfolders, the depth and the files to include are asked first.
     func printList(withSubfolders: Bool) {
         let panel = kernel.panels.source
         let model = panel.model
@@ -850,7 +856,9 @@ final class SystemTools {
     // MARK: Open With
 
     /// "Associate With" as the Mac has it: the applications able to open the item under the
-    /// cursor, the usual one first. Choosing a lasting association is left to Finder.
+    /// cursor, the usual one first.
+    ///
+    /// Choosing a lasting association is left to Finder.
     func openWith(_ item: FileItem) {
         let shownName = DisplayText.oneLine(item.name)
         let applicationsToOpen = desktop.applicationsToOpen

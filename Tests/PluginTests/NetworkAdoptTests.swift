@@ -6,8 +6,10 @@ import Testing
 @testable import NetworkPlugin
 
 /// A call made on a thread of its own, so that one which does not come back fails the test
-/// instead of hanging it. (Threads rather than `DispatchQueue.global()`, which stalls for
-/// seconds while the whole suite runs.)
+/// instead of hanging it.
+///
+/// (Threads rather than `DispatchQueue.global()`, which stalls for seconds while the whole suite
+/// runs.).
 final class AdoptOutcome: @unchecked Sendable {
     private let lock = NSLock()
     private let done = DispatchSemaphore(value: 0)
@@ -29,9 +31,11 @@ final class AdoptOutcome: @unchecked Sendable {
         .start()
     }
 
-    /// True when the call ended within `seconds`. The default is long on purpose: these tests
-    /// run beside many others, and what they show is that a call ends at all where the fault
-    /// would be a wait of ten minutes or for ever, not how fast it ends.
+    /// True when the call ended within `seconds`.
+    ///
+    /// The default is long on purpose: these tests run beside many others, and what they show is
+    /// that a call ends at all where the fault would be a wait of ten minutes or for ever, not how
+    /// fast it ends.
     func ended(within seconds: TimeInterval = Wait.ceiling) -> Bool { done.wait(timeout: .now() + seconds) == .success }
     /// What the call threw; nil while it runs and when it succeeded.
     var thrown: (any Error)? { lock.withLock { error } }

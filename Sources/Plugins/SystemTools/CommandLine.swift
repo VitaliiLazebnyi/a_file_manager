@@ -2,8 +2,10 @@ import AFMKernel
 import Foundation
 
 /// A line typed on the command line, taken apart as far as the program needs to know it
-/// (spec 02 › Executing a line). The shell does the real parsing; this only finds out how the
-/// line is to be started. A value without state: usable from any thread.
+/// (spec 02 › Executing a line).
+///
+/// The shell does the real parsing; this only finds out how the line is to be started. A value
+/// without state: usable from any thread.
 struct TypedCommand: Equatable {
     /// The line without surrounding blanks and without a trailing `&`.
     let command: String
@@ -61,8 +63,9 @@ struct TypedCommand: Equatable {
     }
 
     /// Where an application of that name would be, when the first word names one: a path ending
-    /// in `.app`, or a bare name found in the usual application folders. Asks the disk, so it
-    /// is for a background thread.
+    /// in `.app`, or a bare name found in the usual application folders.
+    ///
+    /// Asks the disk, so it is for a background thread.
     ///
     /// A bare name (`Preview.app`) means the application of the system first: one of the same
     /// name that lies in the panel's folder (a downloaded folder, a memory stick) is opened
@@ -98,8 +101,10 @@ struct TypedCommand: Equatable {
         path.split(separator: ":").contains { FileManager.default.isExecutableFile(atPath: $0 + "/" + name) }
     }
 
-    /// The PATH this process was started with. A program started from the Dock has a short
-    /// one; the PATH of a terminal is `LoginShell.searchPath`.
+    /// The PATH this process was started with.
+    ///
+    /// A program started from the Dock has a short one; the PATH of a terminal is
+    /// `LoginShell.searchPath`.
     static var processPath: String { path(in: ProcessInfo.processInfo.environment) }
 
     /// The PATH of `environment`; the system's usual one without.

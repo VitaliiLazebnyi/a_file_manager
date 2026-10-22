@@ -28,7 +28,10 @@ import Testing
     @Test func theBulkListingAgreesWithLookingAtEachEntry() throws {
         let box = try Sandbox()
         try box.file(
-            "plain.txt", String(repeating: "p", count: 1_234), modified: Date(timeIntervalSince1970: 1_700_000_000))
+            "plain.txt",
+            String(repeating: "p", count: 1_234),
+            modified: Date(timeIntervalSince1970: 1_700_000_000)
+        )
         try box.file("script.sh", "#!/bin/sh")
         try FileManager.default.setAttributes([.posixPermissions: 0o750], ofItemAtPath: box.url("script.sh").path)
         try box.file(".dotfile", "h")
@@ -36,9 +39,13 @@ import Testing
         try box.folder("Tool.app/Contents")
         try box.file("name with spaces and ünïcödé.md", "u")
         try FileManager.default.createSymbolicLink(
-            at: box.url("link-to-folder"), withDestinationURL: box.url("folder"))
+            at: box.url("link-to-folder"),
+            withDestinationURL: box.url("folder")
+        )
         try FileManager.default.createSymbolicLink(
-            at: box.url("link-to-file"), withDestinationURL: box.url("plain.txt"))
+            at: box.url("link-to-file"),
+            withDestinationURL: box.url("plain.txt")
+        )
         try FileManager.default.createSymbolicLink(at: box.url("broken-link"), withDestinationURL: box.url("nowhere"))
         try box.file("flagged.txt")
         #expect(chflags(box.url("flagged.txt").path, UInt32(UF_HIDDEN)) == 0)
@@ -53,7 +60,8 @@ import Testing
         let byName = Dictionary(uniqueKeysWithValues: listed.map { ($0.name, $0) })
         #expect(
             byName["plain.txt"]?.size == 1_234
-                && byName["plain.txt"]?.modified == Date(timeIntervalSince1970: 1_700_000_000))
+                && byName["plain.txt"]?.modified == Date(timeIntervalSince1970: 1_700_000_000)
+        )
         #expect(byName["script.sh"]?.permissions == 0o750)
         #expect(byName["Tool.app"]?.isPackage == true && byName["folder"]?.isPackage == false)
         #expect(byName["link-to-folder"]?.isDirectory == true && byName["link-to-file"]?.isDirectory == false)
@@ -64,7 +72,8 @@ import Testing
                 == [
                     "plain.txt", "script.sh", "folder", "Tool.app", "name with spaces and ünïcödé.md", "link-to-folder",
                     "link-to-file", "broken-link"
-                ])
+                ]
+        )
         #expect(try local.list(box.url("folder/inner"), showHidden: true).isEmpty)
     }
 

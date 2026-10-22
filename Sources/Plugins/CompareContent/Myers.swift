@@ -2,8 +2,9 @@ public import AFMKernel
 import Foundation
 
 /// A stretch of two sequences that is either the same in both or differs: `a` is deleted and
-/// `b` inserted in its place (either may be empty). The segments of a diff cover both
-/// sequences completely, in order.
+/// `b` inserted in its place (either may be empty).
+///
+/// The segments of a diff cover both sequences completely, in order.
 public struct DiffSegment: Equatable, Sendable {
     public let a: Range<Int>
     public let b: Range<Int>
@@ -30,16 +31,18 @@ public enum Myers {
     /// shortest possible.
     public static let exactBelow = 20_000
 
-    /// The most rounds one search for a middle takes on a large input. A search that is cut off
-    /// costs about the square of its rounds and is repeated about `size / rounds` times, so the
-    /// bound is chosen for a total of a few hundred million steps whatever the size; real
-    /// files, whose differences number thousands, never come near it.
+    /// The most rounds one search for a middle takes on a large input.
+    ///
+    /// A search that is cut off costs about the square of its rounds and is repeated about `size /
+    /// rounds` times, so the bound is chosen for a total of a few hundred million steps whatever
+    /// the size; real files, whose differences number thousands, never come near it.
     static func defaultLimit(forSize size: Int) -> Int? {
         size < exactBelow ? nil : max(256, min(8_192, 250_000_000 / size))
     }
 
-    /// `costLimit` bounds the effort per split; nil chooses by size. The result is cut short
-    /// (everything left counts as different) when `cancellation` is set.
+    /// `costLimit` bounds the effort per split; nil chooses by size.
+    ///
+    /// The result is cut short (everything left counts as different) when `cancellation` is set.
     public static func diff<Element: Hashable>(
         _ a: [Element],
         _ b: [Element],
@@ -89,8 +92,9 @@ public enum Myers {
 
     // MARK: Matching
 
-    /// For every element of `a` the position of its partner in `b`, or -1. The partners rise
-    /// with the positions.
+    /// For every element of `a` the position of its partner in `b`, or -1.
+    ///
+    /// The partners rise with the positions.
     static func matching(_ a: [Int32], _ b: [Int32], kinds: Int, costLimit: Int?, cancellation: CancellationFlag?)
         -> [Int]
     {
@@ -160,9 +164,10 @@ public enum Myers {
     }
 
     /// A point on a shortest edit path of two sequences that share neither a start nor an
-    /// end, found by walking from both corners until the walks meet. Nil when the sequences
-    /// have nothing in common. With a `limit`, the walks stop after that many rounds and the
-    /// point is the furthest either of them reached (`isExact` is false then).
+    /// end, found by walking from both corners until the walks meet.
+    ///
+    /// Nil when the sequences have nothing in common. With a `limit`, the walks stop after that
+    /// many rounds and the point is the furthest either of them reached (`isExact` is false then).
     private static func middle(
         _ a: UnsafeBufferPointer<Int32>,
         _ b: UnsafeBufferPointer<Int32>,
@@ -275,7 +280,9 @@ public enum Myers {
     }
 
     /// The longest run, rising on both sides, of the elements that occur exactly once in each of
-    /// the two stretches: pairs of positions (patience diff). Empty when there are none.
+    /// the two stretches: pairs of positions (patience diff).
+    ///
+    /// Empty when there are none.
     private static func uniqueAnchors(
         _ a: UnsafeBufferPointer<Int32>,
         _ b: UnsafeBufferPointer<Int32>,

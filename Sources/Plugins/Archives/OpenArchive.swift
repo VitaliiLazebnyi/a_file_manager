@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
 
-/// The options of the Packer page as the working threads see them. The settings store belongs
-/// to the main thread; this copy is refreshed there and read anywhere.
+/// The options of the Packer page as the working threads see them.
+///
+/// The settings store belongs to the main thread; this copy is refreshed there and read anywhere.
 struct ArchiveOptions {
     var compressionLevel = 6
     var opensAsFolders = true
@@ -12,9 +13,11 @@ struct ArchiveOptions {
     var datesArchiveByNewest = false
 }
 
-/// What archives need from their surroundings. One object is shared by everything the plugin
-/// owns; its closures are set while the plugin starts, and may be called from any thread.
-/// The settings are read and written as properties of the environment (`environment.flushDelay`).
+/// What archives need from their surroundings.
+///
+/// One object is shared by everything the plugin owns; its closures are set while the plugin
+/// starts, and may be called from any thread. The settings are read and written as properties of
+/// the environment (`environment.flushDelay`).
 ///
 /// Unchecked: the settings, `options` and `isStopping` are guarded by `lock` (tests change
 /// settings while archives are open); the rest is fixed in `init`.
@@ -57,10 +60,13 @@ final class ArchiveEnvironment: @unchecked Sendable {
     struct Settings {
         /// The file systems of the program, for archives that lie on something other than the disk.
         var fileSystems: @Sendable () -> FileSystemRegistry? = { nil }
-        /// Asks for the password of an archive; `retry` after a wrong one. Nil gives up.
+        /// Asks for the password of an archive; `retry` after a wrong one.
+        ///
+        /// Nil gives up.
         var askPassword: @Sendable (_ archiveName: String, _ retry: Bool) -> String? = { _, _ in nil }
-        /// Tells the user that changes could not be written into an archive. Must not wait for
-        /// the user: it is called on the thread that writes.
+        /// Tells the user that changes could not be written into an archive.
+        ///
+        /// Must not wait for the user: it is called on the thread that writes.
         var reportFailure: @Sendable (_ error: any Error, _ archiveName: String) -> Void = { _, _ in }
         /// The directories whose contents changed behind the panels' backs.
         var contentsChanged: @Sendable (_ archive: URL) -> Void = { _ in }
@@ -77,9 +83,11 @@ final class ArchiveEnvironment: @unchecked Sendable {
         /// together; beyond it the least recently used are let go.
         var scratchBudget: UInt64 = 8 << 30
         /// An archive may hold this many entries; one that lists more is refused with a clear
-        /// message instead of filling the memory. An entry of a ZIP costs about 400 bytes
-        /// (measured: 396 with a 45-byte path and the extra fields the `zip` program writes), so
-        /// the directory of the largest archive that is opened takes about 800 MB.
+        /// message instead of filling the memory.
+        ///
+        /// An entry of a ZIP costs about 400 bytes (measured: 396 with a 45-byte path and the extra
+        /// fields the `zip` program writes), so the directory of the largest archive that is opened
+        /// takes about 800 MB.
         var maxEntries = 2_000_000
         /// Archives may lie inside archives this deep.
         var maxNesting = 6
@@ -87,18 +95,23 @@ final class ArchiveEnvironment: @unchecked Sendable {
         /// writes by itself.
         var flushDelay: TimeInterval? = 1
         /// How long after a failed write the next attempt is made; doubled with every further
-        /// failure, up to `maxRetryDelay`. A change to the archive brings the next attempt at once.
+        /// failure, up to `maxRetryDelay`.
+        ///
+        /// A change to the archive brings the next attempt at once.
         var retryDelay: TimeInterval = 30
         var maxRetryDelay: TimeInterval = 3_600
-        /// The delayed write runs with low priority. When all cores are busy that may not run for
-        /// minutes; this long after it was due it runs with the priority of the user's own work.
+        /// The delayed write runs with low priority.
+        ///
+        /// When all cores are busy that may not run for minutes; this long after it was due it runs
+        /// with the priority of the user's own work.
         var escalationDelay: TimeInterval = 5
-        /// Runs `work` after `delay` on a thread of its own with the given priority. The delayed
-        /// writes are started this way and not on the system's shared queues: those have a
-        /// limited number of threads, and when all of them are busy (or blocked) a write that is
-        /// due would wait behind them for as long as that lasts. The clock itself is a queue of
-        /// the plugin's own, on which nothing ever runs but the starting of these threads.
-        /// (Tests put a clock of their own here.)
+        /// Runs `work` after `delay` on a thread of its own with the given priority.
+        ///
+        /// The delayed writes are started this way and not on the system's shared queues: those
+        /// have a limited number of threads, and when all of them are busy (or blocked) a write
+        /// that is due would wait behind them for as long as that lasts. The clock itself is a
+        /// queue of the plugin's own, on which nothing ever runs but the starting of these threads.
+        /// (Tests put a clock of their own here.).
         var schedule: Scheduler = { delay, priority, work in
             ArchiveEnvironment.later(delay, priority, name: "Archive write", work)
         }
@@ -106,14 +119,17 @@ final class ArchiveEnvironment: @unchecked Sendable {
         /// the member it delivered for someone to read on; then it is closed.
         var readerParkTime: TimeInterval = 10
         /// Runs the housekeeping (closing the readers nobody came back for) as `schedule` runs
-        /// the delayed writes. (Tests put a clock of their own here.)
+        /// the delayed writes.
+        ///
+        /// (Tests put a clock of their own here.).
         var housekeeping: Scheduler = { delay, priority, work in
             ArchiveEnvironment.later(delay, priority, name: "Archive readers", work)
         }
         /// A file that a job has just given its final name inside a ZIP is written into the
         /// archive file before the rename returns, when that means writing no more than this
-        /// many bytes besides the file itself (or no more than is waiting anyway). Zero leaves
-        /// every write to the delay.
+        /// many bytes besides the file itself (or no more than is waiting anyway).
+        ///
+        /// Zero leaves every write to the delay.
         var immediateWriteLimit: UInt64 = 256 << 10
         /// Off, archives are never cloned and every change writes the whole archive anew, as on
         /// a file system that cannot clone (tests).
@@ -221,7 +237,9 @@ enum Volume {
     }
 
     /// True when every volume the path runs through is a disk of this machine, by the table
-    /// of mounts alone. Asking such a path about itself does not hang on a server that is gone.
+    /// of mounts alone.
+    ///
+    /// Asking such a path about itself does not hang on a server that is gone.
     static func isOnLocalVolume(_ path: String) -> Bool {
         let bytes = Array(path.utf8)
         guard bytes.first == 0x2F else { return false }
@@ -246,8 +264,9 @@ enum Volume {
 
     /// What lies at an absolute path, found without ever asking a volume that is not a disk
     /// of this machine: the path is walked name by name, links are followed by hand, and the
-    /// walk stops with `.unasked` where it would leave the local disks. Fast, and safe on the
-    /// main thread.
+    /// walk stops with `.unasked` where it would leave the local disks.
+    ///
+    /// Fast, and safe on the main thread.
     static func kind(ofLocalPath path: String) -> PathKind {
         var current = path
         var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
@@ -309,10 +328,11 @@ struct FileSignature: Equatable {
     }
 }
 
-/// The lock that lets one write of an archive run at a time. A write may take minutes and
-/// runs with low priority when the delay started it; a thread of the user's own work that has
-/// to wait for it (a commit, a quit) lends it its priority for as long as it waits, so the
-/// wait is not longer than the write itself needs.
+/// The lock that lets one write of an archive run at a time.
+///
+/// A write may take minutes and runs with low priority when the delay started it; a thread of the
+/// user's own work that has to wait for it (a commit, a quit) lends it its priority for as long as
+/// it waits, so the wait is not longer than the write itself needs.
 ///
 /// A long write (anything but the small write of a rename, see `OpenArchive.move`) says so
 /// when it takes the gate, in the same step: a rename sees it at once and does not wait
@@ -331,8 +351,9 @@ internal final class FlushGate: @unchecked Sendable {
         }
     }
 
-    /// Waits for the gate; `long` for anything but the small write of a rename. With a
-    /// `cancellation`, no longer than until it is set.
+    /// Waits for the gate; `long` for anything but the small write of a rename.
+    ///
+    /// With a `cancellation`, no longer than until it is set.
     internal func lock(long: Bool, cancellation: CancellationFlag?) throws {
         condition.lock()
         defer { condition.unlock() }
@@ -392,14 +413,18 @@ internal final class FlushGate: @unchecked Sendable {
         condition.unlock()
     }
 
-    /// Takes the free gate. Called with `condition` held.
+    /// Takes the free gate.
+    ///
+    /// Called with `condition` held.
     private func take(long: Bool) {
         holder = pthread_self()
         holdsLong = long
     }
 
     /// The thread that holds the gate runs at this thread's priority until the returned mark
-    /// is ended. Nil when there is nothing to lend. Called with `condition` held.
+    /// is ended.
+    ///
+    /// Nil when there is nothing to lend. Called with `condition` held.
     private func lend() -> pthread_override_t? {
         let mine = qos_class_self()
         guard let holder, mine.rawValue > QOS_CLASS_UTILITY.rawValue else {
@@ -489,7 +514,9 @@ final class OpenArchive: @unchecked Sendable {
     private let lock = NSLock()
     /// Held while the archive file is written or sent; taken before `lock`, never inside it.
     private let gate = FlushGate()
-    /// Guards only `publishedEditable`. Nothing is done while it is held.
+    /// Guards only `publishedEditable`.
+    ///
+    /// Nothing is done while it is held.
     private let stateLock = NSLock()
     private var publishedEditable = false
     /// Names this instance's temporary files next to the archive.
@@ -526,7 +553,9 @@ final class OpenArchive: @unchecked Sendable {
     /// Where the first member starts; what stands before it (the program of a self-extracting
     /// archive) is kept.
     private var prefixEnd: UInt64 = 0
-    /// Entries without a usable name. They are not shown, and they stay in the archive.
+    /// Entries without a usable name.
+    ///
+    /// They are not shown, and they stay in the archive.
     private var unlisted: [ZipRecord] = []
     /// An archive that lists a name twice shows one of the two; it is not changed.
     private var hasDuplicates = false
@@ -542,7 +571,9 @@ final class OpenArchive: @unchecked Sendable {
     private var pendingBytes: UInt64 = 0
     /// Members that lie here under a job's temporary name, on their way to their real one.
     private var transfers = 0
-    /// (An archive fetched from elsewhere.) The local copy is ahead of the original.
+    /// (An archive fetched from elsewhere.)
+    ///
+    /// The local copy is ahead of the original.
     private var uploadPending = false
     private var openWriters = 0
     /// Set when the store let this archive go; see the class comment.
@@ -554,8 +585,9 @@ final class OpenArchive: @unchecked Sendable {
     private var immediateSpent: UInt64 = 0
     private var arrivedBytes: UInt64 = 0
     private var lastChange = DispatchTime.now()
-    /// When the armed timer is due; nil when none is armed. A timer that was overtaken by an
-    /// earlier one knows it by its number.
+    /// When the armed timer is due; nil when none is armed.
+    ///
+    /// A timer that was overtaken by an earlier one knows it by its number.
     private var timerDeadline: DispatchTime?
     private var timerNumber = 0
     private var notifyPending = false
@@ -566,7 +598,9 @@ final class OpenArchive: @unchecked Sendable {
     private var reportedFailure: String?
     /// How many writes have failed in a row.
     private var failures = 0
-    /// Where new members wait: nil until one was written. See `newSpool()`.
+    /// Where new members wait: nil until one was written.
+    ///
+    /// See `newSpool()`.
     private var spoolFolder: URL?
     private var spoolIsOutside = false
     private var notedBuildFile = false
@@ -695,8 +729,9 @@ final class OpenArchive: @unchecked Sendable {
         var prefixEnd: UInt64 = 0
     }
 
-    /// Reads the directory of a ZIP file. Touches nothing of an archive: whoever calls it
-    /// needs no lock for it.
+    /// Reads the directory of a ZIP file.
+    ///
+    /// Touches nothing of an archive: whoever calls it needs no lock for it.
     private static func readZip(_ file: RandomAccessFile, environment: ArchiveEnvironment, control: StreamInterrupt?)
         throws -> ZipListing
     {
@@ -766,11 +801,12 @@ final class OpenArchive: @unchecked Sendable {
         )
     }
 
-    /// Reads the headers of a TAR stream. Of every file both its position in the stream and
-    /// its number are noted; `seekable`, asked at the end, says which of the two will serve:
-    /// positions when the stream is (or has become) a file, numbers otherwise.
-    /// With `toTheEnd` the stream is read on behind the last member: a decompressor checks
-    /// its data only then, and a child process says only then that it failed.
+    /// Reads the headers of a TAR stream.
+    ///
+    /// Of every file both its position in the stream and its number are noted; `seekable`, asked at
+    /// the end, says which of the two will serve: positions when the stream is (or has become) a
+    /// file, numbers otherwise. With `toTheEnd` the stream is read on behind the last member: a
+    /// decompressor checks its data only then, and a child process says only then that it failed.
     private func indexTar(
         _ stream: any ByteStream,
         toTheEnd: Bool = true,
@@ -853,11 +889,12 @@ final class OpenArchive: @unchecked Sendable {
         return SpaceWatch(folder: folder, reserve: environment.scratchReserve, hasRoom: environment.hasRoom)
     }
 
-    /// An archive that can only be read front to back. It is read once: the members are
-    /// listed from the stream while the stream is copied into a temporary TAR, which then
-    /// serves every read. A large archive, one that unpacks to more than the copy may hold,
-    /// or one for whose copy the temporary folder's volume has no room to spare has no copy;
-    /// its members are read from the stream.
+    /// An archive that can only be read front to back.
+    ///
+    /// It is read once: the members are listed from the stream while the stream is copied into a
+    /// temporary TAR, which then serves every read. A large archive, one that unpacks to more than
+    /// the copy may hold, or one for whose copy the temporary folder's volume has no room to spare
+    /// has no copy; its members are read from the stream.
     private func loadStream(control: StreamInterrupt?, _ source: @escaping (StreamInterrupt?) throws -> any ByteStream)
         throws
     {
@@ -1013,9 +1050,10 @@ final class OpenArchive: @unchecked Sendable {
     private var isBusyLocked: Bool { hasPendingLocked || openWriters > 0 || transfers > 0 }
 
     /// False when the archive file was replaced or changed by someone else since it was read
-    /// (and for an archive the store has let go). The disk is asked without the lock; a
-    /// server, which costs a round trip, at most once a second, and with a `cancellation`
-    /// that wait ends when it is set.
+    /// (and for an archive the store has let go).
+    ///
+    /// The disk is asked without the lock; a server, which costs a round trip, at most once a
+    /// second, and with a `cancellation` that wait ends when it is set.
     func isCurrent(cancellation: CancellationFlag? = nil) -> Bool {
         lock.lock()
         if retired {
@@ -1054,7 +1092,9 @@ final class OpenArchive: @unchecked Sendable {
         return item.size == stamp.size && item.modified == stamp.modified
     }
 
-    /// Lets the archive go, unless it is in use: see the class comment. True when it is retired.
+    /// Lets the archive go, unless it is in use: see the class comment.
+    ///
+    /// True when it is retired.
     func retireIfIdle() -> Bool {
         locked {
             if retired { return true }
@@ -1066,12 +1106,13 @@ final class OpenArchive: @unchecked Sendable {
 
     // MARK: Reading members
 
-    /// The contents of a member from its first byte. Members are checked while they are read:
-    /// a stream that reaches its end without an error delivered what was packed. A ZIP entry
-    /// carries the file its position belongs to, so an entry that was looked up before the
-    /// archive was rewritten still reads the right bytes. Through a `slot` the reading ends
-    /// early, with an error, when its owner interrupts: where the member lies behind a long
-    /// stretch of decompression, opening itself is that long.
+    /// The contents of a member from its first byte.
+    ///
+    /// Members are checked while they are read: a stream that reaches its end without an error
+    /// delivered what was packed. A ZIP entry carries the file its position belongs to, so an entry
+    /// that was looked up before the archive was rewritten still reads the right bytes. Through a
+    /// `slot` the reading ends early, with an error, when its owner interrupts: where the member
+    /// lies behind a long stretch of decompression, opening itself is that long.
     func open(_ entry: ArchiveEntry, slot: InterruptSlot? = nil) throws -> any ByteStream {
         let (file, unpacked, source, format) = locked { (self.file, self.unpacked?.file, memberSource, self.format) }
         switch entry.content {
@@ -1151,8 +1192,9 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// Keeps a reader that has delivered a member for the members behind it; it is closed
-    /// when nobody came for it after a while. One sweep looks after all that wait, however
-    /// many members are read.
+    /// when nobody came for it after a while.
+    ///
+    /// One sweep looks after all that wait, however many members are read.
     private func park(_ reader: TarReader, next: Int) {
         // One that was interrupted can read no more.
         guard reader.control?.isSet != true else {
@@ -1190,12 +1232,13 @@ final class OpenArchive: @unchecked Sendable {
         }
     }
 
-    /// Hands the wanted members to `body` one by one, in archive order. For archives that can
-    /// only be read front to back this takes one pass, however many members are wanted;
-    /// `body` must then read (or leave) each stream before it returns. With `throughTheEnd`, the
-    /// pass reads the archive's stream from the file to its end, also when its members are read
-    /// from a copy or none is wanted: only there are the checks of the compressed stream itself
-    /// (the checksum at the end of a GZIP file) made, on the file as it is now.
+    /// Hands the wanted members to `body` one by one, in archive order.
+    ///
+    /// For archives that can only be read front to back this takes one pass, however many members
+    /// are wanted; `body` must then read (or leave) each stream before it returns. With
+    /// `throughTheEnd`, the pass reads the archive's stream from the file to its end, also when its
+    /// members are read from a copy or none is wanted: only there are the checks of the compressed
+    /// stream itself (the checksum at the end of a GZIP file) made, on the file as it is now.
     func readInOnePass(
         _ wanted: [ArchiveEntry],
         cancellation: CancellationFlag? = nil,
@@ -1356,11 +1399,13 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// Opens an encrypted member with `make`, which throws `wrongPassword` for a password
-    /// that does not fit. The passwords that have opened members of this archive are tried
-    /// first. Then the user is asked, by one thread at a time: whoever waited for the
-    /// question to be answered tries the answer before asking again. A refusal (no answer, or
-    /// three wrong ones) is remembered for the operation under way (`withPasswordScope`) and
-    /// for `passwordRefusalMemory`, so that the members that follow fail without a question.
+    /// that does not fit.
+    ///
+    /// The passwords that have opened members of this archive are tried first. Then the user is
+    /// asked, by one thread at a time: whoever waited for the question to be answered tries the
+    /// answer before asking again. A refusal (no answer, or three wrong ones) is remembered for the
+    /// operation under way (`withPasswordScope`) and for `passwordRefusalMemory`, so that the
+    /// members that follow fail without a question.
     private func unlocked(_ make: (String) throws -> any ByteStream) throws -> (any ByteStream, String) {
         var tried = Set<String>()
         func tryKnown() throws -> (any ByteStream, String)? {
@@ -1428,8 +1473,10 @@ final class OpenArchive: @unchecked Sendable {
 
     // MARK: Changing a ZIP
 
-    /// Called with the lock held, by everything that changes the archive. Answers from
-    /// memory; what the disk has to say comes from `requireWritable()`, before the lock.
+    /// Called with the lock held, by everything that changes the archive.
+    ///
+    /// Answers from memory; what the disk has to say comes from `requireWritable()`, before the
+    /// lock.
     private func requireEditable() throws {
         guard !retired else { throw ArchiveError.retired }
         guard format.isEditable else { throw ArchiveError.readOnly(name) }
@@ -1439,9 +1486,10 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// Whether the archive file can be written where it lies, and (asked once) whether its
-    /// volume clones files. Called by everything that changes the archive **before** it takes
-    /// the lock: the disk, and the file system an archive was fetched from, are never asked
-    /// while the directory is locked.
+    /// volume clones files.
+    ///
+    /// Called by everything that changes the archive **before** it takes the lock: the disk, and
+    /// the file system an archive was fetched from, are never asked while the directory is locked.
     private func requireWritable() throws {
         var refusal: any Error?
         if fetchedCopy != nil {
@@ -1459,7 +1507,9 @@ final class OpenArchive: @unchecked Sendable {
         probeCloning()
     }
 
-    /// Tries once whether the archive's file system makes clones. Not under the lock.
+    /// Tries once whether the archive's file system makes clones.
+    ///
+    /// Not under the lock.
     private func probeCloning() {
         guard environment.clonesArchives,
             locked({ () -> Bool in
@@ -1484,7 +1534,9 @@ final class OpenArchive: @unchecked Sendable {
         locked { if canClone == nil { canClone = result } }
     }
 
-    /// Makes what `capabilities` answers from follow the directory. Called when it was read.
+    /// Makes what `capabilities` answers from follow the directory.
+    ///
+    /// Called when it was read.
     private func publish() {
         let editable = format.isEditable && !hasDuplicates
         stateLock.lock()
@@ -1494,10 +1546,11 @@ final class OpenArchive: @unchecked Sendable {
 
     /// What can be done inside this archive, from what is known without touching the disk:
     /// members can be added, renamed and removed in a ZIP that lists no name twice, and that
-    /// lies where the file system can be written to. Writes are kept back (`.deferredWrites`):
-    /// whoever is about to destroy the only other copy of what it wrote calls `commit` first.
-    /// Answers at once, on any thread: it waits for no lock that is held while a file is
-    /// read, written or asked about.
+    /// lies where the file system can be written to.
+    ///
+    /// Writes are kept back (`.deferredWrites`): whoever is about to destroy the only other copy of
+    /// what it wrote calls `commit` first. Answers at once, on any thread: it waits for no lock
+    /// that is held while a file is read, written or asked about.
     var capabilities: FileSystemCapabilities {
         stateLock.lock()
         let editable = publishedEditable
@@ -1509,7 +1562,9 @@ final class OpenArchive: @unchecked Sendable {
         return [.write, .deferredWrites]
     }
 
-    /// Notes a change and sees to it that it is written. Called with the lock held.
+    /// Notes a change and sees to it that it is written.
+    ///
+    /// Called with the lock held.
     private func changed() {
         changeCount += 1
         lastChange = .now()
@@ -1518,9 +1573,11 @@ final class OpenArchive: @unchecked Sendable {
 
     /// One timer at a time, however many changes arrive; one that is due earlier takes the
     /// place of the one that is armed (a change after a failed write does not wait for the
-    /// retry). The timer holds on to the archive: an archive with changes waiting is not
-    /// released before they are written, whoever else lets go of it. (Once the plugin has
-    /// stopped, a timer that still fires does nothing.)
+    /// retry).
+    ///
+    /// The timer holds on to the archive: an archive with changes waiting is not released before
+    /// they are written, whoever else lets go of it. (Once the plugin has stopped, a timer that
+    /// still fires does nothing.).
     ///
     /// The timer runs with low priority, which under full load may not run for minutes; a
     /// second one with the user's priority follows `escalationDelay` later and does the work
@@ -1540,9 +1597,11 @@ final class OpenArchive: @unchecked Sendable {
         removals != writtenRemovals || fetchedCopy != nil || clones() == false
     }
 
-    /// How long nothing must have changed before the timer writes. A write that copies the
-    /// whole archive waits for a pause many times its own length, so that a slow job (a
-    /// server, a question left unanswered) is not interleaved with rewrites of the archive.
+    /// How long nothing must have changed before the timer writes.
+    ///
+    /// A write that copies the whole archive waits for a pause many times its own length, so that a
+    /// slow job (a server, a question left unanswered) is not interleaved with rewrites of the
+    /// archive.
     private func idleDelay(_ base: TimeInterval) -> TimeInterval {
         writesWholeArchive ? max(base, min(60, 20 * lastRewriteDuration)) : base
     }
@@ -1607,7 +1666,9 @@ final class OpenArchive: @unchecked Sendable {
 
     /// Whether the archive's file system makes clones, as far as is known (`probeCloning`
     /// tried it before the first change; a write that could not clone corrects it); nil when
-    /// the try said neither. Called with the lock held; asks nothing.
+    /// the try said neither.
+    ///
+    /// Called with the lock held; asks nothing.
     private func clones() -> Bool? {
         environment.clonesArchives ? canClone : false
     }
@@ -1684,9 +1745,11 @@ final class OpenArchive: @unchecked Sendable {
 
     /// Where the next new member waits until it is written into the archive: in the
     /// temporary folder, or, when the archive lies on another volume than that folder, in a
-    /// hidden folder next to the archive. A job that copies a hundred gigabytes into a ZIP on
-    /// an external disk then needs the room there, where the archive grows anyway, and not on
-    /// the disk the system runs from. Asks the disk, so it is called without the lock.
+    /// hidden folder next to the archive.
+    ///
+    /// A job that copies a hundred gigabytes into a ZIP on an external disk then needs the room
+    /// there, where the archive grows anyway, and not on the disk the system runs from. Asks the
+    /// disk, so it is called without the lock.
     private func newSpool() throws -> (url: URL, folder: URL, isOutside: Bool) {
         var place = locked { spoolFolder.map { (folder: $0, isOutside: spoolIsOutside) } }
         if place == nil {
@@ -1716,9 +1779,11 @@ final class OpenArchive: @unchecked Sendable {
         )
     }
 
-    /// Starts a new member. Its data is compressed into a temporary file while it is written
-    /// and joins the archive's directory when the writer is closed. `level` overrides the
-    /// compression rate of the settings; with a `password` the member is encrypted (AES-256).
+    /// Starts a new member.
+    ///
+    /// Its data is compressed into a temporary file while it is written and joins the archive's
+    /// directory when the writer is closed. `level` overrides the compression rate of the settings;
+    /// with a `password` the member is encrypted (AES-256).
     func write(_ path: String, level: Int? = nil, password: String? = nil) throws -> any FileWriter {
         try requireWritable()
         try locked {
@@ -1755,9 +1820,10 @@ final class OpenArchive: @unchecked Sendable {
         }
     }
 
-    /// The end of a writer: with a record the member joins the directory. That is refused
-    /// when the disk has no room to write the member into the archive file later: the writer
-    /// fails here, where its job can still tell the user and keep the source.
+    /// The end of a writer: with a record the member joins the directory.
+    ///
+    /// That is refused when the disk has no room to write the member into the archive file later:
+    /// the writer fails here, where its job can still tell the user and keep the source.
     fileprivate func finishWrite(_ record: ZipRecord?, path: String) throws {
         guard let record else {
             // Abandoned: nothing joins. What else waits is written once no writer is open.
@@ -1810,7 +1876,9 @@ final class OpenArchive: @unchecked Sendable {
         }
     }
 
-    /// The renaming itself, with the lock held. Returns what stood at the destination.
+    /// The renaming itself, with the lock held.
+    ///
+    /// Returns what stood at the destination.
     private func rename(_ source: String, to destination: String, replacing: Bool) throws -> ArchiveEntry? {
         guard let entry = tree.entry(source), !destination.isEmpty else { throw ArchiveError.notFound(source) }
         if ArchiveTree.relative(destination, to: source) != nil {
@@ -1931,8 +1999,9 @@ final class OpenArchive: @unchecked Sendable {
         }
     }
 
-    /// A second member with the same contents under another name. The compressed data is
-    /// shared until the archive is written, and copied as it is then.
+    /// A second member with the same contents under another name.
+    ///
+    /// The compressed data is shared until the archive is written, and copied as it is then.
     func duplicate(_ source: String, to destination: String) throws -> Int64 {
         try requireWritable()
         return try locked {
@@ -2013,11 +2082,12 @@ final class OpenArchive: @unchecked Sendable {
         var isRewrite = true
     }
 
-    /// Writes the pending changes into the archive file (see the class comment for how). If
-    /// that fails nothing has changed, on disk or here: the changes keep waiting, and the
-    /// call can be repeated. Members that were added, or changed again, while the file was
-    /// being written wait for the next write, and with `leavingOutArrivals` so do members
-    /// that came through a writer and have not been given their final names yet.
+    /// Writes the pending changes into the archive file (see the class comment for how).
+    ///
+    /// If that fails nothing has changed, on disk or here: the changes keep waiting, and the call
+    /// can be repeated. Members that were added, or changed again, while the file was being written
+    /// wait for the next write, and with `leavingOutArrivals` so do members that came through a
+    /// writer and have not been given their final names yet.
     ///
     /// With a `cancellation`, a write that is under way ends soon after it is set, with
     /// `ArchiveError.cancelled`, and so does the wait for another write of this archive to
@@ -2081,10 +2151,11 @@ final class OpenArchive: @unchecked Sendable {
 
     /// Makes the archive file on the disk (or on the server it came from) hold everything
     /// that was written through writers that are closed, and the renames, deletions and
-    /// changes of attributes made so far; returns when it does. This is the write of the
-    /// delay, done now, on the calling thread. A write that fails throws and leaves
-    /// everything as it is for the next attempt, like the delayed one. The failure is then
-    /// the caller's to report: the delay does not report the same one again.
+    /// changes of attributes made so far; returns when it does.
+    ///
+    /// This is the write of the delay, done now, on the calling thread. A write that fails throws
+    /// and leaves everything as it is for the next attempt, like the delayed one. The failure is
+    /// then the caller's to report: the delay does not report the same one again.
     ///
     /// `progress`: see `flush`; with it a commit that takes long can be shown, held and ended.
     func commit(cancellation: CancellationFlag? = nil, progress: (Int64, Int64) -> Bool = { _, _ in true }) throws {
@@ -2302,9 +2373,10 @@ final class OpenArchive: @unchecked Sendable {
     }
 
     /// Writes a changed time into the header in front of a member's data, in the clone: the
-    /// DOS time, and the exact time where the header has that field. Nothing is written
-    /// before the header was found to be this member's: a directory that points elsewhere
-    /// must not get another member's data overwritten.
+    /// DOS time, and the exact time where the header has that field.
+    ///
+    /// Nothing is written before the header was found to be this member's: a directory that points
+    /// elsewhere must not get another member's data overwritten.
     private static func correctTime(
         of record: ZipRecord,
         at offset: UInt64,
@@ -2417,7 +2489,9 @@ final class OpenArchive: @unchecked Sendable {
 
     /// Reads the archive again after another program changed it, and adds the members that
     /// exist only here to what it holds now; one whose name is taken there gets a name of
-    /// its own. Returns true when changes to members of the old archive had to be given up.
+    /// its own.
+    ///
+    /// Returns true when changes to members of the old archive had to be given up.
     ///
     /// The file is opened and its directory read without the lock; the lock is taken to put
     /// the new directory in the old one's place, which is memory alone.
@@ -2474,8 +2548,9 @@ final class OpenArchive: @unchecked Sendable {
         return lost
     }
 
-    /// Puts the changed copy back where the archive came from. The copy stays ahead of the
-    /// original until that has worked.
+    /// Puts the changed copy back where the archive came from.
+    ///
+    /// The copy stays ahead of the original until that has worked.
     private func upload(cancellation: CancellationFlag?, progress: (Int64, Int64) -> Bool) throws {
         guard let fileSystems = environment.fileSystems() else { throw ArchiveError.readOnly(name) }
         let provider = try fileSystems.provider(for: archiveURL)
@@ -2514,11 +2589,12 @@ final class OpenArchive: @unchecked Sendable {
 
     /// The last resort when changes cannot be written and the program is about to quit: the
     /// members that exist only in temporary files are written into an archive of their own,
-    /// next to the archive or in the recovery folder. When that fails too (or `quickly`, when
-    /// there is no time left to copy them), their compressed data is left on the disk instead
-    /// of being cleared away with the temporary folder, with a list that says which file is
-    /// which member. Members still under a job's temporary name are not saved: their job did
-    /// not finish them, and its source is where it was.
+    /// next to the archive or in the recovery folder.
+    ///
+    /// When that fails too (or `quickly`, when there is no time left to copy them), their
+    /// compressed data is left on the disk instead of being cleared away with the temporary folder,
+    /// with a list that says which file is which member. Members still under a job's temporary name
+    /// are not saved: their job did not finish them, and its source is where it was.
     ///
     /// Waits for a write that is under way no longer than until `deadline`; then the data is kept as it is.
     func rescue(quickly: Bool = false, before deadline: Date = .distantFuture) -> RescueOutcome {
@@ -2585,10 +2661,11 @@ extension ZipWriter {
 }
 
 /// Writes one new member of a ZIP: compresses into a temporary file as the data arrives.
-/// The data is cut into pieces of one megabyte, and the pieces that have gathered are
-/// compressed on all cores at once (see `ZipPacker` for why that gives one valid stream).
-/// With a password the compressed bytes are encrypted (AES-256) as they are written.
-/// Used by the one thread that copies the file.
+///
+/// The data is cut into pieces of one megabyte, and the pieces that have gathered are compressed on
+/// all cores at once (see `ZipPacker` for why that gives one valid stream). With a password the
+/// compressed bytes are encrypted (AES-256) as they are written. Used by the one thread that copies
+/// the file.
 ///
 /// Unchecked: used by one thread at a time, as `FileWriter` allows; `interrupt` touches only
 /// `interruption`, which is safe from any thread.

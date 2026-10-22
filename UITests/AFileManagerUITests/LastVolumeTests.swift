@@ -42,10 +42,11 @@ internal final class LastVolumeTests: XCTestCase {
         Wait.forElement(pathBar(of: window, endingWith: folder))
     }
 
-    /// Rename Volume… asks for the new name and the drive takes it; the panel follows it. Eject
-    /// Volume then takes the panel back to the folder it came from (a long one, which takes a
-    /// moment to read), ejects the drive, and a notice says it can be removed. The user
-    /// minimized the window meanwhile: the notice shows at the bottom of the screen on its own.
+    /// Rename Volume… asks for the new name and the drive takes it; the panel follows it.
+    ///
+    /// Eject Volume then takes the panel back to the folder it came from (a long one, which takes a
+    /// moment to read), ejects the drive, and a notice says it can be removed. The user minimized
+    /// the window meanwhile: the notice shows at the bottom of the screen on its own.
     ///
     /// The left panel shows the Brief view, which offers its long list to the accessibility
     /// interface as one element: XCUITest would take too long to go through a table of it.

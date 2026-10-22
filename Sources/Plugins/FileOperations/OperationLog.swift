@@ -1,7 +1,7 @@
 public import AFMKernel
 public import Foundation
 
-/// The log of file operations (spec 13 › Operation › Log file): one line per item,
+/// The log of file operations (spec 13 › Operation › Log file): one line per item,.
 ///
 ///     2026-10-12 14:03:22: Copy: /a/one.txt -> /b/one.txt
 ///     2026-10-12 14:03:22: Error: Delete: /a/two.txt: Permission denied
@@ -109,6 +109,7 @@ public final class OperationLog: @unchecked Sendable {
     }
 
     /// Waits until everything handed in so far is in the file, and lets go of the file.
+    ///
     /// Blocks for as long as the disk takes: for a background thread, and for tests.
     public func flush() {
         queue.sync {
@@ -119,8 +120,9 @@ public final class OperationLog: @unchecked Sendable {
 
     /// The same for the end of the program, where the caller is the main thread: waits at most
     /// `timeout` seconds, so that a log on a volume that no longer answers cannot keep the
-    /// program from quitting. The writing itself goes on on the log's queue. False when the
-    /// time ran out.
+    /// program from quitting.
+    ///
+    /// The writing itself goes on on the log's queue. False when the time ran out.
     @discardableResult
     public func flush(timeout: TimeInterval) -> Bool {
         let done = DispatchSemaphore(value: 0)
@@ -135,7 +137,9 @@ public final class OperationLog: @unchecked Sendable {
     /// The same without anybody waiting on a thread: `completion` is called exactly once, on
     /// some thread, when everything handed in so far is in the file, or as soon as
     /// `cancellation` is set (the user does not want to wait for a disk that is not
-    /// answering). The writing itself goes on on the log's queue either way. Any thread.
+    /// answering).
+    ///
+    /// The writing itself goes on on the log's queue either way. Any thread.
     public func flush(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         /// Unchecked `Sendable`: all state is guarded by `lock`. What it lets go of (the
         /// registration, whose release takes the flag's lock) is released outside the lock.
@@ -170,8 +174,9 @@ public final class OperationLog: @unchecked Sendable {
         if cancellation.isCancelled { once.fire() }
     }
 
-    /// Runs `work` on the log's queue, in its turn. For tests, which hold the queue up with
-    /// it the way a disk that has stopped answering does.
+    /// Runs `work` on the log's queue, in its turn.
+    ///
+    /// For tests, which hold the queue up with it the way a disk that has stopped answering does.
     func onQueue(_ work: @escaping @Sendable () -> Void) {
         queue.async(execute: work)
     }
@@ -236,6 +241,7 @@ public final class OperationLog: @unchecked Sendable {
     }
 
     /// The size of the file and the time it was last written; 0 and nil when there is none.
+    ///
     /// A handle that no longer points to the file at that place is dropped.
     private func fileState() -> (size: Int, modified: Date?) {
         var info = stat()
@@ -281,8 +287,9 @@ public final class OperationLog: @unchecked Sendable {
         try? handle?.write(contentsOf: chunk)
     }
 
-    /// When the file to be rotated was last written, if adding `bytes` at `time` makes a rotation due. A file
-    /// with something in it (`size`) has been written (`modified`).
+    /// When the file to be rotated was last written, if adding `bytes` at `time` makes a rotation due.
+    ///
+    /// A file with something in it (`size`) has been written (`modified`).
     private func rotationDue(adding bytes: Int, size: Int, modified: Date?, at time: Date) -> Date? {
         switch configuration.rotation {
         case .never:

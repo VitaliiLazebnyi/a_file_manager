@@ -2,8 +2,10 @@ import AFMKernel
 import Foundation
 
 /// Counts the names a regular expression ran out of time on; shared by the threads that match
-/// one mask. After a few timeouts the expression is given up: the rest of the names answer at
-/// once instead of costing the budget each.
+/// one mask.
+///
+/// After a few timeouts the expression is given up: the rest of the names answer at once instead of
+/// costing the budget each.
 ///
 /// All state is guarded by `lock`.
 final class SelectionRegexTrip: @unchecked Sendable {
@@ -29,9 +31,10 @@ final class SelectionRegexTrip: @unchecked Sendable {
     }
 }
 
-/// Runs the regular expression of a `<` mask with a bound on its time. Such an expression can
-/// take time that grows with every character of the name (`<(a+)+$`), so it is never run with
-/// the plain `firstMatch`: the matching is stopped from the progress block of
+/// Runs the regular expression of a `<` mask with a bound on its time.
+///
+/// Such an expression can take time that grows with every character of the name (`<(a+)+$`), so it
+/// is never run with the plain `firstMatch`: the matching is stopped from the progress block of
 /// `enumerateMatches` once the budget has passed or the work was cancelled.
 enum SelectionRegex {
     /// What one name may take.

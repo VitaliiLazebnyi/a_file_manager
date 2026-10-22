@@ -7,8 +7,10 @@ import Testing
 @testable import ViewerPlugin
 
 /// The text of an HTML file whose tags were removed comes back to the main thread late: another mode was chosen
-/// meanwhile. The pane's work queue runs the removal; a barrier on it waits until that is done and its answer waits
-/// for the main thread, which this test holds until it has chosen the other mode.
+/// meanwhile.
+///
+/// The pane's work queue runs the removal; a barrier on it waits until that is done and its answer
+/// waits for the main thread, which this test holds until it has chosen the other mode.
 @MainActor
 @Suite(.serialized)
 internal struct StallViewerLateTags {

@@ -1,9 +1,11 @@
 import AppKit
 
 /// What the system tools do outside the program, and the questions to the system behind it: starting applications,
-/// printing, the clipboard, quitting and minimizing, renaming and ejecting volumes, the shell a line runs in. The
-/// program uses the system's (`system`); tests use `quiet`, which does nothing outside the program and answers
-/// from what the test gives it, so that nothing opens, prints, quits or ejects on the desktop.
+/// printing, the clipboard, quitting and minimizing, renaming and ejecting volumes, the shell a line runs in.
+///
+/// The program uses the system's (`system`); tests use `quiet`, which does nothing outside the
+/// program and answers from what the test gives it, so that nothing opens, prints, quits or ejects
+/// on the desktop.
 ///
 /// The main-thread members are called on the main thread; the others on a job's thread.
 internal struct ToolsDesktop: Sendable {
@@ -38,8 +40,9 @@ internal struct ToolsDesktop: Sendable {
 
     /// Nothing outside the program: only harmless lines run, by the plain system shell with the PATH and the
     /// environment of this process; no application is known by its identifier and none opens a file; renaming and
-    /// ejecting a volume succeed without touching it; printing, copying, quitting and minimizing do nothing. The
-    /// volumes are those of the Mac as they are.
+    /// ejecting a volume succeed without touching it; printing, copying, quitting and minimizing do nothing.
+    ///
+    /// The volumes are those of the Mac as they are.
     internal static let quiet = Self(
         mayRun: SystemTools.isHarmless,
         shell: (URL(fileURLWithPath: "/bin/sh"), ["-c"]),
@@ -76,16 +79,21 @@ internal struct ToolsDesktop: Sendable {
     internal var mayRun: @Sendable (TypedCommand) -> Bool
     /// The shell that runs a line, and its options before the line.
     internal var shell: (executable: URL, options: [String])
-    /// The PATH that decides whether a bare name is a program or an application. May start a process the first
-    /// time.
+    /// The PATH that decides whether a bare name is a program or an application.
+    ///
+    /// May start a process the first time.
     internal var searchPath: @Sendable () -> String
     /// The environment a line runs in.
     internal var environment: @Sendable () -> [String: String]
     /// The application with this bundle identifier.
     internal var applicationWithIdentifier: @Sendable (String) -> URL?
-    /// The applications that can open a file, and the one that usually does. Asks the file's volume.
+    /// The applications that can open a file, and the one that usually does.
+    ///
+    /// Asks the file's volume.
     internal var applicationsToOpen: @Sendable (URL) -> (usual: URL?, all: [URL])
-    /// Gives the volume at a location a new name. Asks the volume.
+    /// Gives the volume at a location a new name.
+    ///
+    /// Asks the volume.
     internal var renameVolume: @Sendable (URL, String) throws -> Void
     /// The volumes, to look at and to eject.
     internal var volumes: any VolumeAccess

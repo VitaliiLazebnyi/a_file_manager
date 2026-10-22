@@ -3,7 +3,9 @@ import Foundation
 import TestSupport
 
 /// A reader that hands over blocks of the reader below while the budget of its path lasts, and then fails, as a
-/// disk that stops halfway does. Every reader of the path draws on the one budget.
+/// disk that stops halfway does.
+///
+/// Every reader of the path draws on the one budget.
 ///
 /// Unchecked: used by one thread at a time, as `FileReader` allows; `interrupt` is handed to the reader below,
 /// which is safe from any thread, and the budget is a `Shared` box.

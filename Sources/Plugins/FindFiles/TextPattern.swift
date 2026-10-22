@@ -1,9 +1,10 @@
 public import AFMKernel
 public import Foundation
 
-/// The encodings "Find text" can look for a text in (spec 09 › "Find text"). The Windows
-/// pair "ANSI" and "ASCII (DOS)" is kept for files that come from there; UTF-8 is what a Mac
-/// writes and therefore the default.
+/// The encodings "Find text" can look for a text in (spec 09 › "Find text").
+///
+/// The Windows pair "ANSI" and "ASCII (DOS)" is kept for files that come from there; UTF-8 is what
+/// a Mac writes and therefore the default.
 public enum TextEncoding: String, Codable, CaseIterable, Sendable {
     case utf8, western, dos, utf16
 
@@ -34,8 +35,9 @@ public enum TextEncoding: String, Codable, CaseIterable, Sendable {
     }
 }
 
-/// The check boxes under "Find text" (spec 09 › "Find text"). "Case sensitive" is a member of
-/// `SearchQuery`, where it has always been.
+/// The check boxes under "Find text" (spec 09 › "Find text").
+///
+/// "Case sensitive" is a member of `SearchQuery`, where it has always been.
 public struct TextSearchOptions: Codable, Equatable, Sendable {
     public var wholeWords: Bool
     /// The text is a regular expression, matched line by line.
@@ -84,9 +86,10 @@ public struct TextPattern: Sendable {
         }
     }
 
-    /// One way the text can appear as bytes. Every element is one character (or one byte of a
-    /// hex string) with the byte sequences that stand for it: one, or two where upper and lower
-    /// case both count.
+    /// One way the text can appear as bytes.
+    ///
+    /// Every element is one character (or one byte of a hex string) with the byte sequences that
+    /// stand for it: one, or two where upper and lower case both count.
     struct Needle {
         let elements: [[[UInt8]]]
         /// Bytes per code unit: 2 for UTF-16.
@@ -146,8 +149,10 @@ public struct TextPattern: Sendable {
         }
 
         /// Tries the alternatives of the elements one after the other, going back to the
-        /// element before when one has none left. Iterative, with the state in two arrays: a
-        /// text of any length is matched on the small stack of a search thread.
+        /// element before when one has none left.
+        ///
+        /// Iterative, with the state in two arrays: a text of any length is matched on the small
+        /// stack of a search thread.
         private func match(
             _ bytes: UnsafeBufferPointer<UInt8>,
             at start: Int,
@@ -338,8 +343,10 @@ public struct TextPattern: Sendable {
         return elements(encoding.stringEncoding).map { [Needle(elements: $0, wholeWords: wholeWords)] } ?? []
     }
 
-    /// Reads `00 FF 12` and `"PK"0102`. Without "Case sensitive", the code of a lowercase
-    /// letter also finds the uppercase letter; the code of an uppercase letter finds only that.
+    /// Reads `00 FF 12` and `"PK"0102`.
+    ///
+    /// Without "Case sensitive", the code of a lowercase letter also finds the uppercase letter;
+    /// the code of an uppercase letter finds only that.
     static func hexElements(_ text: String, caseSensitive: Bool) throws -> [[[UInt8]]] {
         var bytes: [UInt8] = []
         var digits = ""
@@ -377,7 +384,9 @@ public struct TextPattern: Sendable {
     // MARK: Searching
 
     /// Whether the file passes the text criterion: the text is in it, or, with "NOT
-    /// containing", is not. A file that cannot be read never passes.
+    /// containing", is not.
+    ///
+    /// A file that cannot be read never passes.
     public func accepts(_ reader: any FileReader, cancellation: CancellationFlag? = nil, blockSize: Int = 1 << 20)
         -> Bool
     {
@@ -406,8 +415,10 @@ public struct TextPattern: Sendable {
         }
     }
 
-    /// Reads block by block. The end of each block is looked at again together with the next
-    /// one, so a hit across a block border is found, with the characters around it.
+    /// Reads block by block.
+    ///
+    /// The end of each block is looked at again together with the next one, so a hit across a block
+    /// border is found, with the characters around it.
     private static func search(
         _ needles: [Needle],
         _ reader: any FileReader,
@@ -447,8 +458,10 @@ public struct TextPattern: Sendable {
 
     /// Decodes the file in pieces that end at a line break and matches each piece with `^` and
     /// `$` standing for the line ends, which is matching line by line without cutting the
-    /// text into lines. A piece that takes the expression too long ends the search of the file
-    /// (it is not found in it), and a cancelled search ends at once, also in the middle of a piece.
+    /// text into lines.
+    ///
+    /// A piece that takes the expression too long ends the search of the file (it is not found in
+    /// it), and a cancelled search ends at once, also in the middle of a piece.
     private static func search(
         _ regex: NSRegularExpression,
         _ encodings: [TextEncoding],

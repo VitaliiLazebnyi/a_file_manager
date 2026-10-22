@@ -79,10 +79,12 @@ public struct TargetSpec: Equatable, Sendable {
         directory.appending(name: isExactName ? mask : TargetMask.apply(mask, to: sourceName))
     }
 
-    /// Reads the target field. Relative paths, `..` and an empty path refer to the source folder.
-    /// Looks at the file system to tell a folder from a new name, so it is not for the main thread.
-    /// With a `cancellation` flag that look ends when the flag is set (a target on a server
-    /// that has stopped answering); the text is then read as if nothing were there.
+    /// Reads the target field.
+    ///
+    /// Relative paths, `..` and an empty path refer to the source folder. Looks at the file system
+    /// to tell a folder from a new name, so it is not for the main thread. With a `cancellation`
+    /// flag that look ends when the flag is set (a target on a server that has stopped answering);
+    /// the text is then read as if nothing were there.
     public static func parse(
         _ text: String,
         sourceDirectory: URL,
@@ -112,9 +114,10 @@ public struct TargetSpec: Equatable, Sendable {
 
 public enum UniqueName {
     /// A free name next to `url`: `report (2).txt`, `report (3).txt` (spec 07 › Auto-rename names).
-    /// `isTaken` names locations that are spoken for although nothing is there yet.
-    /// With a `cancellation` flag the looks at the file system end when it is set; the name
-    /// that comes back then is not known to be free, and whoever asked is being stopped.
+    ///
+    /// `isTaken` names locations that are spoken for although nothing is there yet. With a
+    /// `cancellation` flag the looks at the file system end when it is set; the name that comes
+    /// back then is not known to be free, and whoever asked is being stopped.
     public static func available(
         for url: URL,
         in fileSystems: FileSystemRegistry,
@@ -188,7 +191,7 @@ public enum OperationText {
     }
 
     /// How the file being copied compares with the one at the target, for the Overwrite
-    /// dialog: `The file being copied is newer and larger.`
+    /// dialog: `The file being copied is newer and larger.`.
     public static func comparison(source: FileItem, target: FileItem) -> String {
         let age =
             source.modified > target.modified

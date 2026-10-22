@@ -2,7 +2,9 @@ import AVFoundation
 
 /// What the media player mode plays with: AVFoundation's player (`SystemMediaPlayback`), or a
 /// test's that only records what it is asked (a player that plays opens the audio device, and
-/// in a session someone watches that can ask for the microphone). Main thread only.
+/// in a session someone watches that can ask for the microphone).
+///
+/// Main thread only.
 @MainActor
 internal protocol MediaPlayback: AnyObject {
     /// The player the controls on screen drive; nil for one that plays nothing.

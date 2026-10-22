@@ -10,7 +10,9 @@ import Testing
 @testable import MacIntegrationPlugin
 
 /// What the Mac-integration plugin hands to other applications, read from its `opened` list
-/// and its log. Nothing is started and no system panel is shown.
+/// and its log.
+///
+/// Nothing is started and no system panel is shown.
 @MainActor @Suite struct MacIntegrationMore {
     let box: Sandbox
     private let scratch = ScratchPasteboard()

@@ -2,11 +2,12 @@ public import AFMKernel
 public import Foundation
 
 /// The "Search for" field of Find Files (spec 09 › "Search for"): masks separated by spaces,
-/// exclude masks after `|`. A word without wildcards and without a dot matches anywhere in the
-/// name; a name with a dot must match exactly. A name with spaces is written in quotes, or as
-/// it is when nothing else is in the field. With `regex`, the whole field is one regular
-/// expression for the name, without regard to case.
-/// Unchecked: immutable, and `NSRegularExpression` may match on several threads at once.
+/// exclude masks after `|`.
+///
+/// A word without wildcards and without a dot matches anywhere in the name; a name with a dot must
+/// match exactly. A name with spaces is written in quotes, or as it is when nothing else is in the
+/// field. With `regex`, the whole field is one regular expression for the name, without regard to
+/// case. Unchecked: immutable, and `NSRegularExpression` may match on several threads at once.
 public struct SearchMask: @unchecked Sendable {
     /// The masks in wildcard form (`*` and `?` only), lowercased.
     let include: [String]
@@ -72,8 +73,9 @@ public struct SearchMask: @unchecked Sendable {
         matches(name, cancelled: { false })
     }
 
-    /// `cancelled` ends a regular expression that is still working on a name. A name the
-    /// expression takes too long for does not match.
+    /// `cancelled` ends a regular expression that is still working on a name.
+    ///
+    /// A name the expression takes too long for does not match.
     func matches(_ name: String, cancelled: () -> Bool) -> Bool {
         guard isValid else { return false }
         if let expression {
@@ -123,16 +125,19 @@ public struct SearchMask: @unchecked Sendable {
     }
 }
 
-/// Everything a search is told (spec 09 › General tab, Advanced tab, Plugins tab). All
-/// criteria that are set must hold.
+/// Everything a search is told (spec 09 › General tab, Advanced tab, Plugins tab).
+///
+/// All criteria that are set must hold.
 public struct SearchQuery: Sendable {
     /// The first (and usually only) start directory.
     public var directory: URL
     /// Further start directories: "Search in" takes several, separated by `;`.
     public var moreDirectories: [URL] = []
     /// "Only search in selected directories/files" and "Search in found files": when set, the
-    /// search covers these items instead of the start directories. Files are tested
-    /// themselves; folders are searched inside, or, with a depth of 0, tested themselves.
+    /// search covers these items instead of the start directories.
+    ///
+    /// Files are tested themselves; folders are searched inside, or, with a depth of 0, tested
+    /// themselves.
     public var onlyItems: [URL]?
     /// "Search for"; empty finds everything.
     public var names: String
@@ -152,8 +157,9 @@ public struct SearchQuery: Sendable {
     public var searchArchives = false
     public var duplicates = DuplicateOptions()
     /// The most hits a run reports; it stops there and says so (`FileSearch.reachedResultLimit`).
-    /// `nil` takes all. A search of a whole disk with an open mask would otherwise keep every
-    /// file of it in memory.
+    ///
+    /// `nil` takes all. A search of a whole disk with an open mask would otherwise keep every file
+    /// of it in memory.
     public var resultLimit: Int?
 
     public init(
@@ -210,7 +216,9 @@ public final class FileSearch: @unchecked Sendable {
     public let query: SearchQuery
     public let cancellation = CancellationFlag()
     /// Why the search cannot run as asked (a text that is no hex string, a broken regular
-    /// expression); `run` then finds nothing. Whoever starts a search shows it first.
+    /// expression); `run` then finds nothing.
+    ///
+    /// Whoever starts a search shows it first.
     public let problem: any Error?
     private let fileSystems: FileSystemRegistry
     private let mask: SearchMask
@@ -316,8 +324,10 @@ public final class FileSearch: @unchecked Sendable {
     }
 
     /// Walks the trees; the hits come in path order: the matching entries of a folder by name,
-    /// then its subfolders one after the other. `onDirectory` reports the folder being
-    /// searched, `onMatch` each hit. With a text to find, only files can match.
+    /// then its subfolders one after the other.
+    ///
+    /// `onDirectory` reports the folder being searched, `onMatch` each hit. With a text to find,
+    /// only files can match.
     public func run(onDirectory: (URL) -> Void = { _ in }, onMatch: (FileItem) -> Void) {
         runWalk(limit: query.resultLimit, onDirectory: onDirectory, onMatch: onMatch)
     }
@@ -422,9 +432,10 @@ public final class FileSearch: @unchecked Sendable {
     let partialListingAfter: Int
 
     /// Runs the search and returns the files that are duplicates of each other, in groups
-    /// (spec 09 › Duplicate finder); empty when the search was cancelled. The files are all
-    /// held while they are compared, so a search stops at `duplicateCandidateLimit` of them
-    /// and says so (`reachedResultLimit`).
+    /// (spec 09 › Duplicate finder); empty when the search was cancelled.
+    ///
+    /// The files are all held while they are compared, so a search stops at
+    /// `duplicateCandidateLimit` of them and says so (`reachedResultLimit`).
     public func runForDuplicates(
         onDirectory: (URL) -> Void = { _ in },
         onHashing: (@Sendable (Int, Int) -> Void)? = nil
@@ -447,8 +458,9 @@ public final class FileSearch: @unchecked Sendable {
         )
     }
 
-    /// Whether an item found by other means (Spotlight) passes the criteria. Without
-    /// `checkingText` the text criterion is taken as met. Blocks like the search itself.
+    /// Whether an item found by other means (Spotlight) passes the criteria.
+    ///
+    /// Without `checkingText` the text criterion is taken as met. Blocks like the search itself.
     public func accepts(_ item: FileItem, checkingText: Bool = true) -> Bool {
         problem == nil && passesQuickChecks(item) && (checkingText && pattern != nil ? !item.isDirectory : true)
             && passesSlowChecks(item, checkingText: checkingText)
@@ -480,8 +492,9 @@ public final class FileSearch: @unchecked Sendable {
 
     /// The walk of one `run`: a few threads list folders and test the files found, all from
     /// one stack of jobs (the job that comes last in path order is on the bottom), while the
-    /// calling thread hands the results out in path order as they become ready. The shared
-    /// state is the folder tree below, which the walk's condition protects.
+    /// calling thread hands the results out in path order as they become ready.
+    ///
+    /// The shared state is the folder tree below, which the walk's condition protects.
     private final class Walk {
         /// One folder (or, without a URL, a plain list of files): what it holds that passed
         /// the quick checks, which of these passed the slow ones, and its subfolders.
@@ -514,8 +527,9 @@ public final class FileSearch: @unchecked Sendable {
         private var visited: [FileIdentity: Int] = [:]
         private let visitedLock = NSLock()
         /// Counts what is listed and not yet reported, and what the reporting thread waits for.
-        /// A leaf lock: nothing else is taken while it is held (the job stack and `deliver` ask
-        /// it from inside their own).
+        ///
+        /// A leaf lock: nothing else is taken while it is held (the job stack and `deliver` ask it
+        /// from inside their own).
         private let budgetLock = NSLock()
         private var undelivered = 0
         private var needed: Node?
@@ -601,8 +615,9 @@ public final class FileSearch: @unchecked Sendable {
         }
 
         /// Reports each folder in turn: the folder, then what of its entries is ready, in
-        /// order, while the rest is still being tested, then its subfolders. Returns early when
-        /// cancelled or stopped.
+        /// order, while the rest is still being tested, then its subfolders.
+        ///
+        /// Returns early when cancelled or stopped.
         func deliver(_ root: Node, onDirectory: (URL) -> Void, onMatch: (FileItem) -> Void) {
             var stack = [root]
             while let node = stack.popLast() {
@@ -754,7 +769,9 @@ public final class FileSearch: @unchecked Sendable {
         /// Makes a node's candidates and subfolders known, all at once under the lock (the
         /// reporting thread must never see them without the state that goes with them), and
         /// returns the jobs that test the candidates; the node's pending count is the number of
-        /// them. Without slow criteria nothing is left to do.
+        /// them.
+        ///
+        /// Without slow criteria nothing is left to do.
         private func publish(_ node: Node, candidates: [FileItem], children: [Node], isFinal: Bool = true) -> [JobStack
             .Job]
         {
@@ -798,8 +815,10 @@ public final class FileSearch: @unchecked Sendable {
     }
 
     /// Jobs for a few threads, taken from the top of a stack so that the work follows the
-    /// order the results are wanted in. Closing drops what is left, and anything pushed after.
-    /// `stack` and `isClosed` are guarded by `condition`; `shouldHold` is set once, before `start`.
+    /// order the results are wanted in.
+    ///
+    /// Closing drops what is left, and anything pushed after. `stack` and `isClosed` are guarded by
+    /// `condition`; `shouldHold` is set once, before `start`.
     private final class JobStack: @unchecked Sendable {
         struct Job {
             let node: Node?
@@ -833,8 +852,10 @@ public final class FileSearch: @unchecked Sendable {
             }
         }
 
-        /// `jobs[0]` is taken first. After `close` nothing is kept: a worker that was still
-        /// listing a folder must not bring the walk back to life.
+        /// `jobs[0]` is taken first.
+        ///
+        /// After `close` nothing is kept: a worker that was still listing a folder must not bring
+        /// the walk back to life.
         func push(_ jobs: [Job]) {
             guard !jobs.isEmpty else { return }
             condition.lock()
@@ -881,7 +902,9 @@ public final class FileSearch: @unchecked Sendable {
     }
 
     /// Where the contents of an archive file are listed: the location another file system
-    /// reads out of the file's own, if any does. Works on the text alone.
+    /// reads out of the file's own, if any does.
+    ///
+    /// Works on the text alone.
     private func archiveRoot(of file: FileItem, in provider: any FileSystemProvider) -> URL? {
         guard Self.archiveExtensions.contains(FileItem.split(file.name).ext.lowercased()) else { return nil }
         let notations = [provider.displayPath(file.url), file.url.absoluteString]

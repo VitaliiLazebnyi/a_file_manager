@@ -2,7 +2,9 @@ import AFMKernel
 import Foundation
 
 /// What the program knows about its settings, for deciding what a settings file may bring in
-/// and what an export leaves out. A plain value: made on the main thread, used on any.
+/// and what an export leaves out.
+///
+/// A plain value: made on the main thread, used on any.
 struct SettingsSchema {
     /// The options of the configuration pages, with their kinds.
     var preferences: [String: Preference.Kind] = [:]
@@ -10,12 +12,15 @@ struct SettingsSchema {
     var known: Set<String> = []
     var keyBindingsKey = KeyBindings.settingsKey
     /// What the plugin a key belongs to has said about it (`Kernel.settingsKeys`), nil for a
-    /// key nobody declared. Asked before the names are looked at: a plugin knows what its
-    /// key does, and a name gives it away only when it happens to hold the right word.
+    /// key nobody declared.
+    ///
+    /// Asked before the names are looked at: a plugin knows what its key does, and a name gives it
+    /// away only when it happens to hold the right word.
     var declaredKind: @Sendable (String) -> SettingsKeyKind? = { _ in nil }
 
-    /// The corners of the settings the parts of the program keep their values in. A key of
-    /// none of them is nobody's and is not imported.
+    /// The corners of the settings the parts of the program keep their values in.
+    ///
+    /// A key of none of them is nobody's and is not imported.
     static let namespaces: Set<String> = [
         "window", "panel", "listingCache", "toolbar", "configuration", "systemTools", "viewOptions", "macIntegration",
         "folderTabs", "clipboard",
@@ -44,7 +49,9 @@ struct SettingsSchema {
         return Self.namespaces.contains(String(key[..<dot]))
     }
 
-    /// The copy the program keeps of stored data it could not read. It is neither exported nor imported.
+    /// The copy the program keeps of stored data it could not read.
+    ///
+    /// It is neither exported nor imported.
     func isBackup(_ key: String) -> Bool { key.contains(".unreadable") }
 
     // MARK: What an export leaves out unless asked
@@ -67,7 +74,9 @@ struct SettingsSchema {
     // MARK: What an import asks about
 
     /// The parts of a settings file that can make the program run something, change what a
-    /// key does, or change whom it trusts. Each is imported only when the user says so.
+    /// key does, or change whom it trusts.
+    ///
+    /// Each is imported only when the user says so.
     enum Group: String, CaseIterable {
         case commands, keys, programs, trust, connections, hotlist, tabs
     }
@@ -160,8 +169,10 @@ struct CheckedSettings: @unchecked Sendable {
     }
 
     /// Checks every entry: its key must be known, a value whose shape is known must have it,
-    /// and numbers are limited. Throws when a known value cannot be read, so that a damaged
-    /// file is refused before it replaces working settings.
+    /// and numbers are limited.
+    ///
+    /// Throws when a known value cannot be read, so that a damaged file is refused before it
+    /// replaces working settings.
     init(_ archive: SettingsArchive, schema: SettingsSchema) throws {
         for (key, data) in archive.values {
             guard schema.isKnown(key) else {
@@ -501,7 +512,9 @@ struct SettingsImportPlan {
         return lines.joined(separator: "\n")
     }
 
-    /// Stores the plan. Of the parts, only those in `accepted`.
+    /// Stores the plan.
+    ///
+    /// Of the parts, only those in `accepted`.
     func apply(to settings: any SettingsStore, accepting accepted: Set<SettingsSchema.Group>) {
         for key in removed { settings.set(nil as Data?, forKey: key) }
         for (key, value) in ordinary { settings.set(value as Data?, forKey: key) }
@@ -546,7 +559,9 @@ struct SettingsExportOptions: Equatable {
 
 extension SettingsArchive {
     /// Writes the archive so that only the user can read it, beside the file and then over
-    /// it: a failure leaves an earlier file whole. Blocks: not for the main thread.
+    /// it: a failure leaves an earlier file whole.
+    ///
+    /// Blocks: not for the main thread.
     func write(to url: URL) throws {
         let data = try encoded()
         let temporary = url.deletingLastPathComponent()

@@ -32,10 +32,11 @@ public struct RemoteEntry: Equatable, Sendable {
         self.permissions = permissions
     }
 
-    /// Whether a name from a server may become a path below a local or remote folder. A name is
-    /// one path component: a server that sends `../../x` or `a/b` must not be able to place a
-    /// file outside the folder the user chose. `isDOSFormat` also rejects the backslash, which
-    /// Windows servers use as a separator.
+    /// Whether a name from a server may become a path below a local or remote folder.
+    ///
+    /// A name is one path component: a server that sends `../../x` or `a/b` must not be able to
+    /// place a file outside the folder the user chose. `isDOSFormat` also rejects the backslash,
+    /// which Windows servers use as a separator.
     ///
     /// The name must also stay one component when the path it becomes part of is read as
     /// text: a name that begins with a combining mark would melt into the slash before it
@@ -67,10 +68,12 @@ public struct RemoteEntry: Equatable, Sendable {
     }
 }
 
-/// Reads directory listings (spec 11 › Listing: MLSD or LIST). MLSD is a standard; LIST is
-/// whatever the server's `ls` or `dir` prints, so that parser recognises the formats in use:
-/// Unix `ls -l` in its many variants (with or without group, ACL marks, device numbers, ISO
-/// dates, month names in several languages, NetWare), Windows/DOS `dir`, and EPLF.
+/// Reads directory listings (spec 11 › Listing: MLSD or LIST).
+///
+/// MLSD is a standard; LIST is whatever the server's `ls` or `dir` prints, so that parser
+/// recognises the formats in use: Unix `ls -l` in its many variants (with or without group, ACL
+/// marks, device numbers, ISO dates, month names in several languages, NetWare), Windows/DOS `dir`,
+/// and EPLF.
 public enum FTPListParser {
     /// A line of a listing longer than this is not an entry: no server has names this long, and
     /// what a hostile one sends must not cost more than a glance.
@@ -97,6 +100,7 @@ public enum FTPListParser {
     // MARK: MLSD
 
     /// One line of MLSD: `type=file;size=12;modify=20240102030405; name`.
+    ///
     /// The entries for the directory itself and its parent give nil.
     public static func mlsd(_ line: String) -> RemoteEntry? {
         guard let entry = parseMLSD(line), RemoteEntry.isSafeName(entry.name) else { return nil }
@@ -136,7 +140,9 @@ public enum FTPListParser {
         return entry
     }
 
-    /// The line inside the reply to MLST. It is indented by a space, and the name may be a whole path.
+    /// The line inside the reply to MLST.
+    ///
+    /// It is indented by a space, and the name may be a whole path.
     public static func mlst(_ line: String) -> RemoteEntry? {
         guard var entry = parseMLSD(line.hasPrefix(" ") ? String(line.dropFirst()) : line) else { return nil }
         entry.name = RemotePath.name(of: entry.name)
@@ -170,7 +176,9 @@ public enum FTPListParser {
         return entry
     }
 
-    /// A whole listing. Large ones are parsed on all cores.
+    /// A whole listing.
+    ///
+    /// Large ones are parsed on all cores.
     public static func entries(
         of lines: [String],
         asMLSD: Bool,
@@ -298,8 +306,10 @@ public enum FTPListParser {
     /// What every `ls -l` variant ends with, in the three ways servers write the date:
     /// `<size> <month> <day> <year or time> <name>`, the same with the day before the month (as
     /// some European servers print it), and `<size> 2024-01-31 12:34 <name>`
-    /// (`ls --time-style=long-iso`, some newer servers). The first place of the line that
-    /// reads as one of them is taken, the forms tried in this order.
+    /// (`ls --time-style=long-iso`, some newer servers).
+    ///
+    /// The first place of the line that reads as one of them is taken, the forms tried in this
+    /// order.
     private static func unix(_ line: Scalars, now: Date, calendar: Calendar) -> RemoteEntry? {
         let characters = Array(line.prefix(10))
         guard let type = characters.first, "-dlbcpsDw".unicodeScalars.contains(type) else { return nil }
@@ -481,7 +491,9 @@ public enum FTPListParser {
 
     // MARK: EPLF
 
-    /// `+i8388621.29609,m824255902,/,\tdev` (D. J. Bernstein's Easily Parsed LIST Format).
+    /// `+i8388621.29609,m824255902,/,\tdev` (D.
+    ///
+    /// J. Bernstein's Easily Parsed LIST Format).
     private static func eplf(_ line: Scalars) -> RemoteEntry? {
         guard let tab = line.firstIndex(of: "\t") else { return nil }
         var entry = RemoteEntry(name: text(line[(tab + 1)...]), isDirectory: false)

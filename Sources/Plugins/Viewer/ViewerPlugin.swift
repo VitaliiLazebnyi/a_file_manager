@@ -21,9 +21,10 @@ extension CommandID {
 }
 
 /// Lister, the built-in viewer (spec 10), and the Quick View panel (spec 03 › Quick View).
+///
 /// Files are read through their file-system providers, so everything works in archives and on
-/// servers as it does on the disk. The plugin and its windows live on the main thread; what
-/// reads files runs in the background (see `ViewerPane`).
+/// servers as it does on the disk. The plugin and its windows live on the main thread; what reads
+/// files runs in the background (see `ViewerPane`).
 public final class ViewerPlugin: Plugin, ViewerService {
     public let name = "Viewer"
     private let overlayHost: (any PanelHandle) -> any PanelOverlayHost?
@@ -37,8 +38,10 @@ public final class ViewerPlugin: Plugin, ViewerService {
     private(set) var quickView: QuickViewPanel?
     /// What the panes play sounds and films with: the system's player, or a test's that plays nothing.
     internal var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
-    /// Puts a Lister window on screen (with `showsWindows`). Tests replace it, so that no window
-    /// shows in the session they run in, and look at what it was asked to show.
+    /// Puts a Lister window on screen (with `showsWindows`).
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `overlayHost` finds the part of a panel that can be covered by the quick view;

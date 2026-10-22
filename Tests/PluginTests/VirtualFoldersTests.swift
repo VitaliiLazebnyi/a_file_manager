@@ -382,7 +382,9 @@ import Testing
 }
 
 /// A two-level tree that records what it was asked to watch.
-/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+///
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a
+/// time.
 private final class WatchableFileSystem: FileSystemProvider, @unchecked Sendable {
     let scheme = "watched"
     let capabilities: FileSystemCapabilities = []

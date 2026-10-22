@@ -9,13 +9,19 @@ import Testing
 /// and a new layout that takes over what the old one found.
 @Suite struct ViewerAdoptIndex {
     private func signature(_ document: TextDocument) throws -> [String] {
-        try document.rows(from: 0, count: document.rowCount).map {
-            "\($0.range.lowerBound)-\($0.range.upperBound) \($0.startsLine) \($0.line) \($0.text)"
-        }
+        try document.rows(from: 0, count: document.rowCount)
+            .map {
+                "\($0.range.lowerBound)-\($0.range.upperBound) \($0.startsLine) \($0.line) \($0.text)"
+            }
     }
 
     private func index(
-        _ data: Data, _ encoding: ViewerEncoding, _ options: TextLayoutOptions, raw: Bool, segment: Int, chunk: Int,
+        _ data: Data,
+        _ encoding: ViewerEncoding,
+        _ options: TextLayoutOptions,
+        raw: Bool,
+        segment: Int,
+        chunk: Int,
         parallel: Bool = false
     ) -> TextDocument {
         let document = TextDocument(source: DataByteSource(data), encoding: encoding, layout: .text(options))
@@ -70,16 +76,30 @@ import Testing
                 ] {
                     for (segment, chunk) in [(1 << 20, 1 << 20), (700, 61), (98, 16), (4_096, 1_000), (5_000, 1)] {
                         let raw = index(
-                            data, encoding, options, raw: true, segment: segment, chunk: chunk,
-                            parallel: segment < 1_000)
+                            data,
+                            encoding,
+                            options,
+                            raw: true,
+                            segment: segment,
+                            chunk: chunk,
+                            parallel: segment < 1_000
+                        )
                         let decoded = index(
-                            data, encoding, options, raw: false, segment: segment, chunk: chunk,
-                            parallel: segment < 1_000)
+                            data,
+                            encoding,
+                            options,
+                            raw: false,
+                            segment: segment,
+                            chunk: chunk,
+                            parallel: segment < 1_000
+                        )
                         #expect(
                             raw.rowCount == decoded.rowCount && raw.lineCount == decoded.lineCount,
-                            "\(encoding.name) \(options) \(segment)/\(chunk)")
+                            "\(encoding.name) \(options) \(segment)/\(chunk)"
+                        )
                         #expect(
-                            try signature(raw) == signature(decoded), "\(encoding.name) \(options) \(segment)/\(chunk)"
+                            try signature(raw) == signature(decoded),
+                            "\(encoding.name) \(options) \(segment)/\(chunk)"
                         )
                     }
                 }
@@ -93,13 +113,19 @@ import Testing
         for encoding in [ViewerEncoding.utf16LE, .utf16BE] {
             let data = Data(try #require(encoding.encode(text)))
             let document = index(
-                data, encoding, TextLayoutOptions(columns: 1_000, wordWrap: false), raw: true, segment: 1 << 20,
-                chunk: 1 << 20)
+                data,
+                encoding,
+                TextLayoutOptions(columns: 1_000, wordWrap: false),
+                raw: true,
+                segment: 1 << 20,
+                chunk: 1 << 20
+            )
             #expect(document.lineCount == 2 && document.rowCount == 2, "\(encoding.name)")
             #expect(
                 try document.rows(from: 0, count: 2).map(\.text) == [
                     String(text.dropLast(4)).trimmingCharacters(in: .newlines), "end"
-                ])
+                ]
+            )
         }
     }
 
@@ -108,8 +134,14 @@ import Testing
     @Test func aFileOfNothingButLineEndsNeedsFewCheckpoints() throws {
         let data = Data(repeating: 0x0A, count: 16 << 20)
         let document = index(
-            data, .utf8, TextLayoutOptions(columns: 80, wordWrap: true), raw: true, segment: 4 << 20, chunk: 1 << 20,
-            parallel: true)
+            data,
+            .utf8,
+            TextLayoutOptions(columns: 80, wordWrap: true),
+            raw: true,
+            segment: 4 << 20,
+            chunk: 1 << 20,
+            parallel: true
+        )
         #expect(document.rowCount == 16 << 20 && document.lineCount == 16 << 20)
         // One per 4 KB, not one per 64 rows.
         #expect(document.checkpointCount <= (16 << 20) / 4_096 + 8 && document.checkpointCount >= 16)
@@ -117,17 +149,28 @@ import Testing
             let found = try document.rows(from: row, count: 3)
             #expect(
                 found.map(\.index) == Array(row..<min(16 << 20, row + 3))
-                    && found.first?.range == Int64(row)..<Int64(row + 1))
+                    && found.first?.range == Int64(row)..<Int64(row + 1)
+            )
             #expect(try document.row(containing: Int64(row)) == row)
             #expect(try document.row(ofLine: row + 1) == row)
         }
         // The same checkpoints on every path.
         let decoded = index(
-            data.prefix(1 << 20), .utf8, TextLayoutOptions(columns: 80, wordWrap: true), raw: false, segment: 1 << 18,
-            chunk: 1 << 16)
+            data.prefix(1 << 20),
+            .utf8,
+            TextLayoutOptions(columns: 80, wordWrap: true),
+            raw: false,
+            segment: 1 << 18,
+            chunk: 1 << 16
+        )
         let raw = index(
-            data.prefix(1 << 20), .utf8, TextLayoutOptions(columns: 80, wordWrap: true), raw: true, segment: 1 << 18,
-            chunk: 1 << 16)
+            data.prefix(1 << 20),
+            .utf8,
+            TextLayoutOptions(columns: 80, wordWrap: true),
+            raw: true,
+            segment: 1 << 18,
+            chunk: 1 << 16
+        )
         #expect(decoded.rowCount == raw.rowCount && raw.rowCount == 1 << 20)
         #expect(decoded.checkpointCount == raw.checkpointCount)
     }
@@ -193,41 +236,62 @@ import Testing
         let data = Data(lines.joined(separator: "\n").utf8)
         let source = DataByteSource(data)
         let narrow = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 100, wordWrap: true)))
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 100, wordWrap: true))
+        )
         narrow.buildIndex(parallel: false, segmentSize: 40_000)
         #expect(narrow.segmentsReused == 0)
         let segments = (data.count + 39_999) / 40_000
         // 100 → 400 columns: every line fits both, so everything is taken over.
         let wide = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 400, wordWrap: true)),
-            reusing: narrow)
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 400, wordWrap: true)),
+            reusing: narrow
+        )
         wide.buildIndex(parallel: true, segmentSize: 40_000)
         #expect(wide.segmentsReused == segments - 1, "the line of 300 characters did not fit 100 columns")
         let fresh = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 400, wordWrap: true)))
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 400, wordWrap: true))
+        )
         fresh.buildIndex(parallel: true, segmentSize: 40_000)
         #expect(fresh.segmentsReused == 0)
         #expect(wide.rowCount == fresh.rowCount && wide.lineCount == fresh.lineCount && wide.rowCount == lines.count)
         #expect(try signature(wide) == signature(fresh))
         // Back to 100 columns from the wide one: the segment with the long line is read again.
         let back = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 100, wordWrap: true)),
-            reusing: wide)
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 100, wordWrap: true)),
+            reusing: wide
+        )
         back.buildIndex(parallel: false, segmentSize: 40_000)
         #expect(back.segmentsReused == segments - 1 && back.rowCount == narrow.rowCount)
         #expect(try signature(back) == signature(narrow))
         // 50 columns: lines of 41 characters still fit, so that is taken over too; 30: they do not.
         let fifty = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)),
-            reusing: back)
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)),
+            reusing: back
+        )
         fifty.buildIndex(parallel: false, segmentSize: 40_000)
         #expect(fifty.segmentsReused == segments - 1)
         let thirty = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 30, wordWrap: true)),
-            reusing: fifty)
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 30, wordWrap: true)),
+            reusing: fifty
+        )
         thirty.buildIndex(parallel: false, segmentSize: 40_000)
         let thirtyFresh = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 30, wordWrap: true)))
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 30, wordWrap: true))
+        )
         thirtyFresh.buildIndex(parallel: false, segmentSize: 40_000)
         // (The 17 bytes behind the eighth segment hold no line start: nothing to read.)
         #expect(thirty.segmentsReused <= 1 && thirty.rowCount == thirtyFresh.rowCount && thirty.rowCount > lines.count)
@@ -238,13 +302,21 @@ import Testing
         let data = Data((0..<2_000).map { "line \($0)" }.joined(separator: "\n").utf8)
         let source = DataByteSource(data)
         let first = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 80, wordWrap: true))
+        )
         first.buildIndex(parallel: false, segmentSize: 4_000)
         func relaid(_ source: any ByteSource, _ encoding: ViewerEncoding, _ options: TextLayoutOptions, bom: Int = 0)
             -> TextDocument
         {
             let document = TextDocument(
-                source: source, encoding: encoding, bomLength: bom, layout: .text(options), reusing: first)
+                source: source,
+                encoding: encoding,
+                bomLength: bom,
+                layout: .text(options),
+                reusing: first
+            )
             document.buildIndex(parallel: false, segmentSize: 4_000)
             return document
         }
@@ -253,13 +325,17 @@ import Testing
         // The same bytes in another source are not known to be the same.
         #expect(relaid(DataByteSource(data), .utf8, wide).segmentsReused == 0)
         #expect(
-            relaid(source, .utf8, TextLayoutOptions(columns: 200, wordWrap: true, tabWidth: 4)).segmentsReused == 0)
+            relaid(source, .utf8, TextLayoutOptions(columns: 200, wordWrap: true, tabWidth: 4)).segmentsReused == 0
+        )
         #expect(relaid(source, .ansi, wide).segmentsReused == 0)
         #expect(relaid(source, .utf8, wide, bom: 3).segmentsReused == 0)
         #expect(relaid(source, .utf8, wide).segmentsReused > 0)
         // An index that was cancelled is not a basis.
         let cut = TextDocument(
-            source: source, encoding: .utf8, layout: .text(TextLayoutOptions(columns: 80, wordWrap: true)))
+            source: source,
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 80, wordWrap: true))
+        )
         cut.cancellation.cancel()
         cut.buildIndex(parallel: false, segmentSize: 4_000)
         let after = TextDocument(source: source, encoding: .utf8, layout: .text(wide), reusing: cut)
@@ -270,12 +346,18 @@ import Testing
     @Test func aSegmentRecordsTheWidestLineOrThatALineWasCut() throws {
         func widest(_ text: String, columns: Int) throws -> Int {
             let data = Data(text.utf8)
-            return try TextRowIndex.scan(
-                source: DataByteSource(data), content: 0..<Int64(data.count), segment: 0..<Int64(data.count),
-                isFirst: true,
-                encoding: .utf8, options: TextLayoutOptions(columns: columns, wordWrap: true), chunkSize: 1 << 20,
-                cancellation: CancellationFlag()
-            ).widest
+            return
+                try TextRowIndex.scan(
+                    source: DataByteSource(data),
+                    content: 0..<Int64(data.count),
+                    segment: 0..<Int64(data.count),
+                    isFirst: true,
+                    encoding: .utf8,
+                    options: TextLayoutOptions(columns: columns, wordWrap: true),
+                    chunkSize: 1 << 20,
+                    cancellation: CancellationFlag()
+                )
+                .widest
         }
         #expect(try widest("ab\nabcdef\nabc", columns: 80) == 6)
         #expect(try widest("a\tb\n", columns: 80) == 9)

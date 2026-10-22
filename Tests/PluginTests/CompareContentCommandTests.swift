@@ -9,7 +9,9 @@ import Testing
 @testable import CompareContentPlugin
 
 /// Compare by content driven through its command and its session, with fake panels, a
-/// scripted user and jobs that run at once. No window is involved.
+/// scripted user and jobs that run at once.
+///
+/// No window is involved.
 @MainActor @Suite struct CompareContentCommands {
     let memory = MemoryFileSystem()
     let plugin = CompareContentPlugin(opensWindows: false)

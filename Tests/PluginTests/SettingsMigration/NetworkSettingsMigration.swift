@@ -54,8 +54,9 @@ internal struct NetworkSettingsMigration {
         internal static let trustedCertificates = #"{"files.example.com":["AA:BB:CC"]}"#
     }
 
-    /// The plugin started on the settings, with passwords in memory. The bench is returned with it: it
-    /// owns the kernel the plugin works with.
+    /// The plugin started on the settings, with passwords in memory.
+    ///
+    /// The bench is returned with it: it owns the kernel the plugin works with.
     private static func started(on settings: any SettingsStore) -> (bench: TestBench, plugin: NetworkPlugin) {
         let memory = MemoryFileSystem()
         let plugin = NetworkPlugin(launchesApplications: false, passwords: MemoryPasswords())

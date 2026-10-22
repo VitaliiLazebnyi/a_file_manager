@@ -13,8 +13,10 @@ struct CommandAction: Codable, Equatable {
     var startPath = ""
 }
 
-/// A command the user defined (spec 14 › User commands (`em_`)). It is registered like any
-/// other command, so keys, the button bar, menus and the command line reach it by its name.
+/// A command the user defined (spec 14 › User commands (`em_`)).
+///
+/// It is registered like any other command, so keys, the button bar, menus and the command line
+/// reach it by its name.
 struct UserCommand: Codable, Equatable {
     static let prefix = "em_"
 
@@ -29,8 +31,9 @@ struct UserCommand: Codable, Equatable {
     /// What menus and lists show.
     var caption: String { title.isEmpty ? String(name.dropFirst(Self.prefix.count)) : title }
 
-    /// The name as it is stored: letters, digits and `_` after `em_`. Nil when nothing usable
-    /// is left of what the user typed.
+    /// The name as it is stored: letters, digits and `_` after `em_`.
+    ///
+    /// Nil when nothing usable is left of what the user typed.
     static func name(from text: String) -> String? {
         var text = text.trimmingCharacters(in: .whitespaces)
         if text.lowercased().hasPrefix(prefix) { text.removeFirst(prefix.count) }
@@ -39,7 +42,9 @@ struct UserCommand: Codable, Equatable {
     }
 }
 
-/// An entry of the Start menu (spec 14 › Start menu). The n-th entry runs as `cm_UserMenu<n>`.
+/// An entry of the Start menu (spec 14 › Start menu).
+///
+/// The n-th entry runs as `cm_UserMenu<n>`.
 struct StartMenuEntry: Codable, Equatable {
     /// A title of `-` makes a separator, as in Total Commander.
     var title: String
@@ -66,7 +71,9 @@ enum CommandStep: Equatable {
     case unknown(String)
 }
 
-/// Reads a Command field (spec 14 › The command language, Grammar and Rules). Pure.
+/// Reads a Command field (spec 14 › The command language, Grammar and Rules).
+///
+/// Pure.
 ///
 /// Not taken over from Windows: `*`/`**` (run as administrator or as another user), subbars
 /// (`.bar` files) and command numbers in place of names.
@@ -76,8 +83,10 @@ enum CommandLanguage {
     /// The longest pause a `cm_wait` makes: a stored number may be anything.
     static let longestWait = 3_600_000
 
-    /// `%NAME%` in a Command field is an environment variable (spec 14 › Rules). Its value is
-    /// data: it stays apart from the text, so that a shell is handed it and never reads it.
+    /// `%NAME%` in a Command field is an environment variable (spec 14 › Rules).
+    ///
+    /// Its value is data: it stays apart from the text, so that a shell is handed it and never
+    /// reads it.
     static func environmentPieces(_ text: String, _ environment: [String: String]) -> [ExpandedPiece] {
         var pieces: [ExpandedPiece] = []
         var written = ""
@@ -100,14 +109,18 @@ enum CommandLanguage {
     }
 
     /// The same as one readable text: each value written where it stands, as one word,
-    /// whatever it holds. For commands of the program and for showing; never for a shell.
+    /// whatever it holds.
+    ///
+    /// For commands of the program and for showing; never for a shell.
     static func expandingEnvironment(_ text: String, _ environment: [String: String]) -> String {
         ShellLine.display(environmentPieces(text, environment))
     }
 
-    /// The steps of a Command field. `resolve` finds a registered command by its name, whatever
-    /// its case. A field in which not every comma-separated item is a command of the program
-    /// is one external line, commas included.
+    /// The steps of a Command field.
+    ///
+    /// `resolve` finds a registered command by its name, whatever its case. A field in which not
+    /// every comma-separated item is a command of the program is one external line, commas
+    /// included.
     static func steps(_ command: String, environment: [String: String] = [:], resolve: (String) -> CommandID?)
         -> [CommandStep]
     {

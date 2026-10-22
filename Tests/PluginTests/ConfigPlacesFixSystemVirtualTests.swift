@@ -155,7 +155,9 @@ private final class Counter: @unchecked Sendable {
 }
 
 /// A file system whose watchers can be fired by hand.
-/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+///
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a
+/// time.
 private final class WatchedSystem: FileSystemProvider, @unchecked Sendable {
     let scheme = "watched"
     let capabilities: FileSystemCapabilities = []

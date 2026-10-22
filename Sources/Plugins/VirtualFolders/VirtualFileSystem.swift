@@ -54,7 +54,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         private let lock = NSLock()
         private var result: Prepared?
         /// When the list was last used (a number from the file system's counter): the least
-        /// recently used one is forgotten first. Guarded by the file system's lock.
+        /// recently used one is forgotten first.
+        ///
+        /// Guarded by the file system's lock.
         var stamp = 0
 
         init(location: VirtualLocation, raw: [URL], isUnique: Bool = false) {
@@ -73,7 +75,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
             return made
         }
 
-        /// The finished work; nil when it is not done yet, whoever is doing it. Never waits.
+        /// The finished work; nil when it is not done yet, whoever is doing it.
+        ///
+        /// Never waits.
         var preparedIfReady: Prepared? {
             guard lock.try() else { return nil }
             defer { lock.unlock() }
@@ -178,9 +182,10 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         VirtualLocation.branch(of: directory).url
     }
 
-    /// Registers a list of files and returns the location that shows it. A file that is named
-    /// twice is listed once. `origin` is where `[..]` leads back to. Takes no time however long
-    /// the list is: the files are looked at later, on a background thread.
+    /// Registers a list of files and returns the location that shows it.
+    ///
+    /// A file that is named twice is listed once. `origin` is where `[..]` leads back to. Takes no
+    /// time however long the list is: the files are looked at later, on a background thread.
     public func register(files: [URL], title: String, origin: URL?) -> URL {
         register(files, isUnique: false) { .list(id: $0, title: VirtualLocation.pathComponent(title), origin: origin) }
     }
@@ -220,7 +225,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     /// Forgets the least recently used lists that are not shown (watched) while there are too
-    /// many lists or files; when all are shown, the limits are exceeded. Under the lock.
+    /// many lists or files; when all are shown, the limits are exceeded.
+    ///
+    /// Under the lock.
     private func forgetSurplus(keeping id: Int) {
         var total = lists.values.reduce(0) { $0 + $1.raw.count }
         while lists.count > Self.listLimit || total > Self.entryLimit {
@@ -236,8 +243,10 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     /// What identifies a file in a list, as exact bytes: two names that differ only in Unicode
-    /// normalisation are two files (a `String` key would merge them). The scheme, host, port and
-    /// path, without a trailing slash (which `URL.path` never has), as `locationKey` has them.
+    /// normalisation are two files (a `String` key would merge them).
+    ///
+    /// The scheme, host, port and path, without a trailing slash (which `URL.path` never has), as
+    /// `locationKey` has them.
     static func identity(of url: URL) -> [UInt8] {
         var bytes = Array((url.scheme ?? "file").utf8)
         bytes.append(0)
@@ -248,8 +257,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         return bytes
     }
 
-    /// Works out what has to look at every file of the list. Blocks while another thread is on
-    /// it; for the background.
+    /// Works out what has to look at every file of the list.
+    ///
+    /// Blocks while another thread is on it; for the background.
     private func prepared(_ list: FileList) -> FileList.Prepared {
         list.prepared { raw in
             var seen = Set<[UInt8]>()
@@ -289,8 +299,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     /// The real locations a registered list or selected branch was made from; nil for every
-    /// other location and for a list that was forgotten. Waits for a long list to be worked
-    /// through: not for the main thread.
+    /// other location and for a list that was forgotten.
+    ///
+    /// Waits for a long list to be worked through: not for the main thread.
     public func entries(of url: URL) -> [URL]? {
         guard let location = VirtualLocation(url) else { return nil }
         switch location {
@@ -300,8 +311,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     /// The real location a location in a branch view or selected branch stands for: the file
-    /// or folder that is really there, which is what an operation on it must go to. Nil for
-    /// every other URL and for a list (whose entries keep their real locations).
+    /// or folder that is really there, which is what an operation on it must go to.
+    ///
+    /// Nil for every other URL and for a list (whose entries keep their real locations).
     public func realLocation(of url: URL) -> URL? {
         switch VirtualLocation(url) {
         case .branch(let real), .picked(_, let real): return real
@@ -310,7 +322,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     /// The list registered as `id`, when it is the one the location says: a stored location
-    /// whose number was given to another list means nothing. Counts as a use of the list.
+    /// whose number was given to another list means nothing.
+    ///
+    /// Counts as a use of the list.
     private func registered(_ id: Int, as location: VirtualLocation) -> FileList? {
         synchronized {
             guard let list = lists[id], list.location.url.absoluteString == location.url.absoluteString else {
@@ -581,8 +595,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
         try target.provider.setAttributes(attributes, of: target.url)
     }
 
-    /// The folder is a virtual one at both ends: the real file systems do the work. The source
-    /// may also be a real location already; a list is nothing to copy metadata from.
+    /// The folder is a virtual one at both ends: the real file systems do the work.
+    ///
+    /// The source may also be a real location already; a list is nothing to copy metadata from.
     public func copyMetadata(from source: URL, to destination: URL) throws {
         let target = try real(destination)
         let origin: URL
@@ -673,8 +688,9 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
 
     /// Watches the real directories behind the virtual folders, as far as that is cheap: the
     /// directories read on the last walk of a branch (up to `watchLimit`), and the folders of
-    /// the files of a list. Any change in them is reported as a change of the virtual folder,
-    /// on the main thread.
+    /// the files of a list.
+    ///
+    /// Any change in them is reported as a change of the virtual folder, on the main thread.
     public func watch(_ directories: [URL], onChange: @escaping @MainActor @Sendable ([URL]) -> Void) -> (
         any WatchToken
     )? {
@@ -748,10 +764,12 @@ public final class VirtualFileSystem: FileSystemProvider, @unchecked Sendable {
     }
 
     /// Passes the first report on at once and the ones that follow within a short time as one
-    /// more report after it. The reports go out on the main thread, whichever thread the real
-    /// file system reports on, and none goes out once `cancel` was called. A folder that keeps
-    /// changing is reported ever less often (up to `longestWindow` apart), so that the virtual
-    /// folder is not walked again all the time.
+    /// more report after it.
+    ///
+    /// The reports go out on the main thread, whichever thread the real file system reports on, and
+    /// none goes out once `cancel` was called. A folder that keeps changing is reported ever less
+    /// often (up to `longestWindow` apart), so that the virtual folder is not walked again all the
+    /// time.
     ///
     /// All mutable state is guarded by `lock`.
     private final class Coalescer: @unchecked Sendable {

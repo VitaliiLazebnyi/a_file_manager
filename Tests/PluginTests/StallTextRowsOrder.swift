@@ -38,9 +38,11 @@ internal struct StallTextRowsOrder {
         }
     }
 
-    /// Two segments of 8 MB, each read on a thread of its own. The first waits until the second has read 4 MB, the
-    /// length after which a segment shows what it has found so far: the second is not the next to be shown, so
-    /// nothing is shown until the first is read; then all rows are there, in order.
+    /// Two segments of 8 MB, each read on a thread of its own.
+    ///
+    /// The first waits until the second has read 4 MB, the length after which a segment shows what
+    /// it has found so far: the second is not the next to be shown, so nothing is shown until the
+    /// first is read; then all rows are there, in order.
     @Test
     internal func aLaterSegmentShowsNothingBeforeTheEarlierOnes() {
         let line = String(repeating: "x", count: 79) + "\n"

@@ -139,8 +139,9 @@ public final class Kernel {
     ///
     /// Available to command handlers, not while a plugin starts.
     public var panels: any PanelSet { attachedShell.panels }
-    /// Runs long work with a progress window. A job's completion is not called once the kernel
-    /// has gone.
+    /// Runs long work with a progress window.
+    ///
+    /// A job's completion is not called once the kernel has gone.
     public var jobs: any JobService { LivingJobs(attachedShell.jobs, of: self) }
 
     private var attachedShell: any ShellServices {

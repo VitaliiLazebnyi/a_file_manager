@@ -102,19 +102,19 @@ final class FileTools {
         static let scope = "filetools."
         /// `SplitBytesPerFile`, as typed.
         static let splitSize = scope + "splitBytesPerFile"
-        /// `EncodeMethod`
+        /// `EncodeMethod`.
         static let encodeMethod = scope + "encodeMethod"
-        /// `EncodeLinesPerFile`
+        /// `EncodeLinesPerFile`.
         static let encodeLines = scope + "encodeLinesPerFile"
-        /// `Lastmd5`
+        /// `Lastmd5`.
         static let checksumMethod = scope + "lastChecksumMethod"
-        /// `CrcSeparateFiles`, `CrcSeparateFolders`, `CrcForceUtf8`, `CrcForwardSlashes`, `CrcAppendExt`
+        /// `CrcSeparateFiles`, `CrcSeparateFolders`, `CrcForceUtf8`, `CrcForwardSlashes`, `CrcAppendExt`.
         static let separateFiles = scope + "crcSeparateFiles"
         static let separateFolders = scope + "crcSeparateFolders"
         static let forceUTF8 = scope + "crcForceUtf8"
         static let unixFormat = scope + "crcUnixFormat"
         static let appendExtension = scope + "crcAppendExt"
-        /// `ChecksumExtraTypes`
+        /// `ChecksumExtraTypes`.
         static let extraTypes = scope + "checksumExtraTypes"
         static let onlyErrors = scope + "verifyOnlyErrors"
     }
@@ -146,10 +146,12 @@ final class FileTools {
             ? directory : fileSystems.location(from: text, relativeTo: directory)
     }
 
-    /// Runs a tool as a job with progress and Cancel. Its error, if any, is shown under
-    /// `title`; a cancelled run says nothing. The folders in `refreshing` are read again; it
-    /// gets the result of the work (nil when it failed or was cancelled), which was made on the
-    /// job's thread and reaches the main thread with the completion.
+    /// Runs a tool as a job with progress and Cancel.
+    ///
+    /// Its error, if any, is shown under `title`; a cancelled run says nothing. The folders in
+    /// `refreshing` are read again; it gets the result of the work (nil when it failed or was
+    /// cancelled), which was made on the job's thread and reaches the main thread with the
+    /// completion.
     private func run<Value: Sendable>(
         _ title: String,
         job: String,
@@ -515,7 +517,9 @@ final class FileTools {
         }
     }
 
-    /// The text on the clipboard. Main thread: `NSPasteboard` is not made for other threads.
+    /// The text on the clipboard.
+    ///
+    /// Main thread: `NSPasteboard` is not made for other threads.
     private func clipboardText() -> String? {
         pasteboard.string(forType: .string)
     }

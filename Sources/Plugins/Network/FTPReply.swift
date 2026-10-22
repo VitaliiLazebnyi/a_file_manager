@@ -22,8 +22,9 @@ public struct FTPReply: Equatable, Sendable {
     public var message: String { "\(code) \(lines.last ?? "")" }
 }
 
-/// What is taken from a server before it is called a hostile one. No command of the protocol
-/// needs anywhere near this much.
+/// What is taken from a server before it is called a hostile one.
+///
+/// No command of the protocol needs anywhere near this much.
 public enum FTPLimits {
     /// The longest line of a reply, and of a listing, in bytes.
     public static let lineLength = 4_096
@@ -37,11 +38,12 @@ public enum FTPLimits {
     public static let listingBytes: Int64 = 1 << 30
 }
 
-/// Puts the lines of the control connection together into replies. A reply of several lines
-/// starts with `123-` and ends with a line that starts with the same code and a space; the
-/// lines between may look like anything (RFC 959 › 4.2). A reply is kept up to
-/// `FTPLimits.replyLines` lines and `FTPLimits.replyBytes` bytes; of a longer one the first
-/// lines and the last are kept, so the memory a reply takes has a limit.
+/// Puts the lines of the control connection together into replies.
+///
+/// A reply of several lines starts with `123-` and ends with a line that starts with the same code
+/// and a space; the lines between may look like anything (RFC 959 › 4.2). A reply is kept up to
+/// `FTPLimits.replyLines` lines and `FTPLimits.replyBytes` bytes; of a longer one the first lines
+/// and the last are kept, so the memory a reply takes has a limit.
 public struct FTPReplyParser {
     private var code: Int?
     private var lines: [String] = []
@@ -94,9 +96,10 @@ public struct FTPReplyParser {
     }
 }
 
-/// Cuts what a data connection delivers into lines, block by block. Every byte is looked at
-/// once, whatever the sizes of the blocks; a line longer than `limit` is dropped whole, so the
-/// part of a line that is waiting for its end never grows beyond the limit.
+/// Cuts what a data connection delivers into lines, block by block.
+///
+/// Every byte is looked at once, whatever the sizes of the blocks; a line longer than `limit` is
+/// dropped whole, so the part of a line that is waiting for its end never grows beyond the limit.
 struct LineSplitter {
     let limit: Int
     private var partial = Data()
@@ -162,6 +165,7 @@ public enum FTPSyntax {
     }
 
     /// Host and port in the reply to PASV: `227 Entering Passive Mode (192,168,1,2,19,137)`.
+    ///
     /// The brackets are left out by some servers.
     public static func passiveEndpoint(_ text: String) -> (host: String, port: Int)? {
         var numbers: [Int] = []

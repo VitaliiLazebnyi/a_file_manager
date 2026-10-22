@@ -9,9 +9,11 @@ import Testing
 @testable import DirectorySyncPlugin
 @testable import FileToolsPlugin
 
-/// Review round 2, second pass: the tools. BLAKE3 beside many files, the reproducers of the
-/// fuzzer, the marks of a long selection, and the two paths that had no test (a superseded
-/// background compare, a listing that the cancel cuts short).
+/// Review round 2, second pass: the tools.
+///
+/// BLAKE3 beside many files, the reproducers of the fuzzer, the marks of a long selection, and the
+/// two paths that had no test (a superseded background compare, a listing that the cancel cuts
+/// short).
 @MainActor @Suite struct Review2PluginsBP2Tools {
     let box: Sandbox
     let registry = FileSystemRegistry()

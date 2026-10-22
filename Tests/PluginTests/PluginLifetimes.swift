@@ -26,8 +26,10 @@ import VirtualFoldersPlugin
 
 /// The kernel keeps every plugin and whatever a plugin registers (commands, file systems,
 /// openers, questions); none of that may keep the kernel in turn, or the program never lets go
-/// of any of it. Each plugin is started on its own, used a little, and must be gone with its
-/// kernel when the bench is.
+/// of any of it.
+///
+/// Each plugin is started on its own, used a little, and must be gone with its kernel when the
+/// bench is.
 @MainActor @Suite struct PluginLifetimes {
     nonisolated static let names = [
         "LocalFileSystem", "Archives", "Network", "VirtualFolders", "Navigation", "Places", "Viewer", "MacIntegration",
@@ -71,7 +73,11 @@ import VirtualFoldersPlugin
             let make = try #require(Self.plugins[name])
             let plugin = make(scratch.pasteboard)
             let bench = TestBench(
-                plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
+                plugins: [plugin],
+                fileSystems: [memory],
+                left: memory.url("/A"),
+                right: memory.url("/B")
+            )
             // Every command is asked whether it may run, as the menus and buttons do.
             for command in bench.commands.all {
                 _ = bench.commands.isEnabled(command.id)
@@ -91,7 +97,11 @@ import VirtualFoldersPlugin
             let memory = MemoryFileSystem()
             memory.addDirectory("/A")
             let bench = TestBench(
-                plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/A"))
+                plugins: [plugin],
+                fileSystems: [memory],
+                left: memory.url("/A"),
+                right: memory.url("/A")
+            )
             (center, environment) = (plugin.center, plugin.center.environment)
             #expect(bench.kernel.plugins.count == 1)
         }

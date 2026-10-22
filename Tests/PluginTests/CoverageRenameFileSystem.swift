@@ -3,8 +3,10 @@ import Foundation
 import TestSupport
 
 /// A file system over memory that refuses chosen moves, and that can take names differing only
-/// in letter case for the same file, as a server on a Mac volume does. Every other call goes to
-/// `base`. Unchecked: the switches are set by the test before use and guarded by `lock`.
+/// in letter case for the same file, as a server on a Mac volume does.
+///
+/// Every other call goes to `base`. Unchecked: the switches are set by the test before use and
+/// guarded by `lock`.
 final class CoverageRenameFileSystem: FileSystemProvider, @unchecked Sendable {
     let base: MemoryFileSystem
     private let lock = NSLock()

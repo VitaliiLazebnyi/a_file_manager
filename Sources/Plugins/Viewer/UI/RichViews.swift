@@ -84,8 +84,9 @@ final class TemporaryCopies: @unchecked Sendable {
     }
 
     /// The file itself when it is on the local disk, else a copy of it read through its
-    /// provider, kept for `owner` until it is released. Nil when it cannot be read or
-    /// `cancellation` was set.
+    /// provider, kept for `owner` until it is released.
+    ///
+    /// Nil when it cannot be read or `cancellation` was set.
     func localURL(
         for url: URL,
         fileSystems: FileSystemRegistry,
@@ -236,8 +237,9 @@ final class TemporaryCopies: @unchecked Sendable {
         evict()
     }
 
-    /// Deletes the idle copies beyond the limits, the least recently used first. The files are
-    /// deleted on a background queue: this is called on the main thread.
+    /// Deletes the idle copies beyond the limits, the least recently used first.
+    ///
+    /// The files are deleted on a background queue: this is called on the main thread.
     private func evict() {
         lock.lock()
         let idle = copies.filter { $0.value.owners.isEmpty }.sorted { $0.value.lastUsed > $1.value.lastUsed }
@@ -362,8 +364,10 @@ final class TemporaryCopies: @unchecked Sendable {
     }
 }
 
-/// The media player mode (spec 10 › Media player mode), on AVKit. It plays with a
-/// `MediaPlayback`: the system's in the program, a recording one in tests. Main thread only.
+/// The media player mode (spec 10 › Media player mode), on AVKit.
+///
+/// It plays with a `MediaPlayback`: the system's in the program, a recording one in tests. Main
+/// thread only.
 final class MediaView: NSView {
     private let playerView = AVPlayerView()
     /// What it plays with.
@@ -441,10 +445,11 @@ final class MediaView: NSView {
 }
 
 /// HTML shown as a page: scripts do not run and nothing is loaded from elsewhere, so a file is
-/// safe to look at. The page is shown once, from the string; every navigation after that is
-/// refused (a `<meta http-equiv="refresh">` and a script-less redirect are navigations too, and
-/// would load a page of the web into the viewer), and a link that was clicked is handed to
-/// `onLink`. Main thread only.
+/// safe to look at.
+///
+/// The page is shown once, from the string; every navigation after that is refused (a `<meta
+/// http-equiv="refresh">` and a script-less redirect are navigations too, and would load a page of
+/// the web into the viewer), and a link that was clicked is handed to `onLink`. Main thread only.
 final class WebContentView: NSView, WKNavigationDelegate {
     private let webView: WKWebView
     var onLink: (URL) -> Void = { _ in }
@@ -531,10 +536,11 @@ final class WebContentView: NSView, WKNavigationDelegate {
     func printOperation(with info: NSPrintInfo) -> NSPrintOperation { webView.printOperation(with: info) }
 }
 
-/// What a link in a file that is viewed may do. A file is untrusted: a click on a link in it
-/// opens a web page or a mail in the program for that, and the viewer follows only links to
-/// files beside the one shown. Everything else (`file:`, `smb:`, `ftp:`, `sftp:`, the URL
-/// schemes of other programs) does nothing.
+/// What a link in a file that is viewed may do.
+///
+/// A file is untrusted: a click on a link in it opens a web page or a mail in the program for that,
+/// and the viewer follows only links to files beside the one shown. Everything else (`file:`,
+/// `smb:`, `ftp:`, `sftp:`, the URL schemes of other programs) does nothing.
 enum LinkPolicy {
     static func opensInBrowser(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
@@ -544,7 +550,9 @@ enum LinkPolicy {
 
     /// The file a link names when the viewer may load it: a relative link, resolved against
     /// `base`, that lies in the folder of `base` or below it, on the same file system (the same
-    /// scheme, host and port). Nil otherwise.
+    /// scheme, host and port).
+    ///
+    /// Nil otherwise.
     static func target(of link: URL, relativeTo base: URL) -> URL? {
         let text = link.relativeString.replacingOccurrences(of: "about:blank", with: "")
         // A link with a scheme of its own (an absolute one) is not relative.

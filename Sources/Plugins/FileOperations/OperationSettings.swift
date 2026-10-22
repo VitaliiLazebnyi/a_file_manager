@@ -2,7 +2,9 @@ import AFMKernel
 import Foundation
 
 /// The settings of the file operations and the two configuration pages that show them
-/// (spec 13 › Operation › Copy/Delete, Operation › Log file). Main thread, like the settings store.
+/// (spec 13 › Operation › Copy/Delete, Operation › Log file).
+///
+/// Main thread, like the settings store.
 enum OperationSettings {
     static let overwrite = "fileOperations.overwriteMode"
     static let attributes = "fileOperations.keepAttributes"
@@ -39,27 +41,37 @@ enum OperationSettings {
             title: "Copy/Delete",
             preferences: [
                 Preference(
-                    overwrite, "When a file exists at the target",
-                    .choice(OverwriteMode.allCases.map(\.title), default: 0)),
+                    overwrite,
+                    "When a file exists at the target",
+                    .choice(OverwriteMode.allCases.map(\.title), default: 0)
+                ),
                 Preference(attributes, "Copies keep dates and permissions", .flag(default: true)),
                 Preference(folderDates, "Copy date/time of folders", .flag(default: false)),
                 Preference(links, "Symbolic links", .choice(linkTitles, default: 0)),
                 Preference(verify, "Verify after copy (SHA-256 checksum)", .flag(default: false)),
                 Preference(
-                    skipErrors, "Keep going on errors (skip what fails, report at the end)", .flag(default: false)),
+                    skipErrors,
+                    "Keep going on errors (skip what fails, report at the end)",
+                    .flag(default: false)
+                ),
                 Preference(parallel, "Copy several small files at once on fast local disks", .flag(default: true)),
                 Preference(
                     keepPartial,
                     "Keep a partly copied file when a copy between file systems is interrupted (to resume it)",
-                    .flag(default: false)),
+                    .flag(default: false)
+                ),
                 Preference(alwaysOptions, "F5/F6 always show the copy options", .flag(default: false)),
                 Preference(useTrash, "F8/Del moves to the Trash (Shift = delete permanently)", .flag(default: true)),
                 Preference(askReadOnly, "Ask before overwriting/deleting read-only files", .flag(default: true)),
                 Preference(askHidden, "Ask before overwriting/deleting hidden files", .flag(default: false)),
                 Preference(askNonEmpty, "Ask before deleting non-empty folders", .flag(default: true)),
                 Preference(
-                    askMerge, "Ask before copying into an existing folder of the same name", .flag(default: false))
-            ])
+                    askMerge,
+                    "Ask before copying into an existing folder of the same name",
+                    .flag(default: false)
+                )
+            ]
+        )
     }
 
     static var logPage: PreferencePage {
@@ -75,16 +87,20 @@ enum OperationSettings {
                 Preference(logErrors, "Log errors", .flag(default: true)),
                 Preference(logSkipped, "Log skipped files (when choosing skip or skip all)", .flag(default: true)),
                 Preference(
-                    logRotation, "Start a new log file",
+                    logRotation,
+                    "Start a new log file",
                     .choice(
                         [
                             "Never (always log to the same file)", "Every day after midnight",
                             "When the file becomes larger than the limit"
                         ],
-                        default: 0)),
+                        default: 0
+                    )
+                ),
                 Preference(logSizeLimit, "Size limit (kBytes)", .text(default: "1000")),
                 Preference(logKeepCount, "Keep a maximum of log file copies (0 = all)", .text(default: "30"))
-            ])
+            ]
+        )
     }
 
     /// The options of a job as the configuration has them.
@@ -110,7 +126,8 @@ enum OperationSettings {
         configuration.isEnabled = settings.flag(logEnabled, default: false)
         let path = settings.text(logFile, default: defaultLogFile).trimmingCharacters(in: .whitespaces)
         configuration.file = URL(
-            fileURLWithPath: NSString(string: path.isEmpty ? defaultLogFile : path).expandingTildeInPath)
+            fileURLWithPath: NSString(string: path.isEmpty ? defaultLogFile : path).expandingTildeInPath
+        )
         configuration.logsTransfers = settings.flag(logTransfers, default: true)
         configuration.logsDeletes = settings.flag(logDeletes, default: true)
         configuration.logsFolders = settings.flag(logFolders, default: true)
@@ -132,7 +149,9 @@ enum OperationSettings {
 
 /// The options a command carries after its name, as in `cm_Copy /V1 O2 T="/tmp/" W="*.txt" G`
 /// (spec 17 › Commands with parameters): a letter, then a number or `="text"`; a quote inside
-/// the text is doubled. A letter without a number counts as 1.
+/// the text is doubled.
+///
+/// A letter without a number counts as 1.
 public enum CommandSwitches {
     public static func parse(_ text: String) -> [Character: String] {
         var switches: [Character: String] = [:]

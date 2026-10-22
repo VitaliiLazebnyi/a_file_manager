@@ -1,7 +1,9 @@
 public import AppKit
 
 /// A drag as a table view's data source sees it: a pasteboard, where it comes from and nothing
-/// else. For dropping rows on a list without a mouse.
+/// else.
+///
+/// For dropping rows on a list without a mouse.
 @MainActor
 public final class FakeDrag: NSObject, NSDraggingInfo {
     /// The pasteboard the drag carries.

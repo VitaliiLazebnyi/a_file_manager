@@ -34,9 +34,10 @@ public final class ViewOptionsPlugin: Plugin {
         case programs, custom, selected
     }
 
-    /// The filter this plugin gave a tab. It counts for as long as the tab's filter still
-    /// carries its title: someone who lays a filter over it (the quick filter) keeps the title
-    /// in front, and someone who replaces it does not.
+    /// The filter this plugin gave a tab.
+    ///
+    /// It counts for as long as the tab's filter still carries its title: someone who lays a filter
+    /// over it (the quick filter) keeps the title in front, and someone who replaces it does not.
     private struct Applied {
         weak var model: PanelModel?
         let kind: FilterKind
@@ -46,7 +47,9 @@ public final class ViewOptionsPlugin: Plugin {
     private var applied: [ObjectIdentifier: Applied] = [:]
 
     /// Where long lists are worked through, and how the result comes back to the main
-    /// thread. Tests put their own in, to say when each happens.
+    /// thread.
+    ///
+    /// Tests put their own in, to say when each happens.
     var background: @Sendable (@escaping @Sendable () -> Void) -> Void = {
         DispatchQueue.global(qos: .userInitiated).async(execute: $0)
     }
@@ -118,8 +121,10 @@ public final class ViewOptionsPlugin: Plugin {
         kernel.menus.add(views.map(\.0) + [Self.customColumns], to: .showViewType)
     }
 
-    /// One checkbox per column the plugins offer. The columns that stay keep their order;
-    /// new ones go to the end, in the order the plugins registered them.
+    /// One checkbox per column the plugins offer.
+    ///
+    /// The columns that stay keep their order; new ones go to the end, in the order the plugins
+    /// registered them.
     private func chooseColumns(in kernel: Kernel) {
         let panel = kernel.panels.source
         let offered = kernel.columns.all
@@ -239,7 +244,9 @@ public final class ViewOptionsPlugin: Plugin {
     /// one pass on all cores, and the user gets the filter or the order they asked for.
     static let staleTries = 3
     /// The number of the filter each panel was given last: a result that comes back for an
-    /// older one is dropped. The numbers are never used twice.
+    /// older one is dropped.
+    ///
+    /// The numbers are never used twice.
     private var filterTickets: [ObjectIdentifier: Int] = [:]
     private var lastFilterTicket = 0
 
@@ -247,11 +254,12 @@ public final class ViewOptionsPlugin: Plugin {
         apply(filter?.title, as: kind, to: model) { filter }
     }
 
-    /// Gives a tab a display filter, or with nil takes away whatever filter it has. A long
-    /// list is filtered on a background thread (on all cores) and the result handed to the
+    /// Gives a tab a display filter, or with nil takes away whatever filter it has.
+    ///
+    /// A long list is filtered on a background thread (on all cores) and the result handed to the
     /// model; should the list have changed by then, the new one is filtered, again in the
-    /// background. `make` builds the filter (in the background too, for a long list);
-    /// `matches` of it is then called from several threads and looks at the entry alone.
+    /// background. `make` builds the filter (in the background too, for a long list); `matches` of
+    /// it is then called from several threads and looks at the entry alone.
     private func apply(
         _ title: String?,
         as kind: FilterKind?,
@@ -313,7 +321,9 @@ public final class ViewOptionsPlugin: Plugin {
     }
 
     /// What Show › Programs lists on a Mac: applications, files that may be executed, and the
-    /// files the user's masks name (the Windows list is `*.exe *.com *.bat`). Folders stay.
+    /// files the user's masks name (the Windows list is `*.exe *.com *.bat`).
+    ///
+    /// Folders stay.
     nonisolated static func isProgram(_ item: FileItem, masks: FileMask) -> Bool {
         if item.isFolder { return true }
         if masks.matches(item.name) { return true }
@@ -324,13 +334,16 @@ public final class ViewOptionsPlugin: Plugin {
 
     /// Lists from this length on are sorted in the background.
     static let backgroundSortThreshold = 20_000
-    /// The order each panel was last asked for and has not got yet. It stays the wish until it
-    /// is met: every sort that goes stale starts again from the list as it is.
+    /// The order each panel was last asked for and has not got yet.
+    ///
+    /// It stays the wish until it is met: every sort that goes stale starts again from the list as
+    /// it is.
     private var pendingOrders: [ObjectIdentifier: ListOrder] = [:]
 
-    /// Gives a panel the order `change` makes of its present one. A short list is sorted on
-    /// the spot. A long one is sorted on a background thread and handed to the panel when
-    /// it is done, so the window stays alive meanwhile.
+    /// Gives a panel the order `change` makes of its present one.
+    ///
+    /// A short list is sorted on the spot. A long one is sorted on a background thread and handed
+    /// to the panel when it is done, so the window stays alive meanwhile.
     private func sort(_ model: PanelModel, reload: @escaping () -> Void, _ change: (ListOrder) -> ListOrder) {
         let id = ObjectIdentifier(model)
         let order = change(pendingOrders[id] ?? model.wantedSort)
@@ -355,12 +368,13 @@ public final class ViewOptionsPlugin: Plugin {
         sortInBackground(model, to: order)
     }
 
-    /// Sorts a copy of the list off the main thread. The model knows the order that is
-    /// wanted (`requestSort`), so a folder that changes while the copy is sorted costs
-    /// nothing here: the reading that arrives is taken in that order by whoever reads it,
-    /// and the result made here is then of no use. Only a change that brings no list (another
-    /// filter) leaves the list in its old order; then it is sorted again, in the background
-    /// as before. Nothing is ever sorted on the main thread for a long list.
+    /// Sorts a copy of the list off the main thread.
+    ///
+    /// The model knows the order that is wanted (`requestSort`), so a folder that changes while the
+    /// copy is sorted costs nothing here: the reading that arrives is taken in that order by
+    /// whoever reads it, and the result made here is then of no use. Only a change that brings no
+    /// list (another filter) leaves the list in its old order; then it is sorted again, in the
+    /// background as before. Nothing is ever sorted on the main thread for a long list.
     private func sortInBackground(_ model: PanelModel, to order: ListOrder) {
         let id = ObjectIdentifier(model)
         let basis = model.basis

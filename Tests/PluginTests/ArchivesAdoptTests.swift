@@ -7,6 +7,7 @@ import Testing
 
 /// Stored deflate blocks of zeros without end: a stream that decompresses for as long as it
 /// is read from, which no real archive does.
+///
 /// Unchecked: read by one thread at a time, as a stream is.
 private final class EndlessDeflate: ByteStream, @unchecked Sendable {
     private var block = Data()

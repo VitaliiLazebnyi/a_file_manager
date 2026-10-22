@@ -181,9 +181,10 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     }
 
     /// Leaves the view for the real folder of the item under the cursor, with the cursor on
-    /// it (spec 03 › Branch view, "Leaving with Ctrl+B"). On `[..]` the panel goes back to the
-    /// directory the view was made from; after a selected branch, the items it was made from
-    /// are selected again.
+    /// it (spec 03 › Branch view, "Leaving with Ctrl+B").
+    ///
+    /// On `[..]` the panel goes back to the directory the view was made from; after a selected
+    /// branch, the items it was made from are selected again.
     private func leave(
         _ panel: any PanelHandle,
         _ location: VirtualLocation,
@@ -254,8 +255,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     }
 }
 
-/// A text file that names one file per line (spec 19 › List files). Lines are full paths or
-/// paths relative to a base directory; empty lines are skipped.
+/// A text file that names one file per line (spec 19 › List files).
+///
+/// Lines are full paths or paths relative to a base directory; empty lines are skipped.
 ///
 /// A name that holds a line break or another control character, or starts or ends with a
 /// space or a quote, cannot stand on a line as it is. It is written in quotes with backslash
@@ -271,8 +273,10 @@ public enum FileListFile {
         public var errorDescription: String? { "The list of files is too large to load." }
     }
 
-    /// The lines of a list file. UTF-8 with or without a byte-order mark and UTF-16 with one
-    /// are read; line ends may be LF or CRLF.
+    /// The lines of a list file.
+    ///
+    /// UTF-8 with or without a byte-order mark and UTF-16 with one are read; line ends may be LF or
+    /// CRLF.
     public static func lines(in data: Data) -> [String] {
         let text: String?
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
@@ -376,9 +380,11 @@ public enum FileListFile {
         }
     }
 
-    /// Reads a list file from any file system. Blocks: for a background thread. Only files of
-    /// this computer and of the file system the list file is on are taken over from it: a
-    /// list file must not make the program connect to any host it names.
+    /// Reads a list file from any file system.
+    ///
+    /// Blocks: for a background thread. Only files of this computer and of the file system the list
+    /// file is on are taken over from it: a list file must not make the program connect to any host
+    /// it names.
     public static func read(_ file: URL, fileSystems: FileSystemRegistry, relativeTo base: URL) throws -> [URL] {
         let reader = try fileSystems.provider(for: file).read(file)
         defer { reader.close() }

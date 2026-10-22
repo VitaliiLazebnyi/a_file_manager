@@ -32,7 +32,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
 
         /// Option-click on a disclosure triangle (and Option-Right) open a folder and everything
         /// below it: on a disk that is every row at once and a reader for each folder that has
-        /// not been read. A folder opens one level.
+        /// not been read.
+        ///
+        /// A folder opens one level.
         override func expandItem(_ item: Any?, expandChildren _: Bool) {
             super.expandItem(item, expandChildren: false)
         }
@@ -109,6 +111,7 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     private var isLinking = false
 
     /// Numbers the scans of each tree (by location key) and lets only the latest store its result.
+    ///
     /// All state is guarded by `lock`.
     private final class StoreTickets: @unchecked Sendable {
         private let lock = NSLock()
@@ -131,12 +134,16 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    /// Puts the window on screen. Tests replace it, so that no window shows in the
-    /// session they run in, and look at what it was asked to show.
+    /// Puts the window on screen.
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `hiddenScanLimit`: how long a scan goes on after the window was closed (a quarter of an
-    /// hour); `beep`: the sound of a search that found nothing. Tests replace both.
+    /// hour); `beep`: the sound of a search that found nothing.
+    ///
+    /// Tests replace both.
     init(
         kernel: Kernel,
         cache: TreeCache,
@@ -371,8 +378,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
             + (isComplete ? "" : ", incomplete: folders are read when opened, F2 reads the rest")
     }
 
-    /// Reads the tree from its file system. A rescan fills the tree on screen, so the outline
-    /// stays as it is while folders come and go.
+    /// Reads the tree from its file system.
+    ///
+    /// A rescan fills the tree on screen, so the outline stays as it is while folders come and go.
     private func scan(_ root: URL, selecting directory: URL, generation: Int, rescanning: Bool) {
         // A disk of a file system that is not there (a place another one offered).
         guard let provider = try? kernel.fileSystems.provider(for: root) else {
@@ -459,8 +467,9 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// Folders that are shown but not read with the rest: other disks mounted inside this one.
-    /// On the start-up disk these are `/Volumes` and the system's own mount points, which show
-    /// the same files a second time. The answer is a fixed set, so any thread may ask.
+    ///
+    /// On the start-up disk these are `/Volumes` and the system's own mount points, which show the
+    /// same files a second time. The answer is a fixed set, so any thread may ask.
     private func exclusions(for root: URL) -> @Sendable (URL) -> Bool {
         var excluded = Set(roots.filter { $0.kind != .home && $0.url.isInside(root) }.map(\.url.locationKey))
         if root.isFileURL, root.path == "/" {
@@ -538,10 +547,11 @@ final class DirectoryTreeWindowController: NSWindowController, NSWindowDelegate,
         reloadQueue.append(node)
     }
 
-    /// Loads the rows of the queued folders again, as long as `stop` says no. Only a folder
-    /// that is open has rows below it to load; one that is shut shows nothing of its children,
-    /// and one that is not on screen is shown anew when its parent is opened. The cursor is
-    /// put back on its folder afterwards, once, because rows may have come in above it.
+    /// Loads the rows of the queued folders again, as long as `stop` says no.
+    ///
+    /// Only a folder that is open has rows below it to load; one that is shut shows nothing of its
+    /// children, and one that is not on screen is shown anew when its parent is opened. The cursor
+    /// is put back on its folder afterwards, once, because rows may have come in above it.
     private func reloadQueuedRows(_ tree: DirectoryTree, until stop: () -> Bool) {
         guard !reloadQueue.isEmpty else { return }
         let selected = selectedNode

@@ -55,8 +55,11 @@ private func names(in folder: URL) -> [String] {
     @Test func aMoveWithinABranchViewNeverRemovesTheFile() throws {
         let file = try box.file("d/a.txt", "precious")
         let job = FileJob(
-            kind: .move, sources: [file], target: TargetSpec(directory: virtual.branch(of: box.url("d"))),
-            fileSystems: fileSystems)
+            kind: .move,
+            sources: [file],
+            target: TargetSpec(directory: virtual.branch(of: box.url("d"))),
+            fileSystems: fileSystems
+        )
         let answers = OldAnswers()
         job.delegate = answers
         _ = job.run()
@@ -70,7 +73,11 @@ private func names(in folder: URL) -> [String] {
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
         try box.folder("t")
         let job = FileJob(
-            kind: .move, sources: sources, target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+            kind: .move,
+            sources: sources,
+            target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems
+        )
         job.options.overwrite = .overwriteAll
         let answers = OldAnswers()
         job.delegate = answers
@@ -92,8 +99,11 @@ private func names(in folder: URL) -> [String] {
         ]
         try box.folder("t")
         let job = FileJob(
-            kind: .move, sources: sources, target: TargetSpec(directory: box.url("t"), mask: "*.txt"),
-            fileSystems: fileSystems)
+            kind: .move,
+            sources: sources,
+            target: TargetSpec(directory: box.url("t"), mask: "*.txt"),
+            fileSystems: fileSystems
+        )
         job.options.overwrite = .overwriteAll
         let answers = OldAnswers()
         job.delegate = answers
@@ -116,7 +126,11 @@ private func names(in folder: URL) -> [String] {
         try box.folder("t")
         try FileManager.default.createSymbolicLink(at: box.url("t/f.txt"), withDestinationURL: victim)
         let job = FileJob(
-            kind: .copy, sources: [source], target: TargetSpec(directory: box.url("t")), fileSystems: fileSystems)
+            kind: .copy,
+            sources: [source],
+            target: TargetSpec(directory: box.url("t")),
+            fileSystems: fileSystems
+        )
         let answers = OldAnswers(conflict: .resume)
         job.delegate = answers
         _ = job.run()

@@ -165,11 +165,11 @@ public final class FilePropertiesPlugin: Plugin {
         )
     }
 
-    /// Opens Finder's Info window for local items. Finder is asked through `osascript`, off
-    /// the main thread; the first time, macOS asks the user whether the program may control
-    /// Finder.
-    /// Asked for local items only: the command is offered in local folders, the button of the
-    /// Properties dialog for local items.
+    /// Opens Finder's Info window for local items.
+    ///
+    /// Finder is asked through `osascript`, off the main thread; the first time, macOS asks the
+    /// user whether the program may control Finder. Asked for local items only: the command is
+    /// offered in local folders, the button of the Properties dialog for local items.
     private func showFinderInfo(_ urls: [URL]) {
         finderInfoRequests = Array((finderInfoRequests + urls).suffix(Self.finderInfoRequestLimit))
         guard let runScript else { return }
@@ -227,8 +227,9 @@ final class PropertyActions {
     private var ui: any UserInteraction { kernel.interaction }
     private var fileSystems: FileSystemRegistry { kernel.fileSystems }
 
-    /// The folders whose listings an operation on `items` may have changed. Grows with the
-    /// selection, so it is worked out on a job's thread.
+    /// The folders whose listings an operation on `items` may have changed.
+    ///
+    /// Grows with the selection, so it is worked out on a job's thread.
     nonisolated private static func folders(of items: [FileItem], and directory: URL) -> [URL] {
         var seen = Set<String>()
         return ([directory] + items.map { $0.url.deletingLastPathComponent() })
@@ -527,9 +528,11 @@ final class PropertyActions {
         )
     }
 
-    /// Shows calculated folder sizes in a panel. They were written into a copy of the list on
-    /// the job's thread (`prepared`), which the model takes in one step; if its list is no
-    /// longer the one the copy was made of, the sizes are set by name instead. Main thread.
+    /// Shows calculated folder sizes in a panel.
+    ///
+    /// They were written into a copy of the list on the job's thread (`prepared`), which the model
+    /// takes in one step; if its list is no longer the one the copy was made of, the sizes are set
+    /// by name instead. Main thread.
     static func show(_ sizes: [(name: String, size: Int64)], prepared: PanelModel.Prepared?, in model: PanelModel) {
         guard !sizes.isEmpty else { return }
         if let prepared, model.apply(prepared) != .stale { return }
@@ -745,9 +748,10 @@ struct AttributeDraft {
 
     var recurse = false
     var permissions = ""
-    /// What the permissions field was filled with. A field left as it was asks for no change:
-    /// otherwise a change of the date alone would also set every file below a folder to the
-    /// folder's own mode, and unlock a locked file.
+    /// What the permissions field was filled with.
+    ///
+    /// A field left as it was asks for no change: otherwise a change of the date alone would also
+    /// set every file below a folder to the folder's own mode, and unlock a locked file.
     private var prefilledPermissions: String?
 
     /// The permissions as they were pre-filled, while the field still shows them.

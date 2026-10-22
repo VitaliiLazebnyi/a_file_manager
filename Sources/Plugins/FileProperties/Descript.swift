@@ -3,8 +3,9 @@ import Foundation
 
 /// The file comments of one folder, as Total Commander keeps them in `descript.ion`
 /// (spec 19 › `descript.ion` and `files.bbs`, 07 › File comments): one line per file, the name
-/// (in double quotes when it holds a space), a space, the comment, CRLF. A value type without
-/// any file access; `CommentStore` reads and writes it.
+/// (in double quotes when it holds a space), a space, the comment, CRLF.
+///
+/// A value type without any file access; `CommentStore` reads and writes it.
 struct DescriptIon: Equatable {
     static let fileName = "descript.ion"
     /// The longest comment the format takes.
@@ -12,8 +13,10 @@ struct DescriptIon: Equatable {
     /// Follows a comment of several lines, whose lines are joined with a literal `\n`.
     private static let multilineMarker = "\u{04}\u{C2}"
 
-    /// How the file is written. A new file is plain text, and becomes UTF-16 only when a name
-    /// or a comment needs it (`CommentPreferredFormat=4`, the default).
+    /// How the file is written.
+    ///
+    /// A new file is plain text, and becomes UTF-16 only when a name or a comment needs it
+    /// (`CommentPreferredFormat=4`, the default).
     enum Encoding: Equatable {
         case ansi
         case utf8(bom: Bool)
@@ -74,9 +77,11 @@ struct DescriptIon: Equatable {
         return (ansi, .ansi)
     }
 
-    /// Reads one line. The separators (the quotes around a name, the space after it) are
-    /// looked for scalar by scalar, as the file has them: taken by characters, a space or a
-    /// quote followed by a combining mark is one character with it and would not be found.
+    /// Reads one line.
+    ///
+    /// The separators (the quotes around a name, the space after it) are looked for scalar by
+    /// scalar, as the file has them: taken by characters, a space or a quote followed by a
+    /// combining mark is one character with it and would not be found.
     private static func parse(_ line: Substring.UnicodeScalarView) -> Entry? {
         var name: Substring.UnicodeScalarView
         var rest: Substring.UnicodeScalarView
@@ -147,8 +152,10 @@ struct DescriptIon: Equatable {
 
     var isEmpty: Bool { entries.isEmpty }
 
-    /// The file's bytes. The encoding the file was read in is kept as long as it can hold
-    /// every character; plain text that cannot becomes UTF-16 LE with a byte-order mark.
+    /// The file's bytes.
+    ///
+    /// The encoding the file was read in is kept as long as it can hold every character; plain text
+    /// that cannot becomes UTF-16 LE with a byte-order mark.
     func data() -> Data {
         var text = ""
         for entry in entries {
@@ -228,8 +235,9 @@ final class CommentStore: @unchecked Sendable {
 
     /// Comment files larger than this are not read; no folder has that many comments.
     private static let sizeLimit = 16 * 1_024 * 1_024
-    /// How long a reading is trusted. Changes made here are known at once (`forget`); this is
-    /// for changes other programs make.
+    /// How long a reading is trusted.
+    ///
+    /// Changes made here are known at once (`forget`); this is for changes other programs make.
     private static let lifetime: TimeInterval = 3
     /// How long a thread waits for another thread's reading of the same folder.
     var waitLimit: TimeInterval {
@@ -244,8 +252,9 @@ final class CommentStore: @unchecked Sendable {
     private let condition = NSCondition()
     private var remembered: [String: Remembered] = [:]
     private var beingRead: Set<String> = []
-    /// Counts the changes made to each folder's comments here. A reading that began before a
-    /// change is not remembered: it may be the file as it was.
+    /// Counts the changes made to each folder's comments here.
+    ///
+    /// A reading that began before a change is not remembered: it may be the file as it was.
     private var generations: [String: Int] = [:]
 
     init(fileSystems: FileSystemRegistry) {
@@ -257,8 +266,10 @@ final class CommentStore: @unchecked Sendable {
         comments(in: item.url.deletingLastPathComponent(), cancellation: cancellation)[item.name.lowercased()] ?? ""
     }
 
-    /// The comments of a folder by lower-cased file name. Nothing when `cancellation` was
-    /// set before they were read, or when another thread's reading did not come back in time.
+    /// The comments of a folder by lower-cased file name.
+    ///
+    /// Nothing when `cancellation` was set before they were read, or when another thread's reading
+    /// did not come back in time.
     func comments(in directory: URL, cancellation: CancellationFlag = CancellationFlag()) -> [String: String] {
         let key = directory.locationKey
         condition.lock()
@@ -359,10 +370,12 @@ final class CommentStore: @unchecked Sendable {
         return file
     }
 
-    /// Changes the comment of one file. The new comment file is written beside the old one and
-    /// then takes its place in one step, so a failure leaves the old comments as they were. A
-    /// file without comments is removed. With `hidden`, the file gets the hidden flag where the
-    /// file system has one (a new `descript.ion` is hidden in Total Commander).
+    /// Changes the comment of one file.
+    ///
+    /// The new comment file is written beside the old one and then takes its place in one step, so
+    /// a failure leaves the old comments as they were. A file without comments is removed. With
+    /// `hidden`, the file gets the hidden flag where the file system has one (a new `descript.ion`
+    /// is hidden in Total Commander).
     func setComment(
         _ comment: String,
         for name: String,

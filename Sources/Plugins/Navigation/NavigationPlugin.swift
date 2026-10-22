@@ -21,6 +21,7 @@ extension CommandID {
 }
 
 /// Moving through the directory structure (spec 03 › Navigation, 06 › Navigation).
+///
 /// Every move asks the panel to show a location; the panel reads it in the background.
 public final class NavigationPlugin: Plugin {
     public let name = "Navigation"
@@ -35,8 +36,9 @@ public final class NavigationPlugin: Plugin {
     }
 
     /// The place a directory belongs to, and the one `delta` steps further in the volume list
-    /// (wrapping around): the disks when there are several, otherwise every place. Nil when
-    /// there is nowhere else to go. Works on the locations alone.
+    /// (wrapping around): the disks when there are several, otherwise every place.
+    ///
+    /// Nil when there is nowhere else to go. Works on the locations alone.
     nonisolated static func neighbourPlace(of directory: URL, in places: [Place], delta: Int) -> Place? {
         let disks = places.filter { $0.kind == .internalDisk || $0.kind == .externalDisk }
         let candidates = disks.count > 1 ? disks : places
@@ -53,7 +55,9 @@ public final class NavigationPlugin: Plugin {
     }
 
     /// The first line of a text from the clipboard as a path: without the quotes and spaces a
-    /// path copied from a terminal or a document tends to come with. Nil when nothing is left.
+    /// path copied from a terminal or a document tends to come with.
+    ///
+    /// Nil when nothing is left.
     nonisolated static func path(fromClipboard text: String) -> String? {
         // Only the first line that has anything on it is looked at, however long the text is: the
         // first 8 KB of it (a path is not longer), cut at a byte, which only touches the last character.
@@ -67,12 +71,13 @@ public final class NavigationPlugin: Plugin {
         return path.isEmpty ? nil : path
     }
 
-    /// What the commands and menus need of the clipboard. Its text is copied (all of it, if it is
-    /// a long one) only when a command needs it, and once for each change count; the menus ask
-    /// only for the kinds of its contents, which costs no copy: a yes is kept for as long as the
-    /// change count stays, a no is asked again each time, since a program that fills the
-    /// clipboard may add the text after the count was changed. Main thread only (`NSPasteboard`
-    /// is not safe to use from two threads at once).
+    /// What the commands and menus need of the clipboard.
+    ///
+    /// Its text is copied (all of it, if it is a long one) only when a command needs it, and once
+    /// for each change count; the menus ask only for the kinds of its contents, which costs no
+    /// copy: a yes is kept for as long as the change count stays, a no is asked again each time,
+    /// since a program that fills the clipboard may add the text after the count was changed. Main
+    /// thread only (`NSPasteboard` is not safe to use from two threads at once).
     @MainActor private final class ClipboardText {
         private let pasteboard: NSPasteboard
         private var textCount: Int?

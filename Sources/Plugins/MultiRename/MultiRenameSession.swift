@@ -5,14 +5,18 @@ import ImageIO
 import UniformTypeIdentifiers
 
 /// The text on the clipboard for `[X]`, read when a mask asks for it and not before, and kept
-/// until the clipboard changes. A mask does not wait for it on its own thread: a queue of the
-/// session asks for it (`read`, which reads on the main thread) and the mask waits at most
-/// `Snapshot.patience` (a program that provides its text only when asked can take as long as it
-/// likes). Main thread; its snapshots are safe to use from several threads.
+/// until the clipboard changes.
+///
+/// A mask does not wait for it on its own thread: a queue of the session asks for it (`read`, which
+/// reads on the main thread) and the mask waits at most `Snapshot.patience` (a program that
+/// provides its text only when asked can take as long as it likes). Main thread; its snapshots are
+/// safe to use from several threads.
 @MainActor
 final class ClipboardSource {
-    /// One reading of the clipboard. Unchecked `Sendable`: the state is guarded by `condition`;
-    /// `read` and `queue` do not change after `init`.
+    /// One reading of the clipboard.
+    ///
+    /// Unchecked `Sendable`: the state is guarded by `condition`; `read` and `queue` do not change
+    /// after `init`.
     final class Snapshot: @unchecked Sendable {
         private let condition = NSCondition()
         private var text: String?
@@ -67,8 +71,10 @@ final class ClipboardSource {
         self.changeCount = changeCount
     }
 
-    /// The clipboard as it is now. Cheap: nothing is read until the snapshot is asked for its
-    /// value, and a clipboard that has not changed since the last call gives the same snapshot.
+    /// The clipboard as it is now.
+    ///
+    /// Cheap: nothing is read until the snapshot is asked for its value, and a clipboard that has
+    /// not changed since the last call gives the same snapshot.
     func snapshot() -> Snapshot {
         guard let changeCount else { return Snapshot(read: read, queue: queue) }
         let count = changeCount()
@@ -184,7 +190,9 @@ final class MultiRenameSession {
         if previewsInBackground { store.loadUndo() }
     }
 
-    /// The rows as the list shows them. Made on each call: ask for one row with `row(at:)`.
+    /// The rows as the list shows them.
+    ///
+    /// Made on each call: ask for one row with `row(at:)`.
     var rows: [Row] { entries.indices.map(row(at:)) }
     var rowCount: Int { entries.count }
 
@@ -209,7 +217,9 @@ final class MultiRenameSession {
     }
 
     /// A change of the fields: the preview is started after a short pause, so that typing a
-    /// mask starts one preview and not one per key. Without background work it is made at once.
+    /// mask starts one preview and not one per key.
+    ///
+    /// Without background work it is made at once.
     private func scheduleRefresh() {
         guard previewsInBackground else {
             refresh()
@@ -225,7 +235,9 @@ final class MultiRenameSession {
         }
     }
 
-    /// Computes the preview again. With a window, in the background; `onChange` follows.
+    /// Computes the preview again.
+    ///
+    /// With a window, in the background; `onChange` follows.
     func refresh() {
         refreshRequest += 1
         previewCancellation.cancel()
@@ -287,9 +299,11 @@ final class MultiRenameSession {
 
     // MARK: The list
 
-    /// The list changed. A cache is made again for the new list; with `keepingFolders` what
-    /// was found out about the folders, and the dates in pictures, are taken along (the same
-    /// items in another order, or fewer).
+    /// The list changed.
+    ///
+    /// A cache is made again for the new list; with `keepingFolders` what was found out about the
+    /// folders, and the dates in pictures, are taken along (the same items in another order, or
+    /// fewer).
     private func listChanged(keepingFolders: Bool = false) {
         listGeneration += 1
         cache = keepingFolders ? cache.forChangedOrder() : RenameCache()
@@ -300,10 +314,11 @@ final class MultiRenameSession {
     /// Lists at least this long are worked on off the main thread.
     private static let backgroundSortThreshold = 2_000
 
-    /// Sorts by a column; the order drives the counter `[C]`. The keys are worked out once
-    /// per row, and a long list is sorted in the background (the list shows the new order
-    /// when it is ready; a change of the list in the meantime drops the result, and of two
-    /// sorts asked for in a row, the second wins).
+    /// Sorts by a column; the order drives the counter `[C]`.
+    ///
+    /// The keys are worked out once per row, and a long list is sorted in the background (the list
+    /// shows the new order when it is ready; a change of the list in the meantime drops the result,
+    /// and of two sorts asked for in a row, the second wins).
     func sort(by key: SortKey, ascending: Bool) {
         guard !isBusy else { return }
         struct Keys {
@@ -415,7 +430,9 @@ final class MultiRenameSession {
     }
 
     /// "Next step" (F5): the computed names become the old names, so that another set of
-    /// rules can be applied on top; the fields go back to "no change". Nothing is renamed yet.
+    /// rules can be applied on top; the fields go back to "no change".
+    ///
+    /// Nothing is renamed yet.
     func nextStep() {
         guard !isBusy else { return }
         let (oldEntries, names) = (entries, newNames)
@@ -609,10 +626,11 @@ final class MultiRenameSession {
     var canUndo: Bool { !isBusy && store.undoLimit > 0 && store.undoCount > 0 }
     var hasResultList: Bool { !lastRun.isEmpty }
 
-    /// Renames the items in list order, as a job with progress. The names are computed afresh
-    /// on the job's thread, so what happens is what the fields say, whatever the preview
-    /// has caught up with; the job ends when it is cancelled, also in the middle of a regular
-    /// expression. `completion` runs on the main thread.
+    /// Renames the items in list order, as a job with progress.
+    ///
+    /// The names are computed afresh on the job's thread, so what happens is what the fields say,
+    /// whatever the preview has caught up with; the job ends when it is cancelled, also in the
+    /// middle of a regular expression. `completion` runs on the main thread.
     func start(completion: (@MainActor (RenameRunResult) -> Void)? = nil) {
         guard !entries.isEmpty, !isBusy else { return }
         rememberFields()
@@ -763,7 +781,9 @@ final class MultiRenameSession {
     }
 
     /// A successful run shows no message: the renamed items leave the list and Undo and the
-    /// result list become available. What failed stays in the list and is reported.
+    /// result list become available.
+    ///
+    /// What failed stays in the list and is reported.
     private func finish(_ outcome: Outcome) {
         let result = outcome.result
         if !result.renamed.isEmpty {
@@ -935,10 +955,12 @@ extension RenameStatus {
 }
 
 /// `[T4]`: the date a camera recorded in a picture (EXIF "date taken", else the digitized or
-/// the plain date; spec 18 › Date and time). Read from files on the local disk only; called
-/// on the preview threads. Only plain files of a picture type that are on this disk are opened:
-/// a FIFO in the list would hold a preview thread for good, a stub of a file in the cloud would
-/// be downloaded, and the decoders of ImageIO are not pointed at what is not a picture.
+/// the plain date; spec 18 › Date and time).
+///
+/// Read from files on the local disk only; called on the preview threads. Only plain files of a
+/// picture type that are on this disk are opened: a FIFO in the list would hold a preview thread
+/// for good, a stub of a file in the cloud would be downloaded, and the decoders of ImageIO are not
+/// pointed at what is not a picture.
 enum ContentDate {
     static func read(_ url: URL) -> Date? {
         guard url.isFileURL, isPicture(url), isPlainFileHere(url),

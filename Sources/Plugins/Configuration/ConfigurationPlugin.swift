@@ -59,8 +59,9 @@ public final class ConfigurationPlugin: Plugin {
     /// The lines of user commands that were started without a command-line plugin.
     public var launched: [String] { center?.runner.launched ?? [] }
 
-    /// The keys of the values the program itself stored in the macOS preferences. Only the
-    /// real settings store is listed this way; any other store has no list of its keys.
+    /// The keys of the values the program itself stored in the macOS preferences.
+    ///
+    /// Only the real settings store is listed this way; any other store has no list of its keys.
     static func storedKeys(of settings: any SettingsStore) -> [String] {
         storedKeys(of: settings, domain: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName)
     }

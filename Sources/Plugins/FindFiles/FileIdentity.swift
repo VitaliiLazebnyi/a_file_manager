@@ -13,7 +13,9 @@ struct FileIdentity: Hashable {
     static let datalessFlag: UInt32 = 0x4000_0000
 
     /// What a local path is, with one system call; nil for other locations or a path that
-    /// cannot be examined. Links are followed.
+    /// cannot be examined.
+    ///
+    /// Links are followed.
     static func of(_ url: URL) -> (identity: Self, isRegularFile: Bool)? {
         guard let info = status(of: url) else { return nil }
         return (
@@ -30,7 +32,9 @@ struct FileIdentity: Hashable {
 
     /// False for a FIFO, a device or a socket, which would block or never end when read, and
     /// for a file that is only a stub of one in the cloud (reading it would download it, for
-    /// every file of a search). A location that is not a local path is given the benefit of the doubt.
+    /// every file of a search).
+    ///
+    /// A location that is not a local path is given the benefit of the doubt.
     static func canBeRead(_ url: URL) -> Bool {
         guard url.isFileURL else { return true }
         guard let info = status(of: url) else { return false }
@@ -41,6 +45,7 @@ struct FileIdentity: Hashable {
 /// Reads a local file through a descriptor that was checked after it was opened: the file is
 /// opened without waiting (a FIFO that took the place of the file since it was looked at
 /// would block an `open` for good), and only a regular file that is not a cloud stub is kept.
+///
 /// The descriptor is guarded by `lock`; it is used outside the lock, which is safe because a
 /// `FileReader` is used by one thread at a time (`close` too) and `interrupt` does nothing.
 final class LocalFileReader: FileReader, @unchecked Sendable {

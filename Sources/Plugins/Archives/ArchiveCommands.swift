@@ -27,9 +27,11 @@ enum ArchiveSettings {
     static let unpackSeparate = "archives.unpackSeparate"
     static let unpackOverwrite = "archives.unpackOverwrite"
 
-    /// The endings Enter opens as folders. Office documents and installer packages are ZIP or
-    /// XAR files too, but Enter should hand those to their applications (spec 08 › Opening an
-    /// archive, `PreferOpenTypes`); "Open as Archive" still enters them.
+    /// The endings Enter opens as folders.
+    ///
+    /// Office documents and installer packages are ZIP or XAR files too, but Enter should hand
+    /// those to their applications (spec 08 › Opening an archive, `PreferOpenTypes`); "Open as
+    /// Archive" still enters them.
     static let defaultExtensions = "zip 7z rar tar gz tgz bz2 tbz tbz2 xz txz jar war cab cpio lha lzh arj z taz"
     static let levels = ["0 (store)", "1 (fastest)", "2", "3", "4", "5", "6 (normal)", "7", "8", "9 (best)"]
 
@@ -111,8 +113,10 @@ final class ArchiveCommands {
     // MARK: Entering archives
 
     /// True while the key being handled is Ctrl+PgDn, which enters any file as an archive
-    /// (spec 08 › Opening an archive). The key itself belongs to "Open Directory", which sends
-    /// files to the openers like Enter does; this is how the opener tells the two apart.
+    /// (spec 08 › Opening an archive).
+    ///
+    /// The key itself belongs to "Open Directory", which sends files to the openers like Enter
+    /// does; this is how the opener tells the two apart.
     private var isForcedOpen: Bool {
         guard let event = currentEvent(), event.type == .keyDown else { return false }
         return event.keyCode == 121 && event.modifierFlags.contains(.control)
@@ -217,8 +221,9 @@ final class ArchiveCommands {
         )
     }
 
-    /// Enters the file under the cursor as an archive, whatever it is called. The first bytes
-    /// are read in the background to see whether it is a ZIP, which can be changed.
+    /// Enters the file under the cursor as an archive, whatever it is called.
+    ///
+    /// The first bytes are read in the background to see whether it is a ZIP, which can be changed.
     func openAsArchive() {
         let panel = source
         guard let file = panel.model.cursorFile else { return }
@@ -418,8 +423,10 @@ final class ArchiveCommands {
         )
     }
 
-    /// The names the panel marks the operands that were packed with. A branch or list view
-    /// names its items by path, which is not the last name of their locations.
+    /// The names the panel marks the operands that were packed with.
+    ///
+    /// A branch or list view names its items by path, which is not the last name of their
+    /// locations.
     nonisolated static func names(of operands: [FileItem], packedAs completed: [URL]) -> [String] {
         let packed = Set(completed)
         return operands.filter { packed.contains($0.url) }.map(\.name)
@@ -432,8 +439,9 @@ final class ArchiveCommands {
         "Use the old ZIP encryption instead (weak: it can be broken within minutes; "
         + "only for programs that cannot open AES)"
 
-    /// Asks twice for the password of a new archive, and how to encrypt; nil on Cancel. The
-    /// old encryption is offered for exchange with old programs, and is said to be weak. A
+    /// Asks twice for the password of a new archive, and how to encrypt; nil on Cancel.
+    ///
+    /// The old encryption is offered for exchange with old programs, and is said to be weak. A
     /// password that is empty, or typed differently the second time, is asked for again.
     private func askNewPassword(detail: String) -> (password: String, encryption: ZipEncryption)? {
         let fields: [FormField] = [

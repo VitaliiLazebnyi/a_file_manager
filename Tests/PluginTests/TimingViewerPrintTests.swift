@@ -4,8 +4,10 @@ import Testing
 @testable import ViewerPlugin
 
 /// Printing a text from the Lister while the pane leaves its window: the print panel is a sheet
-/// of the window the user printed from, taken when printing started. The text is prepared in the
-/// background; the tests hold that step back by suspending the pane's work queue.
+/// of the window the user printed from, taken when printing started.
+///
+/// The text is prepared in the background; the tests hold that step back by suspending the pane's
+/// work queue.
 @MainActor
 @Suite(.serialized)
 internal struct TimingViewerPrintTests {

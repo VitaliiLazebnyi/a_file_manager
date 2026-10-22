@@ -21,7 +21,8 @@ import Testing
         #expect(copy[.creationDate] as? Date == Date(timeIntervalSince1970: 1_500_000_000))
         #expect(
             copy[.modificationDate] as? Date == Date(timeIntervalSince1970: 1_700_000_000)
-                && copy[.posixPermissions] as? Int == 0o640)
+                && copy[.posixPermissions] as? Int == 0o640
+        )
         var buffer = [UInt8](repeating: 0, count: 16)
         let length = getxattr(box.url("b.txt").path, "com.example.note", &buffer, 16, 0, 0)
         #expect(length == 5 && String(decoding: buffer[..<5], as: UTF8.self) == "hello")
@@ -49,7 +50,8 @@ import Testing
         let here = try #require(local.volume(of: box.root))
         #expect(
             here.isLocal && (here.freeBytes ?? 0) > 0 && (here.totalBytes ?? 0) >= (here.freeBytes ?? 0)
-                && !here.name.isEmpty)
+                && !here.name.isEmpty
+        )
         let future = try #require(local.volume(of: box.url("not/yet/there.txt")))
         #expect(future.name == here.name && future.isLocal)
         let file = try box.file("f.txt")
@@ -67,9 +69,11 @@ import Testing
         #expect(places.filter { $0.url.path == "/" }.map(\.kind) == [.internalDisk])
         #expect(Set(places.map(\.url.path)).count == places.count)
         // iCloud Drive appears exactly when this user has one.
-        let cloud = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
-            "Library/Mobile Documents/com~apple~CloudDocs"
-        ).path
+        let cloud = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(
+                "Library/Mobile Documents/com~apple~CloudDocs"
+            )
+            .path
         #expect(names.contains("iCloud Drive") == FileManager.default.fileExists(atPath: cloud))
     }
 }

@@ -1,7 +1,8 @@
 import Foundation
 
-/// AppleScript of the system, which reaches other applications. The UI tests cover this; unit
-/// tests hand the plugin a recorder instead.
+/// AppleScript of the system, which reaches other applications.
+///
+/// The UI tests cover this; unit tests hand the plugin a recorder instead.
 internal enum AppleScript {
     /// Runs `osascript` with these arguments and does not wait for it.
     internal static let run: @Sendable ([String]) -> Void = { arguments in

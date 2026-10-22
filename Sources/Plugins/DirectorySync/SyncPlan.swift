@@ -3,8 +3,9 @@ public import AFMKernel
 public import Foundation
 
 /// What Synchronize is about to do, worked out from the rows and their actions
-/// (spec 09 › The "Synchronize" dialog and the run). A value without behaviour: the dialog
-/// shows its counts, the executor carries it out.
+/// (spec 09 › The "Synchronize" dialog and the run).
+///
+/// A value without behaviour: the dialog shows its counts, the executor carries it out.
 public struct SyncPlan: Equatable, Sendable {
     public struct Copy: Equatable, Sendable {
         public let source: URL
@@ -86,7 +87,7 @@ public struct SyncPlan: Equatable, Sendable {
         if toRight { self.toRight = moved(self.toRight) } else { self.toLeft = moved(self.toLeft) }
     }
 
-    /// `Copy 16 files, total size: 6,363,930 bytes`
+    /// `Copy 16 files, total size: 6,363,930 bytes`.
     public static func describe(_ copies: [Copy]) -> String {
         let files = copies.filter { !$0.isDirectory }
         let folders = copies.count - files.count
@@ -139,8 +140,9 @@ public struct SyncOutcome: Sendable {
 }
 
 /// Carries out a plan through the file-system providers, so it works between any two file
-/// systems (spec 09 › The "Synchronize" dialog and the run). Right-to-left copies run first,
-/// then left-to-right, then the deletions.
+/// systems (spec 09 › The "Synchronize" dialog and the run).
+///
+/// Right-to-left copies run first, then left-to-right, then the deletions.
 ///
 /// **Threading.** `run` blocks and belongs on a job's thread; the three callbacks are called
 /// on that thread and may block while the user decides. `cancellation` may be set from any
@@ -245,7 +247,9 @@ public final class SyncExecutor: @unchecked Sendable {
         return outcome
     }
 
-    /// Does one item with the user's say on failures. Returns false when the run is to stop.
+    /// Does one item with the user's say on failures.
+    ///
+    /// Returns false when the run is to stop.
     private func step(_ url: URL, lines: [String], _ work: () throws -> Bool) -> Bool {
         defer { itemsDone += 1 }
         // Tried again for as long as the user asks for it, unless the run is cancelled.
@@ -406,8 +410,10 @@ public final class SyncExecutor: @unchecked Sendable {
         uncommitted[root.locationKey] = (provider, root)
     }
 
-    /// Makes what the copies wrote durable. False when that failed: nothing below the root
-    /// can be relied on, so the run ends as failed and deletes nothing.
+    /// Makes what the copies wrote durable.
+    ///
+    /// False when that failed: nothing below the root can be relied on, so the run ends as failed
+    /// and deletes nothing.
     private func commitWrites() -> Bool {
         let pending = uncommitted
         uncommitted = [:]
@@ -428,7 +434,9 @@ public final class SyncExecutor: @unchecked Sendable {
     }
 
     /// Copies the file to a free name: inside one file system by the file system itself,
-    /// otherwise by reading from one and writing to the other. Nothing stays behind on failure.
+    /// otherwise by reading from one and writing to the other.
+    ///
+    /// Nothing stays behind on failure.
     private func transfer(_ copy: SyncPlan.Copy, to destination: URL, in targetSystem: any FileSystemProvider) throws {
         let sourceSystem = try fileSystems.provider(for: copy.source)
         let report = { (bytes: Int64) in
@@ -491,9 +499,11 @@ public final class SyncExecutor: @unchecked Sendable {
     }
 
     /// A target that did not keep the date it is to have would look different again at the next
-    /// comparison. The target's date is set; where that is not possible, the source takes
-    /// the target's date (spec 09 › Synchronizing with FTP, the timestamp problem), moved by the
-    /// same amount the target's was.
+    /// comparison.
+    ///
+    /// The target's date is set; where that is not possible, the source takes the target's date
+    /// (spec 09 › Synchronizing with FTP, the timestamp problem), moved by the same amount the
+    /// target's was.
     private func adjustDate(of copy: SyncPlan.Copy, in targetSystem: any FileSystemProvider) {
         guard let arrived = targetSystem.item(at: copy.target), !arrived.isSymlink,
             abs(arrived.modified.timeIntervalSince(copy.targetModified)) > Double(options.toleranceSeconds)
@@ -538,7 +548,9 @@ public final class SyncExecutor: @unchecked Sendable {
     }
 
     /// Deletes the empty folders of a tree from the bottom up; returns whether `directory`
-    /// itself is empty afterwards. Failures are ignored: the folder simply stays.
+    /// itself is empty afterwards.
+    ///
+    /// Failures are ignored: the folder simply stays.
     @discardableResult
     private func removeEmptyDirectories(below directory: URL, isRoot: Bool = false) -> Bool {
         guard !cancellation.isCancelled, let fileSystem = try? fileSystems.provider(for: directory),

@@ -50,22 +50,25 @@ public final class PlacesPlugin: Plugin {
     private var subscription: AnyObject?
     /// The Directory Tree window, once it was opened; it is kept for the next time.
     private(set) var treeWindow: DirectoryTreeWindowController?
-    /// Puts the tree window on screen. Tests replace it, so that no window shows in the
-    /// session they run in, and look at what it was asked to show.
+    /// Puts the tree window on screen.
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
     /// Stored data that could not be read in full is reported once per key and run.
     private var reportedKeys = Set<String>()
     private var lastNoted: URL?
-    /// Shows the hotlist editor and returns the changed list, or nil on Cancel. Tests put a
-    /// script here; without one the editor window is used.
+    /// Shows the hotlist editor and returns the changed list, or nil on Cancel.
+    ///
+    /// Tests put a script here; without one the editor window is used.
     var editHotlist: ((Hotlist) -> Hotlist?)?
 
     /// Directory trees are cached in `treeCacheDirectory`; without one they go to the program's
     /// folder in Application Support, or stay in memory only when `keepsTreesOnDisk` is off.
-    /// `favorites` are the standard places offered next to the user's hotlist; `now` is the
-    /// clock the history measures stays with. Tests replace all of these. With `opensWindows`
-    /// off, the Directory Tree window is made but never put on screen (for tests of the whole
-    /// program).
+    ///
+    /// `favorites` are the standard places offered next to the user's hotlist; `now` is the clock
+    /// the history measures stays with. Tests replace all of these. With `opensWindows` off, the
+    /// Directory Tree window is made but never put on screen (for tests of the whole program).
     public init(
         treeCacheDirectory: URL? = nil,
         keepsTreesOnDisk: Bool = true,
@@ -205,7 +208,9 @@ public final class PlacesPlugin: Plugin {
     /// Writes the history changes that are waiting for their delay to end.
     func flushHistory() { tracker?.flush() }
 
-    /// Tells the user, once, that stored data was damaged. The data itself is kept aside.
+    /// Tells the user, once, that stored data was damaged.
+    ///
+    /// The data itself is kept aside.
     private func storedDataProblem(_ message: String, in kernel: Kernel) {
         guard reportedKeys.insert(message).inserted else { return }
         performOnMainLoop {
@@ -266,9 +271,10 @@ public final class PlacesPlugin: Plugin {
         case favorites
     }
 
-    /// Ctrl+D: the hotlist as a pick list, one level at a time. A submenu opens as the next
-    /// list and Cancel leads back out of it; the second button opens the entry in a new tab
-    /// (Shift+Enter of the specification).
+    /// Ctrl+D: the hotlist as a pick list, one level at a time.
+    ///
+    /// A submenu opens as the next list and Cancel leads back out of it; the second button opens
+    /// the entry in a new tab (Shift+Enter of the specification).
     private func showHotlist(in kernel: Kernel, level: HotlistLevel = .user([])) {
         let list = hotlist(in: kernel)
         let current = kernel.panels.source.model.directory
@@ -406,8 +412,9 @@ public final class PlacesPlugin: Plugin {
     }
 
     /// Alt+Down: the directories the source panel visited, the last one first, and below them
-    /// the folders used most often. The list comes back after "Remove", so several entries
-    /// can be cleared in a row.
+    /// the folders used most often.
+    ///
+    /// The list comes back after "Remove", so several entries can be cleared in a row.
     ///
     /// The "maximum to show" settings apply to Alt+Down, with or without thinning; the
     /// unthinned list of Alt+Shift+Down shows everything (`limited: false`).

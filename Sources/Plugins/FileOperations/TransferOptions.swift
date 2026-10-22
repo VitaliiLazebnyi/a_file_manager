@@ -2,8 +2,10 @@ import AFMKernel
 import Foundation
 
 /// What happens to a file whose name is taken at the target, for the whole job (spec 07 ›
-/// Default overwrite mode). The first nine are the spec's `CopyOverwriteDefault` list in its
-/// order; the tenth exists only in the Overwrite dialog.
+/// Default overwrite mode).
+///
+/// The first nine are the spec's `CopyOverwriteDefault` list in its order; the tenth exists only in
+/// the Overwrite dialog.
 public enum OverwriteMode: Int, CaseIterable, Sendable {
     case ask, overwriteAll, skipAll, overwriteOlder, autoRenameCopied, autoRenameExisting, copyLarger, copySmaller
     case renameOlderSkipNewer, overwriteOlderOrSame
@@ -34,13 +36,16 @@ public enum LinkHandling: Int, Sendable {
 
 /// The choices of the Copy and Move dialogs and of the Copy/Delete configuration page that
 /// the engine acts on (spec 07 › Copy dialog, Advanced options; 13 › Operation › Copy/Delete).
+///
 /// The defaults are the behaviour without any dialog.
 public struct TransferOptions: Sendable {
     public var overwrite = OverwriteMode.ask
     /// "Only files of this type".
     public var filter = CopyFilter()
     /// Copies keep the date of last change and the permissions (and, within one file system,
-    /// whatever else that file system keeps). Off: the copy is dated now, with the usual permissions.
+    /// whatever else that file system keeps).
+    ///
+    /// Off: the copy is dated now, with the usual permissions.
     public var preservesAttributes = true
     /// Copied folders get the date of the folder they were copied from (`CopyDirTimeStamp`).
     public var preservesFolderDates = false

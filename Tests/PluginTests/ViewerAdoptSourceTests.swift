@@ -9,8 +9,9 @@ import Testing
 /// A function that runs on a thread of its own, for work that is meant to block: it says when
 /// the thread waits (in a read that never answers), so a test sets the flag then and not "after a
 /// moment".
-/// Unchecked: `port` is written by the worker before it signals `started`, and read after
-/// that; `thread` is set in `init`.
+///
+/// Unchecked: `port` is written by the worker before it signals `started`, and read after that;
+/// `thread` is set in `init`.
 final class ViewerAdoptWorker: @unchecked Sendable {
     private var port: mach_port_t = 0
     private let started = DispatchSemaphore(value: 0)
@@ -64,6 +65,7 @@ func viewerAdoptWait(_ seconds: TimeInterval = Wait.ceiling, until condition: ()
 }
 
 /// A guarded value, for results that come from threads.
+///
 /// Unchecked: the value is guarded by `lock`.
 final class ViewerAdoptBox<Value>: @unchecked Sendable {
     private let lock = NSLock()

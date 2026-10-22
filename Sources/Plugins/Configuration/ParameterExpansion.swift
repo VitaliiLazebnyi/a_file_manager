@@ -26,6 +26,7 @@ struct ExpansionContext {
     /// The name of the list file without extension; unique per run.
     var listName = UUID().uuidString
     /// The same words when they came out of an expansion already: their values stay values.
+    ///
     /// Nil stands for `arguments` as the user typed them.
     var argumentPieces: [ExpandedPiece]?
 
@@ -33,16 +34,20 @@ struct ExpansionContext {
     var target: PanelSnapshot { sourceIsRight ? left : right }
 }
 
-/// A list of file names a started program reads (spec 18 › List files). The expansion only says
-/// what the file holds; whoever runs the command writes it, off the main thread.
+/// A list of file names a started program reads (spec 18 › List files).
+///
+/// The expansion only says what the file holds; whoever runs the command writes it, off the main
+/// thread.
 struct ListFile: Equatable {
     let url: URL
     let contents: Data
 }
 
-/// One piece of an expanded text. Only `text` is ever read as shell text or searched for
-/// placeholders; a `value` is data (a file name, a path, the content of a variable) and reaches
-/// a program as it is, whatever characters it holds.
+/// One piece of an expanded text.
+///
+/// Only `text` is ever read as shell text or searched for placeholders; a `value` is data (a file
+/// name, a path, the content of a variable) and reaches a program as it is, whatever characters it
+/// holds.
 enum ExpandedPiece: Equatable {
     /// What the user wrote.
     case text(String)
@@ -60,21 +65,27 @@ struct ExpandedParameters: Equatable {
     /// An `%A` code used the arguments, so they are not appended a second time.
     var usedArguments = false
     /// A code for the name under the cursor met a panel with no such name (`[..]`, an empty
-    /// list). The text then names the folder instead of a file (`rm -rf %P%N`), so the
-    /// command must not run.
+    /// list).
+    ///
+    /// The text then names the folder instead of a file (`rm -rf %P%N`), so the command must not
+    /// run.
     var missingName = false
     /// Another reason why the command must not run (a name that cannot stand in a list file).
     var problem: String?
 
     /// The parameters as one readable line: the values written into it, quoted where they
-    /// need it. For commands of the program, for `cd` and for showing; a shell is given
-    /// `ShellLine.script` instead.
+    /// need it.
+    ///
+    /// For commands of the program, for `cd` and for showing; a shell is given `ShellLine.script`
+    /// instead.
     var text: String { ShellLine.display(pieces) }
 }
 
-/// Quoting for reading and showing a command line. Total Commander quotes names that contain
-/// a space; here everything a shell would read as something else is quoted too. Everything
-/// works on Unicode scalars: a quote followed by a combining mark is still a quote to a shell.
+/// Quoting for reading and showing a command line.
+///
+/// Total Commander quotes names that contain a space; here everything a shell would read as
+/// something else is quoted too. Everything works on Unicode scalars: a quote followed by a
+/// combining mark is still a quote to a shell.
 enum ShellWords {
     /// What may stand in a word without quotes.
     private static let plain = CharacterSet(
@@ -254,6 +265,7 @@ enum ShellWords {
 }
 
 /// Replaces the placeholders of a Parameters field (spec 18 › Button and command parameters).
+///
 /// Pure: it reads nothing but its context and writes nothing.
 ///
 /// Adapted to the Mac: there are no 8.3 names, so the lower-case codes insert the same as the
@@ -290,8 +302,10 @@ struct ParameterExpander {
         )
     }
 
-    /// Whether a text has a code that needs the marked names of a panel. Making that list
-    /// costs a pass over the whole panel, so it is made only for a text that asks for it.
+    /// Whether a text has a code that needs the marked names of a panel.
+    ///
+    /// Making that list costs a pass over the whole panel, so it is made only for a text that asks
+    /// for it.
     static func usesSelection(_ pieces: [ExpandedPiece]) -> Bool {
         let codes = Set("SsRrCcLlDFfdUW".unicodeScalars)
         var found = false
@@ -299,8 +313,10 @@ struct ParameterExpander {
         return found
     }
 
-    /// Joins neighbouring texts and takes the blanks off both ends of the line. Only blanks
-    /// the user wrote go: a value keeps every character, a no-break space at its end included.
+    /// Joins neighbouring texts and takes the blanks off both ends of the line.
+    ///
+    /// Only blanks the user wrote go: a value keeps every character, a no-break space at its end
+    /// included.
     static func trimmed(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
         var result: [ExpandedPiece] = []
         for piece in pieces {
@@ -326,8 +342,9 @@ struct ParameterExpander {
         return result
     }
 
-    /// One pass over the text. Placeholders that follow each other directly (`%P%N`) form one
-    /// word and one value.
+    /// One pass over the text.
+    ///
+    /// Placeholders that follow each other directly (`%P%N`) form one word and one value.
     private struct Run {
         enum Token {
             case scalar(Unicode.Scalar)
@@ -684,9 +701,11 @@ struct ParameterExpander {
             }
         }
 
-        /// `%S`, `%R`: every name is its own word. A path code directly in front goes before
-        /// each name; inside the user's quotes each name gets its own pair, with the text
-        /// around the code as affixes (`"before%Sbeforeext%Eafterext"`).
+        /// `%S`, `%R`: every name is its own word.
+        ///
+        /// A path code directly in front goes before each name; inside the user's quotes each name
+        /// gets its own pair, with the text around the code as affixes
+        /// (`"before%Sbeforeext%Eafterext"`).
         private mutating func names(of panel: PanelSnapshot) {
             let range = selectionRange()
             let cut = substring()
@@ -854,8 +873,9 @@ struct ParameterExpander {
             case plain, utf8WithMark, utf16WithMark
         }
 
-        /// A list code puts the name of the list file into the line. Only the first list of a
-        /// command counts.
+        /// A list code puts the name of the list file into the line.
+        ///
+        /// Only the first list of a command counts.
         private mutating func list(withPath: Bool, encoding: ListEncoding) {
             guard !listWasRequested else { return }
             listWasRequested = true
@@ -895,8 +915,10 @@ struct ParameterExpander {
         }
     }
 
-    /// The pieces without the empty texts. (The pieces of a run never hold two texts in a
-    /// row: a text is written out only in front of a value or a quote.)
+    /// The pieces without the empty texts.
+    ///
+    /// (The pieces of a run never hold two texts in a row: a text is written out only in front of a
+    /// value or a quote.).
     fileprivate static func withoutEmptyTexts(_ pieces: [ExpandedPiece]) -> [ExpandedPiece] {
         pieces.filter { piece in
             guard case .text(let text) = piece else { return true }

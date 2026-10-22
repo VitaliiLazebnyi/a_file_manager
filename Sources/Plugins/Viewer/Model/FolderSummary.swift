@@ -19,19 +19,25 @@ struct FolderSummary: Equatable {
 
     static func + (left: Self, right: Self) -> Self {
         Self(
-            files: left.files + right.files, folders: left.folders + right.folders,
+            files: left.files + right.files,
+            folders: left.folders + right.folders,
             bytes: left.bytes.addingSaturated(right.bytes),
-            isPartial: left.isPartial || right.isPartial)
+            isPartial: left.isPartial || right.isPartial
+        )
     }
 
-    /// Counts everything below `directory` through its file system. The subfolders are walked
-    /// on all cores at once. Blocks; call it on a background thread. Returns what was counted
-    /// up to then when `cancellation` is set (the listings are cancellable, so a server that
-    /// does not answer does not keep the threads). Links are counted, not followed. With
-    /// `limit`, counting stops after that many entries, as it does for a tree on a server,
-    /// where every folder is a trip; `isPartial` is then set.
+    /// Counts everything below `directory` through its file system.
+    ///
+    /// The subfolders are walked on all cores at once. Blocks; call it on a background thread.
+    /// Returns what was counted up to then when `cancellation` is set (the listings are
+    /// cancellable, so a server that does not answer does not keep the threads). Links are counted,
+    /// not followed. With `limit`, counting stops after that many entries, as it does for a tree on
+    /// a server, where every folder is a trip; `isPartial` is then set.
     static func measure(
-        _ directory: URL, provider: any FileSystemProvider, cancellation: CancellationFlag, limit: Int? = nil
+        _ directory: URL,
+        provider: any FileSystemProvider,
+        cancellation: CancellationFlag,
+        limit: Int? = nil
     ) -> Self {
         let budget = limit.map { Budget($0) }
         var result = measure(directory, provider: provider, cancellation: cancellation, budget: budget)
@@ -39,8 +45,9 @@ struct FolderSummary: Equatable {
         return result
     }
 
-    /// The entries still to be counted, shared by all the threads of a walk. All state is
-    /// guarded by `lock`.
+    /// The entries still to be counted, shared by all the threads of a walk.
+    ///
+    /// All state is guarded by `lock`.
     private final class Budget: @unchecked Sendable {
         private let lock = NSLock()
         private var left: Int
@@ -69,7 +76,10 @@ struct FolderSummary: Equatable {
     }
 
     private static func measure(
-        _ directory: URL, provider: any FileSystemProvider, cancellation: CancellationFlag, budget: Budget?
+        _ directory: URL,
+        provider: any FileSystemProvider,
+        cancellation: CancellationFlag,
+        budget: Budget?
     ) -> Self {
         guard !cancellation.isCancelled, budget?.exhausted != true,
             let items = try? provider.list(directory, showHidden: true, cancellation: cancellation),

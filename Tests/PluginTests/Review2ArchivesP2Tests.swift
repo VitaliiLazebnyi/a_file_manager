@@ -37,6 +37,7 @@ private func tarBody(_ text: String) -> Data {
 }
 
 /// A clock for the delayed writes that the test turns by hand.
+///
 /// Unchecked: what is due is guarded by `lock`.
 private final class HandClock: @unchecked Sendable {
     struct Due {
@@ -65,6 +66,7 @@ private final class HandClock: @unchecked Sendable {
 }
 
 /// What a test collects from other threads.
+///
 /// Unchecked: the state is guarded by `lock`.
 private final class Collected<Value>: @unchecked Sendable {
     private let lock = NSLock()

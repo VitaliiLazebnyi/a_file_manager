@@ -48,7 +48,8 @@ func patternData(_ count: Int) -> Data {
         #expect(digest(.sha256, abc) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
         #expect(
             digest(.sha384, abc)
-                == "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7")
+                == "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7"
+        )
         #expect(digest(.sha512, abc).hasPrefix("ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"))
         #expect(digest(.sha3_256, abc) == "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")
         #expect(digest(.blake3, abc) == "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85")
@@ -140,7 +141,8 @@ func patternData(_ count: Int) -> Data {
         for pieces in [1, 9] {
             #expect(
                 digest(.md5, data, pieces: pieces)
-                    == (try first("/sbin/md5", ["-q"])).trimmingCharacters(in: .whitespacesAndNewlines))
+                    == (try first("/sbin/md5", ["-q"])).trimmingCharacters(in: .whitespacesAndNewlines)
+            )
             #expect(digest(.sha1, data, pieces: pieces) == (try first("/usr/bin/shasum", ["-a", "1"])))
             #expect(digest(.sha224, data, pieces: pieces) == (try first("/usr/bin/shasum", ["-a", "224"])))
             #expect(digest(.sha256, data, pieces: pieces) == (try first("/usr/bin/shasum", ["-a", "256"])))
@@ -156,14 +158,17 @@ func patternData(_ count: Int) -> Data {
         #expect(ChecksumMethod.allCases.map(\.rawValue) == Array(0...11))
         #expect(
             ChecksumMethod(rawValue: 3) == .sha256 && ChecksumMethod(rawValue: 7) == .sha3_256
-                && ChecksumMethod(rawValue: 11) == .blake3)
+                && ChecksumMethod(rawValue: 11) == .blake3
+        )
         #expect(Set(ChecksumMethod.dialogOrder) == Set(ChecksumMethod.allCases))
         #expect(
             [ChecksumMethod.crc32, .md5, .sha1, .sha256, .blake3, .sha512, .sha3_256].map(\.fileExtension)
-                == ["sfv", "md5", "sha", "sha256", "bk3", "sha512", "sha3_256"])
+                == ["sfv", "md5", "sha", "sha256", "bk3", "sha512", "sha3_256"]
+        )
         #expect(
             ChecksumMethod.md5.reportName == "MD5" && ChecksumMethod.sha256.reportName == "SHA2_256"
-                && ChecksumMethod.crc32.reportName == "CRC32")
+                && ChecksumMethod.crc32.reportName == "CRC32"
+        )
         #expect(ChecksumMethod.candidates(hexDigits: 64) == [.sha256, .sha3_256, .blake3])
         #expect(ChecksumMethod.candidates(hexDigits: 8) == [.crc32] && ChecksumMethod.candidates(hexDigits: 10).isEmpty)
         for method in ChecksumMethod.allCases {
@@ -173,9 +178,10 @@ func patternData(_ count: Int) -> Data {
 
     @Test func manyFilesAreHashedOnAllCoresInOrder() {
         let (fileSystems, memory) = makeFileSystems()
-        let files = (0..<300).map {
-            (url: memory.addFile("/h/f\($0)", "content \($0)"), methods: [ChecksumMethod.md5, .crc32])
-        }
+        let files = (0..<300)
+            .map {
+                (url: memory.addFile("/h/f\($0)", "content \($0)"), methods: [ChecksumMethod.md5, .crc32])
+            }
         // Guarded by `lock`.
         nonisolated(unsafe) var reports: [JobProgress] = []
         let lock = NSLock()
@@ -185,7 +191,8 @@ func patternData(_ count: Int) -> Data {
                 lock.lock()
                 reports.append(progress)
                 lock.unlock()
-            })
+            }
+        )
         run.expect(bytes: 300 * 10, items: 300)
         let digests = ChecksumRun.digests(of: files + [(memory.url("/h/missing"), [.md5])], run: run)
         #expect(digests.count == 301)
@@ -199,7 +206,8 @@ func patternData(_ count: Int) -> Data {
         run.advance(0, force: true)
         #expect(
             reports.last?.itemsDone == 300
-                && reports.last?.bytesDone == Int64((0..<300).reduce(0) { $0 + "content \($1)".count }))
+                && reports.last?.bytesDone == Int64((0..<300).reduce(0) { $0 + "content \($1)".count })
+        )
     }
 
     @Test func hashingStopsWhenCancelled() {

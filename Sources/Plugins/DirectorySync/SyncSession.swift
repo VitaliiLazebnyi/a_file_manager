@@ -32,7 +32,9 @@ enum SyncSettingsKey {
 
 /// Everything the Synchronize directories window does, without the window: the two paths, the
 /// options, the rows of the last comparison with the actions the user chose, and the run
-/// (spec 09 › Synchronize directories). The window draws this and forwards clicks and keys.
+/// (spec 09 › Synchronize directories).
+///
+/// The window draws this and forwards clicks and keys.
 ///
 /// **Threading.** The session belongs to the main thread. A comparison runs on a background
 /// queue and comes back to the main thread with its rows; while it runs, only its
@@ -364,8 +366,11 @@ final class SyncSession {
         return layout
     }
 
-    /// Lays the list out again. The rows of a large list are worked on away from the main thread, and the previous
-    /// list stays on show until the new one has come; where the rows themselves are new (`rowsChanged`) there is nothing to show meanwhile.
+    /// Lays the list out again.
+    ///
+    /// The rows of a large list are worked on away from the main thread, and the previous list
+    /// stays on show until the new one has come; where the rows themselves are new (`rowsChanged`)
+    /// there is nothing to show meanwhile.
     private func rebuild(rowsChanged: Bool) {
         layoutGeneration += 1
         let generation = layoutGeneration
@@ -416,8 +421,10 @@ final class SyncSession {
         changed()
     }
 
-    /// Orders the rows of one folder. The keys (a size, a date) are taken out once, and the pairs of key and
-    /// row are sorted: sorting the rows by looking into their files on every comparison takes seconds at a million.
+    /// Orders the rows of one folder.
+    ///
+    /// The keys (a size, a date) are taken out once, and the pairs of key and row are sorted:
+    /// sorting the rows by looking into their files on every comparison takes seconds at a million.
     nonisolated private static func sorted(
         _ indexes: [Int],
         rows: [SyncRow],
@@ -523,8 +530,10 @@ final class SyncSession {
     }
 
     /// "Compare left & right": the two picked files when one was picked on each side, else
-    /// the two files of the row. The comparison tool is another plugin's command; it is
-    /// handed the two locations as two lines of text.
+    /// the two files of the row.
+    ///
+    /// The comparison tool is another plugin's command; it is handed the two locations as two lines
+    /// of text.
     func compareContents(row index: Int?) {
         var files = (left: picked.left, right: picked.right)
         if files.left == nil || files.right == nil {
@@ -595,8 +604,9 @@ final class SyncSession {
         )
     }
 
-    /// Asks about the plan of the last comparison and runs it. Only while the comparison's
-    /// rows are shown (`phase` is `.compared`).
+    /// Asks about the plan of the last comparison and runs it.
+    ///
+    /// Only while the comparison's rows are shown (`phase` is `.compared`).
     private func present(_ plan: SyncPlan) {
         var plan = plan
         guard !plan.isEmpty else { return }
@@ -779,8 +789,9 @@ final class SyncSession {
         settings.set(show, forKey: SyncSettingsKey.show)
     }
 
-    /// The saved sets, sorted by name (spec 09 › Saved sync sets). A set that cannot be read
-    /// is left out; the others stay.
+    /// The saved sets, sorted by name (spec 09 › Saved sync sets).
+    ///
+    /// A set that cannot be read is left out; the others stay.
     var savedSets: [SyncSet] {
         (settings.value([StoredElement<SyncSet>].self, forKey: SyncSettingsKey.sets) ?? []).compactMap(\.value)
             .sorted { Sorter.compare($0.name, $1.name, numeric: true) == .orderedAscending }

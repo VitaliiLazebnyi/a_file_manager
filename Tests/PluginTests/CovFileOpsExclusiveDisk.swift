@@ -3,8 +3,9 @@ import Foundation
 import LocalFileSystemPlugin
 
 /// The disk as a volume sees it that cannot rename exclusively and looks at letter case only: a move that is not to
-/// replace is refused wherever the name is taken, also by the file itself under another case. With
-/// `refusesReplacing`, a move that is to replace is one between volumes.
+/// replace is refused wherever the name is taken, also by the file itself under another case.
+///
+/// With `refusesReplacing`, a move that is to replace is one between volumes.
 internal final class CovFileOpsExclusiveDisk: FileSystemProvider, Sendable {
     private let base = LocalFileSystem()
     private let refusesReplacing: Bool

@@ -19,9 +19,10 @@ public enum TransferMode: Int, CaseIterable, Sendable {
     }
 }
 
-/// The user's network preferences as the connections need them. The settings store belongs to
-/// the main thread, so its values are copied here whenever they change; this copy is read from
-/// any thread.
+/// The user's network preferences as the connections need them.
+///
+/// The settings store belongs to the main thread, so its values are copied here whenever they
+/// change; this copy is read from any thread.
 ///
 /// All state is guarded by `lock`.
 public final class NetworkOptions: @unchecked Sendable {
@@ -91,7 +92,9 @@ public struct ConnectionProfile: Sendable {
     public var initCommands: [String]
     public var usesMLSD: Bool?
     /// True for a server nobody chose to connect to: its address stood in a tab, a list or a
-    /// link, and nothing is known of it. The user is asked before the first login.
+    /// link, and nothing is known of it.
+    ///
+    /// The user is asked before the first login.
     public var asksBeforeConnecting = false
 
     public init(
@@ -131,8 +134,10 @@ public struct ConnectionProfile: Sendable {
 public struct Credentials: Sendable {
     public var user: String
     public var password: String
-    /// The user wants the password kept for the saved connection. It is stored once the
-    /// server has accepted it (`SessionEnvironment.rememberPassword`), not before.
+    /// The user wants the password kept for the saved connection.
+    ///
+    /// It is stored once the server has accepted it (`SessionEnvironment.rememberPassword`), not
+    /// before.
     public var remember: Bool
 
     public init(user: String, password: String, remember: Bool = false) {
@@ -143,8 +148,9 @@ public struct Credentials: Sendable {
 }
 
 /// What connections need from the program around them: the preferences, the certificates the
-/// user accepted, and a way to ask the user. The questions may be asked from any thread and
-/// block until they are answered.
+/// user accepted, and a way to ask the user.
+///
+/// The questions may be asked from any thread and block until they are answered.
 ///
 /// The questions and the other settings are set while the plugin starts (tests set them when
 /// they like) and read from any thread; they are guarded by `lock`. A question is taken under
@@ -193,21 +199,26 @@ public final class SessionEnvironment: @unchecked Sendable {
     }
 
     /// Asks for the user name and password of a server; `message` says why (the first time, or
-    /// what the server answered to the last attempt). Nil when the user gives up.
+    /// what the server answered to the last attempt).
+    ///
+    /// Nil when the user gives up.
     public var askCredentials: @Sendable (_ profile: ConnectionProfile, _ message: String) -> Credentials? {
         get { hook(\.askCredentials) }
         set { setHook(\.askCredentials, newValue) }
     }
-    /// Shows a certificate the system does not trust; true when the user accepts it. The
-    /// answer is recorded in `trust` by whoever asks.
+    /// Shows a certificate the system does not trust; true when the user accepts it.
+    ///
+    /// The answer is recorded in `trust` by whoever asks.
     public var askToTrust: @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo) -> Bool {
         get { hook(\.askToTrust) }
         set { setHook(\.askToTrust, newValue) }
     }
     /// Shows a certificate that differs from the ones accepted for this server before
     /// (`known`, their fingerprints): the sign of somebody in the middle, or of a server that
-    /// renewed its certificate. True when the user accepts the new one in place of the old;
-    /// whoever asks records that with `CertificateTrust.replace`. Refused unless set.
+    /// renewed its certificate.
+    ///
+    /// True when the user accepts the new one in place of the old; whoever asks records that with
+    /// `CertificateTrust.replace`. Refused unless set.
     public var askToTrustChanged:
         @Sendable (_ profile: ConnectionProfile, _ certificate: CertificateInfo, _ known: [String]) -> Bool
     {
@@ -225,13 +236,16 @@ public final class SessionEnvironment: @unchecked Sendable {
         set { setHook(\.askToSendPasswordUnprotected, newValue) }
     }
     /// A server on this machine itself (`localhost`, `127.0.0.1`) is not asked about: nothing
-    /// sent there crosses a network. Tests set this to ask all the same.
+    /// sent there crosses a network.
+    ///
+    /// Tests set this to ask all the same.
     public var asksAboutUnprotectedLoopback: Bool {
         get { hook(\.asksAboutUnprotectedLoopback) }
         set { setHook(\.asksAboutUnprotectedLoopback, newValue) }
     }
-    /// Stores the password the user asked to keep, after the server accepted it. Called on the
-    /// connecting thread.
+    /// Stores the password the user asked to keep, after the server accepted it.
+    ///
+    /// Called on the connecting thread.
     public var rememberPassword: @Sendable (_ profile: ConnectionProfile, _ password: String) -> Void {
         get { hook(\.rememberPassword) }
         set { setHook(\.rememberPassword, newValue) }
@@ -255,6 +269,7 @@ public final class SessionEnvironment: @unchecked Sendable {
     }
     /// The time by which connections age: how long one sat idle, how long nothing was done with
     /// a server, and when the links of a listing are no longer asked about in the background.
+    ///
     /// The system's clock unless a test sets another.
     public var clock: @Sendable () -> Date {
         get { hook(\.clock) }
@@ -267,8 +282,9 @@ public final class SessionEnvironment: @unchecked Sendable {
     }
 }
 
-/// A live connection to one server, whatever protocol it speaks. The file-system provider
-/// translates between URLs and the paths these methods take.
+/// A live connection to one server, whatever protocol it speaks.
+///
+/// The file-system provider translates between URLs and the paths these methods take.
 ///
 /// **Threading.** Every method may be called from several threads at once and blocks until
 /// the server has answered.
@@ -340,8 +356,9 @@ extension RemoteSession {
 
 /// Where the work runs that waits for a server and that nobody waits for: the clean-up of an
 /// abandoned transfer, the goodbye of a connection that is closed, the questions about links
-/// after a listing, the keep-alive. The thread that caused it (possibly the main thread) goes
-/// on at once.
+/// after a listing, the keep-alive.
+///
+/// The thread that caused it (possibly the main thread) goes on at once.
 ///
 /// A few threads of its own, not a dispatch queue: every piece of work may sit until a time
 /// limit runs out when a server has stopped answering, and work that blocks on a dispatch
@@ -391,7 +408,9 @@ enum Background {
         condition.unlock()
     }
 
-    /// The first piece in line whose lane has room. Called with the lock held.
+    /// The first piece in line whose lane has room.
+    ///
+    /// Called with the lock held.
     private static func takeNext() -> Piece? {
         guard
             let index = waiting.firstIndex(where: { piece in runningIn[piece.lane, default: 0] < mostPerLane })
@@ -454,8 +473,9 @@ enum Background {
 }
 
 /// Runs `body` with a flag that is set as soon as either of two is: the session's own (set
-/// by Disconnect) and the caller's (Cancel in the progress window). Without a caller's flag
-/// the session's own is passed as it is.
+/// by Disconnect) and the caller's (Cancel in the progress window).
+///
+/// Without a caller's flag the session's own is passed as it is.
 func withEither<Result>(
     _ own: CancellationFlag,
     _ callers: CancellationFlag?,
@@ -483,11 +503,14 @@ func lockPatiently(_ lock: NSLock, cancellation: CancellationFlag?, shouldGiveUp
 }
 
 /// Converts line ends for transfers in text mode: the network form is CR LF, the Mac's is LF.
+///
 /// Runs between the line ends are copied as blocks.
 struct LineEndConverter {
     private var pendingCR = false
 
-    /// Network to Mac. A CR at the end of a block waits for the next block.
+    /// Network to Mac.
+    ///
+    /// A CR at the end of a block waits for the next block.
     mutating func toLocal(_ data: Data) -> Data {
         var result = Data(capacity: data.count)
         data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in

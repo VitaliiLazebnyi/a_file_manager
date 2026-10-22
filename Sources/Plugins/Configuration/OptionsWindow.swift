@@ -3,7 +3,9 @@ import AFMKernel
 import AFMShell
 import AppKit
 
-/// A page of the Options window. What the user changes on it is pending until `commit`.
+/// A page of the Options window.
+///
+/// What the user changes on it is pending until `commit`.
 @MainActor
 protocol OptionsPage: AnyObject {
     var title: String { get }
@@ -531,7 +533,9 @@ final class SettingsFilePage: NSObject, OptionsPage {
 }
 
 /// The Options window (spec 13 › The dialog framework): the pages on the left, the selected
-/// page on the right, OK, Cancel and Apply below. Main thread only.
+/// page on the right, OK, Cancel and Apply below.
+///
+/// Main thread only.
 ///
 /// Unlike Total Commander's dialog it is not modal, as is usual on the Mac; what is pending on
 /// its pages reaches the program only with Apply or OK.
@@ -603,7 +607,9 @@ final class OptionsWindowController: NSWindowController, NSWindowDelegate {
         window.contentView = padded(filledStack([top, bottom], vertical: true, spacing: 12))
     }
 
-    /// Opens the window on a page. A window that was closed shows what is stored now.
+    /// Opens the window on a page.
+    ///
+    /// A window that was closed shows what is stored now.
     func show(_ section: Section) {
         prepare(section)
         center.effects.present(self)

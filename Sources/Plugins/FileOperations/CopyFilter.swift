@@ -3,8 +3,10 @@ import Foundation
 
 /// "Only files of this type" of the Copy and Move dialogs (spec 07 › Only files of this type):
 /// `include-masks | exclude-masks`, masks separated by spaces, a name with spaces in double
-/// quotes. A pattern that ends in a slash names folders; with a leading slash it is anchored
-/// to the folder the operation starts in. Both `/` and the Windows `\` are read.
+/// quotes.
+///
+/// A pattern that ends in a slash names folders; with a leading slash it is anchored to the folder
+/// the operation starts in. Both `/` and the Windows `\` are read.
 ///
 ///     *.txt *.md              only these types, in subfolders as well
 ///     *.* | *.bak *.old       everything except these

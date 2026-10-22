@@ -43,9 +43,10 @@ public enum TextEncoding: Equatable, Sendable {
     }
 
     /// `detect` and `decode` in one pass over the bytes, which for UTF-8 without a mark is the
-    /// validation that decides between UTF-8 and Latin-1; and whether the bytes were read without loss. A file with a
-    /// byte-order mark that holds invalid sequences is shown with replacement characters; writing it
-    /// back would change those bytes.
+    /// validation that decides between UTF-8 and Latin-1; and whether the bytes were read without loss.
+    ///
+    /// A file with a byte-order mark that holds invalid sequences is shown with replacement
+    /// characters; writing it back would change those bytes.
     static func decodeDetectedChecked(_ data: Data) -> (encoding: Self, text: String, isLossless: Bool) {
         if let marked = detect(prefixOf: data) {
             let body = data.dropFirst(marked.bom.count)
@@ -121,7 +122,9 @@ public struct TextLine: Equatable, Sendable {
 }
 
 /// A text file as lines, with what is needed to write it back unchanged: its encoding and
-/// every line's own line break. A value; safe to hand between threads.
+/// every line's own line break.
+///
+/// A value; safe to hand between threads.
 public struct TextDocument: Equatable, Sendable {
     public var encoding: TextEncoding
     public var lines: [TextLine]
@@ -146,8 +149,9 @@ public struct TextDocument: Equatable, Sendable {
         }
     }
 
-    /// Cuts a text at `\n`, `\r\n` and `\r`. A text that ends with a line break has no empty
-    /// line after it.
+    /// Cuts a text at `\n`, `\r\n` and `\r`.
+    ///
+    /// A text that ends with a line break has no empty line after it.
     public static func split(_ text: String) -> [TextLine] {
         var lines: [TextLine] = []
         var text = text

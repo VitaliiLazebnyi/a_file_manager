@@ -10,7 +10,9 @@ import Testing
 import ViewOptionsPlugin
 
 /// Settings that remember every value ever stored, to prove what never went through them.
-/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+///
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a
+/// time.
 private final class RecordingSettings: SettingsStore, @unchecked Sendable {
     private var values: [String: Data] = [:]
     private(set) var everything = Data()
@@ -25,7 +27,9 @@ private final class RecordingSettings: SettingsStore, @unchecked Sendable {
 }
 
 /// Stands in for the system when volumes are mounted and ejected.
-/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+///
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a
+/// time.
 private final class FakeMounter: VolumeMounter, @unchecked Sendable {
     var mounted: [URL] = []
     var ejected: [URL] = []

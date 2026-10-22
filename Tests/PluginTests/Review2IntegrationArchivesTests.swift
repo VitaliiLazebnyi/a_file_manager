@@ -10,8 +10,10 @@ import Testing
 // folders that an unpacking by path makes for itself alone (L043).
 
 /// A file system over memory with a moment to interfere right before a folder is made
-/// exclusively. Every call is forwarded to `base`.
-/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+/// exclusively.
+///
+/// Every call is forwarded to `base`. Unchecked: what it records is guarded by `lock`; its switches
+/// are set by the test before use.
 final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
     let base = MemoryFileSystem(scheme: "hooked")
     var scheme: String { base.scheme }
@@ -125,16 +127,18 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
         // Nothing of the attempt that was ended is left next to the archive.
         #expect(
             try FileManager.default.contentsOfDirectory(atPath: box.root.path).filter { $0.contains(".afm-zip") }
-                .isEmpty)
+                .isEmpty
+        )
     }
 
     // MARK: A wrong password for the old encryption is a wrong password
 
     /// The old ZIP encryption proves a password with one byte: one wrong password in 256 passes.
+    ///
     /// The member then decrypts to noise, and the user was told the archive is damaged
     /// (`encryptedZipsAskForThePassword` failed that way once in the final runs: it gives three
-    /// wrong answers and expects "wrong password"). Many wrong passwords here, so that some
-    /// pass the byte: none may be reported as damage, and none may open anything.
+    /// wrong answers and expects "wrong password"). Many wrong passwords here, so that some pass
+    /// the byte: none may be reported as damage, and none may open anything.
     @Test func noWrongPasswordForTheOldEncryptionIsTakenForADamagedArchive() throws {
         let tree = try bench.makeTree()
         let own = box.url("own.zip")
@@ -163,7 +167,8 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
         fresh.passwords.set(["wrong-1", "open sesame"])
         #expect(
             try fresh.read(fresh.inside(own, "tree/readme.txt"))
-                == Data(contentsOf: tree.appendingPathComponent("readme.txt")))
+                == Data(contentsOf: tree.appendingPathComponent("readme.txt"))
+        )
     }
 
     // MARK: L043 — by path (a target that is not a disk of this machine), folders are made exclusively
@@ -174,17 +179,21 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
         hooked.base.addFile("/target/there/kept.txt", "kept")
         let archive = try writeZip("tree.zip", members: ["there/a.txt", "new/deep/b.txt", "new/c.txt", "top.txt"])
         let unpacker = Unpacker(fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions()) {
-            _, _ in .overwrite
+            _,
+            _ in .overwrite
         }
         let result = unpacker.run(
-            [Unpacker.Source(archive: try bench.store.archive(at: archive))], into: hooked.base.url("/target"))
+            [Unpacker.Source(archive: try bench.store.archive(at: archive))],
+            into: hooked.base.url("/target")
+        )
         #expect(result.problems.isEmpty, "\(result.problems)")
         #expect(
             Set(hooked.base.allPaths.filter { $0.hasPrefix("/target/") && !$0.contains(".afm-") })
                 .isSuperset(of: [
                     "/target/there/a.txt", "/target/there/kept.txt", "/target/new/deep/b.txt", "/target/new/c.txt",
                     "/target/top.txt"
-                ]))
+                ])
+        )
         // The folder that was there is used as it is; the two that were not are made exclusively, once each.
         #expect(hooked.madeExclusively.sorted() == ["/target/new", "/target/new/deep"])
     }
@@ -199,14 +208,18 @@ final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
         }
         let archive = try writeZip("planted.zip", members: ["dir/a.txt", "dir/b.txt", "plain.txt"])
         let unpacker = Unpacker(fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions()) {
-            _, _ in .overwrite
+            _,
+            _ in .overwrite
         }
         let result = unpacker.run(
-            [Unpacker.Source(archive: try bench.store.archive(at: archive))], into: hooked.base.url("/target"))
+            [Unpacker.Source(archive: try bench.store.archive(at: archive))],
+            into: hooked.base.url("/target")
+        )
         // The members of that folder are refused, each with its line; the other one arrives.
         #expect(
             result.problems.count == 2 && result.problems.allSatisfy { $0.contains("not a folder") },
-            "\(result.problems)")
+            "\(result.problems)"
+        )
         #expect(hooked.base.contents("/target/dir") == "somebody else's")
         #expect(hooked.base.contents("/target/plain.txt") != nil)
         #expect(hooked.base.allPaths.filter { $0.hasPrefix("/target/dir/") }.isEmpty)

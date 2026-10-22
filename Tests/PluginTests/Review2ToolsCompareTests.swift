@@ -32,9 +32,10 @@ private func isValid(_ segments: [DiffSegment], _ a: [Int], _ b: [Int]) -> Bool 
 /// A source-like file: mostly distinct lines, some repeated ones (braces, blanks).
 private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
     var random = Seeded(state: seed)
-    return (0..<count).map { index in
-        Int.random(in: 0..<10, using: &random) < 2 ? -Int.random(in: 1...30, using: &random) : index
-    }
+    return (0..<count)
+        .map { index in
+            Int.random(in: 0..<10, using: &random) < 2 ? -Int.random(in: 1...30, using: &random) : index
+        }
 }
 
 /// Review round 2: the diff of large files near the shortest, saving that never loses or mangles
@@ -106,7 +107,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         let ranges = TextDiff.inline(long, long + "X")
         #expect(
             ranges.left.allSatisfy { $0.upperBound <= long.utf16.count }
-                && ranges.right.last?.upperBound == long.utf16.count + 1)
+                && ranges.right.last?.upperBound == long.utf16.count + 1
+        )
     }
 }
 
@@ -123,8 +125,12 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         try box.file("A/f.txt", "one\ntwo\nthree\nfour\n")
         try box.file("B/f.txt", "one\n2\nthree\nfour\nfive\n")
         bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"),
-            settings: settings)
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B"),
+            settings: settings
+        )
     }
 
     func open() {
@@ -147,7 +153,8 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         #expect(!session.hasUnsavedChanges && !session.canUndo)
         #expect(
             session.text(.right, row: 1) == before
-                && (0..<session.rowCount).map { session.text(.left, row: $0) } == ["one", "two", "three", "four", nil])
+                && (0..<session.rowCount).map { session.text(.left, row: $0) } == ["one", "two", "three", "four", nil]
+        )
     }
 
     @Test func aRowThatPointsOutsideTheTextsIsNeverTrusted() {
@@ -211,7 +218,9 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         bench.left.reload()
         bench.left.moveCursor(toName: "g.txt")
         bench.commands.perform(
-            .compareByContent, .text(box.url("A/g.txt").absoluteString + "\n" + box.url("A/g.txt").absoluteString))
+            .compareByContent,
+            .text(box.url("A/g.txt").absoluteString + "\n" + box.url("A/g.txt").absoluteString)
+        )
         session.setEditing(true)
         session.setText("x", .left, row: 0)
         session.setText("y", .right, row: 1)
@@ -231,7 +240,11 @@ private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
         try "changed elsewhere, longer".write(to: box.url("h/one.txt"), atomically: false, encoding: .utf8)
         #expect(throws: CompareLoader.SaveError.self) {
             try CompareLoader.replace(
-                box.url("h/one.txt"), with: Data("mine".utf8), expected: loaded, fileSystems: registry)
+                box.url("h/one.txt"),
+                with: Data("mine".utf8),
+                expected: loaded,
+                fileSystems: registry
+            )
         }
         #expect(box.read("h/one.txt") == "changed elsewhere, longer")
     }

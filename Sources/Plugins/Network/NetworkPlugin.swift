@@ -36,7 +36,9 @@ enum NetworkSettings {
     static let parallelCounts = [1, 2, 3, 4, 6, 8]
     static let parallelChoices = parallelCounts.map(String.init)
 
-    /// Reads the preferences into the form the connections use. Main thread.
+    /// Reads the preferences into the form the connections use.
+    ///
+    /// Main thread.
     static func values(from settings: any SettingsStore) -> NetworkOptions.Values {
         var values = NetworkOptions.Values()
         values.passiveByDefault = settings.flag(passiveMode, default: true)
@@ -52,7 +54,9 @@ enum NetworkSettings {
 }
 
 /// The addresses the user typed in person (`ServerConsentService`): their servers count as
-/// chosen. A location of another file system, or one that names no server, is ignored.
+/// chosen.
+///
+/// A location of another file system, or one that names no server, is ignored.
 final class TypedAddresses: ServerConsentService {
     private let center: ConnectionCenter
 
@@ -91,8 +95,10 @@ public final class NetworkPlugin: Plugin {
     public var connections: [SavedConnection] { store?.connections ?? [] }
 
     /// Tests turn `launchesApplications` off, so no volume is mounted through the system, and
-    /// pass a password store of their own, so the Keychain is not touched. Without a store the
-    /// Keychain is used when applications may be launched, and memory otherwise.
+    /// pass a password store of their own, so the Keychain is not touched.
+    ///
+    /// Without a store the Keychain is used when applications may be launched, and memory
+    /// otherwise.
     public init(
         launchesApplications: Bool = true,
         passwords: any PasswordStore? = nil,
@@ -299,8 +305,10 @@ public final class NetworkPlugin: Plugin {
         kernel.toolbar.setSymbol("arrow.left.arrow.right", for: .ftpSelectTransferMode)
     }
 
-    /// Closes the connections when the program quits. Returns at once: nothing here waits for
-    /// a server, the goodbyes are said in the background for as long as the program still runs.
+    /// Closes the connections when the program quits.
+    ///
+    /// Returns at once: nothing here waits for a server, the goodbyes are said in the background
+    /// for as long as the program still runs.
     public func stop() {
         center.disconnectAll()
     }

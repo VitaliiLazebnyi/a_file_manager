@@ -16,6 +16,7 @@ import Testing
 
 /// A file system over memory that can be told to misbehave the way servers and shares do:
 /// list names that lead out of their folder, refuse the Trash in different ways, fail a removal.
+///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 final class OddFileSystem: FileSystemProvider, @unchecked Sendable {
     let base = MemoryFileSystem(scheme: "odd")

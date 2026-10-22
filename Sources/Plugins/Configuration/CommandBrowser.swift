@@ -4,8 +4,9 @@ import AFMShell
 import AppKit
 
 /// The *Choose command* dialog (spec 14 › The Choose command dialog): every command with its
-/// name, title and keys, a live filter, and the management of user commands. Opened on its own
-/// it runs the chosen command; the editors use it to pick one. Main thread only.
+/// name, title and keys, a live filter, and the management of user commands.
+///
+/// Opened on its own it runs the chosen command; the editors use it to pick one. Main thread only.
 ///
 /// The categories are the menus the commands are in; this program has no `totalcmd.inc` with
 /// numbers, so the Nr. column is replaced by the keys.

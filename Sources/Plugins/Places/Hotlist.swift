@@ -48,8 +48,10 @@ public struct HotlistEntry: Codable, Equatable, Sendable {
 }
 
 /// The directory hotlist: the user's bookmarks, with submenus and separators (spec 03 ›
-/// Directory hotlist). A value: the plugin reads it from the settings, changes it and writes
-/// it back, on the main thread.
+/// Directory hotlist).
+///
+/// A value: the plugin reads it from the settings, changes it and writes it back, on the main
+/// thread.
 public struct Hotlist: Codable, Equatable {
     /// The position of an entry: its index on the top level, then inside each submenu.
     public typealias Path = [Int]
@@ -107,8 +109,9 @@ public struct Hotlist: Codable, Equatable {
     public var count: Int { rows.count }
 
     /// Keeps the first `room` entries (submenus and what they hold count one each, in display
-    /// order) and drops the rest; `room` is what is left. Returns how many were dropped.
-    /// Without recursion into more than the entries that stay.
+    /// order) and drops the rest; `room` is what is left.
+    ///
+    /// Returns how many were dropped. Without recursion into more than the entries that stay.
     static func trimmed(_ entries: inout [HotlistEntry], room: inout Int) -> Int {
         var dropped = 0
         var kept: [HotlistEntry] = []
@@ -157,6 +160,7 @@ public struct Hotlist: Codable, Equatable {
     }
 
     /// Puts an entry at `path`, moving what is there down; an index past the end appends.
+    ///
     /// Returns where it landed, or nil when the level does not exist or the list is full.
     @discardableResult
     public mutating func insert(_ entry: HotlistEntry, at path: Path) -> Path? {
@@ -200,10 +204,11 @@ public struct Hotlist: Codable, Equatable {
         } ?? false
     }
 
-    /// Shift+Up / Shift+Down in the editor: moves an entry one line. Past the edge of a
-    /// submenu it leaves the submenu, and next to a submenu it enters it, so every position
-    /// can be reached as in a flat list. Returns the entry's new position; the same path when
-    /// nothing moved.
+    /// Shift+Up / Shift+Down in the editor: moves an entry one line.
+    ///
+    /// Past the edge of a submenu it leaves the submenu, and next to a submenu it enters it, so
+    /// every position can be reached as in a flat list. Returns the entry's new position; the same
+    /// path when nothing moved.
     ///
     /// Each move takes the entry out and puts it back within one level of the list, so it is
     /// never lost or doubled, also in a list read from damaged data (an item holding entries,

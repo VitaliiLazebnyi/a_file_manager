@@ -12,15 +12,23 @@ import Testing
     // MARK: Search
 
     private func find(
-        _ pattern: String, _ options: SearchOptions = SearchOptions(), in data: Data, from start: Int64 = 0,
+        _ pattern: String,
+        _ options: SearchOptions = SearchOptions(),
+        in data: Data,
+        from start: Int64 = 0,
         encoding: ViewerEncoding = .utf8,
         chunkSize: Int = 1 << 20
     ) throws -> Range<Int64>? {
         let pattern = try SearchPattern(pattern, options: options, encoding: encoding)
         return try ViewerSearch.find(
-            pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: start,
+            pattern,
+            in: DataByteSource(data),
+            content: 0..<Int64(data.count),
+            from: start,
             backwards: options.backwards,
-            encoding: encoding, chunkSize: chunkSize)
+            encoding: encoding,
+            chunkSize: chunkSize
+        )
     }
 
     @Test func anchorsAndWordBoundariesDoNotMatchAtTheSearchStart() throws {
@@ -88,11 +96,17 @@ import Testing
         Thread {
             Thread.sleep(forTimeInterval: 0.3)
             flag.cancel()
-        }.start()
+        }
+        .start()
         let found = try ViewerSearch.find(
-            pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: 0, backwards: false,
+            pattern,
+            in: DataByteSource(data),
+            content: 0..<Int64(data.count),
+            from: 0,
+            backwards: false,
             encoding: .utf8,
-            cancellation: flag)
+            cancellation: flag
+        )
         #expect(found == nil)
         #expect(Date().timeIntervalSince(started) < 20)
     }
@@ -135,9 +149,10 @@ import Testing
     }
 
     private func signature(_ document: TextDocument) throws -> [String] {
-        try document.rows(from: 0, count: document.rowCount).map {
-            "\($0.range.lowerBound)-\($0.range.upperBound) \($0.startsLine) \($0.line) \($0.text)"
-        }
+        try document.rows(from: 0, count: document.rowCount)
+            .map {
+                "\($0.range.lowerBound)-\($0.range.upperBound) \($0.startsLine) \($0.line) \($0.text)"
+            }
     }
 
     @Test func theRawByteScanFindsTheSameRowsAsDecodingEverything() throws {
@@ -162,9 +177,16 @@ import Testing
                     var counts: [[Int]] = []
                     for raw in [true, false] {
                         let document = TextDocument(
-                            source: DataByteSource(data), encoding: encoding, layout: .text(options))
+                            source: DataByteSource(data),
+                            encoding: encoding,
+                            layout: .text(options)
+                        )
                         document.buildIndex(
-                            parallel: segment < 1_000, segmentSize: segment, chunkSize: chunk, rawScan: raw)
+                            parallel: segment < 1_000,
+                            segmentSize: segment,
+                            chunkSize: chunk,
+                            rawScan: raw
+                        )
                         results.append(try signature(document))
                         counts.append([document.rowCount, document.lineCount])
                     }
@@ -180,8 +202,13 @@ import Testing
         let data = Data(repeating: UInt8(ascii: "x"), count: 10 << 20)
         var partials: [(rows: Int, covered: Int64)] = []
         let segment = try TextRowIndex.scan(
-            source: DataByteSource(data), content: 0..<Int64(data.count), segment: 0..<Int64(4 << 20), isFirst: true,
-            encoding: .utf8, options: TextLayoutOptions(columns: 100, wordWrap: true), chunkSize: 1 << 20,
+            source: DataByteSource(data),
+            content: 0..<Int64(data.count),
+            segment: 0..<Int64(4 << 20),
+            isFirst: true,
+            encoding: .utf8,
+            options: TextLayoutOptions(columns: 100, wordWrap: true),
+            chunkSize: 1 << 20,
             cancellation: CancellationFlag()
         ) { found, covered in partials.append((found.rowCount, covered)) }
         #expect(partials.count >= 2)
@@ -193,8 +220,10 @@ import Testing
     @Test func theIndexPublishesTheFrontierSegmentAsItGoes() throws {
         let data = Data(repeating: UInt8(ascii: "y"), count: 9 << 20)
         let document = TextDocument(
-            source: DataByteSource(data), encoding: .utf8,
-            layout: .text(TextLayoutOptions(columns: 100, wordWrap: true)))
+            source: DataByteSource(data),
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 100, wordWrap: true))
+        )
         let seen = Locked<[Int64]>([])
         document.buildIndex(parallel: true, segmentSize: 9 << 20, chunkSize: 1 << 20) {
             seen.mutate { $0.append(document.indexedThrough) }
@@ -223,7 +252,10 @@ import Testing
             }
         }
         let document = TextDocument(
-            source: Failing(), encoding: .utf8, layout: .text(TextLayoutOptions(columns: 50, wordWrap: true)))
+            source: Failing(),
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: 50, wordWrap: true))
+        )
         #expect(document.readError == nil)
         document.buildIndex(parallel: false, segmentSize: 500, chunkSize: 200)
         #expect(document.readError != nil)
@@ -316,7 +348,8 @@ import Testing
         let other = memory.addFile("/a/other.mp4", String(repeating: "z", count: 100))
         #expect(copies.localURL(for: other, fileSystems: registry, owner: owner, cancellation: cancelled) == nil)
         #expect(
-            FileManager.default.fileExists(atPath: first.path) && FileManager.default.fileExists(atPath: second.path))
+            FileManager.default.fileExists(atPath: first.path) && FileManager.default.fileExists(atPath: second.path)
+        )
         // Once released, only a couple of idle copies stay.
         for number in 0..<4 {
             let file = memory.addFile("/b/f\(number).mp4", "x\(number)")
@@ -326,7 +359,8 @@ import Testing
         // The files are deleted in the background.
         copies.waitForCleanup()
         #expect(
-            !FileManager.default.fileExists(atPath: first.path) && !FileManager.default.fileExists(atPath: second.path))
+            !FileManager.default.fileExists(atPath: first.path) && !FileManager.default.fileExists(atPath: second.path)
+        )
         let root = second.deletingLastPathComponent().deletingLastPathComponent()
         let left = (try? FileManager.default.contentsOfDirectory(atPath: root.path))?.count ?? 0
         #expect(left == TemporaryCopies.idleLimit)
@@ -337,7 +371,9 @@ import Testing
 
     @Test func leftoverFoldersOfDeadProcessesAreSwept() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "afm-sweep-test-\(UUID().uuidString)", isDirectory: true)
+            "afm-sweep-test-\(UUID().uuidString)",
+            isDirectory: true
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let mine = directory.appendingPathComponent("afm-viewer-p\(getpid())-A", isDirectory: true)
@@ -355,11 +391,13 @@ import Testing
         TemporaryCopies.sweep(in: directory, now: Date().addingTimeInterval(3 * 86_400))
         #expect(
             !FileManager.default.fileExists(atPath: recentOld.path)
-                && FileManager.default.fileExists(atPath: other.path))
+                && FileManager.default.fileExists(atPath: other.path)
+        )
     }
 }
 
 /// A value guarded by a lock, for collecting results from several threads.
+///
 /// Unchecked: the state is guarded by `lock`.
 private final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()

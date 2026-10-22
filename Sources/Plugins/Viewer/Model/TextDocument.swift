@@ -20,8 +20,9 @@ struct DisplayRow {
     let contentEnd: Int64
     /// What is drawn: no line end, tabs expanded, control characters replaced.
     let text: String
-    /// For each UTF-16 unit of `text`, its byte offset from the start of the row. Empty for
-    /// hex rows, whose columns are fixed (`HexFormat`).
+    /// For each UTF-16 unit of `text`, its byte offset from the start of the row.
+    ///
+    /// Empty for hex rows, whose columns are fixed (`HexFormat`).
     let offsets: [Int32]
     let startsLine: Bool
     /// The number of the line the row belongs to, counted from 1.
@@ -29,7 +30,7 @@ struct DisplayRow {
 }
 
 /// The hex display of the specification (10 › Hex):
-/// `00000000: 52 65 70 6F 72 74 20 31|0D 0A 4C 6F 72 65 6D 20 | Report 1..Lorem `
+/// `00000000: 52 65 70 6F 72 74 20 31|0D 0A 4C 6F 72 65 6D 20 | Report 1..Lorem `.
 struct HexFormat: Equatable {
     static let bytesPerRow = 16
     /// Eight digits as in the specification; more for files they cannot address.
@@ -86,11 +87,12 @@ struct HexFormat: Equatable {
     }
 }
 
-/// A file as rows of text in one encoding and one layout: what a text view pages through. It
-/// reads only the blocks a request needs. Everything here may block on the file system and is
+/// A file as rows of text in one encoding and one layout: what a text view pages through.
+///
+/// It reads only the blocks a request needs. Everything here may block on the file system and is
 /// safe to call from several threads; nothing is meant for the main thread except the plain
-/// properties and the geometry functions, which touch no file. What changes is guarded by a
-/// lock each (`tableLock`, `boundariesLock`, `errorLock`); the rest is immutable.
+/// properties and the geometry functions, which touch no file. What changes is guarded by a lock
+/// each (`tableLock`, `boundariesLock`, `errorLock`); the rest is immutable.
 final class TextDocument: @unchecked Sendable {
     let source: any ByteSource
     let encoding: ViewerEncoding
@@ -176,8 +178,10 @@ final class TextDocument: @unchecked Sendable {
     /// The rows of everything before this offset are known.
     var indexedThrough: Int64 { index.map { $0.isComplete ? length : $0.indexedThrough } ?? length }
 
-    /// Finds the rows of a text. Blocks until done or cancelled (`cancellation`); the byte
-    /// layouts need no index and return at once. `progress` is called from working threads.
+    /// Finds the rows of a text.
+    ///
+    /// Blocks until done or cancelled (`cancellation`); the byte layouts need no index and return
+    /// at once. `progress` is called from working threads.
     func buildIndex(
         parallel: Bool,
         segmentSize: Int = 4 << 20,
@@ -213,8 +217,10 @@ final class TextDocument: @unchecked Sendable {
     private var boundaries: CharacterBoundaries?
 
     /// What a search cuts a text in a double-byte code page into characters with; nil for any
-    /// other. Kept for as long as the document is, so the next search finds the boundaries
-    /// of the last one.
+    /// other.
+    ///
+    /// Kept for as long as the document is, so the next search finds the boundaries of the last
+    /// one.
     var characterBoundaries: CharacterBoundaries? {
         guard encoding.kind == .doubleByte else { return nil }
         boundariesLock.lock()
@@ -461,7 +467,9 @@ final class TextDocument: @unchecked Sendable {
     }
 
     /// The UTF-16 index in a row's text of the character at a byte offset (the text's length
-    /// when the offset is behind the row's text). In hex rows, the place in the hex part.
+    /// when the offset is behind the row's text).
+    ///
+    /// In hex rows, the place in the hex part.
     func textIndex(in row: DisplayRow, of offset: Int64) -> Int {
         if layout == .hex {
             return hexFormat.hexColumn(
@@ -478,8 +486,9 @@ final class TextDocument: @unchecked Sendable {
         return low
     }
 
-    /// The parts of a row's text that show bytes of `selection`. A hex row shows them twice:
-    /// in the hex part and in the character part (spec 10 › Hex).
+    /// The parts of a row's text that show bytes of `selection`.
+    ///
+    /// A hex row shows them twice: in the hex part and in the character part (spec 10 › Hex).
     func textRanges(in row: DisplayRow, for selection: Range<Int64>) -> [Range<Int>] {
         let lower = max(selection.lowerBound, row.range.lowerBound)
         let upper = min(selection.upperBound, row.range.upperBound)
@@ -500,7 +509,9 @@ final class TextDocument: @unchecked Sendable {
     // MARK: Copying
 
     /// The bytes of `range` as text for the clipboard, in the document's encoding; NUL becomes
-    /// a space (spec 10 › Selection and clipboard). Blocks.
+    /// a space (spec 10 › Selection and clipboard).
+    ///
+    /// Blocks.
     func text(in range: Range<Int64>, cancellation: CancellationFlag? = nil) throws -> String {
         var text = DecodedText()
         text.tracksOffsets = false

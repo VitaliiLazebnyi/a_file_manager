@@ -2,8 +2,10 @@ public import AFMKernel
 public import Foundation
 
 /// A `MemoryFileSystem` behind a layer that fails the calls a test names, as a disk that fills
-/// up or a server that drops the connection does. Everything else goes to the memory file
-/// system as it is; only this layer is registered, under the memory file system's scheme.
+/// up or a server that drops the connection does.
+///
+/// Everything else goes to the memory file system as it is; only this layer is registered, under
+/// the memory file system's scheme.
 ///
 /// Unchecked: the switches are guarded by `lock`.
 public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
@@ -269,7 +271,9 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
         }
     }
 
-    /// Tells every watch that `directories` changed, as the file system would. Main thread.
+    /// Tells every watch that `directories` changed, as the file system would.
+    ///
+    /// Main thread.
     @preconcurrency
     @MainActor
     public func report(_ directories: [URL]) {

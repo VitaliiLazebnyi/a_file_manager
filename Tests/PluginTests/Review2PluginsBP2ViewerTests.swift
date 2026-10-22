@@ -750,6 +750,7 @@ import UniformTypeIdentifiers
 }
 
 /// A value that several threads look at.
+///
 /// Unchecked: the state is guarded by `lock`.
 private final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()

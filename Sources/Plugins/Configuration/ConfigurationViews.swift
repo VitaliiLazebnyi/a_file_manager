@@ -62,6 +62,7 @@ func spacer() -> NSView {
 }
 
 /// A list of text rows in columns, as the editors of the configuration windows use it.
+///
 /// Main thread only.
 final class RowsTable: NSScrollView, NSTableViewDataSource, NSTableViewDelegate {
     private final class Table: NSTableView {
@@ -234,13 +235,17 @@ final class StartMenuTarget: NSObject, NSMenuItemValidation {
     }
 }
 
-/// Changes to the menu bar while the program runs. The shell builds its menus once, from the
-/// registries; its items carry the name of their command, which is all that is relied on here.
+/// Changes to the menu bar while the program runs.
+///
+/// The shell builds its menus once, from the registries; its items carry the name of their command,
+/// which is all that is relied on here.
 @MainActor
 enum LiveMenus {
     private static let slotPrefix = "cm_UserMenu"
 
-    /// The key as a menu shows it; nil for keys a menu cannot show. The same rule as the shell's.
+    /// The key as a menu shows it; nil for keys a menu cannot show.
+    ///
+    /// The same rule as the shell's.
     private static func menuEquivalent(_ key: Key) -> String? {
         // AppKit's characters of the special keys lie in one block of 16-bit code units.
         func special(_ value: Int) -> String { String(utf16CodeUnits: [UInt16(truncatingIfNeeded: value)], count: 1) }
@@ -294,7 +299,9 @@ enum LiveMenus {
     }
 
     /// Replaces the user's entries of the Start menu by the current ones; the menu's fixed
-    /// entries stay below them. Does nothing when the menu bar has no Start menu.
+    /// entries stay below them.
+    ///
+    /// Does nothing when the menu bar has no Start menu.
     static func rebuildStartMenu(in mainMenu: NSMenu, entries: [StartMenuEntry], target: StartMenuTarget) {
         guard let menu = mainMenu.items.first(where: { $0.submenu?.title == MenuID.start.title })?.submenu else {
             return

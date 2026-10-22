@@ -2,9 +2,11 @@ public import AFMKernel
 public import Foundation
 
 /// Turns a search into a question for Spotlight's index (in place of the spec's *Everything*,
-/// 09 › Everything integration). Spotlight answers the parts it knows (names, plain text,
-/// sizes, dates) at once; whatever it returns is then checked against all criteria, as the
-/// spec has it for Everything. Nothing here touches a file system except `verify`.
+/// 09 › Everything integration).
+///
+/// Spotlight answers the parts it knows (names, plain text, sizes, dates) at once; whatever it
+/// returns is then checked against all criteria, as the spec has it for Everything. Nothing here
+/// touches a file system except `verify`.
 public enum SpotlightQuery {
     /// Whether the index can be asked at all: the start directories are on local disks and
     /// the search is not limited to chosen items.
@@ -12,24 +14,28 @@ public enum SpotlightQuery {
         query.onlyItems == nil && query.directories.allSatisfy(\.isFileURL)
     }
 
-    /// Whether the index answers the text criterion. A regular expression, hex bytes and "NOT
-    /// containing" are beyond it; the files it returns are then read like in a normal search.
+    /// Whether the index answers the text criterion.
+    ///
+    /// A regular expression, hex bytes and "NOT containing" are beyond it; the files it returns are
+    /// then read like in a normal search.
     public static func handlesText(of query: SearchQuery) -> Bool {
         !query.text.isEmpty && !query.textOptions.regex && !query.textOptions.hex && !query.textOptions.notContaining
     }
 
-    /// Whether the files the index returns are read for the text all the same. The index
-    /// holds the words of a text, as Unicode, and does not tell upper from lower case reliably: a
-    /// "Case sensitive" search, one in other encodings and one for more than a word (a phrase,
-    /// punctuation) are only narrowed down by it.
+    /// Whether the files the index returns are read for the text all the same.
+    ///
+    /// The index holds the words of a text, as Unicode, and does not tell upper from lower case
+    /// reliably: a "Case sensitive" search, one in other encodings and one for more than a word (a
+    /// phrase, punctuation) are only narrowed down by it.
     public static func recheckingText(of query: SearchQuery) -> Bool {
         guard handlesText(of: query) else { return false }
         return query.caseSensitive || query.textOptions.encodings.contains { $0 != .utf8 }
             || TextPattern.unescape(query.text).contains { !$0.isLetter && !$0.isNumber }
     }
 
-    /// The question in Spotlight's own query language. It may find more than the search asks
-    /// for (a `?` in a mask is asked as `*`), never less.
+    /// The question in Spotlight's own query language.
+    ///
+    /// It may find more than the search asks for (a `?` in a mask is asked as `*`), never less.
     public static func string(for query: SearchQuery, now: Date = Date()) -> String {
         var parts: [String] = []
         if !query.namesAreRegex {
@@ -85,7 +91,9 @@ public enum SpotlightQuery {
 
     /// Checks what the index returned against the whole search: location below a start
     /// directory within the depth, hidden files, and every criterion (the text only where the
-    /// index could not answer it). Returns the hits in path order.
+    /// index could not answer it).
+    ///
+    /// Returns the hits in path order.
     ///
     /// **Threading.** Blocks on the file system and examines the files on all cores; meant for
     /// a background thread.
@@ -123,11 +131,12 @@ public enum SpotlightQuery {
     }
 }
 
-/// One question to Spotlight. The question is started on the main thread; the system then
-/// gathers the answer on its own and delivers it on a queue of ours, where the paths are read
-/// out of the result (a million of them take seconds), and `completion` is called on the main
-/// thread with the paths found. Reading and checking the files afterwards is the caller's
-/// business and belongs in the background.
+/// One question to Spotlight.
+///
+/// The question is started on the main thread; the system then gathers the answer on its own and
+/// delivers it on a queue of ours, where the paths are read out of the result (a million of them
+/// take seconds), and `completion` is called on the main thread with the paths found. Reading and
+/// checking the files afterwards is the caller's business and belongs in the background.
 ///
 /// `completion` and `isStopped` are guarded by `lock`. The metadata query is set up in `init`
 /// and started on the main thread; after that only `queue` touches it.
@@ -145,8 +154,9 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
     let limit: Int
 
     /// `string` is a question in Spotlight's language, as `SpotlightQuery.string` makes it (the
-    /// system stops the program at one it cannot read). The answer is read on `queue` (tests hold
-    /// it, to choose what comes first).
+    /// system stops the program at one it cannot read).
+    ///
+    /// The answer is read on `queue` (tests hold it, to choose what comes first).
     init(
         _ string: String,
         scopes: [URL],
@@ -165,8 +175,9 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
         super.init()
     }
 
-    /// `completion` gets the paths and whether the answer was cut at `resultLimit`. A question
-    /// that was stopped is not started again.
+    /// `completion` gets the paths and whether the answer was cut at `resultLimit`.
+    ///
+    /// A question that was stopped is not started again.
     func start(completion: @escaping @MainActor @Sendable ([String], Bool) -> Void) {
         lock.lock()
         self.completion = completion
@@ -180,8 +191,10 @@ final class SpotlightSearch: NSObject, SpotlightQuestion, @unchecked Sendable {
         if !metadataQuery.start() { queue.addOperation { [weak self] in self?.finished() } }
     }
 
-    /// Ends the question without an answer. May be called from the main thread while the paths
-    /// are being read: the reading notices at its next piece.
+    /// Ends the question without an answer.
+    ///
+    /// May be called from the main thread while the paths are being read: the reading notices at
+    /// its next piece.
     func stop() {
         lock.lock()
         isStopped = true

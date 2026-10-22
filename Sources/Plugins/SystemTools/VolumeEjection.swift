@@ -29,8 +29,10 @@ public struct EjectRefusal: Error, Equatable {
     }
 }
 
-/// How volumes are looked at and ejected. Both calls ask the volume and may wait on it: they
-/// run on a job's thread. Tests put a stand-in in place of the system.
+/// How volumes are looked at and ejected.
+///
+/// Both calls ask the volume and may wait on it: they run on a job's thread. Tests put a stand-in
+/// in place of the system.
 public protocol VolumeAccess: AnyObject, Sendable {
     func facts(of directory: URL) -> VolumeFacts
     /// Ejects gently: the system writes what is pending and refuses while any program has a
@@ -116,8 +118,9 @@ internal final class SystemVolumes: VolumeAccess {
     }
 }
 
-/// Ejects a drive the way the user expects it to (Commands › Eject Volume, the eject buttons
-/// of the drive bar and the path bar):
+/// Ejects a drive the way the user expects it to.
+///
+/// What Commands › Eject Volume and the eject buttons of the drive bar and the path bar do:
 ///
 /// 1. Every panel and folder tab that is on the drive goes back to the folder it showed before
 ///    it entered the drive (its history), or to the home folder; the panels are waited for.
@@ -308,8 +311,10 @@ final class VolumeEjection {
     /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
     nonisolated private static let volumes = CallOwner()
 
-    /// Asks something of a volume from a job. A volume that has stopped answering may never
-    /// return: the question then goes on alone, and the job ends, with nil, once cancelled.
+    /// Asks something of a volume from a job.
+    ///
+    /// A volume that has stopped answering may never return: the question then goes on alone, and
+    /// the job ends, with nil, once cancelled.
     nonisolated private static func ask<Answer: Sendable>(
         _ question: String,
         of url: URL,

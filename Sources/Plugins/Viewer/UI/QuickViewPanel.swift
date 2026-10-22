@@ -3,8 +3,9 @@ import AFMShell
 import AppKit
 
 /// The Quick View panel (spec 03 › Quick View, 10 › Embedded Lister): a Lister over the file
-/// list of the other panel that shows whatever the cursor of the followed panel is on. A bar
-/// above it names the file; for a folder the pane tells what it holds.
+/// list of the other panel that shows whatever the cursor of the followed panel is on.
+///
+/// A bar above it names the file; for a folder the pane tells what it holds.
 ///
 /// It goes away when the user switches to the covered panel or shows another place in it
 /// (`onDismiss`). Main thread only; the pane does its reading in the background and drops the
@@ -102,7 +103,9 @@ final class QuickViewPanel {
     /// Reads the shown item again (`cm_UpdateQuickView`).
     func refresh() { follower?.refresh() }
 
-    /// Brings the file list back. Safe to call more than once.
+    /// Brings the file list back.
+    ///
+    /// Safe to call more than once.
     func remove() {
         follower = nil
         subscription = nil

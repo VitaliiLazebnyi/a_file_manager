@@ -52,11 +52,13 @@ import Testing
         #expect(
             try names("<[A] ([E]) in [P] of [G], [S] bytes") == [
                 "Holiday pics.jpeg (jpeg) in Photos of Data, 4096 bytes"
-            ])
+            ]
+        )
         #expect(
             try names("<[N1][N-4][N2-5]|[N2,3]|[N9-]|[N-4-]|[N-8-5]|[N2--5]") == [
                 "Hpolid", "oli", "pics", "pics", "day", "oliday"
-            ])
+            ]
+        )
         #expect(try names("<[E02-9]|[E 1-6]x|[E1-3]") == ["00000peg", "jpegx", "jpe"])
         var folder = context
         folder.cursorName = "My.Folder"
@@ -143,7 +145,8 @@ import Testing
             admitted("*.txt *.JPG") == [
                 "a.txt", "c.jpg", "docs/d.txt", "docs/build/f.txt", "src/g.txt", "src/docs/h.txt",
                 "src/docs/deep/i.txt"
-            ])
+            ]
+        )
         #expect(admitted("*.* | *.bak *.old") == admitted("*.txt *.jpg"))
         #expect(admitted("| *.txt") == ["b.bak", "c.jpg", "docs/e.old"])
         #expect(admitted("\"a.txt\" ?.bak") == ["a.txt", "b.bak"])
@@ -160,7 +163,8 @@ import Testing
         #expect(
             admitted("*.txt docs/**/") == [
                 "a.txt", "docs/d.txt", "docs/build/f.txt", "src/docs/h.txt", "src/docs/deep/i.txt"
-            ])
+            ]
+        )
         #expect(admitted("*.txt docs\\ | /") == ["docs/d.txt", "src/docs/h.txt"])
         #expect(CopyFilter("*.* | **/").skipsEmptyFolders && !CopyFilter("*.*").skipsEmptyFolders)
     }
@@ -188,7 +192,9 @@ import Testing
         configuration.file = box.url("logs/operations.log")
     }
 
-    /// A clock the test moves. Unchecked: the test moves it only while no line is being written.
+    /// A clock the test moves.
+    ///
+    /// Unchecked: the test moves it only while no line is being written.
     final class Clock: @unchecked Sendable {
         var now = Date(timeIntervalSince1970: 1_791_813_787)
     }
@@ -205,10 +211,15 @@ import Testing
             lines == [
                 "Copy: /a/one.txt -> /b/one.txt", "Error: Delete: /a/two.txt: Permission denied",
                 "Skipped: Move: /a/three.txt -> /b/three.txt"
-            ])
+            ]
+        )
         #expect(
-            box.read("logs/operations.log")?.range(
-                of: #"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: Copy"#, options: .regularExpression) != nil)
+            box.read("logs/operations.log")?
+                .range(
+                    of: #"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: Copy"#,
+                    options: .regularExpression
+                ) != nil
+        )
     }
 
     @Test func manyThreadsCanWriteAtOnce() {
@@ -237,7 +248,8 @@ import Testing
         #expect(
             text.contains("kept") && text.contains("Error: Rename: failed: no") && !text.contains("skipped")
                 && !text.contains("trashed")
-                && !text.contains("folder"))
+                && !text.contains("folder")
+        )
 
         var off = configuration
         off.isEnabled = false
@@ -275,7 +287,9 @@ import Testing
         // The file was last written two days ago, as far as the disk knows.
         let before = Date(timeIntervalSinceNow: -2 * 86_400)
         try FileManager.default.setAttributes(
-            [.modificationDate: before], ofItemAtPath: box.url("logs/operations.log").path)
+            [.modificationDate: before],
+            ofItemAtPath: box.url("logs/operations.log").path
+        )
         clock.now = Date()
         log.write(OperationRecord(.copy, source: "later"))
         log.flush()
@@ -284,6 +298,7 @@ import Testing
         let old = try #require(names.first { $0 != "operations.log" })
         #expect(
             old.range(of: #"^operations\.\d{4}-\d\d-\d\d\.log$"#, options: .regularExpression) != nil
-                && box.read("logs/" + old)?.contains("today") == true)
+                && box.read("logs/" + old)?.contains("today") == true
+        )
     }
 }

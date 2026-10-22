@@ -7,8 +7,10 @@ import Testing
 
 @testable import NetworkPlugin
 
-/// A test server on a sandbox folder with the FTP file system connected to it. Unchecked: set up
-/// in `init` and not changed afterwards; the server and the connections are safe from any thread.
+/// A test server on a sandbox folder with the FTP file system connected to it.
+///
+/// Unchecked: set up in `init` and not changed afterwards; the server and the connections are safe
+/// from any thread.
 final class FTPFixture: @unchecked Sendable {
     let box: Sandbox
     let server: TestFTPServer
@@ -43,8 +45,10 @@ final class FTPFixture: @unchecked Sendable {
     var key: ServerKey { ServerKey(scheme: "ftp", host: "127.0.0.1", port: server.port) }
 
     /// Waits until the background work of this fixture's session is done (connections given
-    /// back, goodbyes said). Of this session only: the tests run side by side, and the work of
-    /// another test's server, which may be one that never answers, is not waited for.
+    /// back, goodbyes said).
+    ///
+    /// Of this session only: the tests run side by side, and the work of another test's server,
+    /// which may be one that never answers, is not waited for.
     func settle(_ session: (any RemoteSession)? = nil, timeout: TimeInterval = Wait.ceiling) -> Bool {
         guard let session = session ?? center.existingSession(for: key) else { return true }
         return Background.waitUntilIdle(lane: session, timeout: timeout)

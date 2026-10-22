@@ -1,8 +1,9 @@
 import AppKit
 import Quartz
 
-/// The Mac's desktop itself: each request goes to the system as it is. The UI tests cover this;
-/// unit tests use a recording desktop instead.
+/// The Mac's desktop itself: each request goes to the system as it is.
+///
+/// The UI tests cover this; unit tests use a recording desktop instead.
 ///
 /// Unchecked `Sendable`: `open` and `reveal` only call `NSWorkspace`, which may be used from any
 /// thread; `picker` is touched on the main thread only.

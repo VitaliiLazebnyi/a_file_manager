@@ -1,11 +1,12 @@
 import AFMKernel
 import Foundation
 
-/// Where the characters of a text in a code page of more than one byte (932, 936, 949, 950, EUC-JP, GB 18030) begin. A
-/// piece cut out of such a text can only be decoded from the start of a character: a lead byte
-/// pairs with the byte after it whatever that is (from 0x40 on), so starting one byte off
-/// reads every character after it wrong until a byte below 0x40 (a line end, a space, a digit)
-/// stands in the way. In a long run of nothing but two-byte characters there is none.
+/// Where the characters of a text in a code page of more than one byte (932, 936, 949, 950, EUC-JP, GB 18030) begin.
+///
+/// A piece cut out of such a text can only be decoded from the start of a character: a lead byte
+/// pairs with the byte after it whatever that is (from 0x40 on), so starting one byte off reads
+/// every character after it wrong until a byte below 0x40 (a line end, a space, a digit) stands in
+/// the way. In a long run of nothing but two-byte characters there is none.
 ///
 /// The boundaries are found, not guessed: the character that follows a byte that cannot be a
 /// lead byte begins right after it, and from a known boundary the characters are counted off
@@ -47,8 +48,10 @@ final class CharacterBoundaries: @unchecked Sendable {
     }
 
     /// The most boundaries kept: one per 16 KB would make a map of millions for a file of
-    /// gigabytes. A search that comes back to a block that was let go finds it again from the
-    /// nearest one that is kept.
+    /// gigabytes.
+    ///
+    /// A search that comes back to a block that was let go finds it again from the nearest one that
+    /// is kept.
     static let keptLimit = 1 << 16
 
     private func remember(_ block: Int64, _ boundary: Int64) {
@@ -71,8 +74,9 @@ final class CharacterBoundaries: @unchecked Sendable {
     }
 
     /// The start of the character that the byte at `offset` belongs to: `offset` itself when a
-    /// character begins there. Reads at most one block, plus what finding the block's
-    /// boundary needs the first time.
+    /// character begins there.
+    ///
+    /// Reads at most one block, plus what finding the block's boundary needs the first time.
     func characterStart(atOrBefore offset: Int64, cancellation: CancellationFlag? = nil) throws -> Int64 {
         let offset = min(max(offset, content.lowerBound), content.upperBound)
         let block = (offset - content.lowerBound) / spacing
@@ -88,10 +92,11 @@ final class CharacterBoundaries: @unchecked Sendable {
     }
 
     /// Counts characters off from index `from` of `data` (a boundary) and returns the index of
-    /// the last character start at or before `limit`. A lead byte pairs with the next byte
-    /// when that is 0x40 or more; the byte after the data is not known, so a lead at the very
-    /// end is taken as the stray byte the decoder makes of it only when `data` reaches the
-    /// end of the file.
+    /// the last character start at or before `limit`.
+    ///
+    /// A lead byte pairs with the next byte when that is 0x40 or more; the byte after the data is
+    /// not known, so a lead at the very end is taken as the stray byte the decoder makes of it only
+    /// when `data` reaches the end of the file.
     private func walk(_ data: Data, from: Int, whileAtOrBefore limit: Int) -> Int {
         var index = from
         // Never past the bytes there are, whatever was asked for.

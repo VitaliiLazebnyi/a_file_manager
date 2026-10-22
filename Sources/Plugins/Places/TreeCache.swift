@@ -2,10 +2,11 @@ import AFMKernel
 public import Foundation
 
 /// The directory trees that were read, kept so the tree window opens at once (spec 12 ›
-/// Reading the tree and the tree cache). Each root (with and without hidden folders, which
-/// are different trees) has its list of folders in memory and in a file of its own: the
-/// specification's `treeinfo.wc`, except that the files live in the program's Application
-/// Support folder and never in the folders that were scanned.
+/// Reading the tree and the tree cache).
+///
+/// Each root (with and without hidden folders, which are different trees) has its list of folders
+/// in memory and in a file of its own: the specification's `treeinfo.wc`, except that the files
+/// live in the program's Application Support folder and never in the folders that were scanned.
 ///
 /// The file is plain text: a `root=<url>` line, an optional `state=partial` line, then one
 /// `[relative/path]` line per folder and one `(relative/path)` line per folder that was not
@@ -120,6 +121,7 @@ public final class TreeCache: @unchecked Sendable {
     }
 
     /// Lets the trees go from memory that are not waiting to be written, down to the limit.
+    ///
     /// Under the lock.
     private func trimMemory(keeping key: String) {
         var total = memory.values.reduce(0) { $0 + $1.entry.paths.count }
@@ -180,6 +182,7 @@ public final class TreeCache: @unchecked Sendable {
 
     /// A folder is known to exist (a panel is showing it): if the tree of `root` is in memory
     /// and does not have it, it is added, in the background and without scanning anything.
+    ///
     /// Returns at once.
     public func noteFolder(_ relativePath: String, below root: URL) {
         updates.async { [self] in note(relativePath, below: root) }
@@ -275,8 +278,9 @@ public final class TreeCache: @unchecked Sendable {
     }
 
     /// The tree written to the file in pieces of about a megabyte, so that a tree of a million
-    /// folders is never held again as one text (and then as one `Data`). False when it would
-    /// be more than `fileLimit` (nothing replaces the old file then).
+    /// folders is never held again as one text (and then as one `Data`).
+    ///
+    /// False when it would be more than `fileLimit` (nothing replaces the old file then).
     @discardableResult
     static func writePrivately(_ entry: Entry, root: URL, to file: URL) -> Bool {
         let temporary = file.path + ".tmp\(getpid())"

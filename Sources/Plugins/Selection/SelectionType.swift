@@ -3,8 +3,10 @@ import Foundation
 
 /// A predefined selection type: a mask with further conditions, saved under a name and used
 /// in Select group as `>name` (spec 03 › Select and unselect group, 18 › File masks and
-/// selection types). Total Commander saves a whole search here; this holds what a file list
-/// knows of its entries: kind, size, date of last change, hidden and link.
+/// selection types).
+///
+/// Total Commander saves a whole search here; this holds what a file list knows of its entries:
+/// kind, size, date of last change, hidden and link.
 struct SelectionType: Codable, Equatable {
     enum Kind: Int, Codable {
         case any, files, folders
@@ -83,8 +85,10 @@ struct SelectionType: Codable, Equatable {
         return formatter
     }
 
-    /// `2026-10-11` or `2026-10-11 09:58`. A day without a time means its start, or with
-    /// `endOfDay` its last second, so that "to 2026-10-11" includes that day.
+    /// `2026-10-11` or `2026-10-11 09:58`.
+    ///
+    /// A day without a time means its start, or with `endOfDay` its last second, so that "to
+    /// 2026-10-11" includes that day.
     static func date(from text: String, endOfDay: Bool = false) -> Date? {
         let text = text.trimmingCharacters(in: .whitespaces)
         if let date = formatter("yyyy-MM-dd HH:mm").date(from: text) { return date }
@@ -98,6 +102,7 @@ struct SelectionType: Codable, Equatable {
 }
 
 /// A mask or a selection type, ready to be asked which entries of a list it selects.
+///
 /// A value without shared state; `names` may run on any thread.
 struct SelectionRule {
     let mask: SelectionMask
@@ -127,7 +132,9 @@ struct SelectionRule {
     }
 
     /// The same, ending early once `cancelled` says so (the names found so far are then of no
-    /// use). Whether a regular expression of the mask ran out of time is told by `mask.timedOut`.
+    /// use).
+    ///
+    /// Whether a regular expression of the mask ran out of time is told by `mask.timedOut`.
     func matching(among items: [FileItem], base: URL, now: Date = Date(), cancelled: () -> Bool) -> [String] {
         matchingIndices(among: items, base: base, now: now, cancelled: cancelled).map { items[$0].name }
     }
@@ -154,8 +161,9 @@ struct SelectionRule {
         return found
     }
 
-    /// Whether the rule selects one entry on its own, for a rule that is not `isPairwise`. A
-    /// function of the entry alone, so it may be asked from several threads at once.
+    /// Whether the rule selects one entry on its own, for a rule that is not `isPairwise`.
+    ///
+    /// A function of the entry alone, so it may be asked from several threads at once.
     func probe(base: URL, now: Date = Date()) -> @Sendable (FileItem) -> Bool {
         let (mask, type, entry) = (self.mask, self.type, entryMaker(base: base))
         return { item in mask.matches(entry(item)) && (type?.accepts(item, now: now) ?? true) }
@@ -180,7 +188,9 @@ struct SelectionRule {
 }
 
 /// What the Mark menu remembers between sessions: the masks typed into Select group, the
-/// predefined selection types and the options of the configuration page. Main thread only.
+/// predefined selection types and the options of the configuration page.
+///
+/// Main thread only.
 final class SelectionStore {
     static let historyLimit = 20
     static let scope = "selection"

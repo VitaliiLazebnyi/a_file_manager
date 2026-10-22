@@ -4,8 +4,10 @@ import Foundation
 
 /// What the System Information dialog shows (spec 12 › System Information), adapted to the
 /// Mac: hardware, software and the mounted volumes instead of BIOS, ports and Windows
-/// networks. A plain value; `gather` asks the system and the volumes and may block, so it runs
-/// on a job's thread.
+/// networks.
+///
+/// A plain value; `gather` asks the system and the volumes and may block, so it runs on a job's
+/// thread.
 struct SystemInformation: Equatable {
     struct Section: Equatable {
         let title: String
@@ -99,7 +101,9 @@ struct SystemInformation: Equatable {
         return "\(Format.bytes(Int64(free / (1_024 * 1_024)))) M (\(load) %)"
     }
 
-    /// What `gather` asks the system: its named values and its volumes. Tests answer in its place.
+    /// What `gather` asks the system: its named values and its volumes.
+    ///
+    /// Tests answer in its place.
     struct Questions: Sendable {
         /// The system's own.
         static let system = Self(
@@ -122,7 +126,9 @@ struct SystemInformation: Equatable {
     }
 
     /// `displays` are the screens as text; they belong to the main thread and are read there
-    /// before the job starts. Nil when `cancellation` was set before every volume had answered.
+    /// before the job starts.
+    ///
+    /// Nil when `cancellation` was set before every volume had answered.
     static func gather(displays: [String], cancellation: CancellationFlag, asking system: Questions) -> Self? {
         let process = ProcessInfo.processInfo
         var hardware = [Row(label: "Model", value: system.text("hw.model") ?? "unknown")]
@@ -177,8 +183,9 @@ struct SystemInformation: Equatable {
     /// Stands for the volumes in `BlockingCalls`.
     private static let volumeCalls = CallOwner()
 
-    /// The mounted volumes with their free space. Each volume is asked on its own core,
-    /// because a network share may take its time to answer.
+    /// The mounted volumes with their free space.
+    ///
+    /// Each volume is asked on its own core, because a network share may take its time to answer.
     ///
     /// A volume that has stopped answering never returns from the question. The question is
     /// therefore asked through `BlockingCalls`: it goes on alone, and this function comes back

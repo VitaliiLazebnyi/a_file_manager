@@ -1,7 +1,9 @@
 import Foundation
 
-/// What a rename mask sees of one item. The name may differ from the name on disk: after
-/// "next step" the computed names stand in for the old ones (spec 09 › Result list).
+/// What a rename mask sees of one item.
+///
+/// The name may differ from the name on disk: after "next step" the computed names stand in for the
+/// old ones (spec 09 › Result list).
 struct RenameSubject {
     var name: String
     var isFolder: Bool
@@ -44,8 +46,9 @@ struct CounterDefinition: Codable, Equatable {
     var digits = 1
 }
 
-/// Everything a mask needs besides the item itself. A value, so that a preview computed on
-/// several threads works on one fixed state.
+/// Everything a mask needs besides the item itself.
+///
+/// A value, so that a preview computed on several threads works on one fixed state.
 struct RenameContext {
     /// The number of items in the list, for `[c]` and automatic counter widths.
     var count = 1
@@ -63,7 +66,9 @@ struct RenameContext {
     var titleRule = TitleCaseRule.standard
     var locale = Locale.current
     var timeZone = TimeZone.current
-    /// `[T4]`: the date recorded inside a picture. Called on the preview threads, several at once.
+    /// `[T4]`: the date recorded inside a picture.
+    ///
+    /// Called on the preview threads, several at once.
     var contentDate: (@Sendable (RenameSubject) -> Date?)?
 }
 
@@ -132,7 +137,9 @@ struct CharacterRange: Equatable {
 }
 
 /// A counter written into the placeholder itself: `[C10+5:3]`, `[C+1/100]`, `[Caa+1]`
-/// (spec 18 › Counter). It ignores the Define-counter fields.
+/// (spec 18 › Counter).
+///
+/// It ignores the Define-counter fields.
 struct InlineCounter: Equatable {
     var start = 1
     /// The start of an alphabetic counter (`aa`); its length is the width.
@@ -144,9 +151,10 @@ struct InlineCounter: Equatable {
     var digits: Int? = 1
 }
 
-/// A parsed rename mask (spec 18 › Rename and new-folder placeholders). Parsing never fails:
-/// what cannot be read becomes an `invalid` token, and the mask then gives `<Error!>` for
-/// every item.
+/// A parsed rename mask (spec 18 › Rename and new-folder placeholders).
+///
+/// Parsing never fails: what cannot be read becomes an `invalid` token, and the mask then gives
+/// `<Error!>` for every item.
 struct RenameMask {
     enum Source: Equatable {
         case name, ext, nameWithExt, fullPath, parent, grandparent
@@ -477,8 +485,10 @@ struct MaskState {
     var timeOffset: RenameMask.TimeOffset?
 }
 
-/// The date and time formats one preview uses. Built once and shared by the preview threads
-/// (formatting with a `DateFormatter` is safe from several threads).
+/// The date and time formats one preview uses.
+///
+/// Built once and shared by the preview threads (formatting with a `DateFormatter` is safe from
+/// several threads).
 ///
 /// Unchecked `Sendable`: nothing changes after `init`, and the formatters are only used to format.
 final class RenameFormats: @unchecked Sendable {
@@ -527,8 +537,9 @@ extension RenameMask {
         }
     }
 
-    /// The text the mask gives for one item. `index` is the item's place in the list, from 0.
-    /// Safe to call from several threads at once.
+    /// The text the mask gives for one item.
+    ///
+    /// `index` is the item's place in the list, from 0. Safe to call from several threads at once.
     func evaluate(
         _ subject: RenameSubject,
         index: Int,
@@ -747,8 +758,9 @@ extension RenameMask {
     }
 
     /// `aa`, `ab`, … `az`, `ba`: the letters are the digits of a number in base 26, as wide
-    /// as the start text and in its case. Letters that make a number too large for the
-    /// counter are an error of the mask.
+    /// as the start text and in its case.
+    ///
+    /// Letters that make a number too large for the counter are an error of the mask.
     static func alphabetic(_ start: String, advancedBy steps: Int) throws -> String {
         let isUpper = start.first?.isUppercase ?? false
         let base = UInt8(ascii: isUpper ? "A" : "a")

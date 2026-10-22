@@ -3,8 +3,9 @@ import Foundation
 
 /// Counts the regular expressions that ran out of time, so that a pattern which is too slow
 /// for every name does not cost its time budget again for each of a million files: after a few
-/// timeouts the pattern is taken as unusable and the rest answer at once. Shared by the
-/// threads of one search. All state is guarded by `lock`.
+/// timeouts the pattern is taken as unusable and the rest answer at once.
+///
+/// Shared by the threads of one search. All state is guarded by `lock`.
 final class RegexTrip: @unchecked Sendable {
     private let lock = NSLock()
     private var timeouts = 0
@@ -35,11 +36,12 @@ final class RegexTrip: @unchecked Sendable {
     }
 }
 
-/// Runs a regular expression the user typed with a bound on its time. Such an expression can
-/// take time that grows with every character of the text (`(a+)+$`), so it is never run with
-/// the plain `firstMatch`: the matching is stopped from the progress block of
-/// `enumerateMatches` when the budget has passed or the work was cancelled, on whatever thread
-/// the caller is.
+/// Runs a regular expression the user typed with a bound on its time.
+///
+/// Such an expression can take time that grows with every character of the text (`(a+)+$`), so it
+/// is never run with the plain `firstMatch`: the matching is stopped from the progress block of
+/// `enumerateMatches` when the budget has passed or the work was cancelled, on whatever thread the
+/// caller is.
 enum FindRegex {
     /// What one match may take.
     static let defaultBudget: TimeInterval = 0.25
@@ -48,8 +50,9 @@ enum FindRegex {
         case matched, unmatched, timedOut
     }
 
-    /// Whether `text` holds a match, within `budget` seconds of work. A cancelled run reports
-    /// `timedOut`; whoever cancelled does not use the answer.
+    /// Whether `text` holds a match, within `budget` seconds of work.
+    ///
+    /// A cancelled run reports `timedOut`; whoever cancelled does not use the answer.
     static func firstMatch(
         _ regex: NSRegularExpression,
         in text: String,

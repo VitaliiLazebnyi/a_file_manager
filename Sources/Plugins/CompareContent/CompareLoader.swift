@@ -29,7 +29,9 @@ public struct ComparedFiles: Sendable {
 }
 
 /// Reads two files through their file systems and compares them (spec 09 › Loading, mode and
-/// encodings). UI-free.
+/// encodings).
+///
+/// UI-free.
 ///
 /// **Threading.** Everything here blocks and belongs on a background thread. The two files
 /// are read at the same time. Large files of the same size are first checked for being
@@ -357,9 +359,10 @@ public enum CompareLoader {
     }
 
     /// Replaces the file at `url` with `data`: the new content is written next to it under a
-    /// temporary name and moved over it, so the file is never half written. `expected` is how the
-    /// file looked when it was loaded: a file that is different now (changed by someone else) is
-    /// not overwritten. Returns the file as it is now.
+    /// temporary name and moved over it, so the file is never half written.
+    ///
+    /// `expected` is how the file looked when it was loaded: a file that is different now (changed
+    /// by someone else) is not overwritten. Returns the file as it is now.
     ///
     /// A local file with several hard links is written in place instead: a rename would give
     /// this name a file of its own and leave the other names with the old content.
@@ -442,7 +445,9 @@ public enum CompareLoader {
     }
 
     /// What a rename over the file would lose: extended attributes (tags, quarantine, Finder
-    /// info), ACLs, owner and creation date. Best effort; the data is what counts.
+    /// info), ACLs, owner and creation date.
+    ///
+    /// Best effort; the data is what counts.
     private static func carryOverMetadata(from original: URL, to copy: URL) {
         _ = copyfile(original.path, copy.path, nil, copyfile_flags_t(COPYFILE_METADATA))
         // The copying of the metadata also copied the old modification date; the file is saved now.

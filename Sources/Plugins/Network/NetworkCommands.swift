@@ -37,9 +37,11 @@ final class NetworkCommands {
 
     // MARK: Questions asked by connections
 
-    /// Routes the questions of the connections to the user. They are asked from the thread
-    /// that connects and answered on the main thread. Nothing here touches the Keychain: what
-    /// is to be stored is handed to the vault, which works on a queue of its own.
+    /// Routes the questions of the connections to the user.
+    ///
+    /// They are asked from the thread that connects and answered on the main thread. Nothing here
+    /// touches the Keychain: what is to be stored is handed to the vault, which works on a queue of
+    /// its own.
     ///
     /// The questions handed to `askUser` are marked `@Sendable`: they hold only values that are
     /// safe on any thread, and without the mark the compiler cannot check them.
@@ -243,8 +245,9 @@ final class NetworkCommands {
 
     // MARK: Connecting
 
-    /// Opens the connection in the source panel (spec 11 › Connecting). The login runs as a
-    /// job with a Cancel button; the panel follows when it succeeded.
+    /// Opens the connection in the source panel (spec 11 › Connecting).
+    ///
+    /// The login runs as a job with a Cancel button; the panel follows when it succeeded.
     func connect(
         _ profile: ConnectionProfile,
         path: String? = nil,
@@ -413,7 +416,9 @@ final class NetworkCommands {
         }
     }
 
-    /// "FTP: connection details" (spec 11). Returns what was saved; nil on Cancel.
+    /// "FTP: connection details" (spec 11).
+    ///
+    /// Returns what was saved; nil on Cancel.
     ///
     /// The password is kept by the vault under the connection's server and login. It is never
     /// read here (the Keychain may make the main thread wait): an empty field leaves what is
@@ -629,8 +634,10 @@ final class NetworkCommands {
         return location.isFileURL ? location : nil
     }
 
-    /// The text of a list file. A list is a small text; a file that is no plain file, or
-    /// larger than `DownloadList.largestFile`, is not read.
+    /// The text of a list file.
+    ///
+    /// A list is a small text; a file that is no plain file, or larger than
+    /// `DownloadList.largestFile`, is not read.
     nonisolated static func readList(_ list: URL) throws -> String {
         let values = try list.resourceValues(forKeys: [.isRegularFileKey])
         guard values.isRegularFile == true else { throw VolumeError(message: "\(list.path) is not a file.") }
@@ -649,8 +656,10 @@ final class NetworkCommands {
     }
 
     /// Download later: writes the marked files of the server into the list file, each with
-    /// the place it is to go to (spec 11 › Download later). The lines are made in the job, not
-    /// here: with very many files that is work the main thread must not do.
+    /// the place it is to go to (spec 11 › Download later).
+    ///
+    /// The lines are made in the job, not here: with very many files that is work the main thread
+    /// must not do.
     func addToDownloadList() {
         let items = source.model.operands()
         guard !items.isEmpty, let list = askForList("File name of download list:") else { return }
@@ -705,8 +714,9 @@ final class NetworkCommands {
     }
 
     /// Works through a list file, one line after the other, with the usual copy job for each
-    /// (spec 11 › Net › FTP Download From List…). Lines without a target go to the folder of
-    /// the target panel.
+    /// (spec 11 › Net › FTP Download From List…).
+    ///
+    /// Lines without a target go to the folder of the target panel.
     ///
     /// A list file may come from anybody and says what is copied where, so nothing runs
     /// before the user has seen what the list would do and agreed (`ListPlan.preview`).
@@ -851,8 +861,9 @@ final class NetworkCommands {
 }
 
 /// What a download list would do, worked out before anything is done: the lines as transfers
-/// between two locations, and the lines that are not carried out. Main thread; it only reads
-/// text (no server and no disk is asked).
+/// between two locations, and the lines that are not carried out.
+///
+/// Main thread; it only reads text (no server and no disk is asked).
 struct ListPlan {
     enum Kind { case download, copy, move }
 
@@ -964,8 +975,10 @@ struct ListPlan {
     }
 }
 
-/// One run through a download list. The copy jobs are asynchronous, so the run moves from
-/// line to line in their completions. Main thread only; it keeps itself alive until the end.
+/// One run through a download list.
+///
+/// The copy jobs are asynchronous, so the run moves from line to line in their completions. Main
+/// thread only; it keeps itself alive until the end.
 @MainActor
 private final class ListRun {
     private var items: ArraySlice<ListPlan.Item>
@@ -1025,8 +1038,10 @@ private final class ListRun {
         }
     }
 
-    /// Gives the file that arrived the name the list wants. A file that has that name already
-    /// is replaced only when the user says so; otherwise the new file keeps the name it came with.
+    /// Gives the file that arrived the name the list wants.
+    ///
+    /// A file that has that name already is replaced only when the user says so; otherwise the new
+    /// file keeps the name it came with.
     private func rename(_ arrived: URL, to: URL, replacing: Bool) {
         let fileSystems = kernel.fileSystems
         kernel.jobs.run(

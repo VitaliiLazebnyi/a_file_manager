@@ -47,8 +47,10 @@ internal final class CoverageCompareStage {
         }
     }
 
-    /// What the window did outside itself. Declared first, so that it goes first: its presenter holds the window's
-    /// controller, which must go before the kernel it belongs to.
+    /// What the window did outside itself.
+    ///
+    /// Declared first, so that it goes first: its presenter holds the window's controller, which
+    /// must go before the kernel it belongs to.
     internal let recorder = Recorder()
     /// The files.
     internal let memory = MemoryFileSystem()

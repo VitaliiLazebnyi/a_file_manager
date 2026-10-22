@@ -2,14 +2,17 @@ import AFMKernel
 import Foundation
 
 /// HTML as plain text with its links (spec 10 › HTML text (strip tags)): tags are removed,
-/// the targets of links are written behind their text, in braces when asked for. A pure
-/// function; nothing is loaded and no script runs.
+/// the targets of links are written behind their text, in braces when asked for.
+///
+/// A pure function; nothing is loaded and no script runs.
 enum HTMLText {
     private static let blockTags: Set<String> = [
         "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
         "blockquote", "pre", "hr", "section", "article", "header", "footer", "title", "dt", "dd"
     ]
-    /// Elements whose content is not text. Each name has 8 letters at most (the scan relies on it).
+    /// Elements whose content is not text.
+    ///
+    /// Each name has 8 letters at most (the scan relies on it).
     private static let skippedElements: Set<String> = ["script", "style", "noscript", "template", "svg"]
     private static let entities: [String: String] = [
         "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " ", "copy": "©", "reg": "®", "trade": "™",
@@ -127,8 +130,9 @@ enum HTMLText {
     }
 
     /// The range of the value of attribute `name` (lower case ASCII) in the text of a tag
-    /// (without `<` and `>`): `name="x"`, `name='x'` or `name=x`, with spaces around the `=`. The
-    /// attributes are walked one by one, so `data-href`, and a value that holds the text
+    /// (without `<` and `>`): `name="x"`, `name='x'` or `name=x`, with spaces around the `=`.
+    ///
+    /// The attributes are walked one by one, so `data-href`, and a value that holds the text
     /// `href=` (`title='a href="x"'`), are no `href`. The first one counts.
     static func attributeRange(_ name: [UInt16], in tag: UnsafeBufferPointer<UInt16>) -> Range<Int>? {
         let count = tag.count
@@ -241,7 +245,9 @@ enum HTMLText {
     }
 
     /// The same for text that is decoded already, scanned unit by unit (hundreds of megabytes a
-    /// second). Nil when `cancellation` was set.
+    /// second).
+    ///
+    /// Nil when `cancellation` was set.
     static func plainText(units html: [UInt16], linkBraces: Bool = true, cancellation: CancellationFlag? = nil)
         -> Result?
     {

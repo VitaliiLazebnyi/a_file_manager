@@ -405,8 +405,10 @@ final class P2Bench: ShellServices {
         )
     }
 
-    /// Lets the main queue run until `condition` holds. The limit is far beyond what the
-    /// work takes; it only ends a test whose condition never comes true.
+    /// Lets the main queue run until `condition` holds.
+    ///
+    /// The limit is far beyond what the work takes; it only ends a test whose condition never comes
+    /// true.
     private func wait(for condition: () -> Bool) async -> Bool {
         for _ in 0..<12_000 {
             if condition() { return true }

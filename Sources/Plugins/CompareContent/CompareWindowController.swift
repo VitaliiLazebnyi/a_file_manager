@@ -4,9 +4,10 @@ import AFMShell
 import AppKit
 
 /// The "Compare contents" window (spec 09 › Compare by content › Window): two panes that
-/// scroll and select together, one row per line of the comparison. It draws a
-/// `CompareSession` and forwards clicks and keys to it; nothing here reads a file.
-/// Main thread only.
+/// scroll and select together, one row per line of the comparison.
+///
+/// It draws a `CompareSession` and forwards clicks and keys to it; nothing here reads a file. Main
+/// thread only.
 final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private let session: CompareSession
     /// Unowned: the kernel owns the plugin, and through it this.
@@ -385,8 +386,10 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate, NSTab
         window?.firstResponder === rightTable ? .right : .left
     }
 
-    /// Selects a row in both panes and shows it near the top. (Rows come from the session's current rows: a
-    /// search that the rows have changed under is dropped by the session.)
+    /// Selects a row in both panes and shows it near the top.
+    ///
+    /// (Rows come from the session's current rows: a search that the rows have changed under is
+    /// dropped by the session.).
     private func go(toRow row: Int) {
         leftTable.selectRowIndexes([row], byExtendingSelection: false)
         let top = leftTable.rect(ofRow: max(0, row - 3)).minY

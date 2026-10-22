@@ -29,8 +29,9 @@ enum ViewerError: LocalizedError, Equatable {
 
 /// Where things that wait for a file system are done that nobody is waiting for: closing the
 /// readers of a file that is no longer shown (an SFTP or FTP close is a request to the server
-/// and waits for the answer, up to the session's time-out), deleting copies. Never call these
-/// from a queue that must not wait, and hand work here from the main thread.
+/// and waits for the answer, up to the session's time-out), deleting copies.
+///
+/// Never call these from a queue that must not wait, and hand work here from the main thread.
 enum ViewerCleanup {
     private static let queue = DispatchQueue(label: "viewer.cleanup", qos: .userInitiated, attributes: .concurrent)
 
@@ -55,10 +56,11 @@ enum ViewerCleanup {
     }
 }
 
-/// Random access to the bytes of what is being viewed. The viewer never holds a file whole: it
-/// asks for the pieces it shows (spec 10 › Window model: the text modes stream the file).
-/// `read` blocks and is safe to call from several threads at once; never call it on the main
-/// thread.
+/// Random access to the bytes of what is being viewed.
+///
+/// The viewer never holds a file whole: it asks for the pieces it shows (spec 10 › Window model:
+/// the text modes stream the file). `read` blocks and is safe to call from several threads at once;
+/// never call it on the main thread.
 protocol ByteSource: AnyObject, Sendable {
     var length: Int64 { get }
     /// The bytes from `offset` on, at most `count`; fewer only at the end of the file.
@@ -115,8 +117,9 @@ extension CancellationFlag {
 }
 
 /// A flag that is set when any of its parents is, for work that has a stop of its own and also
-/// ends with the document or the pane it belongs to. Keep the value for as long as the work
-/// runs; letting go of it unhooks the flag from its parents.
+/// ends with the document or the pane it belongs to.
+///
+/// Keep the value for as long as the work runs; letting go of it unhooks the flag from its parents.
 ///
 /// Immutable after `init`; the tokens are only held, never used.
 final class LinkedCancellation: @unchecked Sendable {
@@ -148,8 +151,10 @@ final class DataByteSource: ByteSource {
 }
 
 /// A file on any file system, read through its provider with `seek` and `read`, so the viewer
-/// works wherever a panel can show files (archives, servers). Several threads read at once,
-/// each through a reader of its own; idle readers are kept for the next request.
+/// works wherever a panel can show files (archives, servers).
+///
+/// Several threads read at once, each through a reader of its own; idle readers are kept for the
+/// next request.
 ///
 /// `idle` and `closes` are guarded by `lock`; everything else is immutable.
 final class ProviderByteSource: ByteSource, @unchecked Sendable {
@@ -168,11 +173,12 @@ final class ProviderByteSource: ByteSource, @unchecked Sendable {
         self.length = length
     }
 
-    /// Opens `url` for viewing. The size comes from the directory entry; a file system that
-    /// cannot tell it (or tells zero) is measured by reading the file once. A file on the local
-    /// disk that the entry only knows as a link is measured by asking for the size of what it
-    /// points to; pipes, devices and sockets are refused. Blocks; ends early (throwing) once
-    /// `cancellation` is set.
+    /// Opens `url` for viewing.
+    ///
+    /// The size comes from the directory entry; a file system that cannot tell it (or tells zero)
+    /// is measured by reading the file once. A file on the local disk that the entry only knows as
+    /// a link is measured by asking for the size of what it points to; pipes, devices and sockets
+    /// are refused. Blocks; ends early (throwing) once `cancellation` is set.
     static func open(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag = CancellationFlag())
         throws -> any ByteSource
     {
@@ -289,9 +295,10 @@ final class ProviderByteSource: ByteSource, @unchecked Sendable {
         if !keep { reader.close() }
     }
 
-    /// Lets go of the idle readers, and of the ones in use as they come back. The readers are
-    /// closed on a background queue: closing one may wait for the server, and `close` is called
-    /// where nothing may wait (the main thread, as the file shown changes).
+    /// Lets go of the idle readers, and of the ones in use as they come back.
+    ///
+    /// The readers are closed on a background queue: closing one may wait for the server, and
+    /// `close` is called where nothing may wait (the main thread, as the file shown changes).
     func close() {
         lock.lock()
         let readers = idle
@@ -306,12 +313,13 @@ final class ProviderByteSource: ByteSource, @unchecked Sendable {
 
 /// The blocks of a file on a slow file system, kept on disk: a temporary file with holes (one
 /// per source), so reading the whole file again, as laying a big text out anew does, is a
-/// read of the local disk and not of the server. The file has no name once it is open, so
-/// nothing is left behind whatever happens to the program. All the sources together keep at
-/// most what their `DiskBudget` allows (2 GB) and one source at most 1 GB; a source that finds
-/// the room used up goes on without caching more.
-/// Safe to use from several threads: the state of a cache is guarded by `lock`; the shared
-/// budget guards itself; the rest is immutable.
+/// read of the local disk and not of the server.
+///
+/// The file has no name once it is open, so nothing is left behind whatever happens to the program.
+/// All the sources together keep at most what their `DiskBudget` allows (2 GB) and one source at
+/// most 1 GB; a source that finds the room used up goes on without caching more. Safe to use from
+/// several threads: the state of a cache is guarded by `lock`; the shared budget guards itself; the
+/// rest is immutable.
 final class DiskBlockCache: @unchecked Sendable {
     let blockSize: Int
     private let length: Int64
@@ -455,7 +463,9 @@ final class DiskBlockCache: @unchecked Sendable {
 }
 
 /// Keeps the blocks read last, so scrolling back and forth and drawing the same rows again do
-/// not go to the file system each time. Safe to use from several threads.
+/// not go to the file system each time.
+///
+/// Safe to use from several threads.
 ///
 /// Long sequential reads (indexing, searching) would only push the shown blocks out, so they go
 /// past the cache; except for a file small enough to be kept whole (`wholeFileLimit`, for

@@ -3,9 +3,11 @@ import AFMKernel
 import Foundation
 
 /// Runs what a button, a Start-menu item or a user command says (spec 14 › The command
-/// language; 18 › Expansion). Used on the main thread; a list file is written on `background`
-/// before the command starts. Programs and shell lines are started here, as processes of their
-/// own: they take no part in the command line's job and leave no entry in its history.
+/// language; 18 › Expansion).
+///
+/// Used on the main thread; a list file is written on `background` before the command starts.
+/// Programs and shell lines are started here, as processes of their own: they take no part in the
+/// command line's job and leave no entry in its history.
 ///
 /// A line for the shell never has a file name, a path or another value in its text: the
 /// values are handed to the shell as data and the line refers to them (`ShellLine.script`).
@@ -18,15 +20,18 @@ final class CommandRunner {
     /// earlier never takes a file written later.
     private let listQueue: DispatchQueue?
     /// Where list files are written: a folder of this process, emptied when the program starts
-    /// and removed when it quits. Each file goes when its command has ended.
+    /// and removed when it quits.
+    ///
+    /// Each file goes when its command has ended.
     let listFolder: URL
     /// How long a list file outlives the command that was given it: a program started with
     /// `open` has ended long before the application it opened has read the list.
     static let defaultListGrace: TimeInterval = 60
     /// The same for this runner (tests make it short).
     var listGrace = CommandRunner.defaultListGrace
-    /// How the end of a started program comes back to the main thread. Tests keep it for later,
-    /// to see what comes when the runner has gone meanwhile.
+    /// How the end of a started program comes back to the main thread.
+    ///
+    /// Tests keep it for later, to see what comes when the runner has gone meanwhile.
     var backToMain: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { MainLoop.perform($0) }
     /// How deep user commands may call each other, and how many steps one run may take with
     /// everything it calls: a loop the name check does not see still ends.
@@ -42,8 +47,9 @@ final class CommandRunner {
     var userCommand: ((String) -> UserCommand?)?
     /// Finds the entry of the Start menu a `cm_UserMenu<n>` runs, for the same purpose.
     var startMenuEntry: ((String) -> StartMenuEntry?)?
-    /// The user commands whose steps are being performed right now, outermost first. A
-    /// command started from inside them (through the command registry) continues this list.
+    /// The user commands whose steps are being performed right now, outermost first.
+    ///
+    /// A command started from inside them (through the command registry) continues this list.
     private var active: [String] = []
     /// The lines started without a command-line plugin, also when starting is switched off.
     private(set) var launched: [String] = []
@@ -53,8 +59,10 @@ final class CommandRunner {
     private var waiting = 0
     private let children = ChildTable()
 
-    /// What one run counts with everything it calls. Main thread only. (A run whose steps are
-    /// spent goes no further: nothing of it is waiting to go on then.)
+    /// What one run counts with everything it calls.
+    ///
+    /// Main thread only. (A run whose steps are spent goes no further: nothing of it is waiting to
+    /// go on then.).
     @MainActor
     private final class Budget {
         var steps = 0
@@ -125,8 +133,10 @@ final class CommandRunner {
     }
 
     /// For the moment the program quits (nothing dispatched is run then): removes the lists
-    /// no started program can still be reading. A younger one stays; its folder is cleared
-    /// away at the next start, when this process is gone.
+    /// no started program can still be reading.
+    ///
+    /// A younger one stays; its folder is cleared away at the next start, when this process is
+    /// gone.
     func removeListFilesNow() {
         let fm = FileManager.default
         let files =
@@ -147,8 +157,9 @@ final class CommandRunner {
         if kept == 0 { try? fm.removeItem(at: listFolder) }
     }
 
-    /// Removes the folders of earlier runs of the program that are no longer running. Folders
-    /// are named by process number; another running instance keeps its own.
+    /// Removes the folders of earlier runs of the program that are no longer running.
+    ///
+    /// Folders are named by process number; another running instance keeps its own.
     nonisolated static func removeStaleListFolders(in parent: URL) {
         let fm = FileManager.default
         for url in (try? fm.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)) ?? [] {
@@ -194,8 +205,10 @@ final class CommandRunner {
         return (snapshot, { operands.markedItems().map(name(of:)) })
     }
 
-    /// Replaces the placeholders of `template`. With many marked names the work is done away
-    /// from the main thread; `completion` is called on it either way.
+    /// Replaces the placeholders of `template`.
+    ///
+    /// With many marked names the work is done away from the main thread; `completion` is called on
+    /// it either way.
     private func expand(
         _ template: [ExpandedPiece],
         arguments: [ExpandedPiece],
@@ -439,9 +452,11 @@ final class CommandRunner {
         )
     }
 
-    /// Runs the steps in the written order. A `cm_wait` hands the rest to a timer, so the
-    /// main thread never sleeps; so does a program that later steps have to wait for. The
-    /// chain carries the names of the commands it is inside of through every such wait.
+    /// Runs the steps in the written order.
+    ///
+    /// A `cm_wait` hands the rest to a timer, so the main thread never sleeps; so does a program
+    /// that later steps have to wait for. The chain carries the names of the commands it is inside
+    /// of through every such wait.
     private func perform(
         _ steps: ArraySlice<CommandStep>,
         _ chain: Chain,
@@ -538,10 +553,11 @@ final class CommandRunner {
     }
 
     /// Starts a program or shell line as a process of its own, run by a login shell (so it
-    /// finds the same PATH as a terminal), away from the main thread. It is no job and not in
-    /// the command-line history. `completion` is called on the main thread when the process
-    /// has ended (with `waits` only), telling whether it could be started; a start that fails
-    /// is reported. No thread waits for the process: its end is reported by the system.
+    /// finds the same PATH as a terminal), away from the main thread.
+    ///
+    /// It is no job and not in the command-line history. `completion` is called on the main thread
+    /// when the process has ended (with `waits` only), telling whether it could be started; a start
+    /// that fails is reported. No thread waits for the process: its end is reported by the system.
     private func launch(
         _ line: [ExpandedPiece],
         _ chain: Chain,
@@ -612,9 +628,10 @@ final class CommandRunner {
     }
 
     /// A line whose program is an application (`Safari.app`, or the bare name of an installed
-    /// application) is opened with `open`. Nil for any other line. For a bare name the shell
-    /// decides: a program of that name on the user's PATH, which only the login shell knows,
-    /// comes first. Asks the disk: background only.
+    /// application) is opened with `open`.
+    ///
+    /// Nil for any other line. For a bare name the shell decides: a program of that name on the
+    /// user's PATH, which only the login shell knows, comes first. Asks the disk: background only.
     nonisolated static func applicationLine(for line: [ExpandedPiece]) -> [ExpandedPiece]? {
         // The first word as a whole, also when it is quoted and has a space in it.
         let (word, rest) = ShellWords.firstWord(of: line)

@@ -9,9 +9,11 @@ import Testing
 
 /// Review round 2, integration: an imported settings file is judged by what the plugins say
 /// their keys are (`Kernel.settingsKeys`), not only by words in the keys' names
-/// (`cross-requests/archnet-p2.md` item 3). The list of servers a password may be sent to
-/// without protection, `network.unprotectedPasswordHosts`, has none of those words in its
-/// name: a file could plant a host there and take that question away without being asked.
+/// (`cross-requests/archnet-p2.md` item 3).
+///
+/// The list of servers a password may be sent to without protection,
+/// `network.unprotectedPasswordHosts`, has none of those words in its name: a file could plant a
+/// host there and take that question away without being asked.
 @MainActor @Suite struct Review2IntegrationSettings {
     let box: Sandbox
     let settings = MemorySettings()
@@ -23,10 +25,18 @@ import Testing
         try box.folder("A")
         try box.folder("B")
         plugin = ConfigurationPlugin(
-            launchesApplications: false, background: nil, listFolder: box.url("lists"), settingsKeys: { [] })
+            launchesApplications: false,
+            background: nil,
+            listFolder: box.url("lists"),
+            settingsKeys: { [] }
+        )
         bench = TestBench(
-            plugins: [plugin], fileSystems: [LocalFileSystem()], left: box.url("A"), right: box.url("B"),
-            settings: settings)
+            plugins: [plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B"),
+            settings: settings
+        )
         // What the network plugin says about its keys when it starts.
         bench.kernel.settingsKeys.declare(prefix: "network.")
         bench.kernel.settingsKeys.declare("network.unprotectedPasswordHosts", kind: .trust)
@@ -47,10 +57,12 @@ import Testing
         bench.interaction.formAnswers = [.accept]
         bench.commands.perform("afm_ImportSettings", .location(url))
         let fields = try #require(bench.interaction.forms.last)
-        let parts = fields.filter {
-            guard case .checkbox = $0.kind else { return false }
-            return true
-        }.map(\.key)
+        let parts =
+            fields.filter {
+                guard case .checkbox = $0.kind else { return false }
+                return true
+            }
+            .map(\.key)
         #expect(parts == ["programs", "trust"])
         if case .multilineText(let text)? = fields.first(where: { $0.key == "trust.contents" })?.kind {
             #expect(text.contains("evil.example"))
@@ -60,7 +72,8 @@ import Testing
         #expect(stored("network.passiveMode") == "false")
         #expect(
             settings.data(forKey: "network.unprotectedPasswordHosts") == nil
-                && settings.data(forKey: "viewer.helper") == nil)
+                && settings.data(forKey: "viewer.helper") == nil
+        )
 
         // Ticked, it comes in.
         bench.interaction.formAnswers = [.values(["trust": .flag(true)])]

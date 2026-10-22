@@ -5,10 +5,11 @@ import Testing
 
 @testable import NetworkPlugin
 
-/// FTP over TLS against a server with a self-signed certificate. The in-process test server
-/// speaks no TLS, so this one is a short script for the Python that comes with the developer
-/// tools, with a certificate made by `/usr/bin/openssl` in the sandbox; where one of the two
-/// is missing the tests are skipped.
+/// FTP over TLS against a server with a self-signed certificate.
+///
+/// The in-process test server speaks no TLS, so this one is a short script for the Python that
+/// comes with the developer tools, with a certificate made by `/usr/bin/openssl` in the sandbox;
+/// where one of the two is missing the tests are skipped.
 @Suite(.enabled(if: TLSServer.isAvailable)) struct NetworkTLS {
     @Test(arguments: [TLSMode.explicit, .implicit]) func connectsListsAndTransfers(mode: TLSMode) throws {
         let box = try Sandbox()
@@ -69,8 +70,10 @@ import Testing
     }
 }
 
-/// The script below, running as a child process on a port it picks itself. What goes wrong on a connection (a
-/// handshake the client gave up, among others) is written to `tls-errors.log` in the sandbox, a line each.
+/// The script below, running as a child process on a port it picks itself.
+///
+/// What goes wrong on a connection (a handshake the client gave up, among others) is written to
+/// `tls-errors.log` in the sandbox, a line each.
 final class TLSServer {
     static let python = "/usr/bin/python3"
     static let openssl = "/usr/bin/openssl"

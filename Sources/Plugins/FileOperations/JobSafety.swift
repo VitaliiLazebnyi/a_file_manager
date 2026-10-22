@@ -10,8 +10,9 @@ import Foundation
 /// name) would be a second spelling of a real place, which no comparison of locations sees
 /// through; so the real one is taken before anything is planned.
 enum RealLocation {
-    /// The real place behind `url`; `url` itself when it stands for nothing else. Works on the
-    /// text of the locations alone, so it may be asked on the main thread.
+    /// The real place behind `url`; `url` itself when it stands for nothing else.
+    ///
+    /// Works on the text of the locations alone, so it may be asked on the main thread.
     ///
     /// A file system that shows the files of others says so itself
     /// (`FileSystemProvider.realLocation(of:)`), and that answer is taken first. One that
@@ -43,8 +44,9 @@ enum RealLocation {
     }
 
     /// True when files can be addressed below `directory` by writing its displayed path with
-    /// a name after it, which is how the target field of a dialog names them. A list of files
-    /// from anywhere is not such a place.
+    /// a name after it, which is how the target field of a dialog names them.
+    ///
+    /// A list of files from anywhere is not such a place.
     static func takesNames(_ directory: URL, in fileSystems: FileSystemRegistry) -> Bool {
         if directory.isFileURL { return true }
         let typed = fileSystems.displayPath(directory)
@@ -58,10 +60,11 @@ enum RealLocation {
     }
 }
 
-/// Names as they are shown in questions and written to the log. A file name may hold anything
-/// but `/` and NUL: line breaks, characters that turn the reading direction around, characters
-/// without width. Shown raw, such a name can make a question say something else than it asks,
-/// or add lines to a log.
+/// Names as they are shown in questions and written to the log.
+///
+/// A file name may hold anything but `/` and NUL: line breaks, characters that turn the reading
+/// direction around, characters without width. Shown raw, such a name can make a question say
+/// something else than it asks, or add lines to a log.
 public enum DisplayName {
     /// The text with every such character written out as `<U+202E>`: the program's one
     /// rule for it (`Format.displayName`), so that every message shows a name the same way.
@@ -87,7 +90,9 @@ extension FileIdentity {
     }
 
     /// A pipe, a device or a socket (or, with `followingLinks`, a link to one): opening it to
-    /// read may wait for ever. False for what is not a local path or is not there.
+    /// read may wait for ever.
+    ///
+    /// False for what is not a local path or is not there.
     static func isSpecialNode(_ url: URL, followingLinks: Bool) -> Bool {
         guard url.isFileURL else { return false }
         var info = stat()
@@ -103,7 +108,9 @@ extension FileIdentity {
     }
 
     /// Whether the item carries a flag that makes the system refuse to change or remove it
-    /// (the Finder's Locked among them). Nil for what is not a local path: there nobody knows.
+    /// (the Finder's Locked among them).
+    ///
+    /// Nil for what is not a local path: there nobody knows.
     static func isLocked(_ url: URL) -> Bool? {
         guard url.isFileURL else { return nil }
         var info = stat()
@@ -112,7 +119,9 @@ extension FileIdentity {
     }
 
     /// True when `folder` is on another volume than the folder it lies in: a mounted disk, disk
-    /// image or share. False when either cannot be asked.
+    /// image or share.
+    ///
+    /// False when either cannot be asked.
     static func isMountPoint(_ folder: URL) -> Bool {
         guard let own = id(of: folder), let above = id(of: folder.deletingLastPathComponent(), followingLinks: true)
         else { return false }

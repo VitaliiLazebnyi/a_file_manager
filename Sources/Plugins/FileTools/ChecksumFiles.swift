@@ -42,9 +42,11 @@ enum ChecksumFile {
         name.unicodeScalars.contains { $0 == "\n" || $0 == "\r" }
     }
 
-    /// The contents of a checksum file. The Unix format ends lines with LF and keeps `/` in
-    /// paths; the other one is that of the Windows original: CRLF and `\`. The text is UTF-8;
-    /// `byteOrderMark` puts the mark in front that the original needs to read it as such.
+    /// The contents of a checksum file.
+    ///
+    /// The Unix format ends lines with LF and keeps `/` in paths; the other one is that of the
+    /// Windows original: CRLF and `\`. The text is UTF-8; `byteOrderMark` puts the mark in front
+    /// that the original needs to read it as such.
     static func contents(
         _ entries: [(name: String, digest: [UInt8])],
         method: ChecksumMethod,
@@ -156,7 +158,9 @@ enum ChecksumFile {
     /// Reads the lines of a checksum file named `fileName`: `<digest> *<name>` (also with two
     /// spaces), the SFV form `<name> <crc>`, the OpenSSL and BSD form `SHA256(name)= <digest>`
     /// and the checksum of a stream `<digest>  -`, which stands for the file the checksum
-    /// file is named after. Comment lines (`;`, `#`) are passed over, and so is nothing else.
+    /// file is named after.
+    ///
+    /// Comment lines (`;`, `#`) are passed over, and so is nothing else.
     static func parse(_ text: String, fileName: String) -> [Entry] {
         parseLines(text, fileName: fileName).entries
     }
@@ -279,7 +283,7 @@ struct VerifyReport {
         }
     }
 
-    /// `<METHOD>: Errors: N`
+    /// `<METHOD>: Errors: N`.
     var title: String {
         let method = methods.count == 1 ? methods.map(\.reportName).joined() : "Checksums"
         return "\(method): Errors: \(errors)"
@@ -321,10 +325,11 @@ struct VerifyReport {
 /// all cores at once, each file as a stream of blocks on one of them; the results come back
 /// in the order of the input.
 enum ChecksumRun {
-    /// The digests of each file for each of its methods, or the error that stopped it. With an
-    /// `expected` digest and several methods of that length only the first (the likeliest) is
-    /// computed in a first pass over the file; the others, all in one further pass, only when
-    /// it does not match. The digests of methods not computed are empty.
+    /// The digests of each file for each of its methods, or the error that stopped it.
+    ///
+    /// With an `expected` digest and several methods of that length only the first (the likeliest)
+    /// is computed in a first pass over the file; the others, all in one further pass, only when it
+    /// does not match. The digests of methods not computed are empty.
     static func digests(of files: [(url: URL, methods: [ChecksumMethod], expected: String?)], run: ToolRun) -> [Result<
         [[UInt8]], any Error
     >] {
@@ -373,8 +378,9 @@ enum ChecksumRun {
         }
     }
 
-    /// How many files are being hashed at this moment. Unchecked `Sendable`: `active` is
-    /// guarded by `lock`.
+    /// How many files are being hashed at this moment.
+    ///
+    /// Unchecked `Sendable`: `active` is guarded by `lock`.
     private final class BusyFiles: @unchecked Sendable {
         private let lock = NSLock()
         private var active = 0
@@ -492,8 +498,10 @@ enum ChecksumRun {
         return (stars >= 2 ? fileName : FileItem.split(fileName).base) + "." + ext
     }
 
-    /// Hashes the files and writes the checksum file(s). `target` is the checksum file for
-    /// all, or, with separate files, the folder and pattern for them. Returns what was written.
+    /// Hashes the files and writes the checksum file(s).
+    ///
+    /// `target` is the checksum file for all, or, with separate files, the folder and pattern for
+    /// them. Returns what was written.
     static func create(for operands: [FileItem], target: URL, options: CreateOptions, run: ToolRun) throws -> [URL] {
         var files = try files(below: operands, run: run)
         // A checksum file among the operands is about to be replaced: it is not hashed, or the
@@ -653,7 +661,9 @@ enum ChecksumRun {
     }
 
     /// Checks files against one checksum each, given from outside: the clipboard, or a CRC32
-    /// in square brackets in the name. Every method the length of the checksum allows is tried.
+    /// in square brackets in the name.
+    ///
+    /// Every method the length of the checksum allows is tried.
     static func verify(_ files: [(item: FileItem, digest: String)], title: String, run: ToolRun) throws -> VerifyReport
     {
         var report = VerifyReport()

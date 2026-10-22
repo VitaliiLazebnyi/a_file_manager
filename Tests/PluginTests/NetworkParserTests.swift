@@ -37,13 +37,24 @@ import Testing
         #expect(
             entry
                 == RemoteEntry(
-                    name: "report.txt", isDirectory: false, size: 1_234, modified: d(2_024, 1, 5, 10, 30),
-                    permissions: 0o644))
+                    name: "report.txt",
+                    isDirectory: false,
+                    size: 1_234,
+                    modified: d(2_024, 1, 5, 10, 30),
+                    permissions: 0o644
+                )
+        )
         entry = list("drwxr-xr-x   12 root     wheel        4096 Mar  3  2021 pub")
         #expect(
             entry
                 == RemoteEntry(
-                    name: "pub", isDirectory: true, size: 4_096, modified: d(2_021, 3, 3), permissions: 0o755))
+                    name: "pub",
+                    isDirectory: true,
+                    size: 4_096,
+                    modified: d(2_021, 3, 3),
+                    permissions: 0o755
+                )
+        )
         // A date later in the year than today belongs to last year.
         #expect(list("-rw-r--r-- 1 u g 5 Dec 24 08:00 gift.txt")?.modified == d(2_023, 12, 24, 8, 0))
         // Names with spaces, also leading and doubled ones.
@@ -55,7 +66,8 @@ import Testing
         entry = list("lrwxrwxrwx 1 root root 11 May 10 2022 latest -> release-2.4")
         #expect(
             entry?.name == "latest" && entry?.isSymlink == true && entry?.linkTarget == "release-2.4"
-                && entry?.isDirectory == false)
+                && entry?.isDirectory == false
+        )
         // No group column (BSD `ls -lo`, some embedded servers).
         #expect(list("-rw-r--r--   1 ftp          512 Apr 12 09:15 nogroup.bin")?.size == 512)
         // Group names with spaces and numbers, huge sizes.
@@ -101,11 +113,17 @@ import Testing
         #expect(
             entry
                 == RemoteEntry(
-                    name: "setup.exe", isDirectory: false, size: 1_048_576, modified: d(1_998, 12, 7, 0, 30)))
+                    name: "setup.exe",
+                    isDirectory: false,
+                    size: 1_048_576,
+                    modified: d(1_998, 12, 7, 0, 30)
+                )
+        )
         // Four-digit years and a 24-hour clock, thousands separators.
         entry = list("02-29-2024  17:45            1,234,567 leap year.zip")
         #expect(
-            entry?.size == 1_234_567 && entry?.name == "leap year.zip" && entry?.modified == d(2_024, 2, 29, 17, 45))
+            entry?.size == 1_234_567 && entry?.name == "leap year.zip" && entry?.modified == d(2_024, 2, 29, 17, 45)
+        )
         #expect(list("07-04-05  12:00PM                    0 empty")?.modified == d(2_005, 7, 4, 12, 0))
         #expect(list("07-04-05  09:00AM       <JUNCTION>     link")?.isSymlink == true)
     }
@@ -113,24 +131,35 @@ import Testing
     @Test func eplfListings() {
         var entry = list("+i8388621.29609,m824255902,/,\tdev")
         #expect(
-            entry == RemoteEntry(name: "dev", isDirectory: true, modified: Date(timeIntervalSince1970: 824_255_902)))
+            entry == RemoteEntry(name: "dev", isDirectory: true, modified: Date(timeIntervalSince1970: 824_255_902))
+        )
         entry = list("+i8388621.44468,m839956783,r,s10376,up644,\tRFCEPLF with spaces")
         #expect(
             entry
                 == RemoteEntry(
-                    name: "RFCEPLF with spaces", isDirectory: false, size: 10_376,
-                    modified: Date(timeIntervalSince1970: 839_956_783), permissions: 0o644))
+                    name: "RFCEPLF with spaces",
+                    isDirectory: false,
+                    size: 10_376,
+                    modified: Date(timeIntervalSince1970: 839_956_783),
+                    permissions: 0o644
+                )
+        )
     }
 
     @Test func mlsdListings() {
         var entry = FTPListParser.mlsd(
-            "type=file;size=4096;modify=20261011035043;UNIX.mode=0640; a file; with semicolon.txt")
+            "type=file;size=4096;modify=20261011035043;UNIX.mode=0640; a file; with semicolon.txt"
+        )
         #expect(
             entry
                 == RemoteEntry(
-                    name: "a file; with semicolon.txt", isDirectory: false, size: 4_096,
+                    name: "a file; with semicolon.txt",
+                    isDirectory: false,
+                    size: 4_096,
                     modified: d(2_026, 10, 11, 3, 50, 43),
-                    permissions: 0o640))
+                    permissions: 0o640
+                )
+        )
         entry = FTPListParser.mlsd("modify=20261011035043.123;perm=eldfmMTcp;size=4096;type=dir; docs")
         #expect(entry?.isDirectory == true && entry?.name == "docs" && entry?.modified == d(2_026, 10, 11, 3, 50, 43))
         #expect(FTPListParser.mlsd("Type=cdir;Modify=20200101000000; .") == nil)
@@ -138,14 +167,16 @@ import Testing
         entry = FTPListParser.mlsd("type=OS.unix=slink:/srv/target;size=7; link")
         #expect(entry?.isSymlink == true && entry?.linkTarget == "/srv/target")
         #expect(
-            FTPListParser.mlsd("Type=file;Size=3; UPPER") == RemoteEntry(name: "UPPER", isDirectory: false, size: 3))
+            FTPListParser.mlsd("Type=file;Size=3; UPPER") == RemoteEntry(name: "UPPER", isDirectory: false, size: 3)
+        )
         // No facts at all: only the name.
         #expect(FTPListParser.mlsd(" just a name")?.name == "just a name")
         #expect(FTPListParser.mlsd("nonsense") == nil)
         // MLST indents its line and may give the whole path.
         #expect(
             FTPListParser.mlst(" type=file;size=9; /pub/dir/file name.txt")
-                == RemoteEntry(name: "file name.txt", isDirectory: false, size: 9))
+                == RemoteEntry(name: "file name.txt", isDirectory: false, size: 9)
+        )
     }
 
     @Test func largeListingsAreParsedInOrder() {
@@ -169,7 +200,10 @@ import Testing
         #expect(
             reply
                 == FTPReply(
-                    code: 230, lines: ["First line", " indented text", "Second", "123 a number inside", "Logged in"]))
+                    code: 230,
+                    lines: ["First line", " indented text", "Second", "123 a number inside", "Logged in"]
+                )
+        )
         #expect(reply?.isSuccess == true && reply?.message == "230 Logged in")
         #expect(parser.feed("226") == FTPReply(code: 226, lines: [""]))
         #expect(parser.feed("garbage") == nil && parser.feed("") == nil)
@@ -207,7 +241,8 @@ import Testing
         #expect(
             FTPServerConfig.initCommands(from: "CWD /test/a;;b;;c;PWD; ;SITE X") == [
                 "CWD /test/a;b;c", "PWD", "SITE X"
-            ])
+            ]
+        )
     }
 
     // MARK: Addresses
@@ -216,19 +251,22 @@ import Testing
         var address = try #require(ServerAddress("ftp.example.com"))
         #expect(
             address.scheme == "ftp" && address.port == 21 && address.user == nil && address.path == "/"
-                && !address.hasPath)
+                && !address.hasPath
+        )
         #expect(address.url.absoluteString == "ftp://ftp.example.com/")
 
         address = try #require(ServerAddress("myself@myserver.com:1021"))
         #expect(
             address.user == "myself" && address.password == nil && address.host == "myserver.com"
-                && address.port == 1_021)
+                && address.port == 1_021
+        )
         #expect(address.url.absoluteString == "ftp://myserver.com:1021/")
 
         address = try #require(ServerAddress("ftp://anna:p%40ss:w@rd@Host.Example.com:2121/home/my%20user/"))
         #expect(
             address.user == "anna" && address.password == "p@ss:w@rd" && address.path == "/home/my user"
-                && address.hasPath)
+                && address.hasPath
+        )
         // The URL for the panel carries no credentials; the remembered text no password.
         #expect(address.url.absoluteString == "ftp://host.example.com:2121/home/my%20user")
         #expect(address.textWithoutPassword == "ftp://anna@host.example.com:2121/home/my%20user")
@@ -240,13 +278,15 @@ import Testing
         address = try #require(ServerAddress("ftpis://secure.example.com"))
         #expect(
             address.tls == .implicit && address.port == 990
-                && address.url.absoluteString == "ftps://secure.example.com:990/")
+                && address.url.absoluteString == "ftps://secure.example.com:990/"
+        )
         address = try #require(ServerAddress("ftpes://secure.example.com:990/x"))
         #expect(address.tls == .explicit && address.port == 990)
         address = try #require(ServerAddress("sftp://deploy@box.local/var/www"))
         #expect(
             address.scheme == "sftp" && address.port == 22 && address.user == "deploy"
-                && address.url.absoluteString == "sftp://box.local/var/www")
+                && address.url.absoluteString == "sftp://box.local/var/www"
+        )
 
         address = try #require(ServerAddress("[1234:56:789A:BC::DE]:2100"))
         #expect(address.host == "1234:56:789A:BC::DE" && address.port == 2_100)
@@ -262,20 +302,24 @@ import Testing
         let key = ServerKey(scheme: "FTP", host: "Example.COM", port: nil)
         #expect(
             key.description == "ftp://example.com"
-                && key.url(path: "pub/a b").absoluteString == "ftp://example.com/pub/a%20b")
+                && key.url(path: "pub/a b").absoluteString == "ftp://example.com/pub/a%20b"
+        )
         #expect(ServerKey(scheme: "sftp", host: "h").port == 22)
         #expect(URL(string: "ftp://example.com:21/x").flatMap(ServerKey.init) == key)
         #expect(
             ServerKey(URL(fileURLWithPath: "/tmp")) == nil
-                && URL(string: "http://example.com/").flatMap(ServerKey.init) == nil)
+                && URL(string: "http://example.com/").flatMap(ServerKey.init) == nil
+        )
         let odd = key.url(path: "/a#b?c%d;e")
         #expect(RemotePath.of(odd) == "/a#b?c%d;e" && ServerKey(odd) == key)
         #expect(
             RemotePath.normalized("a//b/./c/../d/") == "/a/b/d" && RemotePath.normalized("") == "/"
-                && RemotePath.normalized("/../..") == "/")
+                && RemotePath.normalized("/../..") == "/"
+        )
         #expect(
             RemotePath.parent(of: "/a/b") == "/a" && RemotePath.parent(of: "/a") == "/"
-                && RemotePath.parent(of: "/") == nil)
+                && RemotePath.parent(of: "/") == nil
+        )
         #expect(RemotePath.name(of: "/a/b.txt") == "b.txt" && RemotePath.join("/a/", "b") == "/a/b")
     }
 
@@ -287,10 +331,12 @@ import Testing
         accepted = connection.setHost("ftpis://anna@secure.example.com/start", kind: .ftp)
         #expect(
             accepted && connection.kind == .ftpImplicitTLS && connection.port == nil && connection.key.port == 990
-                && connection.user == "anna")
+                && connection.user == "anna"
+        )
         #expect(
             connection.remoteDirectory == "/start" && connection.profile.tls == .implicit
-                && connection.profile.user == "anna")
+                && connection.profile.user == "anna"
+        )
         accepted = connection.setHost("box", kind: .sftp)
         #expect(accepted && connection.key == ServerKey(scheme: "sftp", host: "box", port: 22))
         accepted = connection.setHost("not a host", kind: .ftp)
@@ -301,7 +347,8 @@ import Testing
         let profile = connection.profile
         #expect(
             profile.user == nil && profile.anonymous && profile.usesMLSD == false
-                && profile.initCommands == ["SITE A", "SITE B"])
+                && profile.initCommands == ["SITE A", "SITE B"]
+        )
         #expect(profile.savedID == connection.id)
     }
 
@@ -341,16 +388,19 @@ import Testing
                 .copy(source: "/src/file.zip", target: "ftp://host/dir/file.zip"), .copy(source: "/a", target: "/b"),
                 .move(source: "/a", target: "/b"), .pause(1.5), .unsupported("header: Referer: http://x"),
                 .unsupported("copyflags: 3")
-            ])
+            ]
+        )
         #expect(
             DownloadList.line(source: "ftp://h/a", target: "/t/a") == "ftp://h/a -> /t/a"
-                && DownloadList.line(source: "x", target: nil) == "x")
+                && DownloadList.line(source: "x", target: nil) == "x"
+        )
     }
 
     @Test func volumes() {
         #expect(
             ServerSchemes.mountedVolume(of: URL(fileURLWithPath: "/Volumes/Share/a/b"))
-                == URL(fileURLWithPath: "/Volumes/Share", isDirectory: true))
+                == URL(fileURLWithPath: "/Volumes/Share", isDirectory: true)
+        )
         #expect(ServerSchemes.mountedVolume(of: URL(fileURLWithPath: "/Users/x")) == nil)
         #expect(ServerSchemes.mountedVolume(of: URL(fileURLWithPath: "/Volumes")) == nil)
         #expect(ServerSchemes.mountedVolume(of: ServerKey(scheme: "ftp", host: "h").url(path: "/Volumes/x")) == nil)

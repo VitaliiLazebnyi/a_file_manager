@@ -236,7 +236,9 @@ import Testing
         #expect(steps.isEmpty && asked.value >= 2)
     }
 
-    /// Counts the calls of a closure. Unchecked: the count is guarded by `lock`.
+    /// Counts the calls of a closure.
+    ///
+    /// Unchecked: the count is guarded by `lock`.
     private final class CallCounter: @unchecked Sendable {
         private let lock = NSLock()
         private var count = 0

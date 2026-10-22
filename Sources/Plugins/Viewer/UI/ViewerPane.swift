@@ -22,7 +22,9 @@ struct ViewerItem {
 }
 
 /// A Lister: the menu strip, the content in one of the display modes and the status line
-/// (spec 10 › The Lister window). The Lister window holds one, the quick-view pane another.
+/// (spec 10 › The Lister window).
+///
+/// The Lister window holds one, the quick-view pane another.
 ///
 /// Threading: the pane and its views belong to the main thread. Everything that touches a
 /// file — opening it, detecting its type, indexing, fetching rows, searching, decoding images,
@@ -105,7 +107,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
     var cancellation = CancellationFlag()
     let workQueue = DispatchQueue(label: "viewer.work", qos: .userInitiated, attributes: .concurrent)
     /// How a file whose reads are slow (a server) is kept once read: in blocks of this size, this
-    /// many of them in memory. A file that fits (64 MB) is kept whole, a bigger one on disk.
+    /// many of them in memory.
+    ///
+    /// A file that fits (64 MB) is kept whole, a bigger one on disk.
     var slowFileBlocks = (size: 256 << 10, count: 256)
     private let temporaryCopies: TemporaryCopies
     /// The text of an HTML file with its tags removed, kept while the file is shown.
@@ -295,7 +299,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
 
     // MARK: Loading
 
-    /// Shows a file or a text. Returns at once; the content appears when it has been read.
+    /// Shows a file or a text.
+    ///
+    /// Returns at once; the content appears when it has been read.
     func load(_ item: ViewerItem) {
         stopWork()
         self.item = item
@@ -445,8 +451,10 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// Shows what a folder holds instead of a file (spec 03 › Quick View: on a folder,
-    /// information about its occupied space). The folder is counted in the background, on all
-    /// cores; moving on to something else stops the counting.
+    /// information about its occupied space).
+    ///
+    /// The folder is counted in the background, on all cores; moving on to something else stops the
+    /// counting.
     func showFolder(_ url: URL, name: String) {
         clear(message: "\(name)\n\nCounting…")
         let generation = loadGeneration
@@ -483,9 +491,11 @@ final class ViewerPane: NSView, NSMenuDelegate {
         (imageView, mediaView, pdfView, webView, richText) = (nil, nil, nil, nil, nil)
     }
 
-    /// Lets go of the Quick Look view. One that is in a window has a window of its own until it is
-    /// closed; closing one that is in no window (never was, or no longer is) ends the program, so
-    /// it is closed only in a window, and before the pane leaves its window (`viewWillMove`).
+    /// Lets go of the Quick Look view.
+    ///
+    /// One that is in a window has a window of its own until it is closed; closing one that is in
+    /// no window (never was, or no longer is) ends the program, so it is closed only in a window,
+    /// and before the pane leaves its window (`viewWillMove`).
     private func closePreview() {
         if previewView?.window != nil { previewView?.close() }
         previewView = nil
@@ -629,8 +639,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
         updateChrome()
     }
 
-    /// Reads an HTML file whole, removes its tags off the main thread and shows the text. A file
-    /// beyond `htmlTextLimit` is shown as plain text instead.
+    /// Reads an HTML file whole, removes its tags off the main thread and shows the text.
+    ///
+    /// A file beyond `htmlTextLimit` is shown as plain text instead.
     private func stripHTML(_ loaded: Loaded) {
         let generation = loadGeneration
         let token = presentGeneration
@@ -856,7 +867,9 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// All the bytes of a file, for a mode that needs them at once; nil beyond `limit` or when they
-    /// cannot be read. A file on the local disk is mapped, the others are read through `source`.
+    /// cannot be read.
+    ///
+    /// A file on the local disk is mapped, the others are read through `source`.
     nonisolated static func wholeData(
         of source: any ByteSource,
         at url: URL,
@@ -881,9 +894,10 @@ final class ViewerPane: NSView, NSMenuDelegate {
     }
 
     /// A link in an HTML page, after a click on it: a page elsewhere opens in the browser, a
-    /// file below the folder of this one in the viewer (spec 10 › HTML text). Nothing else is
-    /// followed: a page cannot make the viewer open another server, another folder, or a local
-    /// file it does not sit beside.
+    /// file below the folder of this one in the viewer (spec 10 › HTML text).
+    ///
+    /// Nothing else is followed: a page cannot make the viewer open another server, another folder,
+    /// or a local file it does not sit beside.
     func followLink(_ link: URL) {
         if LinkPolicy.opensInBrowser(link) {
             links.open(link)

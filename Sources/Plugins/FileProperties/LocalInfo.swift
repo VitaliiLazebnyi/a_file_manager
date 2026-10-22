@@ -45,7 +45,9 @@ enum LocalInfo {
         )
     }
 
-    /// The item itself; a link is not followed. Nil when nothing is there.
+    /// The item itself; a link is not followed.
+    ///
+    /// Nil when nothing is there.
     static func details(_ url: URL) -> LocalDetails? {
         guard url.isFileURL else { return nil }
         var st = stat()
@@ -71,7 +73,9 @@ enum LocalInfo {
     }
 
     /// False when reading `url` could wait for ever: it is, or leads to, a pipe, a device or
-    /// a socket. True for everything else, and for what is not on a local disk.
+    /// a socket.
+    ///
+    /// True for everything else, and for what is not on a local disk.
     static func canBeRead(_ url: URL) -> Bool {
         guard url.isFileURL else { return true }
         var st = stat()
@@ -81,8 +85,10 @@ enum LocalInfo {
     }
 
     /// How often a name had to be asked of the system (which may be a directory server on
-    /// the network) because it was not known yet. For tests: they check that this happens on
-    /// a job's thread and not when a dialog is put together.
+    /// the network) because it was not known yet.
+    ///
+    /// For tests: they check that this happens on a job's thread and not when a dialog is put
+    /// together.
     static var nameLookups: Int { lock.withLock { lookups } }
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var lookups = 0
@@ -151,8 +157,10 @@ enum LocalInfo {
     }
 
     /// The item a link leads to: the target of a symbolic link (relative targets count from
-    /// the link's folder) or the original of a Finder alias. Nil when `url` is neither. An
-    /// alias is resolved without mounting volumes and without any dialog.
+    /// the link's folder) or the original of a Finder alias.
+    ///
+    /// Nil when `url` is neither. An alias is resolved without mounting volumes and without any
+    /// dialog.
     static func resolvedLinkTarget(_ url: URL) -> URL? {
         if let target = linkTarget(url) {
             return URL(fileURLWithPath: target, relativeTo: url.deletingLastPathComponent()).standardizedFileURL
@@ -188,8 +196,9 @@ enum LocalInfo {
         return (try? url.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
     }
 
-    /// What kind of file this is, in the user's language: "PNG image", "Folder". Local files
-    /// are asked from the system; elsewhere the extension decides.
+    /// What kind of file this is, in the user's language: "PNG image", "Folder".
+    ///
+    /// Local files are asked from the system; elsewhere the extension decides.
     static func kind(of item: FileItem) -> String {
         if item.url.isFileURL,
             let kind = try? item.url.resourceValues(forKeys: [.localizedTypeDescriptionKey]).localizedTypeDescription

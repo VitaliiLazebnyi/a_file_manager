@@ -2,23 +2,30 @@ import Foundation
 
 // The same as in the Configuration plugin: plugins share no code but the kernel's.
 
-/// The shell that runs command lines. Always a POSIX shell, whatever the user's login shell
-/// is: the lines of user commands are written for one, a reference to a value is written the
-/// way such a shell reads it, and `csh` and `tcsh` do not even take the options.
+/// The shell that runs command lines.
+///
+/// Always a POSIX shell, whatever the user's login shell is: the lines of user commands are written
+/// for one, a reference to a value is written the way such a shell reads it, and `csh` and `tcsh`
+/// do not even take the options.
 internal enum LoginShell {
-    /// `/bin/zsh` as a login shell, so that a command finds the PATH of a terminal. Every macOS
-    /// the program runs on has it.
+    /// `/bin/zsh` as a login shell, so that a command finds the PATH of a terminal.
+    ///
+    /// Every macOS the program runs on has it.
     internal static let posix: (executable: String, options: [String]) = ("/bin/zsh", ["-l", "-c"])
 
     /// The PATH of the user's login shell when that is another shell than zsh, asked for once
-    /// (`foreignPath(of:)`). Starts a process the first time: never for the main thread.
+    /// (`foreignPath(of:)`).
+    ///
+    /// Starts a process the first time: never for the main thread.
     internal static let foreignPath: String? = foreignPath(
         of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell())
     )
 
     /// The PATH a terminal would have: that of the user's login shell, asked for once; the
-    /// PATH of this process when the shell does not answer. Starts a process and waits up to a
-    /// few seconds for it the first time: never for the main thread.
+    /// PATH of this process when the shell does not answer.
+    ///
+    /// Starts a process and waits up to a few seconds for it the first time: never for the main
+    /// thread.
     internal static let searchPath: String = searchPath(
         foreign: foreignPath,
         shell: posix,
@@ -40,9 +47,10 @@ internal enum LoginShell {
     }
 
     /// The PATH of `shell` when that is another shell than zsh (bash, fish, tcsh …): its start
-    /// files are not read by zsh, so the PATH they set up is asked for and handed on. Nil for
-    /// zsh and when the shell does not answer. Starts a process and waits up to a few seconds
-    /// for it: never for the main thread.
+    /// files are not read by zsh, so the PATH they set up is asked for and handed on.
+    ///
+    /// Nil for zsh and when the shell does not answer. Starts a process and waits up to a few
+    /// seconds for it: never for the main thread.
     internal static func foreignPath(of shell: String) -> String? {
         guard URL(fileURLWithPath: shell).lastPathComponent != "zsh",
             FileManager.default.isExecutableFile(atPath: shell)

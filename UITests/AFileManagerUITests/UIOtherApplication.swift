@@ -30,7 +30,9 @@ internal struct UIOtherApplication {
     }
 
     /// Quits the application the way a user does, if the test started it; says whether it is
-    /// gone. An application that ran before is left running.
+    /// gone.
+    ///
+    /// An application that ran before is left running.
     internal func quit() -> Bool {
         guard !wasRunning, app.state != .notRunning else {
             return true

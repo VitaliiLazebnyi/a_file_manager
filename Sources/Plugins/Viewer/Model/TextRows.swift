@@ -1,9 +1,11 @@
 import AFMKernel
 import Foundation
 
-/// How text is cut into rows (spec 10 › Text). With wrapping on, a row breaks at a word
-/// boundary after at most `columns` characters; with wrapping off it is simply cut there
-/// (the specification's `UnwrapWidth`), so no row is ever unbounded.
+/// How text is cut into rows (spec 10 › Text).
+///
+/// With wrapping on, a row breaks at a word boundary after at most `columns` characters; with
+/// wrapping off it is simply cut there (the specification's `UnwrapWidth`), so no row is ever
+/// unbounded.
 struct TextLayoutOptions: Equatable {
     var columns: Int
     var wordWrap: Bool
@@ -16,10 +18,11 @@ struct TextLayoutOptions: Equatable {
     }
 }
 
-/// Cuts decoded text into rows. CR, LF and CR+LF each end a line; a line longer than the
-/// allowed width continues in further rows. It works on one piece of text after another: what
-/// is left of an unfinished row is handed in again with the next piece. A value without shared
-/// state.
+/// Cuts decoded text into rows.
+///
+/// CR, LF and CR+LF each end a line; a line longer than the allowed width continues in further
+/// rows. It works on one piece of text after another: what is left of an unfinished row is handed
+/// in again with the next piece. A value without shared state.
 struct RowSplitter {
     let options: TextLayoutOptions
     /// Whether the row at the start of the next piece begins a line (and is not the
@@ -31,9 +34,11 @@ struct RowSplitter {
     }
 
     /// Calls `row` with the unit range of every complete row (line end included) and whether it
-    /// begins a line, until `row` returns false. Returns the index of the first unit that is
-    /// not part of a reported row: the start of the unfinished row to hand in again. With
-    /// `final`, the text ends here and the last row is reported too.
+    /// begins a line, until `row` returns false.
+    ///
+    /// Returns the index of the first unit that is not part of a reported row: the start of the
+    /// unfinished row to hand in again. With `final`, the text ends here and the last row is
+    /// reported too.
     mutating func split(
         _ units: UnsafeBufferPointer<UInt16>,
         final: Bool,
@@ -215,10 +220,11 @@ struct RowSplitter {
     }
 }
 
-/// Where the rows of a text are in the file. Holding the start of every row of a file of many
-/// gigabytes would cost more memory than showing it is worth, so only every 64th row is kept
-/// (and no more than one per 4 KB of a file of very short rows); the rows in between are found
-/// again by cutting the text from there.
+/// Where the rows of a text are in the file.
+///
+/// Holding the start of every row of a file of many gigabytes would cost more memory than showing
+/// it is worth, so only every 64th row is kept (and no more than one per 4 KB of a file of very
+/// short rows); the rows in between are found again by cutting the text from there.
 ///
 /// The index is built in the background (`build`), big files in segments on all cores at once.
 /// Segments are published in file order as they finish, so the start of the file can be shown
@@ -249,10 +255,11 @@ final class TextRowIndex: @unchecked Sendable {
     }
 
     /// Checkpoints in 12 bytes each instead of 24: the offset with the flag in its lowest bit,
-    /// and the line count relative to the segment, which a segment cannot overflow. They are kept
-    /// in chunks, so a copy of the list that was published (the partial state of a segment) shares
-    /// all full chunks and appending to the original copies the outer array and one chunk at
-    /// most, whatever the length of the list.
+    /// and the line count relative to the segment, which a segment cannot overflow.
+    ///
+    /// They are kept in chunks, so a copy of the list that was published (the partial state of a
+    /// segment) shares all full chunks and appending to the original copies the outer array and one
+    /// chunk at most, whatever the length of the list.
     struct CheckpointList: RandomAccessCollection {
         private static let chunkShift = 12
         private static let chunkSize = 1 << chunkShift
@@ -306,14 +313,16 @@ final class TextRowIndex: @unchecked Sendable {
         /// the rows after the last one of this segment are not those of the next row number.
         var endsAtGap = false
         /// Where the first line begins that this segment does not own: the line start behind its
-        /// last row, or the end of the text. nil when the scan did not get there. A sequential
-        /// build passes it on, so the segments in between (a line longer than they are) are not
-        /// read again only to find that no line begins in them.
+        /// last row, or the end of the text. nil when the scan did not get there.
+        ///
+        /// A sequential build passes it on, so the segments in between (a line longer than they
+        /// are) are not read again only to find that no line begins in them.
         var nextStart: Int64?
 
         /// Keeps fewer checkpoints when the segment has too many for the bytes its rows cover:
         /// `bytes` is that span (from the first checkpoint to the end of the last row, which is
         /// far more than the nominal size of the segment when a line is longer than a segment).
+        ///
         /// On average they stay `minimumCheckpointDistance` bytes apart, and there are never more
         /// than `maximumCheckpoints`.
         mutating func thin(spanning bytes: Int64) {
@@ -442,8 +451,9 @@ final class TextRowIndex: @unchecked Sendable {
         return body()
     }
 
-    /// Copies the counters to what the main thread reads. Called with the lock held, after any
-    /// of them changed.
+    /// Copies the counters to what the main thread reads.
+    ///
+    /// Called with the lock held, after any of them changed.
     private func mirror() {
         overview.store(
             rows: rows,
@@ -473,11 +483,13 @@ final class TextRowIndex: @unchecked Sendable {
 
     // MARK: Building
 
-    /// Reads `content` of `source` and records its rows. Blocks until done or cancelled; call
-    /// it on a background thread. With `parallel`, the segments are read on all cores at once
-    /// (each through a reader of its own); otherwise one after another. `progress` is called
-    /// from the working threads whenever more of the start of the file is known. `rawScan`
-    /// off decodes every byte (the reference the fast scan is tested against).
+    /// Reads `content` of `source` and records its rows.
+    ///
+    /// Blocks until done or cancelled; call it on a background thread. With `parallel`, the
+    /// segments are read on all cores at once (each through a reader of its own); otherwise one
+    /// after another. `progress` is called from the working threads whenever more of the start of
+    /// the file is known. `rawScan` off decodes every byte (the reference the fast scan is tested
+    /// against).
     func build(
         source: any ByteSource,
         content: Range<Int64>,
@@ -595,7 +607,9 @@ final class TextRowIndex: @unchecked Sendable {
         }
     }
 
-    /// A number shared by the threads of a build. Guarded by `lock`.
+    /// A number shared by the threads of a build.
+    ///
+    /// Guarded by `lock`.
     private final class Locked<Value: AdditiveArithmetic>: @unchecked Sendable {
         private let lock = NSLock()
         private var stored: Value
@@ -623,7 +637,9 @@ final class TextRowIndex: @unchecked Sendable {
     }
 
     /// Shows what the segment that comes next has found so far, in place of its earlier state (`scan` hands on
-    /// only a state that has rows). Returns whether anything was published.
+    /// only a state that has rows).
+    ///
+    /// Returns whether anything was published.
     private func publishPartial(_ number: Int, _ segment: Segment, coveredEnd covered: Int64) -> Bool {
         synchronized {
             guard number == nextToPublish else { return false }
@@ -649,7 +665,9 @@ final class TextRowIndex: @unchecked Sendable {
     }
 
     /// Takes a finished segment and publishes every segment that now follows the published
-    /// ones without a gap. Returns whether anything was published.
+    /// ones without a gap.
+    ///
+    /// Returns whether anything was published.
     private func finish(_ number: Int, _ segment: Segment, end: Int64, failed: Bool) -> Bool {
         synchronized {
             finished[number] = (segment, end, failed)
@@ -720,9 +738,11 @@ final class TextRowIndex: @unchecked Sendable {
             return true
         }
 
-        /// Keeps a checkpoint. A segment that holds a line of gigabytes keeps thinning its
-        /// checkpoints as the line goes on, so it never holds more than a fixed number whatever
-        /// its length: thinning waits for 2,048, where one thinning halves them.
+        /// Keeps a checkpoint.
+        ///
+        /// A segment that holds a line of gigabytes keeps thinning its checkpoints as the line goes
+        /// on, so it never holds more than a fixed number whatever its length: thinning waits for
+        /// 2,048, where one thinning halves them.
         @inline(__always)
         private mutating func addCheckpoint(_ checkpoint: Checkpoint) {
             result.checkpoints.append(checkpoint)
@@ -791,11 +811,12 @@ final class TextRowIndex: @unchecked Sendable {
         return ~(((x & 0x7F7F_7F7F_7F7F_7F7F) &+ 0x7F7F_7F7F_7F7F_7F7F) | x | 0x7F7F_7F7F_7F7F_7F7F)
     }
 
-    /// The rows of one segment: those of the lines that begin inside it. A line belongs to the
-    /// segment its first byte is in (`lower < start <= upper`; the very first line to the first
-    /// segment), wherever it ends, so the segments need nothing from each other: each looks
-    /// for the first line start behind its lower bound and reads on past its upper bound to
-    /// the end of its last line. `partial` is handed what is found so far, every few megabytes.
+    /// The rows of one segment: those of the lines that begin inside it.
+    ///
+    /// A line belongs to the segment its first byte is in (`lower < start <= upper`; the very first
+    /// line to the first segment), wherever it ends, so the segments need nothing from each other:
+    /// each looks for the first line start behind its lower bound and reads on past its upper bound
+    /// to the end of its last line. `partial` is handed what is found so far, every few megabytes.
     static func scan(
         source: any ByteSource,
         content: Range<Int64>,

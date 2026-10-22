@@ -23,7 +23,9 @@ enum CompareSettingsKey {
 
 /// Everything a "Compare contents" window does, without the window: the two files, the
 /// options, the loaded contents with their differences, the edits and saving
-/// (spec 09 › Compare by content). The window draws this and forwards clicks and keys.
+/// (spec 09 › Compare by content).
+///
+/// The window draws this and forwards clicks and keys.
 ///
 /// **Threading.** The session belongs to the main thread. Loading and comparing run on a
 /// background queue and come back to the main thread with a finished value; a newer request
@@ -35,9 +37,11 @@ final class CompareSession {
         case empty, working, ready
     }
 
-    /// Unowned: the kernel owns the plugin, and through it this. Read only on the way of a
-    /// request (a command, a click); what comes back later uses the parts taken when it began,
-    /// for the kernel may have gone by then (a window closed, the end of a test).
+    /// Unowned: the kernel owns the plugin, and through it this.
+    ///
+    /// Read only on the way of a request (a command, a click); what comes back later uses the parts
+    /// taken when it began, for the kernel may have gone by then (a window closed, the end of a
+    /// test).
     unowned let kernel: Kernel
     private let settings: any SettingsStore
     private let fileSystems: FileSystemRegistry
@@ -65,6 +69,7 @@ final class CompareSession {
     private(set) var anchors: [(left: Int, right: Int)] = []
 
     /// One change to the lines of one side: `removed` stood at `start`, and `insertedCount` lines stand there now.
+    ///
     /// Undo puts the removed lines back; nothing of the files is copied for it.
     private struct Splice {
         var side: CompareSide
@@ -84,7 +89,9 @@ final class CompareSession {
     /// Counts the edits, so that a save that finishes later can tell whether the text moved on meanwhile.
     private var editGeneration = 0
     /// The parts of changed rows that differ inside the line, by row: worked out once for both
-    /// sides, since the table asks for each side on every scroll. Emptied with every new `content`.
+    /// sides, since the table asks for each side on every scroll.
+    ///
+    /// Emptied with every new `content`.
     private var inlineCache: [Int: (left: [Range<Int>], right: [Range<Int>])] = [:]
     private static let inlineCacheLimit = 4_096
     private var findGeneration = 0
@@ -144,9 +151,10 @@ final class CompareSession {
         }
     }
 
-    /// Loads the two files and compares them. Identical files are announced with the message
-    /// of the spec (09 › Opening and choosing the files); `completion` tells whether there is
-    /// something to show.
+    /// Loads the two files and compares them.
+    ///
+    /// Identical files are announced with the message of the spec (09 › Opening and choosing the
+    /// files); `completion` tells whether there is something to show.
     func compare(completion: @escaping (_ hasContent: Bool) -> Void = { _ in }) {
         guard let leftURL, let rightURL else {
             content = .none
@@ -368,7 +376,9 @@ final class CompareSession {
     }
 
     /// What stands in front of a row: the line number (0 for a new or changed line), or the
-    /// offset in binary mode. Empty where the side has no line.
+    /// offset in binary mode.
+    ///
+    /// Empty where the side has no line.
     func label(_ side: CompareSide, row: Int) -> String {
         switch content {
         case .none: return ""
@@ -421,7 +431,9 @@ final class CompareSession {
     }
 
     /// The next row, in either file, whose text contains `needle`, ignoring case; the search
-    /// goes round at the ends. Blocks: for callers that are not the window.
+    /// goes round at the ends.
+    ///
+    /// Blocks: for callers that are not the window.
     func find(_ needle: String, from row: Int, forward: Bool) -> Int? {
         Self.search(content, needle, from: row, forward: forward, cancellation: nil)
     }
@@ -542,9 +554,10 @@ final class CompareSession {
         onChange()
     }
 
-    /// Applies an edit in place and remembers what it replaced. The texts are taken out of `content`
-    /// first, so that nothing else holds their lines and they are changed where they are: an edit in
-    /// a file of millions of lines does not copy it.
+    /// Applies an edit in place and remembers what it replaced.
+    ///
+    /// The texts are taken out of `content` first, so that nothing else holds their lines and they
+    /// are changed where they are: an edit in a file of millions of lines does not copy it.
     private func edit(_ change: (inout TextDocument, inout TextDocument, TextDiff) -> [Splice]) {
         guard isEditing, phase == .ready, diffIsCurrent, case .text(var left, var right, let diff, let width) = content
         else { return }
@@ -584,8 +597,9 @@ final class CompareSession {
         }
     }
 
-    /// "Copy ->" / "Copy <-": the lines of the given rows on the other side replace those on
-    /// `side`. Rows that have no line on the source side remove the target's lines.
+    /// Replaces the lines of the given rows on `side` with those on the other side ("Copy ->" / "Copy <-").
+    ///
+    /// Rows that have no line on the source side remove the target's lines.
     func copy(rows: Range<Int>, to side: CompareSide) {
         edit { left, right, diff in
             let rows = rows.clamped(to: 0..<diff.rows.count)
@@ -735,7 +749,9 @@ final class CompareSession {
     }
 
     /// Writes the changed files at once on the calling thread, for the program quitting, where a
-    /// job can no longer be waited for. Returns whether everything was saved; errors are reported.
+    /// job can no longer be waited for.
+    ///
+    /// Returns whether everything was saved; errors are reported.
     func saveNow() -> Bool {
         guard case .text(let left, let right, _, _) = content, hasUnsavedChanges else { return true }
         var ok = true
@@ -758,8 +774,10 @@ final class CompareSession {
 }
 
 /// Where the session's loading, comparing and searching run: a thread of their own for each, never
-/// a worker of the shared pool. Reading from a share that does not answer can block for as long as the
-/// server takes to give up; a handful of those must not use up the workers that everything else needs.
+/// a worker of the shared pool.
+///
+/// Reading from a share that does not answer can block for as long as the server takes to give up;
+/// a handful of those must not use up the workers that everything else needs.
 enum CompareWorker {
     static func run(_ name: String, _ body: @escaping @Sendable () -> Void) {
         let thread = Thread(block: body)

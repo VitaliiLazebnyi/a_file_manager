@@ -199,10 +199,12 @@ public final class ArchivesPlugin: Plugin {
     /// The kernel's hook for work before quitting: the changes that still wait are written
     /// into their archives on a background thread, while every service is still there (a
     /// server an archive lies on is still connected) and the shell shows that the program is
-    /// busy. `completion` is called when all is written, or when the writes ended because
-    /// `cancellation` was set: the user did not want to wait. Nothing is lost by that: what
-    /// was not written still waits, and `stop()`, which then no longer tries to write it,
-    /// keeps it on the disk and says where.
+    /// busy.
+    ///
+    /// `completion` is called when all is written, or when the writes ended because `cancellation`
+    /// was set: the user did not want to wait. Nothing is lost by that: what was not written still
+    /// waits, and `stop()`, which then no longer tries to write it, keeps it on the disk and says
+    /// where.
     public func prepareToQuit(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         let (store, environment) = (self.store, self.environment)
         guard store.hasPendingChanges else {
@@ -218,9 +220,11 @@ public final class ArchivesPlugin: Plugin {
     }
 
     /// Writes what is still waiting to go into archives, then removes the temporary files.
-    /// With a shell that calls `prepareToQuit` there is usually nothing left to write here;
-    /// this is what holds when there is. Changes that cannot be written are not dropped with them: the user is told, and the
-    /// new members are saved in an archive of their own (see `OpenArchive.rescue()`).
+    ///
+    /// With a shell that calls `prepareToQuit` there is usually nothing left to write here; this is
+    /// what holds when there is. Changes that cannot be written are not dropped with them: the user
+    /// is told, and the new members are saved in an archive of their own (see
+    /// `OpenArchive.rescue()`).
     ///
     /// **Threading.** Called on the main thread when the program quits. The writing itself
     /// runs on a background thread; this thread waits for it while it keeps the main run loop
@@ -292,7 +296,9 @@ public final class ArchivesPlugin: Plugin {
         store.close()
     }
 
-    /// What the stop's background thread hands back. All state is guarded by `lock`.
+    /// What the stop's background thread hands back.
+    ///
+    /// All state is guarded by `lock`.
     private final class StopState: @unchecked Sendable {
         private let lock = NSLock()
         private var result: [(error: any Error, name: String)]?
@@ -310,9 +316,10 @@ public final class ArchivesPlugin: Plugin {
         }
     }
 
-    /// Waits until the state is finished or the time is up; true when it is finished. The main
-    /// thread's run loop keeps turning meanwhile, so that what other threads send to the main
-    /// thread (a question to the user) is done and does not wait for this wait.
+    /// Waits until the state is finished or the time is up; true when it is finished.
+    ///
+    /// The main thread's run loop keeps turning meanwhile, so that what other threads send to the
+    /// main thread (a question to the user) is done and does not wait for this wait.
     private static func wait(until deadline: Date, for state: StopState) -> Bool {
         // A run loop with nothing to watch returns at once: this port, which nothing sends to,
         // gives it something, so the wait below does not spin.
@@ -326,14 +333,17 @@ public final class ArchivesPlugin: Plugin {
     }
 
     /// True when changes made inside archives have not been written into their files yet.
+    ///
     /// Answers from memory; any thread.
     public var hasPendingChanges: Bool { store.hasPendingChanges }
 
     /// Writes the changes made inside ZIP archives into the archive files on a background
     /// thread and calls `completion` on the main thread with what failed, one line per
-    /// archive. For a shell that wants to show "Saving archives…" before it lets the program
-    /// quit; `cancellation` ends the writes early, and nothing is lost by that: what was not
-    /// written keeps waiting (and `stop()` deals with it).
+    /// archive.
+    ///
+    /// For a shell that wants to show "Saving archives…" before it lets the program quit;
+    /// `cancellation` ends the writes early, and nothing is lost by that: what was not written
+    /// keeps waiting (and `stop()` deals with it).
     public func writePendingChanges(
         cancellation: CancellationFlag,
         completion: @escaping @MainActor @Sendable ([String]) -> Void
@@ -349,8 +359,10 @@ public final class ArchivesPlugin: Plugin {
     }
 
     /// Writes the changes made inside ZIP archives into the archive files now, instead of
-    /// shortly after the last change. Blocks while it writes (not for the main thread of the
-    /// running program; tests call it); returns what failed, one line per archive.
+    /// shortly after the last change.
+    ///
+    /// Blocks while it writes (not for the main thread of the running program; tests call it);
+    /// returns what failed, one line per archive.
     @discardableResult
     public func flushPendingChanges() -> [String] {
         store.flushAll().map { "\($0.name): \($0.error.localizedDescription)" }

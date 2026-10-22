@@ -5,8 +5,10 @@ import AppKit
 import PDFKit
 
 /// One entry of the Lister's menus: what it is called, its keys, whether it applies right now
-/// and what it does. The menus and the keyboard are both driven by the same list, so a key
-/// does exactly what its menu entry does (spec 10 › Menu bar, 10 › General keys).
+/// and what it does.
+///
+/// The menus and the keyboard are both driven by the same list, so a key does exactly what its menu
+/// entry does (spec 10 › Menu bar, 10 › General keys).
 struct ViewerAction {
     let title: String
     var shortcuts: [Shortcut] = []
@@ -504,6 +506,7 @@ extension ViewerPane {
     // MARK: Going to a place
 
     /// "Go to position (in %)": decimals with `.` or `,` (spec 10 › Position and zoom item).
+    ///
     /// In image mode the same item sets the zoom factor.
     func goToPercent() {
         let isImage = imageView != nil
@@ -687,7 +690,9 @@ extension ViewerPane {
     static let copyLimit: Int64 = 16 << 20
 
     /// Copies the selection as text or as hexadecimal values (spec 10 › Selection and
-    /// clipboard). The bytes are read in the background.
+    /// clipboard).
+    ///
+    /// The bytes are read in the background.
     func copySelection(asHex: Bool, completion: @escaping @MainActor @Sendable () -> Void = {}) {
         guard let document = pager.document, let selection = pager.selection else { return }
         // Hex is three characters a byte; the string is made on the main thread for the clipboard.
@@ -797,7 +802,9 @@ extension ViewerPane {
     }
 
     /// Saves what is shown under another name: meant for files that came out of an archive or
-    /// from a server (spec 10 › File menu behaviour). Runs as a job with a progress window.
+    /// from a server (spec 10 › File menu behaviour).
+    ///
+    /// Runs as a job with a progress window.
     private func saveAs() {
         guard let loaded else { return }
         guard let target = dialogs.saveTarget(proposing: loaded.item.url?.lastPathComponent ?? loaded.item.title)
@@ -977,7 +984,9 @@ extension ViewerPane {
     }
 
     /// The rows of `range` as the document's layout shows them, at most `maxRows` of them (`truncated`
-    /// when there are more). Blocks.
+    /// when there are more).
+    ///
+    /// Blocks.
     nonisolated static func printableText(
         of document: TextDocument,
         in range: Range<Int64>,

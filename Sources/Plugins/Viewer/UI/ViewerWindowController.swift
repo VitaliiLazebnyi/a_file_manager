@@ -3,7 +3,9 @@ import AFMShell
 import AppKit
 
 /// A Lister window (spec 10 › The Lister window): one pane, and the files of the session to
-/// step through with N and P. Main thread only.
+/// step through with N and P.
+///
+/// Main thread only.
 final class ViewerWindowController: NSWindowController, NSWindowDelegate {
     let pane: ViewerPane
     private let settings: ListerSettings
@@ -133,9 +135,10 @@ final class ViewerWindowController: NSWindowController, NSWindowDelegate {
 }
 
 /// Follows the cursor of a panel for a quick view: every time the cursor, the folder or the
-/// source panel changes it reports, a moment later, what the cursor is on. Events that follow
-/// each other quickly (holding an arrow key) are answered once, for the last one. Main thread
-/// only.
+/// source panel changes it reports, a moment later, what the cursor is on.
+///
+/// Events that follow each other quickly (holding an arrow key) are answered once, for the last
+/// one. Main thread only.
 @MainActor
 final class CursorFollower {
     private let delay: TimeInterval

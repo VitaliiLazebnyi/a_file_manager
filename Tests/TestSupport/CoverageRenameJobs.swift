@@ -3,8 +3,10 @@ import Foundation
 
 /// Runs each job on the calling thread, like `ImmediateJobService`, and presses its Cancel
 /// button at a chosen moment: before it starts, when it asks a question, or when it reports its
-/// progress. With `held`, a job waits until the test lets it run, so that what is refused while
-/// a job runs can be tried.
+/// progress.
+///
+/// With `held`, a job waits until the test lets it run, so that what is refused while a job runs
+/// can be tried.
 ///
 /// Main thread only.
 public final class CancellingJobService: JobService, ShellServices {
@@ -22,7 +24,9 @@ public final class CancellingJobService: JobService, ShellServices {
         case held
     }
 
-    /// The monitor a job reports to. Unchecked: the counts are guarded by `lock`.
+    /// The monitor a job reports to.
+    ///
+    /// Unchecked: the counts are guarded by `lock`.
     private final class Monitor: JobMonitor, @unchecked Sendable {
         let cancellation = CancellationFlag()
         private let moment: Moment

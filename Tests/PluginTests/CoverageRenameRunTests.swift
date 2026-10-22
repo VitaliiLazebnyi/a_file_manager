@@ -393,7 +393,9 @@ import UniformTypeIdentifiers
         )
     }
 
-    /// Counts the questions asked of a closure. Unchecked: the count is guarded by `lock`.
+    /// Counts the questions asked of a closure.
+    ///
+    /// Unchecked: the count is guarded by `lock`.
     private final class Asked: @unchecked Sendable {
         private let lock = NSLock()
         private var count = 0

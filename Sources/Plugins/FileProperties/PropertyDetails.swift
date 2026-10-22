@@ -90,7 +90,7 @@ enum PropertyText {
         return String(repeating: "0", count: max(0, 3 - text.count)) + text
     }
 
-    /// `1,234 bytes (1.21 k)`
+    /// `1,234 bytes (1.21 k)`.
     static func size(_ bytes: Int64) -> String {
         "\(Format.bytes(bytes)) bytes" + (bytes >= 1_024 ? " (\(Format.shortSize(bytes)))" : "")
     }
@@ -261,11 +261,14 @@ enum LinkKind: Int, CaseIterable {
     }
 }
 
-/// Creates links on the Mac's own file system. Blocks; for a job's thread.
+/// Creates links on the Mac's own file system.
+///
+/// Blocks; for a job's thread.
 enum LinkMaker {
-    /// Creates a link at `destination` that leads to `source`. An existing item at the
-    /// destination is never replaced. `relative` writes a symbolic link's target relative to
-    /// the link's own folder, so the pair can be moved together.
+    /// Creates a link at `destination` that leads to `source`.
+    ///
+    /// An existing item at the destination is never replaced. `relative` writes a symbolic link's
+    /// target relative to the link's own folder, so the pair can be moved together.
     static func create(_ kind: LinkKind, to source: URL, at destination: URL, relative: Bool) throws {
         guard source.isFileURL, destination.isFileURL else { throw FileSystemError.notSupported("Creating links") }
         var existing = stat()

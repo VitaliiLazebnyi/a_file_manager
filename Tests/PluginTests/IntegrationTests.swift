@@ -132,7 +132,9 @@ private final class BreakingAnswers: FileJobDelegate {
     }
 
     /// With the quick write at each rename (the default) a file that cannot be written fails on its
-    /// own. Without it the renames succeed and everything waits for the commit; the folder of the
+    /// own.
+    ///
+    /// Without it the renames succeed and everything waits for the commit; the folder of the
     /// archive stops being writable when the last file is begun, so that file and the commit fail.
     @Test(arguments: [true, false]) func aMoveKeepsEverySourceWhenTheArchiveCannotBeWritten(quickWrites: Bool) throws {
         if !quickWrites { bench.environment.immediateWriteLimit = 0 }

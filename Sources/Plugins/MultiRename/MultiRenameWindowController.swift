@@ -3,9 +3,10 @@ import AFMKernel
 import AFMShell
 import AppKit
 
-/// The window of the Multi-Rename Tool (spec 09 › Window and scope). It only shows a
-/// `MultiRenameSession` and passes on what the user does; everything it does is on the main
-/// thread, and the session keeps the work off it.
+/// The window of the Multi-Rename Tool (spec 09 › Window and scope).
+///
+/// It only shows a `MultiRenameSession` and passes on what the user does; everything it does is on
+/// the main thread, and the session keeps the work off it.
 final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
     NSTableViewDelegate,
     NSTextFieldDelegate, NSComboBoxDelegate
@@ -37,12 +38,16 @@ final class MultiRenameWindowController: NSWindowController, NSWindowDelegate, N
     /// Called when the window has closed, so that its owner can let go of it.
     var onClose: (() -> Void)?
     /// Shows an open panel as a sheet of the window and hands on the button and the locations
-    /// chosen. The program shows the real panel; a test answers in its place.
-    /// Opens a menu under a button. The program shows the real menu; a test records it.
+    /// chosen.
+    ///
+    /// The program shows the real panel; a test answers in its place. Opens a menu under a button.
+    /// The program shows the real menu; a test records it.
     var popUpMenu: (NSMenu, NSView) -> Void = { menu, view in
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 2), in: view)
     }
-    /// Opens the menu of a pull-down button, as a click on it does. A test records it instead.
+    /// Opens the menu of a pull-down button, as a click on it does.
+    ///
+    /// A test records it instead.
     var clickPopUp: (NSPopUpButton) -> Void = { $0.performClick(nil) }
     var presentOpenPanel: (NSOpenPanel, NSWindow, @escaping (NSApplication.ModalResponse, [URL]) -> Void) -> Void = {
         panel,

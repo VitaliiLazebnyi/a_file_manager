@@ -12,8 +12,10 @@ import Testing
 // writes, N009 origin marks, L029 exclusive folders) and the provider-level `realLocation`.
 
 /// A file system over memory that notes how it is called, and can be made to misbehave the
-/// way a server does. Every call is forwarded to `base`.
-/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
+/// way a server does.
+///
+/// Every call is forwarded to `base`. Unchecked: what it records is guarded by `lock`; its switches
+/// are set by the test before use.
 final class P2ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
     let base: MemoryFileSystem
     var scheme: String { base.scheme }
@@ -172,7 +174,9 @@ final class P2ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
 
 /// The local disk, with a moment to step in right before a folder is made: what somebody
 /// else does between a job's look at a name and its use of it.
-/// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+///
+/// Unchecked: its switches are set by the test before use, and it is used from one thread at a
+/// time.
 final class P2RacingLocalFileSystem: FileSystemProvider, @unchecked Sendable {
     let local = LocalFileSystem()
     var scheme: String { local.scheme }
@@ -276,8 +280,10 @@ final class P2Replies: FileJobDelegate {
 }
 
 /// Runs `work` on another thread and waits for it; if it does not end in `seconds`, `rescue`
-/// is called (to free whatever it hangs on) and false comes back. The time only matters when
-/// the code under test hangs, which is the failure the test is there to catch.
+/// is called (to free whatever it hangs on) and false comes back.
+///
+/// The time only matters when the code under test hangs, which is the failure the test is there to
+/// catch.
 func p2Finishes(within seconds: TimeInterval = 60, rescue: () -> Void = {}, _ work: @escaping @Sendable () -> Void)
     -> Bool
 {
@@ -293,8 +299,10 @@ func p2Finishes(within seconds: TimeInterval = 60, rescue: () -> Void = {}, _ wo
 }
 
 /// Sets `flag` a moment from now, from a thread of its own (not from a shared queue, whose
-/// threads other tests may all be holding). The moment only has to be after the work under
-/// test has begun to wait; if it is not, the work finds the flag set and ends just the same.
+/// threads other tests may all be holding).
+///
+/// The moment only has to be after the work under test has begun to wait; if it is not, the work
+/// finds the flag set and ends just the same.
 func p2CancelSoon(_ flag: CancellationFlag, after seconds: TimeInterval = 0.2) {
     Thread.detachNewThread {
         Thread.sleep(forTimeInterval: seconds)
@@ -325,12 +333,19 @@ func p2Quarantine(_ url: URL) -> String? {
     }
 
     private func job(
-        _ kind: JobKind, _ sources: [URL], to directory: URL? = nil, replies: P2Replies,
+        _ kind: JobKind,
+        _ sources: [URL],
+        to directory: URL? = nil,
+        replies: P2Replies,
         cancellation: CancellationFlag = CancellationFlag()
     ) -> FileJob {
         let job = FileJob(
-            kind: kind, sources: sources, target: directory.map { TargetSpec(directory: $0) }, fileSystems: fileSystems,
-            cancellation: cancellation)
+            kind: kind,
+            sources: sources,
+            target: directory.map { TargetSpec(directory: $0) },
+            fileSystems: fileSystems,
+            cancellation: cancellation
+        )
         job.delegate = replies
         return job
     }
@@ -357,9 +372,11 @@ func p2Quarantine(_ url: URL) -> String? {
         #expect(probe.unflagged.isEmpty, "\(probe.unflagged)")
         // …and all the kinds of call were made.
         #expect(
-            Set(probe.flagged).isSuperset(of: [
-                "createDirectory", "move", "setQuarantine", "setAttributes", "copyMetadata", "remove"
-            ]))
+            Set(probe.flagged)
+                .isSuperset(of: [
+                    "createDirectory", "move", "setQuarantine", "setAttributes", "copyMetadata", "remove"
+                ])
+        )
     }
 
     @Test func aRemovalThatWaitsForAServerEndsWhenTheJobIsCancelled() {
@@ -387,8 +404,13 @@ func p2Quarantine(_ url: URL) -> String? {
         flaky.afterFirstBlock = { flag.cancel() }
         let replies = P2Replies()
         let result = job(
-            .copy, [flaky.base.url("/s/big.bin")], to: probe.base.url("/t"), replies: replies, cancellation: flag
-        ).run()
+            .copy,
+            [flaky.base.url("/s/big.bin")],
+            to: probe.base.url("/t"),
+            replies: replies,
+            cancellation: flag
+        )
+        .run()
         #expect(result.cancelled)
         // The job's flag is set by the time the half-written file is removed; the removal is
         // made with a flag of its own, or the file system would have refused it.
@@ -410,7 +432,12 @@ func p2Quarantine(_ url: URL) -> String? {
         // (Kept here: the job holds whoever answers its questions weakly.)
         let replies = P2Replies()
         let job = job(
-            .copy, [flaky.base.url("/s/big.bin")], to: probe.base.url("/t"), replies: replies, cancellation: flag)
+            .copy,
+            [flaky.base.url("/s/big.bin")],
+            to: probe.base.url("/t"),
+            replies: replies,
+            cancellation: flag
+        )
         job.cleanupPatience = 0.2
         // Guarded by `lock`.
         nonisolated(unsafe) var result = JobResult()
@@ -436,8 +463,11 @@ func p2Quarantine(_ url: URL) -> String? {
         }
         let replies = P2Replies()
         let job = FileJob(
-            kind: .copy, sources: [box.url("s/dir")], target: TargetSpec(directory: box.url("t")),
-            fileSystems: registry)
+            kind: .copy,
+            sources: [box.url("s/dir")],
+            target: TargetSpec(directory: box.url("t")),
+            fileSystems: registry
+        )
         job.delegate = replies
         let result = job.run()
         #expect(namesOnDisk(box.url("elsewhere")).isEmpty)
@@ -484,10 +514,15 @@ func p2Quarantine(_ url: URL) -> String? {
         memory.addDirectory("/t")
         let replies = P2Replies()
         var result = job(
-            .move, [memory.url("/s/open.zip"), memory.url("/s/other.txt")], to: memory.url("/t"), replies: replies
-        ).run()
+            .move,
+            [memory.url("/s/open.zip"), memory.url("/s/other.txt")],
+            to: memory.url("/t"),
+            replies: replies
+        )
+        .run()
         #expect(
-            result.completed == [memory.url("/s/other.txt")] && replies.errors == ["The archive could not be written."])
+            result.completed == [memory.url("/s/other.txt")] && replies.errors == ["The archive could not be written."]
+        )
         #expect(memory.contents("/s/open.zip") == "what is on disk" && !memory.exists("/t/open.zip"))
         result = job(.delete(toTrash: false), [memory.url("/s/open.zip")], replies: replies).run()
         #expect(result.completed.isEmpty && memory.exists("/s/open.zip") && replies.errors.count == 2)
@@ -599,13 +634,15 @@ func p2Quarantine(_ url: URL) -> String? {
         // The copy is there and counts as done; the failure is told at the end, not asked about.
         #expect(
             result.completed.count == 1 && probe.base.contents("/t/tool.command") == "#!/bin/sh\n"
-                && replies.errors.isEmpty)
+                && replies.errors.isEmpty
+        )
         #expect(result.failureCount == 1 && result.failures.first?.contains("could not be marked") == true)
         #expect(
             records.contains { record in
                 if case .failed(let message) = record.status { return message.contains("marks are not kept here") }
                 return false
-            })
+            }
+        )
     }
 
     // MARK: F041, F047 — work that grows with the tree is done once, or not at all
@@ -622,7 +659,8 @@ func p2Quarantine(_ url: URL) -> String? {
         // Two paths per report that went out; two per file would be six hundred.
         #expect(
             replies.progress.count <= 3 && probe.displayed <= 12,
-            "\(replies.progress.count) reports, \(probe.displayed) paths")
+            "\(replies.progress.count) reports, \(probe.displayed) paths"
+        )
     }
 
     @Test func aFolderThatIsSkippedIsNotWalkedAgainForTheCount() {

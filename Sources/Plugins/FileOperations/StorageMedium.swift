@@ -1,16 +1,19 @@
 import Foundation
 import IOKit
 
-/// What kind of disk a local volume sits on. Several files are copied at once only where
-/// that helps: a spinning disk gets slower when its head has to serve several streams.
+/// What kind of disk a local volume sits on.
+///
+/// Several files are copied at once only where that helps: a spinning disk gets slower when its
+/// head has to serve several streams.
 enum StorageMedium {
     private static let lock = NSLock()
     /// Guarded by `lock`.
     nonisolated(unsafe) private static var known: [String: Bool] = [:]
 
-    /// True when `url` is a local path on a spinning disk. Anything else, and anything the
-    /// system cannot tell, counts as not spinning. Safe to call from any thread; asks the
-    /// system once per device.
+    /// True when `url` is a local path on a spinning disk.
+    ///
+    /// Anything else, and anything the system cannot tell, counts as not spinning. Safe to call
+    /// from any thread; asks the system once per device.
     static func isRotational(_ url: URL) -> Bool {
         guard url.isFileURL else { return false }
         var info = statfs()

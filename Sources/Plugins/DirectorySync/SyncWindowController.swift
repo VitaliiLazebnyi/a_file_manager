@@ -3,8 +3,9 @@ import AFMKernel
 import AFMShell
 import AppKit
 
-/// The "Synchronize directories" window (spec 09 › Window and workflow). It draws a
-/// `SyncSession` and forwards clicks and keys to it; nothing here touches a file system.
+/// The "Synchronize directories" window (spec 09 › Window and workflow).
+///
+/// It draws a `SyncSession` and forwards clicks and keys to it; nothing here touches a file system.
 /// Main thread only.
 final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate,
     NSMenuDelegate
@@ -69,8 +70,10 @@ final class SyncWindowController: NSWindowController, NSWindowDelegate, NSTableV
         }
     }
 
-    /// Puts a window of the tool on screen. Tests replace it, so that no window shows in the
-    /// session they run in, and look at what it was asked to show.
+    /// Puts a window of the tool on screen.
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     init(session: SyncSession, effects: SyncWindowEffects = .system) {

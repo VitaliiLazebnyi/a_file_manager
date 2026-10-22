@@ -75,7 +75,9 @@ internal struct CovSysToolsShell {
     }
 
     /// The system's desktop answers the questions that change nothing: what may run, the PATH, the environment, the
-    /// applications. (What it does on the desktop is left to the UI tests.)
+    /// applications.
+    ///
+    /// (What it does on the desktop is left to the UI tests.).
     @Test
     internal func theSystemsDesktopAnswersQuestions() throws {
         let system = ToolsDesktop.system

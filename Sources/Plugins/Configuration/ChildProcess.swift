@@ -1,11 +1,14 @@
 import Foundation
 
-/// The shell that runs command lines. Always a POSIX shell, whatever the user's login shell
-/// is: the lines of user commands are written for one, a reference to a value is written the
-/// way such a shell reads it, and `csh` and `tcsh` do not even take the options.
+/// The shell that runs command lines.
+///
+/// Always a POSIX shell, whatever the user's login shell is: the lines of user commands are written
+/// for one, a reference to a value is written the way such a shell reads it, and `csh` and `tcsh`
+/// do not even take the options.
 enum LoginShell {
-    /// `/bin/zsh` as a login shell, so that a command finds the PATH of a terminal. Every macOS
-    /// the program runs on has it.
+    /// `/bin/zsh` as a login shell, so that a command finds the PATH of a terminal.
+    ///
+    /// Every macOS the program runs on has it.
     static let posix = (executable: "/bin/zsh", options: ["-l", "-c"])
 
     /// The shell the user logs in with: `SHELL`, else the shell of the user's `account`, else zsh.
@@ -21,16 +24,19 @@ enum LoginShell {
     }
 
     /// The PATH of the user's login shell when that is another shell than zsh (bash, fish,
-    /// tcsh …), asked for once. Starts a process and waits up to a few seconds for it: never
-    /// for the main thread.
+    /// tcsh …), asked for once.
+    ///
+    /// Starts a process and waits up to a few seconds for it: never for the main thread.
     static let foreignPath = foreignPath(
         of: usersShell(environment: ProcessInfo.processInfo.environment, account: accountShell),
         waiting: .seconds(3)
     )
 
     /// The PATH that `shell` sets up: its start files are not read by zsh, so the PATH they set
-    /// up is asked for and handed on. Nil for zsh and when the shell does not answer within
-    /// `waiting`. Starts a process and waits for it: never for the main thread.
+    /// up is asked for and handed on.
+    ///
+    /// Nil for zsh and when the shell does not answer within `waiting`. Starts a process and waits
+    /// for it: never for the main thread.
     static func foreignPath(of shell: String, waiting: DispatchTimeInterval) -> String? {
         guard URL(fileURLWithPath: shell).lastPathComponent != "zsh",
             FileManager.default.isExecutableFile(atPath: shell)
@@ -75,10 +81,11 @@ enum LoginShell {
     }
 }
 
-/// A program started on its own, with its arguments handed over byte for byte. (Foundation's
-/// `Process` rewrites every argument in decomposed form, so a name with an accent would arrive
-/// as another name on a volume that tells the two forms apart.) Its end is reported through a
-/// dispatch source: no thread waits for it.
+/// A program started on its own, with its arguments handed over byte for byte.
+///
+/// (Foundation's `Process` rewrites every argument in decomposed form, so a name with an accent
+/// would arrive as another name on a volume that tells the two forms apart.) Its end is reported
+/// through a dispatch source: no thread waits for it.
 enum ChildProcess {
     struct Failure: Error {
         let code: Int32
@@ -89,8 +96,10 @@ enum ChildProcess {
         }
     }
 
-    /// The calls of the system a child's start and end go through. Tests give failing ones: the
-    /// system fails them only when it runs out of memory, or when a signal comes at that moment.
+    /// The calls of the system a child's start and end go through.
+    ///
+    /// Tests give failing ones: the system fails them only when it runs out of memory, or when a
+    /// signal comes at that moment.
     internal struct SystemCalls: Sendable {
         /// The system's own.
         internal static let system = Self(
@@ -112,6 +121,7 @@ enum ChildProcess {
     }
 
     /// Starts `executable` in `directory`, with nothing to read and its output discarded.
+    ///
     /// Returns the process number. Blocks for the time the start takes: not for the main thread.
     static func spawn(
         executable: String,
@@ -163,8 +173,9 @@ enum ChildProcess {
         let status: Int32?
     }
 
-    /// Reports the end of a child once, on a queue of the system. Lives in a `ChildTable`.
-    /// `reported` is guarded by `lock`; nothing else changes after `init`.
+    /// Reports the end of a child once, on a queue of the system.
+    ///
+    /// Lives in a `ChildTable`. `reported` is guarded by `lock`; nothing else changes after `init`.
     final class Watch: @unchecked Sendable {
         private let pid: pid_t
         private let handler: @Sendable (Ending) -> Void
@@ -214,8 +225,10 @@ enum ChildProcess {
 }
 
 /// The children that are running, so that a watch lives as long as its child and a waiting
-/// chain can be stopped. Used from the thread that starts a child, from the system's queue
-/// that reports its end, and from the main thread. All state is guarded by `lock`.
+/// chain can be stopped.
+///
+/// Used from the thread that starts a child, from the system's queue that reports its end, and from
+/// the main thread. All state is guarded by `lock`.
 final class ChildTable: @unchecked Sendable {
     private let lock = NSLock()
     private var children: [pid_t: (watch: ChildProcess.Watch, waitedFor: Bool)] = [:]

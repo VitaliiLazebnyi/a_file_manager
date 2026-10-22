@@ -5,7 +5,9 @@ import Testing
 @testable import ViewerPlugin
 
 /// `HTMLText.plainText(units:)` as it was before it was made fast: unit by unit, with the strings
-/// of the tags made for every one. What the fast one must give exactly.
+/// of the tags made for every one.
+///
+/// What the fast one must give exactly.
 enum HTMLReference {
     static let blockTags: Set<String> = [
         "p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol",
@@ -102,7 +104,9 @@ enum HTMLReference {
                     return ampersand + 1
                 }
                 let name = String(
-                    decoding: UnsafeBufferPointer(rebasing: input[ampersand + 1..<semicolon]), as: UTF16.self)
+                    decoding: UnsafeBufferPointer(rebasing: input[ampersand + 1..<semicolon]),
+                    as: UTF16.self
+                )
                 if let replacement = HTMLText.decodeEntity(name) {
                     for unit in replacement.utf16 { emit(unit) }
                     return semicolon + 1
@@ -204,7 +208,9 @@ enum HTMLReference {
                         pendingLink = nil
                     } else if !isClosing {
                         let tag = String(
-                            decoding: UnsafeBufferPointer(rebasing: input[open + 1..<close]), as: UTF16.self)
+                            decoding: UnsafeBufferPointer(rebasing: input[open + 1..<close]),
+                            as: UTF16.self
+                        )
                         if let link = HTMLText.attribute("href", in: Substring(tag)), !link.isEmpty,
                             !link.hasPrefix("#")
                         {

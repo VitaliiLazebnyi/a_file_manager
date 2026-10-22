@@ -153,11 +153,12 @@ final class ConfigurationStore {
         }
     }
 
-    /// The list stored under `key`, element by element. When the data is not a list, or has
-    /// elements that cannot be read, a copy of it is kept under `<key>.unreadable` before
-    /// anything else is saved over it, and the user is told. A copy kept from an earlier time
-    /// moves to `<key>.unreadable.previous`, so the newest two are there. The copies are not
-    /// exported; Reset All Settings removes them.
+    /// The list stored under `key`, element by element.
+    ///
+    /// When the data is not a list, or has elements that cannot be read, a copy of it is kept under
+    /// `<key>.unreadable` before anything else is saved over it, and the user is told. A copy kept
+    /// from an earlier time moves to `<key>.unreadable.previous`, so the newest two are there. The
+    /// copies are not exported; Reset All Settings removes them.
     private func load<Element: Decodable>(_: Element.Type, key: String, what: String) -> [Element] {
         guard let data = settings.data(forKey: key) else { return [] }
         let list = try? JSONDecoder().decode(LenientList<Element>.self, from: data)
@@ -185,8 +186,9 @@ final class ConfigurationStore {
 }
 
 /// The button bar while it is being edited (spec 14 › Button bars, The Change button bar
-/// dialog): a list of commands and separators. Nothing changes outside until `commit`.
-/// Main thread only.
+/// dialog): a list of commands and separators.
+///
+/// Nothing changes outside until `commit`. Main thread only.
 ///
 /// The bar holds commands of the program only; a program with parameters goes on the bar as a
 /// user command, which is what Total Commander's `em_` commands are for.
@@ -278,8 +280,9 @@ final class ToolbarEditor {
     }
 }
 
-/// The Start menu while it is being edited (spec 14 › The Change start menu dialog). Each
-/// entry carries its shortcut as text; the keys themselves live in the key bindings.
+/// The Start menu while it is being edited (spec 14 › The Change start menu dialog).
+///
+/// Each entry carries its shortcut as text; the keys themselves live in the key bindings.
 struct StartMenuDraft: Equatable {
     struct Row: Equatable {
         var entry: StartMenuEntry
@@ -306,8 +309,9 @@ struct StartMenuDraft: Equatable {
 }
 
 /// Settings written to a file and read back (the Mac's stand-in for copying `wincmd.ini`;
-/// spec 19 › What is saved when). A value is kept as the JSON it is stored as, so the file
-/// can be read and changed by hand.
+/// spec 19 › What is saved when).
+///
+/// A value is kept as the JSON it is stored as, so the file can be read and changed by hand.
 struct SettingsArchive: Equatable {
     static let format = "A File Manager settings"
 
@@ -332,8 +336,10 @@ struct SettingsArchive: Equatable {
         return archive
     }
 
-    /// Makes the store hold what the archive holds. Of `knownKeys`, those the archive lacks
-    /// are removed, so an import brings back the state at export, not a mixture.
+    /// Makes the store hold what the archive holds.
+    ///
+    /// Of `knownKeys`, those the archive lacks are removed, so an import brings back the state at
+    /// export, not a mixture.
     func restore(into settings: any SettingsStore, replacing knownKeys: [String]) {
         for key in knownKeys where values[key] == nil { settings.set(nil as Data?, forKey: key) }
         for (key, value) in values { settings.set(value as Data?, forKey: key) }

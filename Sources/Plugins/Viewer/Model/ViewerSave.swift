@@ -19,13 +19,19 @@ enum ViewerSave {
     /// Writes the whole `source` to `target`: into a new file beside it that is then moved onto
     /// it, so a target that is being read, or a copy that stops half way (the file became
     /// shorter, the disk is full, the job is cancelled), never leaves a half-written file in
-    /// place of a whole one. Blocks. `progress` is given the bytes written.
+    /// place of a whole one.
+    ///
+    /// Blocks. `progress` is given the bytes written.
     static func save(
-        _ source: any ByteSource, to target: URL, cancellation: CancellationFlag, progress: (Int64) -> Void = { _ in }
+        _ source: any ByteSource,
+        to target: URL,
+        cancellation: CancellationFlag,
+        progress: (Int64) -> Void = { _ in }
     ) throws {
         let folder = target.deletingLastPathComponent()
         let temporary = folder.appendingPathComponent(
-            ".\(target.lastPathComponent).afm-saving-\(UUID().uuidString.prefix(8))")
+            ".\(target.lastPathComponent).afm-saving-\(UUID().uuidString.prefix(8))"
+        )
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
         guard descriptor >= 0 else {
             throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: folder.path])
@@ -54,7 +60,8 @@ enum ViewerSave {
                 .fileWriteUnknown,
                 userInfo: [
                     NSFilePathErrorKey: target.path, NSLocalizedFailureReasonErrorKey: String(cString: strerror(errno))
-                ])
+                ]
+            )
         }
         finished = true
     }

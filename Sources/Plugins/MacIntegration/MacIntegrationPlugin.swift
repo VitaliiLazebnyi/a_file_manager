@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 /// What the Mac itself does with files: opening them with their application or one the user
 /// picks, editing in the editor of the user's choice, Quick Look, sharing, Finder tags, showing
 /// them in Finder (spec 10 › Associations, 10 › Edit (F4), 05 › File and folder context menu).
+///
 /// Only files on the local disks can be handed to other applications.
 ///
 /// Thread ownership: the plugin's state and its commands belong to the main thread; looking
@@ -14,8 +15,9 @@ import UniformTypeIdentifiers
 public final class MacIntegrationPlugin: Plugin {
     public let name = "Mac integration"
     /// Where requests to other applications and the system's panels go: the Mac's desktop, a
-    /// test's recording one, or nowhere (tests that start nothing). What would have been opened
-    /// is recorded in `opened` and `log` either way.
+    /// test's recording one, or nowhere (tests that start nothing).
+    ///
+    /// What would have been opened is recorded in `opened` and `log` either way.
     private let desktop: (any MacDesktop)?
     private let pasteboard: NSPasteboard
     private let applications: @Sendable (URL) -> [URL]
@@ -31,7 +33,9 @@ public final class MacIntegrationPlugin: Plugin {
         opened = Array((opened + urls).suffix(Self.recordLimit))
     }
 
-    /// A line of the log. Names come from the disk: a line break in one cannot make a second line.
+    /// A line of the log.
+    ///
+    /// Names come from the disk: a line break in one cannot make a second line.
     private func remember(_ line: String) {
         log.append(DisplayText.oneLine(line, limit: 2_000))
         if log.count > Self.recordLimit * 2 {
@@ -55,10 +59,12 @@ public final class MacIntegrationPlugin: Plugin {
     nonisolated private static let launchServices = LaunchServices()
 
     /// The local operands of a panel, worked on by `work` and handed to `deliver` on the main
-    /// thread. With many marked items both happen on a background thread first (the marks and
-    /// the list are taken as they are, which copies nothing); with few, everything is done at
-    /// once, here. `deliver` runs from the main run loop, not from a block of the main queue:
-    /// it may ask the user something.
+    /// thread.
+    ///
+    /// With many marked items both happen on a background thread first (the marks and the list are
+    /// taken as they are, which copies nothing); with few, everything is done at once, here.
+    /// `deliver` runs from the main run loop, not from a block of the main queue: it may ask the
+    /// user something.
     private func withLocalOperands<Result: Sendable>(
         of model: PanelModel,
         _ work: @escaping @Sendable ([URL]) -> Result,
@@ -83,9 +89,11 @@ public final class MacIntegrationPlugin: Plugin {
     private var followed: (model: ObjectIdentifier, marked: Int, listVersion: Int)?
     private var followTicket = 0
 
-    /// Has the open Quick Look panel show what the source panel now has. A move of the cursor
-    /// costs nothing that grows with the list: without marked items the file under the cursor
-    /// is shown, and with them the panel keeps showing those until they or the list change.
+    /// Has the open Quick Look panel show what the source panel now has.
+    ///
+    /// A move of the cursor costs nothing that grows with the list: without marked items the file
+    /// under the cursor is shown, and with them the panel keeps showing those until they or the
+    /// list change.
     private func follow(_ model: PanelModel) {
         let marked = model.selectionCount
         let state = (ObjectIdentifier(model), marked, model.listVersion)
@@ -143,8 +151,9 @@ public final class MacIntegrationPlugin: Plugin {
         quickLook.panel = desktop?.preview
     }
 
-    /// The applications that open a file, the default one first. Launch Services looks at the
-    /// file to know its type: not for the main thread.
+    /// The applications that open a file, the default one first.
+    ///
+    /// Launch Services looks at the file to know its type: not for the main thread.
     nonisolated private static func installedApplications(for url: URL) -> [URL] {
         let workspace = NSWorkspace.shared
         var all = workspace.urlsForApplications(toOpen: url)
@@ -155,7 +164,9 @@ public final class MacIntegrationPlugin: Plugin {
         return all
     }
 
-    /// Finds the application the editor preference names. Looks at the disk: not for the main thread.
+    /// Finds the application the editor preference names.
+    ///
+    /// Looks at the disk: not for the main thread.
     nonisolated static func editorApplication(named text: String) -> URL {
         let fallback = URL(fileURLWithPath: "/System/Applications/TextEdit.app")
         let text = text.trimmingCharacters(in: .whitespaces)
@@ -436,14 +447,18 @@ public final class MacIntegrationPlugin: Plugin {
 
     // MARK: Finder tags
 
-    /// The Finder tags of a file. Reads the disk: not for the main thread.
+    /// The Finder tags of a file.
+    ///
+    /// Reads the disk: not for the main thread.
     nonisolated static func tags(of url: URL) -> [String] {
         var value: AnyObject?
         try? (URL(fileURLWithPath: url.path) as NSURL).getResourceValue(&value, forKey: .tagNamesKey)
         return value as? [String] ?? []
     }
 
-    /// Replaces the Finder tags of a file. Writes to the disk: not for the main thread.
+    /// Replaces the Finder tags of a file.
+    ///
+    /// Writes to the disk: not for the main thread.
     nonisolated static func setTags(_ tags: [String], of url: URL) throws {
         try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
     }
@@ -458,9 +473,10 @@ public final class MacIntegrationPlugin: Plugin {
         return tags
     }
 
-    /// Shows the tags of the first file and gives all files what the user makes of them. The
-    /// disk is read and written as jobs, off the main thread.
-    /// Shows the system's sharing panel for `urls`, unless there are too many.
+    /// Shows the tags of the first file and gives all files what the user makes of them.
+    ///
+    /// The disk is read and written as jobs, off the main thread. Shows the system's sharing panel
+    /// for `urls`, unless there are too many.
     private func share(_ urls: [URL], in kernel: Kernel) {
         // The sharing panel looks at every item; nobody shares a hundred thousand at once.
         guard urls.count <= Self.shareLimit else {

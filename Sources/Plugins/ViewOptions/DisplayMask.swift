@@ -2,9 +2,11 @@ import AFMKernel
 import Foundation
 
 /// A file-type specification of Show › Custom…: `*.bmp *.gif`, `*.* | *.bak`, `*.txt | */`
-/// (spec 03 › Show files of type). The masks before the `|` say which files are shown, the
-/// ones after it which are left out; an exclusion that ends in a slash is about folders.
-/// Folders are shown unless such an exclusion names them. Pure, safe on any thread.
+/// (spec 03 › Show files of type).
+///
+/// The masks before the `|` say which files are shown, the ones after it which are left out; an
+/// exclusion that ends in a slash is about folders. Folders are shown unless such an exclusion
+/// names them. Pure, safe on any thread.
 struct DisplayMask: Sendable {
     let text: String
     private let includes: FileMask?

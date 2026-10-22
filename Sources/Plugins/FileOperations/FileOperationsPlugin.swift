@@ -38,8 +38,9 @@ public final class FileOperationsPlugin: Plugin {
         self.clipboard = clipboard
     }
 
-    /// The operation log is written in bursts; this is where the last one goes out. The
-    /// program is quitting and this is the main thread: a log on a volume that has stopped
+    /// The operation log is written in bursts; this is where the last one goes out.
+    ///
+    /// The program is quitting and this is the main thread: a log on a volume that has stopped
     /// answering is waited for a moment and no longer.
     public func stop() {
         operations?.flushLog()
@@ -234,8 +235,9 @@ public final class FileOperationsPlugin: Plugin {
     }
 }
 
-/// The behaviour behind the commands. It only talks to the kernel: panels, questions, jobs
-/// and file systems.
+/// The behaviour behind the commands.
+///
+/// It only talks to the kernel: panels, questions, jobs and file systems.
 ///
 /// **Threading.** Commands start on the main thread and only prepare there: they read the
 /// panel's state and the settings and ask the user. Everything that touches a file system runs
@@ -268,7 +270,9 @@ final class FileOperations: FileTransferService {
     nonisolated(unsafe) private var sharedLog: OperationLog?
 
     /// Job thread: a log written to `volume` writes what it has and closes its file, so the
-    /// volume can be ejected. The next line opens it again.
+    /// volume can be ejected.
+    ///
+    /// The next line opens it again.
     nonisolated func closeLog(on volume: URL) {
         logLock.lock()
         let log = sharedLog
@@ -377,8 +381,10 @@ final class FileOperations: FileTransferService {
     }
 
     /// What a command works on, taken on the main thread at no cost: how many items, and the
-    /// first of them. The list itself is made where it is needed, on the job's thread; for
-    /// a selection of several hundred thousand that is time the main thread does not have.
+    /// first of them.
+    ///
+    /// The list itself is made where it is needed, on the job's thread; for a selection of several
+    /// hundred thousand that is time the main thread does not have.
     struct Picked {
         let count: Int
         /// The first operand; the only one when `count` is 1.
@@ -398,7 +404,9 @@ final class FileOperations: FileTransferService {
             }
         }
 
-        /// The operands. For any thread.
+        /// The operands.
+        ///
+        /// For any thread.
         func items() -> [FileItem] { snapshot.items() }
 
         /// The marked operands one after another, without the list of them being made, until
@@ -415,7 +423,9 @@ final class FileOperations: FileTransferService {
 
     /// What the completion of a job takes the marks off with: the places of the processed
     /// items in what the panel showed, and their names in case the panel shows something
-    /// else by then. Put together on the job's thread.
+    /// else by then.
+    ///
+    /// Put together on the job's thread.
     struct Processed {
         var indices: [Int] = []
         var names: [String] = []
@@ -453,8 +463,10 @@ final class FileOperations: FileTransferService {
         return first.url.deletingLastPathComponent()
     }
 
-    /// The panel's names of the items a job processed. In a branch or list view a name is a
-    /// path, not the last component of the item's location, so the items are matched by URL.
+    /// The panel's names of the items a job processed.
+    ///
+    /// In a branch or list view a name is a path, not the last component of the item's location, so
+    /// the items are matched by URL.
     static func names(of processed: [URL], among items: [FileItem]) -> [String] {
         var wanted = Set(processed.map(\.locationKey))
         guard !wanted.isEmpty else { return [] }
@@ -490,7 +502,9 @@ final class FileOperations: FileTransferService {
         }
     }
 
-    /// The operands of a command and the first of them. The commands are offered only where there are operands.
+    /// The operands of a command and the first of them.
+    ///
+    /// The commands are offered only where there are operands.
     private func withOperands(_ body: (Picked, FileItem) -> Void) {
         let picked = Picked(source.model)
         if let first = picked.first {
@@ -619,8 +633,10 @@ final class FileOperations: FileTransferService {
         )
     }
 
-    /// The Copy dialog with its options (spec 07 › Copy dialog, Advanced options). The second
-    /// button also stores the choices as the defaults of the configuration. Returns the target.
+    /// The Copy dialog with its options (spec 07 › Copy dialog, Advanced options).
+    ///
+    /// The second button also stores the choices as the defaults of the configuration. Returns the
+    /// target.
     private func askForOptions(_ heading: String, kind: TransferKind, target: String, options: inout TransferOptions)
         -> String?
     {
@@ -682,8 +698,9 @@ final class FileOperations: FileTransferService {
     }
 
     /// F8 moves to the Trash where the file system has one; elsewhere, and with Shift, it
-    /// deletes directly. The configuration can turn the two around (spec 07 › Recycle bin or
-    /// direct deletion).
+    /// deletes directly.
+    ///
+    /// The configuration can turn the two around (spec 07 › Recycle bin or direct deletion).
     func delete(shifted: Bool) {
         withOperands { picked, _ in delete(picked, shifted: shifted) }
     }
@@ -860,7 +877,9 @@ final class FileOperations: FileTransferService {
     }
 
     /// Shift+F6 with several items: a wildcard mask for all, or a new name for each in turn
-    /// (spec 07 › Shift+F6 with several items). Name conflicts get the Overwrite dialog.
+    /// (spec 07 › Shift+F6 with several items).
+    ///
+    /// Name conflicts get the Overwrite dialog.
     func renameSelection() {
         withOperands { picked, first in renameSelection(picked, first: first) }
     }

@@ -56,12 +56,14 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
             Myers.diff(Array("abcd"), Array("abXcd")) == [
                 DiffSegment(a: 0..<2, b: 0..<2, isEqual: true), DiffSegment(a: 2..<2, b: 2..<3, isEqual: false),
                 DiffSegment(a: 2..<4, b: 3..<5, isEqual: true)
-            ])
+            ]
+        )
         #expect(
             Myers.diff(Array("abcd"), Array("ad")) == [
                 DiffSegment(a: 0..<1, b: 0..<1, isEqual: true), DiffSegment(a: 1..<3, b: 1..<1, isEqual: false),
                 DiffSegment(a: 3..<4, b: 1..<2, isEqual: true)
-            ])
+            ]
+        )
         // The classic example of the paper: five edits.
         #expect(Myers.editDistance(Myers.diff(Array("ABCABBA"), Array("CBABAC"))) == 5)
     }
@@ -70,12 +72,14 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         var random = Seeded(state: 42)
         for round in 0..<600 {
             let alphabet = [2, 3, 5, 12][round % 4]
-            let a = (0..<Int.random(in: 0...40, using: &random)).map { _ in
-                Int.random(in: 0..<alphabet, using: &random)
-            }
-            let b = (0..<Int.random(in: 0...40, using: &random)).map { _ in
-                Int.random(in: 0..<alphabet, using: &random)
-            }
+            let a = (0..<Int.random(in: 0...40, using: &random))
+                .map { _ in
+                    Int.random(in: 0..<alphabet, using: &random)
+                }
+            let b = (0..<Int.random(in: 0...40, using: &random))
+                .map { _ in
+                    Int.random(in: 0..<alphabet, using: &random)
+                }
             let segments = Myers.diff(a, b)
             #expect(isValid(segments, a, b), "\(a) -> \(b)")
             #expect(Myers.editDistance(segments) == a.count + b.count - 2 * longestCommon(a, b), "\(a) -> \(b)")
@@ -173,14 +177,16 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
     func lines(_ text: String) -> [TextLine] { TextDocument.split(text) }
 
     func kinds(_ left: String, _ right: String, _ options: DiffOptions = DiffOptions()) -> String {
-        TextDiff.compute(left: lines(left), right: lines(right), options: options).rows.map { row in
-            switch row.kind {
-            case .equal: return "="
-            case .changed: return "~"
-            case .added: return "+"
-            case .removed: return "-"
+        TextDiff.compute(left: lines(left), right: lines(right), options: options).rows
+            .map { row in
+                switch row.kind {
+                case .equal: return "="
+                case .changed: return "~"
+                case .added: return "+"
+                case .removed: return "-"
+                }
             }
-        }.joined()
+            .joined()
     }
 
     @Test func encodingsAreDetectedAndWrittenBackUnchanged() {
@@ -208,7 +214,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(document.lines.map(\.number) == [1, 2, 3, 4, 5, 6] && document.usualEnding == .lf)
         #expect(
             TextDocument.split("\n").map(\.text) == [""] && TextDocument.split("").isEmpty
-                && TextDocument.split("a\r").map(\.ending) == [.cr])
+                && TextDocument.split("a\r").map(\.ending) == [.cr]
+        )
 
         // A line put after a last line without a break gets the file's usual break.
         var windows = TextDocument(data: Data("a\r\nb\r\nc".utf8))
@@ -236,7 +243,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(diff.blocks == [1..<3, 6..<7] && !diff.isIdentical)
         #expect(
             diff.rows[1] == DiffRow(left: 1, right: 1, kind: .changed)
-                && diff.rows[6] == DiffRow(left: nil, right: 6, kind: .added))
+                && diff.rows[6] == DiffRow(left: nil, right: 6, kind: .added)
+        )
     }
 
     @Test func optionsDecideWhichLinesAreEqual() {
@@ -256,18 +264,21 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         var random = Seeded(state: 11)
         let words = ["alpha", "Alpha", "beta", " beta", "gamma  delta", "gamma delta", "", "end", "END", "x"]
         for round in 0..<300 {
-            let left = (0..<Int.random(in: 0...30, using: &random)).map { _ in
-                TextLine(words.randomElement(using: &random)!)
-            }
-            let right = (0..<Int.random(in: 0...30, using: &random)).map { _ in
-                TextLine(words.randomElement(using: &random)!)
-            }
+            let left = (0..<Int.random(in: 0...30, using: &random))
+                .map { _ in
+                    TextLine(words.randomElement(using: &random)!)
+                }
+            let right = (0..<Int.random(in: 0...30, using: &random))
+                .map { _ in
+                    TextLine(words.randomElement(using: &random)!)
+                }
             let options = DiffOptions(ignoreCase: round % 2 == 0, ignoreRepeatedSpaces: round % 3 == 0)
             let diff = TextDiff.compute(left: left, right: right, options: options)
             #expect(diff.rebuiltRight(left: left, right: right) == right)
             #expect(
                 diff.rows.compactMap(\.left) == Array(left.indices)
-                    && diff.rows.compactMap(\.right) == Array(right.indices))
+                    && diff.rows.compactMap(\.right) == Array(right.indices)
+            )
             for row in diff.rows where row.kind == .equal {
                 #expect(options.key(left[row.left!]) == options.key(right[row.right!]))
             }
@@ -294,13 +305,15 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         let anchored = TextDiff.compute(left: left, right: right, anchors: [(left: 2, right: 1)])
         #expect(
             anchored.rows.contains(DiffRow(left: 2, right: 1, kind: .equal))
-                && !anchored.rows.contains(DiffRow(left: 1, right: 1, kind: .equal)))
+                && !anchored.rows.contains(DiffRow(left: 1, right: 1, kind: .equal))
+        )
         #expect(anchored.rebuiltRight(left: left, right: right) == right)
         // An anchor on lines that differ is a changed row; anchors out of range are ignored.
         let odd = TextDiff.compute(left: left, right: right, anchors: [(left: 3, right: 2), (left: 99, right: 0)])
         #expect(
             odd.rows.contains(DiffRow(left: 3, right: 2, kind: .changed))
-                && odd.rebuiltRight(left: left, right: right) == right)
+                && odd.rebuiltRight(left: left, right: right) == right
+        )
     }
 
     @Test func differencesInsideALine() {
@@ -323,7 +336,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         let ranges = TextDiff.inline(long, long + "b")
         #expect(
             ranges.left == [TextDiff.inlineLimit..<(TextDiff.inlineLimit + 10)]
-                && ranges.right == [TextDiff.inlineLimit..<(TextDiff.inlineLimit + 11)])
+                && ranges.right == [TextDiff.inlineLimit..<(TextDiff.inlineLimit + 11)]
+        )
     }
 }
 
@@ -340,7 +354,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         #expect(diff.blocks == [0..<1, 2..<3, 5..<6])
         #expect(
             diff.differingOffsets(left: left, right: right, row: 2) == [1, 2]
-                && diff.differingOffsets(left: left, right: right, row: 5) == [0, 1, 2])
+                && diff.differingOffsets(left: left, right: right, row: 5) == [0, 1, 2]
+        )
         #expect(diff.differingOffsets(left: left, right: right, row: 1).isEmpty)
         #expect(diff.offsetText(row: 2) == "00000010")
         #expect(diff.text(of: Data("Hello, W".utf8) + Data([0, 0xFF]), row: 0) == "48 65 6C 6C 6F 2C 20 57  Hello, W")
@@ -352,7 +367,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
     @Test func edgeCases() {
         #expect(
             BinaryDiff.compute(left: Data(), right: Data()).isIdentical
-                && BinaryDiff.compute(left: Data(), right: Data()).rowCount == 0)
+                && BinaryDiff.compute(left: Data(), right: Data()).rowCount == 0
+        )
         let one = BinaryDiff.compute(left: Data([1, 2, 3]), right: Data(), bytesPerLine: 16)
         #expect(one.blocks == [0..<1] && one.differingBytes == 3 && one.rowCount == 1)
         let same = BinaryDiff.compute(left: Data([9, 9]), right: Data([9, 9]), bytesPerLine: 1)
@@ -362,7 +378,8 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         let sliced = BinaryDiff.compute(left: slice, right: Data([7, 0, 9]), bytesPerLine: 2)
         #expect(
             sliced.differingOffsets(left: slice, right: Data([7, 0, 9]), row: 0) == [1]
-                && sliced.text(of: slice, row: 1).hasPrefix("09"))
+                && sliced.text(of: slice, row: 1).hasPrefix("09")
+        )
     }
 
     @Test func largeFilesAreComparedInPiecesOnAllCores() {
@@ -397,7 +414,10 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         memory.addFile("/a.txt", "one\ntwo\nthree\n")
         memory.addFile("/b.txt", "one\n2\nthree\nfour\n")
         let result = CompareLoader.load(
-            left: memory.url("/a.txt"), right: memory.url("/b.txt"), fileSystems: fileSystems)
+            left: memory.url("/a.txt"),
+            right: memory.url("/b.txt"),
+            fileSystems: fileSystems
+        )
         guard case .text(let left, let right, let diff, let width) = result.content else {
             Issue.record("not a text comparison")
             return
@@ -414,8 +434,12 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         memory.addDirectory("/folder")
         func load(_ left: String, _ right: String, binary: Bool = false) -> ComparedFiles {
             CompareLoader.load(
-                left: memory.url(left), right: memory.url(right), forceBinary: binary, bytesPerLine: 8,
-                fileSystems: fileSystems)
+                left: memory.url(left),
+                right: memory.url(right),
+                forceBinary: binary,
+                bytesPerLine: 8,
+                fileSystems: fileSystems
+            )
         }
         #expect(load("/a.txt", "/b.txt").isIdentical)
         // Equal for the options, but not the same content.
@@ -443,9 +467,13 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         cancelled.cancel()
         #expect(
             CompareLoader.load(
-                left: memory.url("/a.txt"), right: memory.url("/c.txt"), fileSystems: fileSystems,
+                left: memory.url("/a.txt"),
+                right: memory.url("/c.txt"),
+                fileSystems: fileSystems,
                 cancellation: cancelled
-            ).wasCancelled)
+            )
+            .wasCancelled
+        )
     }
 
     @Test func largeLocalFilesAreCheckedInStretchesOnAllCores() throws {
@@ -466,8 +494,13 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
             -> Bool?
         {
             try CompareLoader.identical(
-                box.url("a"), box.url(name), size: Int64(data.count), fileSystems: fileSystems, cancellation: flag,
-                stretch: stretch)
+                box.url("a"),
+                box.url(name),
+                size: Int64(data.count),
+                fileSystems: fileSystems,
+                cancellation: flag,
+                stretch: stretch
+            )
         }
         #expect(try identical("same") == true && identical("last") == false && identical("middle") == false)
         #expect(try identical("same", stretch: 1_000_003) == true && identical("last", stretch: 7_777) == false)
@@ -485,8 +518,12 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
         memory.addFile("/c", text.dropLast() + "!")
         func identical(_ name: String) throws -> Bool? {
             try CompareLoader.identical(
-                memory.url("/a"), memory.url(name), size: Int64(text.utf8.count), fileSystems: fileSystems,
-                stretch: 4_096)
+                memory.url("/a"),
+                memory.url(name),
+                size: Int64(text.utf8.count),
+                fileSystems: fileSystems,
+                stretch: 4_096
+            )
         }
         #expect(try identical("/b") == true && identical("/c") == false)
         // The same through the stretches, when the file system says it is local.
@@ -497,7 +534,10 @@ private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T])
     @Test func savingReplacesTheFileAndLeavesNothingBehind() throws {
         memory.addFile("/dir/file.txt", "old content", permissions: 0o600)
         try CompareLoader.replace(
-            memory.url("/dir/file.txt"), with: Data("new content".utf8), fileSystems: fileSystems)
+            memory.url("/dir/file.txt"),
+            with: Data("new content".utf8),
+            fileSystems: fileSystems
+        )
         #expect(memory.contents("/dir/file.txt") == "new content" && memory.allPaths == ["/dir", "/dir/file.txt"])
         #expect(memory.item(at: memory.url("/dir/file.txt"))?.permissions == 0o600)
         // A file that has gone meanwhile is written anew.

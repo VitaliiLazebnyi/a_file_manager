@@ -2,10 +2,11 @@ public import AFMKernel
 public import Foundation
 
 /// The servers the program is connected to, and how to reach the ones it is not connected to
-/// yet (spec 11 › A connection is a panel location). The file-system providers find their
-/// sessions here by the server part of a URL; a URL of a server without a session connects on
-/// first use, with a saved connection's settings when one fits and as an anonymous guest
-/// otherwise.
+/// yet (spec 11 › A connection is a panel location).
+///
+/// The file-system providers find their sessions here by the server part of a URL; a URL of a
+/// server without a session connects on first use, with a saved connection's settings when one fits
+/// and as an anonymous guest otherwise.
 ///
 /// **Threading.** Safe from any thread; the state is guarded by a lock. `onChange` is called on
 /// the thread that connected or disconnected.
@@ -28,14 +29,18 @@ public final class ConnectionCenter: @unchecked Sendable {
         nil
     }
     /// The stored password of a saved connection: of this very server and login, not of
-    /// whatever connection carries the same identifier. Called on the thread that connects.
+    /// whatever connection carries the same identifier.
+    ///
+    /// Called on the thread that connects.
     public var storedPassword: @Sendable (ConnectionProfile) -> String? {
         get { lock.withLock { passwordSource } }
         set { lock.withLock { passwordSource = newValue } }
     }
     private var passwordSource: @Sendable (ConnectionProfile) -> String? = { _ in nil }
     /// The servers the user chose to connect to (a saved connection, the connection dialogs, an
-    /// earlier yes). A server that is none of these is asked about before the first login.
+    /// earlier yes).
+    ///
+    /// A server that is none of these is asked about before the first login.
     private var chosen: Set<ServerKey> = []
 
     /// The name of this program, for the mark on what it downloads (`RemoteFileSystem.quarantine`).
@@ -73,8 +78,9 @@ public final class ConnectionCenter: @unchecked Sendable {
     }
 
     /// The user named this server in person just now (an address typed into the command line or
-    /// the path field): it is not asked about before the first login. Nothing else changes; how
-    /// to log in is what `announce` or a saved connection said.
+    /// the path field): it is not asked about before the first login.
+    ///
+    /// Nothing else changes; how to log in is what `announce` or a saved connection said.
     public func noteChosen(_ key: ServerKey) {
         lock.lock()
         // A session made before this was known would still ask; one that is logging in is left alone.
@@ -84,8 +90,10 @@ public final class ConnectionCenter: @unchecked Sendable {
     }
 
     /// Takes out the sessions of these servers that never got as far as a login, so the next
-    /// attempt starts with what is known now. A session that is in the middle of its login is
-    /// left alone: the user may be answering its question. Called with the lock held.
+    /// attempt starts with what is known now.
+    ///
+    /// A session that is in the middle of its login is left alone: the user may be answering its
+    /// question. Called with the lock held.
     private func dropUnconnected(_ keys: [ServerKey]) -> [any RemoteSession] {
         keys.compactMap { key in
             guard let session = sessions[key], !session.isConnected, !session.isConnecting else { return nil }
@@ -213,11 +221,12 @@ public final class ConnectionCenter: @unchecked Sendable {
 }
 
 /// What is known about single entries from the listings read a moment ago, so that the many
-/// questions a copy job asks about its targets do not each travel to the server. A listing is
-/// forgotten after a few seconds. What this program itself changes in a directory (a file
-/// written, a folder made or removed, a rename) is entered into the listing at once, so the
-/// next question about the directory is still answered from it; a change that cannot be
-/// entered exactly makes the directory forgotten. Safe from any thread.
+/// questions a copy job asks about its targets do not each travel to the server.
+///
+/// A listing is forgotten after a few seconds. What this program itself changes in a directory (a
+/// file written, a folder made or removed, a rename) is entered into the listing at once, so the
+/// next question about the directory is still answered from it; a change that cannot be entered
+/// exactly makes the directory forgotten. Safe from any thread.
 ///
 /// A listing that was under way while the directory changed would bring the old state back
 /// when it is stored. Changes are therefore also noted for a while in a journal, and a
@@ -231,7 +240,9 @@ private final class EntryCache: @unchecked Sendable {
         var entries: [String: RemoteEntry]
     }
 
-    /// One change of a directory. No name: everything about the directory is unknown.
+    /// One change of a directory.
+    ///
+    /// No name: everything about the directory is unknown.
     private struct Change {
         let at: Date
         let name: String?
@@ -292,9 +303,10 @@ private final class EntryCache: @unchecked Sendable {
         return .absent(hasNameAlike: alike)
     }
 
-    /// Changes what is known of an entry, when it is known; nothing else happens. For news that
-    /// arrive on their own (a link resolved in the background): they must not make a listing
-    /// be forgotten that they do not concern.
+    /// Changes what is known of an entry, when it is known; nothing else happens.
+    ///
+    /// For news that arrive on their own (a link resolved in the background): they must not make a
+    /// listing be forgotten that they do not concern.
     func updateIfKnown(_ name: String, in directory: URL, _ change: (inout RemoteEntry) -> Void) {
         let key = directory.locationKey
         lock.lock()
@@ -305,7 +317,9 @@ private final class EntryCache: @unchecked Sendable {
         directories[key]?.entries[name] = entry
     }
 
-    /// The listing of a directory unless it is too old. Called with the lock held.
+    /// The listing of a directory unless it is too old.
+    ///
+    /// Called with the lock held.
     private func fresh(_ key: String) -> Directory? {
         guard let known = directories[key] else { return nil }
         // Too old: forgotten.
@@ -403,8 +417,10 @@ private final class EntryCache: @unchecked Sendable {
 }
 
 /// Servers as a file system (spec 11 › The connected panel): `ftp:`, `ftps:` and `sftp:` URLs
-/// of the form `scheme://host[:port]/path`. A URL never carries a user name or password; those
-/// belong to the connection (`ConnectionCenter`). One instance serves one scheme.
+/// of the form `scheme://host[:port]/path`.
+///
+/// A URL never carries a user name or password; those belong to the connection
+/// (`ConnectionCenter`). One instance serves one scheme.
 ///
 /// **Threading.** Every method is safe to call from several threads at once: the sessions take
 /// care of their connections, and the little state kept here is guarded by locks. The calls
@@ -477,8 +493,10 @@ public final class RemoteFileSystem: FileSystemProvider {
         try read(directory, showHidden: showHidden, isVisit: true, cancellation: cancellation, receive: receive)
     }
 
-    /// Reads a directory and remembers the listing. A visit is what the panels do; reading
-    /// the directory to answer a question about one entry is not. A cancelled listing is not remembered.
+    /// Reads a directory and remembers the listing.
+    ///
+    /// A visit is what the panels do; reading the directory to answer a question about one entry is
+    /// not. A cancelled listing is not remembered.
     private func read(
         _ directory: URL,
         showHidden: Bool,
@@ -654,8 +672,10 @@ public final class RemoteFileSystem: FileSystemProvider {
         return CachingWriter(writer, cache: cache, directory: directory, name: name)
     }
 
-    /// Continues an existing file (Resume, Append). The server has it at the new length at once,
-    /// so the cached listing follows; what is written later is entered when the file is closed.
+    /// Continues an existing file (Resume, Append).
+    ///
+    /// The server has it at the new length at once, so the cached listing follows; what is written
+    /// later is entered when the file is closed.
     public func append(to url: URL, at offset: Int64?, cancellation: CancellationFlag) throws -> any FileWriter {
         let (session, _, path) = try resolve(url, cancellation: cancellation)
         guard session.canAppend(path) else { throw FileSystemError.notSupported("Continuing a file on this server") }
@@ -710,9 +730,10 @@ public final class RemoteFileSystem: FileSystemProvider {
         cache.forgetTree(key.url(path: path))
     }
 
-    /// Renames. With `replacing` an existing file at the destination is replaced, and at no
-    /// moment is it gone without the new file being in its place or the old one being kept
-    /// under another name.
+    /// Renames.
+    ///
+    /// With `replacing` an existing file at the destination is replaced, and at no moment is it
+    /// gone without the new file being in its place or the old one being kept under another name.
     ///
     /// First the plain rename is tried, which replaces in one step on a secure shell server
     /// (`posix-rename`) and on most FTP servers. When the server refuses, nothing is removed
@@ -783,7 +804,9 @@ public final class RemoteFileSystem: FileSystemProvider {
     }
 
     /// Puts the file at `from` in the place of the file at `to` (in `directory`) on a server whose
-    /// rename does not replace. The file in the way is never deleted before the new one stands in its place.
+    /// rename does not replace.
+    ///
+    /// The file in the way is never deleted before the new one stands in its place.
     ///
     /// The caller's flag ends only the first step. Once the file in the way stands aside, the
     /// rest is seen through whatever the flag says (it still ends with the session and at the
@@ -876,8 +899,9 @@ public final class RemoteFileSystem: FileSystemProvider {
     }
 
     /// Reads what `displayPath` writes, and addresses as the user types them (spec 11 › Address
-    /// and URL syntax). A user name and password in the text go to the connection; the
-    /// returned URL is without them.
+    /// and URL syntax).
+    ///
+    /// A user name and password in the text go to the connection; the returned URL is without them.
     public func location(from text: String) -> URL? {
         let lowered = text.lowercased()
         let prefixes = scheme == "ftps" ? ["ftps://", "ftpes://", "ftpis://"] : [scheme + "://"]
@@ -897,8 +921,9 @@ public final class RemoteFileSystem: FileSystemProvider {
 
     /// Everything that comes from a server came from elsewhere: the mark a browser puts on
     /// its downloads (`com.apple.quarantine`), so that the system checks a program, an
-    /// installer or a script fetched from a server before it first runs. Whoever copies a file
-    /// from here to a disk asks for it and puts it on the copy.
+    /// installer or a script fetched from a server before it first runs.
+    ///
+    /// Whoever copies a file from here to a disk asks for it and puts it on the copy.
     public func quarantine(of url: URL) -> Data? {
         guard let key = ServerKey(url), key.scheme == scheme else { return nil }
         return Self.quarantineMark(agent: center.agentName)

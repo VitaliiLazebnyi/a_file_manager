@@ -39,8 +39,9 @@ enum ImageFit: Int {
 }
 
 /// The Lister's options: those of Configure Lister (spec 10 › Configure Lister) and those the
-/// viewer remembers by itself (wrap, text cursor, fonts, window size). They live in the
-/// settings store under `viewer.…`. Main thread only.
+/// viewer remembers by itself (wrap, text cursor, fonts, window size).
+///
+/// They live in the settings store under `viewer.…`. Main thread only.
 final class ListerSettings {
     private let store: any SettingsStore
 

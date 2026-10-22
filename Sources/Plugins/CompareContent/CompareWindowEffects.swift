@@ -1,8 +1,10 @@
 import AppKit
 
 /// What the compare window does outside itself: showing itself on the desktop, a beep, the panel to choose a file,
-/// the font panel and the clipboard. The window of the program uses the system's; tests put recorders in their
-/// place, so that nothing shows, sounds or opens on the desktop.
+/// the font panel and the clipboard.
+///
+/// The window of the program uses the system's; tests put recorders in their place, so that nothing
+/// shows, sounds or opens on the desktop.
 ///
 /// Main thread only, like the window.
 @MainActor

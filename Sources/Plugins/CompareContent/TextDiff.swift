@@ -1,8 +1,10 @@
 public import AFMKernel
 public import Foundation
 
-/// When two lines count as equal (spec 09 › Comparison rules). The options only decide
-/// equality; inside a line that differs, the characters are compared exactly.
+/// When two lines count as equal (spec 09 › Comparison rules).
+///
+/// The options only decide equality; inside a line that differs, the characters are compared
+/// exactly.
 public struct DiffOptions: Equatable, Codable, Sendable {
     /// Lines that differ only in upper and lower case are equal ("Case sensitive" off).
     public var ignoreCase = true
@@ -40,8 +42,10 @@ public struct DiffOptions: Equatable, Codable, Sendable {
         return ignoreLineEndings ? text : text + line.ending.rawValue
     }
 
-    /// A 64-bit hash of a line's key, made without building the key as a string. Equal keys
-    /// have equal hashes; equal hashes are checked again with `isSameKey` where it matters.
+    /// A 64-bit hash of a line's key, made without building the key as a string.
+    ///
+    /// Equal keys have equal hashes; equal hashes are checked again with `isSameKey` where it
+    /// matters.
     func hash(_ line: TextLine) -> UInt64 {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         var text = line.text
@@ -112,8 +116,10 @@ public struct DiffRow: Equatable, Sendable {
     public let kind: Kind
 }
 
-/// Two texts laid side by side (spec 09 › Display). Pure and UI-free; computing it is the
-/// slow part of the comparison and belongs on a background thread.
+/// Two texts laid side by side (spec 09 › Display).
+///
+/// Pure and UI-free; computing it is the slow part of the comparison and belongs on a background
+/// thread.
 public struct TextDiff: Equatable, Sendable {
     public let rows: [DiffRow]
     /// The differences as ranges of rows; a run of differing rows is one difference
@@ -247,9 +253,10 @@ public struct TextDiff: Equatable, Sendable {
     /// The within-line comparison covers this many characters (spec 09 › Comparison rules).
     public static let inlineLimit = 4_096
 
-    /// The parts of two differing lines that differ, as ranges of UTF-16 units. After a
-    /// difference the comparison only picks up again where at least `minimumMatch` characters
-    /// agree, so a stray common letter does not chop a changed word into pieces.
+    /// The parts of two differing lines that differ, as ranges of UTF-16 units.
+    ///
+    /// After a difference the comparison only picks up again where at least `minimumMatch`
+    /// characters agree, so a stray common letter does not chop a changed word into pieces.
     public static func inline(_ left: String, _ right: String, minimumMatch: Int = 3) -> (
         left: [Range<Int>], right: [Range<Int>]
     ) {
@@ -423,7 +430,9 @@ public struct BinaryDiff: Equatable, Sendable {
         String(format: "%08X", row * bytesPerLine)
     }
 
-    /// A line of one file: its bytes in hex, then as characters. Empty past the file's end.
+    /// A line of one file: its bytes in hex, then as characters.
+    ///
+    /// Empty past the file's end.
     public func text(of data: Data, row: Int) -> String {
         let from = row * bytesPerLine
         guard from < data.count else { return "" }

@@ -3,7 +3,9 @@ import Foundation
 
 /// The file a selection is saved to and loaded from (spec 19 › Selection files): one name per
 /// line without a path, folders with a trailing `\`, CRLF between the lines and none after
-/// the last. Pure functions, usable on any thread.
+/// the last.
+///
+/// Pure functions, usable on any thread.
 enum SelectionFile {
     enum Encoding {
         /// UTF-16 LE with a byte-order mark (`cm_SaveSelectionToFileW`, and the default).
@@ -20,10 +22,11 @@ enum SelectionFile {
         }
     }
 
-    /// The text in Windows-1252, one character at a time. A character outside it is written
-    /// as its base letter where it has one (`ą` as `a`), else as `?`. Foundation's lossy
-    /// conversion of the whole text is not used: for some names (`U+3000 U+0300`) it raises an
-    /// exception that nothing catches.
+    /// The text in Windows-1252, one character at a time.
+    ///
+    /// A character outside it is written as its base letter where it has one (`ą` as `a`), else as
+    /// `?`. Foundation's lossy conversion of the whole text is not used: for some names (`U+3000
+    /// U+0300`) it raises an exception that nothing catches.
     static func windows1252(_ text: String) -> Data {
         var bytes: [UInt8] = []
         bytes.reserveCapacity(text.utf8.count)
@@ -62,9 +65,10 @@ enum SelectionFile {
         return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .windowsCP1252) ?? ""
     }
 
-    /// The names a text lists, one per line, that are among `known`. A line may be a name, a
-    /// folder's name with a trailing `\` or `/`, or a full path, of which the last part counts:
-    /// so the lists of *Copy Names To Clipboard* can be loaded as well.
+    /// The names a text lists, one per line, that are among `known`.
+    ///
+    /// A line may be a name, a folder's name with a trailing `\` or `/`, or a full path, of which
+    /// the last part counts: so the lists of *Copy Names To Clipboard* can be loaded as well.
     static func names(in text: String, among known: Set<String>) -> Set<String> {
         Set(listed(in: text, among: known))
     }
@@ -90,7 +94,9 @@ enum SelectionFile {
 }
 
 /// A name that is equal to another only when it is written with the same bytes (a `String`
-/// treats `é` and `e` + U+0301 as one name). Hashing and comparing go over the UTF-8 in place.
+/// treats `é` and `e` + U+0301 as one name).
+///
+/// Hashing and comparing go over the UTF-8 in place.
 struct NameBytes: Hashable {
     let name: String
 
@@ -119,7 +125,9 @@ struct NameBytes: Hashable {
 }
 
 /// Compare Directories and Mark Newer (spec 09 › Compare directories and Mark newer): which
-/// entries of two lists differ. Works on the lists the panels hold; pure, any thread.
+/// entries of two lists differ.
+///
+/// Works on the lists the panels hold; pure, any thread.
 enum DirectoryComparison {
     enum Mode: Int {
         /// Missing on the other side, newer, or of another size at the same time
@@ -190,12 +198,13 @@ enum DirectoryComparison {
         return marks
     }
 
-    /// `withSubdirectories` also marks folders that the other side does not have. With
-    /// `ignoringOneHour`, times exactly one hour apart count as equal. Times are compared in
+    /// `withSubdirectories` also marks folders that the other side does not have.
+    ///
+    /// With `ignoringOneHour`, times exactly one hour apart count as equal. Times are compared in
     /// whole seconds, since not every file system keeps more. With `foldingCase` (a volume that
     /// does not tell `Photo.JPG` from `photo.jpg`) names are paired without regard to case.
-    /// `cancelled` is looked at every few thousand entries; a cancelled comparison returns
-    /// what it had.
+    /// `cancelled` is looked at every few thousand entries; a cancelled comparison returns what it
+    /// had.
     static func compareIndices(
         left: [FileItem],
         right: [FileItem],

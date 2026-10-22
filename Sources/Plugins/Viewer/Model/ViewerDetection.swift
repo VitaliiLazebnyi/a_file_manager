@@ -1,8 +1,10 @@
 import Foundation
 
 /// What the start of a file says about how to show it (spec 10 › Choosing the mode at
-/// start-up). The specification leaves the heuristics open ("a clone must choose its own");
-/// these are the viewer's. Pure functions on a sample of the file.
+/// start-up).
+///
+/// The specification leaves the heuristics open ("a clone must choose its own"); these are the
+/// viewer's. Pure functions on a sample of the file.
 enum ViewerDetection {
     /// How many bytes from the start of a file are looked at.
     static let sampleSize = 64 * 1_024
@@ -24,11 +26,12 @@ enum ViewerDetection {
         return nil
     }
 
-    /// Tells text from binary data and guesses the encoding of text. In order: a byte-order
-    /// mark; UTF-16 without one (every other byte zero, as Latin text has it); binary data
-    /// (NUL bytes, many control characters); valid UTF-8; and for the rest the choice between
-    /// the Windows and the DOS code page. `isWholeFile` says that the sample is not cut off,
-    /// so a UTF-8 sequence may not end in the middle.
+    /// Tells text from binary data and guesses the encoding of text.
+    ///
+    /// In order: a byte-order mark; UTF-16 without one (every other byte zero, as Latin text has
+    /// it); binary data (NUL bytes, many control characters); valid UTF-8; and for the rest the
+    /// choice between the Windows and the DOS code page. `isWholeFile` says that the sample is not
+    /// cut off, so a UTF-8 sequence may not end in the middle.
     static func guessText(_ sample: Data, isWholeFile: Bool) -> TextGuess {
         if let mark = byteOrderMark(sample) { return TextGuess(encoding: mark.encoding, bomLength: mark.length) }
         let bytes = [UInt8](sample)
@@ -91,9 +94,10 @@ enum ViewerDetection {
     }
 
     /// DOS or Windows code page (spec 10 › Start-up word, "Font at startup = Autodetect").
-    /// Points for DOS: box-drawing bytes next to each other (frames and lines), and bytes
-    /// 0x80–0x9F inside words (DOS has letters there, Windows punctuation or nothing). Points
-    /// for Windows: bytes from 0xC0 up inside words, where Windows has its accented letters.
+    ///
+    /// Points for DOS: box-drawing bytes next to each other (frames and lines), and bytes 0x80–0x9F
+    /// inside words (DOS has letters there, Windows punctuation or nothing). Points for Windows:
+    /// bytes from 0xC0 up inside words, where Windows has its accented letters.
     static func looksLikeDOS(_ bytes: [UInt8]) -> Bool {
         func isLetter(_ byte: UInt8) -> Bool { (0x41...0x5A).contains(byte) || (0x61...0x7A).contains(byte) }
         func isBox(_ byte: UInt8) -> Bool { (0xB0...0xDF).contains(byte) }
@@ -150,9 +154,10 @@ enum ViewerDetection {
             if mediaExtensions.contains(ext) || additionalMedia.contains(ext) { return .media }
         }
         if htmlExtensions.contains(ext) { return .html }
-        let start = String(decoding: sample.prefix(256), as: UTF8.self).lowercased().drop {
-            $0.isWhitespace || $0 == "\u{FEFF}"
-        }
+        let start = String(decoding: sample.prefix(256), as: UTF8.self).lowercased()
+            .drop {
+                $0.isWhitespace || $0 == "\u{FEFF}"
+            }
         if start.hasPrefix("<!doctype html") || start.hasPrefix("<html") { return .html }
         return .other
     }
@@ -160,9 +165,12 @@ enum ViewerDetection {
     /// The extensions in a list such as `*.mkv *.wmv` or `mkv, wmv`.
     static func extensions(in list: String) -> Set<String> {
         Set(
-            list.lowercased().split(whereSeparator: { " ,;|".contains($0) }).map {
-                String($0.drop { "*.".contains($0) })
-            }.filter { !$0.isEmpty })
+            list.lowercased().split(whereSeparator: { " ,;|".contains($0) })
+                .map {
+                    String($0.drop { "*.".contains($0) })
+                }
+                .filter { !$0.isEmpty }
+        )
     }
 
     /// The character set an HTML file names in its head (`<meta charset=…>`, or the
@@ -170,9 +178,10 @@ enum ViewerDetection {
     static func htmlCharset(_ sample: Data) -> ViewerEncoding? {
         let head = String(decoding: sample.prefix(4_096), as: UTF8.self).lowercased()
         guard let range = head.range(of: "charset=") else { return nil }
-        let name = head[range.upperBound...].drop { "\"' ".contains($0) }.prefix {
-            $0.isLetter || $0.isNumber || "-_".contains($0)
-        }
+        let name = head[range.upperBound...].drop { "\"' ".contains($0) }
+            .prefix {
+                $0.isLetter || $0.isNumber || "-_".contains($0)
+            }
         switch name {
         case "utf-8", "utf8": return .utf8
         case "utf-16", "utf-16le": return .utf16LE

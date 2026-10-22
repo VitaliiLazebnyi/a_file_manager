@@ -1,9 +1,10 @@
 import AFMKernel
 import Foundation
 
-/// Counts the names a regular expression of Search & Replace ran out of time on. Shared by the
-/// threads of one preview or run. After a few timeouts the expression is given up: the rest of
-/// the names answer at once (`<Error!>`) instead of costing the budget each.
+/// Counts the names a regular expression of Search & Replace ran out of time on.
+///
+/// Shared by the threads of one preview or run. After a few timeouts the expression is given up:
+/// the rest of the names answer at once (`<Error!>`) instead of costing the budget each.
 ///
 /// Unchecked `Sendable`: `timeouts` is guarded by `lock`.
 final class RenameRegexGuard: @unchecked Sendable {
@@ -30,10 +31,11 @@ final class RenameRegexGuard: @unchecked Sendable {
     }
 }
 
-/// Runs the regular expression the user typed with a bound on its time. Such an expression can
-/// take time that grows with every character of the name (`(a*)*b`), so it is never run with
-/// `matches(in:)` or `firstMatch`: the matching is stopped from the progress block of
-/// `enumerateMatches` once the budget has passed or the work was cancelled.
+/// Runs the regular expression the user typed with a bound on its time.
+///
+/// Such an expression can take time that grows with every character of the name (`(a*)*b`), so it
+/// is never run with `matches(in:)` or `firstMatch`: the matching is stopped from the progress
+/// block of `enumerateMatches` once the budget has passed or the work was cancelled.
 enum RenameRegex {
     /// What one name may take.
     static let budget: TimeInterval = 0.1
@@ -74,9 +76,11 @@ enum RenameRegex {
 }
 
 /// The plain (non-regex) search of Search & Replace: `*` stands for any run of characters and
-/// `?` for one character. Matched by hand in time proportional to the name times the mask, where
-/// a regular expression made of the mask (`*a*a*a*b` as `^.*?a.*?a.*?a.*?b`) can take time that
-/// grows with the power of the number of stars.
+/// `?` for one character.
+///
+/// Matched by hand in time proportional to the name times the mask, where a regular expression made
+/// of the mask (`*a*a*a*b` as `^.*?a.*?a.*?a.*?b`) can take time that grows with the power of the
+/// number of stars.
 ///
 /// A run is as short as possible, except at the end of the text searched for, where it takes
 /// the rest of the name. A `*` at the start anchors the match at the beginning of the name.
@@ -119,8 +123,9 @@ struct WildcardMatcher {
     }
 
     /// The name as it is compared: every character once in the form the search has (folded
-    /// to lower case unless the search respects case), and where the line breaks are. Made
-    /// once per name: folding a character asks the Unicode tables, and asking them again for
+    /// to lower case unless the search respects case), and where the line breaks are.
+    ///
+    /// Made once per name: folding a character asks the Unicode tables, and asking them again for
     /// every place a run was tried at was where the time of a long search went.
     private struct Subject {
         let values: [UInt32]
@@ -199,8 +204,10 @@ struct WildcardMatcher {
         return nil
     }
 
-    /// Where a match that begins at `start` ends. Each run of characters after a `*` is looked
-    /// for at its first place: if the rest cannot be found after that, it cannot after any later one.
+    /// Where a match that begins at `start` ends.
+    ///
+    /// Each run of characters after a `*` is looked for at its first place: if the rest cannot be
+    /// found after that, it cannot after any later one.
     private func match(_ subject: Subject, at start: Int, goesOn: () -> Bool) -> Int? {
         var position = start
         var index = 0

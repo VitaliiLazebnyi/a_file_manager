@@ -1,8 +1,9 @@
 import Foundation
 
 /// Follows a command line the way a shell reads it, far enough to say where a value may stand
-/// and how a reference to it must be written there. It reads only what the user wrote: values
-/// are announced with `feedValue()` and never looked at.
+/// and how a reference to it must be written there.
+///
+/// It reads only what the user wrote: values are announced with `feedValue()` and never looked at.
 ///
 /// It knows single and double quotes, `$'…'`, backslashes, backticks, `$(…)`, `$((…))`,
 /// `${…}`, comments and the `<<` of a here-document. Where it cannot be sure of the place
@@ -83,7 +84,9 @@ struct ShellContext {
     /// compares numbers (`-eq`, `-lt` …).
     private var test: (hasValue: Bool, comparesNumbers: Bool)?
     /// A test held a value and compared numbers: the shell works such operands out as
-    /// arithmetic. The whole line is then refused, wherever the value stood in the test.
+    /// arithmetic.
+    ///
+    /// The whole line is then refused, wherever the value stood in the test.
     private(set) var hasArithmeticTest = false
 
     /// Whether what is written next begins a word of the line (also right after the user's
@@ -113,7 +116,9 @@ struct ShellContext {
         }
     }
 
-    /// A value stands here. Returns its place, or why it cannot stand here.
+    /// A value stands here.
+    ///
+    /// Returns its place, or why it cannot stand here.
     @discardableResult
     mutating func feedValue() -> Result<Place, Refusal> {
         let result = check()
@@ -147,8 +152,10 @@ struct ShellContext {
         keyword = nil
     }
 
-    /// The end of a word of the commands. A `case` inside `$(…)` has patterns that end in a
-    /// `)` of their own, which cannot be told from the end of the `$(…)`.
+    /// The end of a word of the commands.
+    ///
+    /// A `case` inside `$(…)` has patterns that end in a `)` of their own, which cannot be told
+    /// from the end of the `$(…)`.
     private mutating func endWord() {
         switch keyword {
         case "case" where frames.count > 1: poisoned = .caseInSubstitution
@@ -420,7 +427,7 @@ struct ShellScript: Equatable {
         return names + "\n" + line
     }
 
-    /// The arguments for a shell after its options: `-c`'s script, a name, and the values.
+    /// The arguments for a shell after its options: the script for `-c`, a name, and the values.
     var arguments: [String] { [text, "afm"] + values }
 }
 
@@ -442,8 +449,10 @@ enum ShellLine {
         }
     }
 
-    /// The line for a shell. No value becomes part of its text: each is passed as data and
-    /// referred to where its placeholder stood. Fails where a reference cannot be written safely.
+    /// The line for a shell.
+    ///
+    /// No value becomes part of its text: each is passed as data and referred to where its
+    /// placeholder stood. Fails where a reference cannot be written safely.
     static func script(_ pieces: [ExpandedPiece]) -> Result<ShellScript, ShellContext.Refusal> {
         var lexer = ShellContext()
         var line = ""
@@ -470,6 +479,7 @@ enum ShellLine {
     }
 
     /// The line as one readable text, the values written into it and quoted where they stand.
+    ///
     /// For showing, for commands of the program and for `cd`: never for a shell.
     static func display(_ pieces: [ExpandedPiece]) -> String {
         var lexer = ShellContext()
@@ -519,8 +529,9 @@ enum ShellLine {
 
     /// What the user is shown when the parameters begin with `?`: the line with harmless
     /// values written out, and every other value as the reference a shell is given, which is
-    /// explained in `legend`. The user may change the line; `pieces(fromPrompt:values:)` reads
-    /// it back.
+    /// explained in `legend`.
+    ///
+    /// The user may change the line; `pieces(fromPrompt:values:)` reads it back.
     static func prompt(_ pieces: [ExpandedPiece]) -> (text: String, values: [String], legend: String) {
         var lexer = ShellContext()
         var line = ""

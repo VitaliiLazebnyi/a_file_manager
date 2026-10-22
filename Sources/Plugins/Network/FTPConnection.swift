@@ -53,9 +53,10 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
 
     func decode(_ data: Data) -> String { decodeTelling(data).text }
 
-    /// The text of bytes from the server, and the encoding that read them. In the automatic
-    /// mode bytes that are not UTF-8 are read as Western Latin 1; `NameMemory` keeps that, so
-    /// the name goes back to the server as the bytes it came as.
+    /// The text of bytes from the server, and the encoding that read them.
+    ///
+    /// In the automatic mode bytes that are not UTF-8 are read as Western Latin 1; `NameMemory`
+    /// keeps that, so the name goes back to the server as the bytes it came as.
     func decodeTelling(_ data: Data) -> (text: String, encoding: String.Encoding) {
         if let encoding {
             guard let text = String(data: data, encoding: encoding) else {
@@ -70,10 +71,11 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
         return (text, .utf8)
     }
 
-    /// The bytes of a command. Names are sent the way the Mac writes them when composed
-    /// (servers compare bytes), except the names the server itself spelled differently, which
-    /// `names` remembers. A character the encoding does not have is an error: written as `?`
-    /// it would name another file.
+    /// The bytes of a command.
+    ///
+    /// Names are sent the way the Mac writes them when composed (servers compare bytes), except the
+    /// names the server itself spelled differently, which `names` remembers. A character the
+    /// encoding does not have is an error: written as `?` it would name another file.
     func encode(_ text: String, names: NameMemory? = nil) throws -> Data {
         func bytes(_ piece: String, as encoding: String.Encoding) throws -> Data {
             guard let data = piece.data(using: encoding, allowLossyConversion: false) else {
@@ -104,9 +106,10 @@ public enum NameEncoding: Int, Codable, CaseIterable, Sendable {
 /// The names of a server that would not reach it again as the bytes they came as, were they
 /// written the usual way (composed, in the encoding of the connection): names in decomposed
 /// form on a server that compares bytes, and names in another encoding than the one in use.
-/// Each is kept, by its exact spelling, with the encoding that read it; a command that names
-/// it writes it back unchanged in that encoding. Shared by the connections of a session.
-/// Safe from any thread: all state is guarded by `lock`.
+///
+/// Each is kept, by its exact spelling, with the encoding that read it; a command that names it
+/// writes it back unchanged in that encoding. Shared by the connections of a session. Safe from any
+/// thread: all state is guarded by `lock`.
 final class NameMemory: @unchecked Sendable {
     private let lock = NSLock()
     private var spellings: [Data: String.Encoding] = [:]
@@ -151,7 +154,9 @@ public struct FTPServerConfig: Sendable {
     public var tls: TLSMode
     public var user: String
     public var password: String
-    /// Passive: this program opens the data connections. Otherwise the server connects back.
+    /// Passive: this program opens the data connections.
+    ///
+    /// Otherwise the server connects back.
     public var passive: Bool
     public var encoding: NameEncoding
     /// Seconds to wait for an answer or for data.
@@ -197,9 +202,10 @@ public struct FTPServerConfig: Sendable {
     }
 }
 
-/// What is known of the links of one server: whether each leads to a directory, by path. Shared
-/// by the connections of a session, so that what one found, in the background or while listing,
-/// spares the others the question. Safe from any thread: all state is guarded by `lock`.
+/// What is known of the links of one server: whether each leads to a directory, by path.
+///
+/// Shared by the connections of a session, so that what one found, in the background or while
+/// listing, spares the others the question. Safe from any thread: all state is guarded by `lock`.
 final class LinkMemory: @unchecked Sendable {
     private let lock = NSLock()
     private var kinds: [String: Bool] = [:]
@@ -261,8 +267,10 @@ final class FTPConnection: @unchecked Sendable {
     private var data: NetStream?
     private var isBroken = false
     /// True from the moment a command was written until its reply has been read (a 421 means
-    /// the server did nothing). When a connection fails in between, nobody knows whether the
-    /// command took effect, so a command that must not run twice is not repeated.
+    /// the server did nothing).
+    ///
+    /// When a connection fails in between, nobody knows whether the command took effect, so a
+    /// command that must not run twice is not repeated.
     private(set) var commandMayHaveRun = false
     /// Guards the two stream references against `interrupt`, the one call from another thread.
     private let streamsLock = NSLock()
@@ -300,9 +308,10 @@ final class FTPConnection: @unchecked Sendable {
 
     // MARK: Login
 
-    /// Connects and logs in (spec 11 › Login sequence). Throws `untrustedCertificate` when the
-    /// server's certificate needs the user's consent, and `loginFailed` when the user name or
-    /// password is not accepted.
+    /// Connects and logs in (spec 11 › Login sequence).
+    ///
+    /// Throws `untrustedCertificate` when the server's certificate needs the user's consent, and
+    /// `loginFailed` when the user name or password is not accepted.
     func connect(cancellation: CancellationFlag? = nil) throws {
         // The certificates the user accepted for good are fetched here, on the connecting thread.
         if config.tls != .none { trust.prepare() }
@@ -424,8 +433,10 @@ final class FTPConnection: @unchecked Sendable {
         return control
     }
 
-    /// Reads one reply. The time limit is for the whole reply, not for each of its lines, and a
-    /// reply has a largest size (`FTPLimits`): a server that never finishes one is given up.
+    /// Reads one reply.
+    ///
+    /// The time limit is for the whole reply, not for each of its lines, and a reply has a largest
+    /// size (`FTPLimits`): a server that never finishes one is given up.
     private func readReply(timeout: TimeInterval? = nil, cancellation: CancellationFlag?) throws -> FTPReply {
         let control = try stream()
         let deadline = Date().addingTimeInterval(timeout ?? config.timeout)
@@ -496,8 +507,9 @@ final class FTPConnection: @unchecked Sendable {
         return reply
     }
 
-    /// Checks that the server still answers. A connection that a router dropped silently
-    /// does not answer at all, so the wait is short.
+    /// Checks that the server still answers.
+    ///
+    /// A connection that a router dropped silently does not answer at all, so the wait is short.
     func isAlive(cancellation: CancellationFlag? = nil) -> Bool {
         guard isUsable else { return false }
         return (try? send("NOOP", replyWithin: min(config.timeout, 5), cancellation: cancellation))?.isSuccess ?? false
@@ -645,8 +657,9 @@ final class FTPConnection: @unchecked Sendable {
         }
     }
 
-    /// Starts a transfer: `RETR`, `STOR`, `LIST` and the like. The returned stream carries the
-    /// data; `finishTransfer` or `abortTransfer` must follow.
+    /// Starts a transfer: `RETR`, `STOR`, `LIST` and the like.
+    ///
+    /// The returned stream carries the data; `finishTransfer` or `abortTransfer` must follow.
     func beginTransfer(
         _ command: String,
         type: Character,
@@ -754,8 +767,10 @@ final class FTPConnection: @unchecked Sendable {
         isBroken = true
     }
 
-    /// Ends a transfer early. The server answers the broken data connection with one reply
-    /// (426 or 226); when it does not, the connection is not used again.
+    /// Ends a transfer early.
+    ///
+    /// The server answers the broken data connection with one reply (426 or 226); when it does not,
+    /// the connection is not used again.
     func abortTransfer() {
         guard let channel = data else { return }
         channel.close()

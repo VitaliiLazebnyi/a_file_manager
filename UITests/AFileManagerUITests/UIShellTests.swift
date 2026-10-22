@@ -1,8 +1,9 @@
 import XCTest
 
 /// The window shell's own ways to the user: its alerts, the volume list, the path bar's menu and
-/// the refused command. Every alert is answered so that nothing changes; the clipboard is put
-/// back.
+/// the refused command.
+///
+/// Every alert is answered so that nothing changes; the clipboard is put back.
 @MainActor
 internal final class UIShellTests: XCTestCase {
     /// The program of the running test, once started.

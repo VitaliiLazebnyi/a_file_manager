@@ -2,7 +2,9 @@ import XCTest
 
 /// The windows of Compare By Content and Synchronize Directories and their ways to the system:
 /// the file and folder panels as sheets, the font panel, the beep at the last difference, the
-/// menu of the saved comparisons. Everything is cancelled or closed; nothing is synchronized.
+/// menu of the saved comparisons.
+///
+/// Everything is cancelled or closed; nothing is synchronized.
 @MainActor
 internal final class UICompareSyncTests: XCTestCase {
     /// The program of the running test, once started.

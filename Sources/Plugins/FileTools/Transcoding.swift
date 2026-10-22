@@ -1,8 +1,9 @@
 import AFMKernel
 import Foundation
 
-/// The formats of Encode File (spec 08 › Encode). The raw values are those of the spec's
-/// `EncodeMethod` setting.
+/// The formats of Encode File (spec 08 › Encode).
+///
+/// The raw values are those of the spec's `EncodeMethod` setting.
 enum EncodeMethod: Int, CaseIterable {
     case mime = 0
     case uue, xxe
@@ -128,6 +129,7 @@ enum Encoder {
     }
 
     /// How many lines go into one file: the smaller of the two limits, 0 for no limit.
+    ///
     /// "Bytes per file" counts the encoded text without the header.
     static func linesPerFile(lines: Int, bytes: Int64, method: EncodeMethod) -> Int {
         let fromBytes = bytes > 0 ? max(1, Int(min(bytes / Int64(method.lineLength), Int64(Int32.max)))) : 0
@@ -278,7 +280,9 @@ protocol DecodeSink: AnyObject {
 
 /// Reads encoded text line by line and recognises by itself what it is (spec 08 › Decode):
 /// MIME/Base64 with or without mail headers, UUEncode (also `begin-base64`), XXEncode and
-/// yEnc. The lines of several part files are fed one after the other.
+/// yEnc.
+///
+/// The lines of several part files are fed one after the other.
 ///
 /// Whatever the encoded text itself lets one check is checked: the end marks, the size and
 /// `sum -r` of UUEncode, the size and CRC32 of yEnc, the padding of Base64. What does not
@@ -345,10 +349,12 @@ final class DecodeMachine {
         return true
     }
 
-    /// Whether the next numbered file can belong to what is being decoded. A structured format
-    /// (UUEncode, XXEncode, yEnc, `begin-base64`) goes on until its end mark. Plain Base64 has no
-    /// end mark: it goes on only where the text breaks off inside a group of four, or on a full
-    /// line (the parts the encoder writes break off after full lines); otherwise it ended.
+    /// Whether the next numbered file can belong to what is being decoded.
+    ///
+    /// A structured format (UUEncode, XXEncode, yEnc, `begin-base64`) goes on until its end mark.
+    /// Plain Base64 has no end mark: it goes on only where the text breaks off inside a group of
+    /// four, or on a full line (the parts the encoder writes break off after full lines); otherwise
+    /// it ended.
     var needsMoreParts: Bool {
         switch state {
         case .searching, .mimeHeaders: return false
@@ -492,7 +498,7 @@ final class DecodeMachine {
             .map(String.init)
     }
 
-    /// `sum -r/size 12345/450`
+    /// `sum -r/size 12345/450`.
     private func trailer(_ line: ArraySlice<UInt8>) -> (sum: UInt32, size: Int64)? {
         let prefix = Array("sum -r/size ".utf8)
         guard line.starts(with: prefix) else { return nil }
@@ -520,6 +526,7 @@ final class DecodeMachine {
     }
 
     /// Looks at the line after `end`: the `sum -r/size` line that checks the file, if there is one.
+    ///
     /// Returns true when the line was that one.
     private func resolveTrailer(with line: ArraySlice<UInt8>) -> Bool {
         guard let pending = awaitingTrailer, !line.isEmpty else { return false }
@@ -731,8 +738,10 @@ final class DecodeMachine {
 
 /// Decode File (spec 08 › Decode).
 enum Decoder {
-    /// Cuts blocks of a file into lines. A line longer than this is handed on in pieces (the
-    /// output of `base64` is one line as long as the file).
+    /// Cuts blocks of a file into lines.
+    ///
+    /// A line longer than this is handed on in pieces (the output of `base64` is one line as long
+    /// as the file).
     private struct LineCutter {
         static let longestLine = 1 << 16
         private var pending: [UInt8] = []
@@ -812,8 +821,10 @@ enum Decoder {
     }
 
     /// The name from the encoded data as a file name: without a path, and with the characters
-    /// a name cannot have replaced by `_`. The path is cut on the code points (a `/` followed by a
-    /// combining mark is one character to Swift, but a slash to the file system).
+    /// a name cannot have replaced by `_`.
+    ///
+    /// The path is cut on the code points (a `/` followed by a combining mark is one character to
+    /// Swift, but a slash to the file system).
     static func safeName(_ name: String?, replacingColon: Bool = true) -> String? {
         guard let scalars = name?.unicodeScalars else { return nil }
         let last = scalars.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last
@@ -829,8 +840,9 @@ enum Decoder {
         return name
     }
 
-    /// The longest start of `name` that takes at most 255 bytes, cut at a code point. Called
-    /// for names longer than that, so it is never empty, `.` or `..`.
+    /// The longest start of `name` that takes at most 255 bytes, cut at a code point.
+    ///
+    /// Called for names longer than that, so it is never empty, `.` or `..`.
     private static func trimmedToLimit(_ name: String) -> String {
         var scalars = String.UnicodeScalarView()
         var bytes = 0
@@ -873,7 +885,9 @@ enum Decoder {
     }
 
     /// Decodes the file and, while a file inside it is unfinished, the parts that follow it by
-    /// their counter (`file001.uue`, `file002.uue`, …). Returns the files written.
+    /// their counter (`file001.uue`, `file002.uue`, …).
+    ///
+    /// Returns the files written.
     @discardableResult
     static func decode(_ first: FileItem, into directory: URL, autoRename: Bool = false, run: ToolRun) throws -> [URL] {
         try decodeChecked(first, into: directory, autoRename: autoRename, run: run).files

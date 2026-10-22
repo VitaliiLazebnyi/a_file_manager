@@ -11,7 +11,7 @@ struct TitleCaseRule: Equatable {
     /// A `!` at the end of the label: the last word may stay in lower case too.
     let allowsLowercaseLastWord: Bool
 
-    /// `<description>:<word list>`
+    /// `<description>:<word list>`.
     init(setting: String) {
         // Without a label the whole setting is the word list.
         let colon = setting.firstIndex(of: ":")
@@ -45,8 +45,9 @@ enum LetterCase: Int, Codable, CaseIterable {
         }
     }
 
-    /// The characters after which a new word starts, besides white space. A dot is not among
-    /// them, so an extension stays in lower case.
+    /// The characters after which a new word starts, besides white space.
+    ///
+    /// A dot is not among them, so an extension stays in lower case.
     private static let wordBreaks: Set<Character> = ["/", "\\", "-", "_", "(", "[", "{", ",", ";", "+", "&"]
 
     func apply(to text: String, rule: TitleCaseRule = .standard) -> String {
@@ -118,7 +119,9 @@ struct RenameSettings: Codable, Equatable {
 }
 
 /// Search & Replace of the Multi-Rename Tool (spec 18 › Search & Replace in the Multi-Rename
-/// Tool). Compiled once per preview and then used from several threads.
+/// Tool).
+///
+/// Compiled once per preview and then used from several threads.
 ///
 /// A regular expression the user typed is run with a bound on its time and ends when the work
 /// is cancelled (`RenameRegex`); the plain search with `*` and `?` is matched by hand
@@ -274,12 +277,13 @@ struct SearchReplace {
     }
 
     /// The regular expression that means what the plain search means: `*` stands for any run
-    /// of characters and `?` for one. A run is as short as possible, except at the end of the
-    /// text searched for, where it takes the rest of the name. A `*` in front starts at the
-    /// beginning of the name: `*x` is everything up to and including the first x, once.
-    /// **Not used for matching**: made of many stars it takes time that grows with the power of
-    /// their number; `WildcardMatcher` finds the same matches by hand. This is its definition,
-    /// which the tests compare it with.
+    /// of characters and `?` for one.
+    ///
+    /// A run is as short as possible, except at the end of the text searched for, where it takes
+    /// the rest of the name. A `*` in front starts at the beginning of the name: `*x` is everything
+    /// up to and including the first x, once. **Not used for matching**: made of many stars it
+    /// takes time that grows with the power of their number; `WildcardMatcher` finds the same
+    /// matches by hand. This is its definition, which the tests compare it with.
     static func wildcardPattern(_ search: String) -> String {
         let characters = Array(search)
         return characters.enumerated()
@@ -295,6 +299,7 @@ struct SearchReplace {
 
     /// Turns the spec's dialect (18 › Regular expressions, the TRegExpr library) into the
     /// system's: named groups are written differently, the greedy switch does not exist.
+    ///
     /// Subroutine calls `(?1)` and recursion `(?R)` have no counterpart; such an expression is
     /// reported as invalid.
     static func systemPattern(_ pattern: String) -> String {
@@ -359,8 +364,9 @@ struct SearchReplace {
 }
 
 /// The whole rename pipeline for one set of settings (spec 09 › Rename pipeline): masks, then
-/// Search & Replace, then the case conversion. Built once, on any thread; `newName` may then
-/// be called from several threads at once.
+/// Search & Replace, then the case conversion.
+///
+/// Built once, on any thread; `newName` may then be called from several threads at once.
 struct RenameEngine {
     /// The text the preview shows where a name could not be made.
     static let errorText = "<Error!>"
@@ -399,8 +405,10 @@ struct RenameEngine {
         searchReplace?.timedOut == true ? SearchReplace.Problem.tooSlow(settings.search) : nil
     }
 
-    /// The new name of the item at `index` of the list. With `given`, that name (loaded from
-    /// a file or typed by the user) takes the place of the masks' result. Nil is `<Error!>`.
+    /// The new name of the item at `index` of the list.
+    ///
+    /// With `given`, that name (loaded from a file or typed by the user) takes the place of the
+    /// masks' result. Nil is `<Error!>`.
     func newName(for subject: RenameSubject, index: Int, given: String? = nil) -> String? {
         guard let searchReplace else { return nil }
         var name: String
@@ -453,8 +461,9 @@ struct RenameEngine {
         return name
     }
 
-    /// Why a name cannot be given to a file; nil when it can. A slash inside the name is
-    /// fine: it moves the item into that folder.
+    /// Why a name cannot be given to a file; nil when it can.
+    ///
+    /// A slash inside the name is fine: it moves the item into that folder.
     static func invalidity(of name: String) -> String? {
         if name.isEmpty { return "The name is empty." }
         // Cut at the `/` byte, not at the character: a combining mark after a slash makes one

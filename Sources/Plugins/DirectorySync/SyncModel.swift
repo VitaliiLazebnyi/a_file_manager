@@ -3,8 +3,9 @@ public import AFMKernel
 public import Foundation
 
 /// The wildcard field of Synchronize directories (spec 09 › Filter, 18 › File masks): masks
-/// separated by spaces or semicolons, masks to leave out after `|`. An excluded mask that ends
-/// in `/` names folders: such folders are not entered at all.
+/// separated by spaces or semicolons, masks to leave out after `|`.
+///
+/// An excluded mask that ends in `/` names folders: such folders are not entered at all.
 public struct SyncMask: Sendable {
     private let include: FileMask?
     private let exclude: FileMask?
@@ -103,7 +104,9 @@ public enum SyncAction: Equatable, Sendable {
 /// on the right, or on both sides.
 public struct SyncRow: Equatable, Sendable {
     /// The folder of the row relative to the start directories, with a trailing slash; empty
-    /// for the start directories themselves. This is the caption of the row's group.
+    /// for the start directories themselves.
+    ///
+    /// This is the caption of the row's group.
     public let directory: String
     public let name: String
     public let isDirectory: Bool
@@ -139,9 +142,10 @@ public struct SyncRow: Equatable, Sendable {
         action = defaultAction
     }
 
-    /// The default direction of a state (spec 09 › Comparison algorithm). In asymmetric mode
-    /// nothing is ever proposed towards the left: what is only on the right is deleted there,
-    /// and a file that is newer on the right is left for the user to decide.
+    /// The default direction of a state (spec 09 › Comparison algorithm).
+    ///
+    /// In asymmetric mode nothing is ever proposed towards the left: what is only on the right is
+    /// deleted there, and a file that is newer on the right is left for the user to decide.
     public static func proposal(for state: SyncState, asymmetric: Bool) -> SyncAction {
         switch state {
         case .leftOnly, .leftNewer: return .copyToRight
@@ -218,7 +222,9 @@ public struct SyncShow: OptionSet, Codable, Equatable, Sendable {
     }
 }
 
-/// The footer after a comparison (spec 09 › Status line). Directories are not counted.
+/// The footer after a comparison (spec 09 › Status line).
+///
+/// Directories are not counted.
 public struct SyncSummary: Equatable, Sendable {
     public var files = 0, identical = 0, different = 0, uniqueLeft = 0, uniqueRight = 0
 

@@ -45,8 +45,10 @@ import Testing
             )
     }
 
-    /// Lets the main thread run until `done`. Only a hang ends the wait without it: on a busy
-    /// machine other tests may hold the main thread for a long time, so no shorter limit is set.
+    /// Lets the main thread run until `done`.
+    ///
+    /// Only a hang ends the wait without it: on a busy machine other tests may hold the main thread
+    /// for a long time, so no shorter limit is set.
     func wait(until done: () -> Bool) async {
         #expect(await RunLoopWait.until(done))
     }
@@ -272,8 +274,10 @@ import Testing
         )
     }
 
-    /// Lets the main thread run until `done`. Only a hang ends the wait without it: on a busy
-    /// machine other tests may hold the main thread for a long time, so no shorter limit is set.
+    /// Lets the main thread run until `done`.
+    ///
+    /// Only a hang ends the wait without it: on a busy machine other tests may hold the main thread
+    /// for a long time, so no shorter limit is set.
     func wait(until done: () -> Bool) async {
         #expect(await RunLoopWait.until(done))
     }

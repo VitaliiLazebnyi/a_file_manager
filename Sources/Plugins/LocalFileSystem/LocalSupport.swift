@@ -3,8 +3,10 @@ import Foundation
 
 /// Lets another thread end a system call this thread is blocked in (an `open`, `read` or
 /// `write` on a share that has stopped answering), by a signal that does nothing except
-/// interrupt the call. Used by the local readers and writers for `interrupt()`, and by the
-/// opening calls for the `CancellationFlag` they are given.
+/// interrupt the call.
+///
+/// Used by the local readers and writers for `interrupt()`, and by the opening calls for the
+/// `CancellationFlag` they are given.
 ///
 /// The signal is only ever sent to a thread that has announced, with `begin()`, that it is
 /// inside one call; a signal that comes a moment too early is sent again until the call is
@@ -14,7 +16,9 @@ final class Interruption: @unchecked Sendable {
     internal typealias Schedule = @Sendable (_ delay: TimeInterval, _ work: @escaping @Sendable () -> Void) -> Void
 
     /// A handler that does nothing, installed without `SA_RESTART`: the call it interrupts
-    /// returns `EINTR` instead of carrying on. (Installing a handler for a valid signal does not fail.)
+    /// returns `EINTR` instead of carrying on.
+    ///
+    /// (Installing a handler for a valid signal does not fail.).
     private static let installed: Void = {
         var action = sigaction()
         action.__sigaction_u.__sa_handler = { _ in }
@@ -45,8 +49,9 @@ final class Interruption: @unchecked Sendable {
         self.schedule = schedule
     }
 
-    /// The calling thread is about to make a call that may wait. False when `interrupt` was
-    /// called already: the call is not to be made.
+    /// The calling thread is about to make a call that may wait.
+    ///
+    /// False when `interrupt` was called already: the call is not to be made.
     func begin() -> Bool {
         Self.installed
         // Some threads (those of Swift's concurrency pool) have it blocked, and then it would not arrive.
@@ -89,8 +94,10 @@ final class Interruption: @unchecked Sendable {
     }
 
     /// Runs `call` (one system call, returning a negative number and setting `errno` on
-    /// failure), again after an `EINTR` that nobody asked for. Throws `userCancelled` once
-    /// interrupted. Returns the result, or a negative number with `errno` set.
+    /// failure), again after an `EINTR` that nobody asked for.
+    ///
+    /// Throws `userCancelled` once interrupted. Returns the result, or a negative number with
+    /// `errno` set.
     func run(_ call: () -> Int) throws -> Int {
         var (result, code): (Int, Int32)
         repeat {
@@ -105,17 +112,20 @@ final class Interruption: @unchecked Sendable {
     }
 }
 
-/// The mounted file systems, as the kernel lists them. Reading the list never touches a
-/// mounted disk (`MNT_NOWAIT`), so it is safe to ask on any thread about a path on a share
-/// that has stopped answering. Kept for a moment and then read again. All state is guarded
-/// by `lock`.
+/// The mounted file systems, as the kernel lists them.
+///
+/// Reading the list never touches a mounted disk (`MNT_NOWAIT`), so it is safe to ask on any thread
+/// about a path on a share that has stopped answering. Kept for a moment and then read again. All
+/// state is guarded by `lock`.
 final class MountTable: @unchecked Sendable {
     static let shared = MountTable()
 
     struct Mount {
         let path: String
-        /// A disk of this Mac. False for shares, and for automounted paths, which look local
-        /// and fetch their contents from a server on first use.
+        /// A disk of this Mac.
+        ///
+        /// False for shares, and for automounted paths, which look local and fetch their contents
+        /// from a server on first use.
         let isLocal: Bool
     }
 
@@ -182,10 +192,12 @@ struct LinkTarget {
 }
 
 /// Finds out where links lead without letting a link into a share that does not answer hold
-/// up a listing. A target on a disk of this Mac is asked for at once; one anywhere else is
-/// asked for on a thread of its own and waited for for a moment only. A few such questions
-/// may be stuck for good (each holds a thread until the share answers); past that limit links
-/// into places that are not local are no longer followed. All state is guarded by `lock`.
+/// up a listing.
+///
+/// A target on a disk of this Mac is asked for at once; one anywhere else is asked for on a thread
+/// of its own and waited for for a moment only. A few such questions may be stuck for good (each
+/// holds a thread until the share answers); past that limit links into places that are not local
+/// are no longer followed. All state is guarded by `lock`.
 final class LinkResolver: @unchecked Sendable {
     static let shared = LinkResolver()
 
@@ -258,7 +270,9 @@ final class LinkResolver: @unchecked Sendable {
     }
 
     /// Where the link says it points, as an absolute path, worked out from the text of the
-    /// link alone (the target is not looked at). Nil when the link cannot be read.
+    /// link alone (the target is not looked at).
+    ///
+    /// Nil when the link cannot be read.
     private static func absoluteTarget(of path: String) -> String? {
         let text: String? = withUnsafeTemporaryAllocation(of: CChar.self, capacity: Int(PATH_MAX) + 1) { buffer in
             let length = readlink(path, buffer.baseAddress, Int(PATH_MAX))
@@ -291,7 +305,9 @@ final class LinkResolver: @unchecked Sendable {
 extension LocalFileSystem {
     /// Runs `body` with the materialising of files that are only on a server (iCloud Drive,
     /// File Provider) switched off for this thread: a walk that measures a tree must not
-    /// make the system download it. A folder that is not there yet then counts as nothing.
+    /// make the system download it.
+    ///
+    /// A folder that is not there yet then counts as nothing.
     static func withoutMaterializing<T>(_ body: () -> T) -> T {
         // IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES = 3, IOPOL_MATERIALIZE_DATALESS_FILES_OFF = 1, _DEFAULT = 0
         let kind: Int32 = 3
@@ -305,8 +321,9 @@ extension LocalFileSystem {
 }
 
 /// Stand-ins for what the system says about a volume, so that tests can put a volume that
-/// has stopped answering, or a disk of a known size, in the place of a real one. Set before
-/// the file system is used, never afterwards; nil everywhere in the program itself.
+/// has stopped answering, or a disk of a known size, in the place of a real one.
+///
+/// Set before the file system is used, never afterwards; nil everywhere in the program itself.
 struct LocalProbes {
     /// Called with a path just before the system is asked about it in a way that can wait on
     /// the volume: a test blocks here for the paths of its "dead" volume.
@@ -326,8 +343,9 @@ struct LocalProbes {
     /// How long a reading of the places may take before it is given up, in seconds.
     internal var placesPatience: TimeInterval = 8
     /// Called with every step the system reports while it copies a file (what it copies, and
-    /// the stage); true stops the copy there, as the caller's flag would. A test cannot choose the
-    /// moment at which a flag it sets is seen.
+    /// the stage); true stops the copy there, as the caller's flag would.
+    ///
+    /// A test cannot choose the moment at which a flag it sets is seen.
     internal var copyStops: (@Sendable (_ what: Int32, _ stage: Int32) -> Bool)?
     /// The home folder whose places are listed; nil is the user's.
     internal var home: URL?
@@ -349,10 +367,11 @@ struct LocalProbes {
 }
 
 /// One call of the file system that changes something, and the system calls it is made of.
+///
 /// Each system call that may wait on the volume goes through `run`: it can then be ended by
-/// `interruption` (from another thread, when the caller's flag is set), and none is begun
-/// once that has happened. What must be done whatever happens (putting a lock back) is
-/// called directly instead.
+/// `interruption` (from another thread, when the caller's flag is set), and none is begun once that
+/// has happened. What must be done whatever happens (putting a lock back) is called directly
+/// instead.
 final class LocalCall: Sendable {
     let interruption = Interruption()
     private let willAsk: (@Sendable (String) -> Void)?
@@ -362,8 +381,9 @@ final class LocalCall: Sendable {
     }
 
     /// Runs one system call on `path` that returns a negative number and sets `errno` on
-    /// failure. Returns its result, with `errno` set on failure; throws `userCancelled` once
-    /// interrupted.
+    /// failure.
+    ///
+    /// Returns its result, with `errno` set on failure; throws `userCancelled` once interrupted.
     func run(_ path: String, _ call: () -> Int32) throws -> Int32 {
         willAsk?(path)
         return Int32(try interruption.run { Int(call()) })
@@ -417,6 +437,7 @@ final class RemoteChanges: @unchecked Sendable {
     }
 
     /// Where the call's thread leaves its result, and learns that nobody waits for it.
+    ///
     /// All state is guarded by `lock`.
     private final class Outcome<Value: Sendable>: @unchecked Sendable {
         let lock = NSLock()
@@ -485,7 +506,9 @@ final class RemoteChanges: @unchecked Sendable {
     }
 }
 
-/// A value that several threads share, behind a lock. All state is guarded by `lock`.
+/// A value that several threads share, behind a lock.
+///
+/// All state is guarded by `lock`.
 final class Locked<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Value
@@ -502,9 +525,11 @@ final class Locked<Value: Sendable>: @unchecked Sendable {
 
 /// The local file system's own clock: what has to happen "a moment later" whatever else the
 /// program is doing (the second signal to a call that is to be ended, giving up on a
-/// question nobody answers). Not the system's shared queues: when all their threads are
-/// taken by work that waits, nothing put on them runs, and these are the steps that free
-/// such threads. Nothing on this queue ever waits for anything.
+/// question nobody answers).
+///
+/// Not the system's shared queues: when all their threads are taken by work that waits, nothing put
+/// on them runs, and these are the steps that free such threads. Nothing on this queue ever waits
+/// for anything.
 enum LocalClock {
     static let queue = DispatchQueue(label: "AFM.LocalFileSystem.clock", qos: .userInitiated)
 }

@@ -2,8 +2,10 @@ import AFMKernel
 import AppKit
 
 /// The four tabs of the Find Files window (spec 09 › General tab, Advanced tab, Plugins tab,
-/// Load/Save tab). It only holds controls: `settings` reads them out as a `SearchSettings`
-/// and writes one back, and that is all the rest of the window knows of them. Main thread only.
+/// Load/Save tab).
+///
+/// It only holds controls: `settings` reads them out as a `SearchSettings` and writes one back, and
+/// that is all the rest of the window knows of them. Main thread only.
 @MainActor
 final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     let tabView = NSTabView()
@@ -11,7 +13,9 @@ final class SearchForm: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     /// Enter in one of the text fields.
     var onSubmit: (() -> Void)?
     /// Shows an open panel as a sheet of the window and hands on the button and the locations
-    /// chosen. The program shows the real panel; a test answers in its place.
+    /// chosen.
+    ///
+    /// The program shows the real panel; a test answers in its place.
     var presentOpenPanel: (NSOpenPanel, NSWindow, @escaping (NSApplication.ModalResponse, [URL]) -> Void) -> Void = {
         panel,
         window,

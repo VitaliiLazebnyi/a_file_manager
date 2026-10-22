@@ -2,7 +2,9 @@ import AFMKernel
 import AppKit
 
 /// A number that can be read on any thread: the newest request, so the work of an overtaken one
-/// can be skipped by the queue it waits in. Guarded by `lock`.
+/// can be skipped by the queue it waits in.
+///
+/// Guarded by `lock`.
 private final class LatestNumber: @unchecked Sendable {
     private let lock = NSLock()
     private var number = 0
@@ -22,8 +24,10 @@ private final class LatestNumber: @unchecked Sendable {
 }
 
 /// Brings the progress of an index that is built on other threads to the main thread, at most one
-/// at a time and not more often than every 50 ms. The threads that build hold this object and not
-/// the view, so the view is never released by one of them (it would be taken apart on that thread).
+/// at a time and not more often than every 50 ms.
+///
+/// The threads that build hold this object and not the view, so the view is never released by one
+/// of them (it would be taken apart on that thread).
 ///
 /// `scheduled` and `last` are guarded by `lock`; `handler` belongs to the main thread.
 private final class ProgressCoalescer: @unchecked Sendable {
@@ -63,10 +67,12 @@ final class DocumentQueues: Sendable {
 }
 
 /// Shows a `TextDocument` row by row: only the rows on screen (and a page around them) are
-/// ever read and laid out, whatever the size of the file. The view itself is used on the main
-/// thread only; rows are fetched on its own serial queue and the index of a text is built on a
-/// background queue, both through the document, which is thread-safe. A request that was
-/// overtaken by a newer one is dropped before it runs, or when it returns.
+/// ever read and laid out, whatever the size of the file.
+///
+/// The view itself is used on the main thread only; rows are fetched on its own serial queue and
+/// the index of a text is built on a background queue, both through the document, which is
+/// thread-safe. A request that was overtaken by a newer one is dropped before it runs, or when it
+/// returns.
 final class TextPagerView: NSView {
     /// How the cursor keys move (spec 10 › Text modes).
     enum Motion {
@@ -139,8 +145,10 @@ final class TextPagerView: NSView {
     /// A document that is being indexed and replaces the shown one as soon as the row of
     /// `offset` is known.
     private var pending: (document: TextDocument, offset: Int64, select: Range<Int64>?, keep: Bool)?
-    /// Counts the requests to go to a place; only the answer to the last one is used. Fetching
-    /// rows has its own count (`generation`), so scrolling does not cancel a search result.
+    /// Counts the requests to go to a place; only the answer to the last one is used.
+    ///
+    /// Fetching rows has its own count (`generation`), so scrolling does not cancel a search
+    /// result.
     private var revealGeneration = 0 { didSet { latestReveal.value = revealGeneration } }
     private let latestReveal = LatestNumber()
     /// The place the view was last asked to go to, until it got there: carried over to a
@@ -185,9 +193,11 @@ final class TextPagerView: NSView {
     // MARK: Documents
 
     /// Shows `document` with the row of byte `offset` at the top, optionally with a selection
-    /// (a found text). The text's rows are indexed in the background, on all cores with
-    /// `parallel`; until the wanted row is known the view keeps what it showed before.
-    /// `keepingSelection` is for the same bytes laid out anew: the selection stays.
+    /// (a found text).
+    ///
+    /// The text's rows are indexed in the background, on all cores with `parallel`; until the
+    /// wanted row is known the view keeps what it showed before. `keepingSelection` is for the same
+    /// bytes laid out anew: the selection stays.
     func show(
         _ document: TextDocument,
         at offset: Int64 = 0,
@@ -630,7 +640,9 @@ final class TextPagerView: NSView {
     }
 
     /// Where the next search starts: behind the start of the selection (the last hit), else at
-    /// the text cursor, else at the top of the view. Backwards it is the place to end before.
+    /// the text cursor, else at the top of the view.
+    ///
+    /// Backwards it is the place to end before.
     func searchStart(backwards: Bool) -> Int64 {
         let unit = Int64(document?.encoding.unitSize ?? 1)
         if let selection { return backwards ? selection.lowerBound : selection.lowerBound + unit }

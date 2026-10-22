@@ -2,9 +2,11 @@ import AFMKernel
 import Foundation
 
 /// Limits how many long jobs of one kind (building the row index of a text) are on threads at
-/// once. A read that cannot be interrupted (a share that stopped answering, a provider that
-/// ignores `interrupt`) keeps its thread after the job was cancelled; without a limit, paging
-/// quickly through files on such a volume would start a job, and strand a thread, for every file.
+/// once.
+///
+/// A read that cannot be interrupted (a share that stopped answering, a provider that ignores
+/// `interrupt`) keeps its thread after the job was cancelled; without a limit, paging quickly
+/// through files on such a volume would start a job, and strand a thread, for every file.
 ///
 /// - At most `live` jobs that nobody has cancelled run at once; the others wait their turn, and a
 ///   waiting job that is cancelled before its turn is dropped without ever running.
@@ -56,7 +58,9 @@ final class ViewerWorkGate: @unchecked Sendable {
 
     /// Runs `work` on a background thread as soon as the limits allow, unless `flag` is set
     /// before; or calls `refused` (on this thread) when `stuck` threads are held by cancelled
-    /// jobs that have not come back. Any thread.
+    /// jobs that have not come back.
+    ///
+    /// Any thread.
     func submit(
         cancellation flag: CancellationFlag,
         refused: @Sendable () -> Void = {},

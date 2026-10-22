@@ -15,6 +15,7 @@ import Testing
 
 /// A `MemoryFileSystem` behind a layer that tells a test what a job is doing to it: it signals
 /// when a read, write, listing or commit begins, and counts the calls that matter.
+///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 final class ProbeFileSystem: FileSystemProvider, @unchecked Sendable {
     let base: MemoryFileSystem
@@ -145,6 +146,7 @@ private func cancel(_ job: FileJob, when gate: DispatchSemaphore) {
 }
 
 /// A value several threads change.
+///
 /// Unchecked: the state is guarded by `lock`.
 private final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()
@@ -155,6 +157,7 @@ private final class Locked<Value>: @unchecked Sendable {
 }
 
 /// Counts calls made from several threads.
+///
 /// Unchecked: the state is guarded by `lock`.
 private final class CallCounter: @unchecked Sendable {
     private let lock = NSLock()

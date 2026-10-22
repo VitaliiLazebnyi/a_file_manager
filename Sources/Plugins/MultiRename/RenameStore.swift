@@ -3,6 +3,7 @@ import Foundation
 
 /// What the Multi-Rename Tool remembers between sessions (spec 09 › Saved settings and
 /// persistence): named settings, the histories of its fields and the runs that can be undone.
+///
 /// Main thread only, like the settings store behind it.
 @MainActor
 final class RenameStore {
@@ -25,11 +26,12 @@ final class RenameStore {
     static let startupSettingsKey = scope + ".loadSettings"
     static let lowercaseWordsKey = scope + ".lowercaseWords"
 
-    /// What the stores made on one settings object share. The lists are read from the settings
-    /// once and then live here, so asking for them costs nothing (the undo history of a big
-    /// run is megabytes of JSON). Changes are written at once for the small lists; the undo
-    /// history of a big run is encoded on a background queue and handed to the settings from
-    /// the main thread.
+    /// What the stores made on one settings object share.
+    ///
+    /// The lists are read from the settings once and then live here, so asking for them costs
+    /// nothing (the undo history of a big run is megabytes of JSON). Changes are written at once
+    /// for the small lists; the undo history of a big run is encoded on a background queue and
+    /// handed to the settings from the main thread.
     @MainActor
     private final class Memory {
         weak var settings: any SettingsStore?
@@ -124,8 +126,9 @@ final class RenameStore {
         own.set(entries, forKey: history.rawValue)
     }
 
-    /// Puts a text at the top of a history. Leading and trailing spaces are kept: they matter
-    /// in Search & Replace.
+    /// Puts a text at the top of a history.
+    ///
+    /// Leading and trailing spaces are kept: they matter in Search & Replace.
     func remember(_ text: String, in history: History) {
         guard !text.isEmpty else { return }
         var entries = self.history(history).filter { $0 != text }
@@ -139,8 +142,9 @@ final class RenameStore {
 
     // MARK: Undo
 
-    /// The runs that can be undone, the latest last. Kept in the settings, so Undo works
-    /// after the tool, and the program, were closed.
+    /// The runs that can be undone, the latest last.
+    ///
+    /// Kept in the settings, so Undo works after the tool, and the program, were closed.
     var undoHistory: [[RenamedItem]] {
         get {
             if let known = memory.undo { return known }
@@ -168,7 +172,9 @@ final class RenameStore {
     var lastUndo: [RenamedItem]? { undoHistory.last }
 
     /// Brings the undo history into memory, decoding it off the main thread; `completion` runs
-    /// on the main thread. Asking for the history before this has finished decodes it where it is asked.
+    /// on the main thread.
+    ///
+    /// Asking for the history before this has finished decodes it where it is asked.
     func loadUndo(completion: @escaping @MainActor @Sendable () -> Void = {}) {
         guard memory.undo == nil else {
             completion()

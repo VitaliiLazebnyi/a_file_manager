@@ -1,7 +1,9 @@
 import AFMKernel
 import Foundation
 
-/// A number several threads add to. All state is guarded by `lock`.
+/// A number several threads add to.
+///
+/// All state is guarded by `lock`.
 final class SharedCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var total: Int64 = 0
@@ -22,9 +24,10 @@ final class SharedCounter: @unchecked Sendable {
 enum Background {
     /// Runs `work` on another thread and calls `tick` on this one ten times a second until it
     /// is done: the job's thread stays free to report progress while all cores are busy.
-    /// The other thread is one of the kernel's own, not one of the system's shared pool:
-    /// the work reads an archive and writes files, and where that waits (a share, a server)
-    /// it must not keep a thread everybody else's work needs.
+    ///
+    /// The other thread is one of the kernel's own, not one of the system's shared pool: the work
+    /// reads an archive and writes files, and where that waits (a share, a server) it must not keep
+    /// a thread everybody else's work needs.
     static func run<Result: Sendable>(_ work: @escaping @Sendable () -> Result, tick: () -> Void) -> Result {
         let group = DispatchGroup()
         // Written by the work before it leaves the group, read here only after the wait.
@@ -42,14 +45,16 @@ enum Background {
 }
 
 /// The mark the system puts on files that came from the internet (`com.apple.quarantine`).
-/// What is unpacked from a marked archive is marked the same way, as the system's own
-/// unpacker does, so that a program from such an archive is still checked when it is first
-/// opened.
+///
+/// What is unpacked from a marked archive is marked the same way, as the system's own unpacker
+/// does, so that a program from such an archive is still checked when it is first opened.
 enum Quarantine {
     private static let name = "com.apple.quarantine"
 
-    /// The mark of the file at `path`; nil when it has none. Read in one call: the mark is a
-    /// short line of text, which a buffer of 4 KB holds with room to spare.
+    /// The mark of the file at `path`; nil when it has none.
+    ///
+    /// Read in one call: the mark is a short line of text, which a buffer of 4 KB holds with room
+    /// to spare.
     static func read(_ path: String) -> Data? {
         var value = Data(count: 4_096)
         let got = value.withUnsafeMutableBytes { getxattr(path, name, $0.baseAddress, $0.count, 0, 0) }
@@ -87,7 +92,9 @@ final class UnpackFolder: Sendable {
     }()
 
     /// The folder itself is taken as it is, links on the way to it included: it is the place
-    /// the user chose. Only what lies below it comes from the archive.
+    /// the user chose.
+    ///
+    /// Only what lies below it comes from the archive.
     init(_ url: URL) throws {
         self.url = url
         descriptor = open(url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
@@ -103,7 +110,9 @@ final class UnpackFolder: Sendable {
     }
 
     /// Opens the folder at `names` below this one, making what is missing; the caller closes
-    /// the descriptor. Throws when a name on the way is a symbolic link or no folder.
+    /// the descriptor.
+    ///
+    /// Throws when a name on the way is a symbolic link or no folder.
     private func openFolder(_ names: ArraySlice<String>) throws -> Int32 {
         var current = fcntl(descriptor, F_DUPFD_CLOEXEC, 0)
         guard current >= 0 else { throw posixError(errno, url.path) }
@@ -149,7 +158,9 @@ final class UnpackFolder: Sendable {
         Self.mark(folder, quarantine)
     }
 
-    /// Makes the symbolic link at `names`. One that stands there is replaced only with `replacing`.
+    /// Makes the symbolic link at `names`.
+    ///
+    /// One that stands there is replaced only with `replacing`.
     func makeLink(_ names: [String], to destination: String, replacing: Bool) throws {
         guard let name = names.last, PathSafety.isSafeName(name) else {
             throw ArchiveError.unsupported("Unpacking to an empty name")
@@ -161,11 +172,13 @@ final class UnpackFolder: Sendable {
     }
 
     /// Writes the file at `names`: `fill` writes the contents through the function it is
-    /// given. The file arrives under a temporary name in the folder it belongs to and takes
-    /// its name when `fill` has returned; when `fill` throws, nothing is left. What stands
-    /// under the name is replaced only with `replacing` (a symbolic link there is replaced
-    /// like a file, never written through); without, it makes the write fail.
-    /// `opened` is called when the folder is open and before the file is made (tests).
+    /// given.
+    ///
+    /// The file arrives under a temporary name in the folder it belongs to and takes its name when
+    /// `fill` has returned; when `fill` throws, nothing is left. What stands under the name is
+    /// replaced only with `replacing` (a symbolic link there is replaced like a file, never written
+    /// through); without, it makes the write fail. `opened` is called when the folder is open and
+    /// before the file is made (tests).
     func write(
         _ names: [String],
         replacing: Bool,
@@ -229,9 +242,10 @@ final class UnpackFolder: Sendable {
     }
 }
 
-/// Test archive (spec 08 › Test): reads every member to its end. ZIP members are checked
-/// against their CRC, compressed streams against their own checksums, TAR headers against
-/// theirs.
+/// Test archive (spec 08 › Test): reads every member to its end.
+///
+/// ZIP members are checked against their CRC, compressed streams against their own checksums, TAR
+/// headers against theirs.
 enum ArchiveTester {
     /// Asks for the password once, before several threads would each ask for it; and only
     /// when one of the members that are wanted (`only`; all without it) is encrypted.
@@ -260,9 +274,10 @@ enum ArchiveTester {
     }
 
     /// The problems found, one line per damaged member; empty when the archive is sound.
-    /// Members that can be read independently are tested on all cores. `counter` receives the
-    /// bytes read, for a progress display. With `only`, just the members at those paths are
-    /// read. Blocks; meant for a job's thread.
+    ///
+    /// Members that can be read independently are tested on all cores. `counter` receives the bytes
+    /// read, for a progress display. With `only`, just the members at those paths are read. Blocks;
+    /// meant for a job's thread.
     static func test(
         _ archive: OpenArchive,
         cancellation: CancellationFlag,
@@ -402,7 +417,9 @@ final class Unpacker: @unchecked Sendable {
     /// the member's file is made (tests: what is done to the target folder meanwhile).
     private let whileUnpacking: (@Sendable (ArchiveEntry) -> Void)?
     /// Whether a path lies on a disk of this machine; a target elsewhere is written by path,
-    /// through its file system. Set before `run`.
+    /// through its file system.
+    ///
+    /// Set before `run`.
     internal var isOnLocalVolume: (String) -> Bool = Volume.isOnLocalVolume
 
     init(
@@ -542,8 +559,9 @@ final class Unpacker: @unchecked Sendable {
     /// Refuses to go through a symbolic link on the way from `root` down to `url` (both on
     /// the local disk): a link in the target folder, left by an earlier unpacking or put
     /// there on purpose, would lead what is unpacked now to wherever it points.
-    /// The paths are taken as they are written, as the file system takes them when it writes:
-    /// a `..` in the target leads wherever the disk says, not where the text would.
+    ///
+    /// The paths are taken as they are written, as the file system takes them when it writes: a
+    /// `..` in the target leads wherever the disk says, not where the text would.
     private static func refuseLinks(from root: URL, to url: URL) throws {
         guard url.isFileURL, root.isFileURL else { return }
         let (names, base) = (url.pathComponents, root.pathComponents)
@@ -581,9 +599,10 @@ final class Unpacker: @unchecked Sendable {
     }
 
     /// The folders of this machine's disks that are unpacked into, open; see `UnpackFolder`.
-    /// A target elsewhere (a server, another archive, a network volume, where a call may
-    /// hang and has to be given up through the file system's own means) has none: there the
-    /// members are written by path through its file system, after a look for links on the way.
+    ///
+    /// A target elsewhere (a server, another archive, a network volume, where a call may hang and
+    /// has to be given up through the file system's own means) has none: there the members are
+    /// written by path through its file system, after a look for links on the way.
     private var roots: [String: UnpackFolder] = [:]
 
     private func openRoot(_ root: URL) throws -> UnpackFolder? {
@@ -752,12 +771,14 @@ final class Unpacker: @unchecked Sendable {
         try checkCancelled()
     }
 
-    /// Writes one member. It arrives under a temporary name and gets its real name when it is
-    /// complete and its checksum was right, so a damaged member never replaces a good file.
-    /// Called from several threads at once, each with its own member. `quarantine` is the
-    /// archive's mark, which the file gets before it appears under its name. With a `root`
-    /// (a target on a disk of this machine) the member is written from that folder's
-    /// descriptor down and through no link; without, by path through the target's file system.
+    /// Writes one member.
+    ///
+    /// It arrives under a temporary name and gets its real name when it is complete and its
+    /// checksum was right, so a damaged member never replaces a good file. Called from several
+    /// threads at once, each with its own member. `quarantine` is the archive's mark, which the
+    /// file gets before it appears under its name. With a `root` (a target on a disk of this
+    /// machine) the member is written from that folder's descriptor down and through no link;
+    /// without, by path through the target's file system.
     private func write(_ task: Task, into root: UnpackFolder?, from stream: any ByteStream, quarantine: Data?) throws {
         let (entry, target) = (task.entry, task.target)
         if let root {

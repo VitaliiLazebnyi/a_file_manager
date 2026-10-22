@@ -4,13 +4,18 @@ public import Foundation
 
 /// Checksums of file contents, read block by block through the file-system providers, so a
 /// file of any size on any file system costs one megabyte of memory (spec 07 › Verify).
-/// SHA-256 takes the place of the spec's MD5/BLAKE3: the processors of every Mac compute it
-/// in hardware.
+///
+/// SHA-256 takes the place of the spec's MD5/BLAKE3: the processors of every Mac compute it in
+/// hardware.
 public enum Checksum {
     /// Nil when `isCancelled` said stop, or one of `flags` was set, before the end of the file;
-    /// a read that waits for a server is ended by the flags. Blocks; not for the main thread.
+    /// a read that waits for a server is ended by the flags.
+    ///
+    /// Blocks; not for the main thread.
     public static func sha256(
-        of url: URL, in fileSystems: FileSystemRegistry, flags: [CancellationFlag] = [],
+        of url: URL,
+        in fileSystems: FileSystemRegistry,
+        flags: [CancellationFlag] = [],
         isCancelled: () -> Bool = { false }
     ) throws -> Data? {
         let provider = try fileSystems.provider(for: url)
@@ -44,10 +49,15 @@ public enum Checksum {
         return Data(hash.finalize())
     }
 
-    /// Whether two files hold the same bytes; nil when cancelled. Files of different sizes are
-    /// different without a byte being read; otherwise the two are read side by side on two cores.
+    /// Whether two files hold the same bytes; nil when cancelled.
+    ///
+    /// Files of different sizes are different without a byte being read; otherwise the two are read
+    /// side by side on two cores.
     public static func sameContents(
-        _ a: URL, _ b: URL, in fileSystems: FileSystemRegistry, flags: [CancellationFlag] = [],
+        _ a: URL,
+        _ b: URL,
+        in fileSystems: FileSystemRegistry,
+        flags: [CancellationFlag] = [],
         isCancelled: @Sendable () -> Bool = { false }
     ) throws -> Bool? {
         // Asked with the caller's flag, where there is one: a file on a server that has stopped
@@ -65,7 +75,8 @@ public enum Checksum {
         let digests = try withoutActuallyEscaping(isCancelled) { isCancelled in
             try Parallel.map([a, b]) { url in
                 Result { try sha256(of: url, in: fileSystems, flags: flags, isCancelled: isCancelled) }
-            }.map { try $0.get() }
+            }
+            .map { try $0.get() }
         }
         guard let first = digests[0], let second = digests[1] else { return nil }
         return first == second

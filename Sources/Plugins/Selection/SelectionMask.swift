@@ -19,7 +19,9 @@ struct MaskEntry {
 /// `includes | excludes` with several masks separated by spaces or `;`, masks in double quotes
 /// for names with spaces, a trailing `/` (or the `\` of the specification) for masks that mean
 /// folders, path-limited masks (`/sub/*.txt`, `sub/**/*.txt`), a leading `<` for a regular
-/// expression and `A>B` for related files. Names are compared without regard to case.
+/// expression and `A>B` for related files.
+///
+/// Names are compared without regard to case.
 ///
 /// A value type without shared state: it may be used from any thread.
 struct SelectionMask {
@@ -68,9 +70,11 @@ struct SelectionMask {
         }
 
         /// Whether the folder patterns fit the folders from the first to the last; `**` stands
-        /// for any number of them. The usual two-pointer match, going back to the last `**`
-        /// only: linear in practice and never more than patterns times folders, where trying
-        /// every number of levels for each `**` in turn grows with the power of their count.
+        /// for any number of them.
+        ///
+        /// The usual two-pointer match, going back to the last `**` only: linear in practice and
+        /// never more than patterns times folders, where trying every number of levels for each
+        /// `**` in turn grows with the power of their count.
         private static func chain(_ patterns: [[Character]], matches chain: [[Character]]) -> Bool {
             let anyLevels: [Character] = ["*", "*"]
             var (p, c) = (0, 0)

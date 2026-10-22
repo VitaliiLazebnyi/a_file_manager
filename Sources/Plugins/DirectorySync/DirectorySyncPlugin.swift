@@ -14,8 +14,10 @@ public final class DirectorySyncPlugin: Plugin {
     /// The state behind the window; it exists from the first time the command runs.
     private(set) var session: SyncSession?
     private var window: SyncWindowController?
-    /// Puts the window on screen. Tests replace it, so that no window shows in the
-    /// session they run in, and look at what it was asked to show.
+    /// Puts the window on screen.
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// Tests pass `opensWindows: false` and drive the session directly; comparisons then run

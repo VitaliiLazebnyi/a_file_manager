@@ -2,10 +2,12 @@ import Foundation
 import TestSupport
 
 /// A small FTP server for the tests: it listens on 127.0.0.1 on a port the system picks and
-/// serves a folder of the test's sandbox. One thread per control connection, plain BSD
-/// sockets. It speaks enough of the protocol to be a believable server, and can be made to
-/// behave like the awkward ones (no MLSD, DOS listings, no EPSV, a password, dropped connections).
-/// Unchecked: what changes is guarded by `lock`; the rest is set in `init`.
+/// serves a folder of the test's sandbox.
+///
+/// One thread per control connection, plain BSD sockets. It speaks enough of the protocol to be a
+/// believable server, and can be made to behave like the awkward ones (no MLSD, DOS listings, no
+/// EPSV, a password, dropped connections). Unchecked: what changes is guarded by `lock`; the rest
+/// is set in `init`.
 final class TestFTPServer: @unchecked Sendable {
     struct Options {
         var offersMLSD = true
@@ -56,12 +58,13 @@ final class TestFTPServer: @unchecked Sendable {
         var announcesTwice = false
     }
 
-    /// The listening socket and the thread that accepts on it. The thread alone closes the
-    /// socket, once it has seen `isStopped` and is no longer inside a call on it: a descriptor
-    /// that is closed under a thread which is about to call `accept` on it may by then be the
-    /// number of another server's socket in this process (the tests run side by side), and that
-    /// thread would take the other server's connections.
-    /// Unchecked: `stopped` is guarded by `lock`; the rest is set in `init`.
+    /// The listening socket and the thread that accepts on it.
+    ///
+    /// The thread alone closes the socket, once it has seen `isStopped` and is no longer inside a
+    /// call on it: a descriptor that is closed under a thread which is about to call `accept` on it
+    /// may by then be the number of another server's socket in this process (the tests run side by
+    /// side), and that thread would take the other server's connections. Unchecked: `stopped` is
+    /// guarded by `lock`; the rest is set in `init`.
     private final class Acceptor: @unchecked Sendable {
         let listener: Int32
         private let lock = NSLock()
@@ -215,7 +218,9 @@ final class TestFTPServer: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Closes the socket of a session that ended. It leaves the list first (see `dropConnections`).
+    /// Closes the socket of a session that ended.
+    ///
+    /// It leaves the list first (see `dropConnections`).
     fileprivate func closed(_ client: Int32) {
         lock.lock()
         clients.remove(client)
@@ -322,8 +327,10 @@ final class TestFTPServer: @unchecked Sendable {
 
     /// Waits for the data connection: until it comes, until the client says something else on
     /// the control connection or hangs up (it gave the transfer up), until the server stops,
-    /// `Wait.ceiling` at most. No short limit: a client on a machine that is busy with other tests
-    /// may take seconds to get to its `connect`.
+    /// `Wait.ceiling` at most.
+    ///
+    /// No short limit: a client on a machine that is busy with other tests may take seconds to get
+    /// to its `connect`.
     fileprivate func acceptOne(_ listener: Int32, control: Int32) -> Int32? {
         let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !isStopped, Date() < deadline {

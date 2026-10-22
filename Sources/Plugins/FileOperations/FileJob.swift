@@ -11,7 +11,9 @@ public enum JobKind: Equatable, Sendable {
     public static let move = Self.transfer(.move)
 }
 
-/// Answers of the Overwrite dialog (07 › Choices). The "all" answers hold for the rest of the job.
+/// Answers of the Overwrite dialog (07 › Choices).
+///
+/// The "all" answers hold for the rest of the job.
 public enum ConflictChoice: Equatable, Sendable {
     case overwrite, overwriteAll, skip, skipAll, overwriteAllOlder, cancel
     /// The copied file gets this name instead; if it is taken too, the question comes again.
@@ -31,8 +33,10 @@ public enum ErrorChoice: Sendable { case skip, skipAll, retry, abort }
 public enum FolderDeleteChoice: Sendable { case delete, all, skip, cancel }
 
 /// The second question about an item that is protected (07 › Read-only, hidden and system
-/// targets; 07 › Delete › Questions). On the Mac "read only" is a file nobody may write to, and
-/// "locked" a file with the Finder's Locked flag, which only shows when the change is refused.
+/// targets; 07 › Delete › Questions).
+///
+/// On the Mac "read only" is a file nobody may write to, and "locked" a file with the Finder's
+/// Locked flag, which only shows when the change is refused.
 public struct ProtectionQuestion: Sendable {
     public enum Reason: Sendable {
         case readOnly, hidden, locked
@@ -86,10 +90,11 @@ public struct OperationRecord: Sendable {
     }
 }
 
-/// The questions and the progress of a job. Questions are asked one at a time and may block
-/// until the user answers; progress arrives from one thread at a time, but possibly from
-/// another thread than the questions and while a question is open. Without a parallel copy
-/// everything comes from the thread that runs the job.
+/// The questions and the progress of a job.
+///
+/// Questions are asked one at a time and may block until the user answers; progress arrives from
+/// one thread at a time, but possibly from another thread than the questions and while a question
+/// is open. Without a parallel copy everything comes from the thread that runs the job.
 public protocol FileJobDelegate: AnyObject {
     func job(_ job: FileJob, progress: JobProgress)
     func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice
@@ -207,9 +212,11 @@ public enum FileJobError: LocalizedError {
 public final class FileJob: @unchecked Sendable {
     public let kind: JobKind
     public let sources: [URL]
-    /// Where the job goes. Always a real place: a folder of a branch view is replaced by the
-    /// folder behind it when the job is made, and whatever else turns out to be another
-    /// spelling of a real folder when the job starts.
+    /// Where the job goes.
+    ///
+    /// Always a real place: a folder of a branch view is replaced by the folder behind it when the
+    /// job is made, and whatever else turns out to be another spelling of a real folder when the
+    /// job starts.
     public private(set) var target: TargetSpec?
     /// Paste into the folder the files came from: the copy gets a free name instead of being refused.
     public var renamesSelfCopies = false
@@ -218,17 +225,23 @@ public final class FileJob: @unchecked Sendable {
     /// `target` only says which file system the job writes to.
     public var newNames: [String: String] = [:]
     public var options = TransferOptions()
-    /// Held weakly; whoever starts the job keeps the delegate alive while it runs. A job whose
-    /// delegate is gone stops at its first question instead of guessing an answer.
+    /// Held weakly; whoever starts the job keeps the delegate alive while it runs.
+    ///
+    /// A job whose delegate is gone stops at its first question instead of guessing an answer.
     public weak var delegate: any FileJobDelegate?
-    /// Receives what was done to every item, for the operation log. Called on the job's
-    /// threads, several at once during a parallel copy, so it must be safe for that.
+    /// Receives what was done to every item, for the operation log.
+    ///
+    /// Called on the job's threads, several at once during a parallel copy, so it must be safe for
+    /// that.
     public var onRecord: (@Sendable (OperationRecord) -> Void)?
     /// Asked before a record is put together (two displayed paths each): false for the kinds
-    /// nobody is going to write down. Nil: every record is made. Called like `onRecord`.
+    /// nobody is going to write down.
+    ///
+    /// Nil: every record is made. Called like `onRecord`.
     public var wantsRecord: (@Sendable (OperationRecord.Verb, OperationRecord.Status) -> Bool)?
-    /// The least time between two progress reports; the first always goes out. Zero reports
-    /// every change, which a window does not need and a test wants.
+    /// The least time between two progress reports; the first always goes out.
+    ///
+    /// Zero reports every change, which a window does not need and a test wants.
     public var progressInterval: TimeInterval = 0
     /// How many small files are copied at the same time when the storage allows it.
     public var parallelWidth = min(8, max(2, ProcessInfo.processInfo.activeProcessorCount))
@@ -254,7 +267,9 @@ public final class FileJob: @unchecked Sendable {
     private var mode = OverwriteMode.ask
     private var skipAllErrors = false, deleteAllNonEmpty = false, mergeAll = false, entersVolumes = false
     private var confirmedForAll: [String] = []
-    /// How coarsely the volume of a folder keeps dates, by the folder's key. Guarded by `decisions`.
+    /// How coarsely the volume of a folder keeps dates, by the folder's key.
+    ///
+    /// Guarded by `decisions`.
     private var grains: [String: TimeInterval] = [:]
 
     private let counters = NSLock()
@@ -265,8 +280,10 @@ public final class FileJob: @unchecked Sendable {
     private var pendingLines: (() -> [String])?
     private var lastReport: UInt64 = 0
     /// Held while the delegate is told the progress, so that the reports arrive in order and
-    /// one at a time. Taken before `counters`, never the other way round. A delegate that
-    /// holds a report back (a paused job) holds only this: the counters stay free.
+    /// one at a time.
+    ///
+    /// Taken before `counters`, never the other way round. A delegate that holds a report back (a
+    /// paused job) holds only this: the counters stay free.
     private let delivery = NSLock()
     private var failureCount = 0
     private var failures: [String] = []
@@ -277,35 +294,44 @@ public final class FileJob: @unchecked Sendable {
     private var deletePool: Pool?
 
     /// What the first walk found below each folder, so that a folder that is skipped, or
-    /// moved by one rename, is not walked again just to advance the counter. Kept by the hash of the
-    /// folder's location (a rare clash only makes the progress bar a little wrong) and capped, so
-    /// a huge tree costs no more than a few megabytes; a folder that is not in it is walked again.
-    /// Past the limit only the folders worth the memory go on being kept, up to twice the limit:
-    /// walking a big one again costs a lot, a small one little, and the small ones are the
-    /// many that would otherwise crowd out the big ones that a later rename asks for.
+    /// moved by one rename, is not walked again just to advance the counter.
+    ///
+    /// Kept by the hash of the folder's location (a rare clash only makes the progress bar a little
+    /// wrong) and capped, so a huge tree costs no more than a few megabytes; a folder that is not
+    /// in it is walked again. Past the limit only the folders worth the memory go on being kept, up
+    /// to twice the limit: walking a big one again costs a lot, a small one little, and the small
+    /// ones are the many that would otherwise crowd out the big ones that a later rename asks for.
     private let remembered = NSLock()
     private var measures: [Int: Measure] = [:]
     var rememberedLimit = 50_000
     private static let worthKeepingPastLimit = 64
     /// Sources (folders of a move) that the first count took for a plain rename and counted as
-    /// one item. Job thread only; filled before the walk starts.
+    /// one item.
+    ///
+    /// Job thread only; filled before the walk starts.
     private var predictedRenames: Set<String> = []
-    /// What the first count learned about the top-level sources on a server. Job thread only.
+    /// What the first count learned about the top-level sources on a server.
+    ///
+    /// Job thread only.
     private var topItems: [FileItem?]?
     /// The target folders this job has written into (hashes of their `claimKey`): a second
     /// source folder that lands in one of them meets files the job itself put there.
+    ///
     /// Job thread only.
     private var enteredTargets: Set<Int> = []
 
     /// A Move to a file system that keeps what is written back for a while (`.deferredWrites`)
     /// may remove no source before `commit`: the removals wait here, in the order they were
-    /// found (a folder after what it holds). Set before the walk starts; the list is guarded by
-    /// `pendingRemovals`.
+    /// found (a folder after what it holds).
+    ///
+    /// Set before the walk starts; the list is guarded by `pendingRemovals`.
     private var defersRemovals = false
     private let pendingRemovals = NSLock()
     private var deferred: [DeferredRemoval] = []
     /// Sources whose removal did not happen (skipped, failed, or the commit failed): they stay,
-    /// and so does everything above them. The keys of those sources and of every folder above.
+    /// and so does everything above them.
+    ///
+    /// The keys of those sources and of every folder above.
     private var kept: Set<String> = []
     /// This many waiting removals are committed and carried out without waiting for the end.
     var deferredBatchSize = 10_000
@@ -318,6 +344,7 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// The origin mark (`quarantine(of:)`) of each source folder asked about, nil for none.
+    ///
     /// Job thread only.
     private var origins: [String: Data?] = [:]
 
@@ -346,6 +373,7 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// What was decided for a file whose turn has come.
+    ///
     /// Skipping is no plan: the planner answers nil.
     private enum Plan {
         case write(URL, replacing: Bool)
@@ -367,8 +395,9 @@ public final class FileJob: @unchecked Sendable {
         }
     }
 
-    /// The bytes one file in progress has contributed to the progress so far. It belongs to
-    /// the thread that copies the file and changes under `counters`.
+    /// The bytes one file in progress has contributed to the progress so far.
+    ///
+    /// It belongs to the thread that copies the file and changes under `counters`.
     private final class Flight {
         var bytes: Int64 = 0
         /// The origin mark the file gets from its source (see `originMark`).
@@ -377,10 +406,11 @@ public final class FileJob: @unchecked Sendable {
         var partial: (url: URL, size: Int64)?
     }
 
-    /// The workers that copy small files side by side. They run on the kernel's threads for
-    /// work that blocks (`BlockingCalls.run`), not on a dispatch queue: a worker waits for a
-    /// disk, and a disk that has stopped answering must not take threads from the queues the
-    /// rest of the program shares.
+    /// The workers that copy small files side by side.
+    ///
+    /// They run on the kernel's threads for work that blocks (`BlockingCalls.run`), not on a
+    /// dispatch queue: a worker waits for a disk, and a disk that has stopped answering must not
+    /// take threads from the queues the rest of the program shares.
     private final class Pool: Sendable {
         let slots: DispatchSemaphore
         private let width: Int
@@ -390,9 +420,10 @@ public final class FileJob: @unchecked Sendable {
             slots = DispatchSemaphore(value: width)
         }
 
-        /// Takes the work out of `task` and runs it. The work is let go of when this returns: a
-        /// local that held it until the end of the closure in `start` would still hold the job while
-        /// the group is left.
+        /// Takes the work out of `task` and runs it.
+        ///
+        /// The work is let go of when this returns: a local that held it until the end of the
+        /// closure in `start` would still hold the job while the group is left.
         private static func runOnce(_ task: OSAllocatedUnfairLock<(@Sendable () -> Void)?>) {
             let taken = task.withLock { work in
                 defer { work = nil }
@@ -416,7 +447,9 @@ public final class FileJob: @unchecked Sendable {
             }
         }
 
-        /// Returns when no worker is busy any more: every slot is taken once and given back. Job thread only.
+        /// Returns when no worker is busy any more: every slot is taken once and given back.
+        ///
+        /// Job thread only.
         func drain() {
             for _ in 0..<width { slots.wait() }
             for _ in 0..<width { slots.signal() }
@@ -434,11 +467,15 @@ public final class FileJob: @unchecked Sendable {
         private var outcomes: [Outcome?]
         private var cancelled = false
         /// The targets this batch has given out so far (hashes of their `claimKey`): written,
-        /// or still being written by a worker. Job thread only.
+        /// or still being written by a worker.
+        ///
+        /// Job thread only.
         var produced: Set<Int> = []
         /// The folder this batch writes into has received files of this job before.
         var isShared = false
-        /// Whether a move within this batch stays on one volume, once known. Job thread only.
+        /// Whether a move within this batch stays on one volume, once known.
+        ///
+        /// Job thread only.
         var staysOnVolume: Bool?
         /// The items are copied one after another, in the order they come: their file system
         /// asked for that order (`readOrder(of:)`), which several readers at once would undo.
@@ -496,10 +533,12 @@ public final class FileJob: @unchecked Sendable {
     /// stopped (to take a temporary file away again) before the job goes on without it.
     var cleanupPatience: TimeInterval = 10
 
-    /// The flag for a call that tidies up. The job's own flag will not do: once the job is
-    /// stopped it would end the very call that removes what the stopped step left behind. A
-    /// local disk answers; a server that has stopped answering is waited for `cleanupPatience`
-    /// and no longer, so that neither Cancel nor the end of the program hangs on it.
+    /// The flag for a call that tidies up.
+    ///
+    /// The job's own flag will not do: once the job is stopped it would end the very call that
+    /// removes what the stopped step left behind. A local disk answers; a server that has stopped
+    /// answering is waited for `cleanupPatience` and no longer, so that neither Cancel nor the end
+    /// of the program hangs on it.
     private func patience(with provider: any FileSystemProvider) -> CancellationFlag {
         let flag = CancellationFlag()
         guard provider.scheme != "file" else { return flag }
@@ -507,17 +546,19 @@ public final class FileJob: @unchecked Sendable {
         return flag
     }
 
-    /// Where the patience runs out. A queue of its own, which gets its thread also when
-    /// every thread of the shared queues is held by something that waits: the very state in
-    /// which giving up matters.
+    /// Where the patience runs out.
+    ///
+    /// A queue of its own, which gets its thread also when every thread of the shared queues is
+    /// held by something that waits: the very state in which giving up matters.
     private static let patienceClock = DispatchQueue(label: "afm.fileoperations.patience", qos: .userInitiated)
 
     private var isMove: Bool { kind == .move }
     private var isStopping: Bool { cancellation.isCancelled || stop.isCancelled }
     private var followsLinks: Bool { options.links == .followLinks && kind != .move }
 
-    /// The entry at `url`, asked in a way that ends when the job is cancelled. Throws then,
-    /// since "nothing there" would be a wrong answer to act on. Not for cleaning up.
+    /// The entry at `url`, asked in a way that ends when the job is cancelled.
+    ///
+    /// Throws then, since "nothing there" would be a wrong answer to act on. Not for cleaning up.
     private func entry(at url: URL) throws -> FileItem? {
         let found = (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation)
         if found == nil, cancellation.isCancelled { throw Cancelled() }
@@ -540,9 +581,10 @@ public final class FileJob: @unchecked Sendable {
         }
     }
 
-    /// Runs the job and returns when all of it is over. The work is done on a thread of the
-    /// job's own, whose stack has room for the deepest tree the job enters (`depthLimit`); the
-    /// calling thread waits for it.
+    /// Runs the job and returns when all of it is over.
+    ///
+    /// The work is done on a thread of the job's own, whose stack has room for the deepest tree the
+    /// job enters (`depthLimit`); the calling thread waits for it.
     public func run() -> JobResult {
         /// Unchecked `Sendable`: written by the job's thread before it signals `finished`, read
         /// here only after the wait.
@@ -636,7 +678,9 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// A source is processed under its last name, like every entry of a folder: one that could
-    /// lead out of its folder (`..` from a provider) is refused. False: reported and skipped.
+    /// lead out of its folder (`..` from a provider) is refused.
+    ///
+    /// False: reported and skipped.
     private func hasSafeName(_ source: URL, verb: OperationRecord.Verb) throws -> Bool {
         let name = source.lastPathComponent
         if Self.isSafeName(name) { return true }
@@ -723,7 +767,9 @@ public final class FileJob: @unchecked Sendable {
 
     /// The order the sources are worked through: as they are (by name), unless their file
     /// system reads them better in another (`readOrder(of:)`: an archive that is one stream
-    /// gives its files in the order they lie in it). Local files are never asked about.
+    /// gives its files in the order they lie in it).
+    ///
+    /// Local files are never asked about.
     private func slotsInReadOrder() -> [Int] {
         let slots = Array(sources.indices)
         guard sources.count > 1, let first = sources.first, !first.isFileURL, let target,
@@ -746,7 +792,9 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// The entries of one source folder in the order their file system reads them best; see
-    /// `slotsInReadOrder`. The order by name stays wherever the file system has no other.
+    /// `slotsInReadOrder`.
+    ///
+    /// The order by name stays wherever the file system has no other.
     private func inReadOrder(_ items: [FileItem], from: any FileSystemProvider) -> [FileItem] {
         guard items.count > 1 else { return items }
         let urls = items.map(\.url)
@@ -764,7 +812,9 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Several files at once only where both ends answer at once: local volumes that are not
-    /// spinning disks. Everything else gets a single stream.
+    /// spinning disks.
+    ///
+    /// Everything else gets a single stream.
     private func makePool() -> Pool? {
         guard options.copiesSmallFilesInParallel, parallelWidth > 1, let target, !sources.isEmpty,
             areFastAndLocal([target.directory] + sourceFolders())
@@ -772,8 +822,9 @@ public final class FileJob: @unchecked Sendable {
         return Pool(width: parallelWidth)
     }
 
-    /// The folders the sources lie in, each once: a list of files from anywhere has many. Of a
-    /// very long list a spread sample is looked at; a wrong guess costs speed, nothing else.
+    /// The folders the sources lie in, each once: a list of files from anywhere has many.
+    ///
+    /// Of a very long list a spread sample is looked at; a wrong guess costs speed, nothing else.
     private func sourceFolders() -> [URL] {
         var folders: [URL] = []
         var seen = Set<String>()
@@ -788,8 +839,10 @@ public final class FileJob: @unchecked Sendable {
         return folders
     }
 
-    /// A few files at once for deleting, where the disk answers at once. Measured on APFS: four
-    /// workers delete three times as fast as one, more cores gain almost nothing.
+    /// A few files at once for deleting, where the disk answers at once.
+    ///
+    /// Measured on APFS: four workers delete three times as fast as one, more cores gain almost
+    /// nothing.
     private func makeDeletePool() -> Pool? {
         guard kind == .delete(toTrash: false), options.copiesSmallFilesInParallel, parallelWidth > 1,
             areFastAndLocal(sourceFolders())
@@ -949,9 +1002,11 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// A move inside one file system is a rename when the system can do it; that is quick and
-    /// stays on the job thread. On local disks that holds only within one volume: between two
-    /// volumes a move is a copy and a removal, which the pool takes. The items of a batch share
-    /// their two folders, so the volumes are looked at once per batch.
+    /// stays on the job thread.
+    ///
+    /// On local disks that holds only within one volume: between two volumes a move is a copy and a
+    /// removal, which the pool takes. The items of a batch share their two folders, so the volumes
+    /// are looked at once per batch.
     private func renamesInPlace(_ source: URL, _ destination: URL, _ batch: Batch) -> Bool {
         guard isMove, let from = try? fileSystems.provider(for: source),
             let to = try? fileSystems.provider(for: destination),
@@ -974,9 +1029,10 @@ public final class FileJob: @unchecked Sendable {
         return isMove ? .move : .copy
     }
 
-    /// Applies the overwrite rules (07 › Name collisions) to one file. Job thread only.
-    /// `ownOutput`: what is found at the target may be a file this very job wrote, from another
-    /// source that maps to the same name. `isTaken` names targets that are spoken for.
+    /// Applies the overwrite rules (07 › Name collisions) to one file.
+    ///
+    /// Job thread only. `ownOutput`: what is found at the target may be a file this very job wrote,
+    /// from another source that maps to the same name. `isTaken` names targets that are spoken for.
     /// Nil: the file is skipped.
     private func plan(for item: FileItem, at destination: URL, ownOutput: Bool, isTaken: (URL) -> Bool) throws -> Plan?
     {
@@ -1061,13 +1117,16 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// A file with contents of its own: not a link (a write would land on what it points to),
-    /// not a pipe or device. Asks the disk again for a local file, whatever the listing said.
+    /// not a pipe or device.
+    ///
+    /// Asks the disk again for a local file, whatever the listing said.
     private func isPlainFile(_ item: FileItem) -> Bool {
         if item.isSymlink || item.isSpecial || item.isDirectory { return false }
         return !FileIdentity.isSymlink(item.url) && !FileIdentity.isSpecialNode(item.url, followingLinks: false)
     }
 
     /// The answer for this one file: from the rule that holds for the job, or from the user.
+    ///
     /// What comes back is one of the single-file answers.
     private func conflictChoice(_ existing: FileItem, _ source: FileItem, ownOutput: Bool) throws -> ConflictChoice {
         try decisions.withLock {
@@ -1117,9 +1176,10 @@ public final class FileJob: @unchecked Sendable {
 
     /// FAT, exFAT, ZIP archives and many servers keep the time of change to two seconds (HFS+
     /// to one), so a file copied there comes back up to that much older: where one of the two
-    /// files lies on such a volume, nearer than that counts as the same age. Between volumes
-    /// that keep the time exactly (APFS) the times are compared as they are. Called with
-    /// `decisions` held.
+    /// files lies on such a volume, nearer than that counts as the same age.
+    ///
+    /// Between volumes that keep the time exactly (APFS) the times are compared as they are. Called
+    /// with `decisions` held.
     private func isNewer(_ file: FileItem, than other: FileItem) -> Bool {
         file.modified.timeIntervalSince(other.modified)
             > max(Self.timestampNoise, grain(at: file.url), grain(at: other.url))
@@ -1134,7 +1194,9 @@ public final class FileJob: @unchecked Sendable {
         return grain
     }
 
-    /// The second question for an item nobody may write to, or a hidden one. False: leave it.
+    /// The second question for an item nobody may write to, or a hidden one.
+    ///
+    /// False: leave it.
     private func mayTouch(_ item: FileItem, for purpose: ProtectionQuestion.Purpose) throws -> Bool {
         if options.ignoresProtection || item.isSymlink { return true }
         if options.asksAboutReadOnly, item.permissions & 0o222 == 0, try !confirm(.readOnly, purpose, item) {
@@ -1200,8 +1262,10 @@ public final class FileJob: @unchecked Sendable {
         return removesSource
     }
 
-    /// Brings one file or link to `destination`, by the cheapest way that works. True when it
-    /// was copied for a move: the caller removes the source, as a step that can be retried.
+    /// Brings one file or link to `destination`, by the cheapest way that works.
+    ///
+    /// True when it was copied for a move: the caller removes the source, as a step that can be
+    /// retried.
     private func put(_ item: FileItem, at destination: URL, replacing: Bool, _ flight: Flight) throws -> Bool {
         let (from, to) = (try fileSystems.provider(for: item.url), try fileSystems.provider(for: destination))
         try ensureFolder(destination.deletingLastPathComponent(), in: to)
@@ -1246,8 +1310,9 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// True when `target` is the very file `source` is, as far as that can be known: the same
-    /// place once every view is seen through, or the same file on a local disk. What was
-    /// written there is then not a second copy, and the source must stay.
+    /// place once every view is seen through, or the same file on a local disk.
+    ///
+    /// What was written there is then not a second copy, and the source must stay.
     private func isStillTheSource(_ target: URL, of source: URL) -> Bool {
         let (there, here) = (
             RealLocation.resolve(target, in: fileSystems), RealLocation.resolve(source, in: fileSystems)
@@ -1256,7 +1321,9 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Takes away the partial file an earlier try of this flight left under the real name, if
-    /// it is still that file. Nothing that was there before the job is ever touched by this.
+    /// it is still that file.
+    ///
+    /// Nothing that was there before the job is ever touched by this.
     private func removePartial(of flight: Flight) {
         guard let partial = flight.partial else { return }
         flight.partial = nil
@@ -1267,9 +1334,11 @@ public final class FileJob: @unchecked Sendable {
         try? provider.remove(partial.url, cancellation: cancellation)
     }
 
-    /// Removes the temporary file of a failed transfer. A copy of a locked file is locked too,
-    /// and the system refuses to remove or rename such a file; it is unlocked the way a locked
-    /// item is when the user agrees to delete it (`removing`), and removed again.
+    /// Removes the temporary file of a failed transfer.
+    ///
+    /// A copy of a locked file is locked too, and the system refuses to remove or rename such a
+    /// file; it is unlocked the way a locked item is when the user agrees to delete it
+    /// (`removing`), and removed again.
     private func discard(_ temporary: URL, in provider: any FileSystemProvider) {
         // Tidying up: the job may be stopped already, which must not keep the file from going.
         let tidying = patience(with: provider)
@@ -1307,7 +1376,9 @@ public final class FileJob: @unchecked Sendable {
 
     /// Removes the unfinished copies that a crash or a failed clean-up left in the target
     /// folder long ago: plain files under the job's own temporary name that nobody has
-    /// touched for a day. Local folders only.
+    /// touched for a day.
+    ///
+    /// Local folders only.
     static func sweepStaleTemporaries(in directory: URL, now: Date = Date()) {
         guard directory.isFileURL, let stream = opendir(directory.path) else { return }
         defer { closedir(stream) }
@@ -1331,8 +1402,10 @@ public final class FileJob: @unchecked Sendable {
         destination.deletingLastPathComponent().appending(name: ".afm-\(UUID().uuidString).tmp")
     }
 
-    /// Copies to a free name. A cancelled or failed copy within one file system leaves nothing
-    /// behind; of a stream the caller removes what arrived.
+    /// Copies to a free name.
+    ///
+    /// A cancelled or failed copy within one file system leaves nothing behind; of a stream the
+    /// caller removes what arrived.
     private func copyContents(
         of item: FileItem,
         to destination: URL,
@@ -1398,10 +1471,11 @@ public final class FileJob: @unchecked Sendable {
         [cancellation.interrupting(writer), stop.interrupting(writer)]
     }
 
-    /// What a streamed copy gets. Rights that come from another file system (an archive, a
-    /// server) were chosen by somebody else: set-user-ID, set-group-ID and the sticky bit
-    /// never come along, and on the local disk the rest is cut by the user's umask, the way
-    /// `tar` and `unzip` unpack.
+    /// What a streamed copy gets.
+    ///
+    /// Rights that come from another file system (an archive, a server) were chosen by somebody
+    /// else: set-user-ID, set-group-ID and the sticky bit never come along, and on the local disk
+    /// the rest is cut by the user's umask, the way `tar` and `unzip` unpack.
     private func attributes(for item: FileItem, from: any FileSystemProvider, to: any FileSystemProvider)
         -> FileAttributes
     {
@@ -1420,9 +1494,10 @@ public final class FileJob: @unchecked Sendable {
         return UInt16(mask & 0o777)
     }()
 
-    /// Puts the origin mark on what was copied. A file system that cannot keep marks does
-    /// nothing; one that can and fails says so, and the user hears of it: the copy is there,
-    /// but without the mark that it came from elsewhere.
+    /// Puts the origin mark on what was copied.
+    ///
+    /// A file system that cannot keep marks does nothing; one that can and fails says so, and the
+    /// user hears of it: the copy is there, but without the mark that it came from elsewhere.
     private func mark(_ url: URL, with origin: Data, in provider: any FileSystemProvider, shownAs shown: URL) {
         do {
             try provider.setQuarantine(origin, of: url, cancellation: cancellation)
@@ -1454,11 +1529,12 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Append and Resume: the file at the target followed by the source (all of it, or what
-    /// the target lacks), written next to the target and swapped in when it is complete. The
-    /// existing part is written again; in return the target stays whole until the longer file
-    /// has fully arrived. A Resume on a file system that can continue a file (`.append`) does
-    /// not copy the partial file at all: it is the file that grows, after a check that it
-    /// really is the start of the source. An Append always takes the safe way.
+    /// the target lacks), written next to the target and swapped in when it is complete.
+    ///
+    /// The existing part is written again; in return the target stays whole until the longer file
+    /// has fully arrived. A Resume on a file system that can continue a file (`.append`) does not
+    /// copy the partial file at all: it is the file that grows, after a check that it really is the
+    /// start of the source. An Append always takes the safe way.
     private func extend(_ destination: URL, with item: FileItem, resuming: Bool, _ flight: Flight) throws -> Bool {
         let (from, to) = (try fileSystems.provider(for: item.url), try fileSystems.provider(for: destination))
         // Looked at again here, right before the files are opened: only a plain file is
@@ -1533,11 +1609,12 @@ public final class FileJob: @unchecked Sendable {
         return isMove
     }
 
-    /// Resume by continuing the partial file where it ends. The partial is first compared with
-    /// the start of the source: its last block (up to 1 MB), or all of it when the job
-    /// verifies, since a file that is not the start of the source would be joined to the wrong
-    /// rest. A failed or cancelled continuation leaves the file as long as it got, as any
-    /// partial file is.
+    /// Resume by continuing the partial file where it ends.
+    ///
+    /// The partial is first compared with the start of the source: its last block (up to 1 MB), or
+    /// all of it when the job verifies, since a file that is not the start of the source would be
+    /// joined to the wrong rest. A failed or cancelled continuation leaves the file as long as it
+    /// got, as any partial file is.
     private func resumeInPlace(
         _ destination: URL,
         partial: FileItem,
@@ -1581,7 +1658,9 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Whether the first `length` bytes of `partial` are the first bytes of the source, which
-    /// `reader` is then left at the end of. Without `fully` only the last block is compared.
+    /// `reader` is then left at the end of.
+    ///
+    /// Without `fully` only the last block is compared.
     private func startsWithPartial(
         _ reader: any FileReader,
         _ partial: URL,
@@ -1625,6 +1704,7 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Reads the copy and the source again, each on its own core, and compares their checksums.
+    ///
     /// Every block read shows the job's progress again, which is also where Pause takes hold.
     private func verify(_ copy: URL, against source: URL) throws {
         report(["Verifying: \(display(source))"])
@@ -1812,10 +1892,11 @@ public final class FileJob: @unchecked Sendable {
         }
     }
 
-    /// Whether the job goes into `folder`. A folder that lies on another volume than the
-    /// folder it is in is a mounted disk, disk image or share: deleting or moving "the folder"
-    /// would empty that volume, so somebody has to say so first. False: it stays as it is,
-    /// and that is noted.
+    /// Whether the job goes into `folder`.
+    ///
+    /// A folder that lies on another volume than the folder it is in is a mounted disk, disk image
+    /// or share: deleting or moving "the folder" would empty that volume, so somebody has to say so
+    /// first. False: it stays as it is, and that is noted.
     private func mayEnter(_ folder: FileItem, for purpose: ProtectionQuestion.Purpose) throws -> Bool {
         guard FileIdentity.isMountPoint(folder.url) else { return true }
         let allowed: Bool = try decisions.withLock {
@@ -1842,10 +1923,11 @@ public final class FileJob: @unchecked Sendable {
         return allowed
     }
 
-    /// What a file or folder copied from `source`'s file system to `destination`'s gets as the
-    /// mark of coming from elsewhere (`quarantine(of:)` of the folder it is found in, asked once
-    /// per folder). Nil inside one file system, which does its own copying. Job thread only,
-    /// where asking the file system is allowed to take long.
+    /// The mark of coming from elsewhere for a file or folder copied from the file system of `folder`
+    /// to that of `destination`: `quarantine(of:)` of the folder it is found in, asked once per folder.
+    ///
+    /// Nil inside one file system, which does its own copying. Job thread only, where asking the file
+    /// system is allowed to take long.
     private func originMark(of folder: URL, copiedTo destination: URL) -> Data? {
         guard let from = try? fileSystems.provider(for: folder), let to = try? fileSystems.provider(for: destination),
             from !== to
@@ -1887,17 +1969,18 @@ public final class FileJob: @unchecked Sendable {
         counters.withLock { _ = createdFolders.insert(key) }
     }
 
-    /// Makes a target folder that was not there a moment ago and is about to be filled. It
-    /// is made exclusively: anything that has appeared under the name since it was looked for
-    /// (a link somebody put there, which would lead everything copied into the folder
-    /// somewhere else) is "already exists", and the step is asked about like any other that
-    /// failed.
+    /// Makes a target folder that was not there a moment ago and is about to be filled.
+    ///
+    /// It is made exclusively: anything that has appeared under the name since it was looked for (a
+    /// link somebody put there, which would lead everything copied into the folder somewhere else)
+    /// is "already exists", and the step is asked about like any other that failed.
     private func createFolder(_ folder: URL, in provider: any FileSystemProvider) throws {
         try provider.createDirectory(at: folder, exclusive: true, cancellation: cancellation)
     }
 
-    /// A link as the thing it points to, for a copy that follows links. A link that leads
-    /// nowhere, or back to a folder it lies in, stays a link.
+    /// A link as the thing it points to, for a copy that follows links.
+    ///
+    /// A link that leads nowhere, or back to a folder it lies in, stays a link.
     private func resolvingLink(_ item: FileItem) -> FileItem {
         guard item.isSymlink else { return item }
         var target = item
@@ -1931,13 +2014,14 @@ public final class FileJob: @unchecked Sendable {
         pendingRemovals.withLock { deferred.append(DeferredRemoval(url: url, isFolder: isFolder, tree: tree)) }
     }
 
-    /// Removes one entry: a file, a link or an empty folder. An entry of a tree the job
-    /// walked into (`tree` is the top folder of that tree, one of the job's own sources) is
-    /// removed by going down from that folder without following a link
-    /// (`remove(_:below:cancellation:)`): should a folder on the way have been swapped for a
-    /// link since it was listed, nothing is removed and the step fails, instead of an entry
-    /// of the same name going wherever the link leads (F043). A source itself is removed by
-    /// its path. File systems without such a walk remove by path in both cases.
+    /// Removes one entry: a file, a link or an empty folder.
+    ///
+    /// An entry of a tree the job walked into (`tree` is the top folder of that tree, one of the
+    /// job's own sources) is removed by going down from that folder without following a link
+    /// (`remove(_:below:cancellation:)`): should a folder on the way have been swapped for a link
+    /// since it was listed, nothing is removed and the step fails, instead of an entry of the same
+    /// name going wherever the link leads (F043). A source itself is removed by its path. File
+    /// systems without such a walk remove by path in both cases.
     private func remove(_ url: URL, below tree: URL?) throws {
         let provider = try fileSystems.provider(for: url)
         if let tree, (try? fileSystems.provider(for: tree)) === provider {
@@ -1952,7 +2036,9 @@ public final class FileJob: @unchecked Sendable {
         pendingRemovals.withLock { kept.contains(url.locationKey) }
     }
 
-    /// Notes that `url` stays, and with it every folder above. Called with `pendingRemovals` held.
+    /// Notes that `url` stays, and with it every folder above.
+    ///
+    /// Called with `pendingRemovals` held.
     private func keep(_ url: URL) {
         var current = url
         // A folder that is noted has everything above it noted too.
@@ -1972,8 +2058,10 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Makes what was written durable, then removes the sources that wait, files before the
-    /// folders that held them. Every writer of the waiting files is closed. If the commit
-    /// fails nothing is removed: the user is told, as for any failed step, and the job ends.
+    /// folders that held them.
+    ///
+    /// Every writer of the waiting files is closed. If the commit fails nothing is removed: the
+    /// user is told, as for any failed step, and the job ends.
     private func flushDeferred() throws {
         let pending = pendingRemovals.withLock { () -> [DeferredRemoval] in
             defer { deferred = [] }
@@ -2069,8 +2157,9 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Deletes an item and everything below it, one entry at a time, so every entry is counted,
-    /// can fail on its own, and the job can be cancelled in between. The files of a folder are
-    /// deleted by a few workers at once where the disk allows it.
+    /// can fail on its own, and the job can be cancelled in between.
+    ///
+    /// The files of a folder are deleted by a few workers at once where the disk allows it.
     ///
     /// `tree` is the job's own source that `url` lies below, nil for such a source itself;
     /// see `remove(_:below:)`.
@@ -2130,7 +2219,9 @@ public final class FileJob: @unchecked Sendable {
 
     /// A file that some plugin still holds changes for (an archive that is written after a
     /// delay) is brought up to date before it goes: otherwise the late writing would find
-    /// its file gone, or put a file back that the user deleted. Files only.
+    /// its file gone, or put a file back that the user deleted.
+    ///
+    /// Files only.
     private func flushBeforeRemoving(_ url: URL, _ item: FileItem?) throws {
         guard let item, !item.isDirectory, !item.isSymlink else { return }
         try fileSystems.flushPendingWrites(to: url, cancellation: cancellation)
@@ -2143,8 +2234,9 @@ public final class FileJob: @unchecked Sendable {
         return try deleteEntry(leaf.url, item: leaf, isFolder: false, tree: tree)
     }
 
-    /// The contents of a folder: its files first, then its subfolders one by one. False when
-    /// something was kept.
+    /// The contents of a folder: its files first, then its subfolders one by one.
+    ///
+    /// False when something was kept.
     private func deleteChildren(of children: [FileItem], tree: URL, depth: Int) throws -> Bool {
         var complete = true
         let (folders, leaves) = (children.filter(\.isRealDirectory), children.filter { !$0.isRealDirectory })
@@ -2171,10 +2263,12 @@ public final class FileJob: @unchecked Sendable {
     /// Fewer files than this are not worth handing to workers.
     private static let parallelDeleteThreshold = 16
 
-    /// Deletes files by the pool. A file that is going to ask a question (read-only, hidden) is
-    /// done here, in the order given, while the workers delete the others; a question a worker
-    /// meets later (a locked file) is asked under the same lock as any other. An Abort or Cancel
-    /// in any of them stops the others, and the function returns only when the workers are done.
+    /// Deletes files by the pool.
+    ///
+    /// A file that is going to ask a question (read-only, hidden) is done here, in the order given,
+    /// while the workers delete the others; a question a worker meets later (a locked file) is
+    /// asked under the same lock as any other. An Abort or Cancel in any of them stops the others,
+    /// and the function returns only when the workers are done.
     private func deleteLeaves(asking: [FileItem], quiet: [FileItem], tree: URL, with pool: Pool) throws -> Bool {
         /// What the workers found out, under a lock of its own. Unchecked `Sendable`: all state
         /// is guarded by `lock`.
@@ -2241,9 +2335,11 @@ public final class FileJob: @unchecked Sendable {
         }
     }
 
-    /// Runs a removal. When the system refuses because the item is locked, the user is asked,
-    /// the item unlocked (the provider does that when it is made writable) and the removal
-    /// tried once more. False: the user wants to keep the item.
+    /// Runs a removal.
+    ///
+    /// When the system refuses because the item is locked, the user is asked, the item unlocked
+    /// (the provider does that when it is made writable) and the removal tried once more. False:
+    /// the user wants to keep the item.
     ///
     /// "Not permitted" has other reasons than a lock (a folder that only lets owners delete,
     /// a locked folder above): on a local disk only an item that really carries a lock is
@@ -2315,7 +2411,9 @@ public final class FileJob: @unchecked Sendable {
         record(verb, url, nil, .failed(message))
     }
 
-    /// Runs one step; on failure asks Skip / Skip all / Retry / Abort. Used on every thread of the job.
+    /// Runs one step; on failure asks Skip / Skip all / Retry / Abort.
+    ///
+    /// Used on every thread of the job.
     private func attempt(_ verb: OperationRecord.Verb, at url: URL, target: URL? = nil, _ step: () throws -> Bool)
         throws -> Bool
     {
@@ -2409,16 +2507,19 @@ public final class FileJob: @unchecked Sendable {
         counters.withLock { done += measure }
     }
 
-    /// Whether enough time has passed for the next report. Called with `counters` held.
+    /// Whether enough time has passed for the next report.
+    ///
+    /// Called with `counters` held.
     private var isDue: Bool {
         guard progressInterval > 0, lastReport != 0 else { return true }
         return DispatchTime.now().uptimeNanoseconds - lastReport >= UInt64(progressInterval * 1_000_000_000)
     }
 
-    /// Tells the delegate where the job stands. The figures are taken under `counters`, the
-    /// delegate is called under `delivery` only: the reports stay in order and one at a time,
-    /// and a delegate that takes its time (a paused job waits in there) keeps no counter from
-    /// being updated. Called without either lock held.
+    /// Tells the delegate where the job stands.
+    ///
+    /// The figures are taken under `counters`, the delegate is called under `delivery` only: the
+    /// reports stay in order and one at a time, and a delegate that takes its time (a paused job
+    /// waits in there) keeps no counter from being updated. Called without either lock held.
     private func emit(force: Bool) {
         guard let delegate else { return }
         delivery.lock()
@@ -2443,10 +2544,11 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Everything directly inside a directory, hidden items too, in processing order (a delete
-    /// has none: nothing depends on it, and sorting a big folder by name is slow). Nil when the
-    /// directory could not be read and the user chose to skip it. An entry whose name could lead
-    /// out of the folder (`..`, a name with a slash: a server may send such a thing) is not
-    /// returned; it is reported as an error of its own and counted in `rejected`.
+    /// has none: nothing depends on it, and sorting a big folder by name is slow).
+    ///
+    /// Nil when the directory could not be read and the user chose to skip it. An entry whose name
+    /// could lead out of the folder (`..`, a name with a slash: a server may send such a thing) is
+    /// not returned; it is reported as an error of its own and counted in `rejected`.
     private func listing(of directory: URL, sorted: Bool = true) throws -> (items: [FileItem], rejected: Int)? {
         var items: [FileItem] = []
         let verb: OperationRecord.Verb = kind == .copy ? .copy : (isMove ? .move : .delete)
@@ -2475,6 +2577,7 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// A name that stands for one entry of its folder: not empty, not `.` or `..`, no `/`, no NUL.
+    ///
     /// The kernel's rule (`PathSafety`), byte for byte.
     static func isSafeName(_ name: String) -> Bool {
         PathSafety.isSafeName(name)
@@ -2486,17 +2589,20 @@ public final class FileJob: @unchecked Sendable {
         url.locationKey.precomposedStringWithCanonicalMapping.lowercased()
     }
 
-    /// `claimKey` as a number, for remembering many targets in little memory. Two targets
-    /// that fold to one place have one number; two that do not may share one, once in a blue
-    /// moon, and are then taken for one place, which errs on the careful side.
+    /// `claimKey` as a number, for remembering many targets in little memory.
+    ///
+    /// Two targets that fold to one place have one number; two that do not may share one, once in a
+    /// blue moon, and are then taken for one place, which errs on the careful side.
     static func claimHash(_ url: URL) -> Int {
         claimKey(url).hashValue
     }
 
     // MARK: Counting
 
-    /// What a source adds to the total. A folder that a move is going to rename as a whole is
-    /// one item, and its contents are not walked: that would take as long as a copy's count.
+    /// What a source adds to the total.
+    ///
+    /// A folder that a move is going to rename as a whole is one item, and its contents are not
+    /// walked: that would take as long as a copy's count.
     private func measureForTotal(_ url: URL, _ item: FileItem?) -> Measure {
         guard let item else { return Measure(items: 1) }
         if isMove, options.filter.isEmpty, item.isRealDirectory, willRename(item) {
@@ -2507,7 +2613,9 @@ public final class FileJob: @unchecked Sendable {
     }
 
     /// Whether the system will rename the folder to its place: both on one local volume, and
-    /// nothing there under that name. A wrong guess costs a count later, nothing else.
+    /// nothing there under that name.
+    ///
+    /// A wrong guess costs a count later, nothing else.
     private func willRename(_ folder: FileItem) -> Bool {
         guard folder.url.isFileURL, let target else { return false }
         let destination = destination(for: folder.url, in: target)
@@ -2531,8 +2639,9 @@ public final class FileJob: @unchecked Sendable {
 
     /// Counts a tree level by level: the folders of a level are listed on all cores at once,
     /// and no call goes deeper for a folder that lies deeper, so a tree of any depth (an
-    /// archive or a server may show one) costs no stack. What lies below `depthLimit` is not
-    /// counted, as it is not processed.
+    /// archive or a server may show one) costs no stack.
+    ///
+    /// What lies below `depthLimit` is not counted, as it is not processed.
     private func measure(_ listed: FileItem) -> Measure {
         struct Node {
             var parent: Int
@@ -2618,7 +2727,9 @@ public final class FileJob: @unchecked Sendable {
 
 /// What identifies an entry on a local disk, so that two spellings of one place (another
 /// letter case on a case-insensitive volume, `/tmp` and `/private/tmp`) are told apart from
-/// two files. Anything that is not a local path has no identity and compares as different.
+/// two files.
+///
+/// Anything that is not a local path has no identity and compares as different.
 enum FileIdentity {
     private static func status(_ path: String, followingLinks: Bool) -> stat? {
         var info = stat()
@@ -2663,8 +2774,9 @@ enum FileIdentity {
     }
 
     /// True when both names are the same directory entry: the same file in the same folder,
-    /// the names differing at most in letter case or in the form of an accented letter. Two
-    /// hard links to one file are not.
+    /// the names differing at most in letter case or in the form of an accented letter.
+    ///
+    /// Two hard links to one file are not.
     static func sameEntry(_ a: URL, _ b: URL) -> Bool {
         guard a.isFileURL, b.isFileURL,
             a.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased()
@@ -2679,7 +2791,9 @@ enum FileIdentity {
 
     /// True when `destination` is somewhere below `folder` as the disk sees it: in the folder
     /// itself or any folder inside it, whichever way the path is spelled or through whatever
-    /// links it leads. Looks at the folders above `destination` that exist.
+    /// links it leads.
+    ///
+    /// Looks at the folders above `destination` that exist.
     static func isInside(_ destination: URL, folder: URL) -> Bool {
         guard destination.isFileURL, let own = status(folder, followingLinks: false) else { return false }
         var path = parent(of: destination.path)
@@ -2694,7 +2808,9 @@ enum FileIdentity {
     }
 }
 
-/// A value behind a lock. Unchecked `Sendable`: `value` is guarded by `lock`.
+/// A value behind a lock.
+///
+/// Unchecked `Sendable`: `value` is guarded by `lock`.
 final class Guarded<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Value

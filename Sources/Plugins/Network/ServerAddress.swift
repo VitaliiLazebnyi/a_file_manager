@@ -11,6 +11,7 @@ public enum TLSMode: Int, Codable, Equatable, Sendable {
 }
 
 /// What identifies a server in the URLs a panel shows: the scheme, the host and the port.
+///
 /// The user name is not part of it, so one server has one connection at a time.
 public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     public static let schemes = ["ftp", "ftps", "sftp"]
@@ -60,6 +61,7 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
     }
 
     /// The location of a path on this server, nil when the host cannot be written in a URL.
+    ///
     /// It never carries a user name or password.
     public func validURL(path: String = "/") -> URL? {
         guard !host.isEmpty, Self.schemes.contains(scheme) else { return nil }
@@ -75,10 +77,11 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
         return url
     }
 
-    /// The location of a path on this server. It never carries a user name or password.
-    /// `ServerAddress` only accepts hosts that have a URL; a key made by hand from a host
-    /// that has none gets a location on a server that does not exist (the reserved name
-    /// `invalid`), never one on the local disk.
+    /// The location of a path on this server.
+    ///
+    /// It never carries a user name or password. `ServerAddress` only accepts hosts that have a
+    /// URL; a key made by hand from a host that has none gets a location on a server that does not
+    /// exist (the reserved name `invalid`), never one on the local disk.
     public func url(path: String = "/") -> URL {
         // `host.invalid` of a known scheme always has a URL, so the second call ends there.
         validURL(path: path)
@@ -94,9 +97,11 @@ public struct ServerKey: Hashable, CustomStringConvertible, Sendable {
 
 /// Paths on a server: always absolute, with `/` between the names.
 public enum RemotePath {
-    /// The names of a path, without empty ones, `.` and `..`. The path is cut at the bytes of
-    /// the slash, as the server does: cut at characters, a slash followed by a combining mark
-    /// would be one character and not a separator, and `a/<mark>..` would keep its `..`.
+    /// The names of a path, without empty ones, `.` and `..`.
+    ///
+    /// The path is cut at the bytes of the slash, as the server does: cut at characters, a slash
+    /// followed by a combining mark would be one character and not a separator, and `a/<mark>..`
+    /// would keep its `..`.
     private static func names(_ path: String) -> [ArraySlice<UInt8>] {
         var names: [ArraySlice<UInt8>] = []
         for name in Array(path.utf8).split(separator: 0x2F) {
@@ -162,8 +167,9 @@ public enum RemotePath {
     }
 
     /// False for a path with a name that would melt into the slash before or after it when the
-    /// path is read as text (see `normalized`). Such a path is not used: what it names cannot
-    /// be told apart reliably from its neighbours.
+    /// path is read as text (see `normalized`).
+    ///
+    /// Such a path is not used: what it names cannot be told apart reliably from its neighbours.
     public static func hasSeparableNames(_ path: String) -> Bool {
         if path.utf8.allSatisfy({ $0 < 0x80 }) { return true }
         let scalars = Array(path.unicodeScalars)
@@ -206,8 +212,10 @@ public enum RemotePath {
 
 /// A server address as the user types it (spec 11 › Address and URL syntax): `host`,
 /// `host:port`, `user@host:port` or `scheme://user:password@host:port/path`, where everything
-/// but the host is optional. The user name and the password are taken out of the text here and
-/// travel separately; the URLs handed to the panels never contain them.
+/// but the host is optional.
+///
+/// The user name and the password are taken out of the text here and travel separately; the URLs
+/// handed to the panels never contain them.
 public struct ServerAddress: Equatable, Sendable {
     public var scheme: String
     public var tls: TLSMode

@@ -69,6 +69,7 @@ private final class ProbingFileSystem: FileSystemProvider {
 }
 
 /// What a background thread produced.
+///
 /// Unchecked: the value is guarded by `lock`.
 private final class Outcome<Value>: @unchecked Sendable {
     private let lock = NSLock()
@@ -356,9 +357,10 @@ extension MemoryFileSystem {
         return registry
     }
 
-    /// The order is the kernel's, with digits by value. (It was Foundation's localized
-    /// comparison, which is no order and ends the program for certain names; for plain names
-    /// the two agree, which the second half checks.)
+    /// The order is the kernel's, with digits by value.
+    ///
+    /// (It was Foundation's localized comparison, which is no order and ends the program for
+    /// certain names; for plain names the two agree, which the second half checks.).
     @Test func theWalkOrdersNamesAsTheSystemDoes() {
         var state: UInt64 = 7
         let alphabet = Array("aAbBzZ0019_.- \u{e9}(")

@@ -125,7 +125,9 @@ struct SFTPEncoder {
     }
 }
 
-/// Reads the body of a packet. Everything comes from the server, so every step is checked.
+/// Reads the body of a packet.
+///
+/// Everything comes from the server, so every step is checked.
 struct SFTPDecoder {
     private let data: Data
     private var offset: Int
@@ -153,8 +155,10 @@ struct SFTPDecoder {
     mutating func string() throws -> String { String(decoding: try bytes(), as: UTF8.self) }
 
     /// A file name, and the encoding that read it: UTF-8 where the bytes are UTF-8, else
-    /// Latin 1, which reads any bytes and writes the same bytes back. Read as UTF-8 with
-    /// replacement characters, such a name could never be sent to the server again.
+    /// Latin 1, which reads any bytes and writes the same bytes back.
+    ///
+    /// Read as UTF-8 with replacement characters, such a name could never be sent to the server
+    /// again.
     mutating func name() throws -> (text: String, encoding: String.Encoding) {
         let raw = Data(try bytes())
         if let text = String(data: raw, encoding: .utf8) { return (text, .utf8) }
@@ -248,8 +252,10 @@ enum SFTPRequest: UInt8 {
 
 /// Lets `ssh` ask its questions (a password, the passphrase of a key, an unknown host key)
 /// through this program instead of a terminal: `SSH_ASKPASS` points to a tiny script that
-/// writes the question into one named pipe and reads the answer from another. Nothing secret
-/// is ever put into the environment, on the command line or into a file. Used by one thread.
+/// writes the question into one named pipe and reads the answer from another.
+///
+/// Nothing secret is ever put into the environment, on the command line or into a file. Used by one
+/// thread.
 ///
 /// Every run of the script gives its question a number of its own and takes only the answer
 /// that carries it: an answer that was written for a script which ssh had ended meanwhile
@@ -393,8 +399,9 @@ final class SFTPChannel: @unchecked Sendable {
     private var waiting: [UInt32: Pending<SFTPPacket>] = [:]
     private var nextID: UInt32 = 1
     private var closed = false
-    /// Requests nobody waits for (a handle to be closed), complete packets in order. They go
-    /// out before the next packet anyone writes, so the server sees them in the order they
+    /// Requests nobody waits for (a handle to be closed), complete packets in order.
+    ///
+    /// They go out before the next packet anyone writes, so the server sees them in the order they
     /// were asked for, and the thread that asked does not wait for the pipe.
     private var deferred: [Data] = []
     /// When the server was last heard from.
@@ -449,7 +456,9 @@ final class SFTPChannel: @unchecked Sendable {
 
     /// `errorMessage` once the child process has had its say: when the dialogue broke off, the
     /// reading thread first reads what the process still wrote, and this waits for that, for a
-    /// moment at most. For the thread that found the connection lost and wants to say why.
+    /// moment at most.
+    ///
+    /// For the thread that found the connection lost and wants to say why.
     func errorMessageAtTheEnd() -> String {
         // The reading thread comes to the end once the process has gone; on a busy machine that
         // can take a moment longer than the process itself, so it is given a few seconds.
@@ -534,8 +543,9 @@ final class SFTPChannel: @unchecked Sendable {
     }
 
     /// Reads what the child process still has to say on its error output, for a moment at most
-    /// (a process ssh started may hold the pipe open for longer). Runs on the reading thread,
-    /// once, when the dialogue has ended.
+    /// (a process ssh started may hold the pipe open for longer).
+    ///
+    /// Runs on the reading thread, once, when the dialogue has ended.
     private func drainErrors() {
         let handle = errors.fileHandleForReading
         handle.readabilityHandler = nil
@@ -565,7 +575,9 @@ final class SFTPChannel: @unchecked Sendable {
     /// How long the thread that found the connection lost waits for the reading thread to see the end.
     static let endTime: TimeInterval = 8
 
-    /// Reads packets until the stream ends or `handle` returns false. Runs on the reading thread.
+    /// Reads packets until the stream ends or `handle` returns false.
+    ///
+    /// Runs on the reading thread.
     private static func readPackets(from input: FileHandle, handle: (SFTPPacket) -> Bool) {
         // `FileHandle` reads again when a signal interrupts it; a failure is the end of the stream.
         func readExactly(_ count: Int) -> Data? {
@@ -630,14 +642,16 @@ final class SFTPChannel: @unchecked Sendable {
     /// takes nothing at all.
     private static let cancelGrace: TimeInterval = 2
 
-    /// Writes all of `packet` into the pipe. The pipe does not block: when it is full the
-    /// writer waits for room, up to `writeTimeout` without progress. A cancellation is obeyed
-    /// at once before the first byte. After it, the packet is finished for as long as the pipe
-    /// keeps taking bytes: the channel is shared, a packet left half written would end the
-    /// dialogue for every transfer, and a packet is small (a block of a file at most), so on a
-    /// slow line, where the pipe is always full but always moving, cancelling one upload costs
-    /// the others nothing. Only when the pipe takes nothing for `cancelGrace` is the cancelled
-    /// writer let go, and the channel with it: that line is not moving for anybody.
+    /// Writes all of `packet` into the pipe.
+    ///
+    /// The pipe does not block: when it is full the writer waits for room, up to `writeTimeout`
+    /// without progress. A cancellation is obeyed at once before the first byte. After it, the
+    /// packet is finished for as long as the pipe keeps taking bytes: the channel is shared, a
+    /// packet left half written would end the dialogue for every transfer, and a packet is small (a
+    /// block of a file at most), so on a slow line, where the pipe is always full but always
+    /// moving, cancelling one upload costs the others nothing. Only when the pipe takes nothing for
+    /// `cancelGrace` is the cancelled writer let go, and the channel with it: that line is not
+    /// moving for anybody.
     ///
     /// `descriptor` does not block (a write that does not block is not interrupted by a signal);
     /// `isClosed` says whether the channel was closed meanwhile.
@@ -684,8 +698,10 @@ final class SFTPChannel: @unchecked Sendable {
     }
 
     /// Writes one complete packet, after the packets that were put aside for it
-    /// (`sendWithoutAnswer`). Any failure in the middle of a packet leaves the dialogue
-    /// unusable and ends the channel; a cancellation that comes before the first byte does not.
+    /// (`sendWithoutAnswer`).
+    ///
+    /// Any failure in the middle of a packet leaves the dialogue unusable and ends the channel; a
+    /// cancellation that comes before the first byte does not.
     private func write(_ packet: Data?, cancellation: CancellationFlag? = nil) throws {
         do {
             try lockForWriting(cancellation: cancellation)
@@ -716,10 +732,12 @@ final class SFTPChannel: @unchecked Sendable {
     }
 
     /// Sends a request whose answer nobody needs (closing a handle that was only read, or one of
-    /// a transfer that was given up). Returns at once, from any thread: the packet is put in
-    /// line and written before the next request, by whoever writes next or, when nobody does, in
-    /// the background. The server therefore sees it before anything that is asked afterwards
-    /// (the removal of a file whose handle is closed here).
+    /// a transfer that was given up).
+    ///
+    /// Returns at once, from any thread: the packet is put in line and written before the next
+    /// request, by whoever writes next or, when nobody does, in the background. The server
+    /// therefore sees it before anything that is asked afterwards (the removal of a file whose
+    /// handle is closed here).
     func sendWithoutAnswer(_ type: SFTPRequest, _ build: (inout SFTPEncoder) -> Void) {
         var packet = SFTPEncoder()
         packet.names = names
@@ -775,19 +793,23 @@ final class SFTPChannel: @unchecked Sendable {
     /// The answer when it has arrived; never waits.
     func poll(_ ticket: Ticket) -> SFTPPacket? { ticket.answer.poll() }
 
-    /// Stops expecting the answer of a request. If it still comes it is dropped.
+    /// Stops expecting the answer of a request.
+    ///
+    /// If it still comes it is dropped.
     func abandon(_ ticket: Ticket) {
         lock.lock()
         waiting[ticket.id] = nil
         lock.unlock()
     }
 
-    /// Waits for one answer. When it takes too long only this request is given up: the answers
-    /// are matched by number, so the others are not affected, and a server that is merely
-    /// slow with one request does not lose every transfer that is running. But when nothing at
-    /// all arrived from the server in that time, the connection is taken for dead and the
-    /// channel is closed: every later request would otherwise wait out its own time limit on
-    /// it, one after the other. The next request opens a new channel.
+    /// Waits for one answer.
+    ///
+    /// When it takes too long only this request is given up: the answers are matched by number, so
+    /// the others are not affected, and a server that is merely slow with one request does not lose
+    /// every transfer that is running. But when nothing at all arrived from the server in that
+    /// time, the connection is taken for dead and the channel is closed: every later request would
+    /// otherwise wait out its own time limit on it, one after the other. The next request opens a
+    /// new channel.
     func wait(for ticket: Ticket, timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws -> SFTPPacket {
         let began = Date()
         let packet: SFTPPacket?
@@ -824,7 +846,9 @@ final class SFTPChannel: @unchecked Sendable {
         }
     }
 
-    /// Ends the dialogue and the child process. Returns at once, from any thread.
+    /// Ends the dialogue and the child process.
+    ///
+    /// Returns at once, from any thread.
     func close() {
         errors.fileHandleForReading.readabilityHandler = nil
         // Marked closed first: a `start` under way then either starts nothing, or has started

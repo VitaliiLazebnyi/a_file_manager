@@ -6,8 +6,9 @@ import Testing
 
 @testable import ViewerPlugin
 
-/// The keys of a Lister pane as the application delivers them, and who has the keyboard. The
-/// windows are never put on screen.
+/// The keys of a Lister pane as the application delivers them, and who has the keyboard.
+///
+/// The windows are never put on screen.
 @MainActor
 @Suite(.serialized)
 internal struct CovViewPaneKeyboardTests {

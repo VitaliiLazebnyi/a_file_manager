@@ -40,7 +40,9 @@ struct RenameStep: Equatable {
 }
 
 /// Works out what a set of renames collides with and in which order it can be carried out
-/// (spec 09 › Name conflicts). Pure: it sees locations only and never touches a file system.
+/// (spec 09 › Name conflicts).
+///
+/// Pure: it sees locations only and never touches a file system.
 ///
 /// Everywhere, `sources[i]` is where item i is, and `targets[i]` where it is to go: nil when
 /// the item stays (no name, skipped), the source itself when the name does not change.
@@ -70,9 +72,10 @@ struct RenamePlanner {
         return plain.precomposedStringWithCanonicalMapping.lowercased()
     }
 
-    /// Whether the item changes place or name. Byte for byte: a name that differs only in how an
-    /// accented letter is written (precomposed or not) is another name, though Swift calls the
-    /// two equal.
+    /// Whether the item changes place or name.
+    ///
+    /// Byte for byte: a name that differs only in how an accented letter is written (precomposed or
+    /// not) is another name, though Swift calls the two equal.
     private func moves(_ source: URL, _ target: URL?) -> Bool {
         guard let target else { return false }
         return !target.locationKey.utf8.elementsEqual(source.locationKey.utf8)
@@ -141,9 +144,10 @@ struct RenamePlanner {
     }
 
     /// The targets with the items that collide, and those that this puts in the way of
-    /// others in turn, left where they are ("Skip these files"). An item that stays keeps its
-    /// name, which another item may want: such an item is skipped as well, and so on along
-    /// a chain. Works through a list of items to look at, once each.
+    /// others in turn, left where they are ("Skip these files").
+    ///
+    /// An item that stays keeps its name, which another item may want: such an item is skipped as
+    /// well, and so on along a chain. Works through a list of items to look at, once each.
     func skippingConflicts(sources: [URL], targets: [URL?], existing: Set<String>) -> [URL?] {
         var targets = targets
         var wanting: [String: [Int]] = [:]
@@ -165,8 +169,10 @@ struct RenamePlanner {
     /// The longest a name can be, in UTF-8 bytes.
     static let longestName = 255
 
-    /// `report.txt` → `report (2).txt`; a folder keeps its dots. A name that the number would make
-    /// too long for the file system is shortened at its base, between two characters.
+    /// `report.txt` → `report (2).txt`; a folder keeps its dots.
+    ///
+    /// A name that the number would make too long for the file system is shortened at its base,
+    /// between two characters.
     static func numbered(_ url: URL, _ number: Int, isFolder: Bool) -> URL {
         let name = url.lastPathComponent
         let (base, ext) = isFolder ? (name, "") : FileItem.split(name)
@@ -220,9 +226,10 @@ struct RenamePlanner {
     }
 
     /// The renames in an order that works: list order, except that an item whose new name
-    /// is still held by another item of the list waits for that one. A ring of such items
-    /// (`1.txt` ↔ `2.txt`) is opened by moving one of them to a temporary name first.
-    /// `temporaryName` gives that name for an item; it must be free in the item's folder.
+    /// is still held by another item of the list waits for that one.
+    ///
+    /// A ring of such items (`1.txt` ↔ `2.txt`) is opened by moving one of them to a temporary name
+    /// first. `temporaryName` gives that name for an item; it must be free in the item's folder.
     ///
     /// With `isFolder`, a folder and what lies in it that are renamed in one run are done
     /// inside out, deepest first: the items inside a folder are still where the list says they

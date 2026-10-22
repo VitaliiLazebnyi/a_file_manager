@@ -4,7 +4,9 @@ import AFMShell
 import AppKit
 
 /// What the configuration windows and commands share: the user's commands and Start menu, the
-/// key bindings, and the settings as a whole. Main thread only.
+/// key bindings, and the settings as a whole.
+///
+/// Main thread only.
 @MainActor
 final class ConfigurationCenter {
     unowned let kernel: Kernel
@@ -58,8 +60,10 @@ final class ConfigurationCenter {
         store.userCommand(named: name)
     }
 
-    /// Makes a user command a command of the program. It looks its definition up when it runs,
-    /// so a later change takes effect at once; its title in menus is the one it started with.
+    /// Makes a user command a command of the program.
+    ///
+    /// It looks its definition up when it runs, so a later change takes effect at once; its title
+    /// in menus is the one it started with.
     func register(_ command: UserCommand) {
         let name = command.name
         guard kernel.commands[command.id] == nil else { return }
@@ -115,8 +119,9 @@ final class ConfigurationCenter {
         kernel.toolbar.onChange?()
     }
 
-    /// The definition dialog of a user command (spec 14 › Defining). Nil when the user gave
-    /// up or the name cannot be used.
+    /// The definition dialog of a user command (spec 14 › Defining).
+    ///
+    /// Nil when the user gave up or the name cannot be used.
     func editUserCommand(_ existing: UserCommand?, proposing action: CommandAction = CommandAction()) -> UserCommand? {
         let action = existing?.action ?? action
         let keys = existing.map { kernel.keyBindings.shortcuts(for: $0.id) } ?? []
@@ -190,7 +195,9 @@ final class ConfigurationCenter {
     }
 
     /// Registers `cm_UserMenu1` … for every position there is, and at least the ten the
-    /// specification names (17 › User). A command runs whatever entry is at its position now.
+    /// specification names (17 › User).
+    ///
+    /// A command runs whatever entry is at its position now.
     func ensureSlots(_ count: Int) {
         let entries = store.startMenu
         while slotCount < max(10, min(count, ConfigurationStore.startMenuLimit)) {
@@ -300,6 +307,7 @@ final class ConfigurationCenter {
     // MARK: Keys
 
     /// Gives a command the key written in `text` as its only key, or none for an empty text.
+    ///
     /// Returns false when the text is not a shortcut or the user left the key with its owner.
     @discardableResult
     func setShortcut(_ text: String, for command: CommandID) -> Bool {
@@ -323,8 +331,9 @@ final class ConfigurationCenter {
         return true
     }
 
-    /// Brings the menu bar in line with the key bindings and the Start menu. The shell builds
-    /// its menus once; this changes the items in place.
+    /// Brings the menu bar in line with the key bindings and the Start menu.
+    ///
+    /// The shell builds its menus once; this changes the items in place.
     func refreshMenus() {
         guard let menu = effects.mainMenu() else { return }
         LiveMenus.rebuildStartMenu(in: menu, entries: store.startMenu, target: startMenuTarget)
@@ -368,7 +377,9 @@ final class ConfigurationCenter {
         return schema
     }
 
-    /// Asks what an export is to hold besides the settings themselves. Nil when the user gave up.
+    /// Asks what an export is to hold besides the settings themselves.
+    ///
+    /// Nil when the user gave up.
     func askExportOptions() -> SettingsExportOptions? {
         let fields: [FormField] = [
             .note(
@@ -388,8 +399,10 @@ final class ConfigurationCenter {
         )
     }
 
-    /// Writes the settings to a file only the user can read. What the user did rather than set
-    /// up (histories), and the servers the user connects to, are in it only when `options` says so.
+    /// Writes the settings to a file only the user can read.
+    ///
+    /// What the user did rather than set up (histories), and the servers the user connects to, are
+    /// in it only when `options` says so.
     func exportSettings(
         to url: URL,
         options: SettingsExportOptions = SettingsExportOptions(),
@@ -424,9 +437,10 @@ final class ConfigurationCenter {
     }
 
     /// Reads a settings file, checks it, shows what it would change and stores it when the
-    /// user agrees. What can run programs, rebind keys or change whom the program trusts is
-    /// stored only when the user ticks it. Nothing is ever imported without this question,
-    /// whoever asked for the import.
+    /// user agrees.
+    ///
+    /// What can run programs, rebind keys or change whom the program trusts is stored only when the
+    /// user ticks it. Nothing is ever imported without this question, whoever asked for the import.
     func importSettings(from url: URL) {
         let schema = settingsSchema()
         let knownKeys = settingsKeys()
@@ -534,8 +548,9 @@ final class ConfigurationCenter {
     }
 
     /// Writes down now what the shell writes when the program quits: the panels' tabs and
-    /// directories (spec 19 › Save Position, Save Settings). Everything else is stored the
-    /// moment it changes.
+    /// directories (spec 19 › Save Position, Save Settings).
+    ///
+    /// Everything else is stored the moment it changes.
     func saveSettingsNow() {
         kernel.settings.set(kernel.panels.left.tabs.state, forKey: "left.tabs")
         kernel.settings.set(kernel.panels.right.tabs.state, forKey: "right.tabs")

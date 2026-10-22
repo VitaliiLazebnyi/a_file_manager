@@ -104,9 +104,10 @@ public enum VirtualLocation: Equatable {
         plain(real.path)
     }
 
-    /// What stands in front of the path of a real URL: `file://`, `sftp://user@host:22`. A
-    /// password is left out: this is written into tabs, history and the hotlist, which must
-    /// not hold one.
+    /// What stands in front of the path of a real URL: `file://`, `sftp://user@host:22`.
+    ///
+    /// A password is left out: this is written into tabs, history and the hotlist, which must not
+    /// hold one.
     private static func prefix(of real: URL) -> String {
         var text = (real.scheme ?? "file") + "://"
         if let user = real.user(percentEncoded: true) { text += user + "@" }

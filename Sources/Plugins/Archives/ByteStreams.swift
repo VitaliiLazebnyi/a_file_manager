@@ -2,7 +2,9 @@ import AFMKernel
 import Foundation
 
 /// Bytes read from front to back: a part of a file, the output of a decompressor or of a
-/// child process. A stream belongs to the thread that reads it.
+/// child process.
+///
+/// A stream belongs to the thread that reads it.
 protocol ByteStream: AnyObject {
     /// The next block, never empty; nil at the end.
     func read(upToCount count: Int) throws -> Data?
@@ -49,8 +51,10 @@ func posixError(_ code: Int32, _ path: String) -> any Error {
 }
 
 /// A file on the local disk that is read at any position, from any number of threads at once
-/// (`pread` keeps no position). The file stays readable for as long as this object lives, even
-/// when it is replaced or deleted meanwhile.
+/// (`pread` keeps no position).
+///
+/// The file stays readable for as long as this object lives, even when it is replaced or deleted
+/// meanwhile.
 final class RandomAccessFile: Sendable {
     let size: UInt64
     let path: String
@@ -109,8 +113,10 @@ final class RandomAccessFile: Sendable {
 }
 
 /// A request to end a read that runs through streams (decompressing, skipping on to a member,
-/// waiting for a child process). Set from any thread; the streams that can take long look at it
-/// and throw, and a child process is stopped by it. All state is guarded by `lock`.
+/// waiting for a child process).
+///
+/// Set from any thread; the streams that can take long look at it and throw, and a child process is
+/// stopped by it. All state is guarded by `lock`.
 final class StreamInterrupt: @unchecked Sendable {
     private let lock = NSLock()
     private var isRaised = false
@@ -135,8 +141,9 @@ final class StreamInterrupt: @unchecked Sendable {
         if isSet { throw ArchiveError.cancelled }
     }
 
-    /// Runs `handler` when the request is set, at once if it is already. Holds on to what it
-    /// touches weakly.
+    /// Runs `handler` when the request is set, at once if it is already.
+    ///
+    /// Holds on to what it touches weakly.
     func onSet(_ handler: @escaping @Sendable () -> Void) {
         lock.lock()
         guard isRaised else {
@@ -155,9 +162,11 @@ final class StreamInterrupt: @unchecked Sendable {
 }
 
 /// Where the reader of a member hands the streams it reads through to its owner's request to
-/// stop, which may come at any time from another thread. A stream that is kept for the next
-/// reader (see `OpenArchive.park`) is let go of at `release()`, so that a request that comes
-/// later cannot end somebody else's read. All state is guarded by `lock`.
+/// stop, which may come at any time from another thread.
+///
+/// A stream that is kept for the next reader (see `OpenArchive.park`) is let go of at `release()`,
+/// so that a request that comes later cannot end somebody else's read. All state is guarded by
+/// `lock`.
 final class InterruptSlot: @unchecked Sendable {
     private let lock = NSLock()
     private var interrupted = false
@@ -265,9 +274,10 @@ extension UInt64 {
     }
 }
 
-/// Lets through no more than a member is said to hold. A member that unpacks to more than its
-/// directory entry declares is damaged or made to fill the disk; it is stopped at the first
-/// byte too many instead of after the last.
+/// Lets through no more than a member is said to hold.
+///
+/// A member that unpacks to more than its directory entry declares is damaged or made to fill the
+/// disk; it is stopped at the first byte too many instead of after the last.
 final class SizeGuardStream: ByteStream {
     private let source: any ByteStream
     private var left: UInt64
@@ -292,7 +302,9 @@ final class SizeGuardStream: ByteStream {
 }
 
 /// Passes a stream on and keeps a copy of what was read in a file, for as long as the copy
-/// stays below `limit` (and the disk takes it). Used by one thread.
+/// stays below `limit` (and the disk takes it).
+///
+/// Used by one thread.
 final class TeeStream: ByteStream {
     private let source: any ByteStream
     private let output: OutputFile
@@ -327,7 +339,9 @@ final class TeeStream: ByteStream {
 }
 
 /// A new file on the local disk, written from front to back, with the possibility to go back
-/// and correct a header. Used by one thread.
+/// and correct a header.
+///
+/// Used by one thread.
 final class OutputFile {
     let url: URL
     private let descriptor: Int32
@@ -335,8 +349,10 @@ final class OutputFile {
     private var flushed: UInt64 = 0
     private var isClosed = false
 
-    /// The file must not exist yet. It is the user's alone until whoever writes it says
-    /// otherwise (`setMode`): a half-written archive is nobody else's to read.
+    /// The file must not exist yet.
+    ///
+    /// It is the user's alone until whoever writes it says otherwise (`setMode`): a half-written
+    /// archive is nobody else's to read.
     init(creating url: URL, mode: mode_t = 0o600) throws {
         self.url = url
         descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode)
@@ -447,7 +463,9 @@ final class OutputFile {
 enum Durable {
     /// Waits until the file's data is on the disk, in order (`F_BARRIERFSYNC`: what the file
     /// system needs to keep a rename behind it honest, without emptying the drive's cache as
-    /// `F_FULLFSYNC` does). File systems that do not know it get a plain `fsync`.
+    /// `F_FULLFSYNC` does).
+    ///
+    /// File systems that do not know it get a plain `fsync`.
     static func sync(_ descriptor: Int32) -> Bool {
         if fcntl(descriptor, F_BARRIERFSYNC) == 0 { return true }
         return fsync(descriptor) == 0
@@ -470,8 +488,9 @@ enum Durable {
     }
 }
 
-/// Little-endian numbers in a block of bytes, as ZIP stores them. Reading past the end gives
-/// zero instead of a crash: the callers check signatures and lengths.
+/// Little-endian numbers in a block of bytes, as ZIP stores them.
+///
+/// Reading past the end gives zero instead of a crash: the callers check signatures and lengths.
 struct ByteReader {
     let data: Data
     var position = 0
@@ -515,7 +534,9 @@ extension Data {
 }
 
 /// Watches the room on a volume while something large is written to it: asked for every
-/// block, it looks at the volume once per `step` bytes. Used by one thread.
+/// block, it looks at the volume once per `step` bytes.
+///
+/// Used by one thread.
 final class SpaceWatch {
     private let folder: URL
     private let reserve: UInt64
@@ -545,9 +566,11 @@ final class SpaceWatch {
 }
 
 /// A folder for the plugin's temporary files: archives copied from other file systems, data
-/// waiting to be written into an archive. It is the user's alone (0700). Emptied when the
-/// plugin stops, and in any case when the program exits; what a crash leaves behind is cleared
-/// away by the next start (`sweepLeftovers`). Safe to use from any thread.
+/// waiting to be written into an archive.
+///
+/// It is the user's alone (0700). Emptied when the plugin stops, and in any case when the program
+/// exits; what a crash leaves behind is cleared away by the next start (`sweepLeftovers`). Safe to
+/// use from any thread.
 ///
 /// Temporary files that have to lie elsewhere (next to an archive on another volume) are
 /// noted in a list beside the folder, so that they are found again and removed too.
@@ -594,7 +617,9 @@ final class ScratchFolder: @unchecked Sendable {
 
     private var listPath: String { url.path + ".external" }
 
-    /// Makes the folder if it is not there. Any thread.
+    /// Makes the folder if it is not there.
+    ///
+    /// Any thread.
     private func prepare() throws {
         _ = Self.atExit
         Self.lock.lock()
@@ -628,8 +653,10 @@ final class ScratchFolder: @unchecked Sendable {
         try? FileManager.default.removeItem(atPath: path)
     }
 
-    /// Notes a temporary file or folder that lies outside this folder. It is removed with the
-    /// folder if it is still there then, and by the next start if the program dies before.
+    /// Notes a temporary file or folder that lies outside this folder.
+    ///
+    /// It is removed with the folder if it is still there then, and by the next start if the
+    /// program dies before.
     func noteExternal(_ url: URL) {
         guard Self.isOwnExternalName(url.lastPathComponent) else { return }
         try? prepare()
@@ -679,8 +706,10 @@ final class ScratchFolder: @unchecked Sendable {
     }
 
     /// Removes the folders, and the temporary files noted outside them, of processes that no
-    /// longer run: what a crash or a kill left behind. Folders that were kept on purpose stay.
-    /// Touches the disk; meant for a background thread, once at the start.
+    /// longer run: what a crash or a kill left behind.
+    ///
+    /// Folders that were kept on purpose stay. Touches the disk; meant for a background thread,
+    /// once at the start.
     static func sweepLeftovers(in parent: URL = FileManager.default.temporaryDirectory) {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else { return }
         for name in names where name.hasPrefix(prefix) {

@@ -2,7 +2,9 @@ public import AFMKernel
 public import Foundation
 import Security
 
-/// Where the passwords of saved connections are kept. Safe from any thread.
+/// Where the passwords of saved connections are kept.
+///
+/// Safe from any thread.
 public protocol PasswordStore: AnyObject, Sendable {
     func password(for account: String) -> String?
     /// Nil removes the password.
@@ -50,8 +52,10 @@ public final class KeychainPasswords: PasswordStore {
         return String(data: data, encoding: .utf8)
     }
 
-    /// The stored password is changed in place. It is only removed when that is what was
-    /// asked for: removed first and added again, a failing second step would lose it.
+    /// The stored password is changed in place.
+    ///
+    /// It is only removed when that is what was asked for: removed first and added again, a failing
+    /// second step would lose it.
     public func setPassword(_ password: String?, for account: String) {
         guard let password else {
             _ = calls.delete(query(account) as CFDictionary)
@@ -105,8 +109,10 @@ public final class PasswordVault: @unchecked Sendable {
         return "\(connection.id.uuidString) \(key.scheme)://\(user)@\(key.host):\(key.port)"
     }
 
-    /// Tells which connections exist. Cheap; called on the main thread whenever the list changed.
-    /// The first call also moves the passwords an earlier version kept by identifier alone, once.
+    /// Tells which connections exist.
+    ///
+    /// Cheap; called on the main thread whenever the list changed. The first call also moves the
+    /// passwords an earlier version kept by identifier alone, once.
     public func setConnections(_ connections: [SavedConnection]) {
         var current: [UUID: String] = [:]
         for connection in connections { current[connection.id] = Self.account(of: connection) }
@@ -134,21 +140,26 @@ public final class PasswordVault: @unchecked Sendable {
 
     /// The stored password for a login that comes from a saved connection; nil when the
     /// connection is not known as it is now (its host or user is not the one the password was
-    /// stored for). Waits for the store: for connecting threads, never the main thread.
+    /// stored for).
+    ///
+    /// Waits for the store: for connecting threads, never the main thread.
     public func password(for profile: ConnectionProfile) -> String? {
         guard let id = profile.savedID, let account = account(of: id) else { return nil }
         return queue.sync { store.password(for: account) }
     }
 
-    /// Stores, or with nil removes, the password of a connection. Returns at once.
+    /// Stores, or with nil removes, the password of a connection.
+    ///
+    /// Returns at once.
     public func setPassword(_ password: String?, for connection: SavedConnection) {
         let account = Self.account(of: connection)
         queue.async { [store] in store.setPassword(password, for: account) }
     }
 
     /// Gives `connection` the password that `original` has: for a copy of a connection, and
-    /// for a connection whose host or user the user changed in the dialog. With `removing`,
-    /// the original's is removed afterwards. Returns at once.
+    /// for a connection whose host or user the user changed in the dialog.
+    ///
+    /// With `removing`, the original's is removed afterwards. Returns at once.
     public func carryPassword(from original: SavedConnection, to connection: SavedConnection, removing: Bool) {
         let (from, to) = (Self.account(of: original), Self.account(of: connection))
         guard from != to else { return }
@@ -158,13 +169,17 @@ public final class PasswordVault: @unchecked Sendable {
         }
     }
 
-    /// The certificates the user accepted for good, by host. Waits for the store.
+    /// The certificates the user accepted for good, by host.
+    ///
+    /// Waits for the store.
     public func trustedCertificates() -> [String: [String]] {
         queue.sync { [store] in Self.decode(store.password(for: Self.trustedAccount)) }
     }
 
     /// Makes `fingerprints` the certificates accepted for good for `host`, in place of what was
-    /// stored for it, or with `adding` in addition to it. Returns at once.
+    /// stored for it, or with `adding` in addition to it.
+    ///
+    /// Returns at once.
     public func setTrusted(_ fingerprints: [String], for host: String, adding: Bool) {
         let host = host.lowercased()
         queue.async { [store] in
@@ -178,7 +193,9 @@ public final class PasswordVault: @unchecked Sendable {
         }
     }
 
-    /// Whether a certificate is stored for good for `host`. Waits for the store.
+    /// Whether a certificate is stored for good for `host`.
+    ///
+    /// Waits for the store.
     public func hasTrusted(for host: String) -> Bool {
         !(trustedCertificates()[host.lowercased()] ?? []).isEmpty
     }
@@ -197,6 +214,7 @@ public final class PasswordVault: @unchecked Sendable {
 }
 
 /// Passwords that live as long as the program; for tests, which never touch the Keychain.
+///
 /// All state is guarded by `lock`.
 public final class MemoryPasswords: PasswordStore, @unchecked Sendable {
     private let lock = NSLock()
@@ -223,8 +241,9 @@ public final class MemoryPasswords: PasswordStore, @unchecked Sendable {
     }
 }
 
-/// A connection the user saved (spec 11 › "FTP: connection details" dialog). The password is
-/// not part of it: it is kept in the Keychain under the connection's `id`.
+/// A connection the user saved (spec 11 › "FTP: connection details" dialog).
+///
+/// The password is not part of it: it is kept in the Keychain under the connection's `id`.
 public struct SavedConnection: Codable, Equatable, Sendable {
     /// The protocols in the order the dialog offers them.
     public enum Kind: Int, Codable, CaseIterable, Sendable {
@@ -308,7 +327,9 @@ public struct SavedConnection: Codable, Equatable, Sendable {
 
     /// Reads a connection from the settings, which a damaged or foreign file may have filled
     /// with anything: a member that is missing or of the wrong kind takes its usual value, and
-    /// a port that is none (`-2`, `70000`) is the usual port. Only the identifier must be there.
+    /// a port that is none (`-2`, `70000`) is the usual port.
+    ///
+    /// Only the identifier must be there.
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         func read<Value: Decodable>(_ key: CodingKeys, _ fallback: Value) -> Value {
@@ -360,7 +381,9 @@ public struct SavedConnection: Codable, Equatable, Sendable {
     }
 
     /// Fills host, port, protocol and user from what was typed into the host field, which may
-    /// be a plain name, `host:port`, or a whole address with a scheme. False when it is none of these.
+    /// be a plain name, `host:port`, or a whole address with a scheme.
+    ///
+    /// False when it is none of these.
     public mutating func setHost(_ text: String, kind chosen: Kind) -> Bool {
         guard let address = ServerAddress(text, defaultScheme: chosen.scheme) else { return false }
         let hasScheme = text.contains("://")
@@ -382,7 +405,9 @@ public struct SavedConnection: Codable, Equatable, Sendable {
 }
 
 /// The saved connections and what else the connection dialogs remember, in the plugin's corner
-/// of the settings (`network.`). Passwords go to the `PasswordStore`. Main thread only.
+/// of the settings (`network.`).
+///
+/// Passwords go to the `PasswordStore`. Main thread only.
 @MainActor
 public final class ConnectionStore {
     private let settings: any SettingsStore
@@ -440,7 +465,9 @@ public final class ConnectionStore {
         set { settings.set(newValue, forKey: Self.lastUsedKey) }
     }
 
-    /// The addresses of quick connections, newest first. They never contain a password.
+    /// The addresses of quick connections, newest first.
+    ///
+    /// They never contain a password.
     public var history: [String] {
         settings.value([String].self, forKey: Self.historyKey) ?? []
     }
@@ -454,11 +481,12 @@ public final class ConnectionStore {
     }
 
     /// What an earlier version kept in the settings: certificates to always trust, by host.
+    ///
     /// **Nothing trusts these any more.** The settings can be replaced by a file from somebody
     /// else, and a fingerprint planted there would make a forged certificate pass without a
-    /// question. The certificates the user accepts for good are kept by `vault`; what stands
-    /// here is ignored and removed (`forgetTrustedCertificatesInSettings`), so each server
-    /// asks once more.
+    /// question. The certificates the user accepts for good are kept by `vault`; what stands here
+    /// is ignored and removed (`forgetTrustedCertificatesInSettings`), so each server asks once
+    /// more.
     public var trustedCertificates: [String: [String]] {
         get { settings.value([String: [String]].self, forKey: "trustedCertificates") ?? [:] }
         set { settings.set(newValue, forKey: "trustedCertificates") }

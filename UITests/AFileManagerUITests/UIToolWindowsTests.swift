@@ -2,7 +2,9 @@ import XCTest
 
 /// The hotlist editor, the directory tree, Find Files and the Multi-Rename tool, where they hand
 /// over to the system: a modal editor, the beep of a search that finds nothing, open panels as
-/// sheets. Everything is cancelled or closed.
+/// sheets.
+///
+/// Everything is cancelled or closed.
 @MainActor
 internal final class UIToolWindowsTests: XCTestCase {
     /// The program of the running test, once started.

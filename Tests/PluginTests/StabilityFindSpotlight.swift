@@ -1,7 +1,9 @@
 @testable import FindFilesPlugin
 
 /// A question to Spotlight that answers when the test says, also after it was stopped, as an
-/// answer that was already on its way does. Used on the main thread only.
+/// answer that was already on its way does.
+///
+/// Used on the main thread only.
 internal final class StabilityFindSpotlight: SpotlightQuestion {
     /// The most paths read out of the answer.
     internal let limit = 10

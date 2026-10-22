@@ -8,9 +8,10 @@ import Testing
 @testable import ViewerPlugin
 
 /// What a Lister pane does with results that come late (the pane moved on meanwhile), files of
-/// other file systems shown in the rich modes, and reads that fail or come back short. The work
-/// of a pane runs on its work queue; a barrier on that queue waits until what was handed to it
-/// has run, and its answers then wait for the main thread.
+/// other file systems shown in the rich modes, and reads that fail or come back short.
+///
+/// The work of a pane runs on its work queue; a barrier on that queue waits until what was handed
+/// to it has run, and its answers then wait for the main thread.
 @MainActor
 @Suite(.serialized)
 internal struct CovViewPaneLateTests {

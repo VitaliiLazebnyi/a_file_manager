@@ -1,8 +1,9 @@
 public import AFMKernel
 public import Foundation
 
-/// The directories one panel visited, oldest first (spec 03 › Directory history list). The
-/// panel's own back/forward list forgets what lay ahead; this one keeps every place once.
+/// The directories one panel visited, oldest first (spec 03 › Directory history list).
+///
+/// The panel's own back/forward list forgets what lay ahead; this one keeps every place once.
 public struct DirectoryHistory: Codable, Equatable {
     public struct Visit: Codable, Equatable {
         /// The location as a URL string, so it can be on any file system.
@@ -10,7 +11,9 @@ public struct DirectoryHistory: Codable, Equatable {
         /// False for a folder that was only passed through: thinning hides it from the list.
         public var isVisible: Bool
         /// The location key of `location`, worked out once, so that looking a visit up does not
-        /// parse a URL for each of the 200 that are kept. Not stored.
+        /// parse a URL for each of the 200 that are kept.
+        ///
+        /// Not stored.
         public private(set) var key: String
 
         private enum CodingKeys: String, CodingKey { case location, isVisible }
@@ -45,9 +48,11 @@ public struct DirectoryHistory: Codable, Equatable {
     /// The directory the panel is in, as far as the history knows.
     public var current: URL? { visits.last.flatMap { URL(string: $0.location) } }
 
-    /// The panel shows `directory` now. `stayedInPrevious` says whether the directory it left
-    /// was more than passed through; that one then stays visible under thinning. A directory
-    /// that was visited before moves to the end. Returns false when nothing changed.
+    /// The panel shows `directory` now.
+    ///
+    /// `stayedInPrevious` says whether the directory it left was more than passed through; that one
+    /// then stays visible under thinning. A directory that was visited before moves to the end.
+    /// Returns false when nothing changed.
     @discardableResult
     public mutating func record(_ directory: URL, stayedInPrevious: Bool) -> Bool {
         let key = directory.locationKey
@@ -68,8 +73,10 @@ public struct DirectoryHistory: Codable, Equatable {
         visits.removeAll { $0.key == key }
     }
 
-    /// The list as it is shown: the last visited first. With `thinning`, folders that were
-    /// only passed through are left out; the current directory is always there.
+    /// The list as it is shown: the last visited first.
+    ///
+    /// With `thinning`, folders that were only passed through are left out; the current directory
+    /// is always there.
     public func shown(thinning: Bool, limit: Int? = nil) -> [URL] {
         let last = visits.count - 1
         let urls = visits.enumerated().reversed()
@@ -197,8 +204,9 @@ public struct HistoryMenu {
     }
 }
 
-/// Follows the panels and keeps their histories (spec 13 › Operation › History). Main thread
-/// only; it is fed from `PanelEvents` and never touches a file system.
+/// Follows the panels and keeps their histories (spec 13 › Operation › History).
+///
+/// Main thread only; it is fed from `PanelEvents` and never touches a file system.
 @MainActor
 public final class DirectoryHistoryTracker {
     public enum Side: String, CaseIterable {
@@ -256,8 +264,9 @@ public final class DirectoryHistoryTracker {
         histories[side] ?? DirectoryHistory()
     }
 
-    /// The panel on `side` shows `directory`. Called for every location event, also when the
-    /// directory is still the same.
+    /// The panel on `side` shows `directory`.
+    ///
+    /// Called for every location event, also when the directory is still the same.
     public func visited(_ directory: URL, on side: Side) {
         var history = history(of: side)
         let time = now()

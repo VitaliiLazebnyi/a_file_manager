@@ -30,9 +30,11 @@ struct SpaceTotals: Equatable {
 
 /// Counts finished items from any thread and passes the count on to a job's progress window:
 /// at most twenty times a second, one thread at a time (the lock is held while reporting, so a
-/// `JobMonitor`, which expects one reporting thread, sees one at a time). Whichever thread
-/// comes by reports, because the job's own thread may be waiting for the others or deep in one
-/// slow folder; a paused job then stops the threads that come by, which is what Pause is for.
+/// `JobMonitor`, which expects one reporting thread, sees one at a time).
+///
+/// Whichever thread comes by reports, because the job's own thread may be waiting for the others or
+/// deep in one slow folder; a paused job then stops the threads that come by, which is what Pause
+/// is for.
 ///
 /// All state is guarded by `lock`.
 final class ProgressMeter: @unchecked Sendable {
@@ -77,7 +79,9 @@ struct SpaceCalculator {
     /// file; "Calculate all folder sizes" shows sizes only.
     var measuresAllocated = true
 
-    /// One figure per item, in the same order. A folder counts itself and everything below.
+    /// One figure per item, in the same order.
+    ///
+    /// A folder counts itself and everything below.
     func measure(_ items: [FileItem]) -> [SpaceTotals] {
         Parallel.map(items) { item in
             item.isRealDirectory ? measure(directory: item.url) + SpaceTotals(folders: 1) : measure(file: item)
@@ -101,8 +105,9 @@ struct SpaceCalculator {
         return size.addingSaturated(cluster - 1) / cluster * cluster
     }
 
-    /// Everything below a directory, not counting the directory itself. Links are counted as
-    /// the links they are and never followed.
+    /// Everything below a directory, not counting the directory itself.
+    ///
+    /// Links are counted as the links they are and never followed.
     func measure(directory: URL) -> SpaceTotals {
         guard !cancellation.isCancelled else { return SpaceTotals() }
         // Listed with the flag: a folder on a server that has stopped answering ends when the

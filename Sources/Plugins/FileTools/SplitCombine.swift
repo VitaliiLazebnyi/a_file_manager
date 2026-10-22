@@ -70,9 +70,10 @@ enum Splitter {
         base + String(format: ".%03d", number)
     }
 
-    /// Writes `<base>.001`, `<base>.002`, … and `<base>.crc` into `directory`. Returns the
-    /// files written. On failure or cancel nothing of them is left, and a file that was there
-    /// before is never touched: parts that replace one are written aside and take its place
+    /// Writes `<base>.001`, `<base>.002`, … and `<base>.crc` into `directory`.
+    ///
+    /// Returns the files written. On failure or cancel nothing of them is left, and a file that was
+    /// there before is never touched: parts that replace one are written aside and take its place
     /// only when all are done.
     @discardableResult
     static func split(_ source: FileItem, into directory: URL, partSize: Int64, run: ToolRun) throws -> [URL] {
@@ -178,7 +179,9 @@ enum PartSeries {
     }
 
     /// The name after `name` in its row: the decimal number of the same width, or the
-    /// letters a…z with carry (`az` → `ba`). Nil when the name has no counter or it is at its end.
+    /// letters a…z with carry (`az` → `ba`).
+    ///
+    /// Nil when the name has no counter or it is at its end.
     static func next(after name: String) -> String? {
         switch counter(in: name) {
         case .digits(let range):
@@ -253,7 +256,9 @@ enum Combiner {
     }
 
     /// What is to be combined when the cursor is on `item`: the row of parts and what the
-    /// `.crc` file says. The cursor may be on the first part or on the `.crc` file itself.
+    /// `.crc` file says.
+    ///
+    /// The cursor may be on the first part or on the `.crc` file itself.
     static func plan(for item: FileItem, run: ToolRun) throws -> (parts: [FileItem], info: SplitInfo?) {
         let provider = try run.provider(for: item.url)
         let directory = item.url.deletingLastPathComponent()

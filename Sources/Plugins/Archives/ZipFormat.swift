@@ -1,8 +1,9 @@
 import CommonCrypto
 import Foundation
 
-/// Above these values ZIP needs its 64-bit extension (ZIP64). They are parameters so that the
-/// rules can be tested without files of four gigabytes.
+/// Above these values ZIP needs its 64-bit extension (ZIP64).
+///
+/// They are parameters so that the rules can be tested without files of four gigabytes.
 struct ZipLimits: Equatable {
     /// The largest size or offset the classic 32-bit fields may hold.
     var maxField: UInt64 = 0xFFFF_FFFE
@@ -89,8 +90,9 @@ struct ZipRecord {
         /// What only the directory holds.
         static let attributes = Self(rawValue: 4)
         /// Not a change: the member came through a writer and has not been renamed since.
-        /// A job that copies a file in writes it under a temporary name first; such a member
-        /// is still on its way.
+        ///
+        /// A job that copies a file in writes it under a temporary name first; such a member is
+        /// still on its way.
         static let arriving = Self(rawValue: 8)
     }
 
@@ -114,9 +116,11 @@ struct ZipRecord {
         return nil
     }
 
-    /// The member's name. Names marked as UTF-8, and names that are valid UTF-8, are read as
-    /// such; then Info-ZIP's Unicode field is tried; what is left is the DOS character set
-    /// (spec 08 › File-name encoding).
+    /// The member's name.
+    ///
+    /// Names marked as UTF-8, and names that are valid UTF-8, are read as such; then Info-ZIP's
+    /// Unicode field is tried; what is left is the DOS character set (spec 08 › File-name
+    /// encoding).
     var name: String {
         if nameRaw.isEmpty {
             if flags & Self.flagUTF8 != 0 || nameText.utf8.allSatisfy({ $0 < 0x80 }) { return nameText }
@@ -261,8 +265,9 @@ struct ZipRecord {
         return nil
     }
 
-    /// The extra fields that fit into `room` bytes, whole fields only, in their order. Extra
-    /// data is optional: an entry whose fields grew past what a header can hold loses the
+    /// The extra fields that fit into `room` bytes, whole fields only, in their order.
+    ///
+    /// Extra data is optional: an entry whose fields grew past what a header can hold loses the
     /// last ones instead of becoming unwritable.
     static func fitting(_ extra: Data, into room: Int) -> Data {
         guard extra.count > room else { return extra }
@@ -348,11 +353,12 @@ enum ZipEncryption: Equatable {
     case legacy
 }
 
-/// WinZip's AES encryption of ZIP members (methods AE-1 and AE-2). A member is stored with
-/// method 99; an extra field says how strong the key is and how the data was compressed. Its
-/// data is a salt, two bytes that tell a wrong password at once, the contents encrypted with
-/// AES in counter mode, and ten bytes of an HMAC-SHA1 over the encrypted bytes, which proves
-/// both the password and that nothing was changed.
+/// WinZip's AES encryption of ZIP members (methods AE-1 and AE-2).
+///
+/// A member is stored with method 99; an extra field says how strong the key is and how the data
+/// was compressed. Its data is a salt, two bytes that tell a wrong password at once, the contents
+/// encrypted with AES in counter mode, and ten bytes of an HMAC-SHA1 over the encrypted bytes,
+/// which proves both the password and that nothing was changed.
 enum ZipAES {
     static let method: UInt16 = 99
     static let extraID: UInt16 = 0x9901
@@ -400,7 +406,9 @@ enum ZipAES {
     }
 
     /// The cipher of one member: counter mode with the counter WinZip uses (little-endian,
-    /// starting at one), and the running HMAC over the encrypted bytes. Used by one thread.
+    /// starting at one), and the running HMAC over the encrypted bytes.
+    ///
+    /// Used by one thread.
     final class Cipher {
         private var cryptor: CCCryptorRef?
         private var mac = CCHmacContext()
@@ -499,7 +507,9 @@ enum ZipAES {
             data.withUnsafeMutableBytes { crypt($0) }
         }
 
-        /// The ten bytes that end the member. Asked once, at the end.
+        /// The ten bytes that end the member.
+        ///
+        /// Asked once, at the end.
         func authentication() -> Data {
             var full = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
             CCHmacFinal(&mac, &full)
@@ -528,8 +538,10 @@ enum ZipAES {
 }
 
 extension ZipRecord {
-    /// Marks a new member as AES-encrypted. Its checksum is left out (AE-2): the HMAC proves
-    /// the contents, and a CRC would tell an attacker something about them.
+    /// Marks a new member as AES-encrypted.
+    ///
+    /// Its checksum is left out (AE-2): the HMAC proves the contents, and a CRC would tell an
+    /// attacker something about them.
     mutating func setAES(_ field: ZipAES.Field) {
         flags |= Self.flagEncrypted
         method = ZipAES.method
@@ -606,8 +618,10 @@ final class ZipAESDecryptStream: ByteStream {
     func close() { source.close() }
 }
 
-/// The traditional ZIP encryption (PKWARE "ZipCrypto"). It is weak (see `ZipEncryption.legacy`),
-/// but it is what every unzip program can open (spec 08 › Encryption).
+/// The traditional ZIP encryption (PKWARE "ZipCrypto").
+///
+/// It is weak (see `ZipEncryption.legacy`), but it is what every unzip program can open (spec 08 ›
+/// Encryption).
 struct ZipCrypto {
     private var keys: (UInt32, UInt32, UInt32) = (0x1234_5678, 0x2345_6789, 0x3456_7890)
 
@@ -741,8 +755,10 @@ final class CRCCheckStream: ByteStream {
     func close() { source.close() }
 }
 
-/// Reads the directory of a ZIP archive. Only the end of the file is read, however large the
-/// archive is: the members' data is touched when one of them is opened.
+/// Reads the directory of a ZIP archive.
+///
+/// Only the end of the file is read, however large the archive is: the members' data is touched
+/// when one of them is opened.
 enum ZipDirectory {
     private static let endSignature: UInt32 = 0x0605_4B50
     private static let end64Signature: UInt32 = 0x0606_4B50
@@ -773,8 +789,10 @@ enum ZipDirectory {
 
     /// Reads the directory and hands its records to `each` one by one, in their order, so
     /// that a caller who keeps them in a form of its own never holds a second list of them;
-    /// the result has no records. `expecting` hears beforehand how many there will be at
-    /// most. A directory that turns out to be damaged throws after some records were handed out.
+    /// the result has no records.
+    ///
+    /// `expecting` hears beforehand how many there will be at most. A directory that turns out to
+    /// be damaged throws after some records were handed out.
     static func scan(
         _ file: RandomAccessFile,
         maxEntries: Int = .max,
@@ -923,7 +941,9 @@ enum ZipDirectory {
     }
 }
 
-/// Writes a ZIP archive front to back: members, then the directory. Used by one thread.
+/// Writes a ZIP archive front to back: members, then the directory.
+///
+/// Used by one thread.
 final class ZipWriter {
     private let output: OutputFile
     private let limits: ZipLimits
@@ -977,9 +997,10 @@ final class ZipWriter {
         return header
     }
 
-    /// Starts a member. With `expectedSize` the sizes need not be known yet: room for 64-bit
-    /// sizes is reserved when the member may grow past the 32-bit fields, and `end` fills in
-    /// the real values.
+    /// Starts a member.
+    ///
+    /// With `expectedSize` the sizes need not be known yet: room for 64-bit sizes is reserved when
+    /// the member may grow past the 32-bit fields, and `end` fills in the real values.
     func begin(_ record: ZipRecord, localExtra: Data? = nil, expectedSize: UInt64? = nil) throws -> OpenMember {
         let largest = max(record.uncompressedSize, record.compressedSize, expectedSize.map { $0 + $0 / 8 + 1_024 } ?? 0)
         let member = OpenMember(
@@ -1117,8 +1138,10 @@ final class ZipWriter {
 
 extension ZipWriter {
     /// Copies a member into the new archive without recompressing it, from the archive or the
-    /// temporary file it lies in. Returns where its header was written.
-    /// `check` is called between the blocks of a large member and may throw to end the copy.
+    /// temporary file it lies in.
+    ///
+    /// Returns where its header was written. `check` is called between the blocks of a large member
+    /// and may throw to end the copy.
     @discardableResult
     func copyMember(_ record: ZipRecord, check: (() throws -> Void)? = nil) throws -> UInt64 {
         var localExtra = record.extra

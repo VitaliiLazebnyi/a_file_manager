@@ -1,8 +1,10 @@
 import Foundation
 
 /// A character encoding the viewer can show text in, named by its Windows code page number as
-/// in the specification's Encoding menu (spec 10 › Encoding menu). A value type without state;
-/// the conversion tables behind it are built once and shared (`CodeTable`).
+/// in the specification's Encoding menu (spec 10 › Encoding menu).
+///
+/// A value type without state; the conversion tables behind it are built once and shared
+/// (`CodeTable`).
 struct ViewerEncoding: Hashable {
     enum Kind {
         case utf8, utf16LE, utf16BE
@@ -136,13 +138,15 @@ struct ViewerEncoding: Hashable {
     }
 }
 
-/// Decoded text with, for every UTF-16 unit, the position of the byte it came from. The
-/// positions are what let a place in the shown text be found in the file again (selection,
+/// Decoded text with, for every UTF-16 unit, the position of the byte it came from.
+///
+/// The positions are what let a place in the shown text be found in the file again (selection,
 /// search results, the row index).
 struct DecodedText {
     var units: [UInt16] = []
-    /// Byte offset of each unit, counted from the start of the decoded bytes. The two halves of
-    /// a surrogate pair share one offset.
+    /// Byte offset of each unit, counted from the start of the decoded bytes.
+    ///
+    /// The two halves of a surrogate pair share one offset.
     var offsets: [Int32] = []
     /// Off for callers that only want the text (copying, HTML): `offsets` then stays empty and
     /// nothing is spent on it.
@@ -161,8 +165,9 @@ struct DecodedText {
     }
 }
 
-/// The conversion tables of a code page, built once from the system's converter. Immutable
-/// after creation, so every thread may read them.
+/// The conversion tables of a code page, built once from the system's converter.
+///
+/// Immutable after creation, so every thread may read them.
 final class CodeTable: Sendable {
     static let leadByte: UInt16 = 0xFFFF
     static let replacement: UInt16 = 0xFFFD
@@ -332,8 +337,10 @@ final class CodeTable: Sendable {
     }
 
     /// Whether `byte` is a character of its own whatever bytes are around it: the character after
-    /// it begins right behind it. In a layout where the trail bytes are lead bytes too (EUC-JP) and
-    /// where they run into the ASCII range (GB 18030) that is a smaller set than "not a lead byte".
+    /// it begins right behind it.
+    ///
+    /// In a layout where the trail bytes are lead bytes too (EUC-JP) and where they run into the
+    /// ASCII range (GB 18030) that is a smaller set than "not a lead byte".
     func isSynchronizing(_ byte: UInt8) -> Bool {
         switch shape {
         case .doubleByte: return single[Int(byte)] != Self.leadByte
@@ -345,9 +352,11 @@ final class CodeTable: Sendable {
 
 extension ViewerEncoding {
     /// Decodes `bytes` into `text` (replacing what it held) and returns how many bytes were
-    /// used. Unless `final`, a character cut off at the end is left for the next call, when the
-    /// rest of it has arrived: this is how text is decoded block by block. Malformed input
-    /// becomes U+FFFD, one per offending byte, and never stops the decoding.
+    /// used.
+    ///
+    /// Unless `final`, a character cut off at the end is left for the next call, when the rest of
+    /// it has arrived: this is how text is decoded block by block. Malformed input becomes U+FFFD,
+    /// one per offending byte, and never stops the decoding.
     @discardableResult
     func decode(_ bytes: UnsafeBufferPointer<UInt8>, final: Bool, into text: inout DecodedText) -> Int {
         text.removeAll()

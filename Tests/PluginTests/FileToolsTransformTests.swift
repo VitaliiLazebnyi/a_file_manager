@@ -31,7 +31,10 @@ import Testing
         bench = TestBench(
             plugins: [FileToolsPlugin(pasteboard: scratch.pasteboard)],
             fileSystems: [LocalFileSystem(), memory],
-            left: box.url("A"), right: box.url("B"), settings: settings)
+            left: box.url("A"),
+            right: box.url("B"),
+            settings: settings
+        )
     }
 
     @discardableResult
@@ -82,14 +85,17 @@ import Testing
     @Test func splitSizes() {
         #expect(
             Splitter.size(from: "1000") == 1_000 && Splitter.size(from: " 2k ") == 2_048
-                && Splitter.size(from: "1.5M") == 1_572_864)
+                && Splitter.size(from: "1.5M") == 1_572_864
+        )
         #expect(
             Splitter.size(from: "1G") == 1 << 30 && Splitter.size(from: "3 kb") == 3_072
-                && Splitter.size(from: "1,024") == 1_024)
+                && Splitter.size(from: "1,024") == 1_024
+        )
         #expect(Splitter.size(from: "360 k (5.25\")") == 362_496 && Splitter.size(from: "automatic") == 1_457_664)
         #expect(
             Splitter.size(from: "") == nil && Splitter.size(from: "0") == nil && Splitter.size(from: "-5") == nil
-                && Splitter.size(from: "abc") == nil)
+                && Splitter.size(from: "abc") == nil
+        )
         #expect(Splitter.partName("random_1MB", 1) == "random_1MB.001" && Splitter.partName("x", 999) == "x.999")
         #expect(Splitter.presets.map(\.title).prefix(2) == ["Automatic", "1.44 MB (3.5\")"])
     }
@@ -100,17 +106,21 @@ import Testing
         perform(.splitFile, ["preset": .index(5)])
         #expect(namesOnDisk(box.url("B")) == ["random_1MB.001", "random_1MB.002", "random_1MB.003", "random_1MB.crc"])
         #expect(
-            ["001", "002", "003", "crc"].map { byteCount("B/random_1MB." + $0) } == [362_496, 362_496, 323_584, 55])
+            ["001", "002", "003", "crc"].map { byteCount("B/random_1MB." + $0) } == [362_496, 362_496, 323_584, 55]
+        )
         let crc =
             UInt32(
-                try systemTool("/usr/bin/cksum", ["-o", "3", source.path]).output.split(separator: " ").first ?? "")
+                try systemTool("/usr/bin/cksum", ["-o", "3", source.path]).output.split(separator: " ").first ?? ""
+            )
             ?? 0
         #expect(
             box.read("B/random_1MB.crc")
-                == "filename=random_1MB.bin\r\nsize=1048576\r\ncrc32=\(String(format: "%08X", crc))\r\n")
+                == "filename=random_1MB.bin\r\nsize=1048576\r\ncrc32=\(String(format: "%08X", crc))\r\n"
+        )
         #expect(
             (data("B/random_1MB.001") ?? Data()) + (data("B/random_1MB.002") ?? Data())
-                + (data("B/random_1MB.003") ?? Data()) == megabyte)
+                + (data("B/random_1MB.003") ?? Data()) == megabyte
+        )
         #expect(ui.log.suffix(2) == ["form: Split", "inform: Split"])
         #expect(bench.jobService.titles == ["Split:"] && bench.jobService.reports.last?.bytesDone == 1_048_576)
         #expect(bench.right.names == ["random_1MB.001", "random_1MB.002", "random_1MB.003", "random_1MB.crc"])
@@ -124,13 +134,15 @@ import Testing
         #expect(
             namesOnDisk(box.url("A")) == [
                 "data.tar.001", "data.tar.002", "data.tar.003", "data.tar.crc", "data.tar.gz"
-            ])
+            ]
+        )
         #expect(byteCount("A/data.tar.001") == 1_024 && byteCount("A/data.tar.003") == 452)
         #expect(settings.text(FileTools.Keys.splitSize, default: "") == "1k")
         // Any provider will do as a target, and a missing folder is created.
         perform(.splitFile, cursor: "data.tar.gz", ["target": .text("mem:/out/new"), "size": .text("2500")])
         #expect(
-            memory.allPaths.filter { $0.hasPrefix("/out/new/") } == ["/out/new/data.tar.001", "/out/new/data.tar.crc"])
+            memory.allPaths.filter { $0.hasPrefix("/out/new/") } == ["/out/new/data.tar.001", "/out/new/data.tar.crc"]
+        )
     }
 
     @Test func splitRefusesBadSizesAndCleansUp() throws {
@@ -147,7 +159,8 @@ import Testing
         perform(.splitFile, ["size": .text("2000")])
         #expect(
             namesOnDisk(box.url("B")) == ["data.001", "data.002", "data.003", "data.crc"]
-                && byteCount("B/data.002") == 2_000)
+                && byteCount("B/data.002") == 2_000
+        )
         #expect(throws: ToolError.self) {
             try Splitter.split(item("A/data.bin"), into: box.url("B"), partSize: 0, run: run)
         }
@@ -166,21 +179,26 @@ import Testing
         #expect(PartSeries.next(after: "file.001") == "file.002" && PartSeries.next(after: "file.099") == "file.100")
         #expect(
             PartSeries.next(after: "file.999") == nil && PartSeries.next(after: "notes.txt") == nil
-                && PartSeries.next(after: "song.mp3") == nil)
+                && PartSeries.next(after: "song.mp3") == nil
+        )
         #expect(PartSeries.next(after: "name.00009.zip.part") == "name.00010.zip.part")
         #expect(
             PartSeries.next(after: "fileaa") == "fileab" && PartSeries.next(after: "fileaz") == "fileba"
-                && PartSeries.next(after: "filezz") == nil)
+                && PartSeries.next(after: "filezz") == nil
+        )
         #expect(PartSeries.next(after: "file001.uue") == "file002.uue")
         #expect(
             PartSeries.combinedName(forPart: "movie.mkv.001") == "movie.mkv"
-                && PartSeries.combinedName(forPart: "xaa") == "x")
+                && PartSeries.combinedName(forPart: "xaa") == "x"
+        )
         #expect(
             PartSeries.combinedName(forPart: "name.00000.zip.part") == "name.zip.part"
-                && PartSeries.combinedName(forPart: "001") == "001.combined")
+                && PartSeries.combinedName(forPart: "001") == "001.combined"
+        )
         #expect(
             SplitInfo(text: "filename=a b.bin\r\nsize=12\r\ncrc32=00FF00ff\r\n")
-                == SplitInfo(name: "a b.bin", size: 12, crc: 0x00FF_00FF))
+                == SplitInfo(name: "a b.bin", size: 12, crc: 0x00FF_00FF)
+        )
         #expect(SplitInfo(text: "filename=a\nsize=x\ncrc32=1") == nil && SplitInfo(text: "") == nil)
     }
 
@@ -194,7 +212,8 @@ import Testing
         if case .note = ui.forms.last?.first?.kind {
             #expect(
                 ui.forms.last?.first?.label
-                    == "Combine random_1MB.001 and all files with ascending names to the following directory:")
+                    == "Combine random_1MB.001 and all files with ascending names to the following directory:"
+            )
         }
         perform(.combineFiles, cursor: "random_1MB.crc", ["target": .text("mem:/out")])
         #expect(memory.item(at: memory.url("/out/random_1MB.bin"))?.size == 1_048_576)
@@ -217,7 +236,11 @@ import Testing
         #expect(try Combiner.combine(short.parts, info: short.info, into: box.url("B"), run: run).verified == false)
         // A stored name with a path stays inside the target folder.
         let outside = try Combiner.combine(
-            short.parts, info: SplitInfo(name: "../../evil.bin", size: 0, crc: 0), into: box.url("B"), run: run)
+            short.parts,
+            info: SplitInfo(name: "../../evil.bin", size: 0, crc: 0),
+            into: box.url("B"),
+            run: run
+        )
         #expect(outside.output == box.url("B/evil.bin"))
     }
 
@@ -236,8 +259,11 @@ import Testing
         try FileManager.default.createDirectory(at: box.url("C"), withIntermediateDirectories: true)
         #expect(throws: ToolError.self) {
             try Combiner.combine(
-                [item("A/letter.txt.001")], info: SplitInfo(name: "letter.txt.001", size: 4, crc: 0),
-                into: box.url("A"), run: run)
+                [item("A/letter.txt.001")],
+                info: SplitInfo(name: "letter.txt.001", size: 4, crc: 0),
+                into: box.url("A"),
+                run: run
+            )
         }
         #expect(box.read("A/letter.txt.001") == "one ")
         // A `.crc` file whose parts are gone.
@@ -259,15 +285,18 @@ import Testing
         #expect(SixBitText.decode(Array("#0V%".utf8)[...], xx: false) == [0x43, 0x61, 0x40])
         #expect(
             SixBitText.decode(Array("#0V{T".utf8)[...], xx: false) == nil
-                && SixBitText.decode(Array("1Eq#o".utf8)[...], xx: true) == nil)
+                && SixBitText.decode(Array("1Eq#o".utf8)[...], xx: true) == nil
+        )
         #expect(Encoder.outputNames(for: "decoded.txt", method: .uue, parts: 1) == ["decoded.uue"])
         #expect(Encoder.outputNames(for: "a.b.txt", method: .mime, parts: 2) == ["a.b001.b64", "a.b002.b64"])
         #expect(
             Encoder.linesPerFile(lines: 0, bytes: 0, method: .mime) == 0
-                && Encoder.linesPerFile(lines: 10, bytes: 0, method: .uue) == 10)
+                && Encoder.linesPerFile(lines: 10, bytes: 0, method: .uue) == 10
+        )
         #expect(
             Encoder.linesPerFile(lines: 0, bytes: 630, method: .uue) == 10
-                && Encoder.linesPerFile(lines: 3, bytes: 7_800, method: .mime) == 3)
+                && Encoder.linesPerFile(lines: 3, bytes: 7_800, method: .mime) == 3
+        )
         #expect(Encoder.linesPerFile(lines: 0, bytes: 5, method: .mime) == 1)
     }
 
@@ -284,7 +313,8 @@ import Testing
         // The system's decoder reads it back.
         #expect(
             try systemTool("/usr/bin/uudecode", ["-o", box.url("B/back.txt").path, box.url("B/decoded.uue").path])
-                .status == 0)
+                .status == 0
+        )
         #expect(data("B/back.txt") == patternData(1_100))
     }
 
@@ -311,7 +341,8 @@ import Testing
         let text = memory.contents("/out/file." + method.fileExtension) ?? ""
         #expect(
             text.components(separatedBy: "\r\n").allSatisfy { $0.count <= 76 }
-                && !text.replacingOccurrences(of: "\r\n", with: "").contains("\n"))
+                && !text.replacingOccurrences(of: "\r\n", with: "").contains("\n")
+        )
         guard let first = memory.item(at: encoded[0]) else { return }
         #expect(try Decoder.decode(first, into: box.url("B"), run: run) == [box.url("B/file.bin")])
         #expect(data("B/file.bin") == original)
@@ -323,22 +354,34 @@ import Testing
         try write("A/big.dat", original)
         // 20 lines per file, or as many as fit into 10 lines' worth of bytes.
         let parts = try Encoder.encode(
-            item("A/big.dat"), into: box.url("B"), method: method, linesPerFile: 20,
-            bytesPerFile: Int64(10 * method.lineLength), run: run)
+            item("A/big.dat"),
+            into: box.url("B"),
+            method: method,
+            linesPerFile: 20,
+            bytesPerFile: Int64(10 * method.lineLength),
+            run: run
+        )
         let lines = (5_000 + method.bytesPerLine - 1) / method.bytesPerLine
         #expect(parts.count == (lines + 9) / 10 && parts.first?.lastPathComponent == "big001." + method.fileExtension)
         #expect(byteCount("B/big002." + method.fileExtension) == 10 * method.lineLength)
         // Decoding starts at the first part and finds the others by their counter.
         #expect(
             try Decoder.decode(
-                item("B/big001." + method.fileExtension), into: box.url("A"), autoRename: true, run: run) == [
-                    box.url("A/big(2).dat")
-                ])
+                item("B/big001." + method.fileExtension),
+                into: box.url("A"),
+                autoRename: true,
+                run: run
+            ) == [
+                box.url("A/big(2).dat")
+            ]
+        )
         #expect(data("A/big(2).dat") == original)
         // The command asks for the same through its dialog.
         perform(
-            .encodeFile, cursor: "big.dat",
-            ["target": .text("mem:/out"), "method": .index(method.rawValue), "lines": .text("30")])
+            .encodeFile,
+            cursor: "big.dat",
+            ["target": .text("mem:/out"), "method": .index(method.rawValue), "lines": .text("30")]
+        )
         #expect(memory.allPaths.filter { $0.hasPrefix("/out/big") }.count == (lines + 29) / 30)
         #expect(settings.index(FileTools.Keys.encodeLines, default: 0) == 30)
     }
@@ -399,7 +442,8 @@ import Testing
         #expect(namesOnDisk(box.url("B")) == ["first_file.txt", "second.png", "third.txt"])
         #expect(
             box.read("B/first_file.txt") == "Hello, world!" && data("B/second.png") == Data([0, 1, 2])
-                && box.read("B/third.txt") == "Cat")
+                && box.read("B/third.txt") == "Cat"
+        )
 
         // yEnc: every byte plus 42, with `=` in front of the few that need escaping.
         let bytes = Data((0..<600).map { UInt8($0 % 256) })
@@ -412,18 +456,21 @@ import Testing
         try write(
             "A/post.ync",
             Data("=ybegin line=128 size=600 name=y enc.bin\r\n".utf8) + Data(body)
-                + Data("\r\n=yend size=600\r\n".utf8))
+                + Data("\r\n=yend size=600\r\n".utf8)
+        )
         perform(.decodeFile)
         #expect(data("B/y enc.bin") == bytes)
     }
 
     @Test func decodeNamesTargetsAndClashes() throws {
         #expect(
-            Decoder.safeName("a/b\\c.txt") == "c.txt" && Decoder.safeName("..") == nil && Decoder.safeName(nil) == nil)
+            Decoder.safeName("a/b\\c.txt") == "c.txt" && Decoder.safeName("..") == nil && Decoder.safeName(nil) == nil
+        )
         #expect(Decoder.safeName(" x:y\u{7}.txt ") == "x_y_.txt")
         #expect(
             Decoder.fallbackName(for: "photo.jpg.b64") == "photo.jpg"
-                && Decoder.fallbackName(for: "noext") == "noext.decoded")
+                && Decoder.fallbackName(for: "noext") == "noext.decoded"
+        )
         try write("A/plain.txt", Data("just some words, nothing encoded here\n".utf8))
         perform(.decodeFile)
         #expect(ui.log.last == "inform: Decode" && namesOnDisk(box.url("B")).isEmpty)
@@ -447,7 +494,8 @@ import Testing
         perform(.decodeFile, ["autoRename": .flag(true)])
         perform(.decodeFile, ["autoRename": .flag(true)])
         #expect(
-            namesOnDisk(box.url("B")) == ["out(2).txt", "out(3).txt", "out.txt"] && box.read("B/out(3).txt") == "Cat")
+            namesOnDisk(box.url("B")) == ["out(2).txt", "out(3).txt", "out.txt"] && box.read("B/out(3).txt") == "Cat"
+        )
         // An unfinished file is still written with what there is.
         try write("A/cut.uue", Data("begin 644 cut.txt\n#0V%T\n".utf8))
         perform(.decodeFile)
@@ -471,10 +519,12 @@ import Testing
         // Cancelled in the middle: the cancel flag is set when half of the bytes are through.
         let flag = CancellationFlag()
         let half = ToolRun(
-            fileSystems: bench.kernel.fileSystems, cancellation: flag,
+            fileSystems: bench.kernel.fileSystems,
+            cancellation: flag,
             report: { progress in
                 if progress.bytesDone >= 500_000 { flag.cancel() }
-            })
+            }
+        )
         try Data(count: 3 << 20).write(to: box.url("A/large.bin"))
         #expect(throws: ToolError.cancelled) {
             try Splitter.split(item("A/large.bin"), into: box.url("B"), partSize: 300_000, run: half)

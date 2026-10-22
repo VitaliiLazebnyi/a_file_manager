@@ -16,8 +16,9 @@ struct DecodedImage {
     var isDownsampled: Bool { size.width < pixelSize.width || size.height < pixelSize.height }
 }
 
-/// Decodes images with ImageIO. A value-free namespace; `decode` is meant for a background
-/// thread and touches nothing shared.
+/// Decodes images with ImageIO.
+///
+/// A value-free namespace; `decode` is meant for a background thread and touches nothing shared.
 enum ImageDecoder {
     /// No side of a decoded frame is longer than this: an image of several hundred megapixels
     /// is downsampled while it is decoded and never exists at full size in memory.
@@ -28,9 +29,10 @@ enum ImageDecoder {
     /// in a few kilobytes would take the memory of the computer to decode).
     static let pixelLimit = 400_000_000.0
 
-    /// Nil when the data is no image ImageIO can read. `minimumDelay` is the shortest time a
-    /// frame of an animation stays (the specification's `GifMinDelay`). Photos are turned as
-    /// their EXIF orientation says.
+    /// Nil when the data is no image ImageIO can read.
+    ///
+    /// `minimumDelay` is the shortest time a frame of an animation stays (the specification's
+    /// `GifMinDelay`). Photos are turned as their EXIF orientation says.
     static func decode(
         _ data: Data,
         minimumDelay: Double = 0.08,
@@ -74,7 +76,9 @@ enum ImageDecoder {
     }
 
     /// With `firstFrame`, an animation's first frame is handed over as soon as it is decoded,
-    /// before the other frames are. Nil also without a source (a file that cannot be opened).
+    /// before the other frames are.
+    ///
+    /// Nil also without a source (a file that cannot be opened).
     private static func decode(
         _ source: CGImageSource?,
         minimumDelay: Double,
@@ -224,10 +228,11 @@ enum ImageDecoder {
 }
 
 /// The frame scaled to the size it is shown at, so that scrolling and resizing a large image do
-/// not resample all of it again at every draw. One bitmap is kept (the one for the frame, size
-/// and scale in use), made in the background; it is dropped when any of them changes. Only a
-/// frame that is shown smaller than it is gets one (an enlarged one is no smaller to keep), and
-/// none above `pixelLimit` pixels. Main thread only.
+/// not resample all of it again at every draw.
+///
+/// One bitmap is kept (the one for the frame, size and scale in use), made in the background; it is
+/// dropped when any of them changes. Only a frame that is shown smaller than it is gets one (an
+/// enlarged one is no smaller to keep), and none above `pixelLimit` pixels. Main thread only.
 @MainActor
 final class ScaledFrameCache {
     /// A scaled bitmap has at most this many pixels (160 MB).
@@ -330,8 +335,9 @@ final class ScaledFrameCache {
     }
 }
 
-/// The image mode (spec 10 › Image mode): zoom, fitting, centring, turning, animation. Main
-/// thread only; the image arrives decoded.
+/// The image mode (spec 10 › Image mode): zoom, fitting, centring, turning, animation.
+///
+/// Main thread only; the image arrives decoded.
 final class ImageCanvasView: NSScrollView {
     private final class Canvas: NSView {
         var frameImage: CGImage?

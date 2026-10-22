@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 
 /// A file system of a few made-up files, for what the memory file system cannot do: readers that
 /// are slow to close, and files that do not end.
+///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
     let scheme = "hook"

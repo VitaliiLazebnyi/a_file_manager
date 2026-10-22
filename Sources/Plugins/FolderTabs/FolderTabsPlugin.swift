@@ -42,9 +42,11 @@ extension CommandID {
     }
 }
 
-/// Folder tabs (spec 03 › Folder tabs). The commands only change the panels' lists of tabs;
-/// a panel notices and reads the tab that becomes visible. Tab files are read and written in
-/// the background, as jobs. Main thread only, like the panels it works on.
+/// Folder tabs (spec 03 › Folder tabs).
+///
+/// The commands only change the panels' lists of tabs; a panel notices and reads the tab that
+/// becomes visible. Tab files are read and written in the background, as jobs. Main thread only,
+/// like the panels it works on.
 public final class FolderTabsPlugin: Plugin {
     public let name = "Folder tabs"
     static let confirmCloseAllKey = "folderTabs.confirmCloseAll"
@@ -61,7 +63,9 @@ public final class FolderTabsPlugin: Plugin {
     }
 
     /// The closed tabs of each panel, the most recent last (spec 03 › Closing tabs,
-    /// "Recently closed tabs"). Kept for the session only.
+    /// "Recently closed tabs").
+    ///
+    /// Kept for the session only.
     private var closedTabs: [ObjectIdentifier: [ClosedTab]] = [:]
 
     public init() {}
@@ -415,11 +419,12 @@ public final class FolderTabsPlugin: Plugin {
         tabs.performBatch(change)
     }
 
-    /// Opens tabs for `records` from position `index` on (at the end without one). The tab
-    /// numbered `active` among them becomes the one shown; nil leaves the shown tab as it is.
-    /// With `fromFile`, the records come from a file someone else may have written: a tab that
-    /// would connect to a server is opened but never made the shown one, so that loading a
-    /// file connects nowhere; it connects when the user activates it.
+    /// Opens tabs for `records` from position `index` on (at the end without one).
+    ///
+    /// The tab numbered `active` among them becomes the one shown; nil leaves the shown tab as it
+    /// is. With `fromFile`, the records come from a file someone else may have written: a tab that
+    /// would connect to a server is opened but never made the shown one, so that loading a file
+    /// connects nowhere; it connects when the user activates it.
     private func restore(
         _ records: [PanelTabState],
         in tabs: PanelTabs,
@@ -451,9 +456,10 @@ public final class FolderTabsPlugin: Plugin {
         }
     }
 
-    /// Gives a panel the tabs of `state` in place of its own; locked tabs go too. From a file,
-    /// the shown tab is one that does not connect to a server; when there is none, the tab
-    /// that was shown stays (and with it, nothing connects).
+    /// Gives a panel the tabs of `state` in place of its own; locked tabs go too.
+    ///
+    /// From a file, the shown tab is one that does not connect to a server; when there is none, the
+    /// tab that was shown stays (and with it, nothing connects).
     private func replace(_ tabs: PanelTabs, with state: PanelTabs.State, fromFile: Bool = false) {
         let old = tabs.tabs
         var wanted: Int? = min(max(state.active, 0), max(state.tabs.count - 1, 0))
@@ -507,7 +513,9 @@ public final class FolderTabsPlugin: Plugin {
     }
 
     /// Brings the closed tab numbered `number` (0 is the one closed first) back to where it
-    /// was and shows it. The commands offer only the numbers there are.
+    /// was and shows it.
+    ///
+    /// The commands offer only the numbers there are.
     private func reopen(_ number: Int, in tabs: PanelTabs) {
         var list = closedList(of: tabs)
         let closed = list.remove(at: number)
@@ -517,8 +525,9 @@ public final class FolderTabsPlugin: Plugin {
 
     // MARK: Tab files
 
-    /// The file a tab-file command works on: its parameter, or what the user enters. A name
-    /// without an extension gets `.tab`.
+    /// The file a tab-file command works on: its parameter, or what the user enters.
+    ///
+    /// A name without an extension gets `.tab`.
     private func tabFile(_ argument: CommandArgument, question: String, kernel: Kernel) -> URL? {
         let directory = kernel.panels.source.model.directory
         if let location = argument.location { return location }

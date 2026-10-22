@@ -12,9 +12,11 @@ struct RenameEntry {
         name = Self.diskName(of: item)
     }
 
-    /// The name the file has in its folder. A list gathered from elsewhere (a branch view, a
-    /// search result) names its items by path, on every file system; the item's own location
-    /// says what it is called. (A name with a slash would otherwise be read as a folder to move into.)
+    /// The name the file has in its folder.
+    ///
+    /// A list gathered from elsewhere (a branch view, a search result) names its items by path, on
+    /// every file system; the item's own location says what it is called. (A name with a slash
+    /// would otherwise be read as a folder to move into.).
     static func diskName(of item: FileItem) -> String {
         item.name.utf8.contains(0x2F) ? item.url.lastPathComponent : item.name
     }
@@ -61,7 +63,9 @@ struct RenamePreview {
 }
 
 /// The dates inside pictures (`[T4]`), kept for as long as a session lives: a list that is
-/// only put in another order does not read its files again. Safe to use from several threads.
+/// only put in another order does not read its files again.
+///
+/// Safe to use from several threads.
 ///
 /// Unchecked `Sendable`: `dates` is guarded by `lock`.
 final class ContentDateStore: @unchecked Sendable {
@@ -83,10 +87,11 @@ final class ContentDateStore: @unchecked Sendable {
 
 /// What a session works out once for its list and reuses for every preview: the subjects the
 /// masks look at, the folders the items are in, which folders tell letter case apart, what
-/// the folders hold and the dates inside pictures. A session replaces its cache whenever the
-/// list changes and after a run, so nothing in it outlives the list it was made for. Folder
-/// contents are as they were when first looked at; a run lists them afresh. Safe to use from
-/// several threads.
+/// the folders hold and the dates inside pictures.
+///
+/// A session replaces its cache whenever the list changes and after a run, so nothing in it
+/// outlives the list it was made for. Folder contents are as they were when first looked at; a run
+/// lists them afresh. Safe to use from several threads.
 ///
 /// Unchecked `Sendable`: all mutable state is guarded by `lock`; `dates` does not change.
 final class RenameCache: @unchecked Sendable {
@@ -114,7 +119,9 @@ final class RenameCache: @unchecked Sendable {
 
     /// A cache for the same items in another order, or with some of them taken out: what the
     /// folders hold, which of them tell letter case apart and the dates in pictures stay; the
-    /// rows are made again. Previews under way keep the cache they have.
+    /// rows are made again.
+    ///
+    /// Previews under way keep the cache they have.
     func forChangedOrder() -> RenameCache {
         lock.lock()
         defer { lock.unlock() }
@@ -171,8 +178,10 @@ final class RenameCache: @unchecked Sendable {
     }
 }
 
-/// Computes previews. Everything here blocks (it lists the target folders) and belongs on a
-/// background thread; the names themselves are computed on all cores.
+/// Computes previews.
+///
+/// Everything here blocks (it lists the target folders) and belongs on a background thread; the
+/// names themselves are computed on all cores.
 enum RenameComputation {
     /// Lists below this size are not worth spreading over the cores.
     static let parallelThreshold = 256
@@ -228,10 +237,11 @@ enum RenameComputation {
         return components?.url
     }
 
-    /// The new names only: masks, Search & Replace and case, on all cores. `subjects` are the
-    /// entries' subjects when they are known already. A cancelled computation returns names
-    /// that are not to be used. `isCancelled` also ends a regular expression that is working on
-    /// a name; one that takes too long gives that name no new name (`<Error!>`).
+    /// The new names only: masks, Search & Replace and case, on all cores.
+    ///
+    /// `subjects` are the entries' subjects when they are known already. A cancelled computation
+    /// returns names that are not to be used. `isCancelled` also ends a regular expression that is
+    /// working on a name; one that takes too long gives that name no new name (`<Error!>`).
     static func names(
         _ entries: [RenameEntry],
         settings: RenameSettings,
@@ -259,10 +269,12 @@ enum RenameComputation {
         }
     }
 
-    /// Names, targets and collisions. `isCancelled` is asked inside the stages, so a preview
-    /// nobody waits for any more ends early (with whatever it has). A `cache` of the session
-    /// saves listing the same folders and building the same subjects for every keystroke.
-    /// `cancellation` ends the listing of a folder that does not answer.
+    /// Names, targets and collisions.
+    ///
+    /// `isCancelled` is asked inside the stages, so a preview nobody waits for any more ends early
+    /// (with whatever it has). A `cache` of the session saves listing the same folders and building
+    /// the same subjects for every keystroke. `cancellation` ends the listing of a folder that does
+    /// not answer.
     static func preview(
         _ entries: [RenameEntry],
         settings: RenameSettings,
@@ -329,7 +341,9 @@ enum RenameComputation {
     }
 }
 
-/// What the planner has to know about the file systems. Blocks; not for the main thread.
+/// What the planner has to know about the file systems.
+///
+/// Blocks; not for the main thread.
 struct RenameSurvey {
     let fileSystems: FileSystemRegistry
     /// What was found out about the same folders before, if the caller keeps any.
@@ -343,8 +357,9 @@ struct RenameSurvey {
         self.cancellation = cancellation
     }
 
-    /// The keys of every entry of the given folders (by `locationKey`). A folder that does not
-    /// exist yet has none.
+    /// The keys of every entry of the given folders (by `locationKey`).
+    ///
+    /// A folder that does not exist yet has none.
     func existingKeys(
         in folders: [String: URL],
         planner: RenamePlanner,
@@ -367,8 +382,10 @@ struct RenameSurvey {
     }
 
     /// The planner for a run: each folder is judged on its own, by the items in it, as it
-    /// is the volume that decides (a list may hold items of several). A folder that holds
-    /// none of the items takes the verdict of the nearest folder above it that does.
+    /// is the volume that decides (a list may hold items of several).
+    ///
+    /// A folder that holds none of the items takes the verdict of the nearest folder above it that
+    /// does.
     func planner(for entries: [RenameEntry], rows: RenameCache.Rows, targetFolders: [String: URL]) -> RenamePlanner {
         var samples: [String: [FileItem]] = [:]
         var sourceFolders: [String: URL] = [:]
@@ -419,8 +436,10 @@ struct RenameSurvey {
     }
 
     /// Whether the file system of the items takes names that differ only in letter case for
-    /// the same file. Found out by asking for one of the items under a differently cased
-    /// name; no provider says it of itself.
+    /// the same file.
+    ///
+    /// Found out by asking for one of the items under a differently cased name; no provider says it
+    /// of itself.
     func foldsCase(_ items: [FileItem]) -> Bool {
         for item in items.prefix(16) {
             let name = RenameEntry.diskName(of: item)
@@ -472,6 +491,7 @@ struct RenameRunResult {
 }
 
 /// Carries out the steps of a plan through the file-system providers, one after the other.
+///
 /// Used on one thread, the job's.
 final class RenameRunner {
     private let fileSystems: FileSystemRegistry
@@ -495,10 +515,11 @@ final class RenameRunner {
             && a.precomposedStringWithCanonicalMapping.utf8.elementsEqual(b.precomposedStringWithCanonicalMapping.utf8)
     }
 
-    /// Whether two locations are one file (same device and inode). Locations that are not on
-    /// the local disk cannot be asked and are taken at the planner's word. A target that is not
-    /// there is no file at all: the volume tells upper from lower case after all, and the
-    /// rename is an ordinary one that replaces nothing.
+    /// Whether two locations are one file (same device and inode).
+    ///
+    /// Locations that are not on the local disk cannot be asked and are taken at the planner's
+    /// word. A target that is not there is no file at all: the volume tells upper from lower case
+    /// after all, and the rename is an ordinary one that replaces nothing.
     static func isSameFile(_ first: URL, _ second: URL) -> Bool {
         guard first.isFileURL, second.isFileURL else { return true }
         func identity(_ url: URL) -> (dev_t, ino_t)? {

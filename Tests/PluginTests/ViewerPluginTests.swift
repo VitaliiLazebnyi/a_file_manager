@@ -13,8 +13,9 @@ private final class FakeOverlayHost: PanelOverlayHost {
 }
 
 /// The viewer driven through its commands, its service and its keys: Lister windows that are
-/// never put on screen, and the quick view over a fake panel. Files live in a memory file
-/// system, so everything is read through the provider interface.
+/// never put on screen, and the quick view over a fake panel.
+///
+/// Files live in a memory file system, so everything is read through the provider interface.
 @MainActor @Suite(.serialized) struct ViewerWindows {
     let memory = MemoryFileSystem()
     let bench: TestBench

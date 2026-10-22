@@ -117,8 +117,10 @@ public final class CompareContentPlugin: Plugin {
     }
 
     /// Asks about every window with edits that are not saved, before the program quits: Save,
-    /// Don't Save or Cancel. False when the user cancels (or a save fails), so that the quit can be
-    /// called off. The shell consults this where it can; `stop` asks once more for what is left.
+    /// Don't Save or Cancel.
+    ///
+    /// False when the user cancels (or a save fails), so that the quit can be called off. The shell
+    /// consults this where it can; `stop` asks once more for what is left.
     public func shouldTerminate() -> Bool {
         askAboutUnsavedChanges(allowCancel: true)
     }
@@ -161,6 +163,7 @@ enum CompareOperands {
     /// Two selected files of the source panel; or its one selected file with the first selected
     /// file of the target panel, else with the file of the same name there; or, with nothing
     /// selected, the file under the cursor with the file of the same name in the target panel.
+    ///
     /// The target panel's cursor is never used. Works on what the panels list.
     @MainActor static func choose(source: PanelModel, target: PanelModel) -> (left: URL?, right: URL?) {
         /// The first `limit` marked files in list order. Nothing marked is known at once, and the walk over the

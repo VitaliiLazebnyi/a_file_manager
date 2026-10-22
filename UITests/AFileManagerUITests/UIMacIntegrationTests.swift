@@ -1,8 +1,10 @@
 import XCTest
 
 /// The program and the Mac's desktop: Quick Look, Finder, the applications that open a file and
-/// the sharing picker. Whatever a test opens it closes again: the Quick Look panel, the Finder
-/// window, TextEdit, the picker.
+/// the sharing picker.
+///
+/// Whatever a test opens it closes again: the Quick Look panel, the Finder window, TextEdit, the
+/// picker.
 @MainActor
 internal final class UIMacIntegrationTests: XCTestCase {
     /// The program of the running test, once started.

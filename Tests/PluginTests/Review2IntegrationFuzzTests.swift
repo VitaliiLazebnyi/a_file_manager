@@ -34,7 +34,8 @@ import Testing
         ] {
             let (outcome, _) = try decode(
                 "=ybegin part=1 line=128 size=3 name=a.bin\n=ypart \(range)\n" + "\u{8b}\u{8c}\u{8d}\n"
-                    + "=yend size=3 part=1\n")
+                    + "=yend size=3 part=1\n"
+            )
             #expect(outcome.problems.contains { $0.contains("range of the part") }, "\(range): \(outcome.problems)")
         }
         // The largest part there can be is a number like any other.
@@ -44,7 +45,8 @@ import Testing
         #expect(whole.problems.contains { $0.contains("the part holds 9223372036854775807") }, "\(whole.problems)")
         // A part that is what it says is decoded without a word.
         let (good, memory) = try decode(
-            "=ybegin part=1 line=128 size=3 name=a.bin\n=ypart begin=1 end=3\nKLM\n=yend size=3 part=1\n")
+            "=ybegin part=1 line=128 size=3 name=a.bin\n=ypart begin=1 end=3\nKLM\n=yend size=3 part=1\n"
+        )
         #expect(good.problems.isEmpty && memory.contents("/out/a.bin") == "!\"#", "\(good.problems)")
     }
 
@@ -54,8 +56,10 @@ import Testing
         -> (ranges: [Range<Int64>], lines: Int)
     {
         let document = TextDocument(
-            source: DataByteSource(data), encoding: .utf8,
-            layout: .text(TextLayoutOptions(columns: columns, wordWrap: false)))
+            source: DataByteSource(data),
+            encoding: .utf8,
+            layout: .text(TextLayoutOptions(columns: columns, wordWrap: false))
+        )
         document.buildIndex(parallel: parallel, segmentSize: segment, chunkSize: chunk, rawScan: raw)
         return (try document.rows(from: 0, count: max(1, document.rowCount)).map(\.range), document.lineCount)
     }
@@ -89,7 +93,8 @@ import Testing
                 let raw = try rows(data, columns: 80, segment: 4 << 20, chunk: 1 << 20, raw: true, parallel: parallel)
                 #expect(
                     raw.lines == reference.lines && raw.ranges.count == reference.ranges.count,
-                    "over by \(over), parallel \(parallel)")
+                    "over by \(over), parallel \(parallel)"
+                )
                 #expect(raw.ranges.suffix(12) == reference.ranges.suffix(12), "over by \(over), parallel \(parallel)")
             }
         }
@@ -118,7 +123,8 @@ import Testing
         var plain = DescriptIon(data: Data([0xE9, 0x20, 0x78, 0x0D, 0x0A]))
         plain.setComment("y", for: "ü.txt")
         #expect(
-            plain.data() == Data([0xE9, 0x20, 0x78, 0x0D, 0x0A, 0xFC, 0x2E, 0x74, 0x78, 0x74, 0x20, 0x79, 0x0D, 0x0A]))
+            plain.data() == Data([0xE9, 0x20, 0x78, 0x0D, 0x0A, 0xFC, 0x2E, 0x74, 0x78, 0x74, 0x20, 0x79, 0x0D, 0x0A])
+        )
     }
 
     // MARK: N4 — a long plain search in a long name
@@ -143,10 +149,12 @@ import Testing
         #expect(
             matcher.matches(in: "xaBCéd-AéZ", firstOnly: false) == [
                 NSRange(location: 1, length: 5), NSRange(location: 7, length: 3)
-            ])
+            ]
+        )
         #expect(
             WildcardMatcher("*é", caseSensitive: true).matches(in: "aÉbéc", firstOnly: false) == [
                 NSRange(location: 0, length: 4)
-            ])
+            ]
+        )
     }
 }

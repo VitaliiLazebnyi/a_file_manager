@@ -37,8 +37,10 @@ import Testing
         nonisolated(unsafe) private static var (entries, overflowed, calls) = (0, false, 0)
         /// The system's hook, set and cleared by the measuring thread only.
         nonisolated(unsafe) private static let slot: UnsafeMutablePointer<Logger?>? = dlsym(
-            UnsafeMutableRawPointer(bitPattern: -2), "malloc_logger")?
-            .assumingMemoryBound(to: Logger?.self)
+            UnsafeMutableRawPointer(bitPattern: -2),
+            "malloc_logger"
+        )?
+        .assumingMemoryBound(to: Logger?.self)
 
         private static let tombstone = UInt.max
 
@@ -88,9 +90,10 @@ import Testing
             defer { gate.unlock() }
             // A sanitizer brings its own allocator: what it would report is not what the
             // program allocates, and the hook's own bookkeeping is nothing it should watch.
-            let sanitized = ["__tsan_init", "__asan_init"].contains(where: { (name: String) -> Bool in
-                dlsym(UnsafeMutableRawPointer(bitPattern: -2), name) != nil
-            })
+            let sanitized = ["__tsan_init", "__asan_init"]
+                .contains(where: { (name: String) -> Bool in
+                    dlsym(UnsafeMutableRawPointer(bitPattern: -2), name) != nil
+                })
             guard !sanitized, let slot, slot.pointee == nil else { return (nil, try body()) }
             let table = UnsafeMutablePointer<UInt>.allocate(capacity: capacity)
             table.initialize(repeating: 0, count: capacity)
@@ -126,8 +129,11 @@ import Testing
         let modified = Date(timeIntervalSince1970: 1_700_000_000)
         for index in 0..<members {
             var record = ZipRecord.new(
-                name: "project-\(index / 40_000)/module-\(index / 400)/source-file-\(index).swift", isDirectory: false,
-                modified: modified, permissions: 0o644)
+                name: "project-\(index / 40_000)/module-\(index / 400)/source-file-\(index).swift",
+                isDirectory: false,
+                modified: modified,
+                permissions: 0o644
+            )
             var extra = record.extra
             extra.append(contentsOf: [0x75, 0x78, 11, 0, 1, 4, 0xF5, 1, 0, 0, 4, 0x14, 0, 0, 0])
             record.extra = extra
@@ -151,7 +157,11 @@ import Testing
         for _ in 0..<3 {
             let (bytes, archive) = try ThreadAllocations.measure {
                 try OpenArchive(
-                    archiveURL: url, localURL: url, fetchedCopy: nil, remoteStamp: nil, environment: bench.environment
+                    archiveURL: url,
+                    localURL: url,
+                    fetchedCopy: nil,
+                    remoteStamp: nil,
+                    environment: bench.environment
                 )
             }
             folders = archive.entries.count - members
@@ -167,7 +177,8 @@ import Testing
         }
         print(
             "A051/A076: \(best) bytes per member (\(members) members, \(folders) folders); an entry is \(MemoryLayout<ArchiveEntry?>.stride) bytes, "
-                + "of which the ZIP record \(MemoryLayout<ZipRecord>.size)")
+                + "of which the ZIP record \(MemoryLayout<ZipRecord>.size)"
+        )
         #expect(folders == 2 + 150)
         // Measured alone before this round's fix: 975. A reading far below what the entries
         // themselves take would mean nothing was counted.

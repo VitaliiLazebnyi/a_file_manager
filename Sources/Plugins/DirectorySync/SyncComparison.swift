@@ -11,22 +11,26 @@ public struct SyncProgress: Equatable, Sendable {
 public struct SyncResult: Sendable {
     public var rows: [SyncRow] = []
     public var leftDirectories = 0, rightDirectories = 0
-    /// Folders that could not be read and files that could not be compared. A folder that
-    /// fails on one side is left out on both, so nothing in it looks unique.
+    /// Folders that could not be read and files that could not be compared.
+    ///
+    /// A folder that fails on one side is left out on both, so nothing in it looks unique.
     public var errors: [String] = []
     public var wasCancelled = false
     /// How many entries the two start directories held before the masks and the selection were
-    /// applied; nil where the directory could not be read. A source that lists as empty while the
-    /// other side is not is how an unmounted share or a wrong path looks.
+    /// applied; nil where the directory could not be read.
+    ///
+    /// A source that lists as empty while the other side is not is how an unmounted share or a
+    /// wrong path looks.
     public var topEntries: (left: Int?, right: Int?) = (nil, nil)
     /// The time tolerance the comparison used: as set where a file system needs it (FAT and
     /// exFAT, shares, servers, archives), none beyond rounding where both sides keep exact dates.
     public var toleranceSeconds = 0
 }
 
-/// The comparison of two directory trees (spec 09 › Comparison algorithm). It knows nothing
-/// of windows: it reads through the file-system providers, so the two sides can be on any
-/// file systems, and returns rows.
+/// The comparison of two directory trees (spec 09 › Comparison algorithm).
+///
+/// It knows nothing of windows: it reads through the file-system providers, so the two sides can be
+/// on any file systems, and returns rows.
 ///
 /// **Threading.** `run` blocks and is meant for a background thread. The two sides of every
 /// folder are listed at the same time, the subfolders of a folder are walked on all cores at
@@ -124,8 +128,9 @@ public final class SyncComparison: @unchecked Sendable {
 
     // MARK: Classification
 
-    /// What two files of the same name are to each other, by size and date alone. The second
-    /// value says that only reading them can tell (spec 09 › Comparison algorithm).
+    /// What two files of the same name are to each other, by size and date alone.
+    ///
+    /// The second value says that only reading them can tell (spec 09 › Comparison algorithm).
     public static func classify(left: FileItem, right: FileItem, options: SyncOptions) -> (
         state: SyncState, needsContent: Bool
     ) {
@@ -197,8 +202,10 @@ public final class SyncComparison: @unchecked Sendable {
         }
     }
 
-    /// The entries that were asked for. A name asked for in one spelling also stands for the
-    /// other spelling of it (NFC, NFD) when the folder holds only that one.
+    /// The entries that were asked for.
+    ///
+    /// A name asked for in one spelling also stands for the other spelling of it (NFC, NFD) when
+    /// the folder holds only that one.
     private func asked(among items: [FileItem]) -> [FileItem] {
         guard let onlyNames else { return items }
         let exact = Set(items.filter { onlyNames.contains(Array($0.name.utf8)) }.map(\.name))
@@ -277,10 +284,12 @@ public final class SyncComparison: @unchecked Sendable {
     }
 
     /// The pairs in the order of their names, digits by their value (`file2` before `file10`),
-    /// as Finder shows names. The order is the kernel's (`Sorter`), which is an order for any
-    /// names: Foundation's localized comparison is none, and it ends the program for certain
-    /// names (K001), which a folder on a server or in an archive may well hold. Each name's
-    /// key is made once; the pairs themselves (large values) are moved once.
+    /// as Finder shows names.
+    ///
+    /// The order is the kernel's (`Sorter`), which is an order for any names: Foundation's
+    /// localized comparison is none, and it ends the program for certain names (K001), which a
+    /// folder on a server or in an archive may well hold. Each name's key is made once; the pairs
+    /// themselves (large values) are moved once.
     static func sorted(_ pairs: [Pair]) -> [Pair] {
         Sorter.sorted(pairs, numeric: true) { ($0.left ?? $0.right)!.name }
     }
@@ -296,8 +305,9 @@ public final class SyncComparison: @unchecked Sendable {
     }
 
     /// Puts the entries of two folders side by side: by exact name (the same bytes) first, then
-    /// what is left over by name without regard to case or Unicode form. Two names that differ
-    /// only in form (NFC and NFD) are two files and keep their own rows.
+    /// what is left over by name without regard to case or Unicode form.
+    ///
+    /// Two names that differ only in form (NFC and NFD) are two files and keep their own rows.
     static func pair(_ leftItems: [FileItem], _ rightItems: [FileItem]) -> [Pair] {
         var rightByName: [[UInt8]: Int] = [:]
         for (index, item) in rightItems.enumerated() where rightByName[Array(item.name.utf8)] == nil {
@@ -384,8 +394,10 @@ public final class SyncComparison: @unchecked Sendable {
         }
     }
 
-    /// Reads two files side by side and stops at the first difference. Nil when cancelled.
-    /// The blocks a reader hands out may be of any length; they are cut to match.
+    /// Reads two files side by side and stops at the first difference.
+    ///
+    /// Nil when cancelled. The blocks a reader hands out may be of any length; they are cut to
+    /// match.
     static func sameContent(
         _ first: URL,
         _ second: URL,

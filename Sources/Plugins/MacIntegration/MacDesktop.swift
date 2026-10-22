@@ -1,8 +1,10 @@
 import AppKit
 
 /// What the plugin asks of the Mac's desktop: other applications, Finder, the panels of the
-/// system, the program's windows. Everything the plugin decides is decided before it gets here;
-/// an implementation only passes the request on (`SystemDesktop`), or notes it (tests).
+/// system, the program's windows.
+///
+/// Everything the plugin decides is decided before it gets here; an implementation only passes the
+/// request on (`SystemDesktop`), or notes it (tests).
 ///
 /// `open` and `reveal` may be called on any thread; the others on the main thread.
 internal protocol MacDesktop: AnyObject, Sendable {

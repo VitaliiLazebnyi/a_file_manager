@@ -28,6 +28,7 @@ private func volume(_ key: String) -> URL {
 
 /// The local disk behind a layer that makes copies take a moment, counts how many run at once
 /// and per file, and lets chosen removals fail once.
+///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 final class LocalProbe: FileSystemProvider, @unchecked Sendable {
     private let local = LocalFileSystem()
@@ -120,7 +121,9 @@ private func foldsCase(in folder: URL) throws -> Bool {
 @Suite(
     .enabled(
         if: volumesAreMounted,
-        "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"))
+        "needs mounted disk images: set AFM_VOLUME_TESTS=1, AFM_VOLUME_A, AFM_VOLUME_B, AFM_VOLUME_CS"
+    )
+)
 struct FileOpsAdoptVolumes {
     @Test func theThreeVolumesAreTheKindsTheseTestsNeed() throws {
         let (a, b, cs) = (volume("AFM_VOLUME_A"), volume("AFM_VOLUME_B"), volume("AFM_VOLUME_CS"))
@@ -207,7 +210,10 @@ struct FileOpsAdoptVolumes {
         bench.commands.perform(.renameOnly, .text("README"))
         #expect(text(cs.appendingPathComponent("readme")) == "lower")
         #expect(text(cs.appendingPathComponent("README")) == "UPPER")
-        #expect(bench.interaction.log.contains { $0.hasPrefix("inform: readme cannot be renamed!") }, "\(bench.interaction.log)")
+        #expect(
+            bench.interaction.log.contains { $0.hasPrefix("inform: readme cannot be renamed!") },
+            "\(bench.interaction.log)"
+        )
 
         // Nothing else has the name: a rename that only changes the case is just a rename.
         bench.left.moveCursor(toName: "solo")
@@ -227,8 +233,12 @@ struct FileOpsAdoptVolumes {
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
         let result = runJob(
-            .move, [readme], to: TargetSpec(directory: cs, exactName: "README"), replies: replies,
-            fileSystems: fileSystems)
+            .move,
+            [readme],
+            to: TargetSpec(directory: cs, exactName: "README"),
+            replies: replies,
+            fileSystems: fileSystems
+        )
         #expect(replies.conflicts == ["README"])
         #expect(result.completed.isEmpty)
         #expect(text(readme) == "lower" && text(cs.appendingPathComponent("README")) == "UPPER")
@@ -247,7 +257,12 @@ struct FileOpsAdoptVolumes {
         let fileSystems = FileSystemRegistry()
         fileSystems.register(LocalFileSystem())
         let result = runJob(
-            .copy, [tree], to: TargetSpec(directory: spelled), replies: replies, fileSystems: fileSystems)
+            .copy,
+            [tree],
+            to: TargetSpec(directory: spelled),
+            replies: replies,
+            fileSystems: fileSystems
+        )
         #expect(result.completed.isEmpty)
         #expect(replies.errors.count == 1 && replies.errors[0].contains("own subfolders"), "\(replies.errors)")
         #expect(namesOnDisk(a.appendingPathComponent("Tree/Sub")) == ["file.txt"])

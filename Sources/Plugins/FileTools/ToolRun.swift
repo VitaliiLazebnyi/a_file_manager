@@ -81,9 +81,11 @@ final class ToolRun: @unchecked Sendable {
     /// Set by a tool whose outputs are made of what it reads (the parts of a split file, a
     /// file put together again, an encoded or decoded one): they then carry the mark of
     /// coming from elsewhere that their source carries (`quarantine(of:)`: a file on a
-    /// server, a download), as a copy of it would. A program that was split, sent and put
-    /// together again is still checked by the system when it is first opened. Not set by
-    /// tools that write something about their sources (a list of checksums).
+    /// server, a download), as a copy of it would.
+    ///
+    /// A program that was split, sent and put together again is still checked by the system when it
+    /// is first opened. Not set by tools that write something about their sources (a list of
+    /// checksums).
     var carriesOrigin: Bool {
         get { lock.withLock { carries } }
         set { lock.withLock { carries = newValue } }
@@ -120,7 +122,9 @@ final class ToolRun: @unchecked Sendable {
         advance(0, force: true)
     }
 
-    /// Shows what is being worked on. Safe from any thread.
+    /// Shows what is being worked on.
+    ///
+    /// Safe from any thread.
     func show(_ lines: [String]) {
         lock.lock()
         self.lines = lines
@@ -129,7 +133,9 @@ final class ToolRun: @unchecked Sendable {
     }
 
     /// Counts bytes (and finished files) and passes the state on, at most twenty times a
-    /// second. Safe from any thread.
+    /// second.
+    ///
+    /// Safe from any thread.
     func advance(_ bytes: Int64, items: Int = 0, force: Bool = false) {
         // The decision is one step under the lock: a report that is due takes its turn at once
         // (the time of the last report moves on), so no other thread finds it due as well.
@@ -170,9 +176,10 @@ final class ToolRun: @unchecked Sendable {
         try read(try openReader(url), counted: counted, blockSize: blockSize, body)
     }
 
-    /// Opens a file for reading; hand it to `read(_:counted:_:)`, which closes it. Tools open
-    /// their source before they create anything, so that a source that cannot be read costs
-    /// no output file.
+    /// Opens a file for reading; hand it to `read(_:counted:_:)`, which closes it.
+    ///
+    /// Tools open their source before they create anything, so that a source that cannot be read
+    /// costs no output file.
     func openReader(_ url: URL) throws -> any FileReader {
         do {
             // What a plugin still holds back for this file (an archive written after a delay) is written first.
@@ -215,8 +222,9 @@ final class ToolRun: @unchecked Sendable {
         try checkCancelled()
     }
 
-    /// The whole of a small file (a checksum file, a `.crc` file). A file longer than `limit`
-    /// is an error, never a silently shortened text.
+    /// The whole of a small file (a checksum file, a `.crc` file).
+    ///
+    /// A file longer than `limit` is an error, never a silently shortened text.
     func contents(of url: URL, limit: Int = 256 << 20) throws -> Data {
         var data = Data()
         let reader = try openReader(url)
@@ -240,8 +248,10 @@ final class ToolRun: @unchecked Sendable {
         return data
     }
 
-    /// Opens a file for writing. When one is there already the user decides (or, with
-    /// `autoRename`, the new file gets the name `name(2).ext`); nil means "skip this file".
+    /// Opens a file for writing.
+    ///
+    /// When one is there already the user decides (or, with `autoRename`, the new file gets the
+    /// name `name(2).ext`); nil means "skip this file".
     ///
     /// A file that replaces another is written under a temporary name. With `deferred` the
     /// replacement happens only when `transaction` ends well, and everything the run created
@@ -300,12 +310,16 @@ final class ToolRun: @unchecked Sendable {
         return created
     }
 
-    /// Outputs made with `deferred`, in the order they were created. Job thread only.
+    /// Outputs made with `deferred`, in the order they were created.
+    ///
+    /// Job thread only.
     private var journal: [ToolOutput] = []
 
-    /// Runs `body`. The outputs it made with `deferred: true` take the place of the files they
-    /// replace when it has finished without an error; if it throws (or is cancelled), they are
-    /// all removed again and the files that were there before are untouched.
+    /// Runs `body`.
+    ///
+    /// The outputs it made with `deferred: true` take the place of the files they replace when it
+    /// has finished without an error; if it throws (or is cancelled), they are all removed again
+    /// and the files that were there before are untouched.
     func transaction<Value>(_ body: () throws -> Value) throws -> Value {
         do {
             let value = try body()
@@ -368,8 +382,10 @@ final class ToolRun: @unchecked Sendable {
     }
 }
 
-/// A file being written. What is not finished is removed again, so a failed or cancelled
-/// tool leaves no half-written files.
+/// A file being written.
+///
+/// What is not finished is removed again, so a failed or cancelled tool leaves no half-written
+/// files.
 final class ToolOutput {
     let url: URL
     private let writer: any FileWriter
@@ -418,8 +434,9 @@ final class ToolOutput {
         bytesWritten += Int64(data.count)
     }
 
-    /// Completes the file. One that replaces another takes its place now, or, when the output is
-    /// deferred, at `commit`.
+    /// Completes the file.
+    ///
+    /// One that replaces another takes its place now, or, when the output is deferred, at `commit`.
     func finish() throws {
         guard state == .open else { return }
         do {
@@ -458,7 +475,9 @@ final class ToolOutput {
     }
 
     /// Takes back what this output made: the partial or waiting temporary, or a file it created
-    /// anew. A file it replaced is not touched; that happens only at `commit`.
+    /// anew.
+    ///
+    /// A file it replaced is not touched; that happens only at `commit`.
     func undo() {
         switch state {
         case .open:

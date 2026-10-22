@@ -13,7 +13,8 @@ import Testing
     func sample() -> DirectoryTree {
         DirectoryTree(
             rootURL: root,
-            paths: ["Apps", "Apps/Tools", "Apps/Tools/test", "Work", "Work/file10", "Work/file2", "Work/Tests"])
+            paths: ["Apps", "Apps/Tools", "Apps/Tools/test", "Work", "Work/file10", "Work/file2", "Work/Tests"]
+        )
     }
 
     @Test func buildsFromCachedPathsInNaturalOrder() {
@@ -22,7 +23,8 @@ import Testing
         #expect(tree.root.children.map(\.name) == ["Apps", "Work"])
         #expect(tree.node(at: "Work")?.children.map(\.name) == ["file2", "file10", "Tests"])
         #expect(
-            tree.paths == ["Apps", "Apps/Tools", "Apps/Tools/test", "Work", "Work/file2", "Work/file10", "Work/Tests"])
+            tree.paths == ["Apps", "Apps/Tools", "Apps/Tools/test", "Work", "Work/file2", "Work/file10", "Work/Tests"]
+        )
         #expect(tree.root.isScanned && tree.node(at: "Apps/Tools/test")?.isScanned == true)
         #expect(tree.node(at: "Apps/Tools/test")?.depth == 3 && tree.root.depth == 0)
         #expect(tree.node(at: "Nowhere") == nil)
@@ -36,10 +38,12 @@ import Testing
         let node = try #require(tree.node(at: "Apps/Tools"))
         #expect(tree.relativePath(of: node) == "Apps/Tools" && tree.relativePath(of: tree.root) == "")
         #expect(
-            tree.url(of: node).path == "/Volumes/Disk/Apps/Tools" && tree.url(of: tree.root).path == "/Volumes/Disk")
+            tree.url(of: node).path == "/Volumes/Disk/Apps/Tools" && tree.url(of: tree.root).path == "/Volumes/Disk"
+        )
         #expect(tree.relativePath(of: URL(fileURLWithPath: "/Volumes/Disk/Work/Tests/")) == "Work/Tests")
         #expect(
-            tree.relativePath(of: root) == "" && tree.relativePath(of: URL(fileURLWithPath: "/Volumes/Other")) == nil)
+            tree.relativePath(of: root) == "" && tree.relativePath(of: URL(fileURLWithPath: "/Volumes/Other")) == nil
+        )
         #expect(tree.nearestNode(to: URL(fileURLWithPath: "/Volumes/Disk/Apps/Tools/new/deeper")) === node)
         #expect(tree.nearestNode(to: URL(fileURLWithPath: "/elsewhere")) == nil)
         let memory = MemoryFileSystem()
@@ -100,7 +104,8 @@ import Testing
         #expect(DirectoryTree(rootURL: root).find("a", from: nil) == nil)
         #expect(
             TreeQuickSearch("*test").matches("test") && TreeQuickSearch("*test").matches("My Tests")
-                && !TreeQuickSearch("test").matches("My Tests"))
+                && !TreeQuickSearch("test").matches("My Tests")
+        )
     }
 
     @Test func rootsFollowTheDisksOfTheVolumeList() {
@@ -114,10 +119,12 @@ import Testing
         let slash = URL(fileURLWithPath: "/")
         #expect(
             TreeRoots.root(for: URL(fileURLWithPath: "/Volumes/Stick/a/b"), places: places, providerRoot: slash).path
-                == "/Volumes/Stick")
+                == "/Volumes/Stick"
+        )
         #expect(
             TreeRoots.root(for: URL(fileURLWithPath: "/Volumes/Stick"), places: places, providerRoot: slash).path
-                == "/Volumes/Stick")
+                == "/Volumes/Stick"
+        )
         #expect(TreeRoots.root(for: home, places: places, providerRoot: slash).path == "/")
         let memory = MemoryFileSystem()
         #expect(TreeRoots.root(for: memory.url("/A"), places: [], providerRoot: memory.url("/")) == memory.url("/"))
@@ -155,7 +162,9 @@ import Testing
         #expect(result.completed && result.tree.paths == ["a", "a/b", "a/b/c", "z"])
         #expect(result.tree.node(at: "a/b/c")?.isScanned == true)
         let withHidden = scan(
-            TreeScanner(root: memory.url("/V"), provider: memory, showHidden: true), root: memory.url("/V"))
+            TreeScanner(root: memory.url("/V"), provider: memory, showHidden: true),
+            root: memory.url("/V")
+        )
         #expect(withHidden.tree.paths == [".hidden", ".hidden/inside", "a", "a/b", "a/b/c", "z"])
     }
 
@@ -165,7 +174,8 @@ import Testing
         let excluded = memory.url("/V/Volumes").locationKey
         let result = scan(
             TreeScanner(root: memory.url("/V"), provider: memory) { $0.locationKey == excluded },
-            root: memory.url("/V"))
+            root: memory.url("/V")
+        )
         #expect(result.tree.paths == ["keep", "keep/inner", "Volumes"])
         #expect(result.tree.node(at: "Volumes")?.isScanned == false && result.tree.node(at: "keep")?.isScanned == true)
         #expect(memory.listRequests(for: "/V/Volumes") == 0)
@@ -178,11 +188,14 @@ import Testing
         memory.listBatchDelay = 0.001
         memory.listBatchSize = 1
         let result = scan(
-            TreeScanner(root: memory.url("/W"), provider: memory, batchSize: 64), root: memory.url("/W"))
+            TreeScanner(root: memory.url("/W"), provider: memory, batchSize: 64),
+            root: memory.url("/W")
+        )
         #expect(result.completed && result.tree.count == 1_200)
         #expect(
             result.tree.root.children.count == 300
-                && result.tree.node(at: "d10")?.children.map(\.name) == ["s0", "s1", "s2"])
+                && result.tree.node(at: "d10")?.children.map(\.name) == ["s0", "s1", "s2"]
+        )
         // One call for the root, five for the 300 folders, and so on: results come in batches.
         #expect(result.batches > 5)
         // Whether the folders of a batch were really read side by side depends on how many
@@ -243,7 +256,8 @@ import Testing
         // Another root has another file, even when the names look alike.
         #expect(
             cache.fileURL(for: memory.url("/V_"))?.lastPathComponent
-                != cache.fileURL(for: memory.url("/V/"))?.lastPathComponent)
+                != cache.fileURL(for: memory.url("/V/"))?.lastPathComponent
+        )
         #expect(cache.fileURL(for: memory.url("/V/")) == file)
         #expect(cache.paths(for: memory.url("/other")) == nil)
 
@@ -287,7 +301,8 @@ import Testing
         #expect(
             DirectoryTree(rootURL: root, paths: cache.paths(for: root) ?? []).paths == [
                 "a", "a/b", "a/new", "a/new/deeper"
-            ])
+            ]
+        )
     }
 
     @Test func cacheIsSafeToUseFromManyThreads() throws {
@@ -317,7 +332,11 @@ import Testing
         memory.addDirectory("/B")
         let plugin = PlacesPlugin(treeCacheDirectory: box.url("trees"), favorites: [])
         let bench = TestBench(
-            plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
+            plugins: [plugin],
+            fileSystems: [memory],
+            left: memory.url("/A"),
+            right: memory.url("/B")
+        )
         // A tree that was never read learns nothing; nothing is written for it either.
         bench.kernel.panelEvents.post(.locationChanged, from: bench.left)
         plugin.treeCache.waitForUpdates()

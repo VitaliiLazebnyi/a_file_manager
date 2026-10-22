@@ -194,8 +194,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     }
 
     /// The whole way through `ssh`: a secure-shell server of the system on 127.0.0.1 with keys
-    /// made in the sandbox. The host is unknown and the key has a passphrase, so both of ssh's
-    /// questions come through the helper. Nothing of the user's own ssh setup is read or written.
+    /// made in the sandbox.
+    ///
+    /// The host is unknown and the key has a passphrase, so both of ssh's questions come through
+    /// the helper. Nothing of the user's own ssh setup is read or written.
     @Test(.enabled(if: LocalSSHServer.isAvailable)) func logsInThroughSSH() throws {
         let server = try LocalSSHServer(box: box, passphrase: "open sesame")
         defer { server.stop() }

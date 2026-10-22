@@ -31,8 +31,10 @@ import Testing
         return condition()
     }
 
-    /// Whether everything the pane gave its work queue so far has ended. The main thread stays
-    /// free meanwhile: the tests of other suites run their main-thread work on it.
+    /// Whether everything the pane gave its work queue so far has ended.
+    ///
+    /// The main thread stays free meanwhile: the tests of other suites run their main-thread work
+    /// on it.
     private func drained(_ pane: ViewerPane) async -> Bool {
         let done = Shared(false)
         pane.workQueue.async(flags: .barrier) { done.value = true }

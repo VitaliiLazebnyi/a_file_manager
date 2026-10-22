@@ -13,8 +13,10 @@ public final class MultiRenamePlugin: Plugin {
     /// The settings last used in this run of the program; they are not kept beyond it.
     private var lastSettings: RenameSettings?
     private var store: RenameStore?
-    /// Puts a window of the tool on screen. Tests replace it, so that no window shows in the
-    /// session they run in, and look at what it was asked to show.
+    /// Puts a window of the tool on screen.
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `opensWindows` false keeps the tool windowless, for tests, and computes previews at

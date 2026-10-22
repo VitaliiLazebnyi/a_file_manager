@@ -37,7 +37,9 @@ struct ListRow: Equatable {
 }
 
 /// Which files a list with subfolders includes: `*.doc *.txt`, or `*.* | *.bak` to leave
-/// some out (spec 18 › Core syntax). Folders are always listed and entered.
+/// some out (spec 18 › Core syntax).
+///
+/// Folders are always listed and entered.
 struct ListMask {
     private let include: FileMask?
     private let exclude: FileMask?
@@ -57,9 +59,10 @@ struct ListMask {
     }
 }
 
-/// Reads the rows of a list with subfolders through the file systems. Blocks; runs on a job's
-/// thread. The subfolders of one folder are read on all cores at once, since on a server each
-/// listing is a trip of its own; the rows keep the order of the names.
+/// Reads the rows of a list with subfolders through the file systems.
+///
+/// Blocks; runs on a job's thread. The subfolders of one folder are read on all cores at once,
+/// since on a server each listing is a trip of its own; the rows keep the order of the names.
 struct ListCollector {
     let fileSystems: FileSystemRegistry
     let showHidden: Bool
@@ -100,7 +103,9 @@ struct ListCollector {
 
 /// Lays a file list out in pages of text: a header line on every page, the rows in the
 /// panel's format, and a footer with the totals after the last row (spec 12 › Print directory
-/// dialog, 12 › Print margins and header). Pure: the same input gives the same pages.
+/// dialog, 12 › Print margins and header).
+///
+/// Pure: the same input gives the same pages.
 struct DirectoryListFormatter {
     static let defaultHeader = "%d - Page %p/%t"
 
@@ -163,7 +168,9 @@ struct DirectoryListFormatter {
         ]
     }
 
-    /// The pages, each as its lines. There is always at least one page.
+    /// The pages, each as its lines.
+    ///
+    /// There is always at least one page.
     func pages(directory: String, rows: [ListRow], now: Date = Date()) -> [[String]] {
         let lines = body(rows)
         let hasHeader = !header.isEmpty
@@ -197,7 +204,9 @@ struct DirectoryListFormatter {
 }
 
 /// Draws pages of text for the printer: one page of the list on each sheet, in a fixed-width
-/// font sized so that the page's lines fit the sheet. Main thread only, like every view.
+/// font sized so that the page's lines fit the sheet.
+///
+/// Main thread only, like every view.
 final class PagePrintView: NSView {
     private let pages: [[String]]
     private let pageSize: NSSize
@@ -205,8 +214,10 @@ final class PagePrintView: NSView {
     private let lineHeight: CGFloat
 
     /// `longestLine` is the length of the longest line, when the caller has measured it
-    /// already (off the main thread, for a long list). Without it the lines are measured here,
-    /// in UTF-16 units (a count that does not cut every line into characters).
+    /// already (off the main thread, for a long list).
+    ///
+    /// Without it the lines are measured here, in UTF-16 units (a count that does not cut every
+    /// line into characters).
     init(pages: [[String]], longestLine: Int? = nil, linesPerPage: Int, printInfo: NSPrintInfo) {
         self.pages = pages
         let bounds = printInfo.imageablePageBounds

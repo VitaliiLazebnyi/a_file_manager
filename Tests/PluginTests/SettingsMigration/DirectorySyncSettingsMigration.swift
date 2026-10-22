@@ -50,6 +50,7 @@ internal struct DirectorySyncSettingsMigration {
     }
 
     /// A session of the window on the settings, with two real folders for the panels.
+    ///
     /// A session on a bench of its own. The bench is returned with it: it owns the kernel, which
     /// the session needs for as long as it is used.
     private static func session(

@@ -16,6 +16,7 @@ private func waitUntil(seconds: TimeInterval = Wait.ceiling, _ condition: () -> 
 }
 
 /// Runs `body` on a thread of its own and hands back what it returned or threw, when it is over.
+///
 /// Unchecked: the result is guarded by `condition`.
 private final class Running<Value>: @unchecked Sendable {
     private let condition = NSCondition()
@@ -53,9 +54,10 @@ private func wasCancelled<Value>(_ result: Result<Value, any Error>?) -> Bool {
 }
 
 /// A folder that stands for a share whose server has gone: every question the file system
-/// puts to the system about a path in it waits here until the "server" answers again. The
-/// folder itself is an ordinary one on the local disk.
-/// Unchecked: the state is guarded by `condition`.
+/// puts to the system about a path in it waits here until the "server" answers again.
+///
+/// The folder itself is an ordinary one on the local disk. Unchecked: the state is guarded by
+/// `condition`.
 private final class DeadVolume: @unchecked Sendable {
     let root: String
     private let condition = NSCondition()

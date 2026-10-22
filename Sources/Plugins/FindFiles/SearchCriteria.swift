@@ -31,9 +31,10 @@ public struct Age: Codable, Equatable, Sendable {
     /// saved search can hold any number) is held to it instead of overflowing.
     public static let largestCount = 1_000_000
 
-    /// The moment that lies this far before `now`. For days and longer units it is midnight of
-    /// that day, not the current time of day. A count beyond what the calendar can reach gives
-    /// the earliest moment there is.
+    /// The moment that lies this far before `now`.
+    ///
+    /// For days and longer units it is midnight of that day, not the current time of day. A count
+    /// beyond what the calendar can reach gives the earliest moment there is.
     public func cutoff(before now: Date, calendar: Calendar = .current) -> Date {
         let count = min(max(count, 0), Self.largestCount)
         var step = DateComponents()
@@ -104,7 +105,9 @@ public struct SizeRule: Codable, Equatable, Sendable {
 }
 
 /// The criteria of the Advanced tab except the duplicate finder; all that are set must hold
-/// (spec 09 › Advanced tab). The Windows attributes are replaced by what a Mac's files have.
+/// (spec 09 › Advanced tab).
+///
+/// The Windows attributes are replaced by what a Mac's files have.
 public struct FileCriteria: Codable, Equatable, Sendable {
     /// "Date between": either bound may be missing. `dateTo` is the last moment that counts.
     public var dateFrom: Date?
@@ -155,7 +158,9 @@ public struct FileCriteria: Codable, Equatable, Sendable {
 }
 
 /// `FileCriteria` with the ages turned into moments, so a search does the calendar
-/// arithmetic once, not for every file. Immutable; may be used from several threads.
+/// arithmetic once, not for every file.
+///
+/// Immutable; may be used from several threads.
 public struct PreparedCriteria {
     private let criteria: FileCriteria
     private let notOlderCutoff: Date?
@@ -249,15 +254,18 @@ public struct FieldRule: Codable, Equatable, Sendable {
     /// False for a regex rule whose value is no regular expression: it can never be judged.
     public var isUsable: Bool { !usesRegex || compiledExpression() != nil }
 
-    /// Tests a field's text. The ordering operators compare as numbers when both sides are
-    /// numbers (digit grouping is ignored), otherwise as text without regard to case.
+    /// Tests a field's text.
+    ///
+    /// The ordering operators compare as numbers when both sides are numbers (digit grouping is
+    /// ignored), otherwise as text without regard to case.
     public func matches(_ text: String) -> Bool {
         matches(text, expression: compiledExpression(), trip: nil, cancelled: { false })
     }
 
     /// The same with the regular expression compiled once (`compiledExpression()`); a run that
-    /// takes the expression too long, or is cancelled, finds no match. A value that is no
-    /// expression never matches `regex` and always matches `!regex`.
+    /// takes the expression too long, or is cancelled, finds no match.
+    ///
+    /// A value that is no expression never matches `regex` and always matches `!regex`.
     func matches(_ text: String, expression: NSRegularExpression?, trip: RegexTrip?, cancelled: () -> Bool) -> Bool {
         switch comparison {
         case .contains: return text.range(of: value, options: .caseInsensitive) != nil

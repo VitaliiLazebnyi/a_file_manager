@@ -2,8 +2,9 @@ public import AFMKernel
 import CryptoKit
 import Foundation
 
-/// "Find duplicate files" of the Advanced tab (spec 09 › Duplicate finder). The ticked
-/// sub-criteria must all hold between the files of a group.
+/// "Find duplicate files" of the Advanced tab (spec 09 › Duplicate finder).
+///
+/// The ticked sub-criteria must all hold between the files of a group.
 public struct DuplicateOptions: Codable, Equatable, Sendable {
     public var isEnabled: Bool
     public var sameName: Bool
@@ -34,9 +35,10 @@ public enum DuplicateFinder {
         var digest = Data()
     }
 
-    /// The groups of two or more files that are equal by the ticked criteria. Groups are in
-    /// the order of the first ticked criterion (name, then size), the files of a group in path
-    /// order. A cancelled run returns nothing, so no half-compared files are shown.
+    /// The groups of two or more files that are equal by the ticked criteria.
+    ///
+    /// Groups are in the order of the first ticked criterion (name, then size), the files of a
+    /// group in path order. A cancelled run returns nothing, so no half-compared files are shown.
     public static func groups(
         of items: [FileItem],
         options: DuplicateOptions,
@@ -109,7 +111,9 @@ public enum DuplicateFinder {
     /// Leaves out what cannot be a duplicate to delete: FIFOs and devices (they are no
     /// files to compare, and reading them blocks or never ends), and every path to a file
     /// already in the list, whether a link, a hard link or the same folder reached by two roads
-    /// (deleting the "other" copy would delete the only one). The first path stays.
+    /// (deleting the "other" copy would delete the only one).
+    ///
+    /// The first path stays.
     ///
     /// `mountOf` tells the share that holds a local file, if any (`Mount.of`).
     static func distinctFiles<Entry: Sendable>(

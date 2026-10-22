@@ -3,7 +3,9 @@ public import Foundation
 import NetFS
 
 /// Mounting and ejecting network volumes, the Mac's form of mapping and disconnecting network
-/// drives (spec 11 › Windows network functions). Both calls block and are made from a job.
+/// drives (spec 11 › Windows network functions).
+///
+/// Both calls block and are made from a job.
 public protocol VolumeMounter: AnyObject, Sendable {
     /// Mounts the share at `url` (smb, afp, nfs, http/https for WebDAV) and returns where it
     /// appeared under /Volumes. The system asks for a name and password when it needs them.
@@ -35,9 +37,11 @@ public struct VolumeError: LocalizedError, Sendable {
 public final class SystemVolumeMounter: VolumeMounter {
     /// The system's calls, which answer later or never; tests put stand-ins in their place.
     struct Calls {
-        /// `NetFSMountURLAsync`: asks for the mount without waiting. Returns the status of
-        /// asking, puts what to cancel the request with into its seventh argument, and later
-        /// calls the block with the status and the mount points, on the queue it is given.
+        /// `NetFSMountURLAsync`: asks for the mount without waiting.
+        ///
+        /// Returns the status of asking, puts what to cancel the request with into its seventh
+        /// argument, and later calls the block with the status and the mount points, on the queue
+        /// it is given.
         var mount:
             @Sendable (
                 _ url: CFURL?, _ mountPath: CFURL?, _ user: CFString?, _ password: CFString?,
@@ -71,6 +75,7 @@ public final class SystemVolumeMounter: VolumeMounter {
     }
 
     /// What the system's answer is delivered into; it may come after the waiting thread left.
+    ///
     /// The first answer counts; until it comes the value is an input/output error. `result`,
     /// `isSet` and `failure` are guarded by `lock`.
     private final class Outcome: @unchecked Sendable {

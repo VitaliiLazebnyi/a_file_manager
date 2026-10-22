@@ -28,7 +28,9 @@ enum SearchError: LocalizedError, Equatable {
 }
 
 /// What the user typed into the Find dialog, made ready for searching (spec 10 › Pattern
-/// rules). An immutable value; safe to share between the searching threads.
+/// rules).
+///
+/// An immutable value; safe to share between the searching threads.
 struct SearchPattern {
     enum Kind {
         case bytes([UInt8])
@@ -139,18 +141,21 @@ struct SearchPattern {
 
 /// Searching a file of any size without loading it: the file is read in chunks that overlap by
 /// more than a match is long, so a match across a chunk border is found in the earlier chunk.
-/// Several chunks are read, decoded and searched at once on all cores; the first hit in file
-/// order wins. Blocks; call it on a background thread.
+///
+/// Several chunks are read, decoded and searched at once on all cores; the first hit in file order
+/// wins. Blocks; call it on a background thread.
 enum ViewerSearch {
     /// The longest match a regular expression can have across a chunk border.
     static let expressionOverlap = 64 * 1_024
 
     /// The next match that begins at or after `start` or, with `backwards`, the last one that
-    /// begins before `start`. Nil when there is none or the search was cancelled (a read that
-    /// was blocked is interrupted). `progress` receives the share of the way that has been
-    /// searched, on the calling thread. `boundaries` is what a text in a double-byte code page
-    /// is cut into characters with; a search that is repeated keeps it between the calls.
-    /// `rawBytes` off decodes every chunk (the reference the raw searches are tested against).
+    /// begins before `start`.
+    ///
+    /// Nil when there is none or the search was cancelled (a read that was blocked is interrupted).
+    /// `progress` receives the share of the way that has been searched, on the calling thread.
+    /// `boundaries` is what a text in a double-byte code page is cut into characters with; a search
+    /// that is repeated keeps it between the calls. `rawBytes` off decodes every chunk (the
+    /// reference the raw searches are tested against).
     static func find(
         _ pattern: SearchPattern,
         in source: any ByteSource,
@@ -225,8 +230,10 @@ enum ViewerSearch {
         let rawBytes: Bool
     }
 
-    /// The first (or last) match that begins inside `accepted`. Reads a little before it, for
-    /// the character a whole word must not touch, and enough behind it for a match to end.
+    /// The first (or last) match that begins inside `accepted`.
+    ///
+    /// Reads a little before it, for the character a whole word must not touch, and enough behind
+    /// it for a match to end.
     private static func search(_ pattern: SearchPattern, _ context: Context, accepted: Range<Int64>, last: Bool) throws
         -> Range<Int64>?
     {
@@ -362,10 +369,12 @@ enum ViewerSearch {
     // MARK: Text in decoded units
 
     /// Finds a text in decoded UTF-16 units, the same way whatever the chunk it is looked for
-    /// in. Without case, both sides are folded a character at a time (ß and ss are the same,
-    /// as are the ligatures and the Kelvin sign) and a match must begin and end at the border of
-    /// a character of the text; nothing is skipped over, so a control character in the text is
-    /// a character that does not match, as it is in the raw bytes.
+    /// in.
+    ///
+    /// Without case, both sides are folded a character at a time (ß and ss are the same, as are the
+    /// ligatures and the Kelvin sign) and a match must begin and end at the border of a character
+    /// of the text; nothing is skipped over, so a control character in the text is a character that
+    /// does not match, as it is in the raw bytes.
     struct TextMatcher {
         private let needle: [UInt16]
         private let caseSensitive: Bool
@@ -516,7 +525,9 @@ enum ViewerSearch {
 
     /// The characters other than ASCII letters that a literal, case-insensitive search of
     /// `NSString` takes for ASCII letters: ß and ẞ for `ss`, the long s, the Kelvin sign,
-    /// the ligatures ﬀ…ﬆ. A chunk that has one is left to the decoded search.
+    /// the ligatures ﬀ…ﬆ.
+    ///
+    /// A chunk that has one is left to the decoded search.
     private static let caseFolded: Set<UInt16> = [
         0xDF, 0x17F, 0x1E9E, 0x212A, 0xFB00, 0xFB01, 0xFB02, 0xFB03, 0xFB04, 0xFB05, 0xFB06
     ]
@@ -556,8 +567,9 @@ enum ViewerSearch {
 
     /// The first (or last) match of an ASCII `needle` that begins inside `accepted`, found in the
     /// raw bytes of a UTF-8 or one-byte-per-character text: a byte is compared with both cases
-    /// of the letter, and for a whole word the characters on either side are looked at. The same
-    /// answer as the decoded search gives; `undecided` where it could not be sure to.
+    /// of the letter, and for a whole word the characters on either side are looked at.
+    ///
+    /// The same answer as the decoded search gives; `undecided` where it could not be sure to.
     private static func rawASCII(
         _ needle: [UInt8],
         _ pattern: SearchPattern,

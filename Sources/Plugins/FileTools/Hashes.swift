@@ -3,16 +3,19 @@ import CryptoKit
 import Foundation
 import zlib
 
-/// A checksum that is fed a file block by block. One hasher belongs to one thread at a time,
-/// and may go from one thread to another between blocks.
+/// A checksum that is fed a file block by block.
+///
+/// One hasher belongs to one thread at a time, and may go from one thread to another between
+/// blocks.
 protocol StreamHasher: AnyObject, Sendable {
     func update(_ data: Data)
     /// The digest; the hasher is used up afterwards.
     func finish() -> [UInt8]
 }
 
-/// The checksum methods of "Create checksum files" (spec 08 › Methods). The raw values are
-/// the numbers of the spec's `Lastmd5` setting.
+/// The checksum methods of "Create checksum files" (spec 08 › Methods).
+///
+/// The raw values are the numbers of the spec's `Lastmd5` setting.
 enum ChecksumMethod: Int, CaseIterable, Codable {
     case crc32 = 0
     case md5, sha1, sha256, sha512, sha224, sha384, sha3_256, sha3_512, sha3_224, sha3_384, blake3
@@ -64,8 +67,10 @@ enum ChecksumMethod: Int, CaseIterable, Codable {
         }
     }
 
-    /// The extension of the checksum file. The spec records `.sfv`, `.md5`, `.sha`, `.sha256`
-    /// and `.bk3`; the others follow the same pattern.
+    /// The extension of the checksum file.
+    ///
+    /// The spec records `.sfv`, `.md5`, `.sha`, `.sha256` and `.bk3`; the others follow the same
+    /// pattern.
     var fileExtension: String {
         switch self {
         case .crc32: return "sfv"
@@ -186,9 +191,11 @@ final class SHA224Hasher: StreamHasher, @unchecked Sendable {
     }
 }
 
-/// SHA-3 (FIPS 202): the Keccak sponge with 1600 bits of state. CryptoKit has it from
-/// macOS 26 on (and not SHA3-224 at all); this is the version for the others. It works on
-/// raw memory with wrapping arithmetic: nothing in the permutation is checked or allocated.
+/// SHA-3 (FIPS 202): the Keccak sponge with 1600 bits of state.
+///
+/// CryptoKit has it from macOS 26 on (and not SHA3-224 at all); this is the version for the others.
+/// It works on raw memory with wrapping arithmetic: nothing in the permutation is checked or
+/// allocated.
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
 final class SHA3Hasher: StreamHasher, @unchecked Sendable {
@@ -386,10 +393,11 @@ final class SHA3Hasher: StreamHasher, @unchecked Sendable {
 }
 
 /// BLAKE3, after the reference implementation of its authors: 1024-byte chunks hashed in
-/// 64-byte blocks and joined in a binary tree. Nothing is allocated per block: the working
-/// state lives in raw memory or on the stack. The chunks of large inputs are hashed on all
-/// cores, each core taking a subtree of equal size, which is correct because the chaining
-/// value of such a subtree does not depend on what is around it.
+/// 64-byte blocks and joined in a binary tree.
+///
+/// Nothing is allocated per block: the working state lives in raw memory or on the stack. The
+/// chunks of large inputs are hashed on all cores, each core taking a subtree of equal size, which
+/// is correct because the chaining value of such a subtree does not depend on what is around it.
 ///
 /// Unchecked `Sendable`: used by one thread at a time, as `StreamHasher` allows.
 final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
@@ -406,8 +414,9 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
         return UnsafePointer(pointer)
     }()
 
-    /// The order in which each of the seven rounds takes the words of a block. Filled once, when
-    /// first used, and only read afterwards.
+    /// The order in which each of the seven rounds takes the words of a block.
+    ///
+    /// Filled once, when first used, and only read afterwards.
     nonisolated(unsafe) private static let schedule: UnsafePointer<UInt8> = {
         let permutation = [2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8]
         var order = Array(0..<16)
@@ -485,8 +494,9 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
 
     // MARK: Chunks and parents
 
-    /// The chaining value (8 words) of a chunk of `length` bytes (1…1024). With `isRoot` the
-    /// chunk is the whole input and the eight words are the start of the digest.
+    /// The chaining value (8 words) of a chunk of `length` bytes (1…1024).
+    ///
+    /// With `isRoot` the chunk is the whole input and the eight words are the start of the digest.
     private static func chunk(
         _ input: UnsafeRawPointer,
         length: Int,
@@ -609,8 +619,9 @@ final class BLAKE3Hasher: StreamHasher, @unchecked Sendable {
 
     // MARK: The hasher
 
-    /// The last (possibly full) chunk of the input so far. A full chunk is closed only when
-    /// more input follows: the last one is the root's.
+    /// The last (possibly full) chunk of the input so far.
+    ///
+    /// A full chunk is closed only when more input follows: the last one is the root's.
     private let buffer = UnsafeMutableRawPointer.allocate(byteCount: BLAKE3Hasher.chunkSize, alignment: 8)
     private var bufferLength = 0
     private var chunkCounter: UInt64 = 0

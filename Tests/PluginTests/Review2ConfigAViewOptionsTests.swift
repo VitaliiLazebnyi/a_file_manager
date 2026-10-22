@@ -8,11 +8,14 @@ import Testing
 
 /// Sorting and filtering of long lists (review 2, C063 and its kin): the work is done away
 /// from the main thread, and when the list changed meanwhile it is done again there, never on
-/// the main thread. The test says when the background work and its return happen.
+/// the main thread.
+///
+/// The test says when the background work and its return happen.
 @MainActor @Suite struct Review2ConfigAViewOptions {
     /// Holds what the plugin hands to the background and back, until the test runs it.
-    /// Unchecked: used on the main thread only; the plugin hands its steps over there and the
-    /// test runs them there.
+    ///
+    /// Unchecked: used on the main thread only; the plugin hands its steps over there and the test
+    /// runs them there.
     final class Steps: @unchecked Sendable {
         var background: [@Sendable () -> Void] = []
         var main: [@MainActor @Sendable () -> Void] = []

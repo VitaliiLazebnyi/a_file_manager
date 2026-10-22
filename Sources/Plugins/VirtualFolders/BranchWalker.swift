@@ -32,9 +32,11 @@ public struct BranchWalker: Sendable {
     /// holds a second view of everything.
     static let mountFolders: Set<String> = ["/Volumes", "/System/Volumes", "/Network", "/net", "/home", "/dev"]
 
-    /// True when a disk is mounted at `path` itself. A folder on another device than its parent
-    /// is not enough to say so: on the start-up disk the user's folders are firmlinked from the
-    /// data volume, and the system reports the volume's mount point for them, not their own.
+    /// True when a disk is mounted at `path` itself.
+    ///
+    /// A folder on another device than its parent is not enough to say so: on the start-up disk the
+    /// user's folders are firmlinked from the data volume, and the system reports the volume's
+    /// mount point for them, not their own.
     static func isMountPoint(_ path: String) -> Bool {
         var info = statfs()
         guard statfs(path, &info) == 0 else { return false }
@@ -93,12 +95,14 @@ public struct BranchWalker: Sendable {
         return child
     }
 
-    /// Walks the trees below `starts`. Each item keeps its real location; its name is its path
-    /// relative to the branch root, which is unique within the list. Links to folders are
-    /// listed, not followed, so the walk cannot run in circles. A folder that cannot be read
-    /// is left out, except when `mustRead` is set and it is one of the starts: that error is
-    /// thrown. `receive` returns false to stop. Once `cancellation` is set the walk ends at
-    /// once, also in the directory it is reading, and returns what it has.
+    /// Walks the trees below `starts`.
+    ///
+    /// Each item keeps its real location; its name is its path relative to the branch root, which
+    /// is unique within the list. Links to folders are listed, not followed, so the walk cannot run
+    /// in circles. A folder that cannot be read is left out, except when `mustRead` is set and it
+    /// is one of the starts: that error is thrown. `receive` returns false to stop. Once
+    /// `cancellation` is set the walk ends at once, also in the directory it is reading, and
+    /// returns what it has.
     ///
     /// Returns the directories that were read, for whoever wants to watch them: the first
     /// `keeping` of them (a walk of a million folders does not hold a million locations).

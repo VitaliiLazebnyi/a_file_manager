@@ -16,8 +16,10 @@ import ViewOptionsPlugin
 @testable import ViewerPlugin
 
 /// Every plugin driven through its commands, against a kernel with fake panels and a job
-/// service that runs at once. No window is put on screen: what the viewer and Find Files would
-/// show goes to `presenter` (none of these commands opens a window of theirs).
+/// service that runs at once.
+///
+/// No window is put on screen: what the viewer and Find Files would show goes to `presenter` (none
+/// of these commands opens a window of theirs).
 @MainActor @Suite struct PluginCommands {
     let memory = MemoryFileSystem()
     private let presenter = StabilityPresenter()

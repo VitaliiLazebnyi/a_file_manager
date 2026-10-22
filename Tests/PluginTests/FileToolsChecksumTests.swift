@@ -28,8 +28,12 @@ import Testing
         try box.file("work/sub/deep/d.txt", "delta")
         try box.folder("other")
         bench = TestBench(
-            plugins: [FileToolsPlugin(pasteboard: scratch.pasteboard)], fileSystems: [LocalFileSystem(), memory],
-            left: box.url("work"), right: box.url("other"), settings: settings)
+            plugins: [FileToolsPlugin(pasteboard: scratch.pasteboard)],
+            fileSystems: [LocalFileSystem(), memory],
+            left: box.url("work"),
+            right: box.url("other"),
+            settings: settings
+        )
     }
 
     func select(_ names: [String]) {
@@ -64,9 +68,12 @@ import Testing
     }
     func digest(_ tool: String, _ arguments: [String], _ path: String) throws -> String {
         String(
-            try systemTool(tool, arguments + [box.url(path).path]).output.split(whereSeparator: {
-                $0 == " " || $0 == "\n"
-            }).first ?? "")
+            try systemTool(tool, arguments + [box.url(path).path]).output
+                .split(whereSeparator: {
+                    $0 == " " || $0 == "\n"
+                })
+                .first ?? ""
+        )
     }
 
     // MARK: Create
@@ -79,13 +86,15 @@ import Testing
         #expect(
             ui.forms.last?.map(\.key).prefix(6) == [
                 "target", "separateFiles", "separateFolders", "utf8", "unix", "method"
-            ])
+            ]
+        )
         #expect(ui.log.last == "form: Create CRC-checksum file" && namesOnDisk(box.url("work")).count == 3)
         // Several items: the folder's name. The last method is proposed again.
         create(["a.txt", "b b.txt"], ["method": method(.md5)])
         #expect(
             box.exists("work/work.md5")
-                && settings.index(FileTools.Keys.checksumMethod, default: 0) == ChecksumMethod.md5.rawValue)
+                && settings.index(FileTools.Keys.checksumMethod, default: 0) == ChecksumMethod.md5.rawValue
+        )
         select(["a.txt", "sub"])
         ui.formAnswers = [.cancel]
         bench.commands.perform(.createChecksums)
@@ -114,7 +123,8 @@ import Testing
         #expect(
             lines.map { String($0.split(separator: "*", maxSplits: 1).last ?? "") } == [
                 "sub/c.txt", "sub/deep/d.txt", "a.txt", "b b.txt"
-            ])
+            ]
+        )
         #expect(lines.last == "\(try digest("/usr/bin/shasum", ["-a", algorithm], "work/b b.txt")) *b b.txt")
         let check = try systemTool("/usr/bin/shasum", ["-a", algorithm, "-c", name], in: box.url("work"))
         #expect(check.status == 0 && check.output.components(separatedBy: ": OK").count == 5)
@@ -122,9 +132,10 @@ import Testing
 
     @Test func sfvFileMatchesCksum() throws {
         create(["a.txt", "b b.txt"])
-        let crcs = try ["a.txt", "b b.txt"].map {
-            String(format: "%08X", UInt32(try digest("/usr/bin/cksum", ["-o", "3"], "work/" + $0)) ?? 0)
-        }
+        let crcs = try ["a.txt", "b b.txt"]
+            .map {
+                String(format: "%08X", UInt32(try digest("/usr/bin/cksum", ["-o", "3"], "work/" + $0)) ?? 0)
+            }
         #expect(box.read("work/work.sfv") == "a.txt \(crcs[0])\nb b.txt \(crcs[1])\n")
     }
 
@@ -132,12 +143,14 @@ import Testing
         for chosen in ChecksumMethod.allCases {
             create(
                 ["a.txt", "sub"],
-                ["method": method(chosen), "target": .text(box.url("work/all." + chosen.fileExtension).path)])
+                ["method": method(chosen), "target": .text(box.url("work/all." + chosen.fileExtension).path)]
+            )
             let result = verify(["all." + chosen.fileExtension])
             #expect(result.title == "\(chosen.reportName): Errors: 0", "\(chosen)")
             #expect(
                 result.text.hasSuffix("Errors: 0\nOK: 3, not found: 0, read error: 0, wrong checksum: 0\n"),
-                "\(chosen)")
+                "\(chosen)"
+            )
         }
     }
 
@@ -151,15 +164,19 @@ import Testing
         #expect(
             text.components(separatedBy: "\r\n").map { String($0.split(separator: "*").last ?? "") } == [
                 "sub\\c.txt", "sub\\deep\\d.txt", "sub\\ünï.txt", ""
-            ])
+            ]
+        )
         #expect(verify(["win.md5"]).title == "MD5: Errors: 0")
         #expect(settings.flag(FileTools.Keys.unixFormat, default: true) == false)
 
         create(
-            ["a.txt"], ["unix": .flag(true), "method": method(.md5), "target": .text(box.url("work/plain.md5").path)])
+            ["a.txt"],
+            ["unix": .flag(true), "method": method(.md5), "target": .text(box.url("work/plain.md5").path)]
+        )
         #expect(!(try Data(contentsOf: box.url("work/plain.md5"))).starts(with: [0xEF, 0xBB, 0xBF]))
         create(
-            ["a.txt"], ["utf8": .flag(true), "method": method(.md5), "target": .text(box.url("work/marked.md5").path)]
+            ["a.txt"],
+            ["utf8": .flag(true), "method": method(.md5), "target": .text(box.url("work/marked.md5").path)]
         )
         #expect((try Data(contentsOf: box.url("work/marked.md5"))).starts(with: [0xEF, 0xBB, 0xBF]))
         #expect(ChecksumFile.needsByteOrderMark(names: ["ä"], unixFormat: true, alwaysUTF8: false) == false)
@@ -178,13 +195,15 @@ import Testing
         settings.set(false, forKey: FileTools.Keys.appendExtension)
         create(
             ["a.txt", "sub"],
-            ["separateFiles": .flag(true), "method": method(.sha1), "target": .text(box.url("other/x.sha").path)])
+            ["separateFiles": .flag(true), "method": method(.sha1), "target": .text(box.url("other/x.sha").path)]
+        )
         #expect(namesOnDisk(box.url("other")) == ["a.sha", "c.sha", "d.sha"])
         // Elsewhere than above the files, the names carry no path.
         #expect(box.read("other/d.sha")?.hasSuffix(" *d.txt\n") == true)
         create(
             ["b b.txt"],
-            ["separateFiles": .flag(true), "method": method(.sha1), "target": .text(box.url("other/*.*.sum").path)])
+            ["separateFiles": .flag(true), "method": method(.sha1), "target": .text(box.url("other/*.*.sum").path)]
+        )
         #expect(box.exists("other/b b.txt.sum"))
 
         // One file per folder, in that folder, whatever the target says.
@@ -193,10 +212,12 @@ import Testing
             [
                 "separateFiles": .flag(false), "separateFolders": .flag(true), "method": method(.md5),
                 "target": .text(box.url("other/ignored.md5").path)
-            ])
+            ]
+        )
         #expect(
             box.exists("work/work.md5") && box.exists("work/sub/sub.md5") && box.exists("work/sub/deep/deep.md5")
-                && !box.exists("other/ignored.md5"))
+                && !box.exists("other/ignored.md5")
+        )
         #expect(box.read("work/sub/sub.md5")?.hasSuffix(" *c.txt\n") == true)
         #expect(verify(["work.md5"]).title == "MD5: Errors: 0")
     }
@@ -208,7 +229,8 @@ import Testing
         create(["one.bin", "two.bin"], ["method": method(.blake3)])
         #expect(
             memory.contents("/data/data.bk3")?.split(separator: "\n").map { $0.suffix(9) }
-                == ["*one.bin", "*two.bin"].map { Substring(" " + $0) })
+                == ["*one.bin", "*two.bin"].map { Substring(" " + $0) }
+        )
         // An existing checksum file is asked about; Cancel keeps it.
         create(["one.bin"], ["method": method(.blake3), "target": .text("mem:/data/data.bk3")])
         #expect(memory.contents("/data/data.bk3")?.contains("two.bin") == true)
@@ -229,50 +251,62 @@ import Testing
         let sha256 = String(repeating: "CD", count: 32)
         #expect(
             ChecksumFile.parse(
-                "\(md5) *a b.txt\r\n\(md5)  text.txt\n; comment\n# another\n\nrubbish line\n", fileName: "x.md5")
+                "\(md5) *a b.txt\r\n\(md5)  text.txt\n; comment\n# another\n\nrubbish line\n",
+                fileName: "x.md5"
+            )
                 == [
                     Entry(name: "a b.txt", digest: md5, method: .md5),
                     Entry(name: "text.txt", digest: md5, method: .md5)
-                ])
+                ]
+        )
         #expect(
             ChecksumFile.parse("file one.bin 1A2B3C4D\ndeadbeef 00112233\ncafe.txt\tFFFFFFFF", fileName: "x.sfv")
                 == [
                     Entry(name: "file one.bin", digest: "1a2b3c4d", method: .crc32),
                     Entry(name: "deadbeef", digest: "00112233", method: .crc32),
                     Entry(name: "cafe.txt", digest: "ffffffff", method: .crc32)
-                ])
+                ]
+        )
         #expect(
             ChecksumFile.parse(
                 "SHA256(my (1).bin)= \(sha256)\nMD5 (b.txt) = \(md5)\nSHA3-256(c)= \(sha256)\nSHA256(short)= abcd",
-                fileName: "sums.txt")
+                fileName: "sums.txt"
+            )
                 == [
                     Entry(name: "my (1).bin", digest: sha256.lowercased(), method: .sha256),
                     Entry(name: "b.txt", digest: md5, method: .md5),
                     Entry(name: "c", digest: sha256.lowercased(), method: .sha3_256)
-                ])
+                ]
+        )
         // The checksum of a stream stands for the file the checksum file is named after.
         #expect(
             ChecksumFile.parse("\(sha256)  -", fileName: "disk.img.sha256") == [
                 Entry(name: "disk.img", digest: sha256.lowercased(), method: .sha256)
-            ])
+            ]
+        )
         // Without a telling extension the length decides, and several methods may fit.
         #expect(
             ChecksumFile.parse("\(sha256) *a", fileName: "sums.txt") == [
                 Entry(name: "a", digest: sha256.lowercased(), method: nil)
-            ])
+            ]
+        )
         #expect(ChecksumFile.parse("\(md5) *a", fileName: "x.sha256") == [Entry(name: "a", digest: md5, method: nil)])
         #expect(
             ChecksumFile.method(forFileNamed: "A.SHA") == .sha1
-                && ChecksumFile.method(forFileNamed: "a.sha3-512") == .sha3_512)
+                && ChecksumFile.method(forFileNamed: "a.sha3-512") == .sha3_512
+        )
         #expect(
-            ChecksumFile.method(forFileNamed: "a.bk3") == .blake3 && ChecksumFile.method(forFileNamed: "a.txt") == nil)
+            ChecksumFile.method(forFileNamed: "a.bk3") == .blake3 && ChecksumFile.method(forFileNamed: "a.txt") == nil
+        )
         #expect(
             ChecksumFile.isChecksumFile("x.SFV") && ChecksumFile.isChecksumFile("x.sha512")
-                && !ChecksumFile.isChecksumFile("x.sum"))
+                && !ChecksumFile.isChecksumFile("x.sum")
+        )
         #expect(ChecksumFile.isChecksumFile("x.sum", extraMasks: "*.sum *.crc32"))
         #expect(
             ChecksumFile.line(name: "n", digest: [0xAB, 0x01], method: .md5) == "ab01 *n"
-                && ChecksumFile.line(name: "n", digest: [0xAB, 0x01], method: .crc32) == "n AB01")
+                && ChecksumFile.line(name: "n", digest: [0xAB, 0x01], method: .crc32) == "n AB01"
+        )
     }
 
     @Test func encodingsOfChecksumFiles() {
@@ -304,27 +338,38 @@ import Testing
                 Errors: 2
                 OK: 2, not found: 1, read error: 0, wrong checksum: 1
 
-                """)
+                """
+        )
         // The failures that are in the panel are marked there.
         #expect(left.model.selection == ["b b.txt"])
         #expect(bench.jobService.titles.last == "Verifying checksums:")
         settings.set(true, forKey: FileTools.Keys.onlyErrors)
         #expect(
-            verify(["work.md5"]).text.hasPrefix(
-                "work.md5:\nCannot open input file sub/c.txt!\nWrong checksum: b b.txt!\n\nErrors: 2\n"))
+            verify(["work.md5"]).text
+                .hasPrefix(
+                    "work.md5:\nCannot open input file sub/c.txt!\nWrong checksum: b b.txt!\n\nErrors: 2\n"
+                )
+        )
     }
 
     @Test func verifiesFilesWrittenByTheSystemTools() throws {
         let work = box.url("work")
         try Data(
             try systemTool("/usr/bin/shasum", ["-a", "256", "a.txt", "b b.txt", "sub/c.txt"], in: work).output.utf8
-        ).write(to: box.url("work/tool.sha256"))
-        try Data(try systemTool("/sbin/md5", ["a.txt", "b b.txt"], in: work).output.utf8).write(
-            to: box.url("work/bsd.md5"))
-        try Data(try systemTool("/usr/bin/shasum", ["-a", "512", "--tag", "a.txt"], in: work).output.utf8).write(
-            to: box.url("work/tagged.txt"))
-        try Data(try systemTool("/usr/bin/shasum", ["-a", "1", "-b", "sub/deep/d.txt"], in: work).output.utf8).write(
-            to: box.url("work/binary.sha"))
+        )
+        .write(to: box.url("work/tool.sha256"))
+        try Data(try systemTool("/sbin/md5", ["a.txt", "b b.txt"], in: work).output.utf8)
+            .write(
+                to: box.url("work/bsd.md5")
+            )
+        try Data(try systemTool("/usr/bin/shasum", ["-a", "512", "--tag", "a.txt"], in: work).output.utf8)
+            .write(
+                to: box.url("work/tagged.txt")
+            )
+        try Data(try systemTool("/usr/bin/shasum", ["-a", "1", "-b", "sub/deep/d.txt"], in: work).output.utf8)
+            .write(
+                to: box.url("work/binary.sha")
+            )
         let both = verify(["tool.sha256", "bsd.md5", "binary.sha"])
         #expect(both.title == "Checksums: Errors: 0")
         #expect(
@@ -344,7 +389,8 @@ import Testing
                 Errors: 0
                 OK: 6, not found: 0, read error: 0, wrong checksum: 0
 
-                """)
+                """
+        )
         // A file with another extension is a checksum file once its mask is configured.
         #expect(verify(["tagged.txt"]).title == "inform: Please select only SFV, MD5 or SHA files!")
         settings.set("*.sum tagged.*", forKey: FileTools.Keys.extraTypes)
@@ -381,14 +427,18 @@ import Testing
         #expect(result.title == "CRC32: Errors: 1")
         #expect(
             result.text.hasPrefix(
-                "Checksums in the file names:\nOK:  Movie [\(crc)].mkv\nWrong checksum: Other [00000000].mkv!\n"))
+                "Checksums in the file names:\nOK:  Movie [\(crc)].mkv\nWrong checksum: Other [00000000].mkv!\n"
+            )
+        )
         #expect(left.model.selection == ["Other [00000000].mkv"])
         #expect(
             ChecksumRun.checksumInName("x [1a2B3c4D] y.z") == "1a2b3c4d"
-                && ChecksumRun.checksumInName("x [123].z") == nil)
+                && ChecksumRun.checksumInName("x [123].z") == nil
+        )
         #expect(
             ChecksumRun.checksum(fromClipboard: "ABCDEF12") == "abcdef12"
-                && ChecksumRun.checksum(fromClipboard: "ABCDEF123") == nil)
+                && ChecksumRun.checksum(fromClipboard: "ABCDEF123") == nil
+        )
     }
 
     @Test func verifyManyFilesOnAnotherFileSystem() {
@@ -408,7 +458,8 @@ import Testing
         // The rows come in the order of the checksum file, though the files were hashed side by side.
         #expect(
             rows.count == 203 && rows[1] == "OK:  f0.dat" && rows[78] == "Wrong checksum: f77.dat!"
-                && rows[200] == "OK:  f199.dat")
+                && rows[200] == "OK:  f199.dat"
+        )
         #expect(left.model.selection == ["f77.dat"])
     }
 }

@@ -11,7 +11,9 @@ internal enum FSEvDescriptors {
 
     /// What a running stream of `folder` (a real path) holds: one descriptor for the folder and
     /// each of its parents (the stream watches them for a rename of the folder), and a few of
-    /// its own. Measured: 3 for `/`, 6 for `/private/tmp`, 71 for a folder 67 levels down.
+    /// its own.
+    ///
+    /// Measured: 3 for `/`, 6 for `/private/tmp`, 71 for a folder 67 levels down.
     internal static func cost(of folder: String) -> Int {
         folder.split(separator: "/").count + 4
     }

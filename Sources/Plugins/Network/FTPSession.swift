@@ -76,7 +76,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     private var returning = 0
     /// How long a thread that needs a connection waits for one of those, or for one the
     /// keep-alive is testing at that moment, before it opens another: on a server that answers,
-    /// the one coming back is there sooner than a new login. Tests lengthen it.
+    /// the one coming back is there sooner than a new login.
+    ///
+    /// Tests lengthen it.
     var returnGrace: TimeInterval {
         get { condition.withLock { grace } }
         set { condition.withLock { grace = newValue } }
@@ -113,7 +115,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     private static let keepAliveLimit: TimeInterval = 3_600
 
     /// How long a wait for a connection, or for another thread's login, goes on while nothing
-    /// moves on any connection of the session and no question is open. Tests shorten it.
+    /// moves on any connection of the session and no question is open.
+    ///
+    /// Tests shorten it.
     var stallLimit: TimeInterval? {
         get { condition.withLock { stallTime } }
         set { condition.withLock { stallTime = newValue } }
@@ -178,6 +182,7 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     }
 
     /// The error for a wait that nothing ended: nil while things move or a question is open.
+    ///
     /// Called with the lock held.
     private func stalled(since began: Date, _ what: String) -> any Error? {
         guard asking == 0, Date().timeIntervalSince(max(began, lastProgress)) > patience else { return nil }
@@ -223,10 +228,11 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    /// Asks the user something on behalf of a login. Every question is asked with `loginLock`
-    /// held, so several threads do not each raise a dialog; `holdsLock` tells whether this
-    /// thread has it already and is set when it is taken here. Work in the background asks
-    /// nothing. Nil is the user's refusal.
+    /// Asks the user something on behalf of a login.
+    ///
+    /// Every question is asked with `loginLock` held, so several threads do not each raise a
+    /// dialog; `holdsLock` tells whether this thread has it already and is set when it is taken
+    /// here. Work in the background asks nothing. Nil is the user's refusal.
     private func ask<Answer>(
         holdsLock: inout Bool,
         background: Bool,
@@ -457,7 +463,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     // MARK: The pool
 
-    /// Hands out a connection. A `transfer` connection is kept for as long as a file is open.
+    /// Hands out a connection.
+    ///
+    /// A `transfer` connection is kept for as long as a file is open.
     ///
     /// Every wait in here ends: when `cancellation` is set, when the session is closed, and when
     /// nothing has moved on any connection for `patience` seconds (then with an error that says
@@ -574,7 +582,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         return acquired
     }
 
-    /// How many connections are held for files of this kind. Called with the lock held.
+    /// How many connections are held for files of this kind.
+    ///
+    /// Called with the lock held.
     private func holders(of kind: TransferKind) -> Int { kind == .read ? readers : writers }
 
     private func adjust(_ kind: TransferKind, by change: Int) {
@@ -617,10 +627,11 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         connection.close()
     }
 
-    /// Runs a command sequence on a connection of the pool. When a connection that was idle
-    /// turns out to be dead, the work is done once more on a new one (spec: reconnect on a
-    /// dropped control connection). `mayRetry` is asked first, because work that already had
-    /// an effect outside must not be repeated.
+    /// Runs a command sequence on a connection of the pool.
+    ///
+    /// When a connection that was idle turns out to be dead, the work is done once more on a new
+    /// one (spec: reconnect on a dropped control connection). `mayRetry` is asked first, because
+    /// work that already had an effect outside must not be repeated.
     private func perform<Result>(
         transfer: TransferKind? = nil,
         cancellation: CancellationFlag? = nil,
@@ -649,10 +660,12 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         return (result, connection)
     }
 
-    /// A command, or a few that belong together. One that must not happen twice (it creates,
-    /// removes or renames) is repeated on a new connection only when the old one failed before
-    /// the command was sent, or the server said it was closing (421): after a reply that did not
-    /// come, the command may well have been carried out.
+    /// A command, or a few that belong together.
+    ///
+    /// One that must not happen twice (it creates, removes or renames) is repeated on a new
+    /// connection only when the old one failed before the command was sent, or the server said it
+    /// was closing (421): after a reply that did not come, the command may well have been carried
+    /// out.
     private func command<Result>(
         repeatable: Bool = true,
         cancellation: CancellationFlag? = nil,
@@ -781,8 +794,9 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
 
     /// The links a listing had no time to ask about are asked after it was delivered, on a
     /// connection of the pool; the next listing of the folder then knows where they lead.
-    /// One resolver per session works through one list: the links of the newest listing come
-    /// first, and what does not fit belongs to folders the user has left.
+    ///
+    /// One resolver per session works through one list: the links of the newest listing come first,
+    /// and what does not fit belongs to folders the user has left.
     private func resolveLinksLater(_ paths: [String]) {
         condition.lock()
         var seen = Set<String>()
@@ -796,9 +810,11 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         if start { Background.run(lane: self) { [weak self] in self?.resolveLinks() } }
     }
 
-    /// The resolver. It only ever uses a connection nobody else wants: it takes one that is
-    /// free now (and opens none that would need a question to the user), asks about a few
-    /// links, and gives it back; while a command waits for a connection it stands aside.
+    /// The resolver.
+    ///
+    /// It only ever uses a connection nobody else wants: it takes one that is free now (and opens
+    /// none that would need a question to the user), asks about a few links, and gives it back;
+    /// while a command waits for a connection it stands aside.
     private func resolveLinks() {
         while true {
             condition.lock()
@@ -947,9 +963,10 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
         return !hasConnected || offersRestart
     }
 
-    /// `APPE` where the file is continued at its end, else `REST` and `STOR` (RFC 3659). A server
-    /// does not cut a file there, and one that does not know `APPE` may start the file anew, so
-    /// the length is checked when the file is closed, as after every upload.
+    /// `APPE` where the file is continued at its end, else `REST` and `STOR` (RFC 3659).
+    ///
+    /// A server does not cut a file there, and one that does not know `APPE` may start the file
+    /// anew, so the length is checked when the file is closed, as after every upload.
     func openAppend(_ path: String, at offset: Int64?, cancellation: CancellationFlag?) throws -> (
         writer: any FileWriter, size: Int64
     ) {
@@ -1034,12 +1051,14 @@ final class FTPSession: RemoteSession, @unchecked Sendable {
     fileprivate var timeout: TimeInterval { environment.options.values.timeout }
 }
 
-/// A file on an FTP server being downloaded (`RETR`). The transfer starts with the first read
-/// and holds one connection until the end of the file or `close`. Seeking restarts the
-/// transfer at the new position with `REST` (spec 11 › Target already exists and resume).
-/// Used by one thread at a time; only `close` and `interrupt` may also be called from another
-/// thread, to end a read that waits for a server which does not answer. The read then fails,
-/// and its thread gives the connection back. After `interrupt` every read and seek fails.
+/// A file on an FTP server being downloaded (`RETR`).
+///
+/// The transfer starts with the first read and holds one connection until the end of the file or
+/// `close`. Seeking restarts the transfer at the new position with `REST` (spec 11 › Target already
+/// exists and resume). Used by one thread at a time; only `close` and `interrupt` may also be
+/// called from another thread, to end a read that waits for a server which does not answer. The
+/// read then fails, and its thread gives the connection back. After `interrupt` every read and seek
+/// fails.
 ///
 /// Used by one thread at a time, as `FileReader` allows; what `close` and `interrupt` touch is
 /// guarded by `stateLock` (see there).
@@ -1184,8 +1203,9 @@ private final class FTPReader: FileReader, @unchecked Sendable {
         return running
     }
 
-    /// Ends the running transfer before its end and gives the connection back. Called by the
-    /// owning thread; waits for the server's answer to the broken transfer.
+    /// Ends the running transfer before its end and gives the connection back.
+    ///
+    /// Called by the owning thread; waits for the server's answer to the broken transfer.
     private func stop() {
         guard let running = detach() else { return }
         // A server that is not answering is not asked how the transfer ended.
@@ -1201,9 +1221,11 @@ private final class FTPReader: FileReader, @unchecked Sendable {
         stateLock.unlock()
     }
 
-    /// Returns at once, from any thread. A call under way on the owning thread is cut short
-    /// and that thread cleans up; otherwise the server is told in the background that the
-    /// transfer is over, which may take as long as the server takes to answer.
+    /// Returns at once, from any thread.
+    ///
+    /// A call under way on the owning thread is cut short and that thread cleans up; otherwise the
+    /// server is told in the background that the transfer is over, which may take as long as the
+    /// server takes to answer.
     func close() {
         stateLock.lock()
         wasClosed = true
@@ -1230,8 +1252,10 @@ private final class FTPReader: FileReader, @unchecked Sendable {
     }
 }
 
-/// A file being uploaded (`STOR`, or `APPE` to continue one). Used by one thread; `interrupt` may
-/// be called from another thread to end a write that waits for a server which does not answer.
+/// A file being uploaded (`STOR`, or `APPE` to continue one).
+///
+/// Used by one thread; `interrupt` may be called from another thread to end a write that waits for
+/// a server which does not answer.
 ///
 /// Used by one thread at a time, as `FileWriter` allows; `interrupt` touches only the flag and
 /// the connection, the latter under `holdLock`.
@@ -1245,8 +1269,10 @@ private final class FTPWriter: FileWriter, @unchecked Sendable {
     private var converter = LineEndConverter()
     private var failed = false
     private var written: Int64 = 0
-    /// The length the file had when this writer started: 0 for a new file. What is written
-    /// follows it, and the length the server reports when the file is closed must be the sum.
+    /// The length the file had when this writer started: 0 for a new file.
+    ///
+    /// What is written follows it, and the length the server reports when the file is closed must
+    /// be the sum.
     private let start: Int64
     private let abort = CancellationFlag()
     /// Guards `isHolding`: the connection may be cut by `interrupt` only while this writer has it.

@@ -9,9 +9,11 @@ import Testing
 extension ArchiveFixes {
     /// A wrong password of the old encryption that passes the check byte and whose data even
     /// starts like compressed data (a short stream that ends early) is a wrong password too: it
-    /// is asked for again and not kept. It used to give a CRC error. (About one in 300 of the
-    /// wrong passwords that pass the check byte is such a one; the archive is packed again,
-    /// with another random header, until one is found.)
+    /// is asked for again and not kept.
+    ///
+    /// It used to give a CRC error. (About one in 300 of the wrong passwords that pass the check
+    /// byte is such a one; the archive is packed again, with another random header, until one is
+    /// found.).
     @Test
     internal func aWrongPasswordWhoseDataStartsLikeCompressedDataIsAskedForAgain() throws {
         let tree = try bench.makeTree()

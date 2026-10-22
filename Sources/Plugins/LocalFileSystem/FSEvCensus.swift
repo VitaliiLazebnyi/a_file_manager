@@ -1,10 +1,11 @@
 import Foundation
 
-/// The streams this process holds. The system gives one process 512 of them and refuses
-/// the next one without a word (`FSEventStreamStart` answers false and nothing is
-/// logged), so a program that lets streams pile up ends with folders nobody watches.
-/// Counted here so that this can be seen: by tests, and in a run with
-/// `AFM_WATCHER_CENSUS` set, which prints the figures when the process ends.
+/// The streams this process holds.
+///
+/// The system gives one process 512 of them and refuses the next one without a word
+/// (`FSEventStreamStart` answers false and nothing is logged), so a program that lets streams pile
+/// up ends with folders nobody watches. Counted here so that this can be seen: by tests, and in a
+/// run with `AFM_WATCHER_CENSUS` set, which prints the figures when the process ends.
 internal enum FSEvCensus {
     /// Streams that run now, the most that ran at one time, and how often a stream could
     /// not be had (the system refused it, or the process had too few descriptors to spare).

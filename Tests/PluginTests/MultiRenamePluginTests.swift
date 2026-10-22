@@ -8,7 +8,9 @@ import Testing
 @testable import MultiRenamePlugin
 
 /// The Multi-Rename Tool driven through its command and its session, on a file system in
-/// memory and on the local disk. No window is involved.
+/// memory and on the local disk.
+///
+/// No window is involved.
 @MainActor @Suite struct MultiRenameRuns {
     let memory = MemoryFileSystem()
     let box: Sandbox

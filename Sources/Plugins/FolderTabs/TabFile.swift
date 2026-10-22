@@ -136,8 +136,9 @@ public struct TabFile: Equatable, Sendable {
     }
 
     /// The text of a tab file's bytes: UTF-8, with or without a byte-order mark, or UTF-16 with
-    /// one (which Windows programs write). Bytes that are none of these are read as UTF-8 as far
-    /// as they go.
+    /// one (which Windows programs write).
+    ///
+    /// Bytes that are none of these are read as UTF-8 as far as they go.
     public static func text(decoding data: Data) -> String {
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
             if let text = String(data: data, encoding: .utf16) { return text }

@@ -58,7 +58,9 @@ public enum NetworkError: LocalizedError, Sendable {
     }
 }
 
-/// A value one thread waits for and another delivers. Safe from any thread.
+/// A value one thread waits for and another delivers.
+///
+/// Safe from any thread.
 ///
 /// All state is guarded by `condition`.
 final class Pending<Value: Sendable>: @unchecked Sendable {
@@ -79,7 +81,9 @@ final class Pending<Value: Sendable>: @unchecked Sendable {
         return value
     }
 
-    /// Nil when the time is up. A set cancellation flag ends the wait with `NetworkError.cancelled`.
+    /// Nil when the time is up.
+    ///
+    /// A set cancellation flag ends the wait with `NetworkError.cancelled`.
     func wait(timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws -> Value? {
         let deadline = Date().addingTimeInterval(timeout)
         condition.lock()
@@ -105,6 +109,7 @@ public struct CertificateInfo: Equatable, Sendable {
 }
 
 /// The certificates the user chose to trust although the system does not, by server.
+///
 /// Safe from any thread.
 ///
 /// The certificates trusted for good are not read from the settings, which a file from
@@ -116,8 +121,10 @@ public final class CertificateTrust: @unchecked Sendable {
     private let lock = NSLock()
     private var accepted: [String: Set<String>]
     private var isLoaded = false
-    /// Reads the certificates that were accepted for good. Called once, on the thread that
-    /// first connects with TLS, never on the main thread by this module.
+    /// Reads the certificates that were accepted for good.
+    ///
+    /// Called once, on the thread that first connects with TLS, never on the main thread by this
+    /// module.
     public let load: (@Sendable () -> [String: [String]])?
 
     public init(accepted: [String: [String]] = [:], load: (@Sendable () -> [String: [String]])? = nil) {
@@ -126,7 +133,9 @@ public final class CertificateTrust: @unchecked Sendable {
         for (host, fingerprints) in accepted { self.accepted[host.lowercased(), default: []].formUnion(fingerprints) }
     }
 
-    /// Fetches the stored certificates if that was not done yet. May take a moment.
+    /// Fetches the stored certificates if that was not done yet.
+    ///
+    /// May take a moment.
     public func prepare() {
         lock.lock()
         let loader = isLoaded ? nil : load
@@ -158,7 +167,9 @@ public final class CertificateTrust: @unchecked Sendable {
     }
 
     /// Makes `fingerprint` the only certificate accepted for the server: the answer to a
-    /// certificate that changed. The ones accepted before are no longer trusted.
+    /// certificate that changed.
+    ///
+    /// The ones accepted before are no longer trusted.
     public func replace(with fingerprint: String, for host: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -198,8 +209,10 @@ final class TLSSettings: @unchecked Sendable {
         }
     }
 
-    /// Where certificates are checked. The check may ask the network (revocation) and take
-    /// seconds; on a queue of its own it holds up neither the stream it belongs to nor another.
+    /// Where certificates are checked.
+    ///
+    /// The check may ask the network (revocation) and take seconds; on a queue of its own it holds
+    /// up neither the stream it belongs to nor another.
     private static let verifyQueue = DispatchQueue(
         label: "afm.network.verify",
         qos: .userInitiated,
@@ -229,8 +242,10 @@ final class TLSSettings: @unchecked Sendable {
 
     /// Whether the certificate chain is good for this host: trusted by the system and issued to
     /// the host (a name must match a DNS name of the certificate, an address one of its IP
-    /// addresses), or accepted by the user before. A chain that fails is remembered in
-    /// `rejected` for the thread that connects, which asks the user.
+    /// addresses), or accepted by the user before.
+    ///
+    /// A chain that fails is remembered in `rejected` for the thread that connects, which asks the
+    /// user.
     func evaluate(_ trust: SecTrust) -> Bool {
         // The host is given in both cases: for an address Security compares the certificate's
         // IP addresses, and without it no name would be checked at all.
@@ -263,8 +278,9 @@ extension CertificateInfo {
 }
 
 /// What the explicit-TLS start-up of a control connection reports back: the greeting it read,
-/// or the reply that refused `AUTH TLS`. Written on the connection's queue, read after the
-/// connection is ready or has failed.
+/// or the reply that refused `AUTH TLS`.
+///
+/// Written on the connection's queue, read after the connection is ready or has failed.
 ///
 /// All state is guarded by `lock`.
 final class ExplicitTLSReport: @unchecked Sendable {
@@ -300,9 +316,11 @@ final class ExplicitTLSReport: @unchecked Sendable {
 }
 
 /// Explicit FTPS (`AUTH TLS`, RFC 4217) for `Network.framework`, whose connections cannot switch
-/// to TLS half-way by themselves. This protocol sits on top of TCP, reads the server's
-/// greeting, sends `AUTH TLS`, and after the `234` puts TLS underneath itself and steps out of
-/// the way; the connection reports ready when the handshake is done.
+/// to TLS half-way by themselves.
+///
+/// This protocol sits on top of TCP, reads the server's greeting, sends `AUTH TLS`, and after the
+/// `234` puts TLS underneath itself and steps out of the way; the connection reports ready when the
+/// handshake is done.
 final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
     static let label = "afm-ftp-auth-tls"
     static let definition = NWProtocolFramer.Definition(implementation: FTPAuthTLSFramer.self)
@@ -353,8 +371,9 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
         return 0
     }
 
-    /// The next whole line that arrived, without its line end; nil while none has. One line at a
-    /// time, so nothing that follows the last reply is taken away.
+    /// The next whole line that arrived, without its line end; nil while none has.
+    ///
+    /// One line at a time, so nothing that follows the last reply is taken away.
     private static func nextLine(_ framer: NWProtocolFramer.Instance) -> String? {
         var line: String?
         _ = framer.parseInput(minimumIncompleteLength: 1, maximumLength: 16_384) { buffer, _ in
@@ -374,8 +393,9 @@ final class FTPAuthTLSFramer: NWProtocolFramerImplementation {
     }
 }
 
-/// A TCP connection, with or without TLS, that is used with blocking calls. The contract of a
-/// file-system provider is blocking, and so is FTP: one command, one answer.
+/// A TCP connection, with or without TLS, that is used with blocking calls.
+///
+/// The contract of a file-system provider is blocking, and so is FTP: one command, one answer.
 ///
 /// **Threading.** `Network.framework` reports on a private queue; what arrives is collected in
 /// a buffer under a lock, and the calling thread waits on it. The methods may be called from
@@ -403,8 +423,9 @@ final class NetStream: @unchecked Sendable {
     private var buffer = Data()
     private var readOffset = 0
     private var atEnd = false
-    /// Why the connection stopped receiving, when it was not an orderly end. Thrown once
-    /// everything that arrived before has been read.
+    /// Why the connection stopped receiving, when it was not an orderly end.
+    ///
+    /// Thrown once everything that arrived before has been read.
     private var receiveFailure: any Error?
     private var isReceiving = false
     private var isClosed = false
@@ -522,7 +543,9 @@ final class NetStream: @unchecked Sendable {
 
     // MARK: Reading
 
-    /// Keeps one receive call outstanding while there is room in the buffer. Runs on the queue.
+    /// Keeps one receive call outstanding while there is room in the buffer.
+    ///
+    /// Runs on the queue.
     private func receiveMore() {
         condition.lock()
         let wanted = !isReceiving && !atEnd && !isClosed && buffered < Self.highWater
@@ -546,10 +569,14 @@ final class NetStream: @unchecked Sendable {
         }
     }
 
-    /// Bytes that arrived and were not read yet. Called with the lock held.
+    /// Bytes that arrived and were not read yet.
+    ///
+    /// Called with the lock held.
     private var buffered: Int { buffer.count - readOffset }
 
-    /// Takes `count` bytes off the front. Called with the lock held.
+    /// Takes `count` bytes off the front.
+    ///
+    /// Called with the lock held.
     private func consume(_ count: Int) {
         readOffset += count
         if readOffset == buffer.count {
@@ -582,8 +609,10 @@ final class NetStream: @unchecked Sendable {
         throw NetworkError.timedOut(what)
     }
 
-    /// Asks for more when receiving had stopped for a full buffer. Called after a read made
-    /// room, with the lock not held; the queue is only bothered when there is something to do.
+    /// Asks for more when receiving had stopped for a full buffer.
+    ///
+    /// Called after a read made room, with the lock not held; the queue is only bothered when there
+    /// is something to do.
     private func resumeReceiving() {
         condition.lock()
         let stopped = !isReceiving && !atEnd && !isClosed && isReady
@@ -592,6 +621,7 @@ final class NetStream: @unchecked Sendable {
     }
 
     /// The next bytes, at most `count`; nil when the other side has closed the connection.
+    ///
     /// A connection that broke instead of ending throws, once what arrived before is read.
     func read(upToCount count: Int, timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws -> Data? {
         let data: Data? = try wait(timeout: timeout, cancellation: cancellation, for: "reading") {
@@ -608,9 +638,11 @@ final class NetStream: @unchecked Sendable {
         return data
     }
 
-    /// The next line without its line end. Throws `connectionLost` when the connection ends
-    /// first, and `unexpected` when no line end comes within `limit` bytes: a line of a reply
-    /// is short, and the wait for one must not collect whatever a server sends instead.
+    /// The next line without its line end.
+    ///
+    /// Throws `connectionLost` when the connection ends first, and `unexpected` when no line end
+    /// comes within `limit` bytes: a line of a reply is short, and the wait for one must not
+    /// collect whatever a server sends instead.
     func readLine(timeout: TimeInterval, limit: Int = FTPLimits.lineLength, cancellation: CancellationFlag? = nil)
         throws -> Data
     {
@@ -645,9 +677,10 @@ final class NetStream: @unchecked Sendable {
 
     // MARK: Writing
 
-    /// Sends `data` in pieces. Every piece has its own time-out, so a big block over a slow
-    /// uplink goes through as long as it keeps moving, and a few pieces are under way at a
-    /// time to keep the line busy.
+    /// Sends `data` in pieces.
+    ///
+    /// Every piece has its own time-out, so a big block over a slow uplink goes through as long as
+    /// it keeps moving, and a few pieces are under way at a time to keep the line busy.
     func write(_ data: Data, timeout: TimeInterval, cancellation: CancellationFlag? = nil) throws {
         if data.count <= Self.sendPiece {
             try send(data, isFinal: false, timeout: timeout, cancellation: cancellation)
@@ -672,11 +705,12 @@ final class NetStream: @unchecked Sendable {
         }
     }
 
-    /// Tells the other side that nothing more will be sent (the end of an upload). Under TLS
-    /// nothing is sent here: the framework ends an encrypted stream properly (everything
-    /// delivered, then the closing alert) only when the connection is closed, and an end
-    /// announced before that makes it drop what is still on its way. Found by test.
-    /// True once the caller has declared its data complete.
+    /// Tells the other side that nothing more will be sent (the end of an upload).
+    ///
+    /// Under TLS nothing is sent here: the framework ends an encrypted stream properly (everything
+    /// delivered, then the closing alert) only when the connection is closed, and an end announced
+    /// before that makes it drop what is still on its way. Found by test. True once the caller has
+    /// declared its data complete.
     var didFinishWriting: Bool {
         condition.lock()
         defer { condition.unlock() }
@@ -732,7 +766,9 @@ final class NetStream: @unchecked Sendable {
 }
 
 /// Waits for the server to open a data connection to us (active mode, spec 11 › Active mode,
-/// passive mode and the data connection). Used by one thread.
+/// passive mode and the data connection).
+///
+/// Used by one thread.
 ///
 /// Only the server is let in: the listener is bound to the address the control connection
 /// uses on this side, and a connection from any address but the control connection's other

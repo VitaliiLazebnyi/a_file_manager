@@ -43,8 +43,9 @@ final class JobBridge: FileJobDelegate, Sendable {
         case smaller = "Copy all smaller files (overwrite larger)"
     }
 
-    /// The Overwrite dialog (spec 07 › Name collisions). The six everyday answers and Rename
-    /// are buttons; the rest is behind "More…".
+    /// The Overwrite dialog (spec 07 › Name collisions).
+    ///
+    /// The six everyday answers and Rename are buttons; the rest is behind "More…".
     func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
         func describe(_ item: FileItem) -> String {
             "\(shown(item.url))\n\(Format.bytes(item.size)) bytes, \(Format.date(item.modified))"
@@ -96,8 +97,9 @@ final class JobBridge: FileJobDelegate, Sendable {
         return resolve(job, target: target, source: source, detail: detail, more: more)
     }
 
-    /// One answer of the Overwrite dialog: what the job is to do, or Compare. A Rename or More… that is given up
-    /// asks again. Main thread.
+    /// One answer of the Overwrite dialog: what the job is to do, or Compare.
+    ///
+    /// A Rename or More… that is given up asks again. Main thread.
     @MainActor
     private func overwriteStep(target: FileItem, detail: String, more: [MoreOption]) -> OverwriteStep {
         // Return presses Skip: a file that is overwritten is gone, one that is skipped can still be copied.
@@ -134,7 +136,9 @@ final class JobBridge: FileJobDelegate, Sendable {
         return overwriteStep(target: target, detail: detail, more: more)
     }
 
-    /// What an entry of More… answers; nil when renaming the target was given up. Main thread.
+    /// What an entry of More… answers; nil when renaming the target was given up.
+    ///
+    /// Main thread.
     @MainActor
     private func moreStep(_ option: MoreOption, target: FileItem) -> OverwriteStep? {
         switch option {
@@ -155,7 +159,9 @@ final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
-    /// Asks for a name; nil when the user gave none or kept the proposal's place by cancelling. Main thread.
+    /// Asks for a name; nil when the user gave none or kept the proposal's place by cancelling.
+    ///
+    /// Main thread.
     @MainActor
     private func newName(_ message: String, proposing name: String) -> String? {
         guard let text = ui.prompt(message, value: name)?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
@@ -234,7 +240,9 @@ final class JobBridge: FileJobDelegate, Sendable {
 
     /// A question whose first button destroys something (overwrites, deletes for good, empties
     /// another volume): Return presses the button at `safe`, which leaves things as they are,
-    /// and the destroying answer has to be chosen. Main thread.
+    /// and the destroying answer has to be chosen.
+    ///
+    /// Main thread.
     @MainActor
     private func pick<Choice>(
         _ message: String,

@@ -339,7 +339,9 @@ import Testing
         #expect(found.contains("a.txt") && !found.contains("b.txt"))
     }
 
-    /// Counts calls. Unchecked: the count is guarded by `lock`.
+    /// Counts calls.
+    ///
+    /// Unchecked: the count is guarded by `lock`.
     private final class Calls: @unchecked Sendable {
         private let lock = NSLock()
         private var count = 0

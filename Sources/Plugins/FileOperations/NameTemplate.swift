@@ -34,7 +34,9 @@ public enum NameTemplate {
         public var calendar = Calendar.current
         public var clipboard: String?
         public var environment: [String: String] = ProcessInfo.processInfo.environment
-        /// Whether a name is taken already, for the optional digit `[C]`. May touch a file system.
+        /// Whether a name is taken already, for the optional digit `[C]`.
+        ///
+        /// May touch a file system.
         public var exists: @Sendable (String) -> Bool = { _ in false }
 
         public init() {}
@@ -261,9 +263,10 @@ public enum NameTemplate {
     }
 
     /// What `[X]` puts into a name: the first line of the clipboard, as one part of a name.
-    /// Whatever would make it more than that is replaced: the characters no name may hold, a
-    /// `/` (it would nest folders nobody typed), a leading `~`, and a text that is only dots
-    /// (`..` would lead out of the folder).
+    ///
+    /// Whatever would make it more than that is replaced: the characters no name may hold, a `/`
+    /// (it would nest folders nobody typed), a leading `~`, and a text that is only dots (`..`
+    /// would lead out of the folder).
     static func clipboardText(_ clipboard: String) -> String {
         let line = clipboard.prefix { !$0.isNewline }
         var text = String(
@@ -307,8 +310,10 @@ public enum NameTemplate {
         }
     }
 
-    /// `C`, `C:3`, `C10+5:3`, `" ("C")"`: the width and the text around the number. In a new
-    /// name the number comes from the range, so an inline start and step are read and ignored.
+    /// `C`, `C:3`, `C10+5:3`, `" ("C")"`: the width and the text around the number.
+    ///
+    /// In a new name the number comes from the range, so an inline start and step are read and
+    /// ignored.
     private static func counterParts(_ body: String) -> (prefix: String, suffix: String, width: Int?, hasAffix: Bool)? {
         var core = body
         var prefix = ""

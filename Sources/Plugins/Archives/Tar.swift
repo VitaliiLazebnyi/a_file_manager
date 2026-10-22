@@ -23,11 +23,15 @@ struct TarHeader {
     var permissions: UInt16 = 0o644
     var linkTarget = ""
     /// A file with holes as GNU tar stores it: its data is a list of pieces, not the file's
-    /// contents. Such members are shown but not read.
+    /// contents.
+    ///
+    /// Such members are shown but not read.
     var isSparse = false
     /// The size of a sparse file once its holes are restored, when the header says it.
     var realSize: UInt64?
-    /// (Old GNU sparse format.) More blocks describing the pieces follow the header.
+    /// (Old GNU sparse format.)
+    ///
+    /// More blocks describing the pieces follow the header.
     var hasSparseExtension = false
 
     /// Whether a block looks like a TAR header: its checksum fits.
@@ -106,8 +110,10 @@ struct TarHeader {
         Date(timeIntervalSince1970: seconds.isFinite ? max(-62_167_219_200, min(seconds, 253_402_300_799)) : 0)
     }
 
-    /// The records of a pax extended header: `<length> <key>=<value>\n`. The length counts
-    /// the whole record, its own digits included; a record that says less ends the list.
+    /// The records of a pax extended header: `<length> <key>=<value>\n`.
+    ///
+    /// The length counts the whole record, its own digits included; a record that says less ends
+    /// the list.
     static func paxRecords(_ data: Data) -> [String: String] {
         var records: [String: String] = [:]
         var rest = data
@@ -240,9 +246,11 @@ struct TarHeader {
     }
 }
 
-/// Reads a TAR archive from a stream, member by member. After `next()` the member's data must
-/// be read to its end or skipped before the next call. `position` is where the stream stands,
-/// so a caller that reads from a file can note where each member's data lies.
+/// Reads a TAR archive from a stream, member by member.
+///
+/// After `next()` the member's data must be read to its end or skipped before the next call.
+/// `position` is where the stream stands, so a caller that reads from a file can note where each
+/// member's data lies.
 final class TarReader {
     private let stream: any ByteStream
     private(set) var position: UInt64 = 0

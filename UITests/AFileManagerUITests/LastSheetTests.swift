@@ -2,8 +2,10 @@ import XCTest
 
 /// What the system's open and save panels give back when the user chooses: the file that
 /// Compare By Content and the folder that Synchronize Directories ask for in a sheet, the file
-/// the Lister saves a copy to, and the file the settings are exported to. Also the beep of a
-/// configuration button that has nothing to act on, and a double click on a synchronize action.
+/// the Lister saves a copy to, and the file the settings are exported to.
+///
+/// Also the beep of a configuration button that has nothing to act on, and a double click on a
+/// synchronize action.
 @MainActor
 internal final class LastSheetTests: XCTestCase {
     /// The program of the running test, once started.
@@ -121,7 +123,9 @@ internal final class LastSheetTests: XCTestCase {
     }
 
     /// A double click on a command in the modal chooser of Add Command… chooses it: the
-    /// button-bar editor lists it. Cancel keeps the button bar as it was.
+    /// button-bar editor lists it.
+    ///
+    /// Cancel keeps the button bar as it was.
     internal func testADoubleClickOnACommandChoosesIt() throws {
         let (session, _) = try start()
         let desktop = UIDesktop(session)

@@ -1,10 +1,11 @@
 import AFMKernel
 import Foundation
 
-/// What a question of `ssh` is, told by the words ssh itself puts around it. A server can make
-/// ssh show any text it likes (keyboard-interactive logins, and a jump host can do the same),
-/// so a question is only taken for ssh's own when it has exactly the shape ssh gives it, and
-/// everything a server may have written is shown to the user as the server's.
+/// What a question of `ssh` is, told by the words ssh itself puts around it.
+///
+/// A server can make ssh show any text it likes (keyboard-interactive logins, and a jump host can
+/// do the same), so a question is only taken for ssh's own when it has exactly the shape ssh gives
+/// it, and everything a server may have written is shown to the user as the server's.
 enum SSHQuestion: Equatable {
     /// `user@host's password:`, asked by ssh itself.
     case password(user: String, host: String)
@@ -64,10 +65,11 @@ enum SSHQuestion: Equatable {
     }
 }
 
-/// A connection to an SFTP server (the secure shell's file transfer). The system's own
-/// `/usr/bin/ssh` makes the connection, so everything the user has set up for it works: keys,
-/// the agent, `~/.ssh/config`, known hosts, jump hosts. A password, the passphrase of a key
-/// and the question about an unknown host key are asked through `AskpassHelper`.
+/// A connection to an SFTP server (the secure shell's file transfer).
+///
+/// The system's own `/usr/bin/ssh` makes the connection, so everything the user has set up for it
+/// works: keys, the agent, `~/.ssh/config`, known hosts, jump hosts. A password, the passphrase of
+/// a key and the question about an unknown host key are asked through `AskpassHelper`.
 ///
 /// **Threading.** Safe from any thread. One `SFTPChannel` serves all threads at once; it is
 /// opened on first use and opened again when it broke.
@@ -94,7 +96,9 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     /// The names of this server that are written back as they came.
     private let names = NameMemory()
     /// How long a thread waits for another thread's login that makes no progress, nil for the
-    /// usual time (see `open`). Tests shorten it.
+    /// usual time (see `open`).
+    ///
+    /// Tests shorten it.
     var stallLimit: TimeInterval? {
         get { lock.withLock { stallTime } }
         set { lock.withLock { stallTime = newValue } }
@@ -103,9 +107,10 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
 
     /// The largest piece read or written with one request; every server takes this much.
     fileprivate static let blockSize = 32_768
-    /// The most requests of a transfer that are under way at the same time. With 32 KB each this
-    /// keeps 2 MB on the way, which is what a fast line with a long delay needs; a slow line
-    /// gets fewer (`TransferWindow`).
+    /// The most requests of a transfer that are under way at the same time.
+    ///
+    /// With 32 KB each this keeps 2 MB on the way, which is what a fast line with a long delay
+    /// needs; a slow line gets fewer (`TransferWindow`).
     fileprivate static let window = 64
 
     init(profile: ConnectionProfile, environment: SessionEnvironment, transport: SFTPTransport? = nil) {
@@ -162,9 +167,10 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     /// asks `user@host's password:` (or `(user@host) Password:` for keyboard-interactive logins),
     /// and every `ssh` that runs on behalf of this connection asks through the same helper: a
     /// jump host (`ProxyJump`) would be given the password of the target server if the first
-    /// request for a password were answered whoever it comes from. A question that names another
-    /// login or host is passed on to the user, and so is one that names none: who asks it
-    /// cannot be told.
+    /// request for a password were answered whoever it comes from.
+    ///
+    /// A question that names another login or host is passed on to the user, and so is one that
+    /// names none: who asks it cannot be told.
     static func asksForPassword(_ question: String, of profile: ConnectionProfile) -> Bool {
         let (user, host): (String, String)
         switch SSHQuestion(question) {
@@ -379,7 +385,9 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         }
     }
 
-    /// Runs requests on the channel. A channel that was dropped while idle is opened again.
+    /// Runs requests on the channel.
+    ///
+    /// A channel that was dropped while idle is opened again.
     fileprivate func perform<Result>(cancellation: CancellationFlag? = nil, _ work: (SFTPChannel) throws -> Result)
         throws -> Result
     {
@@ -393,7 +401,9 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
         return home
     }
 
-    /// Returns at once. A login that is under way ends with it: its ssh is stopped too.
+    /// Returns at once.
+    ///
+    /// A login that is under way ends with it: its ssh is stopped too.
     func disconnect() {
         lock.lock()
         isClosed = true
@@ -432,8 +442,10 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     }
 
     /// Closes a handle whose closing can tell nothing (it was read from, or its transfer was
-    /// given up). Never waits: the request is put in line and reaches the server before
-    /// whatever is asked next, so a file whose handle is closed here can be removed right after.
+    /// given up).
+    ///
+    /// Never waits: the request is put in line and reaches the server before whatever is asked
+    /// next, so a file whose handle is closed here can be removed right after.
     fileprivate func closeHandle(_ handle: Data, on channel: SFTPChannel) {
         channel.sendWithoutAnswer(.close) { $0.bytes(handle) }
     }
@@ -558,10 +570,11 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     }
 
     /// With `replacing`, OpenSSH's extension is used where the server has it: it renames like
-    /// the Mac does, an existing file is replaced in the same step. Without, the plain rename
-    /// of the protocol, which a server refuses when the destination exists. What the server
-    /// answers is thrown as it is (`SFTPError`): a refusal is not turned into "something is in
-    /// the way", which only the caller can find out.
+    /// the Mac does, an existing file is replaced in the same step.
+    ///
+    /// Without, the plain rename of the protocol, which a server refuses when the destination
+    /// exists. What the server answers is thrown as it is (`SFTPError`): a refusal is not turned
+    /// into "something is in the way", which only the caller can find out.
     func rename(_ source: String, to destination: String, replacing: Bool, cancellation: CancellationFlag?) throws {
         try withEither(closing, cancellation) { closing in
             try perform(cancellation: closing) { channel in
@@ -666,11 +679,12 @@ final class SFTPSession: RemoteSession, @unchecked Sendable {
     }
 }
 
-/// How many requests of one transfer are kept under way. More requests make a fast line with a
-/// long delay fast; on a slow line they only stand in the way, because everything else on the
-/// shared channel (a listing, another file) is answered after them. The window therefore
-/// follows what the line carries: about `seconds` worth of data, measured over the transfer
-/// so far, between `least` and `SFTPSession.window` requests.
+/// How many requests of one transfer are kept under way.
+///
+/// More requests make a fast line with a long delay fast; on a slow line they only stand in the
+/// way, because everything else on the shared channel (a listing, another file) is answered after
+/// them. The window therefore follows what the line carries: about `seconds` worth of data,
+/// measured over the transfer so far, between `least` and `SFTPSession.window` requests.
 private struct TransferWindow {
     private let started = Date()
     private var bytes = 0
@@ -689,13 +703,14 @@ private struct TransferWindow {
     }
 }
 
-/// A file being read over SFTP. A window of read requests is kept under way, also between
-/// two calls: when the caller has taken one piece the next ones are already on their way, so
-/// the speed does not depend on the delay of one round trip. Nothing is read ahead for the
-/// first read after opening or after a jump (a viewer that shows one page asks for one page);
-/// from the second read in a row on, the window grows, up to what the line carries
-/// (`TransferWindow`). Seeking discards what was read ahead. Used by one thread; `close` and
-/// `interrupt` never wait for the server.
+/// A file being read over SFTP.
+///
+/// A window of read requests is kept under way, also between two calls: when the caller has taken
+/// one piece the next ones are already on their way, so the speed does not depend on the delay of
+/// one round trip. Nothing is read ahead for the first read after opening or after a jump (a viewer
+/// that shows one page asks for one page); from the second read in a row on, the window grows, up
+/// to what the line carries (`TransferWindow`). Seeking discards what was read ahead. Used by one
+/// thread; `close` and `interrupt` never wait for the server.
 ///
 /// Used by one thread at a time, as `FileReader` allows; `interrupt` only sets the flag, which is
 /// safe from any thread.
@@ -726,15 +741,19 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
     /// How many reads followed one another since the file was opened or the position jumped.
     private var readsInARow = 0
     /// How much is asked for with one request: less than the usual block once the server has
-    /// shown that it never gives more. A single short answer says nothing (the file may end
-    /// there, the server may have been interrupted); the same short length three times in a
-    /// row for requests of the full size is the server's limit.
+    /// shown that it never gives more.
+    ///
+    /// A single short answer says nothing (the file may end there, the server may have been
+    /// interrupted); the same short length three times in a row for requests of the full size is
+    /// the server's limit.
     private var block = SFTPSession.blockSize
     private var shortAnswer: Int?
     private var shortAnswers = 0
     private var window = TransferWindow()
-    /// Set by `interrupt`; the waits for answers look at it. Only this reader's requests are
-    /// given up, the channel is shared with other transfers and stays open.
+    /// Set by `interrupt`; the waits for answers look at it.
+    ///
+    /// Only this reader's requests are given up, the channel is shared with other transfers and
+    /// stays open.
     private let abort = CancellationFlag()
 
     init(session: SFTPSession, channel: SFTPChannel, handle: Data) {
@@ -900,10 +919,11 @@ private final class SFTPFileReader: FileReader, @unchecked Sendable {
     func interrupt() { abort.cancel() }
 }
 
-/// A file being written over SFTP. The write requests are not waited for one by one: up to a
-/// window of them are under way, and their answers are collected as they arrive, in the next
-/// call or at the latest when the file is closed. A refusal is therefore reported by a later
-/// `write` or by `close`.
+/// A file being written over SFTP.
+///
+/// The write requests are not waited for one by one: up to a window of them are under way, and
+/// their answers are collected as they arrive, in the next call or at the latest when the file is
+/// closed. A refusal is therefore reported by a later `write` or by `close`.
 ///
 /// Requests that follow a refused one are already on their way and may well be carried out, which
 /// would leave a file with a gap of nothing in it. On the first failure the file is therefore
@@ -950,8 +970,10 @@ private final class SFTPFileWriter: FileWriter, @unchecked Sendable {
     }
 
     /// Records the first failure, gives up the requests under way, and has the server cut the
-    /// file back to `firstUnconfirmed`. The cut is put in line behind the writes that are under
-    /// way and is not waited for: the server may not be answering.
+    /// file back to `firstUnconfirmed`.
+    ///
+    /// The cut is put in line behind the writes that are under way and is not waited for: the
+    /// server may not be answering.
     private func fail(_ error: any Error, firstUnconfirmed: UInt64, handle: Data) {
         guard failure == nil else { return }
         failure = error
@@ -966,7 +988,9 @@ private final class SFTPFileWriter: FileWriter, @unchecked Sendable {
     }
 
     /// Takes the answers that have arrived, and waits for the oldest while more than `keep`
-    /// are outstanding. The first failure is kept and thrown from then on.
+    /// are outstanding.
+    ///
+    /// The first failure is kept and thrown from then on.
     private func collect(keeping keep: Int, handle: Data) throws {
         if abort.isCancelled {
             fail(NetworkError.cancelled, firstUnconfirmed: outstanding.first?.offset ?? position, handle: handle)

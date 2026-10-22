@@ -403,6 +403,7 @@ import VirtualFoldersPlugin
 }
 
 /// A file system over memory whose reads wait until they are let go.
+///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     let base = MemoryFileSystem(scheme: "gated")

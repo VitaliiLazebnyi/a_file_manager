@@ -3,6 +3,7 @@ import PDFKit
 
 /// The panels of the system a Lister asks with, printing, and what changes its window on the
 /// screen: what to open, where to save, the page setup, the print panel, full screen and zoom.
+///
 /// The pane uses the system's (`SystemDialogs`); tests put their own in.
 @MainActor
 internal protocol ViewerDialogs {

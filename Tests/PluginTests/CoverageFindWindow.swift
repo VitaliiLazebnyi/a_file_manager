@@ -9,7 +9,9 @@ import Testing
 
 /// The Find Files window driven through its buttons, keys and form, without being shown:
 /// searches that run, are cancelled or stopped, the list of earlier results, and what the
-/// results are handed to. The tests of the results and of Spotlight are in the extensions.
+/// results are handed to.
+///
+/// The tests of the results and of Spotlight are in the extensions.
 @MainActor
 @Suite(.serialized)
 internal final class CoverageFindWindow {

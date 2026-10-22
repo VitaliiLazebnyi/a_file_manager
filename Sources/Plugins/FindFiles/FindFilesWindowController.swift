@@ -161,13 +161,17 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     private(set) var search: FileSearch?
     private var spotlight: (any SpotlightQuestion)?
     /// Makes the question to Spotlight from its text, the folders it looks in and the most paths
-    /// it reads. Tests put a question in its place that answers when they say.
+    /// it reads.
+    ///
+    /// Tests put a question in its place that answers when they say.
     internal var makeSpotlight: (String, [URL], Int) -> any SpotlightQuestion = { text, scopes, limit in
         SpotlightSearch(text, scopes: scopes, limit: limit)
     }
 
-    /// Puts the window on screen. Tests replace it, so that no window shows in the session they
-    /// run in, and look at what it was asked to show.
+    /// Puts the window on screen.
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     init(kernel: Kernel, title: String = "Find Files") {
@@ -212,16 +216,19 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     /// The window is made in code, never from an archive.
     required init?(coder _: NSCoder) { nil }
 
-    /// Shows the window with "Search in" set to `directory`. Results are viewed, edited and
-    /// shown in the panel through the kernel's commands.
+    /// Shows the window with "Search in" set to `directory`.
+    ///
+    /// Results are viewed, edited and shown in the panel through the kernel's commands.
     func show(startingIn directory: URL, includeHidden: Bool) {
         prepare(startingIn: directory, includeHidden: includeHidden)
         present(self)
         window?.makeFirstResponder(form.searchForField)
     }
 
-    /// Everything `show` does except putting the window on screen. The names and the text
-    /// stay from last time; the Advanced tab starts empty (spec 09 › What is remembered).
+    /// Everything `show` does except putting the window on screen.
+    ///
+    /// The names and the text stay from last time; the Advanced tab starts empty (spec 09 › What is
+    /// remembered).
     func prepare(startingIn directory: URL, includeHidden: Bool) {
         // The list is drawn from this window again (closing let go of it).
         resultsTable.dataSource = self
@@ -376,8 +383,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
         }
     }
 
-    /// Starts the search the form describes. A form that cannot be searched with (a broken
-    /// regular expression) is reported instead.
+    /// Starts the search the form describes.
+    ///
+    /// A form that cannot be searched with (a broken regular expression) is reported instead.
     func startSearch() {
         let settings = form.settings
         // Start directories the user typed (not the ones the window was opened with or a saved
@@ -710,7 +718,9 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
     private var shiftIsDown: Bool { modifierFlags().contains(.shift) }
 
     /// Go to file: closes the window and puts the panel's cursor on the result; with Shift in
-    /// a new tab. A single result is taken even when it is not the selected line.
+    /// a new tab.
+    ///
+    /// A single result is taken even when it is not the selected line.
     @objc func goToFile() {
         guard let url = selectedResult ?? (resultURLs.count == 1 ? resultURLs[0] : nil) else { return }
         close()
@@ -720,6 +730,7 @@ final class FindFilesWindowController: NSWindowController, NSWindowDelegate, NST
 
     /// Feed to listbox: the results become the list of the source panel, through whichever
     /// plugin shows file lists as folders (spec 09 › Feed to listbox); with Shift in a new tab.
+    ///
     /// The window closes and does not keep these results.
     @objc func feedToListbox() {
         let urls = resultURLs

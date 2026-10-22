@@ -12,6 +12,7 @@ import Testing
 // and a commit that asks while it runs (F046).
 
 /// The local file system with a moment to interfere right before an entry is removed.
+///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 final class IntegrationRacingLocalFileSystem: FileSystemProvider, @unchecked Sendable {
     let local = LocalFileSystem()
@@ -116,7 +117,10 @@ final class IntegrationReplies: FileJobDelegate {
         try box.file("alone.txt", "x")
         let replies = IntegrationReplies()
         let job = FileJob(
-            kind: .delete(toTrash: false), sources: [box.url("tree"), box.url("alone.txt")], fileSystems: registry)
+            kind: .delete(toTrash: false),
+            sources: [box.url("tree"), box.url("alone.txt")],
+            fileSystems: registry
+        )
         job.delegate = replies
         _ = job.run()
         #expect(replies.errors.isEmpty && !box.exists("tree") && !box.exists("alone.txt"))
@@ -158,7 +162,8 @@ final class IntegrationReplies: FileJobDelegate {
             replies.errors.allSatisfy {
                 $0.contains("no longer a folder") || $0.contains("not empty") || $0.contains("Directory not empty")
             },
-            "\(replies.errors)")
+            "\(replies.errors)"
+        )
         // The files that were moved aside are as they were; the tree could not be emptied, so it stays.
         #expect(names("victim/sub.real") == ["a.txt", "b.txt"] && box.exists("victim"))
     }
@@ -174,13 +179,16 @@ final class IntegrationReplies: FileJobDelegate {
         to.addDirectory("/t")
         let replies = IntegrationReplies()
         let job = FileJob(
-            kind: .move, sources: [from.url("/s/tree"), from.url("/s/single.txt")],
+            kind: .move,
+            sources: [from.url("/s/tree"), from.url("/s/single.txt")],
             target: TargetSpec(directory: to.url("/t")),
-            fileSystems: registry)
+            fileSystems: registry
+        )
         job.delegate = replies
         _ = job.run()
         #expect(
-            replies.errors.isEmpty && to.contents("/t/tree/sub/b.txt") == "b" && to.contents("/t/single.txt") == "s")
+            replies.errors.isEmpty && to.contents("/t/tree/sub/b.txt") == "b" && to.contents("/t/single.txt") == "s"
+        )
         #expect(from.allPaths.filter { $0.hasPrefix("/s/") }.isEmpty)
         let removals = Set(from.flaggedChanges.filter { $0.hasPrefix("remove") })
         #expect(
@@ -188,7 +196,8 @@ final class IntegrationReplies: FileJobDelegate {
                 "remove below /s/tree /s/tree/a.txt", "remove below /s/tree /s/tree/sub/b.txt",
                 "remove below /s/tree /s/tree/sub",
                 "remove /s/tree", "remove /s/single.txt"
-            ])
+            ]
+        )
     }
 
     // MARK: F046 — a commit that takes long reports, can be paused and can be ended
@@ -216,9 +225,11 @@ final class IntegrationReplies: FileJobDelegate {
             if progress.lines.first?.hasPrefix("Writing:") == true { lock.withLock { duringCommit += 1 } }
         }
         let job = FileJob(
-            kind: .move, sources: [from.url("/s/a.txt"), from.url("/s/b.txt")],
+            kind: .move,
+            sources: [from.url("/s/a.txt"), from.url("/s/b.txt")],
             target: TargetSpec(directory: to.url("/t")),
-            fileSystems: registry)
+            fileSystems: registry
+        )
         job.delegate = replies
         _ = job.run()
         #expect(replies.errors.isEmpty && to.commits == ["/t"])
@@ -231,9 +242,11 @@ final class IntegrationReplies: FileJobDelegate {
         let (from, to, registry) = slowTarget()
         let replies = IntegrationReplies()
         let job = FileJob(
-            kind: .move, sources: [from.url("/s/a.txt"), from.url("/s/b.txt")],
+            kind: .move,
+            sources: [from.url("/s/a.txt"), from.url("/s/b.txt")],
             target: TargetSpec(directory: to.url("/t")),
-            fileSystems: registry)
+            fileSystems: registry
+        )
         job.delegate = replies
         var reportsOfTheCommit = 0
         replies.onProgress = { [weak job] progress in

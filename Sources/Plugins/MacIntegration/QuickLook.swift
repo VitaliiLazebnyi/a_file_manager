@@ -2,11 +2,12 @@ import AFMKernel
 import AppKit
 import Quartz
 
-/// Feeds the system's Quick Look panel with the files of the active panel. The panel finds whoever
-/// feeds it in the responder chain of the main window, so this object puts itself there, behind
-/// the window; keys the panel does not use go on to the file list, which lets the cursor keys
-/// move through the folder while the preview follows. The panel itself is reached through
-/// `PreviewPanel` (none in tests of the plugin that start nothing). Main thread only.
+/// Feeds the system's Quick Look panel with the files of the active panel.
+///
+/// The panel finds whoever feeds it in the responder chain of the main window, so this object puts
+/// itself there, behind the window; keys the panel does not use go on to the file list, which lets
+/// the cursor keys move through the folder while the preview follows. The panel itself is reached
+/// through `PreviewPanel` (none in tests of the plugin that start nothing). Main thread only.
 final class QuickLookController: NSResponder, @preconcurrency QLPreviewPanelDataSource,
     @preconcurrency QLPreviewPanelDelegate
 {

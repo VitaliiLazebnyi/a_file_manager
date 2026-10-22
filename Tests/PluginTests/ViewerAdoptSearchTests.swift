@@ -10,7 +10,10 @@ import Testing
 @Suite struct ViewerAdoptSearch {
     /// Every place `needle` is in `data` when all of it is decoded at once: the reference.
     private func occurrences(
-        of needle: String, in data: Data, encoding: ViewerEncoding, caseSensitive: Bool = true,
+        of needle: String,
+        in data: Data,
+        encoding: ViewerEncoding,
+        caseSensitive: Bool = true,
         wholeWords: Bool = false
     ) -> [Range<Int64>] {
         var text = DecodedText()
@@ -29,28 +32,46 @@ import Testing
         while from + length <= string.length {
             let options: NSString.CompareOptions = caseSensitive ? [.literal] : [.literal, .caseInsensitive]
             let range = string.range(
-                of: needle, options: options, range: NSRange(location: from, length: string.length - from))
+                of: needle,
+                options: options,
+                range: NSRange(location: from, length: string.length - from)
+            )
             guard range.location != NSNotFound else { break }
             from = range.location + 1
             if wholeWords, isWord(range.location - 1) || isWord(range.location + range.length) { continue }
             let end = range.location + range.length
             found.append(
                 Int64(
-                    text.offsets[range.location])..<(end < text.offsets.count ? Int64(text.offsets[end]) : Int64(used)))
+                    text.offsets[range.location]
+                )..<(end < text.offsets.count ? Int64(text.offsets[end]) : Int64(used))
+            )
         }
         return found
     }
 
     private func find(
-        _ needle: String, _ options: SearchOptions, in data: Data, from start: Int64, encoding: ViewerEncoding,
+        _ needle: String,
+        _ options: SearchOptions,
+        in data: Data,
+        from start: Int64,
+        encoding: ViewerEncoding,
         chunk: Int,
-        boundaries: CharacterBoundaries? = nil, raw: Bool = true
+        boundaries: CharacterBoundaries? = nil,
+        raw: Bool = true
     ) throws -> Range<Int64>? {
         let pattern = try SearchPattern(needle, options: options, encoding: encoding)
         return try ViewerSearch.find(
-            pattern, in: DataByteSource(data), content: 0..<Int64(data.count), from: start,
+            pattern,
+            in: DataByteSource(data),
+            content: 0..<Int64(data.count),
+            from: start,
             backwards: options.backwards,
-            encoding: encoding, chunkSize: chunk, parallelism: 3, boundaries: boundaries, rawBytes: raw)
+            encoding: encoding,
+            chunkSize: chunk,
+            parallelism: 3,
+            boundaries: boundaries,
+            rawBytes: raw
+        )
     }
 
     // MARK: Double-byte code pages
@@ -98,22 +119,38 @@ import Testing
             // Chunk sizes that put the borders at every parity and far from any ASCII byte.
             for chunk in [4_096, 10_007, 65_536, 262_145] {
                 let boundaries = CharacterBoundaries(
-                    source: DataByteSource(data), content: 0..<Int64(data.count), encoding: encoding)
+                    source: DataByteSource(data),
+                    content: 0..<Int64(data.count),
+                    encoding: encoding
+                )
                 for start in [0, 1, 2, 3, 4_097, 100_001, 299_998, 300_001, 599_999, 600_002, Int64(data.count) - 3]
                     as [Int64]
                 {
                     let forward = try find(
-                        needle, SearchOptions(), in: data, from: start, encoding: encoding, chunk: chunk,
-                        boundaries: boundaries)
+                        needle,
+                        SearchOptions(),
+                        in: data,
+                        from: start,
+                        encoding: encoding,
+                        chunk: chunk,
+                        boundaries: boundaries
+                    )
                     #expect(
                         forward == reference.first { $0.lowerBound >= start },
-                        "forward \(needle) from \(start), chunks of \(chunk), code page \(codePage)")
+                        "forward \(needle) from \(start), chunks of \(chunk), code page \(codePage)"
+                    )
                     let backward = try find(
-                        needle, SearchOptions(backwards: true), in: data, from: start, encoding: encoding, chunk: chunk
+                        needle,
+                        SearchOptions(backwards: true),
+                        in: data,
+                        from: start,
+                        encoding: encoding,
+                        chunk: chunk
                     )
                     #expect(
                         backward == reference.last { $0.lowerBound < start },
-                        "backward \(needle) from \(start), chunks of \(chunk), code page \(codePage)")
+                        "backward \(needle) from \(start), chunks of \(chunk), code page \(codePage)"
+                    )
                 }
             }
         }
@@ -151,7 +188,11 @@ import Testing
         let sorted = starts.sorted()
         let source = Counting(data)
         let boundaries = CharacterBoundaries(
-            source: source, content: 0..<Int64(data.count), encoding: gbk, spacing: 16 << 10)
+            source: source,
+            content: 0..<Int64(data.count),
+            encoding: gbk,
+            spacing: 16 << 10
+        )
         var queries: [Int64] = [900_000, 1, 2, 3, 524_287, 524_288, 999_999, Int64(data.count) - 1, Int64(data.count)]
         queries += (0..<150).map { _ in Int64.random(in: 0..<Int64(data.count)) }
         for offset in queries {
@@ -165,7 +206,8 @@ import Testing
         // The first query had to go back through the run; the others cost little: a pass over the
         // file and a little, not a pass for each query.
         #expect(
-            source.bytesRead < 3 * Int64(data.count) + 200 * 40_000, "\(source.bytesRead) bytes read for \(data.count)"
+            source.bytesRead < 3 * Int64(data.count) + 200 * 40_000,
+            "\(source.bytesRead) bytes read for \(data.count)"
         )
         let after = source.bytesRead
         _ = try boundaries.characterStart(atOrBefore: 700_000)
@@ -233,30 +275,47 @@ import Testing
                     .utf8,
                     Data(text.utf8)
                         + Data([0xC3, 0x77, 0x6F, 0x72, 0x64, 0xE2, 0x82, 0x20, 0x77, 0x6F, 0x72, 0x64, 0xF0, 0x9F])
-                ))
+                )
+            )
             for (encoding, data) in cases {
                 for needle in needles {
                     for caseSensitive in [false, true] {
                         for wholeWords in [false, true] {
                             for backwards in [false, true] {
                                 let options = SearchOptions(
-                                    wholeWords: wholeWords, caseSensitive: caseSensitive, backwards: backwards)
+                                    wholeWords: wholeWords,
+                                    caseSensitive: caseSensitive,
+                                    backwards: backwards
+                                )
                                 for (start, chunk) in [
                                     (Int64(0), 1 << 20), (Int64(data.count), 977), (Int64(data.count / 2), 313),
                                     (Int64(data.count / 3 + 1), 4_096)
                                 ] {
                                     let raw = try find(
-                                        needle, options, in: data, from: start, encoding: encoding, chunk: chunk,
-                                        raw: true)
+                                        needle,
+                                        options,
+                                        in: data,
+                                        from: start,
+                                        encoding: encoding,
+                                        chunk: chunk,
+                                        raw: true
+                                    )
                                     let decoded = try find(
-                                        needle, options, in: data, from: start, encoding: encoding, chunk: chunk,
-                                        raw: false)
+                                        needle,
+                                        options,
+                                        in: data,
+                                        from: start,
+                                        encoding: encoding,
+                                        chunk: chunk,
+                                        raw: false
+                                    )
                                     #expect(
                                         raw == decoded,
                                         Comment(
                                             rawValue:
                                                 "\(needle) \(options) in \(encoding.name), seed \(seed), from \(start), chunks of \(chunk)"
-                                        ))
+                                        )
+                                    )
                                     compared += 1
                                 }
                             }
@@ -277,8 +336,12 @@ import Testing
             SearchOptions(wholeWords: true), SearchOptions(wholeWords: true, caseSensitive: true), SearchOptions()
         ] {
             let reference = occurrences(
-                of: "quick", in: data, encoding: .utf8, caseSensitive: options.caseSensitive,
-                wholeWords: options.wholeWords)
+                of: "quick",
+                in: data,
+                encoding: .utf8,
+                caseSensitive: options.caseSensitive,
+                wholeWords: options.wholeWords
+            )
             var found: [Range<Int64>] = []
             var from: Int64 = 0
             while let next = try find("quick", options, in: data, from: from, encoding: .utf8, chunk: 1_000) {
@@ -296,7 +359,14 @@ import Testing
         for needle in ["strasse", "kelvin", "star", "find"] {
             let raw = try find(needle, SearchOptions(), in: data, from: 0, encoding: .utf8, chunk: 1 << 20, raw: true)
             let decoded = try find(
-                needle, SearchOptions(), in: data, from: 0, encoding: .utf8, chunk: 1 << 20, raw: false)
+                needle,
+                SearchOptions(),
+                in: data,
+                from: 0,
+                encoding: .utf8,
+                chunk: 1 << 20,
+                raw: false
+            )
             #expect(raw == decoded, Comment(rawValue: needle))
         }
     }

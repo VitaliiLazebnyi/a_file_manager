@@ -2,22 +2,26 @@ import AFMContracts
 public import AFMKernel
 public import AppKit
 
-/// The Mark menu (spec 03 › Selection, 09 › Compare directories and Mark newer). The commands
-/// change the model's selection; the panel redraws by itself.
+/// The Mark menu (spec 03 › Selection, 09 › Compare directories and Mark newer).
+///
+/// The commands change the model's selection; the panel redraws by itself.
 public final class SelectionPlugin: Plugin {
     public let name = "Selection"
     private let pasteboard: NSPasteboard
     private let background: Bool
     private var selections: Selections?
-    /// Where the work that can take long is done: on a thread of the kernel's own. Set before
-    /// the plugin starts; tests hold the work back, to change a list while it is under way.
+    /// Where the work that can take long is done: on a thread of the kernel's own.
+    ///
+    /// Set before the plugin starts; tests hold the work back, to change a list while it is under
+    /// way.
     internal var runsWork: @Sendable (@escaping @Sendable () -> Void) -> Void = { BlockingCalls.run($0) }
 
-    /// Tests pass a pasteboard of their own, so they leave the user's clipboard alone. With
-    /// `background` false everything is worked out on the calling thread and has taken effect
-    /// when a command returns; otherwise the commands that can take long (a regular expression,
-    /// a long list, comparing two folders, the clipboard) work off the main thread and the
-    /// selection changes when they are done.
+    /// Tests pass a pasteboard of their own, so they leave the user's clipboard alone.
+    ///
+    /// With `background` false everything is worked out on the calling thread and has taken effect
+    /// when a command returns; otherwise the commands that can take long (a regular expression, a
+    /// long list, comparing two folders, the clipboard) work off the main thread and the selection
+    /// changes when they are done.
     public init(pasteboard: NSPasteboard = .general, background: Bool = true) {
         self.pasteboard = pasteboard
         self.background = background
@@ -337,7 +341,7 @@ final class Selections {
     /// How many names are applied to the model in one piece of main-thread work.
     static let applyPiece = 20_000
 
-    /// The behaviour for `kernel`'s panels, with the clipboard `pasteboard`; with `background`,
+    /// The behaviour for the panels of `kernel`, with the clipboard `pasteboard`; with `background`,
     /// what can take long is handed to `runsWork`, which works it out elsewhere.
     internal init(
         _ kernel: Kernel,
@@ -367,7 +371,9 @@ final class Selections {
     // MARK: Changing a selection
 
     /// A list as work on it was started, with what tells whether it is still the list the
-    /// result belongs to. Taken on the main thread (nothing is copied).
+    /// result belongs to.
+    ///
+    /// Taken on the main thread (nothing is copied).
     private struct Frozen {
         let model: PanelModel
         let basis: PanelModel.Basis
@@ -388,10 +394,11 @@ final class Selections {
     /// How often a result that the list outgrew is worked out again before it is given up.
     static let attempts = 8
 
-    /// Works `work` out and then `apply`s its result on the main thread. Off the main thread
-    /// when `heavy` (and background work is on), handing it a flag that ends it when a newer
-    /// command has started. `apply` says whether the result still fitted the lists (the
-    /// model refuses a result made for a list it no longer has): if not, and the panels still
+    /// Works `work` out and then `apply`s its result on the main thread.
+    ///
+    /// Off the main thread when `heavy` (and background work is on), handing it a flag that ends it
+    /// when a newer command has started. `apply` says whether the result still fitted the lists
+    /// (the model refuses a result made for a list it no longer has): if not, and the panels still
     /// show the folders they showed, `work` is done again for the lists as they are now.
     private func compute<Result: Sendable>(
         heavy: Bool,
@@ -439,10 +446,11 @@ final class Selections {
     }
 
     /// Marks, unmarks or (with `.replace`) makes the selection of the shown entries that
-    /// `matches` holds for. The rows are found on all cores, in the background for a long list,
-    /// and the model takes them as one bit set. `matches` looks at the entry alone.
-    /// `timedOut` names a mask whose regular expression may have run out of time: nothing is
-    /// changed then, and the user is told.
+    /// `matches` holds for.
+    ///
+    /// The rows are found on all cores, in the background for a long list, and the model takes them
+    /// as one bit set. `matches` looks at the entry alone. `timedOut` names a mask whose regular
+    /// expression may have run out of time: nothing is changed then, and the user is told.
     private func mark(
         _ model: PanelModel,
         _ change: PanelModel.SelectionChange,
@@ -470,7 +478,8 @@ final class Selections {
 
     /// The same for what is found by walking the whole list in order (a step, a mask that
     /// pairs files, the marks of an inversion): `find` returns indexes of the shown items.
-    /// (A mask that pairs files is never a regular expression, which cannot run out of time here.)
+    ///
+    /// (A mask that pairs files is never a regular expression, which cannot run out of time here.).
     private func mark(
         _ model: PanelModel,
         _ change: PanelModel.SelectionChange,
@@ -746,8 +755,9 @@ final class Selections {
         source.restoreSelection()
     }
 
-    /// Selects or unselects everything that is like the item under the cursor. The same
-    /// extension is asked of files only; the same folder matters where a list gathers
+    /// Selects or unselects everything that is like the item under the cursor.
+    ///
+    /// The same extension is asked of files only; the same folder matters where a list gathers
     /// entries of several folders (a branch view, a search result).
     func similar(to similarity: Similarity, as cursor: FileItem, select: Bool) {
         let model = source
@@ -805,8 +815,9 @@ final class Selections {
     }
 
     /// Save Selection To File (spec 03 › Selection files): the selected names, or the name
-    /// under the cursor, written through the file system the file lies on. The text is made
-    /// and written in the job; the old file stays until the new one is complete.
+    /// under the cursor, written through the file system the file lies on.
+    ///
+    /// The text is made and written in the job; the old file stays until the new one is complete.
     func saveToFile(_ encoding: SelectionFile.Encoding, argument: CommandArgument) {
         let model = source
         // The marked entries are picked out in the job, not here (a long selection).
@@ -891,8 +902,9 @@ final class Selections {
     /// Selection files are small; a file that is not one is not read to its end.
     nonisolated private static let readLimit = 32 << 20
 
-    /// Load Selection From File: selects exactly the listed names that the panel shows. The
-    /// file is read and its names picked out in the job, which ends when it is cancelled; the
+    /// Load Selection From File: selects exactly the listed names that the panel shows.
+    ///
+    /// The file is read and its names picked out in the job, which ends when it is cancelled; the
     /// entries are then found like those of any mask.
     func loadFromFile(argument: CommandArgument) {
         let model = source
@@ -944,10 +956,11 @@ final class Selections {
         )
     }
 
-    /// `cm_LoadSelectionFromClip`: the same with the text on the clipboard. The clipboard is
-    /// read once, on the main thread (the pasteboard is not safe against use from two threads
-    /// at once); the lines are matched against the names off the main thread, and the text may
-    /// be as big as memory.
+    /// `cm_LoadSelectionFromClip`: the same with the text on the clipboard.
+    ///
+    /// The clipboard is read once, on the main thread (the pasteboard is not safe against use from
+    /// two threads at once); the lines are matched against the names off the main thread, and the
+    /// text may be as big as memory.
     func loadFromClipboard() {
         let model = source
         let (items, directory) = (model.items, model.directory)
@@ -1003,9 +1016,10 @@ final class Selections {
     // MARK: Comparing the panels
 
     /// Compare Directories (spec 09 › Compare directories and Mark newer): in both panels the
-    /// selection becomes the files that differ from the other side. Whether the volumes tell
-    /// upper from lower case is asked of them, which can take long: it is done with the
-    /// comparison, off the main thread, and given up when a newer command starts.
+    /// selection becomes the files that differ from the other side.
+    ///
+    /// Whether the volumes tell upper from lower case is asked of them, which can take long: it is
+    /// done with the comparison, off the main thread, and given up when a newer command starts.
     func compare(mode: DirectoryComparison.Mode, withSubdirectories: Bool) {
         let (left, right) = (kernel.panels.left.model, kernel.panels.right.model)
         let (leftFolder, rightFolder) = (left.directory, right.directory)
@@ -1034,8 +1048,9 @@ final class Selections {
     }
 
     /// Whether both folders are on local volumes that treat `A.txt` and `a.txt` as one name.
-    /// Asks the volumes on a thread of the kernel's, which is given up when `cancellation`
-    /// is set (a stalled mount holds that thread, not this one); not for the main thread.
+    ///
+    /// Asks the volumes on a thread of the kernel's, which is given up when `cancellation` is set
+    /// (a stalled mount holds that thread, not this one); not for the main thread.
     nonisolated private static func foldsCase(_ folders: URL..., cancellation: CancellationFlag) -> Bool {
         folders.allSatisfy { folder in
             guard folder.isFileURL else { return false }
@@ -1058,7 +1073,9 @@ final class Selections {
 
     /// Mark Newer, Hide Same Files: marks like Compare Directories and leaves what is the
     /// same on both sides out of both lists, until the command is chosen again or the panel
-    /// shows another directory. Nothing is deleted.
+    /// shows another directory.
+    ///
+    /// Nothing is deleted.
     func markNewerHideSame() {
         let models = [kernel.panels.left.model, kernel.panels.right.model]
         if models.contains(where: { shows(.comparison, in: $0) }) {

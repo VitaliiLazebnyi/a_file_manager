@@ -42,8 +42,10 @@ private func folder(_ output: String?) -> String? {
     output.map { URL(fileURLWithPath: $0.trimmingCharacters(in: .newlines)).resolvingSymlinksInPath().path }
 }
 
-/// The system tools through their commands. Nothing here starts another application; the
-/// only programs run are `echo`, `pwd`, `true`, `false` and the like.
+/// The system tools through their commands.
+///
+/// Nothing here starts another application; the only programs run are `echo`, `pwd`, `true`,
+/// `false` and the like.
 @MainActor @Suite struct SystemToolsCommandTests {
     let memory = MemoryFileSystem()
     let tools = SystemToolsPlugin(launchesApplications: false)

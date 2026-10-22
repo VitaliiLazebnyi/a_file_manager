@@ -553,6 +553,7 @@ private final class Record<Value>: @unchecked Sendable {
 }
 
 /// A certificate check that takes long holds up neither its own stream nor another's (N057).
+///
 /// The check is made slow with a hook where it runs; the server is the local TLS test server.
 @Suite(.enabled(if: TLSServer.isAvailable)) struct Review2NetworkP2Certificates {
     @Test func aSlowCheckHoldsUpNeitherItsOwnStreamNorAnother() throws {

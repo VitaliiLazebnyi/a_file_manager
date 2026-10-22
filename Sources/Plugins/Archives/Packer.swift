@@ -1,11 +1,12 @@
 import AFMKernel
 import Foundation
 
-/// Compresses the members of a new ZIP on all cores. Files are cut into pieces of one
-/// megabyte; the pieces of a window (many small files, or parts of a large one) are deflated
-/// at the same time and then written in order. Deflate allows that: pieces compressed
-/// independently form one valid stream when each but the last ends on a byte boundary.
-/// Used by one thread; only the compression itself runs on the others.
+/// Compresses the members of a new ZIP on all cores.
+///
+/// Files are cut into pieces of one megabyte; the pieces of a window (many small files, or parts of
+/// a large one) are deflated at the same time and then written in order. Deflate allows that:
+/// pieces compressed independently form one valid stream when each but the last ends on a byte
+/// boundary. Used by one thread; only the compression itself runs on the others.
 final class ZipPacker {
     private struct Piece {
         let member: Int
@@ -36,9 +37,10 @@ final class ZipPacker {
     private var firstMember = 0
     private let windowBytes = ZipPacker.pieceSize * max(2, ProcessInfo.processInfo.activeProcessorCount * 2)
 
-    /// `level` 0 stores without compressing. With a password the members are encrypted: with
-    /// AES-256, or the traditional way when that is asked for (spec 08 › Encryption; see
-    /// `ZipEncryption` for what each is worth).
+    /// `level` 0 stores without compressing.
+    ///
+    /// With a password the members are encrypted: with AES-256, or the traditional way when that is
+    /// asked for (spec 08 › Encryption; see `ZipEncryption` for what each is worth).
     init(
         _ output: OutputFile,
         level: Int,
@@ -52,9 +54,11 @@ final class ZipPacker {
         self.encryption = encryption
     }
 
-    /// Adds a member. `next` delivers its contents in blocks of at most `pieceSize`, nil at
-    /// the end; folders and empty files deliver nothing. The record carries name, time and
-    /// attributes; sizes, checksum and method are filled in here.
+    /// Adds a member.
+    ///
+    /// `next` delivers its contents in blocks of at most `pieceSize`, nil at the end; folders and
+    /// empty files deliver nothing. The record carries name, time and attributes; sizes, checksum
+    /// and method are filled in here.
     func add(_ record: ZipRecord, expectedSize: UInt64, stored: Bool = false, next: () throws -> Data?) throws {
         let id = firstMember + members.count
         members.append(Member(record: record, expectedSize: expectedSize))
@@ -196,7 +200,9 @@ final class Packer {
     /// The rights of an archive that is created (one that is replaced keeps its own).
     private var newMode: mode_t = 0o600
     /// Asked before an existing archive is replaced (ZIP archives are added to instead);
-    /// false cancels. Called on the job's thread.
+    /// false cancels.
+    ///
+    /// Called on the job's thread.
     var confirmReplace: ((URL) -> Bool)?
 
     init(fileSystems: FileSystemRegistry, store: ArchiveStore, monitor: any JobMonitor, options: PackOptions) {
@@ -442,8 +448,9 @@ final class Packer {
     }
 
     /// The rights a new archive gets: the user's own, and those of group and others only as
-    /// far as every file packed into it grants them. An archive of private files is not
-    /// readable by everyone on the machine.
+    /// far as every file packed into it grants them.
+    ///
+    /// An archive of private files is not readable by everyone on the machine.
     static func mode(for members: [Member]) -> mode_t {
         let shared = members.filter { !$0.item.isDirectory }.reduce(UInt16(0o044)) { $0 & $1.item.permissions }
         return mode_t(0o600 | shared) & ~processMask
@@ -457,10 +464,11 @@ final class Packer {
 
     /// Writes the archive under a temporary name and puts it in place when it is complete, so
     /// that a failed or cancelled pack leaves no half archive and never damages an existing one.
-    /// The new file is on the disk before it takes the place (see `Durable`), and it is the
-    /// user's alone while it is written. An archive that is replaced keeps its rights, and one
-    /// that was reached through a symbolic link is replaced where it really lies. `check` is
-    /// called right before the new file takes the place and may throw to prevent that.
+    ///
+    /// The new file is on the disk before it takes the place (see `Durable`), and it is the user's
+    /// alone while it is written. An archive that is replaced keeps its rights, and one that was
+    /// reached through a symbolic link is replaced where it really lies. `check` is called right
+    /// before the new file takes the place and may throw to prevent that.
     private func build(_ archive: URL, check: () throws -> Void = {}, _ write: (OutputFile) throws -> Void) throws {
         if archive.isFileURL {
             let archive = FileManager.default.fileExists(atPath: archive.path) ? Durable.realFile(archive) : archive
@@ -526,10 +534,11 @@ final class Packer {
     /// Adds members to an existing ZIP on the local disk without copying what it holds: the
     /// archive is cloned (which costs neither time nor space), the clone's directory is cut
     /// off, the new members and a directory that lists old and new are written behind the old
-    /// members, and the clone takes the archive's place in one step. False, with nothing
-    /// done, when that is not possible: a member is to be replaced, the file system does not
-    /// clone, or the archive is not laid out plainly. A failed or cancelled pack leaves the
-    /// archive as it was, as `build` does.
+    /// members, and the clone takes the archive's place in one step.
+    ///
+    /// False, with nothing done, when that is not possible: a member is to be replaced, the file
+    /// system does not clone, or the archive is not laid out plainly. A failed or cancelled pack
+    /// leaves the archive as it was, as `build` does.
     private func appendToZip(_ members: [Member], at archive: URL, innerFolder: String, check: () throws -> Void) throws
         -> Bool
     {
@@ -580,9 +589,10 @@ final class Packer {
     }
 
     /// As in an archive on a server (`OpenArchive`): a member packed again takes the place of
-    /// one of its own kind only, a file that of a file and a folder that of a folder. A file
-    /// under the name of a folder of the archive (one listed or one its members lie in), or a
-    /// folder under the name of a file, leaves the archive as it is and fails.
+    /// one of its own kind only, a file that of a file and a folder that of a folder.
+    ///
+    /// A file under the name of a folder of the archive (one listed or one its members lie in), or
+    /// a folder under the name of a file, leaves the archive as it is and fails.
     private static func refuseOtherKinds(_ members: [Member], in records: [ZipRecord], innerFolder: String) throws {
         // What each name is: what its record says, and a folder where other members lie in it.
         var folders: [String: Bool] = [:]
@@ -782,10 +792,11 @@ final class Packer {
 
     // MARK: Afterwards
 
-    /// Tests the new archive at once (spec 08 › After packing). A failure is reported and the
-    /// archive stays; the sources are then not deleted.
-    /// Of an archive that was added to, `only` names the new members: what it held before
-    /// was not written again and is not read again.
+    /// Tests the new archive at once (spec 08 › After packing).
+    ///
+    /// A failure is reported and the archive stays; the sources are then not deleted. Of an archive
+    /// that was added to, `only` names the new members: what it held before was not written again
+    /// and is not read again.
     private func verify(_ archive: URL, only: Set<String>?) throws {
         lines = ["Testing: \(fileSystems.displayPath(archive))"]
         report(force: true)

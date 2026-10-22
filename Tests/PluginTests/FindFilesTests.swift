@@ -15,9 +15,10 @@ import Testing
 
     func find(_ query: SearchQuery) -> [String] {
         var found: [String] = []
-        FileSearch(query, fileSystems: fileSystems).run {
-            found.append(String($0.url.path.dropFirst(query.directory.path.count + 1)))
-        }
+        FileSearch(query, fileSystems: fileSystems)
+            .run {
+                found.append(String($0.url.path.dropFirst(query.directory.path.count + 1)))
+            }
         return found
     }
 
@@ -46,11 +47,13 @@ import Testing
         #expect(
             find(SearchQuery(directory: box.root, names: "report")) == [
                 "docs/report_01.txt", "docs/deep/report_02.txt"
-            ])
+            ]
+        )
         #expect(find(SearchQuery(directory: box.root, names: "smith")) == ["Letter to Mr. Smith.doc"])
         #expect(find(SearchQuery(directory: box.root, names: "docs")) == ["docs"])
         #expect(
-            find(SearchQuery(directory: box.root, names: "*.txt", includeHidden: true)).contains(".hidden/secret.txt"))
+            find(SearchQuery(directory: box.root, names: "*.txt", includeHidden: true)).contains(".hidden/secret.txt")
+        )
     }
 
     @Test func depthLimit() throws {
@@ -69,7 +72,9 @@ import Testing
     @Test func findsTextAcrossBlockBorders() throws {
         let box = try Sandbox()
         try box.file(
-            "big.txt", String(repeating: "a", count: (1 << 20) - 3) + "needle" + String(repeating: "b", count: 10))
+            "big.txt",
+            String(repeating: "a", count: (1 << 20) - 3) + "needle" + String(repeating: "b", count: 10)
+        )
         #expect(find(SearchQuery(directory: box.root, text: "NEEDLE")) == ["big.txt"])
     }
 
@@ -77,7 +82,9 @@ import Testing
         let box = try Sandbox()
         for index in 0..<200 {
             try box.file(
-                String(format: "f%03d.txt", index), index % 3 == 0 ? "has the word treasure in it" : "nothing")
+                String(format: "f%03d.txt", index),
+                index % 3 == 0 ? "has the word treasure in it" : "nothing"
+            )
         }
         let expected = stride(from: 0, to: 200, by: 3).map { String(format: "f%03d.txt", $0) }
         #expect(find(SearchQuery(directory: box.root, text: "treasure")) == expected)
@@ -98,12 +105,14 @@ import Testing
         memory.addFile("/mail/sent/report.txt", "plain")
         memory.addDirectory("/mail/reports")
         #expect(
-            find(SearchQuery(directory: memory.url("/mail"), names: "*.txt")) == ["inbox/offer.txt", "sent/report.txt"])
+            find(SearchQuery(directory: memory.url("/mail"), names: "*.txt")) == ["inbox/offer.txt", "sent/report.txt"]
+        )
         #expect(find(SearchQuery(directory: memory.url("/mail"), text: "report")) == ["inbox/offer.txt"])
         var kinds: [Bool] = []
-        FileSearch(SearchQuery(directory: memory.url("/mail"), names: "report"), fileSystems: fileSystems).run {
-            kinds.append($0.isDirectory)
-        }
+        FileSearch(SearchQuery(directory: memory.url("/mail"), names: "report"), fileSystems: fileSystems)
+            .run {
+                kinds.append($0.isDirectory)
+            }
         #expect(kinds == [true, false])
     }
 }

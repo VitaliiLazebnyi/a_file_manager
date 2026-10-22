@@ -1,7 +1,9 @@
 import XCTest
 
 /// The Lister's ways out to the system: the open and save panels, page setup and printing,
-/// full screen and the window's zoom. Every panel is cancelled: nothing is saved or printed.
+/// full screen and the window's zoom.
+///
+/// Every panel is cancelled: nothing is saved or printed.
 @MainActor
 internal final class UIViewerTests: XCTestCase {
     /// The program of the running test, once started.
@@ -114,7 +116,9 @@ internal final class UIViewerTests: XCTestCase {
 
     /// A sound plays in the Lister's player as soon as it is shown; Space pauses it and plays it
     /// again, the arrows change the volume and move in it, M mutes it, E steps on, and moving
-    /// past its end ends it. F2 loads it anew. (The Mac's sound is off while the tests run.)
+    /// past its end ends it.
+    ///
+    /// F2 loads it anew. (The Mac's sound is off while the tests run.).
     internal func testASoundPlaysInThePlayerAndItsKeysWork() throws {
         let session = try AppSession(leftFiles: [:])
         try Self.silence(seconds: 20).write(to: session.left.appendingPathComponent("quiet.wav"))
@@ -149,7 +153,9 @@ internal final class UIViewerTests: XCTestCase {
     }
 
     /// Page Setup… shows the system's page layout and Print… its print sheet; with text marked,
-    /// the Lister asks first whether to print the marked text alone. Each is cancelled.
+    /// the Lister asks first whether to print the marked text alone.
+    ///
+    /// Each is cancelled.
     ///
     /// The print panel and the page layout look for printers on the local network: the first
     /// time, macOS asks the user whether the program may (the owner has answered on this Mac).

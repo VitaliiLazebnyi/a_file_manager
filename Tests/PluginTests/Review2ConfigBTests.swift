@@ -19,6 +19,7 @@ private func drainMainQueue() async {
 }
 
 /// A folder tree on a made-up scheme, with watchers that can be fired from any thread.
+///
 /// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
 private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Sendable {
     let scheme: String
@@ -580,6 +581,7 @@ private final class Review2WatchFileSystem: FileSystemProvider, @unchecked Senda
 }
 
 /// A small lock around a value, for results written by callbacks on other threads.
+///
 /// Unchecked: the state is guarded by `lock`.
 private final class Mutex<Value>: @unchecked Sendable {
     private let lock = NSLock()

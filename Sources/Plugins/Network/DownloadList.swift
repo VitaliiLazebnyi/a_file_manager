@@ -29,7 +29,9 @@ public enum DownloadList {
     /// The longest pause one line may ask for.
     public static let longestPause: TimeInterval = 60
 
-    /// The lines of a list file. Empty lines are skipped; lines beyond `mostLines` are left out.
+    /// The lines of a list file.
+    ///
+    /// Empty lines are skipped; lines beyond `mostLines` are left out.
     public static func parse(_ text: String) -> [Action] {
         text.split(whereSeparator: \.isNewline).prefix(mostLines)
             .compactMap { rawLine in
@@ -71,7 +73,9 @@ public enum DownloadList {
 
     /// Whether a location can stand in a line: a line break (of any kind) in it would start a
     /// line of its own when the list is read, and the separator in a source would cut it in
-    /// two. Names on a server are the server's choice, so this is checked for every line written.
+    /// two.
+    ///
+    /// Names on a server are the server's choice, so this is checked for every line written.
     public static func canHold(source: String, target: String?) -> Bool {
         func isOneLine(_ text: String) -> Bool {
             !text.isEmpty
@@ -85,7 +89,9 @@ public enum DownloadList {
         return parse(line(source: source, target: target)) == [.download(source: source, target: target)]
     }
 
-    /// One line for a file to fetch later. Only for what `canHold` accepts.
+    /// One line for a file to fetch later.
+    ///
+    /// Only for what `canHold` accepts.
     public static func line(source: String, target: String?) -> String {
         target.map { source + separator + $0 } ?? source
     }

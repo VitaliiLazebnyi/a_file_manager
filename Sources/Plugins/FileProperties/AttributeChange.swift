@@ -23,6 +23,7 @@ enum PermissionChange: Equatable {
     case symbolic([Clause])
 
     /// Reads `755`, `0755`, `rwxr-xr-x` or `chmod` clauses such as `u+x,go-w` and `a+rX`.
+    ///
     /// An empty text changes nothing; nil when the text is none of these.
     init?(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespaces)
@@ -151,8 +152,9 @@ enum PermissionChange: Equatable {
     }
 }
 
-/// A new date and time of last change (spec 07 › Change attributes › Date and time). The date
-/// is written `yyyy-MM-dd` and the time `HH:mm:ss`, with any separators. A part written in
+/// A new date and time of last change (spec 07 › Change attributes › Date and time).
+///
+/// The date is written `yyyy-MM-dd` and the time `HH:mm:ss`, with any separators. A part written in
 /// letters (`yyyy-05-dd`, `hh:10:ss`), and an empty field, keeps what the file has.
 struct TimestampChange: Equatable {
     /// Year, month, day, hour, minute, second; nil keeps that part of the file's own date.
@@ -230,7 +232,9 @@ struct TimestampChange: Equatable {
     }
 }
 
-/// Everything the Change Attributes dialog can ask for. Nil members stay as they are.
+/// Everything the Change Attributes dialog can ask for.
+///
+/// Nil members stay as they are.
 struct AttributeChange: Equatable {
     var permissions = PermissionChange.unchanged
     /// The hidden flag (`UF_HIDDEN`); local files only.
@@ -254,6 +258,7 @@ struct AttributeChange: Equatable {
     /// Reads the parameter text of the command, modelled on `OPENATTRIBUTES` (spec 07 ›
     /// `OPENATTRIBUTES`): `+h`/`-h` hidden, `+r`/`-r` locked (read only), `+f`/`-f` recurse,
     /// `+d<date>`, `+t<time>`, `+c` current date and time, and for the Mac `+m<permissions>`.
+    ///
     /// A leading `=` means "apply without showing the dialog". Windows' `a` and `s` have no
     /// counterpart and are ignored. Nil when a token cannot be read.
     static func parse(parameters: String) -> (change: Self, applyAtOnce: Bool)? {

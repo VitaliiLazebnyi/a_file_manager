@@ -4,8 +4,10 @@ import AppKit
 
 /// The "Change directory menu" dialog (spec 12 › Directory hotlist editor): the hotlist as a
 /// list with its submenus indented, buttons to add, delete, rename and move entries, and the
-/// command and target path of the selected entry. It works on a copy of the list; only OK
-/// hands the copy back. Main thread only; nothing here touches a file system.
+/// command and target path of the selected entry.
+///
+/// It works on a copy of the list; only OK hands the copy back. Main thread only; nothing here
+/// touches a file system.
 final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
     NSTableViewDelegate,
     NSTextFieldDelegate
@@ -40,7 +42,9 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     private let hideField = NSTextField()
     private var entryButtons: [NSButton] = []
 
-    /// Shows the editor and waits for it. Returns the changed list on OK, nil on Cancel.
+    /// Shows the editor and waits for it.
+    ///
+    /// Returns the changed list on OK, nil on Cancel.
     static func run(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) -> Hotlist? {
         let controller = HotlistEditorWindowController(hotlist, kernel: kernel, currentDirectory: currentDirectory)
         let window = controller.dialog

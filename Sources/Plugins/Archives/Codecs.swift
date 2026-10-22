@@ -30,8 +30,10 @@ enum CRC32 {
 }
 
 /// The two calls of zlib that compress: the one that starts a raw deflate stream at a level,
-/// and the one that runs it with a flush mode. The system's; a test passes calls that fail as
-/// zlib can fail (no memory, a stream in a state it does not accept).
+/// and the one that runs it with a flush mode.
+///
+/// The system's; a test passes calls that fail as zlib can fail (no memory, a stream in a state it
+/// does not accept).
 struct DeflateCalls: Sendable {
     let start: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
     let run: @Sendable (UnsafeMutablePointer<z_stream>, Int32) -> Int32
@@ -56,9 +58,10 @@ struct DeflateCalls: Sendable {
 
 /// Deflate compression (ZIP method 8, GZIP) through zlib.
 enum Deflater {
-    /// One independent piece of a deflate stream, at level 1 (fast) … 9 (small). Pieces made
-    /// this way, each on its own core, form one valid stream when written one after the other;
-    /// the last one is `final`, the others end their block on a byte boundary without ending
+    /// One independent piece of a deflate stream, at level 1 (fast) … 9 (small).
+    ///
+    /// Pieces made this way, each on its own core, form one valid stream when written one after the
+    /// other; the last one is `final`, the others end their block on a byte boundary without ending
     /// the stream. Throws when zlib fails, rather than hand on a piece that is cut short.
     static func piece(_ data: Data, level: Int, final: Bool, calls: DeflateCalls = .zlib) throws -> Data {
         let stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
@@ -225,8 +228,10 @@ final class XZCoder {
         guard isOpen else { throw ArchiveError.unsupported("LZMA compression") }
     }
 
-    /// Feeds `input` through the coder. Returns what came out, how much of the input was used,
-    /// and whether the compressed stream ended (after which a new one may start).
+    /// Feeds `input` through the coder.
+    ///
+    /// Returns what came out, how much of the input was used, and whether the compressed stream
+    /// ended (after which a new one may start).
     func process(_ input: Data, finish: Bool, limit: Int = .max) throws -> (output: Data, consumed: Int, ended: Bool) {
         var output = Data()
         let capacity = 1 << 17
@@ -343,9 +348,10 @@ enum Tool {
     static let bzip2 = "/usr/bin/bzip2"
     static let gzip = "/usr/bin/gzip"
 
-    /// What a child process sees of its surroundings: nothing of the user's. The tools read
-    /// options from variables (`BZIP2`, `TAR_READER_OPTIONS`, …) and look for helper programs
-    /// on the search path; neither is the caller's to steer. The UTF-8 locale is what lets
+    /// What a child process sees of its surroundings: nothing of the user's.
+    ///
+    /// The tools read options from variables (`BZIP2`, `TAR_READER_OPTIONS`, …) and look for helper
+    /// programs on the search path; neither is the caller's to steer. The UTF-8 locale is what lets
     /// bsdtar pass on names that are not ASCII.
     static let environment = ["PATH": "/usr/bin:/bin", "LC_ALL": "en_US.UTF-8", "LANG": "en_US.UTF-8"]
     /// Of what a tool complains about, this much is kept; a tool that warns about every one
@@ -422,9 +428,10 @@ enum Tool {
     }
 }
 
-/// The standard output of a child process as a stream. Closing it before the end stops the
-/// child, which is how a cancelled operation ends it; so does the `control`, from any thread,
-/// and the read that waits for the child then throws.
+/// The standard output of a child process as a stream.
+///
+/// Closing it before the end stops the child, which is how a cancelled operation ends it; so does
+/// the `control`, from any thread, and the read that waits for the child then throws.
 ///
 /// Unchecked: `errors` and `isClosed` are guarded by `lock`; the rest is fixed in `init` or
 /// belongs to the thread that reads the stream. Other threads only `stop` the child.
@@ -457,7 +464,9 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
         control?.onSet { [weak self] in self?.stop() }
     }
 
-    /// Ends the child; the read that waits for it then reaches the end of its output. Any thread.
+    /// Ends the child; the read that waits for it then reaches the end of its output.
+    ///
+    /// Any thread.
     private func stop() {
         lock.lock()
         defer { lock.unlock() }
@@ -509,8 +518,9 @@ final class ProcessStream: ByteStream, @unchecked Sendable {
 /// What a compressed file says about its unpacked size without being unpacked.
 enum CompressedSize {
     /// The size of an `.xz` file's contents, from the indexes at the ends of its streams
-    /// (several streams in a row are one file). Nil when they cannot be read; every number in
-    /// them is checked against the file.
+    /// (several streams in a row are one file).
+    ///
+    /// Nil when they cannot be read; every number in them is checked against the file.
     static func ofXZ(_ file: RandomAccessFile) -> UInt64? {
         var end = file.size
         var total: UInt64 = 0
@@ -568,9 +578,11 @@ enum CompressedSize {
     }
 
     /// What the last four bytes of a `.gz` file say: the size of the contents, counted in 32
-    /// bits. That is the size itself for one stream of less than 4 GB, which is what nearly
-    /// every such file is, but nothing in the file proves it. A number too small for the
-    /// compressed data to have come from is raised by the 4 GB steps it must have lost.
+    /// bits.
+    ///
+    /// That is the size itself for one stream of less than 4 GB, which is what nearly every such
+    /// file is, but nothing in the file proves it. A number too small for the compressed data to
+    /// have come from is raised by the 4 GB steps it must have lost.
     static func claimedByGzip(_ file: RandomAccessFile) -> UInt64? {
         guard file.size >= 18, let tail = try? file.read(at: file.size - 4, count: 4), tail.count == 4 else {
             return nil
@@ -587,6 +599,7 @@ enum CompressedSize {
 
 extension ArchiveFormat.Codec {
     /// Decompresses the local file at `url`.
+    ///
     /// With a `control`, the stream ends with an error once the request is set.
     func decompressing(_ file: RandomAccessFile, control: StreamInterrupt? = nil) throws -> any ByteStream {
         switch self {
@@ -604,9 +617,11 @@ extension ArchiveFormat.Codec {
 }
 
 /// Compresses a stream of bytes on all cores: the stream is cut into pieces, the pieces are
-/// compressed at the same time and written in order. Each of the three formats allows that:
-/// deflate pieces join into one stream, and BZIP2 and XZ files may consist of several streams.
-/// Used by one thread; the pieces are compressed on the others.
+/// compressed at the same time and written in order.
+///
+/// Each of the three formats allows that: deflate pieces join into one stream, and BZIP2 and XZ
+/// files may consist of several streams. Used by one thread; the pieces are compressed on the
+/// others.
 final class ParallelCompressor {
     enum Method: Equatable {
         case none

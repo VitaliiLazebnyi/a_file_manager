@@ -2,8 +2,9 @@ import AFMKernel
 import Foundation
 
 /// The archives that are open, one `OpenArchive` per archive file, so that the directory of an
-/// archive is parsed once however many panels, jobs and searches look into it. An archive is
-/// read again when its file changed on disk (size, date or identity).
+/// archive is parsed once however many panels, jobs and searches look into it.
+///
+/// An archive is read again when its file changed on disk (size, date or identity).
 ///
 /// **Threading.** Safe from any thread; nothing here is for the main thread except
 /// `openArchive(at:)`. A short lock guards the table; each archive has a lock of its own (its
@@ -46,10 +47,11 @@ final class ArchiveStore: @unchecked Sendable {
         self.environment = environment
     }
 
-    /// The open archive for the file at `url`, opening or re-reading it when needed. With a
-    /// `cancellation`, a thread that waits for another's opening of the same archive, or that
-    /// opens it, gives up soon after the flag is set (`ArchiveError.cancelled`): the
-    /// child processes and temporary files of the opening are gone and nothing is cached.
+    /// The open archive for the file at `url`, opening or re-reading it when needed.
+    ///
+    /// With a `cancellation`, a thread that waits for another's opening of the same archive, or
+    /// that opens it, gives up soon after the flag is set (`ArchiveError.cancelled`): the child
+    /// processes and temporary files of the opening are gone and nothing is cached.
     func archive(at url: URL, cancellation: CancellationFlag? = nil) throws -> OpenArchive {
         let key = url.locationKey
         // Open and still the file that was read: handed out at once, behind nobody's opening.
@@ -218,7 +220,9 @@ final class ArchiveStore: @unchecked Sendable {
     }
 
     /// The archive if it is open now; never opens one and never waits for one that is being
-    /// opened. Safe on the main thread.
+    /// opened.
+    ///
+    /// Safe on the main thread.
     func openArchive(at url: URL) -> OpenArchive? {
         lock.lock()
         defer { lock.unlock() }
@@ -311,6 +315,7 @@ final class ArchiveStore: @unchecked Sendable {
     }
 
     /// Makes the archive at `url` hold what was written into it, see `OpenArchive.commit`.
+    ///
     /// An archive that is not in the table holds nothing unwritten (see the class comment).
     func commit(_ url: URL, cancellation: CancellationFlag, progress: (Int64, Int64) -> Bool) throws {
         try openArchive(at: url)?.commit(cancellation: cancellation, progress: progress)
@@ -319,8 +324,10 @@ final class ArchiveStore: @unchecked Sendable {
     /// Brings the file at `url` up to date before somebody else reads, moves or deletes it
     /// (`FileSystemRegistry.flushPendingWrites`): the open archives that are that file, or lie
     /// in the folder it is, or lie inside such an archive, get their pending changes written,
-    /// innermost first. A look into the table for every other file: no archive is opened, and
-    /// none that has nothing waiting is touched.
+    /// innermost first.
+    ///
+    /// A look into the table for every other file: no archive is opened, and none that has nothing
+    /// waiting is touched.
     func bringUpToDate(_ url: URL, cancellation: CancellationFlag) throws {
         let concerns = { (archive: OpenArchive) in Self.archive(archive, liesIn: url) }
         func pending() -> [OpenArchive] {
@@ -349,9 +356,11 @@ final class ArchiveStore: @unchecked Sendable {
     }
 
     /// Lets go of the archives that lie on `volume` (before it is ejected): their files are
-    /// closed. Only archives with nothing left to write go (`retireIfIdle`); the eject has
-    /// written their changes first (`bringUpToDate`). One in use stays, and the eject is
-    /// then refused for it. Blocks on the archives' own locks: not for the main thread.
+    /// closed.
+    ///
+    /// Only archives with nothing left to write go (`retireIfIdle`); the eject has written their
+    /// changes first (`bringUpToDate`). One in use stays, and the eject is then refused for it.
+    /// Blocks on the archives' own locks: not for the main thread.
     func release(on volume: URL) {
         // `opened` belongs to the table's lock, a slot's `archive` to the slot's own.
         lock.lock()
@@ -383,8 +392,10 @@ final class ArchiveStore: @unchecked Sendable {
         openArchives.filter(\.hasPendingChanges).map { ($0.name, $0.rescue(quickly: quickly, before: deadline), $0) }
     }
 
-    /// Lets go of every archive and of the temporary files. From here on the delayed writes
-    /// of archives that somebody still holds do nothing: there is nothing left to write from.
+    /// Lets go of every archive and of the temporary files.
+    ///
+    /// From here on the delayed writes of archives that somebody still holds do nothing: there is
+    /// nothing left to write from.
     func close() {
         environment.isStopping = true
         lock.lock()
@@ -398,11 +409,13 @@ final class ArchiveStore: @unchecked Sendable {
 }
 
 /// Archives as folders (spec 08 › Archives as folders): a file system whose "volumes" are
-/// archive files. The same class serves two schemes, because a file system states what it can
-/// do as a whole: `zip:` for archives that can be changed, `archive:` for those that are only
-/// read. See `ArchiveURL` for how the URLs are made. What a particular archive can do is
-/// told by `capabilities(for:)`: a ZIP that lists a name twice, or lies where nothing can be
-/// written, is read-only like the others.
+/// archive files.
+///
+/// The same class serves two schemes, because a file system states what it can do as a whole:
+/// `zip:` for archives that can be changed, `archive:` for those that are only read. See
+/// `ArchiveURL` for how the URLs are made. What a particular archive can do is told by
+/// `capabilities(for:)`: a ZIP that lists a name twice, or lies where nothing can be written, is
+/// read-only like the others.
 ///
 /// **Threading.** Every method may be called from any thread at once; the state is in
 /// `ArchiveStore` and `OpenArchive`, which guard themselves. `parent(of:)`, `displayPath(_:)`
@@ -590,7 +603,9 @@ final class ArchiveFileSystem: FileSystemProvider {
 
     /// Where going up with `parent(of:)` ends, found at once: the folder the archive file
     /// lies in (for an archive inside archives, the folder of the outermost that this scheme
-    /// shows). A location deep inside an archive is not climbed name by name for it.
+    /// shows).
+    ///
+    /// A location deep inside an archive is not climbed name by name for it.
     func root(of url: URL) -> URL {
         var current = url
         // (No honest location is nested deeper than archives may be.)
@@ -612,8 +627,9 @@ final class ArchiveFileSystem: FileSystemProvider {
     }
 
     /// Opening a member that lies behind a long stretch of decompression ends when the flag is
-    /// set; so does the opening of the archive. The reader that is returned is ended with its
-    /// `interrupt()`.
+    /// set; so does the opening of the archive.
+    ///
+    /// The reader that is returned is ended with its `interrupt()`.
     func read(_ url: URL, cancellation: CancellationFlag) throws -> any FileReader {
         try reading(url, cancellation: cancellation)
     }
@@ -633,10 +649,12 @@ final class ArchiveFileSystem: FileSystemProvider {
 
     // MARK: Changing
 
-    /// Runs a change. The store may let an archive go between handing it out and the change
-    /// (its file was replaced, or it was the least recently used): the archive then refuses
-    /// the change, and the change is made in the archive the store has now. So a change
-    /// never lands in an archive that nobody will write.
+    /// Runs a change.
+    ///
+    /// The store may let an archive go between handing it out and the change (its file was
+    /// replaced, or it was the least recently used): the archive then refuses the change, and the
+    /// change is made in the archive the store has now. So a change never lands in an archive that
+    /// nobody will write.
     private func changing<T>(attempts: Int = 8, _ body: () throws -> T) throws -> T {
         do { return try body() } catch ArchiveError.retired where attempts > 0 {
             return try changing(attempts: attempts - 1, body)
@@ -733,8 +751,9 @@ final class ArchiveFileSystem: FileSystemProvider {
     }
 
     /// Whether two places are in the same archive, or both outside one: only then can this
-    /// file system move or copy between them itself. Decided from the URLs, before any archive
-    /// is opened.
+    /// file system move or copy between them itself.
+    ///
+    /// Decided from the URLs, before any archive is opened.
     private func requireSameVolume(_ source: URL, _ destination: URL) throws {
         switch (ArchiveURL.parse(source), ArchiveURL.parse(destination)) {
         case (.inside(let from), .inside(let to)) where from.archive.isSameLocation(as: to.archive): return
@@ -860,19 +879,21 @@ final class ArchiveFileSystem: FileSystemProvider {
     }
 
     /// Writes into the archive file whatever is still kept back for it: the new members, the
-    /// renames, removals and changes of attributes. For an archive that lies in another archive
-    /// or on a server that keeps writes back, that one is committed too, so that it is the
-    /// last to hold the data. Returns when the file on the disk holds it all; throws what the
-    /// write throws, and the changes wait for the next attempt.
+    /// renames, removals and changes of attributes.
+    ///
+    /// For an archive that lies in another archive or on a server that keeps writes back, that one
+    /// is committed too, so that it is the last to hold the data. Returns when the file on the disk
+    /// holds it all; throws what the write throws, and the changes wait for the next attempt.
     func commit(_ url: URL, cancellation: CancellationFlag) throws {
         try committing(url, cancellation: cancellation) { _, _ in true }
     }
 
     /// The same, asking `progress` between the members that are written (and, for an archive
     /// that came from a server, between the blocks that are sent back): with the bytes
-    /// written and expected, and false ends the write, which then has changed nothing. A
-    /// job that is paused waits inside `progress`, so Pause takes hold in a commit that is
-    /// under way (F046).
+    /// written and expected, and false ends the write, which then has changed nothing.
+    ///
+    /// A job that is paused waits inside `progress`, so Pause takes hold in a commit that is under
+    /// way (F046).
     func commit(_ url: URL, cancellation: CancellationFlag, progress: (Int64, Int64) -> Bool) throws {
         var stopped = false
         do {
@@ -931,7 +952,9 @@ final class ArchiveFileSystem: FileSystemProvider {
     }
 
     /// A place that only passes through an archive scheme is the place on the file system
-    /// the archive lies on; a place inside an archive is itself. Works on the URL alone.
+    /// the archive lies on; a place inside an archive is itself.
+    ///
+    /// Works on the URL alone.
     func realLocation(of url: URL) -> URL? {
         if case .outside(let outer)? = ArchiveURL.parse(url) { return outer }
         return nil
@@ -941,8 +964,10 @@ final class ArchiveFileSystem: FileSystemProvider {
     /// too large for a temporary copy) come in the order they lie in it: read that way, one
     /// pass through the archive serves them all (a reader that has delivered a member waits
     /// for the next, see `OpenArchive.open`), where any other order starts the decompression
-    /// over for every member that lies before the one read last. Members of archives that
-    /// are read at any place, and locations that are no members, keep their places.
+    /// over for every member that lies before the one read last.
+    ///
+    /// Members of archives that are read at any place, and locations that are no members, keep
+    /// their places.
     ///
     /// Opens no archive: one that is not open yet is opened by the first read, and its
     /// members are then read in the order given. Not for the main thread all the same (it
