@@ -501,10 +501,10 @@ internal final class NetStream: @unchecked Sendable {
             return nil
         }
         switch connection.currentPath?.remoteEndpoint {
-        case .hostPort(.ipv4(let address), _)?:
+        case .hostPort(.ipv4(let address), _):
             return "\(address)"
 
-        case .hostPort(.ipv6(let address), _)?:
+        case .hostPort(.ipv6(let address), _):
             return "\(address)"
 
         default:
