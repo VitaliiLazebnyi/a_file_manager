@@ -76,6 +76,15 @@ extension FileOperationCommands {
         #expect(memory.exists("/A/[Q"))
     }
 
+    /// `[X]` in a new name reads the system's clipboard: its text names the folder, and without
+    /// text there the user is told (the clipboard is only read, whatever it holds).
+    @Test
+    internal func aNewFolderCanBeNamedAfterTheSystemClipboard() {
+        commands.perform(.makeDirectory, .text("<clip [X]"))
+        let named = memory.allPaths.contains { $0.hasPrefix("/A/clip ") }
+        #expect(named || interaction.log.last?.contains("cannot be created!") == true)
+    }
+
     /// Several new files can be made at once, quoted or in a list; an existing file is left as it is.
     @Test
     internal func newFilesSeveralAtOnce() {

@@ -13,8 +13,6 @@ extension FileJob {
         return DispatchTime.now().uptimeNanoseconds - lastReport >= UInt64(progressInterval * 1_000_000_000)
     }
 
-    // MARK: Progress
-
     /// A new item is being worked on.
     internal func report(_ lines: [String]) {
         let due = counters.withLock { () -> Bool in

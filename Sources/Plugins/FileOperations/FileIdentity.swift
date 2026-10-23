@@ -179,8 +179,8 @@ internal enum FileIdentity {
         while statfs(folder.path, &info) != 0, folder.path != "/" {
             folder.deleteLastPathComponent()
         }
-        let type = withUnsafeBytes(of: &info.f_fstypename) { raw in
-            String(bytes: raw.prefix { $0 != 0 }, encoding: .utf8) ?? ""
+        let type = withUnsafePointer(to: &info.f_fstypename) { field in
+            field.withMemoryRebound(to: CChar.self, capacity: Int(MFSTYPENAMELEN)) { String(cString: $0) }
         }
         return timestampGrain(ofType: type, isLocal: info.f_flags & UInt32(MNT_LOCAL) != 0)
     }
