@@ -50,7 +50,7 @@ internal struct ArcFixUnpackTarTests {
         let unpacker = Unpacker(fileSystems: files, monitor: monitor, options: options, whileUnpacking: nil) { _, _ in
             .overwrite
         }
-        let source = Unpacker.Source(archive: archive, selection: selection.isEmpty ? nil : selection)
+        let source = Unpacker.Source(archive: archive, selection: selection.isEmpty ? .all : .paths(selection))
         return unpacker.run([source], into: target)
     }
 

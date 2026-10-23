@@ -9,10 +9,10 @@ internal struct SeedArchive {
         Self(folder: "zip", format: .zip, password: "secret", name: "own-crypt-aes.zip"),
         Self(folder: "tar", format: .tar, password: nil, name: "own.tar"),
         Self(folder: "tgz", format: .compressedTar(.gzip), password: nil, name: "own.tar.gz"),
-        Self(folder: "txz", format: .compressedTar(.xz), password: nil, name: "own.tar.xz"),
+        Self(folder: "txz", format: .compressedTar(.xzStream), password: nil, name: "own.tar.xz"),
         Self(folder: "bz", format: .compressedTar(.bzip2), password: nil, name: "own.tar.bz2"),
         Self(folder: "tgz", format: .compressedFile(.gzip), password: nil, name: "own.gz"),
-        Self(folder: "txz", format: .compressedFile(.xz), password: nil, name: "own.xz")
+        Self(folder: "txz", format: .compressedFile(.xzStream), password: nil, name: "own.xz")
     ]
 
     /// The seed folder below the seeds directory: the target's name.

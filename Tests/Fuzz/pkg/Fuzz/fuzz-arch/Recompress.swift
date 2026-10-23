@@ -33,7 +33,7 @@ private func decompressed(_ bytes: [UInt8], _ codec: ArchiveFormat.Codec) -> [UI
     case .gzip:
         stream = InflateStream(source, wrapping: .gzip, control: nil)
 
-    case .xz:
+    case .xzStream:
         stream = try? XZStream(source, control: nil)
 
     case .bzip2:
@@ -71,7 +71,7 @@ private func compress(_ inner: [UInt8], _ codec: ArchiveFormat.Codec, into bytes
             bytes = gzipped(inner, body: body)
         }
 
-    case .xz:
+    case .xzStream:
         if let out = try? XZCoder.compress(Data(inner)) {
             bytes = [UInt8](out)
         }

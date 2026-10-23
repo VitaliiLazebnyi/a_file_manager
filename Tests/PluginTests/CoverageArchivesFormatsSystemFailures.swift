@@ -48,15 +48,14 @@ internal struct CoverageArchivesFormatsSystemFailures {
     /// The text of the error.
     private static func failedWrite(into folder: UnpackFolder, puts: Bool) -> String? {
         CoverageArchivesFormatsSupport.failure {
-            try folder.write(
-                ["file.txt"],
+            let file = UnpackFolder.NewFile(
+                names: ["file.txt"],
                 replacing: false,
                 permissions: 0o644,
                 modified: Date(),
-                quarantine: nil,
-                opened: nil
-            ) {
-                put in
+                quarantine: nil
+            )
+            return try folder.write(file, opened: nil) { put in
                 guard pullDescriptor(where: { $0.contains("/.afm-") }) else {
                     return
                 }

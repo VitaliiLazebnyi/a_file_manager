@@ -158,7 +158,7 @@ internal struct CoverageArchivesFSOutsideTests {
         #expect(throws: FileSystemError.self) {
             _ = try alone.archive(at: bench.memory.url("/a.zip"), cancellation: nil)
         }
-        let scheme = ArchiveFileSystem.scheme(forArchive: box.url("tree.zip"), fileSystems: nil, isZip: nil)
+        let scheme = ArchiveFileSystem.scheme(forArchive: box.url("tree.zip"), fileSystems: nil, isKnownZip: false)
         #expect(scheme == ArchiveURL.readOnlyScheme)
     }
 

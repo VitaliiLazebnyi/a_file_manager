@@ -16,15 +16,15 @@ internal struct CoverageArchivesFormatsUnpackFolder {
         box = try Sandbox()
     }
 
-    private func write(_ folder: UnpackFolder, _ names: [String], replacing: Bool = false, _ text: String) throws {
-        try folder.write(
-            names,
+    private func write(_ folder: UnpackFolder, _ names: [String], _ text: String, replacing: Bool) throws {
+        let file = UnpackFolder.NewFile(
+            names: names,
             replacing: replacing,
             permissions: 0o644,
             modified: Date(),
-            quarantine: nil,
-            opened: nil
-        ) { put in
+            quarantine: nil
+        )
+        try folder.write(file, opened: nil) { put in
             try put(Data(text.utf8))
         }
     }
@@ -46,7 +46,7 @@ internal struct CoverageArchivesFormatsUnpackFolder {
         )
         let empty = ArchiveError.unsupported("Unpacking to an empty name").errorDescription
         #expect(Support.failure { try folder.makeLink([], to: "x", replacing: false) } == empty)
-        #expect(Support.failure { try write(folder, [], "x") } == empty)
+        #expect(Support.failure { try write(folder, [], "x", replacing: false) } == empty)
     }
 
     /// A folder the disk does not let be made is reported with its place.
@@ -61,7 +61,7 @@ internal struct CoverageArchivesFormatsUnpackFolder {
             Support.failure { try folder.makeFolder(["sub"], quarantine: nil) } == Support.systemError(EACCES, place)
         )
         #expect(
-            Support.failure { try write(folder, ["file.txt"], "x") }
+            Support.failure { try write(folder, ["file.txt"], "x", replacing: false) }
                 == Support.systemError(EACCES, target.path + "/file.txt")
         )
     }
@@ -87,11 +87,11 @@ internal struct CoverageArchivesFormatsUnpackFolder {
         let folder = try UnpackFolder(target)
         try box.file("target/file.txt", "old")
         #expect(
-            Support.failure { try write(folder, ["file.txt"], "new") }
+            Support.failure { try write(folder, ["file.txt"], "new", replacing: false) }
                 == Support.systemError(EEXIST, target.path + "/file.txt")
         )
         #expect(box.read("target/file.txt") == "old")
-        try write(folder, ["file.txt"], replacing: true, "new")
+        try write(folder, ["file.txt"], "new", replacing: true)
         #expect(box.read("target/file.txt") == "new")
         #expect(try FileManager.default.contentsOfDirectory(atPath: target.path) == ["file.txt"])
     }

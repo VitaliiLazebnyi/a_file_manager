@@ -18,7 +18,7 @@ internal struct CoverageArchivesFSTreeTests {
         tree.insert(Self.file("folder/file.txt"), keepingOrder: false)
         #expect(tree.hasChildren("folder") && tree.hasChildren(""))
         #expect(!tree.hasChildren("folder/file.txt") && !tree.hasChildren("missing"))
-        #expect(tree.children(of: "folder/file.txt") == nil && tree.children(of: "missing") == nil)
+        #expect(tree.children(of: "folder/file.txt").isEmpty && tree.children(of: "missing").isEmpty)
         #expect(tree.descendants(of: "folder/file.txt").isEmpty && tree.descendants(of: "missing").isEmpty)
         #expect(tree.descendants(of: "").map(\.path).sorted() == ["folder", "folder/file.txt"])
     }

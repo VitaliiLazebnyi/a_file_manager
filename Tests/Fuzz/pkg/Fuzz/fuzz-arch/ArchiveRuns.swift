@@ -24,7 +24,7 @@ internal func runArchive(_ bytes: [UInt8], name: String) {
         let seen = opened.browse(readLimit: 48 << 20)
         if pass == 0, seen.listed, let handle = try? opened.store.archive(at: archive, cancellation: nil) {
             unpackTwice(handle, with: opened.fileSystems, root: root, name: name)
-            _ = ArchiveTester.test(handle, cancellation: CancellationFlag(), counter: nil, only: nil)
+            _ = ArchiveTester.test(handle, cancellation: CancellationFlag(), counter: nil, members: .all)
         }
         opened.store.close()
         checkContainment(root, archiveName: name, what: "browse")

@@ -54,7 +54,7 @@ fuzzMain([
         "txzlist",
         maxLen: 8_000,
         dict: kTarDict + ["\u{FD}7zXZ\u{0}", "YZ"],
-        custom: recompressing(.xz),
+        custom: recompressing(.xzStream),
         setUp: ArchiveRig.setUp
     ) { runList($0, name: "a.tar.xz") },
     FuzzTarget(
@@ -94,7 +94,7 @@ fuzzMain([
         "txz",
         maxLen: 8_000,
         dict: kTarDict + ["\u{FD}7zXZ\u{0}", "YZ"],
-        custom: recompressing(.xz),
+        custom: recompressing(.xzStream),
         setUp: ArchiveRig.setUp
     ) { runArchive($0, name: "a.tar.xz") },
     FuzzTarget("bz", maxLen: 4_000, dict: ["BZh9", "1AY&SY"], setUp: ArchiveRig.setUp) { bytes in

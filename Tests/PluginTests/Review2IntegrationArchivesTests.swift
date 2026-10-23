@@ -5,70 +5,24 @@ import Testing
 
 @testable import ArchivesPlugin
 
-// Review round 2, integration: the kernel calls that arrived after the archives pass was
-// over, now used by the archives plugin — a commit that asks while it runs (F046), and
-// folders that an unpacking by path makes for itself alone (L043).
-
-/// A file system over memory with a moment to interfere right before a folder is made
-/// exclusively.
+/// Review round 2, integration: the kernel calls that arrived after the archives pass was
+/// over, now used by the archives plugin.
 ///
-/// Every call is forwarded to `base`. Unchecked: what it records is guarded by `lock`; its switches
-/// are set by the test before use.
-internal final class IntegrationHookedMemory: FileSystemProvider, @unchecked Sendable {
-    internal let base = MemoryFileSystem(scheme: "hooked")
-    internal var scheme: String { base.scheme }
-    internal var capabilities: FileSystemCapabilities { base.capabilities }
-    internal let readsRootedPaths = true
-    internal var beforeMaking: ((URL) -> Void)?
-    private let lock = NSLock()
-    private var exclusive: [String] = []
-
-    /// The folders that were made exclusively.
-    internal var madeExclusively: [String] { lock.withLock { exclusive } }
-
-    internal func capabilities(for url: URL) -> FileSystemCapabilities { base.capabilities(for: url) }
-    internal func list(_ directory: URL, showHidden: Bool) throws -> [FileItem] {
-        try base.list(directory, showHidden: showHidden)
-    }
-    internal func item(at url: URL) -> FileItem? { base.item(at: url) }
-    internal func parent(of directory: URL) -> URL? { base.parent(of: directory) }
-    internal func read(_ url: URL) throws -> any FileReader { try base.read(url) }
-    internal func write(_ url: URL) throws -> any FileWriter { try base.write(url) }
-    internal func remove(_ url: URL) throws { try base.remove(url) }
-    internal func move(_ source: URL, to destination: URL, replacing: Bool) throws {
-        try base.move(source, to: destination, replacing: replacing)
-    }
-    internal func copy(_ source: URL, to destination: URL, progress: (Int64) -> Bool) throws {
-        try base.copy(source, to: destination, progress: progress)
-    }
-    internal func setAttributes(_ attributes: FileAttributes, of url: URL) throws {
-        try base.setAttributes(attributes, of: url)
-    }
-    internal func displayPath(_ url: URL) -> String { base.displayPath(url) }
-    internal func location(from text: String) -> URL? { base.location(from: text) }
-    internal func volume(of url: URL) -> VolumeInfo? { base.volume(of: url) }
-    internal func createDirectory(at url: URL) { base.createDirectory(at: url) }
-    internal func createDirectory(at url: URL, exclusive: Bool) throws {
-        if exclusive {
-            beforeMaking?(url)
-            lock.withLock { self.exclusive.append(url.path) }
-        }
-        try base.createDirectory(at: url, exclusive: exclusive)
-    }
-    internal func createDirectory(at url: URL, exclusive: Bool, cancellation _: CancellationFlag) throws {
-        try createDirectory(at: url, exclusive: exclusive)
-    }
-}
-
+/// A commit that asks while it runs (F046), and folders that an unpacking by path makes for
+/// itself alone (L043).
 @Suite
-internal struct Review2IntegrationArchives {
+internal struct Review2IntegrationArchivesTests {
+    /// The archive file systems in a sandbox of their own.
     internal let bench: ArchiveBench
+    /// The sandbox the archives are made in.
     internal var box: Sandbox { bench.box }
 
+    /// A fresh bench for each test.
     internal init() throws {
         bench = try ArchiveBench()
     }
 
+    /// A ZIP of empty files under the given names, written by the plugin's own writer.
     private func writeZip(_ name: String, members: [String]) throws -> URL {
         let url = box.url(name)
         let output = try OutputFile(creating: url, mode: 0o600)
@@ -88,6 +42,7 @@ internal struct Review2IntegrationArchives {
         return url
     }
 
+    /// Writes `text` to the member at `url` through the archive's file system.
     private func write(_ text: String, to url: URL) throws {
         let writer = try bench.fileSystems.provider(for: url).write(url)
         try writer.write(Data(text.utf8))
@@ -96,14 +51,18 @@ internal struct Review2IntegrationArchives {
 
     // MARK: F046 — the commit of an archive asks between its members
 
+    /// The commit of a ZIP asks before every member it writes, with figures that only grow (F046).
     @Test
     internal func theCommitOfAnArchiveAsksBetweenTheMembersItWrites() throws {
         let url = try writeZip("commit.zip", members: (0..<40).map { "old-\($0).txt" })
-        for number in 0..<20 { try write("new \(number)", to: bench.inside(url, "new-\(number).txt")) }
+        for number in 0..<20 {
+            try write("new \(number)", to: bench.inside(url, "new-\(number).txt", scheme: ArchiveURL.writableScheme))
+        }
         // (A member that was there is given another name, so the file is written anew.)
-        try bench.zip.remove(bench.inside(url, "old-0.txt"))
+        try bench.zip.remove(bench.inside(url, "old-0.txt", scheme: ArchiveURL.writableScheme))
         var asked: [(done: Int64, total: Int64)] = []
-        try bench.zip.commit(bench.inside(url), cancellation: CancellationFlag()) { done, total in
+        let root = bench.inside(url, "", scheme: ArchiveURL.writableScheme)
+        try bench.zip.commit(root, cancellation: CancellationFlag()) { done, total in
             asked.append((done, total))
             return true
         }
@@ -117,14 +76,18 @@ internal struct Review2IntegrationArchives {
         #expect(names.count == 59 && names.contains("new-19.txt") && !names.contains("old-0.txt"))
     }
 
+    /// A commit ended while it runs leaves the file as it was, keeps what waited, and can be made again.
     @Test
     internal func aCommitThatIsEndedWhileItRunsHasChangedNothingAndCanBeMadeAgain() throws {
         let url = try writeZip("stopped.zip", members: (0..<30).map { "old-\($0).txt" })
-        for number in 0..<10 { try write("new \(number)", to: bench.inside(url, "new-\(number).txt")) }
+        let root = bench.inside(url, "", scheme: ArchiveURL.writableScheme)
+        for number in 0..<10 {
+            try write("new \(number)", to: bench.inside(url, "new-\(number).txt", scheme: ArchiveURL.writableScheme))
+        }
         let before = try Data(contentsOf: url)
         var asked = 0
         #expect(throws: CocoaError.self) {
-            try bench.zip.commit(bench.inside(url), cancellation: CancellationFlag()) { _, _ in
+            try bench.zip.commit(root, cancellation: CancellationFlag()) { _, _ in
                 asked += 1
                 return asked < 5
             }
@@ -132,15 +95,14 @@ internal struct Review2IntegrationArchives {
         #expect(asked == 5)
         // The file is the one it was; what waited still waits and is still shown.
         #expect(try Data(contentsOf: url) == before)
-        #expect(try bench.zip.list(bench.inside(url), showHidden: true).count == 40)
-        try bench.zip.commit(bench.inside(url), cancellation: CancellationFlag()) { _, _ in true }
+        #expect(try bench.zip.list(root, showHidden: true).count == 40)
+        try bench.zip.commit(root, cancellation: CancellationFlag()) { _, _ in true }
         #expect(
             try ZipDirectory.read(RandomAccessFile(url, shownAs: nil), maxEntries: .max, check: nil).records.count == 40
         )
         // Nothing of the attempt that was ended is left next to the archive.
         #expect(
-            try FileManager.default.contentsOfDirectory(atPath: box.root.path).filter { $0.contains(".afm-zip") }
-                .isEmpty
+            try !FileManager.default.contentsOfDirectory(atPath: box.root.path).contains { $0.contains(".afm-zip") }
         )
     }
 
@@ -154,11 +116,11 @@ internal struct Review2IntegrationArchives {
     /// the byte: none may be reported as damage, and none may open anything.
     @Test
     internal func noWrongPasswordForTheOldEncryptionIsTakenForADamagedArchive() throws {
-        let tree = try bench.makeTree()
+        let tree = try bench.makeTree("tree")
         let own = box.url("own.zip")
-        try bench.pack([tree], to: own) {
-            $0.password = "open sesame"
-            $0.encryption = .legacy
+        try bench.pack([tree], to: own, innerFolder: "") { options in
+            options.password = "open sesame"
+            options.encryption = .legacy
         }
         var damaged: [String] = []
         var opened: [String] = []
@@ -167,7 +129,7 @@ internal struct Review2IntegrationArchives {
             let candidate = "wrong-\(number)"
             fresh.passwords.set([candidate])
             do {
-                _ = try fresh.read(fresh.inside(own, "tree/readme.txt"))
+                _ = try fresh.read(fresh.inside(own, "tree/readme.txt", scheme: ArchiveURL.writableScheme))
                 opened.append(candidate)
             } catch ArchiveError.damaged {
                 damaged.append(candidate)
@@ -180,13 +142,14 @@ internal struct Review2IntegrationArchives {
         let fresh = try ArchiveBench()
         fresh.passwords.set(["wrong-1", "open sesame"])
         #expect(
-            try fresh.read(fresh.inside(own, "tree/readme.txt"))
+            try fresh.read(fresh.inside(own, "tree/readme.txt", scheme: ArchiveURL.writableScheme))
                 == Data(contentsOf: tree.appendingPathComponent("readme.txt"))
         )
     }
 
     // MARK: L043 — by path (a target that is not a disk of this machine), folders are made exclusively
 
+    /// Unpacking by path makes the folders it needs exclusively, and uses a folder that was there (L043).
     @Test
     internal func foldersOfATargetThatIsNotALocalDiskAreMadeForThisUnpackingAlone() throws {
         let hooked = IntegrationHookedMemory()
@@ -198,9 +161,8 @@ internal struct Review2IntegrationArchives {
             monitor: bench.monitor,
             options: UnpackOptions(),
             whileUnpacking: nil
-        ) {
-            _,
-            _ in .overwrite
+        ) { _, _ in
+            .overwrite
         }
         let result = unpacker.run(
             [Unpacker.Source(archive: try bench.store.archive(at: archive, cancellation: nil))],
@@ -218,6 +180,7 @@ internal struct Review2IntegrationArchives {
         #expect(hooked.madeExclusively.sorted() == ["/target/new", "/target/new/deep"])
     }
 
+    /// Something that takes a folder's name before the folder is made is not written through; the rest arrives.
     @Test
     internal func whatAppearsUnderAFoldersNameBeforeItIsMadeIsNotWrittenThrough() throws {
         let hooked = IntegrationHookedMemory()
@@ -233,9 +196,8 @@ internal struct Review2IntegrationArchives {
             monitor: bench.monitor,
             options: UnpackOptions(),
             whileUnpacking: nil
-        ) {
-            _,
-            _ in .overwrite
+        ) { _, _ in
+            .overwrite
         }
         let result = unpacker.run(
             [Unpacker.Source(archive: try bench.store.archive(at: archive, cancellation: nil))],
@@ -248,6 +210,6 @@ internal struct Review2IntegrationArchives {
         )
         #expect(hooked.base.contents("/target/dir") == "somebody else's")
         #expect(hooked.base.contents("/target/plain.txt") != nil)
-        #expect(hooked.base.allPaths.filter { $0.hasPrefix("/target/dir/") }.isEmpty)
+        #expect(!hooked.base.allPaths.contains { $0.hasPrefix("/target/dir/") })
     }
 }

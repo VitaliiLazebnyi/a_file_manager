@@ -147,7 +147,7 @@ internal struct CoverageArchivesFormatsCodecs {
                 == gzipCount
         )
         let xzCount = (8 << 20) * min(cores, 4)
-        let lzma = try RandomAccessFile(try compressed(.xz, count: xzCount), shownAs: nil)
+        let lzma = try RandomAccessFile(try compressed(.xzStream, count: xzCount), shownAs: nil)
         #expect(try zeros(in: XZStream(FileRangeStream(lzma, offset: 0, length: nil), control: nil)) == xzCount)
         #expect(CompressedSize.ofXZ(lzma) == UInt64(xzCount))
     }

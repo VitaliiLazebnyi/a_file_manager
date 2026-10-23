@@ -37,7 +37,7 @@ internal struct CoverageArchivesFormatsTester {
             try bench.store.archive(at: archive, cancellation: nil),
             cancellation: CancellationFlag(),
             counter: nil,
-            only: nil
+            members: .all
         )
         #expect(problems == [ArchiveError.passwordNeeded("tree.zip").localizedDescription])
     }
@@ -55,7 +55,7 @@ internal struct CoverageArchivesFormatsTester {
                 try bench.store.archive(at: archive, cancellation: nil),
                 cancellation: flag,
                 counter: counter,
-                only: nil
+                members: .all
             )
             .isEmpty
         )
@@ -91,10 +91,10 @@ internal struct CoverageArchivesFormatsTester {
         let flag = CancellationFlag()
         let counter = SharedCounter()
         let done = Signal<[String]>()
-        OtherThread.start { done.set(ArchiveTester.test(open, cancellation: flag, counter: counter, only: nil)) }
+        OtherThread.start { done.set(ArchiveTester.test(open, cancellation: flag, counter: counter, members: .all)) }
         #expect(Wait.until { counter.value > 0 })
         flag.cancel()
-        #expect(done.wait() == [])
+        #expect(done.wait()?.isEmpty == true)
         #expect(counter.value < Int64(size))
     }
 
@@ -113,7 +113,7 @@ internal struct CoverageArchivesFormatsTester {
         try handle.truncate(atOffset: 0)
         try handle.write(contentsOf: try Data(contentsOf: other))
         try handle.close()
-        let problems = ArchiveTester.test(open, cancellation: CancellationFlag(), counter: nil, only: nil)
+        let problems = ArchiveTester.test(open, cancellation: CancellationFlag(), counter: nil, members: .all)
         #expect(problems.count == 1 && !problems[0].hasPrefix("tree/"))
     }
 
@@ -136,7 +136,7 @@ internal struct CoverageArchivesFormatsTester {
         let handle = try FileHandle(forWritingTo: archive)
         try handle.write(contentsOf: data)
         try handle.close()
-        let problems = ArchiveTester.test(open, cancellation: CancellationFlag(), counter: nil, only: nil)
+        let problems = ArchiveTester.test(open, cancellation: CancellationFlag(), counter: nil, members: .all)
         #expect(problems.first?.hasPrefix("tree/a.txt: ") == true, "\(problems) \(open.allowsParallelReads)")
     }
 

@@ -28,7 +28,7 @@ internal struct Opened {
             registry.register(each)
         }
         environment.fileSystems = { [weak registry] in registry }
-        let scheme = ArchiveFileSystem.scheme(forArchive: archive, fileSystems: registry, isZip: nil)
+        let scheme = ArchiveFileSystem.scheme(forArchive: archive, fileSystems: registry, isKnownZip: false)
         return Self(
             store: newStore,
             fileSystems: registry,

@@ -16,6 +16,9 @@ internal final class TarMemberStream: ByteStream {
         self.onClose = onClose
     }
 
+    /// The next block of the member's data, at most `count` bytes; nil at its end.
+    ///
+    /// An error of the reader is passed on, and the reader then counts as unusable.
     internal func read(upToCount count: Int) throws -> Data? {
         do {
             return try reader.readData(upToCount: count)
@@ -25,9 +28,14 @@ internal final class TarMemberStream: ByteStream {
         }
     }
 
+    /// Closes the reader (with `closesReader`) and tells `onClose` once.
     internal func close() {
         if closesReader { reader.close() }
         onClose?(!failed)
         onClose = nil
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

@@ -33,7 +33,9 @@ internal struct CoverageArchivesFormatsUnpackByPath {
         _ archive: URL,
         into target: URL,
         monitor: (any JobMonitor)? = nil,
-        whenAsked: @escaping () -> Void = {}
+        whenAsked: @escaping () -> Void = {
+            // Nothing to note.
+        }
     ) throws -> UnpackResult {
         let unpacker = Unpacker(
             fileSystems: bench.fileSystems,
