@@ -112,7 +112,7 @@ internal struct DirectorySyncCommands {
         #expect(session.entries.contains(.header("sub/")))
 
         session.show = .all
-        session.sort = (.size, .left, false)
+        session.sort = SyncSort(key: .size, side: .left, ascending: false)
         #expect(session.visibleRows.prefix(2).map { session.rows[$0].name } == ["update.txt", "new.txt"])
     }
 
@@ -210,11 +210,11 @@ internal struct DirectorySyncCommands {
             actions("update.txt") == [.copyToRight] && actions("odd.txt") == [.copyToRight]
                 && actions("back.txt") == [.copyToRight]
         )
-        session.setAction(.none, rows: rows(session, "back.txt", "new.txt"))
-        #expect(actions("back.txt", "new.txt") == [.none, .none])
+        session.setAction(.nothing, rows: rows(session, "back.txt", "new.txt"))
+        #expect(actions("back.txt", "new.txt") == [.nothing, .nothing])
         session.toggle(rows: rows(session, "back.txt", "new.txt", "update.txt"))
         #expect(
-            actions("back.txt", "new.txt") == [.copyToLeft, .copyToRight] && actions("update.txt") == [SyncAction.none]
+            actions("back.txt", "new.txt") == [.copyToLeft, .copyToRight] && actions("update.txt") == [SyncAction.nothing]
         )
         session.markDefault(rows: Array(session.rows.indices))
         #expect(session.rows.allSatisfy { $0.action == $0.defaultAction })
@@ -222,7 +222,7 @@ internal struct DirectorySyncCommands {
         #expect(actions("odd.txt") == [.copyToRight])
         session.setAction(.deleteBoth, rows: rows(session, "same.txt", "new.txt"))
         session.setAction(.deleteRight, rows: rows(session, "arrives.txt"))
-        session.setAction(.none, rows: rows(session, "back.txt", "update.txt"))
+        session.setAction(.nothing, rows: rows(session, "back.txt", "update.txt"))
 
         ui.formAnswers = [.values(["confirm": .flag(false)])]
         session.synchronize()
@@ -279,9 +279,9 @@ internal struct DirectorySyncCommands {
         bench.commands.register(Command(.view, "View"), parameterized: { viewed += [$0.location].compactMap { $0 } })
         let session = opened()
         let odd = rows(session, "odd.txt")[0]
-        session.view(.left, row: odd)
-        session.view(.right, row: rows(session, "new.txt")[0])  // nothing on the right
-        session.view(.right, row: odd)
+        session.view(.left, row: odd, command: .view)
+        session.view(.right, row: rows(session, "new.txt")[0], command: .view)  // nothing on the right
+        session.view(.right, row: odd, command: .view)
         #expect(viewed.map(\.path) == ["/A/odd.txt", "/B/odd.txt"])
 
         session.compareContents(row: odd)
@@ -382,7 +382,7 @@ internal struct DirectorySyncWindow {
         window?.contentView?.layoutSubtreeIfNeeded()
         window?.displayIfNeeded()
         session.show = [.copyToRight, .duplicates, .singles]
-        session.setAction(.none, rows: session.visibleRows)
+        session.setAction(.nothing, rows: session.visibleRows)
         window?.displayIfNeeded()
         #expect(!session.canSynchronize)
         plugin.stop()

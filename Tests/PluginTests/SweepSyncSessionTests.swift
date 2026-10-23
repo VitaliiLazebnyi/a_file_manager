@@ -27,7 +27,12 @@ internal struct SweepSyncSessionTests {
         do {
             let session = SyncSession(kernel: bench.kernel)
             session.runsInline = true
-            session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false)
+            session.adopt(
+                left: bench.left.model,
+                right: bench.right.model,
+                includeHidden: false,
+                readsInBackgroundFrom: SyncSession.backgroundFrom
+            )
             session.compare()
             #expect(session.canSynchronize)
             session.runsInline = false

@@ -81,7 +81,7 @@ internal struct DirectorySyncSettingsMigration {
         #expect(options.subdirectories && options.byContent && !options.ignoreDate && options.asymmetric)
         #expect(!options.emptyDirectories && options.mask == "*.swift *.md" && options.toleranceSeconds == 2)
         #expect(options.timeOffsetHours == 1 && options.ignoreOneHourDifference && !options.includeHidden)
-        #expect(options.onlyNames == nil)
+        #expect(options.onlyNames.isEmpty)
         #expect(session.show == [.copyToRight, .notEqual, .copyToLeft, .singles])
     }
 

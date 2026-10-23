@@ -292,12 +292,12 @@ internal struct Review2PluginsBP2Tools {
         let bench = benchOf(memory)
         let session = SyncSession(kernel: bench.kernel)
         // Nothing marked: no names.
-        session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false)
+        session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false, readsInBackgroundFrom: SyncSession.backgroundFrom)
         #expect(session.selectedNames.isEmpty)
         // Marked on both sides: the names of both, in order, the twin of a name once for each side.
         bench.left.model.setSelected(true, names: ["c.txt", "a.txt", "sub"])
         bench.right.model.setSelected(true, names: ["a.txt"])
-        session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false)
+        session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false, readsInBackgroundFrom: SyncSession.backgroundFrom)
         #expect(session.selectedNames == ["a.txt", "a.txt", "c.txt", "sub"])
         // A long selection is read in the background and arrives later, once.
         var changes = 0

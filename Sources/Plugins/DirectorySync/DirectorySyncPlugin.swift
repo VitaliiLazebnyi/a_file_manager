@@ -9,10 +9,12 @@ import Foundation
 /// `.text` argument it loads the saved set of that name first, and with `=name` it also
 /// compares at once (the spec's `SYNCOPEN`).
 public final class DirectorySyncPlugin: Plugin {
+    /// The plugin's name in the kernel's list of plugins.
     public let name = "DirectorySync"
     private let opensWindows: Bool
     /// The state behind the window; it exists from the first time the command runs.
     internal private(set) var session: SyncSession?
+    /// The window, from the first time it opens.
     private var window: SyncWindowController?
     /// Puts the window on screen.
     ///
@@ -26,15 +28,17 @@ public final class DirectorySyncPlugin: Plugin {
         self.opensWindows = opensWindows
     }
 
+    /// Registers the command with its menu item, toolbar button and preference page.
+    ///
+    /// Called once on the main thread when the kernel loads the plugin.
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
         kernel.commands.register(
-            Command(.synchronizeDirectories, "Synchronize Dirs…", runsDuringJobs: true),
-            parameterized: { [self] argument in
-                open(in: kernel, set: argument.text)
-            }
-        )
+            Command(.synchronizeDirectories, "Synchronize Dirs…", runsDuringJobs: true)
+        ) { [self] argument in
+            open(in: kernel, set: argument.text)
+        }
         kernel.menus.add([.synchronizeDirectories], to: .commandsTools)
         kernel.toolbar.add(
             .synchronizeDirectories,
@@ -78,33 +82,41 @@ public final class DirectorySyncPlugin: Plugin {
         )
     }
 
+    /// Opens the window with the panels' directories, loading the saved set `set` first (compared at once when it
+    /// starts with `=`).
     private func open(in kernel: Kernel, set: String?) {
-        let session = self.session ?? SyncSession(kernel: kernel)
-        self.session = session
-        session.runsInline = !opensWindows
+        let current = session ?? SyncSession(kernel: kernel)
+        session = current
+        current.runsInline = !opensWindows
         let panels = kernel.panels
-        session.adopt(
+        current.adopt(
             left: panels.left.model,
             right: panels.right.model,
-            includeHidden: panels.source.model.showHidden
+            includeHidden: panels.source.model.showHidden,
+            readsInBackgroundFrom: SyncSession.backgroundFrom
         )
         var compareAtOnce = false
-        if var name = set {
-            compareAtOnce = name.hasPrefix("=")
-            if compareAtOnce { name.removeFirst() }
-            if !name.isEmpty, !session.loadSet(named: name) {
-                kernel.interaction.inform("There are no saved synchronize settings named \(name).")
+        if var setName = set {
+            compareAtOnce = setName.hasPrefix("=")
+            if compareAtOnce {
+                setName.removeFirst()
+            }
+            if !setName.isEmpty, !current.loadSet(named: setName) {
+                kernel.interaction.inform("There are no saved synchronize settings named \(setName).")
             }
         }
         if opensWindows {
-            let controller = window ?? SyncWindowController(session: session)
+            let controller = window ?? SyncWindowController(session: current, effects: .system)
             window = controller
             controller.present = present
             controller.show()
         }
-        if compareAtOnce { session.compare() }
+        if compareAtOnce {
+            current.compare()
+        }
     }
 
+    /// Cancels a comparison that runs and closes the window; called on the main thread when the program quits.
     public func stop() {
         session?.cancelComparison()
         window?.close()

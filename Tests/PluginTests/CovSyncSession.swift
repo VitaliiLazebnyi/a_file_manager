@@ -74,7 +74,12 @@ internal struct CovSyncSession {
         memory.stallsListings = true
         session.compare()
         #expect(Wait.until { memory.stalledListings(of: "/A") + memory.stalledListings(of: "/B") > 0 })
-        session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false)
+        session.adopt(
+            left: bench.left.model,
+            right: bench.right.model,
+            includeHidden: false,
+            readsInBackgroundFrom: SyncSession.backgroundFrom
+        )
         memory.releaseStalls()
         var later = false
         DispatchQueue.main.async { later = true }
@@ -95,7 +100,7 @@ internal struct CovSyncSession {
                 return
             }
             preparing += 1
-            session.setAction(.none, rows: Array(session.rows.indices))
+            session.setAction(.nothing, rows: Array(session.rows.indices))
             session.markDefault(rows: Array(session.rows.indices))
         }
         session.compare()
@@ -121,13 +126,18 @@ internal struct CovSyncSession {
         session.synchronize()
         #expect(session.status == "Preparing the plan…")
         let before = session.rows.map(\.action)
-        session.setAction(.none, rows: Array(session.rows.indices))
+        session.setAction(.nothing, rows: Array(session.rows.indices))
         session.synchronize()
         #expect(session.rows.map(\.action) == before)
         #expect(await AppWait.until { bench.interaction.log.contains { $0.hasPrefix("form:") } })
         // Again, but the rows go while the plan is made.
         session.synchronize()
-        session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false)
+        session.adopt(
+            left: bench.left.model,
+            right: bench.right.model,
+            includeHidden: false,
+            readsInBackgroundFrom: SyncSession.backgroundFrom
+        )
         var later = false
         DispatchQueue.main.async { later = true }
         #expect(await AppWait.until { later })
@@ -146,7 +156,12 @@ internal struct CovSyncSession {
                 return
             }
             tried = true
-            session.adopt(left: bench.right.model, right: bench.left.model, includeHidden: true)
+            session.adopt(
+                left: bench.right.model,
+                right: bench.left.model,
+                includeHidden: true,
+                readsInBackgroundFrom: SyncSession.backgroundFrom
+            )
             session.compare()
             #expect(!session.loadSet(named: "Kept") && session.phase == .synchronizing)
         }
@@ -212,7 +227,7 @@ internal struct CovSyncSession {
     internal func whatIsToldAfterARun() throws {
         let session = try opened()
         session.compare()
-        session.setAction(.none, rows: Array(session.rows.indices))
+        session.setAction(.nothing, rows: Array(session.rows.indices))
         session.synchronize()
         #expect(bench.interaction.log.isEmpty)
         var stopped = SyncOutcome()

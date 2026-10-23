@@ -37,7 +37,7 @@ internal struct CovSyncModels {
     /// Every action has its symbol; no action has none.
     @Test
     internal func everyActionHasItsSymbol() {
-        let all: [SyncAction] = [.none, .copyToRight, .copyToLeft, .deleteLeft, .deleteRight, .deleteBoth]
+        let all: [SyncAction] = [.nothing, .copyToRight, .copyToLeft, .deleteLeft, .deleteRight, .deleteBoth]
         let symbols = all.map(\.symbol)
         #expect(symbols.first?.isEmpty == true && Set(symbols).count == all.count)
     }
@@ -61,9 +61,17 @@ internal struct CovSyncModels {
             Self.row("x/", left: Self.file("a", size: 1), right: nil, state: .leftOnly),
             Self.row("x/", left: nil, right: nil, state: .equal)
         ]
-        let byName = SyncSession.layout(rows: rows, show: .all, sort: (.name, .left, false))
+        let byName = SyncSession.layout(
+            rows: rows,
+            show: .all,
+            sort: SyncSort(key: .name, side: .left, ascending: false)
+        )
         #expect(byName.entries == [.header("x/"), .row(3), .row(2), .row(0), .header("y/"), .row(1)])
-        let bySize = SyncSession.layout(rows: rows, show: .all, sort: (.size, .right, true))
+        let bySize = SyncSession.layout(
+            rows: rows,
+            show: .all,
+            sort: SyncSort(key: .size, side: .right, ascending: true)
+        )
         #expect(bySize.entries == [.header("x/"), .row(3), .row(2), .row(0), .header("y/"), .row(1)])
     }
 }

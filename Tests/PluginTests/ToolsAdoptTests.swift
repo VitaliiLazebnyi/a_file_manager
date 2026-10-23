@@ -400,11 +400,12 @@ internal struct ToolsAdoptDirectorySync {
             .map { index -> SyncComparison.Pair in
                 let text = name()
                 return SyncComparison.Pair(
+                    name: text,
                     left: FileItem(url: memory.url("/" + String(index)), name: text),
                     right: nil
                 )
             }
-        let ordered = SyncComparison.sorted(pairs).map { $0.left!.name }
+        let ordered = SyncComparison.sorted(pairs).map(\.name)
         for (one, two) in zip(ordered, ordered.dropFirst()) {
             #expect(Sorter.compare(one, two, numeric: true) != .orderedDescending)
         }
@@ -416,12 +417,13 @@ internal struct ToolsAdoptDirectorySync {
                 plain.enumerated()
                     .map { index, text in
                         SyncComparison.Pair(
+                            name: text,
                             left: FileItem(url: memory.url("/p" + String(index)), name: text),
                             right: nil
                         )
                     }
             )
-            .map { $0.left!.name }
+            .map(\.name)
         #expect(walked == ["A", "a9", "a10", "apple", "b", "file1.txt", "File2.txt", "file10.txt", "Zebra"])
         for (one, two) in zip(walked, walked.dropFirst()) {
             #expect(one.localizedStandardCompare(two) != .orderedDescending)
@@ -582,7 +584,7 @@ internal struct ToolsAdoptSyncSession {
         )
         bench.left.model.setSelected(true, names: [decomposed])
         let session = SyncSession(kernel: bench.kernel)
-        session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false)
+        session.adopt(left: bench.left.model, right: bench.right.model, includeHidden: false, readsInBackgroundFrom: SyncSession.backgroundFrom)
         #expect(session.selectedNames.count == 1 && isExactly(session.selectedNames[0], decomposed))
     }
 }

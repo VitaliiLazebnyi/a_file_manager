@@ -117,7 +117,7 @@ internal struct Review2DirectorySync {
             )
         let rows = result.rows.sorted { $0.name < $1.name }
         #expect(rows.map(\.name) == ["A.txt", "a.txt"])
-        #expect(rows[0].state == .excluded && rows[0].action == .none)
+        #expect(rows[0].state == .excluded && rows[0].action == .nothing)
         #expect(rows[1].state == .equal)
     }
 
@@ -309,7 +309,7 @@ internal struct Review2DirectorySync {
                 )
             )
         }
-        let layout = SyncSession.layout(rows: items, show: .all, sort: (.size, .left, true))
+        let layout = SyncSession.layout(rows: items, show: .all, sort: SyncSort(key: .size, side: .left, ascending: true))
         let sizes = layout.entries.compactMap { entry -> Int64? in
             if case .row(let index) = entry {
                 return items[index].left?.size
@@ -317,7 +317,7 @@ internal struct Review2DirectorySync {
             return nil
         }
         #expect(sizes == sizes.sorted() && sizes.count == 50)
-        let descending = SyncSession.layout(rows: items, show: .all, sort: (.size, .left, false))
+        let descending = SyncSession.layout(rows: items, show: .all, sort: SyncSort(key: .size, side: .left, ascending: false))
         #expect(descending.entries.count == 50 && layout.actionableCount == 50 && layout.summary.uniqueLeft == 50)
     }
 }

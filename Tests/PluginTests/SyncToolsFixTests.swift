@@ -295,7 +295,7 @@ internal struct DirectorySyncFixes {
                 right: box.url("R")
             )
         let row = try #require(result.rows.first { $0.name == "a.txt" })
-        #expect(row.state == .excluded && row.action == .none && !row.accepts(.copyToRight))
+        #expect(row.state == .excluded && row.action == .nothing && !row.accepts(.copyToRight))
         #expect(result.rows.contains { $0.name == "target.txt" } && !result.rows.contains { $0.name == "lonely" })
         #expect(SyncPlan(rows: result.rows).toRight.map(\.source) == [])
     }
@@ -388,10 +388,10 @@ internal struct DirectorySyncSessionFixes {
         var touched: [[Int]] = []
         session.onRowsChange = { touched.append($0) }
         let all = session.visibleRows
-        session.setAction(.none, rows: all)
-        #expect(!session.canSynchronize && touched == [all.filter { session.rows[$0].defaultAction != .none }])
+        session.setAction(.nothing, rows: all)
+        #expect(!session.canSynchronize && touched == [all.filter { session.rows[$0].defaultAction != .nothing }])
         // Rows already at the wanted action are not reported again.
-        session.setAction(.none, rows: all)
+        session.setAction(.nothing, rows: all)
         #expect(touched.last == [])
         let new = session.rows.indices.first { session.rows[$0].name == "new.txt" }!
         session.toggle(rows: [new])

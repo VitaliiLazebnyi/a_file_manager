@@ -95,7 +95,7 @@ internal struct CovSyncWindow {
         table.selectRowIndexes([new], byExtendingSelection: false)
         let index = try #require(stage.session.rows.firstIndex { $0.name == "new.txt" })
         try stage.type(" ", code: 49, [])
-        #expect(stage.session.rows[index].action == SyncAction.none)
+        #expect(stage.session.rows[index].action == SyncAction.nothing)
         try stage.type(" ", code: 49, .shift)
         #expect(stage.session.rows[index].action == .copyToRight)
         let odd = try #require(stage.position("odd.txt"))
@@ -107,7 +107,7 @@ internal struct CovSyncWindow {
         #expect(stage.session.rows[different].action == .copyToLeft)
         try stage.type("r", code: 15, .control)
         try stage.type("m", code: 46, .control)
-        #expect(stage.session.rows[different].action == SyncAction.none)
+        #expect(stage.session.rows[different].action == SyncAction.nothing)
         try stage.type("d", code: 2, .control)
         // F3 with Ctrl, alone and with Shift, F4 alone and with Shift, F2.
         try stage.type("\u{F706}", code: 99, .control)

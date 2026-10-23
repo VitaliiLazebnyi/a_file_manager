@@ -93,11 +93,11 @@ internal struct SyncComparing {
         let result = compare()
         #expect(
             describe(result.rows) == [
-                "equal.txt equal none", "left.txt leftOnly copyToRight", "newer-left.txt leftNewer copyToRight",
-                "newer-right.txt rightNewer copyToLeft", "right.txt rightOnly copyToLeft", "size.txt different none",
-                "twin.txt equal none",
+                "equal.txt equal nothing", "left.txt leftOnly copyToRight", "newer-left.txt leftNewer copyToRight",
+                "newer-right.txt rightNewer copyToLeft", "right.txt rightOnly copyToLeft", "size.txt different nothing",
+                "twin.txt equal nothing",
                 "other/only-right.txt rightOnly copyToLeft", "sub/only-left.txt leftOnly copyToRight",
-                "sub/deep/inner.txt equal none"
+                "sub/deep/inner.txt equal nothing"
             ]
         )
         #expect(result.errors.isEmpty && !result.wasCancelled)
@@ -140,7 +140,7 @@ internal struct SyncComparing {
         #expect(states["dated.txt"]?.state == .equal)
         // Same length, different dates: only the size counts.
         #expect(states["newer-left.txt"]?.state == .equal && states["newer-right.txt"]?.state == .different)
-        #expect(states["newer-right.txt"]?.action == SyncAction.none)
+        #expect(states["newer-right.txt"]?.action == SyncAction.nothing)
         states = Dictionary(
             uniqueKeysWithValues: compare {
                 $0.ignoreDate = true
@@ -160,7 +160,7 @@ internal struct SyncComparing {
         let rows = compare { $0.asymmetric = true }.rows
         let actions = Dictionary(uniqueKeysWithValues: rows.map { ($0.relativePath, $0.action) })
         #expect(actions["right.txt"] == .deleteRight && actions["other/only-right.txt"] == .deleteRight)
-        #expect(actions["newer-right.txt"] == SyncAction.none && actions["left.txt"] == .copyToRight)
+        #expect(actions["newer-right.txt"] == SyncAction.nothing && actions["left.txt"] == .copyToRight)
         #expect(!rows.contains { $0.action == .copyToLeft })
     }
 
@@ -217,9 +217,9 @@ internal struct SyncComparing {
         makeTree()
         #expect(
             describe(compare { $0.mask = "*.txt | newer* sub/" }.rows) == [
-                "equal.txt equal none", "left.txt leftOnly copyToRight", "right.txt rightOnly copyToLeft",
-                "size.txt different none",
-                "twin.txt equal none", "other/only-right.txt rightOnly copyToLeft"
+                "equal.txt equal nothing", "left.txt leftOnly copyToRight", "right.txt rightOnly copyToLeft",
+                "size.txt different nothing",
+                "twin.txt equal nothing", "other/only-right.txt rightOnly copyToLeft"
             ]
         )
         #expect(compare { $0.mask = "*.md" }.rows.isEmpty)
@@ -232,7 +232,7 @@ internal struct SyncComparing {
         #expect(
             describe(rows) == [
                 "left.txt leftOnly copyToRight", "right.txt rightOnly copyToLeft",
-                "sub/only-left.txt leftOnly copyToRight", "sub/deep/inner.txt equal none"
+                "sub/only-left.txt leftOnly copyToRight", "sub/deep/inner.txt equal nothing"
             ]
         )
     }
@@ -273,11 +273,11 @@ internal struct SyncComparing {
         let rows = compare().rows
         #expect(
             describe(rows) == [
-                "Readme.txt excluded none", "thing excluded none", "Docs/a.txt equal none",
+                "Readme.txt excluded nothing", "thing excluded nothing", "Docs/a.txt equal nothing",
                 "Docs/b.txt rightOnly copyToLeft"
             ]
         )
-        #expect(!rows[0].accepts(.copyToRight) && !rows[1].accepts(.deleteBoth) && rows[0].accepts(.none))
+        #expect(!rows[0].accepts(.copyToRight) && !rows[1].accepts(.deleteBoth) && rows[0].accepts(.nothing))
         // Folders that differ only in case are one folder, and each side keeps its own spelling.
         #expect(rows[3].leftURL.path == "/L/Docs/b.txt" && rows[3].rightURL.path == "/R/docs/b.txt")
     }
@@ -308,7 +308,7 @@ internal struct SyncComparing {
         let afterWalk = second.run(left: memory.url("/L"), right: memory.url("/R")) { progress in
             if progress.filesToCompare > 0 { second.cancellation.cancel() }
         }
-        #expect(afterWalk.wasCancelled && afterWalk.rows.contains { $0.state == .pending && $0.action == .none })
+        #expect(afterWalk.wasCancelled && afterWalk.rows.contains { $0.state == .pending && $0.action == .nothing })
     }
 
     @Test
@@ -418,7 +418,7 @@ internal struct SyncComparing {
             )
         #expect(
             describe(result.rows) == [
-                "changed.txt different none", "same.txt equal none", "target.txt leftOnly copyToRight"
+                "changed.txt different nothing", "same.txt equal nothing", "target.txt leftOnly copyToRight"
             ]
         )
     }
@@ -432,6 +432,9 @@ internal struct SyncComparing {
         memory.addFile("/d", big + "tail")
         let flag = CancellationFlag()
         var bytes = 0
+        func uncounted(_: Int) {
+            // Only the first comparison counts its bytes.
+        }
         #expect(
             try SyncComparison.sameContent(
                 memory.url("/a"),
@@ -446,7 +449,8 @@ internal struct SyncComparing {
                 memory.url("/a"),
                 memory.url("/c"),
                 fileSystems: fileSystems,
-                cancellation: flag
+                cancellation: flag,
+                progress: uncounted
             ) == false
         )
         #expect(
@@ -454,7 +458,8 @@ internal struct SyncComparing {
                 memory.url("/a"),
                 memory.url("/d"),
                 fileSystems: fileSystems,
-                cancellation: flag
+                cancellation: flag,
+                progress: uncounted
             ) == false
         )
         #expect(throws: (any Error).self) {
@@ -462,7 +467,8 @@ internal struct SyncComparing {
                 memory.url("/a"),
                 memory.url("/missing"),
                 fileSystems: fileSystems,
-                cancellation: flag
+                cancellation: flag,
+                progress: uncounted
             )
         }
     }
@@ -502,8 +508,8 @@ internal struct SyncComparing {
             clicked.action = clicked.nextAction
             seen.append(clicked.action)
         }
-        #expect(seen == [.copyToRight, .copyToLeft, .none])
-        #expect(left.nextAction == SyncAction.none)
+        #expect(seen == [.copyToRight, .copyToLeft, .nothing])
+        #expect(left.nextAction == SyncAction.nothing)
         var reversed = rows["newer-left.txt"]!
         reversed.action = reversed.reversedAction
         #expect(reversed.action == .copyToLeft && left.reversedAction == .copyToRight)
@@ -582,7 +588,7 @@ internal struct SyncExecuting {
                 changed[index].action = .copyToRight
 
             default:
-                changed[index].action = .none
+                changed[index].action = .nothing
             }
         }
         let second = SyncPlan(rows: changed)
@@ -742,7 +748,7 @@ internal struct SyncExecuting {
             $0.asymmetric = true
             $0.emptyDirectories = true
         }
-        for index in all.indices where all[index].name == "keep.txt" { all[index].action = .none }
+        for index in all.indices where all[index].name == "keep.txt" { all[index].action = .nothing }
         let outcome = run(
             SyncPlan(
                 rows: all.filter {
@@ -762,7 +768,7 @@ internal struct SyncExecuting {
         for index in all.indices {
             if all[index].name == "same.txt" { all[index].action = .deleteBoth }
             if all[index].name == "new.txt" { all[index].action = .deleteLeft }
-            if all[index].name == "update.txt" { all[index].action = .none }
+            if all[index].name == "update.txt" { all[index].action = .nothing }
         }
         var outcome = run(
             SyncPlan(rows: all),
