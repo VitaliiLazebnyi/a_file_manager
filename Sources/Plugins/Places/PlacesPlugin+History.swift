@@ -8,7 +8,8 @@ extension PlacesPlugin {
     internal func registerHistoryCommands(in kernel: Kernel, tracker: DirectoryHistoryTracker) {
         let commands = kernel.commands
         let settings = kernel.settings
-        commands.register(Command(.directoryHistory, "Directory History…", [Shortcut(.downArrow, .option)])) { [self] in
+        commands.register(Command(.directoryHistory, "Directory History…", [Shortcut(.downArrow, .option)])) {
+            [self, unowned kernel] in
             showHistory(
                 in: kernel,
                 tracker: tracker,
@@ -23,7 +24,7 @@ extension PlacesPlugin {
                 "Directory History (All Folders)…",
                 [Shortcut(.downArrow, [.option, .shift])]
             )
-        ) { [self] in
+        ) { [self, unowned kernel] in
             showHistory(in: kernel, tracker: tracker, thinning: false, limited: false, selected: nil)
         }
         commands.register(Command(.saveDirectoryHistory, "Save Directory History Now", runsDuringJobs: true)) {

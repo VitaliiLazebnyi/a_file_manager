@@ -176,13 +176,14 @@ public final class PlacesPlugin: Plugin {
         let commands = kernel.commands
         commands.register(
             Command(.directoryHotlist, "Directory Hotlist…", [Shortcut(.character("d"), .control)])
-        ) { [self] in
+        ) { [self, unowned kernel] in
             showHotlist(in: kernel)
         }
-        commands.register(Command(.toggleHotlistEntry, "Add or Remove Current Directory in Hotlist")) { [self] in
+        commands.register(Command(.toggleHotlistEntry, "Add or Remove Current Directory in Hotlist")) {
+            [self, unowned kernel] in
             toggleCurrentDirectory(at: [], in: kernel)
         }
-        commands.register(Command(.configureHotlist, "Configure Directory Hotlist…")) { [self] in
+        commands.register(Command(.configureHotlist, "Configure Directory Hotlist…")) { [self, unowned kernel] in
             configureHotlist(in: kernel)
         }
     }

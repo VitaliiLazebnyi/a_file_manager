@@ -38,7 +38,7 @@ extension SelectionPlugin {
 
         /// A command of Select group or Unselect group; `.text` gives the mask and skips the dialog.
         func group(_ command: Command, select: Bool, scope: @escaping () -> SelectionScope) {
-            commands.register(command, enabled: isComplete) { argument in
+            commands.register(command, enabled: isComplete) { [selections] argument in
                 selections.group(select: select, scope: scope(), proposal: "*.*", argument: argument)
             }
         }
@@ -49,33 +49,33 @@ extension SelectionPlugin {
         /// Unselecting everything is always safe, also while a directory is still arriving.
         func wholeList(_ command: Command, select: Bool, scope: @escaping () -> SelectionScope) {
             let always = { true }
-            commands.register(command, enabled: select ? isComplete : always) { argument in
+            commands.register(command, enabled: select ? isComplete : always) { [selections] argument in
                 selections.all(select: select, scope: scope(), step: argument.index ?? 0)
             }
         }
 
         /// A command of Invert selection.
         func inversion(_ command: Command, scope: @escaping () -> SelectionScope) {
-            commands.register(command, enabled: isComplete) { selections.invert(scope: scope()) }
+            commands.register(command, enabled: isComplete) { [selections] in selections.invert(scope: scope()) }
         }
 
         /// A command that selects or unselects what is like the item under the cursor.
         func similar(_ command: Command, _ similarity: Selections.Similarity, select: Bool) {
-            commands.register(command, enabled: hasCursorItem) {
+            commands.register(command, enabled: hasCursorItem) { [model, selections] in
                 _ = model().cursorItem.map { selections.similar(to: similarity, as: $0, select: select) }
             }
         }
 
         /// A command of Save selection to file.
         func save(_ command: Command, _ encoding: SelectionFile.Encoding) {
-            commands.register(command, enabled: hasOperands) { argument in
+            commands.register(command, enabled: hasOperands) { [selections] argument in
                 selections.saveToFile(encoding, argument: argument)
             }
         }
 
         /// A command of Compare directories; `.index` chooses what counts as a difference.
         func comparison(_ command: Command, withSubdirectories: Bool) {
-            commands.register(command, enabled: bothComplete) { argument in
+            commands.register(command, enabled: bothComplete) { [selections] argument in
                 selections.compare(
                     mode: DirectoryComparison.Mode(rawValue: argument.index ?? 0) ?? .newerOrDifferent,
                     withSubdirectories: withSubdirectories
