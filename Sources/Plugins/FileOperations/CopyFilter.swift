@@ -55,6 +55,7 @@ public struct CopyFilter: Equatable, Sendable {
         Position(depth: 0, admitted: !excludesBaseFiles, wholeSubtree: false)
     }
 
+    /// The filter written as `text` (the syntax above); an empty text lets everything through.
     public init(_ text: String = "") {
         let halves = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
         // Splitting keeps empty parts, so there is always a first.
@@ -133,6 +134,7 @@ public struct CopyFilter: Equatable, Sendable {
             ? Position(depth: next, admitted: false, wholeSubtree: false) : nil
     }
 
+    /// Whether a file called `name` in the folder at `position` is wanted.
     public func admitsFile(_ name: String, at position: Position) -> Bool {
         guard position.admitted else {
             return false
@@ -141,20 +143,5 @@ public struct CopyFilter: Equatable, Sendable {
             return false
         }
         return includedFiles.isEmpty || includedFiles.contains { Wildcard.matches($0, name) }
-    }
-}
-
-/// One wildcard mask against one name, without regard to case (spec 18 › File masks).
-public enum Wildcard {
-    public static func matches(_ pattern: String, _ name: String) -> Bool {
-        let (pattern, name) = (pattern.lowercased(), name.lowercased())
-        if pattern == "*.*" || pattern == "*" {
-            return true
-        }
-        // `*.` and `name.` match names without an extension.
-        if pattern.hasSuffix("."), !name.contains(".") {
-            return fnmatch(String(pattern.dropLast()), name, 0) == 0
-        }
-        return fnmatch(pattern, name, 0) == 0
     }
 }

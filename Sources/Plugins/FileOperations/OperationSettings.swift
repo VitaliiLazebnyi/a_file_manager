@@ -6,36 +6,64 @@ import Foundation
 ///
 /// Main thread, like the settings store.
 internal enum OperationSettings {
+    /// Settings key: what happens to files whose names are taken: an index into `OverwriteMode.allCases`.
     internal static let overwrite = "fileOperations.overwriteMode"
+    /// Settings key: whether copies keep the date of last change and the permissions.
     internal static let attributes = "fileOperations.keepAttributes"
+    /// Settings key: whether copied folders get the date of the folder they were copied from.
     internal static let folderDates = "fileOperations.copyFolderDates"
+    /// Settings key: whether links are copied as links (0) or replaced by what they point to (1).
     internal static let links = "fileOperations.links"
+    /// Settings key: whether every copy is read again and its checksum compared with the source's.
     internal static let verify = "fileOperations.verify"
+    /// Settings key: whether items that fail are skipped without a question and reported at the end.
     internal static let skipErrors = "fileOperations.keepGoingOnErrors"
+    /// Settings key: whether small files are copied several at a time between fast local disks.
     internal static let parallel = "fileOperations.parallelSmallFiles"
+    /// Settings key: whether a copy between file systems that is interrupted keeps what arrived, to be resumed.
     internal static let keepPartial = "fileOperations.keepPartialFiles"
+    /// Settings key: whether F5 and F6 always open the copy dialog with its options shown.
     internal static let alwaysOptions = "fileOperations.alwaysShowOptions"
+    /// Settings key: whether F8 and Delete move to the Trash (Shift deletes for good).
     internal static let useTrash = "fileOperations.useTrash"
+    /// Settings key: whether to ask before a read-only file is overwritten or deleted.
     internal static let askReadOnly = "fileOperations.askReadOnly"
+    /// Settings key: whether to ask before a hidden file is overwritten or deleted.
     internal static let askHidden = "fileOperations.askHidden"
+    /// Settings key: whether to ask before a folder that is not empty is deleted.
     internal static let askNonEmpty = "fileOperations.askNonEmptyFolders"
+    /// Settings key: whether to ask before a folder is copied into a folder of the same name.
     internal static let askMerge = "fileOperations.askBeforeMerging"
 
+    /// Settings key: whether file operations are written to a log file.
     internal static let logEnabled = "fileOperations.log.enabled"
+    /// Settings key: the path of the log file; `~` stands for the home folder.
     internal static let logFile = "fileOperations.log.file"
+    /// Settings key: whether copies, moves, renames and new files are logged.
     internal static let logTransfers = "fileOperations.log.transfers"
+    /// Settings key: whether deletions are logged.
     internal static let logDeletes = "fileOperations.log.deletes"
+    /// Settings key: whether folders that are created or deleted are logged.
     internal static let logFolders = "fileOperations.log.folders"
+    /// Settings key: whether operations that succeed are logged.
     internal static let logSuccess = "fileOperations.log.success"
+    /// Settings key: whether errors are logged.
     internal static let logErrors = "fileOperations.log.errors"
+    /// Settings key: whether files that are skipped are logged.
     internal static let logSkipped = "fileOperations.log.skipped"
+    /// Settings key: when a new log file is started: never (0), every day (1), or past the size limit (2).
     internal static let logRotation = "fileOperations.log.rotation"
+    /// Settings key: the size limit of a log file in kilobytes, as text.
     internal static let logSizeLimit = "fileOperations.log.sizeLimitKB"
+    /// Settings key: how many old log files are kept (0 keeps all), as text.
     internal static let logKeepCount = "fileOperations.log.keepCount"
 
+    /// The log file when none is set.
     internal static let defaultLogFile = "~/Library/Logs/A File Manager/operations.log"
+    /// The choices of the Symbolic links setting, in the order of the raw values of `LinkHandling`.
     internal static let linkTitles = ["Copy the link itself", "Copy what the link points to"]
 
+    /// The configuration page Operation › Copy/Delete.
     internal static var copyDeletePage: PreferencePage {
         PreferencePage(
             title: "Copy/Delete",
@@ -74,6 +102,7 @@ internal enum OperationSettings {
         )
     }
 
+    /// The configuration page Operation › Log file.
     internal static var logPage: PreferencePage {
         PreferencePage(
             title: "Log file",
@@ -121,13 +150,12 @@ internal enum OperationSettings {
         return options
     }
 
+    /// The log file's configuration as the settings have it; a blank path is the default file.
     internal static func logConfiguration(from settings: any SettingsStore) -> OperationLog.Configuration {
         var configuration = OperationLog.Configuration()
         configuration.isEnabled = settings.flag(logEnabled, default: false)
         let path = settings.text(logFile, default: defaultLogFile).trimmingCharacters(in: .whitespaces)
-        configuration.file = URL(
-            fileURLWithPath: NSString(string: path.isEmpty ? defaultLogFile : path).expandingTildeInPath
-        )
+        configuration.file = URL(fileURLWithPath: expandingTilde(in: path.isEmpty ? defaultLogFile : path))
         configuration.logsTransfers = settings.flag(logTransfers, default: true)
         configuration.logsDeletes = settings.flag(logDeletes, default: true)
         configuration.logsFolders = settings.flag(logFolders, default: true)
@@ -147,43 +175,22 @@ internal enum OperationSettings {
         configuration.keepCount = max(0, Int(settings.text(logKeepCount, default: "30")) ?? 30)
         return configuration
     }
-}
 
-/// The options a command carries after its name, as in `cm_Copy /V1 O2 T="/tmp/" W="*.txt" G`
-/// (spec 17 › Commands with parameters): a letter, then a number or `="text"`; a quote inside
-/// the text is doubled.
-///
-/// A letter without a number counts as 1.
-public enum CommandSwitches {
-    public static func parse(_ text: String) -> [Character: String] {
-        var switches: [Character: String] = [:]
-        var characters = ArraySlice(text)
-        while let letter = characters.popFirst() {
-            guard letter.isLetter else { continue }
-            if characters.first == "=" {
-                characters.removeFirst()
-                var value = ""
-                if characters.first == "\"" {
-                    characters.removeFirst()
-                    while let next = characters.popFirst() {
-                        if next == "\"" {
-                            guard characters.first == "\"" else { break }
-                            characters.removeFirst()
-                        }
-                        value.append(next)
-                    }
-                } else {
-                    while let next = characters.first, next != " ", next != "/" {
-                        value.append(characters.removeFirst())
-                    }
-                }
-                switches[letter] = value
-            } else {
-                var digits = ""
-                while let next = characters.first, next.isNumber { digits.append(characters.removeFirst()) }
-                switches[letter] = digits.isEmpty ? "1" : digits
-            }
+    /// `path` with a leading `~` or `~user` replaced by that user's home folder, as a shell reads it.
+    ///
+    /// A user nobody knows leaves the path as it is.
+    internal static func expandingTilde(in path: String) -> String {
+        guard path.hasPrefix("~") else {
+            return path
         }
-        return switches
+        let end = path.firstIndex(of: "/") ?? path.endIndex
+        let user = String(path[path.index(after: path.startIndex)..<end])
+        let home =
+            user.isEmpty
+            ? FileManager.default.homeDirectoryForCurrentUser : FileManager.default.homeDirectory(forUser: user)
+        guard let home else {
+            return path
+        }
+        return home.path + path[end...]
     }
 }

@@ -24,7 +24,8 @@ internal struct CovFileOpsDeletes {
     @Test
     internal func theTrashTakesOrRefuses() {
         disk.base.addFile("/A/f.txt", "f")
-        var result = runJob(.delete(toTrash: true), [disk.base.url("/A/f.txt")], fileSystems: fileSystems)
+        var result = Answers()
+            .run(.delete(toTrash: true), [disk.base.url("/A/f.txt")], to: nil, fileSystems: fileSystems)
         #expect(result.completed.count == 1 && disk.base.exists("/.Trash/f.txt"))
         disk.trashError.value = FileSystemError.notSupported("Trash")
         disk.base.addFile("/A/g.txt", "g")

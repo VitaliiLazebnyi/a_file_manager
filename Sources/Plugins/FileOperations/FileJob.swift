@@ -2587,7 +2587,7 @@ public final class FileJob: @unchecked Sendable {
             try remove()
             return true
         } catch let error where Self.isRefusedAsLocked(error) {
-            guard let item, !item.isSymlink, !FileIdentity.isSymlink(url), FileIdentity.isLocked(url) != false else {
+            guard let item, !item.isSymlink, !FileIdentity.isSymlink(url), FileIdentity.mayBeLocked(url) else {
                 throw error
             }
             if !options.ignoresProtection, try !confirm(.locked, .delete, item) {
@@ -2936,97 +2936,6 @@ public final class FileJob: @unchecked Sendable {
             }
         }
         return nodes[0].measure
-    }
-}
-
-/// What identifies an entry on a local disk, so that two spellings of one place (another
-/// letter case on a case-insensitive volume, `/tmp` and `/private/tmp`) are told apart from
-/// two files.
-///
-/// Anything that is not a local path has no identity and compares as different.
-internal enum FileIdentity {
-    private static func status(_ path: String, followingLinks: Bool) -> stat? {
-        var info = stat()
-        return (followingLinks ? stat(path, &info) : lstat(path, &info)) == 0 ? info : nil
-    }
-
-    private static func status(_ url: URL, followingLinks: Bool) -> stat? {
-        url.isFileURL ? status(url.path, followingLinks: followingLinks) : nil
-    }
-
-    /// The path of the folder above, down to the root, which has none.
-    private static func parent(of path: String) -> String? {
-        guard path != "/", !path.isEmpty else {
-            return nil
-        }
-        return (path as NSString).deletingLastPathComponent
-    }
-
-    /// The flags of the entry itself (the Finder's lock among them); nil when it cannot be asked.
-    internal static func flags(of url: URL) -> UInt32? {
-        status(url, followingLinks: false)?.st_flags
-    }
-
-    /// Gives an entry back the flags it had.
-    internal static func restoreFlags(_ flags: UInt32, of url: URL) {
-        guard url.isFileURL, let now = status(url, followingLinks: false), now.st_flags != flags else {
-            return
-        }
-        lchflags(url.path, flags)
-    }
-
-    /// The volume the entry is on.
-    internal static func device(of url: URL) -> dev_t? {
-        status(url, followingLinks: true)?.st_dev
-    }
-
-    /// The volume of `url`, or of the nearest folder above it that exists.
-    internal static func device(ofNearest url: URL) -> dev_t? {
-        guard url.isFileURL else {
-            return nil
-        }
-        var path = url.path
-        // The nearest folder that is there: the root always is.
-        while status(path, followingLinks: true) == nil, let above = parent(of: path) {
-            path = above
-        }
-        return status(path, followingLinks: true)?.st_dev
-    }
-
-    /// True when both names are the same directory entry: the same file in the same folder,
-    /// the names differing at most in letter case or in the form of an accented letter.
-    ///
-    /// Two hard links to one file are not.
-    internal static func sameEntry(_ a: URL, _ b: URL) -> Bool {
-        guard a.isFileURL, b.isFileURL,
-            a.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased()
-                == b.lastPathComponent.precomposedStringWithCanonicalMapping.lowercased(),
-            let first = status(a, followingLinks: false), let second = status(b, followingLinks: false),
-            first.st_dev == second.st_dev, first.st_ino == second.st_ino,
-            let folderA = status(a.deletingLastPathComponent(), followingLinks: true),
-            let folderB = status(b.deletingLastPathComponent(), followingLinks: true)
-        else { return false }
-        return folderA.st_dev == folderB.st_dev && folderA.st_ino == folderB.st_ino
-    }
-
-    /// True when `destination` is somewhere below `folder` as the disk sees it: in the folder
-    /// itself or any folder inside it, whichever way the path is spelled or through whatever
-    /// links it leads.
-    ///
-    /// Looks at the folders above `destination` that exist.
-    internal static func isInside(_ destination: URL, folder: URL) -> Bool {
-        guard destination.isFileURL, let own = status(folder, followingLinks: false) else {
-            return false
-        }
-        var path = parent(of: destination.path)
-        while let current = path {
-            if let found = status(current, followingLinks: true), found.st_dev == own.st_dev, found.st_ino == own.st_ino
-            {
-                return true
-            }
-            path = parent(of: current)
-        }
-        return false
     }
 }
 

@@ -8,6 +8,16 @@ public import Foundation
 /// SHA-256 takes the place of the spec's MD5/BLAKE3: the processors of every Mac compute it in
 /// hardware.
 public enum Checksum {
+    /// What a comparison of two files' contents found.
+    public enum Comparison: Sendable {
+        /// The comparison was cancelled before it could tell.
+        case cancelled
+        /// The two files differ in size or in some byte.
+        case different
+        /// The two files hold the same bytes.
+        case same
+    }
+
     /// Nil when `isCancelled` said stop, or one of `flags` was set, before the end of the file;
     /// a read that waits for a server is ended by the flags.
     ///
@@ -26,23 +36,30 @@ public enum Checksum {
         let reader = try flags.first.map { try provider.read(url, cancellation: $0) } ?? provider.read(url)
         defer { reader.close() }
         let tokens = flags.map { $0.interrupting(reader) }
-        defer { withExtendedLifetime(tokens) {} }
+        defer {
+            withExtendedLifetime(tokens) {
+                // The flags can interrupt the reader until the reading is over.
+            }
+        }
         var hash = SHA256()
         do {
             // Each block in a pool of its own: on a thread that lives long the buffers of a
             // large file would otherwise all be kept until the thread ends.
             var stopped = false
-            while try autoreleasepool(invoking: { () throws -> Bool in
-                guard let block = try reader.read(upToCount: 1 << 20) else {
-                    return false
+            var more = true
+            while more {
+                more = try autoreleasepool { () throws -> Bool in
+                    guard let block = try reader.read(upToCount: 1 << 20) else {
+                        return false
+                    }
+                    if isCancelled() {
+                        stopped = true
+                        return false
+                    }
+                    hash.update(data: block)
+                    return true
                 }
-                if isCancelled() {
-                    stopped = true
-                    return false
-                }
-                hash.update(data: block)
-                return true
-            }) {}
+            }
             if stopped {
                 return nil
             }
@@ -55,41 +72,41 @@ public enum Checksum {
         return Data(hash.finalize())
     }
 
-    /// Whether two files hold the same bytes; nil when cancelled.
+    /// Whether two files hold the same bytes, or `.cancelled` when the comparison was stopped.
     ///
     /// Files of different sizes are different without a byte being read; otherwise the two are read
     /// side by side on two cores.
     @preconcurrency
     public static func sameContents(
-        _ a: URL,
-        _ b: URL,
+        _ one: URL,
+        _ other: URL,
         in fileSystems: FileSystemRegistry,
         flags: [CancellationFlag] = [],
         isCancelled: @Sendable () -> Bool = { false }
-    ) throws -> Bool? {
+    ) throws -> Comparison {
         // Asked with the caller's flag, where there is one: a file on a server that has stopped
         // answering must not hold the comparison once it is cancelled.
         let flag = flags.first
-        if let first = UniqueName.item(at: a, in: fileSystems, flag),
-            let second = UniqueName.item(at: b, in: fileSystems, flag),
+        if let first = UniqueName.item(at: one, in: fileSystems, flag),
+            let second = UniqueName.item(at: other, in: fileSystems, flag),
             !first.isDirectory, !second.isDirectory
         {
             if let special = [first, second].first(where: \.isSpecial) {
                 throw FileJobError.specialFile(fileSystems.displayPath(special.url))
             }
             if first.size != second.size {
-                return false
+                return .different
             }
         }
         let digests = try withoutActuallyEscaping(isCancelled) { isCancelled in
-            try Parallel.map([a, b]) { url in
+            try Parallel.map([one, other]) { url in
                 Result { try sha256(of: url, in: fileSystems, flags: flags, isCancelled: isCancelled) }
             }
             .map { try $0.get() }
         }
         guard let first = digests[0], let second = digests[1] else {
-            return nil
+            return .cancelled
         }
-        return first == second
+        return first == second ? .same : .different
     }
 }

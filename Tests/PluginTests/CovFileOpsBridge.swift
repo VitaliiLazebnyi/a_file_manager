@@ -16,7 +16,7 @@ internal struct CovFileOpsBridge {
     private let monitor = CovFileOpsMonitor()
 
     private var bridge: JobBridge {
-        JobBridge(monitor: monitor, ui: interaction, fileSystems: fileSystems)
+        JobBridge(monitor: monitor, interaction: interaction, fileSystems: fileSystems)
     }
 
     private var job: FileJob {

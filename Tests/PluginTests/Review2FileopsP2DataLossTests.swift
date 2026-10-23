@@ -8,42 +8,47 @@ import VirtualFoldersPlugin
 
 @testable import FileOperationsPlugin
 
-// The data-loss defects of review round 2 (F001/F018, F006/F013, F022/F033, F012/F020), each as
-// the smallest scenario that lost data. This file uses nothing that the program did not have
-// before the round, so it also compiles against the sources as they were then
-// (build/backups/before-round2-fixes.tgz): there every test here fails, which is the proof
-// that the tests see the defects and not just the fixes.
-
-/// Says yes to everything a job asks that existed before the round, and nothing else: the
-/// question about another volume is left to the protocol's default.
-private final class OldAnswers: FileJobDelegate {
-    private let lock = NSLock()
-    private var messages: [String] = []
-    let conflict: ConflictChoice
-
-    var errors: [String] { lock.withLock { messages } }
-
-    init(conflict: ConflictChoice = .overwrite) { self.conflict = conflict }
-
-    func job(_: FileJob, progress _: JobProgress) {}
-    func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { conflict }
-    func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
-        lock.withLock { messages.append(error.localizedDescription) }
-        return .skip
-    }
-    func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
-}
-
-private func names(in folder: URL) -> [String] {
-    ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).sorted()
-}
-
+/// The data-loss defects of review round 2, each as the smallest scenario that lost data.
+///
+/// This suite uses nothing that the program did not have before the round, so it also compiles against the sources
+/// as they were then (build/backups/before-round2-fixes.tgz): there every test here fails, which is the proof that
+/// the tests see the defects and not just the fixes.
 @Suite(.serialized)
-internal struct Review2FileopsP2DataLoss {
+internal struct Review2FileopsP2DataLossTests {
+    /// Says yes to everything a job asks that existed before the round, and nothing else: the
+    /// question about another volume is left to the protocol's default.
+    private final class OldAnswers: FileJobDelegate {
+        private let lock = NSLock()
+        private var messages: [String] = []
+        let conflict: ConflictChoice
+
+        var errors: [String] { lock.withLock { messages } }
+
+        init(conflict: ConflictChoice) { self.conflict = conflict }
+
+        func job(_: FileJob, progress _: JobProgress) {
+            // Progress is not checked here.
+        }
+        func job(_: FileJob, conflictAt _: FileItem, source _: FileItem) -> ConflictChoice { conflict }
+        func job(_: FileJob, failedAt _: URL, error: any Error) -> ErrorChoice {
+            lock.withLock { messages.append(error.localizedDescription) }
+            return .skip
+        }
+        func job(_: FileJob, confirmDeleteNonEmpty _: URL) -> FolderDeleteChoice { .delete }
+
+        deinit {
+            // Nothing to release.
+        }
+    }
+
+    /// The temporary folder the files are made in.
     internal let box: Sandbox
+    /// The file systems the jobs see: the local one and the virtual folders over it.
     internal let fileSystems = FileSystemRegistry()
+    /// The virtual folders, for the branch view.
     internal let virtual: VirtualFileSystem
 
+    /// A sandbox and the local and virtual file systems.
     internal init() throws {
         box = try Sandbox()
         fileSystems.register(LocalFileSystem())
@@ -51,8 +56,14 @@ internal struct Review2FileopsP2DataLoss {
         fileSystems.register(virtual)
     }
 
-    // F001, F018: the target is the file's own folder, named through the branch view. Before:
-    // the file was copied onto itself and then removed as the source of the move.
+    /// The names in `folder`, sorted; none when it cannot be read.
+    private static func names(in folder: URL) -> [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).sorted()
+    }
+
+    /// A move into the file's own folder, named through the branch view, never removes the file.
+    ///
+    /// F001, F018: before, the file was copied onto itself and then removed as the source of the move.
     @Test
     internal func aMoveWithinABranchViewNeverRemovesTheFile() throws {
         let file = try box.file("d/a.txt", "precious")
@@ -62,15 +73,16 @@ internal struct Review2FileopsP2DataLoss {
             target: TargetSpec(directory: virtual.branch(of: box.url("d"))),
             fileSystems: fileSystems
         )
-        let answers = OldAnswers()
+        let answers = OldAnswers(conflict: .overwrite)
         job.delegate = answers
         _ = job.run()
         #expect(box.read("d/a.txt") == "precious")
-        #expect(names(in: box.url("d")) == ["a.txt"])
+        #expect(Self.names(in: box.url("d")) == ["a.txt"])
     }
 
-    // F006, F013: two files of one name from two folders, moved into one folder under
-    // "Overwrite all". Before: the second overwrote the first, and both sources were gone.
+    /// Two files of one name from two folders, moved into one folder under "Overwrite all", both survive.
+    ///
+    /// F006, F013: before, the second overwrote the first, and both sources were gone.
     @Test
     internal func twoSourcesOfOneNameBothSurviveAMoveUnderOverwriteAll() throws {
         let sources = [try box.file("s/a/x.txt", "from-a"), try box.file("s/b/x.txt", "from-b")]
@@ -82,20 +94,20 @@ internal struct Review2FileopsP2DataLoss {
             fileSystems: fileSystems
         )
         job.options.overwrite = .overwriteAll
-        let answers = OldAnswers()
+        let answers = OldAnswers(conflict: .overwrite)
         job.delegate = answers
         _ = job.run()
         // Wherever they are now, both contents still exist.
         var contents: Set<String> = []
         for folder in ["t", "s/a", "s/b"] {
-            for name in names(in: box.url(folder)) {
+            for name in Self.names(in: box.url(folder)) {
                 if let text = box.read("\(folder)/\(name)") { contents.insert(text) }
             }
         }
         #expect(contents == ["from-a", "from-b"])
     }
 
-    // The same through a mask that gives three sources one name.
+    /// A move through a mask that gives three sources one name loses none of them.
     @Test
     internal func aMaskThatGivesThreeSourcesOneNameLosesNone() throws {
         let sources = [
@@ -109,20 +121,21 @@ internal struct Review2FileopsP2DataLoss {
             fileSystems: fileSystems
         )
         job.options.overwrite = .overwriteAll
-        let answers = OldAnswers()
+        let answers = OldAnswers(conflict: .overwrite)
         job.delegate = answers
         _ = job.run()
         var contents: Set<String> = []
         for folder in ["t", "s"] {
-            for name in names(in: box.url(folder)) {
+            for name in Self.names(in: box.url(folder)) {
                 if let text = box.read("\(folder)/\(name)") { contents.insert(text) }
             }
         }
         #expect(contents == ["doc", "pdf", "rtf"])
     }
 
-    // F022, F033: the target name is a link to another file. Before: Resume cut that file and
-    // wrote the source over it.
+    /// Resume never writes through a link that stands at the target name.
+    ///
+    /// F022, F033: before, Resume cut the file the link points to and wrote the source over it.
     @Test
     internal func resumeNeverWritesThroughALinkAtTheTarget() throws {
         let kept = "the victim's own contents"
@@ -142,8 +155,9 @@ internal struct Review2FileopsP2DataLoss {
         #expect(box.read("elsewhere/victim.txt") == kept)
     }
 
-    // F012, F020: a disk image mounted inside the folder that is deleted for good, and nobody
-    // says that the volume is meant too. Before: everything on the volume was deleted.
+    /// Deleting a folder for good leaves a disk image mounted inside it alone when nobody says the volume is meant.
+    ///
+    /// F012, F020: before, everything on the volume was deleted.
     @Test
     internal func deletingAFolderLeavesAVolumeMountedInsideItAlone() throws {
         let mount = box.url("tree/mnt")
@@ -169,7 +183,7 @@ internal struct Review2FileopsP2DataLoss {
         let precious = mount.appendingPathComponent("precious.txt")
         try "on the volume".write(to: precious, atomically: true, encoding: .utf8)
         let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], fileSystems: fileSystems)
-        let answers = OldAnswers()
+        let answers = OldAnswers(conflict: .overwrite)
         job.delegate = answers
         _ = job.run()
         #expect((try? String(contentsOf: precious, encoding: .utf8)) == "on the volume")

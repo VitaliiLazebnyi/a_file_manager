@@ -113,12 +113,13 @@ internal struct ArchiveJobsEndToEnd {
         let wanted = try Dictionary(
             uniqueKeysWithValues: sources.map { ($0.lastPathComponent, try String(contentsOf: $0, encoding: .utf8)) }
         )
-        let result = runJob(
-            .move,
-            sources,
-            to: TargetSpec(directory: bench.inside(archive, "tree")),
-            fileSystems: bench.fileSystems
-        )
+        let result = Answers()
+            .run(
+                .move,
+                sources,
+                to: TargetSpec(directory: bench.inside(archive, "tree")),
+                fileSystems: bench.fileSystems
+            )
         #expect(result.completed.count == 5 && !result.cancelled && result.failureCount == 0)
         #expect(sources.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
         // Written before the sources went: nothing waits in memory any more.
@@ -183,12 +184,13 @@ internal struct ArchiveJobsEndToEnd {
         let value = "0083;5e8b1c2d;Safari;"
         mark(archive, with: value)
         let out = try box.folder("out")
-        let result = runJob(
-            .copy,
-            [bench.inside(archive, "tree/readme.txt"), bench.inside(archive, "tree/sub")],
-            to: TargetSpec(directory: out),
-            fileSystems: bench.fileSystems
-        )
+        let result = Answers()
+            .run(
+                .copy,
+                [bench.inside(archive, "tree/readme.txt"), bench.inside(archive, "tree/sub")],
+                to: TargetSpec(directory: out),
+                fileSystems: bench.fileSystems
+            )
         #expect(result.completed.count == 2 && result.failureCount == 0)
         #expect(markOf(out.appendingPathComponent("readme.txt")) == value)
         #expect(markOf(out.appendingPathComponent("sub/deep/inner.txt")) == value)
@@ -200,12 +202,8 @@ internal struct ArchiveJobsEndToEnd {
         try box.file("plain/x.txt", "x")
         mark(box.url("plain"), with: "0083;5e8b1c2d;Safari;")
         let out = try box.folder("out")
-        let result = runJob(
-            .copy,
-            [box.url("plain/x.txt")],
-            to: TargetSpec(directory: out),
-            fileSystems: bench.fileSystems
-        )
+        let result = Answers()
+            .run(.copy, [box.url("plain/x.txt")], to: TargetSpec(directory: out), fileSystems: bench.fileSystems)
         #expect(result.completed.count == 1 && box.read("out/x.txt") == "x")
         #expect(markOf(out.appendingPathComponent("x.txt")) == nil)
     }

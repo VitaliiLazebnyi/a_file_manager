@@ -126,12 +126,13 @@ internal struct ArchiveFixes {
         let archive = try makeZip()
         try box.file("in/one.txt", "one")
         try box.file("in/two.txt", String(repeating: "two ", count: 100_000))
-        let result = runJob(
-            .move,
-            [box.url("in/one.txt"), box.url("in/two.txt")],
-            to: TargetSpec(directory: bench.inside(archive, "tree")),
-            fileSystems: bench.fileSystems
-        )
+        let result = Answers()
+            .run(
+                .move,
+                [box.url("in/one.txt"), box.url("in/two.txt")],
+                to: TargetSpec(directory: bench.inside(archive, "tree")),
+                fileSystems: bench.fileSystems
+            )
         #expect(result.completed.count == 2 && !box.exists("in/one.txt"))
         // Nothing was asked to write: the rename of each file did.
         #expect(try !bench.store.archive(at: archive).hasPendingChanges)
@@ -182,11 +183,10 @@ internal struct ArchiveFixes {
         // The disk is full: the member is refused when its writer closes.
         bench.environment.hasRoom = { _, _ in false }
         let answers = Answers()
-        var result = runJob(
+        var result = answers.run(
             .move,
             [box.url("in/one.txt")],
             to: TargetSpec(directory: bench.inside(archive, "tree")),
-            answers: answers,
             fileSystems: bench.fileSystems
         )
         #expect(result.completed.isEmpty && answers.errors.count == 1 && box.read("in/one.txt") == "one")
@@ -204,12 +204,13 @@ internal struct ArchiveFixes {
         try sound.write(to: archive)
         try opened.move("tree/.part", to: "tree/final.txt", replacing: false)
         #expect(!opened.hasPendingChanges && listed(archive).contains("tree/final.txt") && isSound(archive))
-        result = runJob(
-            .move,
-            [box.url("in/one.txt")],
-            to: TargetSpec(directory: bench.inside(archive, "tree")),
-            fileSystems: bench.fileSystems
-        )
+        result = Answers()
+            .run(
+                .move,
+                [box.url("in/one.txt")],
+                to: TargetSpec(directory: bench.inside(archive, "tree")),
+                fileSystems: bench.fileSystems
+            )
         #expect(result.completed.count == 1 && !box.exists("in/one.txt") && listed(archive).contains("tree/one.txt"))
     }
 
@@ -822,7 +823,8 @@ internal struct ArchiveFixes {
         // The copy job gets every file right this way.
         try box.folder("out")
         let root = bench.inside(archive, "tree", scheme: ArchiveURL.readOnlyScheme)
-        let result = runJob(.copy, [root], to: TargetSpec(directory: box.url("out")), fileSystems: bench.fileSystems)
+        let result = Answers()
+            .run(.copy, [root], to: TargetSpec(directory: box.url("out")), fileSystems: bench.fileSystems)
         #expect(result.completed.count == 1 && snapshot(box.url("out/tree")) == snapshot(tree))
     }
 
