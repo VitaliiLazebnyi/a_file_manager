@@ -31,11 +31,11 @@ internal struct Review2FindSelectionRules {
         let name = String(repeating: "a", count: 45) + "!"
         // Used by the work on its own thread only while the test waits for it to finish.
         nonisolated(unsafe) var selected = [true]
-        #expect(finishes { selected = mask.selected([MaskEntry(name: name)]) })
+        #expect(finishes { selected = mask.selected([MaskEntry(name: name)]) { false } })
         #expect(selected == [false] && mask.timedOut)
         // The same mask judges a name it is quick on.
         let quick = SelectionMask("<(a+)+$")
-        #expect(quick.selected([MaskEntry(name: "aaa")]) == [true] && !quick.timedOut)
+        #expect(quick.selected([MaskEntry(name: "aaa")]) { false } == [true] && !quick.timedOut)
     }
 
     /// A regular expression at work stops when the work is cancelled.
@@ -62,9 +62,9 @@ internal struct Review2FindSelectionRules {
         let directory = (0..<30).map { "d\($0)" }
         // Used by the work on its own thread only while the test waits for it to finish.
         nonisolated(unsafe) var result = [true]
-        #expect(finishes { result = mask.selected([MaskEntry(name: "y.txt", directory: directory)]) })
+        #expect(finishes { result = mask.selected([MaskEntry(name: "y.txt", directory: directory)]) { false } })
         #expect(result == [false])
-        #expect(mask.selected([MaskEntry(name: "x.txt", directory: directory)]) == [true])
+        #expect(mask.selected([MaskEntry(name: "x.txt", directory: directory)]) { false } == [true])
         // The chain still means what it did.
         #expect(
             SelectionMask("a/**/c/*.txt")
@@ -73,7 +73,7 @@ internal struct Review2FindSelectionRules {
                     MaskEntry(name: "f.txt", directory: ["a", "b", "b", "c"]),
                     MaskEntry(name: "f.txt", directory: ["a", "b"]),
                     MaskEntry(name: "f.txt", directory: ["x", "a", "c"])
-                ]) == [true, true, false, true]
+                ]) { false } == [true, true, false, true]
         )
     }
 

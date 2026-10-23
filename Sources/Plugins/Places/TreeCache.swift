@@ -34,22 +34,45 @@ public final class TreeCache: @unchecked Sendable {
         public var isComplete = true
     }
 
+    /// The tree of one root in memory, with what it takes to write it.
     private final class Slot {
+        /// The tree.
         var entry: Entry
+        /// The root it is the tree of.
         let root: URL
+        /// Whether it is the tree with hidden folders.
         let showHidden: Bool
-        /// The set of `entry.paths`, made when a folder is first noted.
-        var known: Set<String>?
+        /// The set of `entry.paths`, made when a folder is first noted; empty until then, and
+        /// again after a write of a long tree.
+        var known: Set<String> = []
         /// The size of the file as it would be written.
         var bytes: Int
+        /// Whether the tree changed since its file was last written.
         var isDirty = false
 
+        /// A slot for `entry`, the tree of `root`, with nothing to write yet.
         init(_ entry: Entry, root: URL, showHidden: Bool) {
             self.entry = entry
             self.root = root
             self.showHidden = showHidden
             bytes = entry.paths.reduce(0) { $0 + $1.utf8.count + 3 }
         }
+
+        deinit {
+            // Nothing to release.
+        }
+    }
+
+    /// A tree to be written, copied while the lock is held.
+    private struct Write {
+        /// The tree.
+        let entry: Entry
+        /// The root it is the tree of.
+        let root: URL
+        /// Whether it is the tree with hidden folders.
+        let showHidden: Bool
+        /// The write's ticket: it is written only while it is the latest asked for.
+        let ticket: Int
     }
 
     /// Above this size a file is only rewritten by a scan, not for single new folders
@@ -66,15 +89,22 @@ public final class TreeCache: @unchecked Sendable {
     /// ~200 MB): above that, trees that are not waiting to be written are let go, whatever their number.
     internal static let memoryPathLimit = 2_000_000
 
+    /// Where the files go; nil keeps the trees in memory only.
     private let directory: URL?
+    /// Guards everything below and the slots.
     private let lock = NSLock()
+    /// The trees in memory, by `key(_:_:)`.
     private var memory: [String: Slot] = [:]
+    /// Whether a write of the noted folders is waiting on `updates`.
     private var writeIsScheduled = false
     /// Which write of each file is the latest asked for: an older one that comes late is not
     /// written, so a file never goes back to an earlier state.
     private var tickets: [String: Int] = [:]
+    /// The last ticket handed out.
     private var nextTicket = 0
+    /// Keeps two writes of the files from running at once.
     private let writeLock = NSLock()
+    /// The cache's own queue, for noted folders and the writes they cause.
     private let updates = DispatchQueue(label: "afm.places.tree-cache", qos: .utility)
 
     /// `directory` is where the files go; nil keeps the trees in memory only.
@@ -82,6 +112,7 @@ public final class TreeCache: @unchecked Sendable {
         self.directory = directory
     }
 
+    /// The key of a tree in `memory` and in the file names.
     private static func key(_ root: URL, _ showHidden: Bool) -> String {
         root.locationKey + (showHidden ? "\u{0}hidden" : "")
     }
@@ -96,137 +127,6 @@ public final class TreeCache: @unchecked Sendable {
             return nil
         }
         return data
-    }
-
-    /// The tree written to the file in pieces of about a megabyte, so that a tree of a million
-    /// folders is never held again as one text (and then as one `Data`).
-    ///
-    /// False when it would be more than `fileLimit` (nothing replaces the old file then).
-    @discardableResult
-    internal static func writePrivately(_ entry: Entry, root: URL, to file: URL) -> Bool {
-        let temporary = file.path + ".tmp\(getpid())"
-        let descriptor = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0o600)
-        guard descriptor >= 0 else {
-            return true
-        }
-        var total = 0
-        var fits = true
-        var ok = true
-        format(entry, root: root) { piece in
-            total += piece.count
-            guard total <= fileLimit else {
-                fits = false
-                return false
-            }
-            ok = piece.withUnsafeBytes { buffer in write(descriptor, buffer) }
-            return ok
-        }
-        close(descriptor)
-        if fits, ok, rename(temporary, file.path) == 0 {
-            return true
-        }
-        unlink(temporary)
-        return fits
-    }
-
-    private static func write(_ descriptor: Int32, _ buffer: UnsafeRawBufferPointer) -> Bool {
-        var written = 0
-        while written < buffer.count {
-            let count = Darwin.write(descriptor, buffer.baseAddress! + written, buffer.count - written)
-            if count <= 0 {
-                return false
-            }
-            written += count
-        }
-        return true
-    }
-
-    internal static func format(_ paths: [String], root: URL) -> String {
-        format(Entry(paths: paths), root: root)
-    }
-
-    internal static func format(_ entry: Entry, root: URL) -> String {
-        var data = Data()
-        format(entry, root: root) { piece in
-            data.append(piece)
-            return true
-        }
-        return String(decoding: data, as: UTF8.self)
-    }
-
-    /// The file's text in pieces of about a megabyte, for as long as `emit` says to go on.
-    internal static func format(_ entry: Entry, root: URL, emit: (Data) -> Bool) {
-        // A path with a line break would add lines to the file; such a folder is left out, and
-        // the tree then is not complete.
-        func isPlain(_ path: String) -> Bool { !path.utf8.contains { $0 == 0x0A || $0 == 0x0D } }
-        let isComplete = entry.isComplete && entry.paths.allSatisfy(isPlain)
-        var piece = Data("root=\(DirectoryHistory.stored(root))\n".utf8)
-        if !isComplete { piece.append(contentsOf: "state=partial\n".utf8) }
-        piece.reserveCapacity(1 << 20 + 4_096)
-        func line(_ open: UInt8, _ path: String, _ close: UInt8) -> Bool {
-            piece.append(open)
-            piece.append(contentsOf: path.utf8)
-            piece.append(close)
-            piece.append(0x0A)
-            guard piece.count >= 1 << 20 else {
-                return true
-            }
-            defer { piece.removeAll(keepingCapacity: true) }
-            return emit(piece)
-        }
-        for path in entry.paths where isPlain(path) {
-            if !line(0x5B, path, 0x5D) {
-                return
-            }
-        }
-        for path in entry.unscanned where isPlain(path) {
-            if !line(0x28, path, 0x29) {
-                return
-            }
-        }
-        if !piece.isEmpty { _ = emit(piece) }
-    }
-
-    /// The paths of a cache file; nil when the file is not one for `root`.
-    internal static func parse(_ text: String, root: URL) -> [String]? {
-        parseEntry(text, root: root)?.paths
-    }
-
-    /// Read byte by byte: the lines end at the line feed byte and are told apart by their
-    /// first and last byte, not by characters (a combining mark after `[` makes one
-    /// character with it, and a name that began with one would be lost).
-    internal static func parseEntry(_ text: String, root: URL) -> Entry? {
-        var text = text
-        return text.withUTF8 { bytes -> Entry? in
-            var entry = Entry(paths: [])
-            var isFirst = true
-            var position = 0
-            while position < bytes.count {
-                var end = position
-                while end < bytes.count, bytes[end] != 0x0A { end += 1 }
-                let line = UnsafeBufferPointer(rebasing: bytes[position..<end])
-                position = end + 1
-                guard !line.isEmpty else { continue }
-                if isFirst {
-                    isFirst = false
-                    let prefix = Array("root=".utf8)
-                    guard line.count >= prefix.count, Array(line.prefix(prefix.count)) == prefix,
-                        URL(string: String(decoding: line.dropFirst(prefix.count), as: UTF8.self))?.locationKey
-                            == root.locationKey
-                    else { return nil }
-                    continue
-                }
-                let (first, last) = (line[0], line[line.count - 1])
-                if line.count > 2, first == 0x5B, last == 0x5D {
-                    entry.paths.append(String(decoding: line.dropFirst().dropLast(), as: UTF8.self))
-                } else if line.count > 2, first == 0x28, last == 0x29 {
-                    entry.unscanned.append(String(decoding: line.dropFirst().dropLast(), as: UTF8.self))
-                } else if line.count == "state=partial".utf8.count, Array(line) == Array("state=partial".utf8) {
-                    entry.isComplete = false
-                }
-            }
-            return isFirst ? nil : entry
-        }
     }
 
     /// The file of a root; nil for a cache without files.
@@ -278,17 +178,12 @@ public final class TreeCache: @unchecked Sendable {
         }
     }
 
-    /// The folders below `root` as relative paths; nil when the tree was never read.
-    public func paths(for root: URL, showHidden: Bool = false) -> [String]? {
-        entry(for: root, showHidden: showHidden)?.paths
-    }
-
     /// Keeps the tree of `root` and writes its file.
     public func store(
         _ paths: [String],
+        for root: URL,
         unscanned: [String] = [],
         isComplete: Bool = true,
-        for root: URL,
         showHidden: Bool = false
     ) {
         let entry = Entry(paths: paths, unscanned: unscanned, isComplete: isComplete)
@@ -298,23 +193,29 @@ public final class TreeCache: @unchecked Sendable {
         trimMemory(keeping: key)
         let ticket = newTicket(for: key)
         lock.unlock()
-        write(entry, for: root, showHidden: showHidden, ticket: ticket)
+        write(Write(entry: entry, root: root, showHidden: showHidden, ticket: ticket))
     }
 
     /// Forgets the trees of `root`, with and without hidden folders, in memory and on disk.
     public func remove(for root: URL) {
-        var removals: [(file: URL, ticket: Int, key: String)] = []
+        var files: [URL] = []
         lock.lock()
         for hidden in [false, true] {
             let key = Self.key(root, hidden)
             memory[key] = nil
-            // A write of this tree that is still on its way must not bring the file back.
-            if let file = fileURL(for: root, showHidden: hidden) { removals.append((file, newTicket(for: key), key)) }
+            // A write of this tree that is still on its way must not bring the file back: it no
+            // longer has the latest ticket.
+            if let file = fileURL(for: root, showHidden: hidden) {
+                _ = newTicket(for: key)
+                files.append(file)
+            }
         }
         lock.unlock()
         writeLock.lock()
         defer { writeLock.unlock() }
-        for removal in removals { try? FileManager.default.removeItem(at: removal.file) }
+        for file in files {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 
     /// A folder is known to exist (a panel is showing it): if the tree of `root` is in memory
@@ -330,10 +231,13 @@ public final class TreeCache: @unchecked Sendable {
     @preconcurrency
     public func noteFolder(resolving resolve: @escaping @Sendable () -> (path: String, root: URL)?) {
         updates.async { [self] in
-            if let found = resolve() { note(found.path, below: found.root) }
+            if let found = resolve() {
+                note(found.path, below: found.root)
+            }
         }
     }
 
+    /// Adds `relativePath` and its parents to the trees of `root` in memory that lack them; on `updates`.
     private func note(_ relativePath: String, below root: URL) {
         guard !relativePath.isEmpty else {
             return
@@ -349,12 +253,14 @@ public final class TreeCache: @unchecked Sendable {
         defer { lock.unlock() }
         for showHidden in isHidden ? [true] : [false, true] {
             guard let slot = memory[Self.key(root, showHidden)] else { continue }
-            if slot.known == nil { slot.known = Set(slot.entry.paths) }
-            guard slot.known?.contains(relativePath) == false else { continue }
+            if slot.known.isEmpty {
+                slot.known = Set(slot.entry.paths)
+            }
+            guard !slot.known.contains(relativePath) else { continue }
             // The folder's parents come with it; a reader takes the lines in any order. Nobody
             // has read these folders, so their subfolders are not known: the tree reads them
             // when they are opened (it would otherwise show them as folders with nothing in them).
-            for path in chain where slot.known?.insert(path).inserted == true {
+            for path in chain where slot.known.insert(path).inserted {
                 slot.entry.paths.append(path)
                 slot.entry.unscanned.append(path)
                 slot.bytes += path.utf8.count + 3
@@ -370,30 +276,36 @@ public final class TreeCache: @unchecked Sendable {
 
     /// Writes the files of the trees that changed.
     public func flush() {
-        var pending: [(root: URL, hidden: Bool, entry: Entry)] = []
+        var pending: [Write] = []
         lock.lock()
         writeIsScheduled = false
-        var tickets: [Int] = []
         for (key, slot) in memory where slot.isDirty {
             slot.isDirty = false
-            pending.append((slot.root, slot.showHidden, slot.entry))
-            tickets.append(newTicket(for: key))
+            pending.append(
+                Write(entry: slot.entry, root: slot.root, showHidden: slot.showHidden, ticket: newTicket(for: key))
+            )
         }
         // The set that tells whether a folder is known doubles the memory of a long list; a long
         // tree gets it made again when the next folder is noted.
-        for slot in memory.values where slot.entry.paths.count > 100_000 { slot.known = nil }
+        for slot in memory.values where slot.entry.paths.count > 100_000 {
+            slot.known = []
+        }
         lock.unlock()
-        for (item, ticket) in zip(pending, tickets) {
-            write(item.entry, for: item.root, showHidden: item.hidden, ticket: ticket)
+        for item in pending {
+            write(item)
         }
     }
 
     /// Writes what is waiting and waits until the updates handed to `noteFolder` are done; for tests.
     public func waitForUpdates() {
-        updates.sync {}
+        updates.sync {
+            // Nothing to do: that this runs at all means the updates before it are done.
+        }
         flush()
     }
 
+    /// A ticket for the next write of the tree under `key`, which makes every earlier one stale.
+    ///
     /// Under the lock.
     private func newTicket(for key: String) -> Int {
         nextTicket += 1
@@ -401,15 +313,16 @@ public final class TreeCache: @unchecked Sendable {
         return nextTicket
     }
 
-    private func write(_ entry: Entry, for root: URL, showHidden: Bool, ticket: Int) {
-        guard let directory, let file = fileURL(for: root, showHidden: showHidden) else {
+    /// Writes the file of a tree, unless a later write was asked for in the meantime; blocks.
+    private func write(_ item: Write) {
+        guard let directory, let file = fileURL(for: item.root, showHidden: item.showHidden) else {
             return
         }
-        let key = Self.key(root, showHidden)
+        let key = Self.key(item.root, item.showHidden)
         writeLock.lock()
         defer { writeLock.unlock() }
         lock.lock()
-        let isLatest = tickets[key] == ticket
+        let isLatest = tickets[key] == item.ticket
         lock.unlock()
         guard isLatest else {
             return
@@ -422,6 +335,12 @@ public final class TreeCache: @unchecked Sendable {
         )
         chmod(directory.path, 0o700)
         // Too big for a file: what is there would be out of date, so it goes.
-        if !Self.writePrivately(entry, root: root, to: file) { try? FileManager.default.removeItem(at: file) }
+        if !Self.writePrivately(item.entry, root: item.root, to: file) {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
+    deinit {
+        // Nothing to release: a write still waiting on `updates` holds the cache until it ran.
     }
 }

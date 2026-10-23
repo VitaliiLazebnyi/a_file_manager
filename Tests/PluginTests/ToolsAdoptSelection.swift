@@ -80,10 +80,10 @@ internal struct ToolsAdoptSelection {
         var type = SelectionType(name: "big")
         type.minSize = 2
         let items = listing("/A")
-        let names = SelectionRule(type).matching(among: items, base: memory.url("/A"))
+        let names = SelectionRule(type).matching(among: items, base: memory.url("/A"), now: Date())
         #expect(names.count == 1 && ToolsAdopt.isExactly(names[0], ToolsAdopt.composed))
         // The set a caller may still ask for holds one member for the twins that read alike.
-        #expect(SelectionRule(mask: "*.txt").matching(among: items, base: memory.url("/A")).count == 2)
+        #expect(SelectionRule(mask: "*.txt").matching(among: items, base: memory.url("/A"), now: Date()).count == 2)
     }
 
     /// Comparing two folders keeps the two names apart.
@@ -96,7 +96,7 @@ internal struct ToolsAdoptSelection {
         let marks = DirectoryComparison.compare(
             left: [file(ToolsAdopt.composed), file(ToolsAdopt.decomposed)],
             right: [file(ToolsAdopt.composed)],
-            mode: .missing
+            options: .init(mode: .missing)
         )
         #expect(marks.leftNames.count == 1 && ToolsAdopt.isExactly(marks.leftNames[0], ToolsAdopt.decomposed))
         #expect(
@@ -107,7 +107,7 @@ internal struct ToolsAdoptSelection {
         let alike = DirectoryComparison.compare(
             left: [file(ToolsAdopt.composed)],
             right: [file(ToolsAdopt.decomposed)],
-            mode: .missing
+            options: .init(mode: .missing)
         )
         #expect(alike.leftNames.isEmpty && alike.rightNames.isEmpty)
     }

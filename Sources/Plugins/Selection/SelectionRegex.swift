@@ -1,36 +1,6 @@
 import AFMKernel
 import Foundation
 
-/// Counts the names a regular expression ran out of time on; shared by the threads that match
-/// one mask.
-///
-/// After a few timeouts the expression is given up: the rest of the names answer at once instead of
-/// costing the budget each.
-///
-/// All state is guarded by `lock`.
-internal final class SelectionRegexTrip: @unchecked Sendable {
-    private let lock = NSLock()
-    private var timeouts = 0
-
-    internal var hasTimedOut: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return timeouts > 0
-    }
-
-    internal var isTripped: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return timeouts >= 3
-    }
-
-    internal func recordTimeout() {
-        lock.lock()
-        timeouts += 1
-        lock.unlock()
-    }
-}
-
 /// Runs the regular expression of a `<` mask with a bound on its time.
 ///
 /// Such an expression can take time that grows with every character of the name (`<(a+)+$`), so it
@@ -40,6 +10,8 @@ internal enum SelectionRegex {
     /// What one name may take.
     internal static let budget: TimeInterval = 0.25
 
+    /// Whether the expression matches the name, false once the budget has passed, the trip has
+    /// tripped or `cancelled` says so; a name that ran out of time is counted on `trip`.
     internal static func matches(
         _ regex: NSRegularExpression,
         _ name: String,
