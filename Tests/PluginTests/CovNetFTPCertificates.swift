@@ -20,7 +20,13 @@ internal struct CovNetFTPCertificates {
     internal init() throws {
         box = try Sandbox()
         try box.folder("srv")
-        server = try TLSServer(mode: .implicit, box: box, resumesSessions: false)
+        server = try TLSServer(
+            mode: .implicit,
+            box: box,
+            refusesProtection: false,
+            requiresReuse: false,
+            resumesSessions: false
+        )
         environment.declineMemory = 0
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval, values.parallelConnections) = (10, 0, 3)

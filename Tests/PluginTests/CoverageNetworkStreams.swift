@@ -39,7 +39,7 @@ internal struct CoverageNetworkStreams {
     /// A stream knows no addresses before it is connected, nor after it was closed.
     @Test
     internal func aStreamKnowsNoAddressesWhenItIsNotConnected() {
-        let stream = NetStream(host: "127.0.0.1", port: 9)
+        let stream = NetStream(host: "127.0.0.1", port: 9, security: .plain)
         #expect(stream.localAddress == nil && stream.remoteAddress == nil)
     }
 
@@ -50,10 +50,10 @@ internal struct CoverageNetworkStreams {
         defer { close(listener) }
         let accepted = Signal<Int32>()
         OtherThread.start { accepted.set(accept(listener, nil, nil)) }
-        let stream = NetStream(host: "127.0.0.1", port: TestFTPServer.port(of: listener))
+        let stream = NetStream(host: "127.0.0.1", port: TestFTPServer.port(of: listener), security: .plain)
         stream.start()
         defer { stream.close() }
-        try stream.waitUntilReady(timeout: Wait.ceiling)
+        try stream.waitUntilReady(timeout: Wait.ceiling, cancellation: nil)
         let peer = try #require(accepted.wait())
         defer { close(peer) }
         // Nothing is read on the other side, so the buffers fill up and a piece is not taken in time.
@@ -61,13 +61,13 @@ internal struct CoverageNetworkStreams {
         var failure: NetworkError?
         for _ in 0..<4_096 where failure == nil {
             do {
-                try stream.write(block, timeout: 0.5)
+                try stream.write(block, timeout: 0.5, cancellation: nil)
             } catch let error as NetworkError {
                 failure = error
             }
         }
         #expect(CoverageNetworkServer.text(of: failure) == "sending")
-        #expect(throws: NetworkError.self) { try stream.write(Data([1]), timeout: 1) }
+        #expect(throws: NetworkError.self) { try stream.write(Data([1]), timeout: 1, cancellation: nil) }
     }
 
     /// A listener for an address this machine does not have listens on every address instead,
@@ -76,11 +76,11 @@ internal struct CoverageNetworkStreams {
     internal func aListenerForAnAddressOfAnotherMachineListensEverywhere() throws {
         let listener = try DataListener(peer: "127.0.0.1", local: "192.0.2.1")
         let port = try listener.start(timeout: 0.5)
-        let client = NetStream(host: "127.0.0.1", port: port)
+        let client = NetStream(host: "127.0.0.1", port: port, security: .plain)
         client.start()
         defer { client.close() }
         let stream = try listener.accept(timeout: Wait.ceiling, cancellation: nil)
-        try stream.waitUntilReady(timeout: Wait.ceiling)
+        try stream.waitUntilReady(timeout: Wait.ceiling, cancellation: nil)
         stream.close()
     }
 
@@ -90,11 +90,15 @@ internal struct CoverageNetworkStreams {
         let server = try CoverageNetworkServer(replies: ["PORT": "200 OK", "RETR": "550 No such file"])
         let connection = try server.connected { config in config.passive = passive }
         // The first transfer is refused; the type is set by then, and the connection is fine.
-        let refused = #expect(throws: NetworkError.self) { try connection.beginTransfer("RETR /a", type: "I") }
+        let refused = #expect(throws: NetworkError.self) {
+            try connection.beginTransfer("RETR /a", type: "I", restartAt: 0, cancellation: nil)
+        }
         #expect(CoverageNetworkServer.code(of: refused) == 550 && connection.isUsable)
         let sent = server.commands.count
         connection.interrupt()
-        #expect(throws: NetworkError.self) { try connection.beginTransfer("RETR /a", type: "I") }
+        #expect(throws: NetworkError.self) {
+            try connection.beginTransfer("RETR /a", type: "I", restartAt: 0, cancellation: nil)
+        }
         #expect(server.commands.count == sent)
     }
 

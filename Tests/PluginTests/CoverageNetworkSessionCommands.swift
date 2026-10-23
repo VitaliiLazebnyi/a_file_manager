@@ -41,7 +41,7 @@ internal struct CoverageNetworkSessionCommands {
         )
         let session = try server.session()
         defer { session.disconnect() }
-        let error = #expect(throws: NetworkError.self) { try session.remove("/x", isDirectory: nil, cancellation: nil) }
+        let error = #expect(throws: NetworkError.self) { try session.remove("/x", kind: .unknown, cancellation: nil) }
         guard case .refused(let reply) = error else {
             Issue.record("not refused: \(String(describing: error))")
             return

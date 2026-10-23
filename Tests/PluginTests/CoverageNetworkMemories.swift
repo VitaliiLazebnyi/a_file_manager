@@ -12,9 +12,9 @@ internal struct CoverageNetworkMemories {
     internal func theMemoriesStartAfreshWhenTheyAreFull() {
         let links = LinkMemory()
         for index in 0...2_048 {
-            links.remember("/\(index)", isDirectory: true)
+            links.remember("/\(index)", target: .directory)
         }
-        #expect(links.isDirectory("/0") == nil && links.isDirectory("/2048") == true)
+        #expect(links.target(of: "/0") == nil && links.target(of: "/2048") == .directory)
         let names = NameMemory()
         for index in 0...65_536 {
             names.remember("n\(index)", encoding: .isoLatin1)

@@ -30,10 +30,10 @@ internal struct CoverageNetworkDataPaths {
             config.host = "::1"
             config.passive = false
         }
-        try connection.connect()
+        try connection.connect(cancellation: nil)
         defer { connection.close() }
         var names: [String] = []
-        try connection.list("/", showHidden: false) { entries in
+        try connection.list("/", showHidden: false, cancellation: nil) { entries in
             names += entries.map(\.name)
             return true
         }
@@ -46,18 +46,26 @@ internal struct CoverageNetworkDataPaths {
     internal func aServerThatWantsItsSessionReusedSaysSo() throws {
         let box = try Sandbox()
         try box.file("srv/a.txt", "a")
-        let server = try TLSServer(mode: .explicit, box: box, requiresReuse: true)
+        let server = try TLSServer(
+            mode: .explicit,
+            box: box,
+            refusesProtection: false,
+            requiresReuse: true,
+            resumesSessions: true
+        )
         let trust = CertificateTrust()
         let config = FTPServerConfig(host: "127.0.0.1", port: server.port, tls: .explicit, timeout: 10)
         do {
-            try FTPConnection(config: config, trust: trust).connect()
+            try FTPConnection(config: config, trust: trust, parts: .init()).connect(cancellation: nil)
         } catch NetworkError.untrustedCertificate(let certificate) {
             trust.accept(certificate.fingerprint, for: "127.0.0.1")
         }
-        let connection = FTPConnection(config: config, trust: trust)
-        try connection.connect()
+        let connection = FTPConnection(config: config, trust: trust, parts: .init())
+        try connection.connect(cancellation: nil)
         defer { connection.close() }
-        let error = #expect(throws: NetworkError.self) { try connection.beginTransfer("RETR /a.txt", type: "I") }
+        let error = #expect(throws: NetworkError.self) {
+            try connection.beginTransfer("RETR /a.txt", type: "I", restartAt: 0, cancellation: nil)
+        }
         guard case .sessionReuseRequired(let said) = error else {
             Issue.record("not about session reuse: \(String(describing: error))")
             return

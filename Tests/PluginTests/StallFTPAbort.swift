@@ -24,7 +24,7 @@ internal struct StallFTPAbort {
             ]
         )
         let connection = try server.connected()
-        _ = try connection.beginTransfer("RETR a", type: "I")
+        _ = try connection.beginTransfer("RETR a", type: "I", restartAt: 0, cancellation: nil)
         connection.abortTransfer()
         return (server, connection)
     }
@@ -59,6 +59,6 @@ internal struct StallFTPAbort {
             connection.close()
             server.stop()
         }
-        #expect(connection.isUsable && connection.isAlive())
+        #expect(connection.isUsable && connection.isAlive(cancellation: nil))
     }
 }

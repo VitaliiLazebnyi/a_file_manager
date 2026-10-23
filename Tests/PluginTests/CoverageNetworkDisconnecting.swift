@@ -30,7 +30,7 @@ internal struct CoverageNetworkDisconnecting {
     /// With two connections and neither panel on one, the user picks the one to close.
     @Test
     internal func theUserPicksTheConnectionToClose() throws {
-        let second = try TestFTPServer(root: fixture.box.url("srv"))
+        let second = try TestFTPServer(root: fixture.box.url("srv"), options: TestFTPServer.Options())
         let other = ServerKey(scheme: "ftp", host: "127.0.0.1", port: second.port)
         fixture.quickConnect("ftp://\(fixture.address)/pub")
         fixture.quickConnect("ftp://127.0.0.1:\(second.port)/")
