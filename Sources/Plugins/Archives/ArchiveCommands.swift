@@ -172,10 +172,11 @@ internal final class ArchiveCommands {
         kernel.panels.refresh(directories + inArchives, focus: focus)
     }
 
-    internal func archiveRoot(for file: URL, isZip: Bool? = nil) -> URL {
+    internal func archiveRoot(for file: URL, isZip: Bool?) -> URL {
         ArchiveURL.make(
             scheme: ArchiveFileSystem.scheme(forArchive: file, fileSystems: fileSystems, isZip: isZip),
-            archive: file
+            archive: file,
+            innerPath: ""
         )
     }
 
@@ -189,7 +190,7 @@ internal final class ArchiveCommands {
         guard known || (options.entersAnyFile && isForcedOpen) else {
             return false
         }
-        panel.show(archiveRoot(for: file.url))
+        panel.show(archiveRoot(for: file.url, isZip: nil))
         return true
     }
 
@@ -263,9 +264,9 @@ internal final class ArchiveCommands {
                     defer { reader.close() }
                     let tie = monitor.cancellation.interrupting(reader)
                     defer { withExtendedLifetime(tie) {} }
-                    let output = try OutputFile(creating: local)
+                    let output = try OutputFile(creating: local, mode: 0o600)
                     while let block = try reader.read(upToCount: 1 << 20) { try output.write(block) }
-                    try output.close()
+                    try output.close(durably: false)
                     // The application that opens it must see where the file came from.
                     if let location = ArchiveURL.location(of: file.url) {
                         Quarantine.apply(
@@ -585,7 +586,12 @@ internal final class ArchiveCommands {
                         }
                     }
                 }
-                let unpacker = Unpacker(fileSystems: fileSystems, monitor: monitor, options: options) {
+                let unpacker = Unpacker(
+                    fileSystems: fileSystems,
+                    monitor: monitor,
+                    options: options,
+                    whileUnpacking: nil
+                ) {
                     existing,
                     entry in
                     // `@Sendable`, so that it may be sent from this thread to the main thread.
@@ -652,9 +658,16 @@ internal final class ArchiveCommands {
                         // The password is asked for here, on the job's thread, before the cores share
                         // the work; one that is declined is not asked for again by the test.
                         let found: [String] = try archive.withPasswordScope {
-                            try ArchiveTester.unlock(archive)
+                            try ArchiveTester.unlock(archive, only: nil)
                             return Background.run(
-                                { ArchiveTester.test(archive, cancellation: monitor.cancellation, counter: counter) },
+                                {
+                                    ArchiveTester.test(
+                                        archive,
+                                        cancellation: monitor.cancellation,
+                                        counter: counter,
+                                        only: nil
+                                    )
+                                },
                                 tick: {
                                     monitor.report(
                                         JobProgress(

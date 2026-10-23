@@ -17,7 +17,14 @@ internal struct CoverageArchivesFormatsUnpackFolder {
     }
 
     private func write(_ folder: UnpackFolder, _ names: [String], replacing: Bool = false, _ text: String) throws {
-        try folder.write(names, replacing: replacing, permissions: 0o644, modified: Date(), quarantine: nil) { put in
+        try folder.write(
+            names,
+            replacing: replacing,
+            permissions: 0o644,
+            modified: Date(),
+            quarantine: nil,
+            opened: nil
+        ) { put in
             try put(Data(text.utf8))
         }
     }

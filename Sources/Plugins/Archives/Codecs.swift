@@ -63,7 +63,7 @@ internal enum Deflater {
     /// Pieces made this way, each on its own core, form one valid stream when written one after the
     /// other; the last one is `final`, the others end their block on a byte boundary without ending
     /// the stream. Throws when zlib fails, rather than hand on a piece that is cut short.
-    internal static func piece(_ data: Data, level: Int, final: Bool, calls: DeflateCalls = .zlib) throws -> Data {
+    internal static func piece(_ data: Data, level: Int, final: Bool, calls: DeflateCalls) throws -> Data {
         let stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
         stream.initialize(to: z_stream())
         defer { stream.deallocate() }
@@ -114,7 +114,7 @@ internal final class InflateStream: ByteStream {
     private var sourceEnded = false
     private let control: StreamInterrupt?
 
-    internal init(_ source: any ByteStream, wrapping: Wrapping, control: StreamInterrupt? = nil) {
+    internal init(_ source: any ByteStream, wrapping: Wrapping, control: StreamInterrupt?) {
         self.source = source
         self.wrapping = wrapping
         self.control = control
@@ -209,14 +209,14 @@ internal final class XZCoder {
 
     /// An LZMA coder; a test passes an `algorithm` the system does not know, which it refuses
     /// as it would refuse to start one without memory for it.
-    internal init(encoding: Bool, algorithm: compression_algorithm = COMPRESSION_LZMA) throws {
+    internal init(encoding: Bool, algorithm: compression_algorithm) throws {
         encodes = encoding
         self.algorithm = algorithm
         try start()
     }
 
     internal static func compress(_ data: Data) throws -> Data {
-        try XZCoder(encoding: true).process(data, finish: true).output
+        try XZCoder(encoding: true, algorithm: COMPRESSION_LZMA).process(data, finish: true, limit: .max).output
     }
 
     private func start() throws {
@@ -235,7 +235,7 @@ internal final class XZCoder {
     ///
     /// Returns what came out, how much of the input was used, and whether the compressed stream
     /// ended (after which a new one may start).
-    internal func process(_ input: Data, finish: Bool, limit: Int = .max) throws -> (
+    internal func process(_ input: Data, finish: Bool, limit: Int) throws -> (
         output: Data, consumed: Int, ended: Bool
     ) {
         var output = Data()
@@ -294,10 +294,10 @@ internal final class XZStream: ByteStream {
     private var readyOffset = 0
     private let control: StreamInterrupt?
 
-    internal init(_ source: any ByteStream, control: StreamInterrupt? = nil) throws {
+    internal init(_ source: any ByteStream, control: StreamInterrupt?) throws {
         self.source = source
         self.control = control
-        coder = try XZCoder(encoding: false)
+        coder = try XZCoder(encoding: false, algorithm: COMPRESSION_LZMA)
     }
 
     /// Never more than `count` bytes: the coder delivers in blocks of its own size, and a
@@ -463,7 +463,7 @@ internal final class ProcessStream: ByteStream, @unchecked Sendable {
     private var ended = false
     private let control: StreamInterrupt?
 
-    internal init(_ executable: String, _ arguments: [String], control: StreamInterrupt? = nil) throws {
+    internal init(_ executable: String, _ arguments: [String], control: StreamInterrupt?) throws {
         self.executable = executable
         self.control = control
         process = Tool.process(executable, arguments)
@@ -637,13 +637,13 @@ extension ArchiveFormat.Codec {
     /// Decompresses the local file at `url`.
     ///
     /// With a `control`, the stream ends with an error once the request is set.
-    internal func decompressing(_ file: RandomAccessFile, control: StreamInterrupt? = nil) throws -> any ByteStream {
+    internal func decompressing(_ file: RandomAccessFile, control: StreamInterrupt?) throws -> any ByteStream {
         switch self {
         case .gzip:
-            return InflateStream(FileRangeStream(file), wrapping: .gzip, control: control)
+            return InflateStream(FileRangeStream(file, offset: 0, length: nil), wrapping: .gzip, control: control)
 
         case .xz:
-            return try XZStream(FileRangeStream(file), control: control)
+            return try XZStream(FileRangeStream(file, offset: 0, length: nil), control: control)
 
         case .bzip2:
             // The child opens the file by its path: it must still be the file that was listed.
@@ -685,7 +685,7 @@ internal final class ParallelCompressor {
         return false
     }
 
-    internal init(_ method: Method, to output: OutputFile, modified: Date = Date()) throws {
+    internal init(_ method: Method, to output: OutputFile, modified: Date) throws {
         self.method = method
         self.output = output
         let cores = ProcessInfo.processInfo.activeProcessorCount
@@ -754,7 +754,8 @@ internal final class ParallelCompressor {
                 switch method {
                 case .gzip(let level):
                     return (
-                        try Deflater.piece(piece, level: level, final: final && index == lastIndex), CRC32.of(piece)
+                        try Deflater.piece(piece, level: level, final: final && index == lastIndex, calls: .zlib),
+                        CRC32.of(piece)
                     )
 
                 case .bzip2(let level):

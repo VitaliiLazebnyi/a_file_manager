@@ -88,11 +88,11 @@ internal struct ArchiveFixes {
         -> URL
     {
         let url = box.url(name)
-        let output = try OutputFile(creating: url)
+        let output = try OutputFile(creating: url, mode: 0o600)
         let writer = ZipWriter(output, limits: limits)
         try fill(writer)
-        try writer.finish()
-        try output.close()
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
         return url
     }
 
@@ -109,14 +109,17 @@ internal struct ArchiveFixes {
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.root.path) }
         let before = FileSignature.of(archive.path)
         for _ in 0..<2 {
-            #expect(bench.store.flushAll().count == 1)
+            #expect(bench.store.flushAll(cancellation: nil).count == 1)
             // The archive is untouched, and the member is still there to read.
             #expect(FileSignature.of(archive.path) == before && isSound(archive))
             #expect(try bench.read(tree.appending(name: "new.txt")) == Data("precious".utf8))
-            #expect(try bench.names(tree).contains("made") && bench.store.archive(at: archive).hasPendingChanges)
+            #expect(
+                try bench.names(tree).contains("made")
+                    && bench.store.archive(at: archive, cancellation: nil).hasPendingChanges
+            )
         }
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.root.path)
-        #expect(bench.store.flushAll().isEmpty && isSound(archive))
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty && isSound(archive))
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/new.txt"]).output == "precious")
         #expect(listed(archive).contains("tree/made/"))
     }
@@ -134,7 +137,7 @@ internal struct ArchiveFixes {
         )
         #expect(result.completed.count == 2 && !box.exists("in/one.txt"))
         // Nothing was asked to write: the rename of each file did.
-        #expect(try !bench.store.archive(at: archive).hasPendingChanges)
+        #expect(try !bench.store.archive(at: archive, cancellation: nil).hasPendingChanges)
         #expect(isSound(archive) && Set(listed(archive)).isSuperset(of: ["tree/one.txt", "tree/two.txt"]))
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/two.txt"]).output.count == 400_000)
         #expect(namesOnDisk(box.root).filter { $0.hasSuffix(".tmp") }.isEmpty)
@@ -165,7 +168,7 @@ internal struct ArchiveFixes {
             }
         }
         #expect(failures.value == 0)
-        #expect(bench.store.flushAll().isEmpty && isSound(archive))
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty && isSound(archive))
         let names = listed(archive)
         #expect(names.filter { $0.hasPrefix("tree/file") }.count == 18 && !names.contains { $0.hasSuffix(".tmp") })
         #expect(
@@ -196,7 +199,7 @@ internal struct ArchiveFixes {
         // The write into the archive fails at the rename (something that is no archive lies in
         // its place): the rename fails with it and is taken back.
         try write("data", to: bench.inside(archive, "tree/.part"))
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         let sound = try Data(contentsOf: archive)
         try Data("no archive".utf8).write(to: archive)
         #expect(throws: ArchiveError.self) { try opened.move("tree/.part", to: "tree/final.txt", replacing: false) }
@@ -218,14 +221,14 @@ internal struct ArchiveFixes {
         let tree = try bench.makeTree()
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
-        let root = ArchiveURL.make(scheme: "zip", archive: onServer)
+        let root = ArchiveURL.make(scheme: "zip", archive: onServer, innerPath: "")
         try write("late", to: root.appending(name: "late.txt"))
         // The server loses the folder: the changed copy cannot be sent.
         bench.memory.removeTree("/store")
-        #expect(bench.store.flushAll().count == 1)
-        #expect(try bench.store.archive(at: onServer).hasPendingChanges)
+        #expect(bench.store.flushAll(cancellation: nil).count == 1)
+        #expect(try bench.store.archive(at: onServer, cancellation: nil).hasPendingChanges)
         _ = bench.memory.addDirectory("/store")
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
         let reader = try bench.memory.read(onServer)
         var bytes = Data()
         while let block = try reader.read(upToCount: 1 << 20) { bytes.append(block) }
@@ -237,11 +240,11 @@ internal struct ArchiveFixes {
     internal func membersThatCannotBeWrittenAreSavedInAnArchiveOfTheirOwn() throws {
         let archive = try makeZip()
         try write("only copy", to: bench.inside(archive, "tree/rescued.txt"))
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         // Another program leaves something that is no archive in its place.
         try Data("not a zip".utf8).write(to: archive)
-        #expect(bench.store.flushAll().count == 1 && opened.hasPendingChanges)
-        guard case .saved(let saved) = opened.rescue() else {
+        #expect(bench.store.flushAll(cancellation: nil).count == 1 && opened.hasPendingChanges)
+        guard case .saved(let saved) = opened.rescue(quickly: false, before: .distantFuture) else {
             Issue.record("nothing was saved")
             return
         }
@@ -250,7 +253,10 @@ internal struct ArchiveFixes {
         // Renames and deletions alone leave nothing to save.
         let other = try makeZip("other.zip")
         try bench.zip.remove(bench.inside(other, "tree/empty.txt"))
-        guard case .nothingToSave = try bench.store.archive(at: other).rescue() else {
+        guard
+            case .nothingToSave = try bench.store.archive(at: other, cancellation: nil)
+                .rescue(quickly: false, before: .distantFuture)
+        else {
             Issue.record("something was saved")
             return
         }
@@ -267,7 +273,7 @@ internal struct ArchiveFixes {
         #expect(runTool("/usr/bin/zip", ["-q", "tree.zip", "tree/readme.txt.new"], in: box.root).status == 0)
         // The deletion cannot be carried over and is reported; the new members are added to
         // the archive as it is now, the one whose name was taken under a name of its own.
-        let failures = bench.store.flushAll()
+        let failures = bench.store.flushAll(cancellation: nil)
         #expect(
             failures.count == 1
                 && failures.first?.error.localizedDescription.contains("changed by another program") == true
@@ -276,7 +282,7 @@ internal struct ArchiveFixes {
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/readme.txt.new"]).output == "theirs")
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/readme.txt (2).new"]).output == "ours")
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/sub/.hidden2"]).output == "ours too")
-        #expect(listed(archive).contains("tree/empty.txt") && bench.store.flushAll().isEmpty)
+        #expect(listed(archive).contains("tree/empty.txt") && bench.store.flushAll(cancellation: nil).isEmpty)
     }
 
     // MARK: A2 – crafted archives are refused, not crashed on
@@ -307,14 +313,20 @@ internal struct ArchiveFixes {
             try file.write(to: url)
             return url
         }
-        #expect(throws: ArchiveError.self) { try ZipDirectory.read(RandomAccessFile(archive(offset: .max, stub: 1))) }
+        #expect(throws: ArchiveError.self) {
+            try ZipDirectory.read(
+                RandomAccessFile(archive(offset: .max, stub: 1), shownAs: nil),
+                maxEntries: .max,
+                check: nil
+            )
+        }
         #expect(throws: ArchiveError.self) { try bench.names(bench.inside(archive(offset: .max - 5, stub: 300))) }
         // Without a shift the directory can be read; the member is refused when it is opened.
         let plain = try archive(offset: .max, stub: 0)
         #expect(try bench.names(bench.inside(plain)) == ["a"])
         #expect(throws: ArchiveError.self) { try bench.read(bench.inside(plain, "a")) }
-        let opened = try bench.store.archive(at: plain)
-        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).count == 1)
+        let opened = try bench.store.archive(at: plain, cancellation: nil)
+        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil).count == 1)
     }
 
     @Test
@@ -367,7 +379,8 @@ internal struct ArchiveFixes {
             name: "a",
             isDirectory: false,
             modified: Date(timeIntervalSince1970: .nan),
-            permissions: 0o644
+            permissions: 0o644,
+            isSymbolicLink: false
         )
         record.setModified(Date(timeIntervalSince1970: .infinity))
         #expect(record.extra.count == 9)
@@ -384,19 +397,20 @@ internal struct ArchiveFixes {
                     name: "claim\(index).bin",
                     isDirectory: false,
                     modified: Date(),
-                    permissions: 0o644
+                    permissions: 0o644,
+                    isSymbolicLink: false
                 )
                 record.uncompressedSize = 1 << 62 + UInt64(index)
-                try writer.copyMember(record)
+                try writer.copyMember(record, check: nil)
             }
         }
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         #expect(opened.entries.map(\.size) == [1 << 62, 1 << 62 + 1, 1 << 62 + 2])
         // Unpacking and testing add the sizes up for their progress.
         let result = try bench.unpack(archive, to: box.url("claimed"))
         #expect(result.unpacked == 3 && !result.cancelled)
         #expect(bench.monitor.reports.last?.bytesTotal == .max)
-        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).count == 3)
+        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil).count == 3)
     }
 
     @Test
@@ -416,13 +430,13 @@ internal struct ArchiveFixes {
         // The 64-bit field no longer fits beside it either, in both headers.
         let limits = ZipLimits(maxField: 10, maxEntries: 100)
         let archive = try writeZip("full.zip", limits: limits) { writer in
-            try writer.copyMember(record)
+            try writer.copyMember(record, check: nil)
             var large = record
             large.uncompressedSize = 500
-            try writer.copyMember(large)
-            try writer.copyMember(dated)
+            try writer.copyMember(large, check: nil)
+            try writer.copyMember(dated, check: nil)
         }
-        let contents = try ZipDirectory.read(RandomAccessFile(archive))
+        let contents = try ZipDirectory.read(RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil)
         #expect(
             contents.records.map(\.uncompressedSize) == [0, 500, 0]
                 && contents.records.map(\.extra.count) == [0xFFFF, 0, 9]
@@ -430,9 +444,9 @@ internal struct ArchiveFixes {
         // A name longer than a header can say is an error, not a crash.
         var long = ZipRecord()
         long.nameBytes = Data(repeating: 97, count: 70_000)
-        #expect(throws: ArchiveError.self) { try writeZip("long.zip") { try $0.copyMember(long) } }
+        #expect(throws: ArchiveError.self) { try writeZip("long.zip") { try $0.copyMember(long, check: nil) } }
         // A stretch that reaches past the end of the file ends with the file.
-        let file = try RandomAccessFile(archive)
+        let file = try RandomAccessFile(archive, shownAs: nil)
         let stream = FileRangeStream(file, offset: file.size - 2, length: .max)
         #expect(try stream.read(upToCount: 100)?.count == 2)
         #expect(throws: ArchiveError.self) { try FileRangeStream(file, offset: .max, length: .max).skip(1) }
@@ -443,22 +457,22 @@ internal struct ArchiveFixes {
     @Test
     internal func anArchiveWithAnOpenWriterStaysInTheStore() throws {
         let first = try makeZip("first.zip")
-        let opened = try bench.store.archive(at: first)
+        let opened = try bench.store.archive(at: first, cancellation: nil)
         let writer = try bench.zip.write(bench.inside(first, "tree/slow.txt"))
         try writer.write(Data("slow".utf8))
         // More archives than the store keeps.
         for index in 0..<20 {
             let url = try writeZip("filler\(index).zip") { _ in }
-            _ = try bench.store.archive(at: url)
+            _ = try bench.store.archive(at: url, cancellation: nil)
         }
-        #expect(try bench.store.archive(at: first) === opened)
+        #expect(try bench.store.archive(at: first, cancellation: nil) === opened)
         try writer.close(attributes: FileAttributes())
-        for index in 0..<20 { _ = try bench.store.archive(at: box.url("filler\(index).zip")) }
-        #expect(try bench.store.archive(at: first) === opened && opened.hasPendingChanges)
-        #expect(bench.store.flushAll().isEmpty && listed(first).contains("tree/slow.txt"))
+        for index in 0..<20 { _ = try bench.store.archive(at: box.url("filler\(index).zip"), cancellation: nil) }
+        #expect(try bench.store.archive(at: first, cancellation: nil) === opened && opened.hasPendingChanges)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty && listed(first).contains("tree/slow.txt"))
         // With nothing waiting it goes like any other.
-        for index in 0..<20 { _ = try bench.store.archive(at: box.url("filler\(index).zip")) }
-        #expect(try bench.store.archive(at: first) !== opened)
+        for index in 0..<20 { _ = try bench.store.archive(at: box.url("filler\(index).zip"), cancellation: nil) }
+        #expect(try bench.store.archive(at: first, cancellation: nil) !== opened)
     }
 
     @Test
@@ -475,9 +489,11 @@ internal struct ArchiveFixes {
             localURL: archive,
             fetchedCopy: nil,
             remoteStamp: nil,
+            quarantine: nil,
+            cancellation: nil,
             environment: bench.environment
         )
-        .write("tree/kept.txt")
+        .write("tree/kept.txt", level: nil, password: nil)
         try writer?.write(Data("kept".utf8))
         try writer?.close(attributes: FileAttributes())
         writer = nil
@@ -494,7 +510,7 @@ internal struct ArchiveFixes {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         let expected = try Data(contentsOf: box.url("tree/readme.txt"))
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         let entry = try #require(opened.entry("tree/readme.txt"))
         let reader = try bench.zip.read(tree.appending(name: "readme.txt"))
         #expect(try reader.read(upToCount: 100)?.count == 100)
@@ -502,14 +518,14 @@ internal struct ArchiveFixes {
         try bench.zip.remove(tree.appending(name: "big.log"))
         try bench.zip.remove(tree.appending(name: "empty.txt"))
         try write("new", to: tree.appending(name: "new.txt"))
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
         try reader.seek(to: 0)
         var data = Data()
         while let block = try reader.read(upToCount: 5_000) { data.append(block) }
         reader.close()
         #expect(data == expected)
         // The entry looked up before the rewrite reads the same bytes, and so does a new one.
-        let stream = try opened.open(entry)
+        let stream = try opened.open(entry, slot: nil)
         #expect(try stream.readFully(1 << 20) == expected)
         #expect(try bench.read(tree.appending(name: "readme.txt")) == expected && isSound(archive))
     }
@@ -528,7 +544,7 @@ internal struct ArchiveFixes {
         let member = bench.inside(archive, "readme.txt")
         let stamp = Date(timeIntervalSince1970: 1_700_000_000)
         try bench.zip.setAttributes(FileAttributes(modified: stamp), of: member)
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
         bench.store.close()
         bench.passwords.set(["sesame"])
         #expect(try bench.item(member).modified == stamp)
@@ -544,10 +560,12 @@ internal struct ArchiveFixes {
         let archive = try makeZip()
         let tree = bench.inside(archive, "tree")
         let original = try Data(contentsOf: archive)
-        let old = try ZipDirectory.read(RandomAccessFile(archive))
+        let old = try ZipDirectory.read(RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil)
         func offsets() throws -> [String: UInt64] {
             var found: [String: UInt64] = [:]
-            for record in try ZipDirectory.read(RandomAccessFile(archive)).records {
+            for record in try ZipDirectory.read(RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil)
+                .records
+            {
                 if case .archive(let offset, _) = record.source { found[record.name] = offset }
             }
             return found
@@ -562,7 +580,7 @@ internal struct ArchiveFixes {
             of: tree.appending(name: "readme.txt")
         )
         try bench.zip.move(tree.appending(name: "empty.txt"), to: tree.appending(name: "void.txt"), replacing: false)
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
 
         // The members' data was not written again: the file starts as it did, but for the
         // four bytes of the time that was changed.
@@ -602,7 +620,7 @@ internal struct ArchiveFixes {
         // A deletion writes the archive anew, and with that the stretch the rename left is gone.
         let grown = try Data(contentsOf: archive).count
         try bench.zip.remove(tree.appending(name: "big.log"))
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
         #expect(try Data(contentsOf: archive).count < grown / 2 && isSound(archive))
         #expect(namesOnDisk(box.root).filter { $0.hasSuffix(".tmp") }.isEmpty)
     }
@@ -622,7 +640,7 @@ internal struct ArchiveFixes {
                 replacing: false
             )
             name = "big\(round).log"
-            try bench.store.flush(archive)
+            try bench.store.flush(archive, cancellation: nil)
             #expect(isSound(archive))
         }
         #expect(try Data(contentsOf: archive).count < size * 2)
@@ -640,10 +658,10 @@ internal struct ArchiveFixes {
         let tree = bench.inside(archive, "tree")
         #expect(try bench.names(tree).count == 5)
         try write("added", to: tree.appending(name: "added.txt"))
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
         #expect(try Data(contentsOf: archive).prefix(stub.count) == stub)
         try bench.zip.remove(tree.appending(name: "big.log"))
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
         #expect(try Data(contentsOf: archive).prefix(stub.count) == stub)
         bench.store.close()
         #expect(try bench.names(tree) == ["added.txt", "empty.txt", "hollow", "readme.txt", "sub"])
@@ -657,10 +675,31 @@ internal struct ArchiveFixes {
     internal func anArchiveThatListsANameTwiceIsNotChanged() throws {
         let archive = try writeZip("twice.zip") { writer in
             for _ in 0..<2 {
-                try writer.copyMember(.new(name: "same.txt", isDirectory: false, modified: Date(), permissions: 0o644))
+                try writer.copyMember(
+                    .new(
+                        name: "same.txt",
+                        isDirectory: false,
+                        modified: Date(),
+                        permissions: 0o644,
+                        isSymbolicLink: false
+                    ),
+                    check: nil
+                )
             }
-            try writer.copyMember(.new(name: "/", isDirectory: true, modified: Date(), permissions: 0o755))
-            try writer.copyMember(.new(name: "other.txt", isDirectory: false, modified: Date(), permissions: 0o644))
+            try writer.copyMember(
+                .new(name: "/", isDirectory: true, modified: Date(), permissions: 0o755, isSymbolicLink: false),
+                check: nil
+            )
+            try writer.copyMember(
+                .new(
+                    name: "other.txt",
+                    isDirectory: false,
+                    modified: Date(),
+                    permissions: 0o644,
+                    isSymbolicLink: false
+                ),
+                check: nil
+            )
         }
         #expect(try bench.names(bench.inside(archive)) == ["other.txt", "same.txt"])
         #expect(throws: ArchiveError.self) { try bench.zip.remove(bench.inside(archive, "other.txt")) }
@@ -668,13 +707,25 @@ internal struct ArchiveFixes {
         #expect(listed(archive).count == 4)
         // An entry without a usable name is not shown, and stays when the archive is changed.
         let odd = try writeZip("odd.zip") { writer in
-            try writer.copyMember(.new(name: "/", isDirectory: true, modified: Date(), permissions: 0o755))
-            try writer.copyMember(.new(name: "other.txt", isDirectory: false, modified: Date(), permissions: 0o644))
+            try writer.copyMember(
+                .new(name: "/", isDirectory: true, modified: Date(), permissions: 0o755, isSymbolicLink: false),
+                check: nil
+            )
+            try writer.copyMember(
+                .new(
+                    name: "other.txt",
+                    isDirectory: false,
+                    modified: Date(),
+                    permissions: 0o644,
+                    isSymbolicLink: false
+                ),
+                check: nil
+            )
         }
         for clones in [true, false] {
             bench.environment.clonesArchives = clones
             try write("x", to: bench.inside(odd, "new\(clones).txt"))
-            try bench.store.flush(odd)
+            try bench.store.flush(odd, cancellation: nil)
             #expect(listed(odd).contains("/") && listed(odd).contains("new\(clones).txt"))
         }
     }
@@ -683,11 +734,14 @@ internal struct ArchiveFixes {
     internal func packingIntoAnExistingArchiveAddsToItAndTestsOnlyWhatIsNew() throws {
         let archive = try makeZip()
         let original = try Data(contentsOf: archive)
-        let directory = try ZipDirectory.read(RandomAccessFile(archive)).directoryOffset
+        let directory = try ZipDirectory.read(RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil)
+            .directoryOffset
         // An old member is damaged where its data lies; the test after packing does not read it.
         var damaged = original
-        let file = try RandomAccessFile(archive)
-        let random = try #require(ZipDirectory.read(file).records.first { $0.name == "tree/sub/random.bin" })
+        let file = try RandomAccessFile(archive, shownAs: nil)
+        let random = try #require(
+            ZipDirectory.read(file, maxEntries: .max, check: nil).records.first { $0.name == "tree/sub/random.bin" }
+        )
         guard case .archive(let offset, _) = random.source else {
             return
         }
@@ -701,7 +755,16 @@ internal struct ArchiveFixes {
         #expect(Set(listed(archive)).isSuperset(of: ["tree/extra/one.txt", "tree/extra/two.txt", "tree/readme.txt"]))
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/extra/two.txt"]).output.count == 1_500_000)
         // The whole test still finds the damage.
-        #expect(try !ArchiveTester.test(bench.store.archive(at: archive), cancellation: CancellationFlag()).isEmpty)
+        #expect(
+            try
+                !ArchiveTester.test(
+                    bench.store.archive(at: archive, cancellation: nil),
+                    cancellation: CancellationFlag(),
+                    counter: nil,
+                    only: nil
+                )
+                .isEmpty
+        )
         // Replacing a member writes the archive anew.
         try original.write(to: archive)
         try box.file("tree/readme.txt", "shorter")
@@ -732,14 +795,14 @@ internal struct ArchiveFixes {
         }
         try writer.close(attributes: FileAttributes())
         #expect(try bench.read(member) == data)
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
         #expect(isSound(archive))
         try box.folder("long")
         #expect(
             runTool("/usr/bin/unzip", ["-q", archive.path, "tree/long.txt", "-d", box.url("long").path]).status == 0
         )
         #expect(try Data(contentsOf: box.url("long/tree/long.txt")) == data)
-        let entry = try #require(try bench.store.archive(at: archive).entry("tree/long.txt"))
+        let entry = try #require(try bench.store.archive(at: archive, cancellation: nil).entry("tree/long.txt"))
         #expect(entry.size == Int64(data.count) && entry.packedSize < entry.size / 3)
         // A size that is exactly a number of windows ends in an empty last piece.
         let exact = bench.inside(archive, "tree/exact.bin")
@@ -747,7 +810,7 @@ internal struct ArchiveFixes {
         let second = try bench.zip.write(exact)
         try second.write(window)
         try second.close(attributes: FileAttributes())
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
         #expect(try isSound(archive) && bench.read(exact) == window)
     }
 
@@ -762,10 +825,10 @@ internal struct ArchiveFixes {
         for codec in [ArchiveFormat.Codec.gzip, .xz, .bzip2] {
             let archive = box.url("big.log." + ArchiveFormat.suffix(codec))
             try bench.pack([source], to: archive) { $0.format = .compressedFile(codec) }
-            let opened = try bench.store.archive(at: archive)
+            let opened = try bench.store.archive(at: archive, cancellation: nil)
             let entry = try #require(opened.entries.first)
             #expect(entry.size == Int64(size) && entry.sizeIsExact == (codec != .gzip), "\(codec)")
-            #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty)
+            #expect(ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil).isEmpty)
         }
         // Several streams in a row with padding between them, as parallel compressors write.
         let parts = [Data(repeating: 1, count: 70_000), Data(), Data(repeating: 2, count: 300)]
@@ -775,25 +838,28 @@ internal struct ArchiveFixes {
             joined.append(Data(count: 8))
         }
         try joined.write(to: box.url("joined.xz"))
-        #expect(try CompressedSize.ofXZ(RandomAccessFile(box.url("joined.xz"))) == 70_300)
-        let stream = try XZStream(FileRangeStream(RandomAccessFile(box.url("joined.xz"))))
+        #expect(try CompressedSize.ofXZ(RandomAccessFile(box.url("joined.xz"), shownAs: nil)) == 70_300)
+        let stream = try XZStream(
+            FileRangeStream(RandomAccessFile(box.url("joined.xz"), shownAs: nil), offset: 0, length: nil),
+            control: nil
+        )
         #expect(try stream.readFully(1 << 20) == parts.reduce(Data(), +))
         // Anything that is not an index is "unknown", whatever it claims.
         for cut in [1, 5, 13, 40] {
             try joined.dropLast(cut).write(to: box.url("cut.xz"))
-            #expect(try CompressedSize.ofXZ(RandomAccessFile(box.url("cut.xz"))) == nil)
+            #expect(try CompressedSize.ofXZ(RandomAccessFile(box.url("cut.xz"), shownAs: nil)) == nil)
         }
         var forged = joined
         forged.replaceSubrange(forged.count - 16..<forged.count - 12, with: [0xFF, 0xFF, 0xFF, 0x7F])
         try forged.write(to: box.url("forged.xz"))
-        #expect(try CompressedSize.ofXZ(RandomAccessFile(box.url("forged.xz"))) == nil)
+        #expect(try CompressedSize.ofXZ(RandomAccessFile(box.url("forged.xz"), shownAs: nil)) == nil)
         // What a file says that is too small to be true is raised by the steps it lost.
         let gz = box.url("big.log.gz")
         var bytes = try Data(contentsOf: gz)
-        #expect(try CompressedSize.claimedByGzip(RandomAccessFile(gz)) == UInt64(size))
+        #expect(try CompressedSize.claimedByGzip(RandomAccessFile(gz, shownAs: nil)) == UInt64(size))
         bytes.replaceSubrange(bytes.count - 4..<bytes.count, with: [5, 0, 0, 0])
         try bytes.write(to: gz)
-        #expect(try CompressedSize.claimedByGzip(RandomAccessFile(gz)) == 5 + 1 << 32)
+        #expect(try CompressedSize.claimedByGzip(RandomAccessFile(gz, shownAs: nil)) == 5 + 1 << 32)
     }
 
     @Test
@@ -802,22 +868,22 @@ internal struct ArchiveFixes {
         let archive = box.url("tree.tar.gz")
         try bench.pack([tree], to: archive) { $0.format = .compressedTar(.gzip) }
         bench.environment.materializeLimit = 0
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         let files = opened.entries.filter { !$0.isDirectory }
         #expect(files.count == 6 && opened.streamStarts == 0)
         // In archive order, as a copy job reads them.
         for entry in files {
-            let stream = try opened.open(entry)
+            let stream = try opened.open(entry, slot: nil)
             let data = try stream.readFully(1 << 24)
             stream.close()
             #expect(data == (try Data(contentsOf: box.url(entry.path))), "\(entry.path)")
         }
         #expect(opened.streamStarts == 1)
         // A member that lies behind the reader starts a new pass; one left half read does not hurt.
-        let half = try opened.open(files[2])
+        let half = try opened.open(files[2], slot: nil)
         _ = try half.read(upToCount: 10)
         half.close()
-        #expect(try opened.open(files[4]).readFully(1 << 24) == Data(contentsOf: box.url(files[4].path)))
+        #expect(try opened.open(files[4], slot: nil).readFully(1 << 24) == Data(contentsOf: box.url(files[4].path)))
         #expect(opened.streamStarts == 2)
         // The copy job gets every file right this way.
         try box.folder("out")
@@ -857,7 +923,7 @@ internal struct ArchiveFixes {
         // Changing the archive keeps its mark, and so does an archive inside it.
         try write("new", to: bench.inside(archive, "tree/new.txt"))
         try bench.zip.remove(bench.inside(archive, "tree/empty.txt"))
-        try bench.store.flush(archive)
+        try bench.store.flush(archive, cancellation: nil)
         #expect(quarantine(of: archive) == mark)
         try bench.pack([box.url("tree")], to: box.url("inner.tar")) { $0.format = .tar }
         try bench.pack([box.url("inner.tar")], to: box.url("outer.zip"))
@@ -898,28 +964,34 @@ internal struct ArchiveFixes {
         }
         // Changing the ZIP does not take the bits from the archive itself.
         try bench.zip.remove(bench.inside(box.url("tools.zip"), "tree/plain"))
-        try bench.store.flush(box.url("tools.zip"))
+        try bench.store.flush(box.url("tools.zip"), cancellation: nil)
         #expect(runTool("/usr/bin/unzip", ["-Z", box.url("tools.zip").path]).output.contains("-rwsr-xr-x"))
     }
 
     @Test
     internal func aMemberThatUnpacksToMoreThanItSaysIsStopped() throws {
         let contents = Data(repeating: 0, count: 50 << 20)
-        let packed = try Deflater.piece(contents, level: 6, final: true)
+        let packed = try Deflater.piece(contents, level: 6, final: true, calls: .zlib)
         let archive = box.url("bomb.zip")
-        let output = try OutputFile(creating: archive)
-        let writer = ZipWriter(output)
-        var record = ZipRecord.new(name: "small.txt", isDirectory: false, modified: Date(), permissions: 0o644)
+        let output = try OutputFile(creating: archive, mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
+        var record = ZipRecord.new(
+            name: "small.txt",
+            isDirectory: false,
+            modified: Date(),
+            permissions: 0o644,
+            isSymbolicLink: false
+        )
         record.method = ZipRecord.methodDeflate
         record.crc = CRC32.of(contents)
         (record.compressedSize, record.uncompressedSize) = (UInt64(packed.count), 1_000)
-        let member = try writer.begin(record)
+        let member = try writer.begin(record, localExtra: nil, expectedSize: nil)
         try writer.append(packed)
-        try writer.end(member, record)
-        try writer.finish()
-        try output.close()
-        let opened = try bench.store.archive(at: archive)
-        let stream = try opened.open(try #require(opened.entry("small.txt")))
+        try writer.end(member, record, headerChanged: true)
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
+        let stream = try opened.open(try #require(opened.entry("small.txt")), slot: nil)
         var read = 0
         #expect(throws: ArchiveError.self) {
             while let block = try stream.read(upToCount: 1 << 16) { read += block.count }
@@ -935,7 +1007,7 @@ internal struct ArchiveFixes {
     internal func theTreeKeepsItsOrderAndItsFolders() {
         var tree = ArchiveTree()
         let paths = ["a/b/c/one.txt", "a/b/c/two.txt", "a/b/three.txt", "x.txt", "a/b/c/d/e/four.txt", "a/z.txt"]
-        for path in paths { tree.insert(ArchiveEntry(path: path, isDirectory: false)) }
+        for path in paths { tree.insert(ArchiveEntry(path: path, isDirectory: false), keepingOrder: false) }
         #expect(tree.ordered.filter { !$0.isDirectory }.map(\.path) == paths)
         #expect(Set(tree.ordered.filter(\.isImplicit).map(\.path)) == ["a", "a/b", "a/b/c", "a/b/c/d", "a/b/c/d/e"])
         #expect(
@@ -944,7 +1016,7 @@ internal struct ArchiveFixes {
         )
         // The remembered order follows every change.
         tree.remove("a/b/c/two.txt")
-        tree.insert(ArchiveEntry(path: "a/b/c/five.txt", isDirectory: false))
+        tree.insert(ArchiveEntry(path: "a/b/c/five.txt", isDirectory: false), keepingOrder: false)
         tree.update("x.txt") { $0.size = 7 }
         #expect(
             tree.ordered.filter { !$0.isDirectory }.map(\.path) == [
@@ -954,7 +1026,7 @@ internal struct ArchiveFixes {
         #expect(tree.ordered.first { $0.path == "x.txt" }?.size == 7)
         // A folder that was taken out is made up again with the next thing inside it.
         for path in ["a/b/c/d/e/four.txt", "a/b/c/d/e", "a/b/c/d"] { tree.remove(path) }
-        tree.insert(ArchiveEntry(path: "a/b/c/d/e/six.txt", isDirectory: false))
+        tree.insert(ArchiveEntry(path: "a/b/c/d/e/six.txt", isDirectory: false), keepingOrder: false)
         #expect(tree.isDirectory("a/b/c/d") && tree.children(of: "a/b/c/d/e")?.map(\.name) == ["six.txt"])
         #expect(tree.children(of: "a/b/c")?.map(\.name).sorted() == ["d", "five.txt", "one.txt"])
     }
@@ -1121,7 +1193,9 @@ internal struct ArchiveFixes {
         // One wrong password in 256 gets past the first twelve bytes. Taken is one whose data does not start like
         // compressed data, which is nearly all of them (the encryption header is random: the few that start like it
         // differ from run to run).
-        let record = try #require(ZipDirectory.read(RandomAccessFile(archive)).records.first)
+        let record = try #require(
+            ZipDirectory.read(RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil).records.first
+        )
         guard case .archive(let offset, let file) = record.source else {
             return
         }
@@ -1136,7 +1210,7 @@ internal struct ArchiveFixes {
                     name: ""
                 )
             else { return false }
-            let probe = InflateStream(decrypted, wrapping: .raw)
+            let probe = InflateStream(decrypted, wrapping: .raw, control: nil)
             defer { probe.close() }
             do {
                 _ = try probe.read(upToCount: 1 << 12)

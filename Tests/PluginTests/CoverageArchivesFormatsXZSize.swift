@@ -50,7 +50,7 @@ internal struct CoverageArchivesFormatsXZSize {
     private func size(_ data: Data) throws -> UInt64? {
         let url = box.url("\(UUID().uuidString).xz")
         try data.write(to: url)
-        return CompressedSize.ofXZ(try RandomAccessFile(url))
+        return CompressedSize.ofXZ(try RandomAccessFile(url, shownAs: nil))
     }
 
     /// The size comes from the index, also behind padding; an empty file has none.

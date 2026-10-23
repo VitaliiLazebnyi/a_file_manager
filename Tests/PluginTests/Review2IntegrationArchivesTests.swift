@@ -71,14 +71,20 @@ internal struct Review2IntegrationArchives {
 
     private func writeZip(_ name: String, members: [String]) throws -> URL {
         let url = box.url(name)
-        let output = try OutputFile(creating: url)
-        let writer = ZipWriter(output)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
         for member in members {
-            let record = ZipRecord.new(name: member, isDirectory: false, modified: Date(), permissions: 0o644)
-            try writer.end(try writer.begin(record), record, headerChanged: false)
+            let record = ZipRecord.new(
+                name: member,
+                isDirectory: false,
+                modified: Date(),
+                permissions: 0o644,
+                isSymbolicLink: false
+            )
+            try writer.end(try writer.begin(record, localExtra: nil, expectedSize: nil), record, headerChanged: false)
         }
-        try writer.finish()
-        try output.close()
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
         return url
     }
 
@@ -105,7 +111,9 @@ internal struct Review2IntegrationArchives {
         #expect(asked.count >= 59, "\(asked.count)")
         #expect(zip(asked, asked.dropFirst()).allSatisfy { $0.done <= $1.done })
         #expect(asked.allSatisfy { $0.total > 0 })
-        let names = Set(try ZipDirectory.read(RandomAccessFile(url)).records.map(\.name))
+        let names = Set(
+            try ZipDirectory.read(RandomAccessFile(url, shownAs: nil), maxEntries: .max, check: nil).records.map(\.name)
+        )
         #expect(names.count == 59 && names.contains("new-19.txt") && !names.contains("old-0.txt"))
     }
 
@@ -126,7 +134,9 @@ internal struct Review2IntegrationArchives {
         #expect(try Data(contentsOf: url) == before)
         #expect(try bench.zip.list(bench.inside(url), showHidden: true).count == 40)
         try bench.zip.commit(bench.inside(url), cancellation: CancellationFlag()) { _, _ in true }
-        #expect(try ZipDirectory.read(RandomAccessFile(url)).records.count == 40)
+        #expect(
+            try ZipDirectory.read(RandomAccessFile(url, shownAs: nil), maxEntries: .max, check: nil).records.count == 40
+        )
         // Nothing of the attempt that was ended is left next to the archive.
         #expect(
             try FileManager.default.contentsOfDirectory(atPath: box.root.path).filter { $0.contains(".afm-zip") }
@@ -183,12 +193,17 @@ internal struct Review2IntegrationArchives {
         bench.fileSystems.register(hooked)
         hooked.base.addFile("/target/there/kept.txt", "kept")
         let archive = try writeZip("tree.zip", members: ["there/a.txt", "new/deep/b.txt", "new/c.txt", "top.txt"])
-        let unpacker = Unpacker(fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions()) {
+        let unpacker = Unpacker(
+            fileSystems: bench.fileSystems,
+            monitor: bench.monitor,
+            options: UnpackOptions(),
+            whileUnpacking: nil
+        ) {
             _,
             _ in .overwrite
         }
         let result = unpacker.run(
-            [Unpacker.Source(archive: try bench.store.archive(at: archive))],
+            [Unpacker.Source(archive: try bench.store.archive(at: archive, cancellation: nil))],
             into: hooked.base.url("/target")
         )
         #expect(result.problems.isEmpty, "\(result.problems)")
@@ -213,12 +228,17 @@ internal struct Review2IntegrationArchives {
             if url.lastPathComponent == "dir" { base.addFile("/target/dir", "somebody else's") }
         }
         let archive = try writeZip("planted.zip", members: ["dir/a.txt", "dir/b.txt", "plain.txt"])
-        let unpacker = Unpacker(fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions()) {
+        let unpacker = Unpacker(
+            fileSystems: bench.fileSystems,
+            monitor: bench.monitor,
+            options: UnpackOptions(),
+            whileUnpacking: nil
+        ) {
             _,
             _ in .overwrite
         }
         let result = unpacker.run(
-            [Unpacker.Source(archive: try bench.store.archive(at: archive))],
+            [Unpacker.Source(archive: try bench.store.archive(at: archive, cancellation: nil))],
             into: hooked.base.url("/target")
         )
         // The members of that folder are refused, each with its line; the other one arrives.

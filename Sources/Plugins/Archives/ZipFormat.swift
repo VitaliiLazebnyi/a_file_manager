@@ -206,7 +206,7 @@ internal struct ZipRecord {
         isDirectory: Bool,
         modified: Date,
         permissions: UInt16,
-        isSymbolicLink: Bool = false
+        isSymbolicLink: Bool
     )
         -> Self
     {
@@ -601,7 +601,7 @@ internal final class ZipAESDecryptStream: ByteStream {
         field: ZipAES.Field,
         password: String,
         name: String,
-        onFailure: (() -> Void)? = nil
+        onFailure: (() -> Void)?
     ) throws {
         self.source = source
         self.name = name
@@ -754,7 +754,7 @@ internal final class CRCCheckStream: ByteStream {
 
     /// `onFailure` is told when the data turns out wrong, whether it cannot be decoded or
     /// has the wrong checksum, before the error is thrown.
-    internal init(_ source: any ByteStream, expected: UInt32, name: String, onFailure: (() -> Void)? = nil) {
+    internal init(_ source: any ByteStream, expected: UInt32, name: String, onFailure: (() -> Void)?) {
         self.source = source
         self.expected = expected
         self.name = name
@@ -808,7 +808,7 @@ internal enum ZipDirectory {
 
     /// `maxEntries` bounds what is read into memory; `check` is called now and then while a
     /// long directory is read, and may throw to end the reading.
-    internal static func read(_ file: RandomAccessFile, maxEntries: Int = .max, check: (() throws -> Void)? = nil)
+    internal static func read(_ file: RandomAccessFile, maxEntries: Int, check: (() throws -> Void)?)
         throws
         -> Contents
     {
@@ -827,8 +827,8 @@ internal enum ZipDirectory {
     /// be damaged throws after some records were handed out.
     internal static func scan(
         _ file: RandomAccessFile,
-        maxEntries: Int = .max,
-        check: (() throws -> Void)? = nil,
+        maxEntries: Int,
+        check: (() throws -> Void)?,
         expecting: (Int) -> Void,
         _ each: (ZipRecord) throws -> Void
     ) throws -> Contents {
@@ -990,7 +990,7 @@ internal final class ZipWriter {
     /// True once anything needed the 64-bit format.
     internal private(set) var usedZip64 = false
 
-    internal init(_ output: OutputFile, limits: ZipLimits = .standard) {
+    internal init(_ output: OutputFile, limits: ZipLimits) {
         self.output = output
         self.limits = limits
     }
@@ -1033,8 +1033,7 @@ internal final class ZipWriter {
     ///
     /// With `expectedSize` the sizes need not be known yet: room for 64-bit sizes is reserved when
     /// the member may grow past the 32-bit fields, and `end` fills in the real values.
-    internal func begin(_ record: ZipRecord, localExtra: Data? = nil, expectedSize: UInt64? = nil) throws -> OpenMember
-    {
+    internal func begin(_ record: ZipRecord, localExtra: Data?, expectedSize: UInt64?) throws -> OpenMember {
         let largest = max(record.uncompressedSize, record.compressedSize, expectedSize.map { $0 + $0 / 8 + 1_024 } ?? 0)
         let member = OpenMember(
             offset: output.position,
@@ -1060,7 +1059,7 @@ internal final class ZipWriter {
     }
 
     /// Ends a member with its final values, which replace those written by `begin`.
-    internal func end(_ member: OpenMember, _ record: ZipRecord, headerChanged: Bool = true) throws {
+    internal func end(_ member: OpenMember, _ record: ZipRecord, headerChanged: Bool) throws {
         guard member.wide || max(record.compressedSize, record.uncompressedSize) <= limits.maxField else {
             throw ArchiveError.unsupported("A file that grew past 4 GB while it was packed")
         }
@@ -1088,7 +1087,7 @@ internal final class ZipWriter {
     }
 
     /// Writes the directory and the end records.
-    internal func finish(comment: Data = Data()) throws {
+    internal func finish(comment: Data) throws {
         let directoryOffset = output.position
         for (record, offset) in written {
             var wide = Data()
@@ -1176,7 +1175,7 @@ extension ZipWriter {
     /// Returns where its header was written. `check` is called between the blocks of a large member
     /// and may throw to end the copy.
     @discardableResult
-    internal func copyMember(_ record: ZipRecord, check: (() throws -> Void)? = nil) throws -> UInt64 {
+    internal func copyMember(_ record: ZipRecord, check: (() throws -> Void)?) throws -> UInt64 {
         var localExtra = record.extra
         var data: any ByteStream?
         switch record.source {
@@ -1186,7 +1185,11 @@ extension ZipWriter {
             data = FileRangeStream(file, offset: header.dataOffset, length: record.compressedSize)
 
         case .spool(let temporary):
-            data = FileRangeStream(try RandomAccessFile(temporary.url), offset: 0, length: record.compressedSize)
+            data = FileRangeStream(
+                try RandomAccessFile(temporary.url, shownAs: nil),
+                offset: 0,
+                length: record.compressedSize
+            )
 
         case .none:
             break
@@ -1201,7 +1204,7 @@ extension ZipWriter {
                 localExtra.append(field)
             }
         }
-        let member = try begin(record, localExtra: localExtra)
+        let member = try begin(record, localExtra: localExtra, expectedSize: nil)
         var copied: UInt64 = 0
         while let block = try data?.read(upToCount: 1 << 20) {
             try check?()

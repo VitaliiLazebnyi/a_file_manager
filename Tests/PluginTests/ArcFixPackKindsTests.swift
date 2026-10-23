@@ -27,7 +27,7 @@ internal struct ArcFixPackKindsTests {
             monitor: bench.monitor,
             options: options
         )
-        return packer.run([try bench.item(source)], archive: archive).failure
+        return packer.run([try bench.item(source)], archive: archive, innerFolder: "").failure
     }
 
     /// An archive with the folder `x` and `x/inside.txt` in it, packed from the disk.

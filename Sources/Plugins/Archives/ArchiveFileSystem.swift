@@ -86,7 +86,7 @@ internal final class ArchiveStore: @unchecked Sendable {
     /// With a `cancellation`, a thread that waits for another's opening of the same archive, or
     /// that opens it, gives up soon after the flag is set (`ArchiveError.cancelled`): the child
     /// processes and temporary files of the opening are gone and nothing is cached.
-    internal func archive(at url: URL, cancellation: CancellationFlag? = nil) throws -> OpenArchive {
+    internal func archive(at url: URL, cancellation: CancellationFlag?) throws -> OpenArchive {
         let key = url.locationKey
         // Open and still the file that was read: handed out at once, behind nobody's opening.
         lock.lock()
@@ -197,6 +197,7 @@ internal final class ArchiveStore: @unchecked Sendable {
                 localURL: Durable.realFile(url),
                 fetchedCopy: nil,
                 remoteStamp: nil,
+                quarantine: nil,
                 cancellation: cancellation,
                 environment: environment
             )
@@ -216,14 +217,19 @@ internal final class ArchiveStore: @unchecked Sendable {
         guard environment.hasRoom(environment.scratchReserve.plusClamped(UInt64(max(0, item.size))), scratch) else {
             throw ArchiveError.noScratchRoom(url.lastPathComponent)
         }
-        let room = SpaceWatch(folder: scratch, reserve: environment.scratchReserve, hasRoom: environment.hasRoom)
+        let room = SpaceWatch(
+            folder: scratch,
+            reserve: environment.scratchReserve,
+            step: 32 << 20,
+            hasRoom: environment.hasRoom
+        )
         let copy = TemporaryFile(local)
         let reader = try provider.read(url, cancellation: flag)
         defer { reader.close() }
         // A read that waits on a server is ended by the flag too.
         let tie = flag.interrupting(reader)
         defer { withExtendedLifetime(tie) {} }
-        let output = try OutputFile(creating: local)
+        let output = try OutputFile(creating: local, mode: 0o600)
         while let block = try reader.read(upToCount: 1 << 20) {
             if flag.isCancelled { throw ArchiveError.cancelled }
             guard room.allows(UInt64(block.count)) else {
@@ -232,7 +238,7 @@ internal final class ArchiveStore: @unchecked Sendable {
             }
             try output.write(block)
         }
-        try output.close()
+        try output.close(durably: false)
         // An archive inside an archive from the internet is from the internet too, and so is
         // one fetched from a server: the copy carries the mark, and so does what is unpacked.
         let quarantine = provider.quarantine(of: url)
@@ -307,7 +313,7 @@ internal final class ArchiveStore: @unchecked Sendable {
     /// whole round has written nothing. With a `cancellation` the writes end soon after it
     /// is set. Blocks for as long as the writes take; not for the main thread.
     @discardableResult
-    internal func flushAll(cancellation: CancellationFlag? = nil) -> [(
+    internal func flushAll(cancellation: CancellationFlag?) -> [(
         name: String, error: any Error, archive: OpenArchive
     )] {
         var failed: [ObjectIdentifier: (name: String, error: any Error, archive: OpenArchive)] = [:]
@@ -318,7 +324,7 @@ internal final class ArchiveStore: @unchecked Sendable {
             var wrote = false
             for archive in pending {
                 do {
-                    try archive.flush(cancellation: cancellation)
+                    try archive.flush(leavingOutArrivals: false, cancellation: cancellation) { _, _ in true }
                     failed[ObjectIdentifier(archive)] = nil
                     wrote = true
                 } catch {
@@ -331,8 +337,9 @@ internal final class ArchiveStore: @unchecked Sendable {
     }
 
     /// Writes the pending changes of the archive at `url`, if it is open and has any.
-    internal func flush(_ url: URL, cancellation: CancellationFlag? = nil) throws {
-        try openArchive(at: url)?.flush(cancellation: cancellation)
+    internal func flush(_ url: URL, cancellation: CancellationFlag?) throws {
+        try openArchive(at: url)?
+            .flush(leavingOutArrivals: false, cancellation: cancellation) { _, _ in true }
     }
 
     /// Makes the archive at `url` hold what was written into it, see `OpenArchive.commit`.
@@ -359,7 +366,7 @@ internal final class ArchiveStore: @unchecked Sendable {
         // until nothing waits, but not for ever.
         var (waiting, rounds) = (pending(), 0)
         while !waiting.isEmpty, rounds < 2 * environment.maxNesting + 4 {
-            for archive in waiting { try archive.commit(cancellation: cancellation) }
+            for archive in waiting { try archive.commit(cancellation: cancellation) { _, _ in true } }
             (waiting, rounds) = (pending(), rounds + 1)
         }
     }
@@ -395,7 +402,7 @@ internal final class ArchiveStore: @unchecked Sendable {
 
     /// For the archives whose changes still wait (their write has failed): saves what can be
     /// saved, see `OpenArchive.rescue()`.
-    internal func rescueAll(quickly: Bool = false, before deadline: Date = .distantFuture) -> [(
+    internal func rescueAll(quickly: Bool, before deadline: Date) -> [(
         name: String, outcome: RescueOutcome, archive: OpenArchive
     )] {
         openArchives.filter(\.hasPendingChanges).map { ($0.name, $0.rescue(quickly: quickly, before: deadline), $0) }
@@ -471,7 +478,7 @@ internal final class ArchiveFileSystem: FileSystemProvider {
 
     /// Which of the two schemes an archive file is shown under: the writable one for ZIP
     /// files on a file system that can itself be written to.
-    internal static func scheme(forArchive url: URL, fileSystems: FileSystemRegistry?, isZip: Bool? = nil) -> String {
+    internal static func scheme(forArchive url: URL, fileSystems: FileSystemRegistry?, isZip: Bool?) -> String {
         let zip = isZip ?? zipExtensions.contains(url.pathExtension.lowercased())
         let writable = fileSystems?.capabilities(for: url).contains(.write) ?? false
         return zip && writable ? ArchiveURL.writableScheme : ArchiveURL.readOnlyScheme
@@ -727,7 +734,7 @@ internal final class ArchiveFileSystem: FileSystemProvider {
                 return try provider.write(outer)
 
             case .inside(let archive, let path, _):
-                return try archive.write(path)
+                return try archive.write(path, level: nil, password: nil)
             }
         }
     }
@@ -740,7 +747,7 @@ internal final class ArchiveFileSystem: FileSystemProvider {
 
             case .inside(let archive, let path, _):
                 if cancellation.isCancelled { throw ArchiveError.cancelled }
-                return try archive.write(path)
+                return try archive.write(path, level: nil, password: nil)
             }
         }
     }
@@ -971,7 +978,10 @@ internal final class ArchiveFileSystem: FileSystemProvider {
         switch ArchiveURL.parse(url) {
         case .inside(let location):
             // Of the archive that is open, without waiting; it is opened only when it is not.
-            return (store.openArchive(at: location.archive) ?? (try? store.archive(at: location.archive)))?.quarantine
+            return
+                (store.openArchive(at: location.archive)
+                ?? (try? store.archive(at: location.archive, cancellation: nil)))?
+                .quarantine
 
         case .outside(let outer):
             return (try? outerProvider(for: outer))?.quarantine(of: outer)
@@ -1110,7 +1120,7 @@ internal final class ArchiveFileSystem: FileSystemProvider {
                 }
             }
             let archive = URL(fileURLWithPath: prefix, isDirectory: false)
-            guard Self.scheme(forArchive: archive, fileSystems: fileSystems) == scheme else {
+            guard Self.scheme(forArchive: archive, fileSystems: fileSystems, isZip: nil) == scheme else {
                 return nil
             }
             let inner = ArchiveTree.normalized(names[(index + 1)...].joined(separator: "/")) ?? ""

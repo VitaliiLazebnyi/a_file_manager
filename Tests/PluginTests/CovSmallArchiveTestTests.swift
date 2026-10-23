@@ -44,12 +44,12 @@ internal struct CovSmallArchiveTestTests {
             options.format = .compressedTar(.gzip)
             options.level = 0
         }
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         #expect(archive.allowsParallelReads == copied)
-        #expect(ArchiveTester.test(archive, cancellation: CancellationFlag()).isEmpty)
+        #expect(ArchiveTester.test(archive, cancellation: CancellationFlag(), counter: nil, only: nil).isEmpty)
         try Self.damage(url)
-        #expect(try bench.store.archive(at: url) === archive)
-        let problems = ArchiveTester.test(archive, cancellation: CancellationFlag())
+        #expect(try bench.store.archive(at: url, cancellation: nil) === archive)
+        let problems = ArchiveTester.test(archive, cancellation: CancellationFlag(), counter: nil, only: nil)
         // What the changed byte becomes depends on the times in the TAR headers: the decoder stops at it, or hands
         // on a header that is wrong. Either way the damage is reported, once.
         #expect(problems.count == 1 && problems.first?.hasPrefix("The archive is damaged:") == true)
@@ -68,9 +68,9 @@ internal struct CovSmallArchiveTestTests {
             options.format = .compressedTar(.gzip)
             options.level = 0
         }
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try Self.damage(url)
-        let problems = ArchiveTester.test(archive, cancellation: CancellationFlag(), only: ["tree/a.txt"])
+        let problems = ArchiveTester.test(archive, cancellation: CancellationFlag(), counter: nil, only: ["tree/a.txt"])
         #expect(problems.count == 1 && problems.first?.hasPrefix("The archive is damaged:") == true)
     }
 }

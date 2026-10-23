@@ -118,20 +118,21 @@ internal struct Review2ArchivesP2 {
     /// A ZIP written record by record, for names and rights no packer would write.
     internal func writeZip(_ name: String, members: [(name: String, permissions: UInt16)]) throws -> URL {
         let url = box.url(name)
-        let output = try OutputFile(creating: url)
-        let writer = ZipWriter(output)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
         for member in members {
             var record = ZipRecord.new(
                 name: member.name,
                 isDirectory: false,
                 modified: Date(),
-                permissions: member.permissions
+                permissions: member.permissions,
+                isSymbolicLink: false
             )
             record.setName(member.name)
-            try writer.end(try writer.begin(record), record, headerChanged: false)
+            try writer.end(try writer.begin(record, localExtra: nil, expectedSize: nil), record, headerChanged: false)
         }
-        try writer.finish()
-        try output.close()
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
         return url
     }
 
@@ -185,7 +186,7 @@ internal struct Review2ArchivesP2 {
                 "d\(Int.random(in: 0..<5, using: &generator))/e\(Int.random(in: 0..<4, using: &generator))/f\(Int.random(in: 0..<30, using: &generator))"
             switch Int.random(in: 0..<4, using: &generator) {
             case 0, 1:
-                tree.insert(ArchiveEntry(path: path, isDirectory: false, size: Int64(round)))
+                tree.insert(ArchiveEntry(path: path, isDirectory: false, size: Int64(round)), keepingOrder: false)
                 model[path] = false
 
             case 2:
@@ -244,19 +245,25 @@ internal struct Review2ArchivesP2 {
 
         // Through a file: names in an old character set survive a rewrite of the archive.
         let url = box.url("names.zip")
-        let output = try OutputFile(creating: url)
-        let writer = ZipWriter(output)
-        var old = ZipRecord.new(name: "x", isDirectory: false, modified: Date(), permissions: 0o644)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
+        var old = ZipRecord.new(
+            name: "x",
+            isDirectory: false,
+            modified: Date(),
+            permissions: 0o644,
+            isSymbolicLink: false
+        )
         old.nameBytes = dos
         old.flags &= ~ZipRecord.flagUTF8
         old.versionMadeBy = 20
-        try writer.end(try writer.begin(old), old, headerChanged: false)
-        try writer.finish()
-        try output.close()
+        try writer.end(try writer.begin(old, localExtra: nil, expectedSize: nil), old, headerChanged: false)
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
         #expect(try bench.names(bench.inside(url, "DIR")) == ["über.txt"])
         try write("new", to: bench.inside(url, "new.txt"))
-        #expect(bench.store.flushAll().isEmpty)
-        let records = try ZipDirectory.read(RandomAccessFile(url)).records
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
+        let records = try ZipDirectory.read(RandomAccessFile(url, shownAs: nil), maxEntries: .max, check: nil).records
         #expect(records.map(\.nameBytes) == [dos, Data("new.txt".utf8)])
     }
 
@@ -295,7 +302,10 @@ internal struct Review2ArchivesP2 {
                 }
             }
         ) { _, _ in .overwrite }
-        let result = unpacker.run([Unpacker.Source(archive: try bench.store.archive(at: archive))], into: target)
+        let result = unpacker.run(
+            [Unpacker.Source(archive: try bench.store.archive(at: archive, cancellation: nil))],
+            into: target
+        )
         #expect(swapped.all == ["dir/sub/planted.txt"])
         // Nothing arrived at the place the link points to.
         #expect(try fm.contentsOfDirectory(atPath: outside.appendingPathComponent("sub").path).isEmpty)
@@ -365,7 +375,7 @@ internal struct Review2ArchivesP2 {
         try tar.write(to: box.url("absolute.tar"))
 
         // Listed without the leading slashes…
-        let opened = try bench.store.archive(at: zip)
+        let opened = try bench.store.archive(at: zip, cancellation: nil)
         #expect(opened.entry(inner + "/evil.txt") != nil && opened.entry("top.txt") != nil)
         #expect(opened.entries.allSatisfy { !$0.path.hasPrefix("/") })
         // …and unpacked below the target, every one of them.
@@ -435,7 +445,7 @@ internal struct Review2ArchivesP2 {
         try bench.pack([box.url("tree")], to: box.url("plain.zip"))
         // Too large for a temporary copy: every read goes through the stream.
         bench.environment.materializeLimit = 0
-        let stream = try bench.store.archive(at: box.url("stream.tar.gz"))
+        let stream = try bench.store.archive(at: box.url("stream.tar.gz"), cancellation: nil)
         #expect(!stream.allowsParallelReads)
         let folder = bench.inside(box.url("stream.tar.gz"), "tree/many", scheme: ArchiveURL.readOnlyScheme)
         let inArchive = try #require(stream.children(of: "tree/many")).sorted { $0.order < $1.order }
@@ -454,7 +464,7 @@ internal struct Review2ArchivesP2 {
         for url in ordered.dropFirst() { #expect(try bench.read(url).starts(with: Data("contents of ".utf8))) }
         #expect(stream.streamStarts - before == 1)
         // An archive that is read at any place keeps the order it was asked in.
-        _ = try bench.store.archive(at: box.url("plain.zip"))
+        _ = try bench.store.archive(at: box.url("plain.zip"), cancellation: nil)
         let zipFolder = bench.inside(box.url("plain.zip"), "tree/many")
         let asked = (0..<12).reversed().map { zipFolder.appending(name: "file\($0).txt") }
         #expect(bench.zip.readOrder(of: asked) == asked)
@@ -470,11 +480,11 @@ internal struct Review2ArchivesP2 {
         try bench.pack([box.url("tree")], to: box.url("full.tar.gz")) { $0.format = .compressedTar(.gzip) }
         try bench.pack([box.url("little")], to: box.url("short.tar.gz")) { $0.format = .compressedTar(.gzip) }
         bench.environment.materializeLimit = 0
-        let archive = try bench.store.archive(at: box.url("full.tar.gz"))
+        let archive = try bench.store.archive(at: box.url("full.tar.gz"), cancellation: nil)
         let wanted = archive.entries.filter { !$0.isDirectory }
         #expect(wanted.count > 8 && !archive.allowsParallelReads)
         var delivered = 0
-        try archive.readInOnePass(wanted, throughTheEnd: false) { _, stream in
+        try archive.readInOnePass(wanted, cancellation: nil, throughTheEnd: false) { _, stream in
             while try stream.read(upToCount: 1 << 16) != nil {}
             delivered += 1
         }
@@ -486,7 +496,7 @@ internal struct Review2ArchivesP2 {
         try handle.close()
         delivered = 0
         #expect(throws: (any Error).self) {
-            try archive.readInOnePass(wanted, throughTheEnd: false) { _, stream in
+            try archive.readInOnePass(wanted, cancellation: nil, throughTheEnd: false) { _, stream in
                 while try stream.read(upToCount: 1 << 16) != nil {}
                 delivered += 1
             }
@@ -541,7 +551,8 @@ internal struct Review2ArchivesP2 {
         plugin.prepareToQuit(cancellation: CancellationFlag()) { done = true }
         #expect(done && plugin.shouldTerminate())
 
-        let writer = try plugin.store.archive(at: archive).write("tree/at-quit.txt")
+        let writer = try plugin.store.archive(at: archive, cancellation: nil)
+            .write("tree/at-quit.txt", level: nil, password: nil)
         try writer.write(Data("kept".utf8))
         try writer.close(attributes: FileAttributes())
         #expect(plugin.hasPendingChanges && !listed(archive).contains("tree/at-quit.txt"))
@@ -558,8 +569,8 @@ internal struct Review2ArchivesP2 {
         let plugin = ArchivesPlugin(flushDelay: nil, launchesApplications: false)
         let reports = Collected<String>()
         plugin.environment.reportFailure = { error, _ in reports.add(error.localizedDescription) }
-        let opened = try plugin.store.archive(at: archive)
-        let writer = try opened.write("tree/unwritten.txt")
+        let opened = try plugin.store.archive(at: archive, cancellation: nil)
+        let writer = try opened.write("tree/unwritten.txt", level: nil, password: nil)
         try writer.write(Data("unwritten".utf8))
         try writer.close(attributes: FileAttributes())
 
@@ -571,7 +582,7 @@ internal struct Review2ArchivesP2 {
         Thread.detachNewThread {
             // (The changes that wait are written first by this call; these come after.)
             try? opened.whileHoldingFile(cancellation: nil) { _ in
-                if let late = try? opened.write("tree/late.txt") {
+                if let late = try? opened.write("tree/late.txt", level: nil, password: nil) {
                     try? late.write(Data("late".utf8))
                     try? late.close(attributes: FileAttributes())
                 }
@@ -618,13 +629,13 @@ internal struct Review2ArchivesP2 {
             // for the archive file, to be over before the stop gives up on it.)
             plugin.environment.quitTimeout = endable ? 3 : 0.2
             plugin.environment.immediateWriteLimit = 0
-            let opened = try plugin.store.archive(at: archive)
+            let opened = try plugin.store.archive(at: archive, cancellation: nil)
             let (holding, release, released) = (
                 DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), DispatchSemaphore(value: 0)
             )
             @Sendable
             func add(_ path: String) {
-                guard let writer = try? opened.write(path) else {
+                guard let writer = try? opened.write(path, level: nil, password: nil) else {
                     return
                 }
                 try? writer.write(Data("added".utf8))
@@ -719,7 +730,7 @@ internal struct Review2ArchivesP2 {
         next.forEach { $0.work() }
         #expect(bench.store.hasPendingChanges && !listed(archive).contains("tree/third.txt"))
         bench.environment.isStopping = false
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
     }
 
     @Test
@@ -772,7 +783,7 @@ internal struct Review2ArchivesP2 {
         due[0].work()
         #expect(clock.take().first?.delay == 30)
         #expect(chmod(box.url("locked").path, 0o755) == 0)
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
     }
 
     // MARK: New members next to an archive on another volume (A046), and the lock (A104)
@@ -782,7 +793,7 @@ internal struct Review2ArchivesP2 {
         let archive = try makeZip()
         let scratch = bench.environment.scratch.url
         // "Another volume": everything outside the temporary folder's own.
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         let asked = Collected<String>()
         // (Weak: the archive holds the environment, which holds this.)
         bench.environment.volume = { [weak opened] path in
@@ -821,7 +832,7 @@ internal struct Review2ArchivesP2 {
         #expect(asked.all.count == 2)
         #expect(try FileManager.default.contentsOfDirectory(atPath: spool.path).count == 2)
         #expect(
-            bench.store.flushAll().isEmpty && listed(archive).contains("tree/large.bin")
+            bench.store.flushAll(cancellation: nil).isEmpty && listed(archive).contains("tree/large.bin")
                 && listed(archive).contains("tree/small.txt")
         )
         #expect(runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0)
@@ -851,7 +862,7 @@ internal struct Review2ArchivesP2 {
         #expect(chmod(archive.path, 0o644) == 0)
         // …and one that is no ZIP says that it cannot be changed, not that the file is locked.
         try bench.pack([box.url("tree")], to: box.url("plain.tar")) { $0.format = .tar }
-        let tar = try bench.store.archive(at: box.url("plain.tar"))
+        let tar = try bench.store.archive(at: box.url("plain.tar"), cancellation: nil)
         #expect(chmod(box.url("plain.tar").path, 0o444) == 0)
         do {
             try tar.makeDirectory("tree/new")
@@ -876,7 +887,7 @@ internal struct Review2ArchivesP2 {
             cancellation: flag
         )
         try bench.zip.remove(bench.inside(archive, "tree/empty.txt"), cancellation: flag)
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
         #expect(listed(archive).contains("tree/made/y.txt") && !listed(archive).contains("tree/empty.txt"))
         flag.cancel()
         #expect(throws: (any Error).self) {

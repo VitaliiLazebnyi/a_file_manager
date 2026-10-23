@@ -111,7 +111,7 @@ internal struct ArchiveAdoption {
         let root = bench.inside(archive)
         // Not opened yet: the scheme's word. Opened: the archive's own.
         #expect(bench.zip.capabilities(for: root) == [.write, .deferredWrites])
-        _ = try bench.store.archive(at: archive)
+        _ = try bench.store.archive(at: archive, cancellation: nil)
         #expect(bench.zip.capabilities(for: root.appending(name: "tree")) == [.write, .deferredWrites])
         #expect(
             bench.readOnly.capabilities(for: bench.inside(archive, "tree", scheme: ArchiveURL.readOnlyScheme)) == []
@@ -119,17 +119,20 @@ internal struct ArchiveAdoption {
 
         // A ZIP that lists a name twice is read-only like the formats that cannot be changed.
         let twice = box.url("twice.zip")
-        let output = try OutputFile(creating: twice)
+        let output = try OutputFile(creating: twice, mode: 0o600)
         let writer = ZipWriter(output, limits: .standard)
         for _ in 0..<2 {
-            try writer.copyMember(.new(name: "same.txt", isDirectory: false, modified: Date(), permissions: 0o644))
+            try writer.copyMember(
+                .new(name: "same.txt", isDirectory: false, modified: Date(), permissions: 0o644, isSymbolicLink: false),
+                check: nil
+            )
         }
-        try writer.finish()
-        try output.close()
-        _ = try bench.store.archive(at: twice)
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
+        _ = try bench.store.archive(at: twice, cancellation: nil)
         #expect(bench.zip.capabilities(for: bench.inside(twice)) == [])
         try bench.pack([box.url("tree")], to: box.url("plain.tar")) { $0.format = .tar }
-        _ = try bench.store.archive(at: box.url("plain.tar"))
+        _ = try bench.store.archive(at: box.url("plain.tar"), cancellation: nil)
         #expect(bench.zip.capabilities(for: bench.inside(box.url("plain.tar"))) == [])
 
         // Nothing here continues a file.
@@ -156,7 +159,7 @@ internal struct ArchiveAdoption {
         bench.memory.capabilitiesAt = { _ in [.write, .append, .deferredWrites] }
         _ = bench.memory.addFile("/store/log.txt", "start")
         let onServer = bench.memory.url("/store/tree.zip")
-        let serverRoot = ArchiveURL.make(scheme: "zip", archive: onServer)
+        let serverRoot = ArchiveURL.make(scheme: "zip", archive: onServer, innerPath: "")
         let place = try outside(serverRoot, "/store/log.txt")
         #expect(bench.zip.capabilities(for: place) == [.write, .append, .deferredWrites])
         let appender = try bench.zip.append(to: place, at: nil, cancellation: CancellationFlag())
@@ -174,7 +177,7 @@ internal struct ArchiveAdoption {
         try bench.pack([tree], to: onServer)
         bench.store.close()
         bench.memory.capabilitiesAt = { _ in [] }
-        let root = ArchiveURL.make(scheme: "zip", archive: onServer)
+        let root = ArchiveURL.make(scheme: "zip", archive: onServer, innerPath: "")
         _ = try bench.names(root)
         #expect(bench.zip.capabilities(for: root) == [])
         #expect(throws: ArchiveError.self) { _ = try bench.zip.write(root.appending(name: "new.txt")) }
@@ -200,7 +203,7 @@ internal struct ArchiveAdoption {
 
         try bench.zip.commit(tree.appending(name: "anything"), cancellation: CancellationFlag())
         #expect(isSound(archive))
-        #expect(try !bench.store.archive(at: archive).hasPendingChanges)
+        #expect(try !bench.store.archive(at: archive, cancellation: nil).hasPendingChanges)
         let names = listed(archive)
         #expect(names.contains("tree/new.txt") && names.contains("tree/made/") && !names.contains("tree/empty.txt"))
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/new.txt"]).output.count == 900_000)
@@ -246,7 +249,7 @@ internal struct ArchiveAdoption {
         for _ in 0..<2 {
             #expect(throws: (any Error).self) { try bench.zip.commit(tree, cancellation: CancellationFlag()) }
             #expect(FileSignature.of(archive.path) == before && isSound(archive))
-            #expect(try bench.store.archive(at: archive).hasPendingChanges)
+            #expect(try bench.store.archive(at: archive, cancellation: nil).hasPendingChanges)
             #expect(try bench.read(tree.appending(name: "new.txt")) == Data("precious".utf8))
         }
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: box.root.path)
@@ -263,7 +266,11 @@ internal struct ArchiveAdoption {
         try bench.pack([tree], to: box.url("inner.zip"))
         try bench.pack([box.url("inner.zip")], to: box.url("outer.zip"))
         bench.environment.immediateWriteLimit = 0
-        let inner = ArchiveURL.make(scheme: "zip", archive: bench.inside(box.url("outer.zip"), "inner.zip"))
+        let inner = ArchiveURL.make(
+            scheme: "zip",
+            archive: bench.inside(box.url("outer.zip"), "inner.zip"),
+            innerPath: ""
+        )
         #expect(bench.zip.capabilities(for: inner) == [.write, .deferredWrites])
         try write("deep", to: inner.appending(name: "tree").appending(name: "added.txt"))
         try bench.zip.commit(inner, cancellation: CancellationFlag())
@@ -278,13 +285,13 @@ internal struct ArchiveAdoption {
         bench.memory.capabilitiesAt = { _ in [.write, .deferredWrites] }
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
-        let root = ArchiveURL.make(scheme: "zip", archive: onServer)
+        let root = ArchiveURL.make(scheme: "zip", archive: onServer, innerPath: "")
         try write("late", to: root.appending(name: "late.txt"))
         #expect(bench.memory.commits.isEmpty)
         try bench.zip.commit(root, cancellation: CancellationFlag())
         // Uploaded, and then the server was told to make it durable.
         #expect(bench.memory.commits == ["/store/tree.zip"])
-        #expect(try !bench.store.archive(at: onServer).hasPendingChanges)
+        #expect(try !bench.store.archive(at: onServer, cancellation: nil).hasPendingChanges)
         let reader = try bench.memory.read(onServer)
         var bytes = Data()
         while let block = try reader.read(upToCount: 1 << 20) { bytes.append(block) }
@@ -347,7 +354,11 @@ internal struct ArchiveAdoption {
             monitor: bench.monitor,
             options: options
         )
-        let failed = packer.run([try bench.item(box.url("src/c.txt"))], archive: bench.memory.url("/store/c.tar"))
+        let failed = packer.run(
+            [try bench.item(box.url("src/c.txt"))],
+            archive: bench.memory.url("/store/c.tar"),
+            innerFolder: ""
+        )
         #expect(failed.failure != nil && failed.completed.isEmpty && box.exists("src/c.txt"))
         #expect(bench.memory.commits == ["/store/c.tar"])
     }
@@ -382,7 +393,7 @@ internal struct ArchiveAdoption {
     @Test
     internal func aReaderIsEndedFromAnotherThreadAndStaysEnded() throws {
         let source = EndlessDeflate()
-        let reader = try ArchiveMemberReader { slot in
+        let reader = try ArchiveMemberReader(cancellation: nil) { slot in
             let control = StreamInterrupt()
             slot.use(control)
             return InflateStream(source, wrapping: .raw, control: control)
@@ -420,7 +431,7 @@ internal struct ArchiveAdoption {
         let archive = box.url("tree.tar.gz")
         try bench.pack([tree], to: archive) { $0.format = .compressedTar(.gzip) }
         let root = bench.inside(archive, "tree", scheme: ArchiveURL.readOnlyScheme)
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         #expect(!opened.allowsParallelReads)
         let big = try Data(contentsOf: tree.appendingPathComponent("big.log"))
         let readme = try Data(contentsOf: tree.appendingPathComponent("readme.txt"))
@@ -499,7 +510,7 @@ internal struct ArchiveAdoption {
         let flag = CancellationFlag()
         // The server never answers; the request comes from a thread of its own.
         signal(when: { true }) { flag.cancel() }
-        let root = ArchiveURL.make(scheme: "zip", archive: onServer)
+        let root = ArchiveURL.make(scheme: "zip", archive: onServer, innerPath: "")
         #expect(throws: ArchiveError.self) { _ = try bench.zip.list(root, showHidden: true, cancellation: flag) }
         #expect(bench.store.openArchive(at: onServer) == nil && scratchFiles.isEmpty)
         bench.memory.stallsReads = false
@@ -512,7 +523,7 @@ internal struct ArchiveAdoption {
         let tree = try bench.makeTree()
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
-        let root = ArchiveURL.make(scheme: "zip", archive: onServer)
+        let root = ArchiveURL.make(scheme: "zip", archive: onServer, innerPath: "")
         _ = bench.memory.addFile("/store/log.txt", String(repeating: "x", count: 1_000))
         let place = try outside(root, "/store/log.txt")
         #expect(bench.zip.item(at: place, cancellation: CancellationFlag())?.size == 1_000)
@@ -551,7 +562,7 @@ internal struct ArchiveAdoption {
         #expect(throws: ArchiveError.self) { try writer.close(attributes: FileAttributes()) }
         // Nothing joined the archive, and it is not held open for a writer that is gone.
         #expect(try bench.names(tree).contains("never.txt") == false)
-        #expect(try !bench.store.archive(at: archive).isBusy)
+        #expect(try !bench.store.archive(at: archive, cancellation: nil).isBusy)
     }
 
     // MARK: Quarantine
@@ -589,7 +600,7 @@ internal struct ArchiveAdoption {
         let onServer = bench.memory.url("/store/tree.zip")
         try bench.pack([tree], to: onServer)
         bench.memory.quarantineValue = Data("0081;downloaded".utf8)
-        let root = ArchiveURL.make(scheme: "zip", archive: onServer)
+        let root = ArchiveURL.make(scheme: "zip", archive: onServer, innerPath: "")
         #expect(bench.zip.quarantine(of: root.appending(name: "tree")) == Data("0081;downloaded".utf8))
         // For places outside the archive the file system is asked, and marked.
         let place = try outside(root, "/store/other.txt")

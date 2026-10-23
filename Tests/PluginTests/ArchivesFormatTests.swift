@@ -140,8 +140,11 @@ internal final class ArchiveBench: @unchecked Sendable {
     {
         var options = UnpackOptions()
         configure(&options)
-        let unpacker = Unpacker(fileSystems: fileSystems, monitor: monitor, options: options) { _, _ in .overwrite }
-        return unpacker.run([Unpacker.Source(archive: try store.archive(at: archive))], into: target)
+        let unpacker = Unpacker(fileSystems: fileSystems, monitor: monitor, options: options, whileUnpacking: nil) {
+            _,
+            _ in .overwrite
+        }
+        return unpacker.run([Unpacker.Source(archive: try store.archive(at: archive, cancellation: nil))], into: target)
     }
 
     /// The location of a path inside an archive file.
@@ -224,7 +227,7 @@ internal struct ArchiveFormats {
         // No temporary file stays next to the archive.
         #expect(namesOnDisk(box.url("out")) == [archive.lastPathComponent])
 
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         #expect(opened.format == format)
         let root = bench.inside(
             archive,
@@ -256,7 +259,7 @@ internal struct ArchiveFormats {
         let attributes = try FileManager.default.attributesOfItem(atPath: box.url("back/tree/readme.txt").path)
         #expect(attributes[.posixPermissions] as? Int == 0o755)
         #expect(attributes[.modificationDate] as? Date == Date(timeIntervalSince1970: 1_600_000_000))
-        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty)
+        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil).isEmpty)
     }
 
     @Test(arguments: [ArchiveFormat.Codec.gzip, .bzip2, .xz])
@@ -291,7 +294,7 @@ internal struct ArchiveFormats {
         try bench.pack([tree], to: archive) { $0.format = .compressedTar(.gzip) }
         // Nothing may be kept in a temporary copy: every read decompresses from the start.
         bench.environment.materializeLimit = 0
-        let opened = try bench.store.archive(at: archive)
+        let opened = try bench.store.archive(at: archive, cancellation: nil)
         #expect(!opened.allowsParallelReads)
         let root = bench.inside(archive, "tree", scheme: ArchiveURL.readOnlyScheme)
         #expect(
@@ -306,7 +309,7 @@ internal struct ArchiveFormats {
         // Unpacking takes one pass, and so does the test.
         let unpacked = try bench.unpack(archive, to: box.url("back"))
         #expect(unpacked.problems.isEmpty && snapshot(box.url("back/tree")) == snapshot(tree))
-        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty)
+        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil).isEmpty)
 
         let single = box.url("big.log.gz")
         try bench.pack([tree.appendingPathComponent("big.log")], to: single) { $0.format = .compressedFile(.gzip) }
@@ -369,7 +372,7 @@ internal struct ArchiveFormats {
         func check(_ archive: URL, _ format: ArchiveFormat, sourceLocation: Testing.SourceLocation = #_sourceLocation)
             throws
         {
-            let opened = try bench.store.archive(at: archive)
+            let opened = try bench.store.archive(at: archive, cancellation: nil)
             #expect(opened.format == format, sourceLocation: sourceLocation)
             let folder = try box.folder("out-" + archive.lastPathComponent)
             let result = try bench.unpack(archive, to: folder)
@@ -388,7 +391,7 @@ internal struct ArchiveFormats {
                 )
             }
             #expect(
-                ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty,
+                ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil).isEmpty,
                 sourceLocation: sourceLocation
             )
         }
@@ -429,7 +432,7 @@ internal struct ArchiveFormats {
         )
 
         // A file that is no archive says so.
-        #expect(throws: ArchiveError.self) { try bench.store.archive(at: box.url("one.txt")) }
+        #expect(throws: ArchiveError.self) { try bench.store.archive(at: box.url("one.txt"), cancellation: nil) }
         #expect(bench.fileSystems.item(at: bench.inside(box.url("one.txt"), "x")) == nil)
     }
 
@@ -443,50 +446,54 @@ internal struct ArchiveFormats {
 
         func write(_ sizes: [Int], limits: ZipLimits) throws -> (url: URL, zip64: Bool) {
             let url = box.url("z-\(UUID().uuidString).zip")
-            let output = try OutputFile(creating: url)
-            let packer = ZipPacker(output, level: 6, limits: limits)
+            let output = try OutputFile(creating: url, mode: 0o600)
+            let packer = ZipPacker(output, level: 6, password: nil, encryption: .aes256, limits: limits)
             for (index, size) in sizes.enumerated() {
                 var sent = false
                 let record = ZipRecord.new(
                     name: "file\(index).txt",
                     isDirectory: false,
                     modified: Date(),
-                    permissions: 0o644
+                    permissions: 0o644,
+                    isSymbolicLink: false
                 )
-                try packer.add(record, expectedSize: UInt64(size)) {
+                try packer.add(record, expectedSize: UInt64(size), stored: false) {
                     defer { sent = true }
                     return sent || size == 0 ? nil : Data(repeating: UInt8(65 + index % 26), count: size)
                 }
             }
-            try packer.finish()
-            try output.close()
+            try packer.finish(comment: Data())
+            try output.close(durably: false)
             return (url, packer.writer.usedZip64)
         }
 
         // Below every limit: a classic archive.
         var small = try write([100, 200, 0], limits: ZipLimits(maxField: 100_000, maxEntries: 3))
-        #expect(try !small.zip64 && !ZipDirectory.read(RandomAccessFile(small.url)).isZip64)
+        #expect(
+            try !small.zip64
+                && !ZipDirectory.read(RandomAccessFile(small.url, shownAs: nil), maxEntries: .max, check: nil).isZip64
+        )
         // One member more than the end record can count.
         small = try write([100, 200, 0, 5], limits: ZipLimits(maxField: 100_000, maxEntries: 3))
         #expect(small.zip64)
-        var contents = try ZipDirectory.read(RandomAccessFile(small.url))
+        var contents = try ZipDirectory.read(RandomAccessFile(small.url, shownAs: nil), maxEntries: .max, check: nil)
         #expect(contents.isZip64 && contents.records.count == 4)
         #expect(runTool("/usr/bin/unzip", ["-tq", small.url.path]).status == 0)
         // A member larger than the size fields, and members behind an offset that does not fit.
         let large = try write([5_000, 300, 300], limits: ZipLimits(maxField: 1_000, maxEntries: 100))
         #expect(large.zip64)
-        contents = try ZipDirectory.read(RandomAccessFile(large.url))
+        contents = try ZipDirectory.read(RandomAccessFile(large.url, shownAs: nil), maxEntries: .max, check: nil)
         #expect(contents.records.map(\.uncompressedSize) == [5_000, 300, 300])
         let check = runTool("/usr/bin/unzip", ["-tq", large.url.path])
         #expect(check.status == 0, "\(check.output)")
-        let opened = try bench.store.archive(at: large.url)
-        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty)
+        let opened = try bench.store.archive(at: large.url, cancellation: nil)
+        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil).isEmpty)
         #expect(try bench.read(bench.inside(large.url, "file0.txt")) == Data(repeating: 65, count: 5_000))
 
         // Changing such an archive keeps it readable.
         bench.environment.limits = ZipLimits(maxField: 1_000, maxEntries: 100)
         try bench.zip.remove(bench.inside(large.url, "file1.txt"))
-        try bench.store.flush(large.url)
+        try bench.store.flush(large.url, cancellation: nil)
         #expect(runTool("/usr/bin/unzip", ["-tq", large.url.path]).status == 0)
         #expect(try bench.names(bench.inside(large.url)) == ["file0.txt", "file2.txt"])
     }
@@ -496,8 +503,8 @@ internal struct ArchiveFormats {
         // More members than the classic end record can count: a real ZIP64 archive.
         let count = 70_000
         let url = box.url("many.zip")
-        let output = try OutputFile(creating: url)
-        let packer = ZipPacker(output, level: 6)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let packer = ZipPacker(output, level: 6, password: nil, encryption: .aes256, limits: .standard)
         let stamp = Date(timeIntervalSince1970: 1_700_000_000)
         for index in 0..<count {
             var sent = false
@@ -505,15 +512,16 @@ internal struct ArchiveFormats {
                 name: "folder\(index % 100)/file\(index).txt",
                 isDirectory: false,
                 modified: stamp,
-                permissions: 0o644
+                permissions: 0o644,
+                isSymbolicLink: false
             )
-            try packer.add(record, expectedSize: 4) {
+            try packer.add(record, expectedSize: 4, stored: false) {
                 defer { sent = true }
                 return sent ? nil : Data("\(index % 10)abc".utf8)
             }
         }
-        try packer.finish()
-        try output.close()
+        try packer.finish(comment: Data())
+        try output.close(durably: false)
         #expect(packer.writer.usedZip64)
 
         let started = Date()
@@ -559,7 +567,7 @@ internal struct ArchiveFormats {
         }
         #expect(runTool("/usr/bin/unzip", ["-tq", "-P", "open sesame", own.path]).status == 0)
         #expect(runTool("/usr/bin/unzip", ["-tq", "-P", "nope", own.path]).status != 0)
-        #expect(try bench.store.archive(at: own).hasEncryptedMembers)
+        #expect(try bench.store.archive(at: own, cancellation: nil).hasEncryptedMembers)
 
         // Three wrong answers end the attempt with a clear error. (With AES, whose check of the
         // password lets a wrong one through once in 65,536 times; the old way's check, once in 256
@@ -584,8 +592,8 @@ internal struct ArchiveFormats {
         let tree = try bench.makeTree()
         let archive = box.url("tree.zip")
         try bench.pack([tree], to: archive) { $0.level = 0 }
-        var opened = try bench.store.archive(at: archive)
-        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag()).isEmpty)
+        var opened = try bench.store.archive(at: archive, cancellation: nil)
+        #expect(ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil).isEmpty)
 
         // One byte in the middle of the stored random data is flipped.
         var bytes = try Data(contentsOf: archive)
@@ -593,8 +601,8 @@ internal struct ArchiveFormats {
         let position = try #require(bytes.range(of: needle)).lowerBound + 1_000
         bytes[position] ^= 0xFF
         try bytes.write(to: archive)
-        opened = try bench.store.archive(at: archive)
-        let problems = ArchiveTester.test(opened, cancellation: CancellationFlag())
+        opened = try bench.store.archive(at: archive, cancellation: nil)
+        let problems = ArchiveTester.test(opened, cancellation: CancellationFlag(), counter: nil, only: nil)
         #expect(
             problems.count == 1 && problems.first?.contains("random.bin") == true
                 && problems.first?.contains("CRC") == true
@@ -613,8 +621,10 @@ internal struct ArchiveFormats {
         deflated.replaceSubrange((log + 2_000)..<(log + 2_040), with: Data(repeating: 0x55, count: 40))
         try deflated.write(to: box.url("deflated.zip"))
         let broken = ArchiveTester.test(
-            try bench.store.archive(at: box.url("deflated.zip")),
-            cancellation: CancellationFlag()
+            try bench.store.archive(at: box.url("deflated.zip"), cancellation: nil),
+            cancellation: CancellationFlag(),
+            counter: nil,
+            only: nil
         )
         #expect(broken.count == 1 && broken.first?.contains("big.log") == true)
 
@@ -623,27 +633,33 @@ internal struct ArchiveFormats {
         tar[600] = 0x7F
         tar[512] = 0x7F
         try tar.write(to: box.url("tree.tar"))
-        #expect(throws: ArchiveError.self) { try bench.store.archive(at: box.url("tree.tar")) }
+        #expect(throws: ArchiveError.self) { try bench.store.archive(at: box.url("tree.tar"), cancellation: nil) }
     }
 
     @Test
     internal func namesDatesAndAttributesOfForeignZips() throws {
         // A ZIP as a DOS program writes it: backslashes, DOS attributes, a code-page name.
         let url = box.url("dos.zip")
-        let output = try OutputFile(creating: url)
-        let writer = ZipWriter(output)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
         var record = ZipRecord()
         record.versionMadeBy = 20
         record.nameBytes = Data([0x44, 0x49, 0x52, 0x5C, 0x81, 0x62, 0x65, 0x72, 0x2E, 0x74, 0x78, 0x74])  // DIR\über.txt in code page 437
         record.externalAttributes = 0x21
         (record.dosTime, record.dosDate) = DOSTime.encode(DOSTime.date(time: 0x6000, date: 0x5221))
-        try writer.end(try writer.begin(record), record, headerChanged: false)
+        try writer.end(try writer.begin(record, localExtra: nil, expectedSize: nil), record, headerChanged: false)
         // Paths that try to leave the folder they are unpacked into are not shown and not unpacked.
-        var evil = ZipRecord.new(name: "../../evil.txt", isDirectory: false, modified: Date(), permissions: 0o644)
+        var evil = ZipRecord.new(
+            name: "../../evil.txt",
+            isDirectory: false,
+            modified: Date(),
+            permissions: 0o644,
+            isSymbolicLink: false
+        )
         evil.setName("../../evil.txt")
-        try writer.end(try writer.begin(evil), evil, headerChanged: false)
+        try writer.end(try writer.begin(evil, localExtra: nil, expectedSize: nil), evil, headerChanged: false)
         try writer.finish(comment: Data("a comment".utf8))
-        try output.close()
+        try output.close(durably: false)
 
         let root = bench.inside(url)
         #expect(try bench.names(root) == ["DIR"])
@@ -660,7 +676,7 @@ internal struct ArchiveFormats {
         )
         // The comment survives a change of the archive.
         try bench.zip.createDirectory(at: root.appending(name: "new"))
-        try bench.store.flush(url)
+        try bench.store.flush(url, cancellation: nil)
         #expect(runTool("/usr/bin/unzip", ["-z", url.path]).output.contains("a comment"))
     }
 
@@ -687,7 +703,7 @@ internal struct ArchiveFormats {
         header.size = 0o100000000000
         let blocks = header.encoded()
         #expect(blocks.count == 3 * 512)
-        let reader = TarReader(DataStream(blocks + Data(count: 1_024)))
+        let reader = TarReader(DataStream(blocks + Data(count: 1_024)), control: nil)
         let read = try #require(try reader.next())
         #expect(read.path == unsplittable && read.size == 0o100000000000)
         parsed = try #require(TarHeader.parse(TarHeader(path: "dir", kind: .directory).encoded()))
@@ -712,17 +728,17 @@ internal struct ArchiveFormats {
             (.gzip(level: 1), "empty.gz")
         ] {
             let url = box.url(name)
-            let output = try OutputFile(creating: url)
-            let compressor = try ParallelCompressor(method, to: output)
+            let output = try OutputFile(creating: url, mode: 0o600)
+            let compressor = try ParallelCompressor(method, to: output, modified: Date())
             if name != "empty.gz" {
                 try compressor.write(data.prefix(1_000_000))
                 try compressor.write(data.dropFirst(1_000_000))
             }
             try compressor.finish()
-            try output.close()
-            let file = try RandomAccessFile(url)
+            try output.close(durably: false)
+            let file = try RandomAccessFile(url, shownAs: nil)
             let codec: ArchiveFormat.Codec = name.hasSuffix("gz") ? .gzip : name.hasSuffix("bz2") ? .bzip2 : .xz
-            let stream = try codec.decompressing(file)
+            let stream = try codec.decompressing(file, control: nil)
             var back = Data()
             while let block = try stream.read(upToCount: 100_000) { back.append(block) }
             stream.close()
@@ -785,13 +801,14 @@ internal struct ArchiveFormats {
     internal func aChildProcessIsStoppedWhenItsStreamIsClosed() throws {
         let tree = try bench.makeTree()
         try bench.pack([tree], to: box.url("tree.tar.bz2")) { $0.format = .compressedTar(.bzip2) }
-        let stream = try ProcessStream(Tool.bzip2, ["-dc", "--", box.url("tree.tar.bz2").path])
+        let stream = try ProcessStream(Tool.bzip2, ["-dc", "--", box.url("tree.tar.bz2").path], control: nil)
         #expect(try stream.read(upToCount: 512)?.isEmpty == false)
         stream.close()
         // A tool that fails says why.
         let failing = try ProcessStream(
             Tool.bsdtar,
-            ["-cf", "-", "--format", "pax", "@" + box.url("missing.7z").path]
+            ["-cf", "-", "--format", "pax", "@" + box.url("missing.7z").path],
+            control: nil
         )
         #expect(throws: ArchiveError.self) { while try failing.read(upToCount: 4_096) != nil {} }
         // Arguments reach the tool as they are: no shell reads the name.

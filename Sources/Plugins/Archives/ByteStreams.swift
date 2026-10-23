@@ -69,7 +69,7 @@ internal final class RandomAccessFile: Sendable {
 
     /// `shownAs` names the file in messages and to child processes when it is opened under a
     /// temporary name that it is about to lose.
-    internal init(_ url: URL, shownAs: String? = nil) throws {
+    internal init(_ url: URL, shownAs: String?) throws {
         path = shownAs ?? url.path
         descriptor = open(url.path, O_RDONLY)
         var status = stat()
@@ -216,7 +216,7 @@ internal final class FileRangeStream: SeekableStream {
     private let end: UInt64
 
     /// A stretch that reaches past the end of the file (a damaged directory) ends with the file.
-    internal init(_ file: RandomAccessFile, offset: UInt64 = 0, length: UInt64? = nil) {
+    internal init(_ file: RandomAccessFile, offset: UInt64, length: UInt64?) {
         self.file = file
         let first = min(offset, file.size)
         start = first
@@ -324,7 +324,7 @@ internal final class TeeStream: ByteStream {
 
     private let room: SpaceWatch?
 
-    internal init(_ source: any ByteStream, to output: OutputFile, limit: UInt64, room: SpaceWatch? = nil) {
+    internal init(_ source: any ByteStream, to output: OutputFile, limit: UInt64, room: SpaceWatch?) {
         self.source = source
         self.output = output
         self.limit = limit
@@ -368,7 +368,7 @@ internal final class OutputFile {
     ///
     /// It is the user's alone until whoever writes it says otherwise (`setMode`): a half-written
     /// archive is nobody else's to read.
-    internal init(creating url: URL, mode: mode_t = 0o600) throws {
+    internal init(creating url: URL, mode: mode_t) throws {
         self.url = url
         descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode)
         guard descriptor >= 0 else {
@@ -455,7 +455,7 @@ internal final class OutputFile {
 
     /// `durably` returns only when the disk holds the data: for a file that is about to take
     /// the place of another, which a rename after a loss of power must not leave half-written.
-    internal func close(durably: Bool = false) throws {
+    internal func close(durably: Bool) throws {
         guard !isClosed else {
             return
         }
@@ -568,7 +568,7 @@ internal final class SpaceWatch {
     private var full = false
 
     /// `reserve` bytes stay free whatever is written.
-    internal init(folder: URL, reserve: UInt64, step: UInt64 = 32 << 20, hasRoom: @escaping (UInt64, URL) -> Bool) {
+    internal init(folder: URL, reserve: UInt64, step: UInt64, hasRoom: @escaping (UInt64, URL) -> Bool) {
         self.folder = folder
         self.reserve = reserve
         self.hasRoom = hasRoom
@@ -636,7 +636,7 @@ internal final class ScratchFolder: @unchecked Sendable {
 
     private var listPath: String { url.path + ".external" }
 
-    internal init(in parent: URL = FileManager.default.temporaryDirectory) {
+    internal init(in parent: URL) {
         url = parent.appendingPathComponent(
             "\(Self.prefix)\(getpid())-\(UUID().uuidString)",
             isDirectory: true
@@ -661,7 +661,7 @@ internal final class ScratchFolder: @unchecked Sendable {
     ///
     /// Folders that were kept on purpose stay. Touches the disk; meant for a background thread,
     /// once at the start.
-    internal static func sweepLeftovers(in parent: URL = FileManager.default.temporaryDirectory) {
+    internal static func sweepLeftovers(in parent: URL) {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else {
             return
         }
@@ -706,7 +706,7 @@ internal final class ScratchFolder: @unchecked Sendable {
         Self.lock.unlock()
     }
 
-    internal func newFile(_ suffix: String = "tmp") throws -> URL {
+    internal func newFile(_ suffix: String) throws -> URL {
         try prepare()
         return url.appendingPathComponent(UUID().uuidString + "." + suffix, isDirectory: false)
     }

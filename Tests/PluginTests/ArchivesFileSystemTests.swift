@@ -34,7 +34,7 @@ internal struct ArchiveFileSystems {
     @Test
     internal func urlsCarryTheArchiveAndThePathInside() throws {
         let archive = URL(fileURLWithPath: "/Users/me/my photos.zip")
-        let root = ArchiveURL.make(scheme: "zip", archive: archive)
+        let root = ArchiveURL.make(scheme: "zip", archive: archive, innerPath: "")
         #expect(
             root.scheme == "zip" && root.path == "/Users/me/my photos.zip" && root.lastPathComponent == "my photos.zip"
         )
@@ -183,7 +183,7 @@ internal struct ArchiveFileSystems {
         )
 
         // Everything is visible at once, before the archive file is touched.
-        #expect(FileSignature.of(archive.path) == before && bench.store.flushAll().isEmpty == true)
+        #expect(FileSignature.of(archive.path) == before && bench.store.flushAll(cancellation: nil).isEmpty == true)
         #expect(FileSignature.of(archive.path) != before)
         #expect(namesOnDisk(box.root).filter { $0.hasSuffix(".tmp") }.isEmpty)
         for _ in 0..<2 {
@@ -232,13 +232,13 @@ internal struct ArchiveFileSystems {
         #expect(try bench.names(bench.inside(box.url("bare.zip"), "tree/a")) == ["b"])
         try bench.zip.remove(folder.appending(name: "only.txt"))
         #expect(try bench.names(folder).isEmpty)
-        try bench.store.flush(box.url("bare.zip"))
+        try bench.store.flush(box.url("bare.zip"), cancellation: nil)
         bench.store.close()
         #expect(try bench.names(folder).isEmpty && bench.item(folder).isDirectory)
         try bench.zip.remove(folder)
         try bench.zip.remove(folder.deletingLastPathComponent())
         try bench.zip.remove(bench.inside(box.url("bare.zip"), "tree"))
-        try bench.store.flush(box.url("bare.zip"))
+        try bench.store.flush(box.url("bare.zip"), cancellation: nil)
         // An archive without members is still an archive.
         #expect(try bench.names(bench.inside(box.url("bare.zip"))).isEmpty)
         #expect(try Data(contentsOf: box.url("bare.zip")).count == 22)
@@ -289,7 +289,7 @@ internal struct ArchiveFileSystems {
         )
         Thread.sleep(forTimeInterval: 0.02)
         #expect(runTool("/usr/bin/zip", ["-q", "tree.zip", "tree/empty.txt"], in: box.root).status == 0)
-        let failures = bench.store.flushAll()
+        let failures = bench.store.flushAll(cancellation: nil)
         #expect(
             failures.count == 1
                 && failures.first?.error.localizedDescription.contains("changed by another program") == true
@@ -335,8 +335,8 @@ internal struct ArchiveFileSystems {
         #expect(try bench.names(outer) == ["inner.tar.gz", "inner.zip"])
 
         // Enter the inner archives; leaving them leads back into the outer one.
-        let innerZip = ArchiveURL.make(scheme: "zip", archive: outer.appending(name: "inner.zip"))
-        let innerTar = ArchiveURL.make(scheme: "archive", archive: outer.appending(name: "inner.tar.gz"))
+        let innerZip = ArchiveURL.make(scheme: "zip", archive: outer.appending(name: "inner.zip"), innerPath: "")
+        let innerTar = ArchiveURL.make(scheme: "archive", archive: outer.appending(name: "inner.tar.gz"), innerPath: "")
         #expect(
             try bench.names(innerZip.appending(name: "tree")) == [
                 "big.log", "empty.txt", "hollow", "readme.txt", "sub"
@@ -356,7 +356,7 @@ internal struct ArchiveFileSystems {
         // A change deep inside travels outwards: the inner archive is rewritten, then the outer.
         try write("added inside", to: innerZip.appending(name: "tree").appending(name: "added.txt"))
         try bench.zip.remove(innerZip.appending(name: "tree").appending(name: "big.log"))
-        #expect(bench.store.flushAll().isEmpty && bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty && bench.store.flushAll(cancellation: nil).isEmpty)
         bench.store.close()
         #expect(runTool("/usr/bin/unzip", ["-q", "outer.zip", "-d", "x"], in: box.root).status == 0)
         let listed = runTool("/usr/bin/unzip", ["-Z1", box.url("x/inner.zip").path]).output
@@ -375,12 +375,12 @@ internal struct ArchiveFileSystems {
         try bench.pack([tree], to: onServer)
         #expect(bench.memory.allPaths == ["/store", "/store/tree.zip"])
         // …opened there, read, changed, and added to.
-        let root = ArchiveURL.make(scheme: "zip", archive: onServer)
+        let root = ArchiveURL.make(scheme: "zip", archive: onServer, innerPath: "")
         #expect(try bench.names(root.appending(name: "tree")).count == 5)
         #expect(try bench.read(root.appending(name: "tree").appending(name: "readme.txt")).count == 17_600)
         #expect(bench.fileSystems.displayPath(root.appending(name: "tree")) == "mem:/store/tree.zip/tree")
         try bench.zip.remove(root.appending(name: "tree").appending(name: "big.log"))
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
         try box.file("more.txt", "more")
         try bench.pack([box.url("more.txt")], to: onServer, innerFolder: "tree/sub")
         #expect(bench.memory.allPaths == ["/store", "/store/tree.zip"])
@@ -399,7 +399,8 @@ internal struct ArchiveFileSystems {
             try bench.zip.remove(root.appending(name: "tree").appending(name: "empty.txt"))
         }
         #expect(
-            ArchiveFileSystem.scheme(forArchive: onServer, fileSystems: bench.fileSystems) == ArchiveURL.readOnlyScheme
+            ArchiveFileSystem.scheme(forArchive: onServer, fileSystems: bench.fileSystems, isZip: nil)
+                == ArchiveURL.readOnlyScheme
         )
     }
 
@@ -438,7 +439,7 @@ internal struct ArchiveFileSystems {
         )
         #expect(result.completed.count == 3 && answers.conflicts == ["readme.txt"] && answers.errors.isEmpty)
         // One rewrite of the archive for the whole job, however many files it brought.
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
         #expect(try bench.names(tree) == ["alpha.txt", "big.log", "empty.txt", "hollow", "more", "readme.txt", "sub"])
         #expect(runTool("/usr/bin/unzip", ["-tq", archive.path]).status == 0)
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/readme.txt"]).output == "replaced")
@@ -469,7 +470,7 @@ internal struct ArchiveFileSystems {
             to: TargetSpec(directory: bench.inside(box.url("second.zip"))),
             fileSystems: bench.fileSystems
         )
-        #expect(result.completed.count == 1 && bench.store.flushAll().isEmpty)
+        #expect(result.completed.count == 1 && bench.store.flushAll(cancellation: nil).isEmpty)
         let listed = runTool("/usr/bin/unzip", ["-Z1", box.url("second.zip").path]).output.split(separator: "\n")
             .map(
                 String.init
@@ -526,7 +527,7 @@ internal struct ArchiveFileSystems {
                     if try bench.readOnly.list(inTar, showHidden: true).count != 5 { failures.add(1) }
 
                 default:
-                    try bench.store.flush(archive)
+                    try bench.store.flush(archive, cancellation: nil)
                     if bench.zip.parent(of: tree) != bench.inside(archive) { failures.add(1) }
                 }
             } catch {
@@ -534,7 +535,7 @@ internal struct ArchiveFileSystems {
             }
         }
         #expect(failures.value == 0)
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
         let names = try bench.names(tree.appending(name: "sub"))
         #expect(names.filter { $0.hasPrefix("t") }.count == 8)
         #expect(try bench.names(tree).filter { $0.hasPrefix("moved") }.count == 8)
@@ -553,7 +554,7 @@ internal struct ArchiveFileSystems {
             monitor: bench.monitor,
             options: options
         )
-        let result = packer.run([try bench.item(tree)], archive: box.url("out/cancelled.tgz"))
+        let result = packer.run([try bench.item(tree)], archive: box.url("out/cancelled.tgz"), innerFolder: "")
         #expect(result.cancelled && result.archives.isEmpty && result.failure == nil)
         #expect(namesOnDisk(box.url("out")).isEmpty)
     }

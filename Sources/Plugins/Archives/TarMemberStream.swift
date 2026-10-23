@@ -10,7 +10,7 @@ internal final class TarMemberStream: ByteStream {
     /// With `closesReader: false` the reader goes on to the next member afterwards; `onClose`
     /// is then told, once, that the reader is free again, and whether it can still be used
     /// (it cannot after an error).
-    internal init(_ reader: TarReader, closesReader: Bool = true, onClose: ((Bool) -> Void)? = nil) {
+    internal init(_ reader: TarReader, closesReader: Bool, onClose: ((Bool) -> Void)?) {
         self.reader = reader
         self.closesReader = closesReader
         self.onClose = onClose

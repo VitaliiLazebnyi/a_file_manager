@@ -118,7 +118,7 @@ public final class ArchivesPlugin: Plugin {
         // A copy job that reads a thousand encrypted members asks for the password once.
         environment.passwordRefusalMemory = 5
         // What a crash left in the temporary folder, and next to archives, is cleared away.
-        BlockingCalls.run { ScratchFolder.sweepLeftovers() }
+        BlockingCalls.run { ScratchFolder.sweepLeftovers(in: FileManager.default.temporaryDirectory) }
         // After a delayed write the archive file has a new size and date: the panels that
         // show its folder follow.
         environment.contentsChanged = { [weak kernel] archive in
@@ -369,14 +369,15 @@ public final class ArchivesPlugin: Plugin {
     /// returns what failed, one line per archive.
     @discardableResult
     public func flushPendingChanges() -> [String] {
-        store.flushAll().map { "\($0.name): \($0.error.localizedDescription)" }
+        store.flushAll(cancellation: nil).map { "\($0.name): \($0.error.localizedDescription)" }
     }
 
     /// The location that shows the archive file at `file` as a folder, as Enter would open it.
     public func location(ofArchive file: URL, in kernel: Kernel) -> URL {
         ArchiveURL.make(
-            scheme: ArchiveFileSystem.scheme(forArchive: file, fileSystems: kernel.fileSystems),
-            archive: file
+            scheme: ArchiveFileSystem.scheme(forArchive: file, fileSystems: kernel.fileSystems, isZip: nil),
+            archive: file,
+            innerPath: ""
         )
     }
 }

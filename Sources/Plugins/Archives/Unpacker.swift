@@ -185,7 +185,7 @@ internal final class UnpackFolder: Sendable {
         permissions: UInt16,
         modified: Date,
         quarantine: Data?,
-        opened: (() -> Void)? = nil,
+        opened: (() -> Void)?,
         _ fill: ((Data) throws -> Void) throws -> Void
     ) throws {
         guard let name = names.last, PathSafety.isSafeName(name) else {
@@ -253,13 +253,13 @@ internal final class UnpackFolder: Sendable {
 internal enum ArchiveTester {
     /// Asks for the password once, before several threads would each ask for it; and only
     /// when one of the members that are wanted (`only`; all without it) is encrypted.
-    internal static func unlock(_ archive: OpenArchive, only: Set<String>? = nil) throws {
+    internal static func unlock(_ archive: OpenArchive, only: Set<String>?) throws {
         guard
             let encrypted = archive.entries.first(where: {
                 $0.isEncrypted && !$0.isDirectory && only?.contains($0.path) != false
             })
         else { return }
-        try archive.open(encrypted).close()
+        try archive.open(encrypted, slot: nil).close()
     }
 
     private static func readThrough(
@@ -285,8 +285,8 @@ internal enum ArchiveTester {
     internal static func test(
         _ archive: OpenArchive,
         cancellation: CancellationFlag,
-        counter: SharedCounter? = nil,
-        only: Set<String>? = nil
+        counter: SharedCounter?,
+        only: Set<String>?
     ) -> [String] {
         // One operation: once the user has declined to give a password, no member asks again.
         archive.withPasswordScope { testInScope(archive, cancellation: cancellation, counter: counter, only: only) }
@@ -441,7 +441,7 @@ internal final class Unpacker: @unchecked Sendable {
         fileSystems: FileSystemRegistry,
         monitor: any JobMonitor,
         options: UnpackOptions,
-        whileUnpacking: (@Sendable (ArchiveEntry) -> Void)? = nil,
+        whileUnpacking: (@Sendable (ArchiveEntry) -> Void)?,
         askConflict: @escaping (_ existing: FileItem, _ entry: ArchiveEntry) -> UnpackConflictChoice
     ) {
         self.fileSystems = fileSystems

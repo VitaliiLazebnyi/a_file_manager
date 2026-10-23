@@ -15,7 +15,7 @@ internal struct CoverageArchivesFSTreeTests {
     @Test
     internal func aFileHasNoChildrenAndNothingBelowIt() {
         var tree = ArchiveTree()
-        tree.insert(Self.file("folder/file.txt"))
+        tree.insert(Self.file("folder/file.txt"), keepingOrder: false)
         #expect(tree.hasChildren("folder") && tree.hasChildren(""))
         #expect(!tree.hasChildren("folder/file.txt") && !tree.hasChildren("missing"))
         #expect(tree.children(of: "folder/file.txt") == nil && tree.children(of: "missing") == nil)
@@ -28,10 +28,10 @@ internal struct CoverageArchivesFSTreeTests {
     @Test
     internal func aFolderThatIsMadeUpCountsWhenItIsInsertedAsSuch() {
         var tree = ArchiveTree()
-        tree.insert(ArchiveEntry(path: "made/up", isDirectory: true, isImplicit: true))
+        tree.insert(ArchiveEntry(path: "made/up", isDirectory: true, isImplicit: true), keepingOrder: false)
         // Its own path, and the path of the folder above it that had to be made up for it.
         #expect(tree.implicitBytes == "made/up".utf8.count + "made".utf8.count)
-        tree.insert(ArchiveEntry(path: "made/up", isDirectory: true))
+        tree.insert(ArchiveEntry(path: "made/up", isDirectory: true), keepingOrder: false)
         #expect(tree.implicitBytes == "made".utf8.count && tree.entry("made/up")?.isImplicit == false)
     }
 

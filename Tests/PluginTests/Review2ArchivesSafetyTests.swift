@@ -48,15 +48,21 @@ internal struct Review2ArchivesSafety {
     /// A ZIP written record by record, for names no packer would write.
     internal func writeZip(_ name: String, limits: ZipLimits = .standard, names: [String]) throws -> URL {
         let url = box.url(name)
-        let output = try OutputFile(creating: url)
+        let output = try OutputFile(creating: url, mode: 0o600)
         let writer = ZipWriter(output, limits: limits)
         for name in names {
-            var record = ZipRecord.new(name: name, isDirectory: false, modified: Date(), permissions: 0o644)
+            var record = ZipRecord.new(
+                name: name,
+                isDirectory: false,
+                modified: Date(),
+                permissions: 0o644,
+                isSymbolicLink: false
+            )
             record.setName(name)
-            try writer.end(try writer.begin(record), record, headerChanged: false)
+            try writer.end(try writer.begin(record, localExtra: nil, expectedSize: nil), record, headerChanged: false)
         }
-        try writer.finish()
-        try output.close()
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
         return url
     }
 
@@ -141,7 +147,7 @@ internal struct Review2ArchivesSafety {
             names.append(Array(repeating: part, count: 250).joined(separator: "/"))
         }
         let many = try writeZip("chains.zip", names: names)
-        #expect { try bench.store.archive(at: many) } throws: { error in
+        #expect { try bench.store.archive(at: many, cancellation: nil) } throws: { error in
             if case ArchiveError.unsupported = error {
                 return true
             }
@@ -150,20 +156,22 @@ internal struct Review2ArchivesSafety {
         // An archive with more entries than the memory is to hold is refused, not read.
         bench.environment.maxEntries = 3
         let crowded = try writeZip("crowded.zip", names: (0..<6).map { "f\($0).txt" })
-        #expect(throws: ArchiveError.self) { try bench.store.archive(at: crowded) }
+        #expect(throws: ArchiveError.self) { try bench.store.archive(at: crowded, cancellation: nil) }
     }
 
     @Test
     internal func theOrderOfTheTreeIsKeptWhileEntriesComeAndGo() {
         var tree = ArchiveTree()
         var generator = SystemRandomNumberGenerator()
-        for index in 0..<40 { tree.insert(ArchiveEntry(path: "d\(index % 7)/f\(index)", isDirectory: false)) }
+        for index in 0..<40 {
+            tree.insert(ArchiveEntry(path: "d\(index % 7)/f\(index)", isDirectory: false), keepingOrder: false)
+        }
         _ = tree.ordered
         for round in 0..<400 {
             let path = "d\(Int.random(in: 0..<7, using: &generator))/f\(Int.random(in: 0..<60, using: &generator))"
             switch round % 3 {
             case 0:
-                tree.insert(ArchiveEntry(path: path, isDirectory: false))
+                tree.insert(ArchiveEntry(path: path, isDirectory: false), keepingOrder: false)
 
             case 1:
                 tree.remove(path)
@@ -224,7 +232,7 @@ internal struct Review2ArchivesSafety {
         ] {
             let url = box.url(name)
             try Data((head + "photo.jpg type=file contents=\(secret.path)\n").utf8).write(to: url)
-            #expect { try bench.store.archive(at: url) } throws: { error in
+            #expect { try bench.store.archive(at: url, cancellation: nil) } throws: { error in
                 if case ArchiveError.notAnArchive = error {
                     return true
                 }
@@ -235,7 +243,7 @@ internal struct Review2ArchivesSafety {
         func kind(_ bytes: [UInt8], padding: Int = 64) throws -> ForeignArchive.Kind? {
             let url = box.url("probe-\(UUID().uuidString)")
             try Data(bytes + [UInt8](repeating: 0x41, count: padding)).write(to: url)
-            return ForeignArchive.kind(of: try RandomAccessFile(url))
+            return ForeignArchive.kind(of: try RandomAccessFile(url, shownAs: nil))
         }
         #expect(try kind([0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C, 0, 4]) == .libarchive)
         #expect(try kind([0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C, 0x0A, 0]) == nil)
@@ -278,7 +286,7 @@ internal struct Review2ArchivesSafety {
         // A folder named like an archive, reached by an archive location all the same (as a
         // typed path on a server is read): the place is the folder's.
         try box.file("folder.zip/inside.txt", "inside")
-        let through = ArchiveURL.make(scheme: ArchiveURL.writableScheme, archive: box.url("folder.zip"))
+        let through = ArchiveURL.make(scheme: ArchiveURL.writableScheme, archive: box.url("folder.zip"), innerPath: "")
         #expect(try bench.names(through) == ["inside.txt"])
     }
 
@@ -291,7 +299,10 @@ internal struct Review2ArchivesSafety {
         file.append(try XZCoder.compress(Data("second".utf8)))
         file.append(Data(count: 65_536))
         try file.write(to: box.url("padded.xz"))
-        let stream = try XZStream(FileRangeStream(try RandomAccessFile(box.url("padded.xz"))))
+        let stream = try XZStream(
+            FileRangeStream(try RandomAccessFile(box.url("padded.xz"), shownAs: nil), offset: 0, length: nil),
+            control: nil
+        )
         var data = Data()
         while let block = try stream.read(upToCount: 1 << 16) { data.append(block) }
         #expect(String(decoding: data, as: UTF8.self) == "first second")
@@ -307,7 +318,11 @@ internal struct Review2ArchivesSafety {
         var stubbed = Data(repeating: 0x90, count: 5_000)
         stubbed.append(try Data(contentsOf: plain))
         try stubbed.write(to: box.url("sfx.zip"))
-        let contents = try ZipDirectory.read(try RandomAccessFile(box.url("sfx.zip")))
+        let contents = try ZipDirectory.read(
+            try RandomAccessFile(box.url("sfx.zip"), shownAs: nil),
+            maxEntries: .max,
+            check: nil
+        )
         #expect(contents.isZip64 && contents.records.map(\.name) == ["a.txt", "b.txt", "c.txt", "d.txt"])
         #expect(try bench.names(bench.inside(box.url("sfx.zip"))) == ["a.txt", "b.txt", "c.txt", "d.txt"])
     }
@@ -337,7 +352,8 @@ internal struct Review2ArchivesSafety {
             $0.password = "open sesame"
             $0.verifies = true
         }
-        let records = try ZipDirectory.read(try RandomAccessFile(archive)).records.filter { !$0.isDirectory }
+        let records = try ZipDirectory.read(try RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil)
+            .records.filter { !$0.isDirectory }
         #expect(
             !records.isEmpty
                 && records.allSatisfy {
@@ -448,8 +464,13 @@ internal struct Review2ArchivesSafety {
         try bench.pack([tree.appendingPathComponent("readme.txt")], to: archive)
         try bench.pack([tree.appendingPathComponent("big.log")], to: archive) { $0.password = "pw" }
         bench.store.close()
-        let open = try bench.store.archive(at: archive)
-        let unpacker = Unpacker(fileSystems: bench.fileSystems, monitor: bench.monitor, options: UnpackOptions()) {
+        let open = try bench.store.archive(at: archive, cancellation: nil)
+        let unpacker = Unpacker(
+            fileSystems: bench.fileSystems,
+            monitor: bench.monitor,
+            options: UnpackOptions(),
+            whileUnpacking: nil
+        ) {
             _,
             _ in .overwrite
         }
@@ -498,8 +519,8 @@ internal struct Review2ArchivesSafety {
 
         // The folder is the user's alone, and so is what is written into it.
         let scratch = ScratchFolder(in: parent)
-        let file = try scratch.newFile()
-        try OutputFile(creating: file).close()
+        let file = try scratch.newFile("tmp")
+        try OutputFile(creating: file, mode: 0o600).close(durably: false)
         #expect((try fm.attributesOfItem(atPath: scratch.url.path)[.posixPermissions] as? Int) == 0o700)
         #expect((try fm.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int) == 0o600)
         scratch.removeAll()
@@ -515,7 +536,7 @@ internal struct Review2ArchivesSafety {
         // A stream archive is listed and read from the stream, without its unpacked copy.
         let inner = bench.inside(box.url("tree.tgz"), "tree", scheme: ArchiveURL.readOnlyScheme)
         #expect(try bench.names(inner).contains("big.log"))
-        let opened = try bench.store.archive(at: box.url("tree.tgz"))
+        let opened = try bench.store.archive(at: box.url("tree.tgz"), cancellation: nil)
         #expect(!opened.allowsParallelReads && opened.scratchBytes == 0)
         #expect(try bench.read(inner.appending(name: "readme.txt")) == Data(contentsOf: box.url("tree/readme.txt")))
         // An archive that would have to be fetched is refused with a message that says why.
@@ -524,7 +545,7 @@ internal struct Review2ArchivesSafety {
         let writer = try bench.memory.write(onServer)
         try writer.write(try Data(contentsOf: box.url("tree.zip")))
         try writer.close(attributes: FileAttributes())
-        #expect { try bench.store.archive(at: onServer) } throws: { error in
+        #expect { try bench.store.archive(at: onServer, cancellation: nil) } throws: { error in
             if case ArchiveError.noScratchRoom = error {
                 return true
             }

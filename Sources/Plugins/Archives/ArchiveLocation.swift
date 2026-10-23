@@ -45,7 +45,7 @@ internal enum ArchiveURL {
         url.scheme.map(schemes.contains) ?? false
     }
 
-    internal static func make(scheme: String, archive: URL, innerPath: String = "") -> URL {
+    internal static func make(scheme: String, archive: URL, innerPath: String) -> URL {
         let names = pathNames(of: archive)
         let archivePath = "/" + names.joined(separator: "/")
         var host = "d\(names.count)-" + checkValue(archivePath)

@@ -28,11 +28,11 @@ internal struct Opened {
             registry.register(each)
         }
         environment.fileSystems = { [weak registry] in registry }
-        let scheme = ArchiveFileSystem.scheme(forArchive: archive, fileSystems: registry)
+        let scheme = ArchiveFileSystem.scheme(forArchive: archive, fileSystems: registry, isZip: nil)
         return Self(
             store: newStore,
             fileSystems: registry,
-            root: ArchiveURL.make(scheme: scheme, archive: archive),
+            root: ArchiveURL.make(scheme: scheme, archive: archive, innerPath: ""),
             provider: scheme == ArchiveURL.writableScheme ? zip : readOnly
         )
     }

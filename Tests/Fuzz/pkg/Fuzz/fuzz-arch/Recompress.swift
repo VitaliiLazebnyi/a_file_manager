@@ -31,10 +31,10 @@ private func decompressed(_ bytes: [UInt8], _ codec: ArchiveFormat.Codec) -> [UI
     let stream: (any ByteStream)?
     switch codec {
     case .gzip:
-        stream = InflateStream(source, wrapping: .gzip)
+        stream = InflateStream(source, wrapping: .gzip, control: nil)
 
     case .xz:
-        stream = try? XZStream(source)
+        stream = try? XZStream(source, control: nil)
 
     case .bzip2:
         stream = nil
@@ -67,7 +67,7 @@ private func readAll(_ stream: any ByteStream, limit: Int) -> [UInt8] {
 private func compress(_ inner: [UInt8], _ codec: ArchiveFormat.Codec, into bytes: inout [UInt8]) {
     switch codec {
     case .gzip:
-        if let body = try? Deflater.piece(Data(inner), level: 6, final: true) {
+        if let body = try? Deflater.piece(Data(inner), level: 6, final: true, calls: .zlib) {
             bytes = gzipped(inner, body: body)
         }
 

@@ -122,7 +122,7 @@ internal struct ArchiveJobsEndToEnd {
         #expect(result.completed.count == 5 && !result.cancelled && result.failureCount == 0)
         #expect(sources.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
         // Written before the sources went: nothing waits in memory any more.
-        #expect(try !bench.store.archive(at: archive).hasPendingChanges)
+        #expect(try !bench.store.archive(at: archive, cancellation: nil).hasPendingChanges)
         #expect(isSound(archive))
         let listed = members(of: archive)
         // Every member once, none of them under the temporary name it was written with.

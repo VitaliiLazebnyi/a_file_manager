@@ -135,23 +135,24 @@ internal struct Review2ArchivesP2Memory {
     /// owner field (24 bytes of extra fields), in folders of a few hundred files.
     private func writeLargeZip(_ name: String, members: Int) throws -> URL {
         let url = box.url(name)
-        let output = try OutputFile(creating: url)
-        let writer = ZipWriter(output)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
         let modified = Date(timeIntervalSince1970: 1_700_000_000)
         for index in 0..<members {
             var record = ZipRecord.new(
                 name: "project-\(index / 40_000)/module-\(index / 400)/source-file-\(index).swift",
                 isDirectory: false,
                 modified: modified,
-                permissions: 0o644
+                permissions: 0o644,
+                isSymbolicLink: false
             )
             var extra = record.extra
             extra.append(contentsOf: [0x75, 0x78, 11, 0, 1, 4, 0xF5, 1, 0, 0, 4, 0x14, 0, 0, 0])
             record.extra = extra
-            try writer.end(try writer.begin(record), record, headerChanged: false)
+            try writer.end(try writer.begin(record, localExtra: nil, expectedSize: nil), record, headerChanged: false)
         }
-        try writer.finish()
-        try output.close()
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
         return url
     }
 
@@ -173,6 +174,8 @@ internal struct Review2ArchivesP2Memory {
                     localURL: url,
                     fetchedCopy: nil,
                     remoteStamp: nil,
+                    quarantine: nil,
+                    cancellation: nil,
                     environment: bench.environment
                 )
             }

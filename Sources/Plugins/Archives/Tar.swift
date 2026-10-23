@@ -163,12 +163,12 @@ internal struct TarHeader {
 
     private static func block(
         name: String,
-        prefix: String = "",
+        prefix: String,
         typeFlag: UInt8,
         size: UInt64,
         modified: Date,
         permissions: UInt16,
-        linkTarget: String = ""
+        linkTarget: String
     ) -> Data {
         var block = [UInt8](repeating: 0, count: blockSize)
         put(name, into: &block, at: 0, length: 100)
@@ -239,10 +239,12 @@ internal struct TarHeader {
             data.append(
                 Self.block(
                     name: "PaxHeader/" + String(name.suffix(80)),
+                    prefix: "",
                     typeFlag: 120,
                     size: UInt64(records.count),
                     modified: modified,
-                    permissions: 0o644
+                    permissions: 0o644,
+                    linkTarget: ""
                 )
             )
             data.append(records)
@@ -278,7 +280,7 @@ internal final class TarReader {
     /// when this is kept for the next member.
     internal let control: StreamInterrupt?
 
-    internal init(_ stream: any ByteStream, control: StreamInterrupt? = nil) {
+    internal init(_ stream: any ByteStream, control: StreamInterrupt?) {
         self.stream = stream
         self.control = control
     }

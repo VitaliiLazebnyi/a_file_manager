@@ -23,7 +23,7 @@ internal struct CoverageArchivesFormatsPackElsewhere {
         var options = PackOptions()
         options.format = format
         let packer = Packer(fileSystems: bench.fileSystems, store: bench.store, monitor: monitor, options: options)
-        return packer.run(try sources.map(bench.item), archive: archive)
+        return packer.run(try sources.map(bench.item), archive: archive, innerFolder: "")
     }
 
     /// An archive the store lets go just before the first change is asked for again, and takes the members.
@@ -80,13 +80,19 @@ internal struct CoverageArchivesFormatsPackElsewhere {
     @Test
     internal func aMemberLargerThanAWindowIsWrittenWhole() throws {
         let url = box.url("large.zip")
-        let output = try OutputFile(creating: url)
-        let packer = ZipPacker(output, level: 0)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let packer = ZipPacker(output, level: 0, password: nil, encryption: .aes256, limits: .standard)
         let pieces = 2 * max(2, ProcessInfo.processInfo.activeProcessorCount * 2) + 1
         for name in ["large.bin", "after.txt"] {
             var left = name == "large.bin" ? pieces : 1
-            let record = ZipRecord.new(name: name, isDirectory: false, modified: Date(), permissions: 0o644)
-            try packer.add(record, expectedSize: UInt64(left * ZipPacker.pieceSize)) {
+            let record = ZipRecord.new(
+                name: name,
+                isDirectory: false,
+                modified: Date(),
+                permissions: 0o644,
+                isSymbolicLink: false
+            )
+            try packer.add(record, expectedSize: UInt64(left * ZipPacker.pieceSize), stored: false) {
                 guard left > 0 else {
                     return nil
                 }
@@ -94,9 +100,10 @@ internal struct CoverageArchivesFormatsPackElsewhere {
                 return Data(repeating: UInt8(left & 0xFF), count: ZipPacker.pieceSize)
             }
         }
-        try packer.finish()
-        try output.close()
-        let records = try ZipDirectory.read(try RandomAccessFile(url)).records
+        try packer.finish(comment: Data())
+        try output.close(durably: false)
+        let records = try ZipDirectory.read(try RandomAccessFile(url, shownAs: nil), maxEntries: .max, check: nil)
+            .records
         #expect(records.map(\.name) == ["large.bin", "after.txt"])
         #expect(records.map(\.uncompressedSize) == [UInt64(pieces * ZipPacker.pieceSize), UInt64(ZipPacker.pieceSize)])
         let large = bench.inside(url, "large.bin")

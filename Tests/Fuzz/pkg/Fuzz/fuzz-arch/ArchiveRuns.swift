@@ -22,9 +22,9 @@ internal func runArchive(_ bytes: [UInt8], name: String) {
         }
         let opened = Opened.open(archive)
         let seen = opened.browse(readLimit: 48 << 20)
-        if pass == 0, seen.listed, let handle = try? opened.store.archive(at: archive) {
+        if pass == 0, seen.listed, let handle = try? opened.store.archive(at: archive, cancellation: nil) {
             unpackTwice(handle, with: opened.fileSystems, root: root, name: name)
-            _ = ArchiveTester.test(handle, cancellation: CancellationFlag())
+            _ = ArchiveTester.test(handle, cancellation: CancellationFlag(), counter: nil, only: nil)
         }
         opened.store.close()
         checkContainment(root, archiveName: name, what: "browse")
@@ -66,7 +66,12 @@ private func unpackTwice(_ archive: OpenArchive, with fileSystems: FileSystemReg
         var options = UnpackOptions()
         options.keepsPaths = keepsPaths
         options.overwrites = true
-        let unpacker = Unpacker(fileSystems: fileSystems, monitor: QuietMonitor(), options: options) { _, _ in
+        let unpacker = Unpacker(
+            fileSystems: fileSystems,
+            monitor: QuietMonitor(),
+            options: options,
+            whileUnpacking: nil
+        ) { _, _ in
             .overwrite
         }
         _ = unpacker.run([Unpacker.Source(archive: archive)], into: URL(fileURLWithPath: target))
@@ -92,7 +97,7 @@ private func plantLinks(in target: String) {
 
 /// The size probes that read the file directly: the XZ index, the gzip trailer and header.
 private func probeSizes(_ archive: URL, head bytes: [UInt8]) {
-    guard let file = try? RandomAccessFile(archive) else {
+    guard let file = try? RandomAccessFile(archive, shownAs: nil) else {
         return
     }
     _ = CompressedSize.ofXZ(file)

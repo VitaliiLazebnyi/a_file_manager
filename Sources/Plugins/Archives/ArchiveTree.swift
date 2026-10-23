@@ -359,7 +359,7 @@ internal struct ArchiveTree {
     /// up.
     ///
     /// With `keepingOrder` the entry keeps the position it carries.
-    internal mutating func insert(_ entry: ArchiveEntry, keepingOrder: Bool = false) {
+    internal mutating func insert(_ entry: ArchiveEntry, keepingOrder: Bool) {
         var entry = entry
         let taken = index[entry.path]
         let existing = taken.flatMap { slots[Int($0)] }
@@ -450,7 +450,7 @@ internal final class ArchiveMemberReader: FileReader, @unchecked Sendable {
     private var position: UInt64 = 0
 
     /// `cancellation` ends the opening (and only that) once it is set.
-    internal init(cancellation: CancellationFlag? = nil, _ open: @escaping (InterruptSlot) throws -> any ByteStream)
+    internal init(cancellation: CancellationFlag?, _ open: @escaping (InterruptSlot) throws -> any ByteStream)
         throws
     {
         self.open = open

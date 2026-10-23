@@ -48,7 +48,14 @@ internal struct CoverageArchivesFormatsSystemFailures {
     /// The text of the error.
     private static func failedWrite(into folder: UnpackFolder, puts: Bool) -> String? {
         CoverageArchivesFormatsSupport.failure {
-            try folder.write(["file.txt"], replacing: false, permissions: 0o644, modified: Date(), quarantine: nil) {
+            try folder.write(
+                ["file.txt"],
+                replacing: false,
+                permissions: 0o644,
+                modified: Date(),
+                quarantine: nil,
+                opened: nil
+            ) {
                 put in
                 guard pullDescriptor(where: { $0.contains("/.afm-") }) else {
                     return
@@ -65,7 +72,7 @@ internal struct CoverageArchivesFormatsSystemFailures {
     private static func closeFails(_ close: (OutputFile) throws -> Void) -> Never {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("afm-exit-\(UUID().uuidString)")
         defer { unlink(url.path) }
-        guard let output = try? OutputFile(creating: url), pullDescriptor(of: url) else {
+        guard let output = try? OutputFile(creating: url, mode: 0o600), pullDescriptor(of: url) else {
             exit(EXIT_FAILURE)
         }
         let message = CoverageArchivesFormatsSupport.failure { try close(output) }
@@ -84,7 +91,7 @@ internal struct CoverageArchivesFormatsSystemFailures {
     @Test
     internal func aFileThatFailsToCloseIsReported() async {
         await #expect(processExitsWith: .success) {
-            Self.closeFails { try $0.close() }
+            Self.closeFails { try $0.close(durably: false) }
         }
     }
 

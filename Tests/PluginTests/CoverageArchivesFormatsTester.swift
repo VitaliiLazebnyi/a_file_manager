@@ -33,7 +33,12 @@ internal struct CoverageArchivesFormatsTester {
     internal func aDeclinedPasswordIsTheProblem() throws {
         let archive = try archive(password: "secret")
         bench.passwords.set([nil])
-        let problems = ArchiveTester.test(try bench.store.archive(at: archive), cancellation: CancellationFlag())
+        let problems = ArchiveTester.test(
+            try bench.store.archive(at: archive, cancellation: nil),
+            cancellation: CancellationFlag(),
+            counter: nil,
+            only: nil
+        )
         #expect(problems == [ArchiveError.passwordNeeded("tree.zip").localizedDescription])
     }
 
@@ -45,7 +50,15 @@ internal struct CoverageArchivesFormatsTester {
         let flag = CancellationFlag()
         flag.cancel()
         let counter = SharedCounter()
-        #expect(ArchiveTester.test(try bench.store.archive(at: archive), cancellation: flag, counter: counter).isEmpty)
+        #expect(
+            ArchiveTester.test(
+                try bench.store.archive(at: archive, cancellation: nil),
+                cancellation: flag,
+                counter: counter,
+                only: nil
+            )
+            .isEmpty
+        )
         #expect(counter.value == 0)
     }
 
@@ -55,24 +68,30 @@ internal struct CoverageArchivesFormatsTester {
         // One member of 64 GB that is all hole: read to its end it would take long.
         let url = box.url("huge.zip")
         let size: UInt64 = 64 << 30
-        var record = ZipRecord.new(name: "huge.bin", isDirectory: false, modified: Date(), permissions: 0o644)
+        var record = ZipRecord.new(
+            name: "huge.bin",
+            isDirectory: false,
+            modified: Date(),
+            permissions: 0o644,
+            isSymbolicLink: false
+        )
         record.uncompressedSize = size
         record.compressedSize = size
-        let head = try OutputFile(creating: url)
-        _ = try ZipWriter(head).begin(record, expectedSize: size)
+        let head = try OutputFile(creating: url, mode: 0o600)
+        _ = try ZipWriter(head, limits: .standard).begin(record, localExtra: nil, expectedSize: size)
         let dataStart = head.position
-        try head.close()
+        try head.close(durably: false)
         let tail = try OutputFile(extending: url, from: dataStart + size)
-        let writer = ZipWriter(tail)
+        let writer = ZipWriter(tail, limits: .standard)
         writer.adopt(record, at: 0)
-        try writer.finish()
-        try tail.close()
+        try writer.finish(comment: Data())
+        try tail.close(durably: false)
 
-        let open = try bench.store.archive(at: url)
+        let open = try bench.store.archive(at: url, cancellation: nil)
         let flag = CancellationFlag()
         let counter = SharedCounter()
         let done = Signal<[String]>()
-        OtherThread.start { done.set(ArchiveTester.test(open, cancellation: flag, counter: counter)) }
+        OtherThread.start { done.set(ArchiveTester.test(open, cancellation: flag, counter: counter, only: nil)) }
         #expect(Wait.until { counter.value > 0 })
         flag.cancel()
         #expect(done.wait() == [])
@@ -84,7 +103,7 @@ internal struct CoverageArchivesFormatsTester {
     internal func anArchiveChangedUnderAPassIsReported() throws {
         bench.environment.hasRoom = { _, _ in false }
         let archive = try archive(.compressedTar(.gzip))
-        let open = try bench.store.archive(at: archive)
+        let open = try bench.store.archive(at: archive, cancellation: nil)
         #expect(!open.allowsParallelReads)
         // Another archive takes its contents, in the same file.
         try box.file("other/c.txt", "c")
@@ -94,7 +113,7 @@ internal struct CoverageArchivesFormatsTester {
         try handle.truncate(atOffset: 0)
         try handle.write(contentsOf: try Data(contentsOf: other))
         try handle.close()
-        let problems = ArchiveTester.test(open, cancellation: CancellationFlag())
+        let problems = ArchiveTester.test(open, cancellation: CancellationFlag(), counter: nil, only: nil)
         #expect(problems.count == 1 && !problems[0].hasPrefix("tree/"))
     }
 
@@ -109,7 +128,7 @@ internal struct CoverageArchivesFormatsTester {
         try box.file("tree/a.txt", text)
         let archive = box.url("tree.tar.gz")
         try bench.pack([box.url("tree")], to: archive) { $0.format = .compressedTar(.gzip) }
-        let open = try bench.store.archive(at: archive)
+        let open = try bench.store.archive(at: archive, cancellation: nil)
         // The compressed data is overwritten in place from a third on, inside the member.
         var data = try Data(contentsOf: archive)
         let start = data.count / 3
@@ -117,7 +136,7 @@ internal struct CoverageArchivesFormatsTester {
         let handle = try FileHandle(forWritingTo: archive)
         try handle.write(contentsOf: data)
         try handle.close()
-        let problems = ArchiveTester.test(open, cancellation: CancellationFlag())
+        let problems = ArchiveTester.test(open, cancellation: CancellationFlag(), counter: nil, only: nil)
         #expect(problems.first?.hasPrefix("tree/a.txt: ") == true, "\(problems) \(open.allowsParallelReads)")
     }
 

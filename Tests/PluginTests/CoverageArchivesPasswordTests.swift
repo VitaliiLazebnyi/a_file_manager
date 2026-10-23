@@ -20,7 +20,7 @@ internal struct CoverageArchivesPasswordTests {
     /// Reads a whole member.
     private static func readFully(_ archive: OpenArchive, _ path: String) throws -> Data {
         let entry = try #require(archive.entry(path))
-        let stream = try archive.open(entry)
+        let stream = try archive.open(entry, slot: nil)
         defer { stream.close() }
         return try stream.readFully(1 << 20)
     }
@@ -67,16 +67,16 @@ internal struct CoverageArchivesPasswordTests {
         while true {
             try? FileManager.default.removeItem(at: box.url("aes.zip"))
             _ = try CoverageArchives.zip("aes.zip", in: box, ["stub.txt": "stub"], options: [])
-            let archive = try bench.store.archive(at: box.url("aes.zip"))
+            let archive = try bench.store.archive(at: box.url("aes.zip"), cancellation: nil)
             try archive.remove("stub.txt")
             for member in members {
-                let writer = try archive.write(member.name, password: member.password)
+                let writer = try archive.write(member.name, level: nil, password: member.password)
                 try writer.write(Data(member.name.utf8))
                 try writer.close(attributes: FileAttributes())
             }
-            try archive.commit()
+            try archive.commit(cancellation: nil) { _, _ in true }
             bench.store.close()
-            let reopened = try bench.store.archive(at: box.url("aes.zip"))
+            let reopened = try bench.store.archive(at: box.url("aes.zip"), cancellation: nil)
             var clean = true
             for member in members {
                 let others = members.map(\.password).filter { $0 != member.password } + refused
@@ -151,7 +151,7 @@ internal struct CoverageArchivesPasswordTests {
         try box.file("plain.txt", String(repeating: "stored text ", count: 100))
         #expect(runTool("/usr/bin/zip", ["-q0", "-P", "pw", "old.zip", "plain.txt"], in: box.root).status == 0)
         try damageFirstMember(of: box.url("old.zip"), into: 12 + 600)
-        let archive = try bench.store.archive(at: box.url("old.zip"))
+        let archive = try bench.store.archive(at: box.url("old.zip"), cancellation: nil)
         bench.passwords.set(["pw", "pw"])
         #expect(throws: (any Error).self) { try read(archive, "plain.txt") }
         #expect(throws: (any Error).self) { try read(archive, "plain.txt") }
@@ -164,15 +164,15 @@ internal struct CoverageArchivesPasswordTests {
     internal func aPasswordThatFailsTheAuthenticationIsForgotten() throws {
         try box.file("stub.txt", "stub")
         #expect(runTool("/usr/bin/zip", ["-q", "aes.zip", "stub.txt"], in: box.root).status == 0)
-        let archive = try bench.store.archive(at: box.url("aes.zip"))
+        let archive = try bench.store.archive(at: box.url("aes.zip"), cancellation: nil)
         try archive.remove("stub.txt")
         let writer = try archive.write("secret.txt", level: 0, password: "pw")
         try writer.write(Data(String(repeating: "secret ", count: 200).utf8))
         try writer.close(attributes: FileAttributes())
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         bench.store.close()
         try damageFirstMember(of: box.url("aes.zip"), into: 18 + 700)
-        let reopened = try bench.store.archive(at: box.url("aes.zip"))
+        let reopened = try bench.store.archive(at: box.url("aes.zip"), cancellation: nil)
         let entry = try #require(reopened.entry("secret.txt"))
         guard case .zip(let record) = entry.content else {
             Issue.record("not a ZIP member")
@@ -193,7 +193,7 @@ internal struct CoverageArchivesPasswordTests {
         try CoverageArchives.craft(url, [(name: "aes.bin", data: Data("x".utf8))], localExtra: nil) { record in
             record.method = ZipAES.method
         }
-        let odd = try bench.store.archive(at: url)
+        let odd = try bench.store.archive(at: url, cancellation: nil)
         #expect {
             _ = try read(odd, "aes.bin")
         } throws: { error in
@@ -206,7 +206,7 @@ internal struct CoverageArchivesPasswordTests {
         try CoverageArchives.craft(other, [(name: "bzip.bin", data: Data("x".utf8))], localExtra: nil) { record in
             record.method = 12
         }
-        let bzip = try bench.store.archive(at: other)
+        let bzip = try bench.store.archive(at: other, cancellation: nil)
         #expect {
             _ = try read(bzip, "bzip.bin")
         } throws: { error in
@@ -222,8 +222,8 @@ internal struct CoverageArchivesPasswordTests {
     internal func anEmptyNewMemberReadsAsEmpty() throws {
         try box.file("stub.txt", "stub")
         #expect(runTool("/usr/bin/zip", ["-q", "empty.zip", "stub.txt"], in: box.root).status == 0)
-        let archive = try bench.store.archive(at: box.url("empty.zip"))
-        let writer = try archive.write("nothing.txt")
+        let archive = try bench.store.archive(at: box.url("empty.zip"), cancellation: nil)
+        let writer = try archive.write("nothing.txt", level: nil, password: nil)
         try writer.close(attributes: FileAttributes())
         #expect(try read(archive, "nothing.txt").isEmpty && archive.hasPendingChanges)
     }

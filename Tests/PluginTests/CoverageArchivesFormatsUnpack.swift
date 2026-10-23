@@ -33,7 +33,7 @@ internal struct CoverageArchivesFormatsUnpack {
             monitor: bench.monitor,
             options: options
         )
-        let result = packer.run([try bench.item(box.url(name))], archive: archive)
+        let result = packer.run([try bench.item(box.url(name))], archive: archive, innerFolder: "")
         #expect(result.failure == nil)
         return archive
     }
@@ -59,7 +59,7 @@ internal struct CoverageArchivesFormatsUnpack {
             return left.isEmpty ? .overwrite : left.removeFirst()
         }
         let result = unpacker.run(
-            [source(Unpacker.Source(archive: try bench.store.archive(at: archive)))],
+            [source(Unpacker.Source(archive: try bench.store.archive(at: archive, cancellation: nil)))],
             into: target
         )
         return (result, asked)
