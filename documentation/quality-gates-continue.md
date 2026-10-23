@@ -105,19 +105,19 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   passed (391 / 3,452 / 337, 54 UI tests); lines 99.98%, functions 99.96%, regions 99.98%; 5 files below 100%:
   `FileGridView+Drop`, `AppleScript`, `MultiRenameWindowController:785`, `NetStream`, and `ZipFormat:175–176` (lost
   counts of the non-atomic counters).
-- **100% reached (2026-10-21):** `UITests/run.sh` (55 UI tests and the two desktop checks of AFM UI Mouse: the drag
-  from the thumbnails, Finder Info), then `Scripts/check.sh test`: every test ran and passed (394 / 3,454 / 337);
-  lines 94,639 / 94,639, functions 15,244 / 15,244, regions 40,997 / 40,997. The owner's four decisions taken:
-  atomic counters in the gate's coverage run, documented `!` in `NetStream` and the rename list, Finder automation
-  for the program and Accessibility for the helper (both signed by `UITests/identity.sh`). Found on the way: Finder
-  on macOS 27 resolves no file path it is handed (Finder Info now walks Finder's own references); a grid in no
-  window trapped on its visible rows; XCUITest's drags do not arrive in the VM (see the hand-over, UI tests). A
-  posted key event that only carries a modifier's flag leaves that modifier held for the whole system (a unit test
-  of drop operations then saw Cmd held): the helper presses and releases modifier keys itself.
-- Next: lint step 6 (the touched files are clean, the rest of the repository is not), the mutation runs, gates
-  repo-wide at zero, benchmarks re-recorded, CI and pre-commit.
-- **Waiting for the owner** (before 2026-10-21; decided since, kept for the record): atomic counters for the coverage run;
-  a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
+- **100% reached (2026-10-21):** `UITests/run.sh` (55 UI tests and the two desktop checks of AFM UI Mouse: the drag from
+  the thumbnails, Finder Info), then `Scripts/check.sh test`: every test ran and passed (394 / 3,454 / 337); lines
+  94,639 / 94,639, functions 15,244 / 15,244, regions 40,997 / 40,997. The owner's four decisions taken: atomic counters
+  in the gate's coverage run, documented `!` in `NetStream` and the rename list, Finder automation for the program and
+  Accessibility for the helper (both signed by `UITests/identity.sh`). Found on the way: Finder on macOS 27 resolves no
+  file path it is handed (Finder Info now walks Finder's own references); a grid in no window trapped on its visible
+  rows; XCUITest's drags do not arrive in the VM (see the hand-over, UI tests). A posted key event that only carries a
+  modifier's flag leaves that modifier held for the whole system (a unit test of drop operations then saw Cmd held): the
+  helper presses and releases modifier keys itself.
+- Next: lint step 6 (the touched files are clean, the rest of the repository is not), the mutation runs, gates repo-wide
+  at zero, benchmarks re-recorded, CI and pre-commit.
+- **Waiting for the owner** (before 2026-10-21; decided since, kept for the record): atomic counters for the coverage
+  run; a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
   prompt); the drop on the thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`,
   `SystemPreviewPanel:20`, `SystemDialogs:31` (millisecond windows: accept, or restructure). Then: lint step 6 and the
   mutation runs.

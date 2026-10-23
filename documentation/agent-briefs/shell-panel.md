@@ -19,9 +19,10 @@ after the merge with per-test selection. Also:
 1. Accessibility audit (see the hand-over section "UI tests, accessibility audit, snapshot tests"): fix the findings in
    the panel: the file lists have no accessibility label; the empty cells of the `[..]` row are static texts without a
    value; the Attr column fails the contrast check where it lies partly outside the visible panel. Add tests (unit tests
-   of the accessibility values where possible, plus the UI audit). You are the only agent that runs `Scripts/check.sh
-   uitest` (it takes over keyboard and mouse); run it near the end. One audit finding (an element of type 81 in the menu
-   bar area without a description) belongs to shell-app; if the audit still fails only on that one, say so.
+   of the accessibility values where possible, plus the UI audit). You are the only agent that runs
+   `Scripts/check.sh uitest` (it takes over keyboard and mouse); run it near the end. One audit finding (an element of
+   type 81 in the menu bar area without a description) belongs to shell-app; if the audit still fails only on that one,
+   say so.
 2. Lifetimes: shell objects in your files that hold the kernel (or other long-lived objects) strongly or `unowned`:
    review each per the module brief.
 3. Duplicated wait/poll helpers in your test files: use the TestSupport ones (`Tests/TestSupport/Wait.swift` etc.)
@@ -33,8 +34,8 @@ after the merge with per-test selection. Also:
    off the main thread; where the code is already main-actor isolated the assert is redundant and goes; elsewhere keep
    it and cover it.
 6. Where your code swallows errors or would benefit from diagnostics, use the kernel's `Log` (`Log.logger(_:)`) rather
-   than print; do not add logging for its own sake.
-If you rename or remove anything public in AFMKernel/AFMContracts (you should not need to), run `Scripts/check.sh api`
-and acknowledge the break in `Scripts/api-breaks.txt` with a reason.
+   than print; do not add logging for its own sake. If you rename or remove anything public in AFMKernel/AFMContracts
+   (you should not need to), run `Scripts/check.sh api` and acknowledge the break in `Scripts/api-breaks.txt` with a
+   reason.
 
 Report as the briefs say, including the coverage numbers for your files before and after.

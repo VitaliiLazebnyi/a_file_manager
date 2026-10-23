@@ -23,14 +23,14 @@ watcher for a folder with a path of 5,000 characters, in the shared test process
 
 `FSEventStreamCreate` keeps one slot per requested path, in memory that starts as zeros; a slot holds the descriptors
 the stream opens for that path and its parents. When the call fails part-way, `_FSEventStreamDeallocate` closes the
-descriptor of every slot, also of the slots it never filled, and those still say 0. So it closes descriptor 0, which
-the stream never owned, once for every path it had not set up.
+descriptor of every slot, also of the slots it never filled, and those still say 0. So it closes descriptor 0, which the
+stream never owned, once for every path it had not set up.
 
 Descriptor 0 is the standard input, or, once that is closed, whatever the program opens next: the lowest free number is
 always taken first. The next failure closes that one under its owner. In the tests that was a socket, a pipe or a file
-being written of another test running at the same time. In the crash above, the number 0 had a guard on it (most
-likely it had gone, after an earlier silent close, to a descriptor that its owner guards), and the kernel ended the
-process at the second close.
+being written of another test running at the same time. In the crash above, the number 0 had a guard on it (most likely
+it had gone, after an earlier silent close, to a descriptor that its owner guards), and the kernel ended the process at
+the second close.
 
 In plain words: a watcher test asked FSEvents for an impossible folder; FSEvents failed and, while cleaning up, closed a
 descriptor that belonged to somebody else. Every retry did it again, to whoever had that number by then.
@@ -39,18 +39,18 @@ descriptor that belonged to somebody else. Every retry did it again, to whoever 
 
 Measured with a probe (`FSEventStreamCreate` with `kFSEventStreamCreateFlagWatchRoot`, as the watcher makes them):
 
-| Request                                                  | Stream | Descriptor 0         |
-| -------------------------------------------------------- | ------ | -------------------- |
-| one path of 1,023 bytes                                  | made   | stays                |
-| one path of 1,024 bytes or more (`PATH_MAX` with the 0)  | none   | **closed**           |
-| a short path and a long one                              | none   | **closed**           |
-| 341 × "é": 683 bytes as UTF-8, 1,024 bytes decomposed    | none   | **closed**           |
-| a missing folder, a relative path, an empty string       | made   | stays                |
-| no path at all                                           | none   | stays                |
-| one folder, 0 to 39 descriptors left (11 kinds of path)  | some   | stays (440 of 440)   |
-| two folders, 1 or 2 descriptors left                     | none   | **closed**           |
-| three folders, 1 to 7 descriptors left                   | none   | **closed**           |
-| the 513th running stream of the process (not started)    | made   | stays                |
+| Request                                                 | Stream | Descriptor 0       |
+| ------------------------------------------------------- | ------ | ------------------ |
+| one path of 1,023 bytes                                 | made   | stays              |
+| one path of 1,024 bytes or more (`PATH_MAX` with the 0) | none   | **closed**         |
+| a short path and a long one                             | none   | **closed**         |
+| 341 × "é": 683 bytes as UTF-8, 1,024 bytes decomposed   | none   | **closed**         |
+| a missing folder, a relative path, an empty string      | made   | stays              |
+| no path at all                                          | none   | stays              |
+| one folder, 0 to 39 descriptors left (11 kinds of path) | some   | stays (440 of 440) |
+| two folders, 1 or 2 descriptors left                    | none   | **closed**         |
+| three folders, 1 to 7 descriptors left                  | none   | **closed**         |
+| the 513th running stream of the process (not started)   | made   | stays              |
 
 So two things reach the clean-up: a path that does not fit in `PATH_MAX` bytes as the file system spells it (decomposed;
 one such path is enough), and running out of descriptors part-way through a request for more than one folder. The
@@ -68,9 +68,9 @@ A running stream holds a descriptor for the folder and for each of its parents, 
   then fails and the watcher used to pass the long path on.)
 - One stream per folder. The program only ever asks for one folder per watcher; tests ask for more, and each now gets a
   stream of its own, so running out of descriptors can only fail a one-folder request, which leaves descriptor 0 alone.
-- Before it makes streams, the watcher checks that the process has their cost in descriptors to spare and still keeps
-  64 for the rest of the program; if not, it makes none, counts the refusal and tries again later, as for a refusal of
-  the system.
+- Before it makes streams, the watcher checks that the process has their cost in descriptors to spare and still keeps 64
+  for the rest of the program; if not, it makes none, counts the refusal and tries again later, as for a refusal of the
+  system.
 - If the system fails all the same, descriptor 0 is given `/dev/null` back when it is free. That is safe whatever other
   threads do: `open` takes the lowest free number, so it lands on 0 only when 0 is free; otherwise it lands elsewhere
   and is closed again.
@@ -90,5 +90,5 @@ leaves nothing to close:
 - `Review2LocalfsTests.aBlockedCallIsEndedByInterrupt` and `CrossRequestTests` started their pipe pair as `[0, 0]` and
   closed both ends whether or not the pipe was made.
 
-The probe is `/private/tmp/claude-501/sp/w101-fsevents/probe.swift` (not kept in the repository); the table above is
-its output.
+The probe is `/private/tmp/claude-501/sp/w101-fsevents/probe.swift` (not kept in the repository); the table above is its
+output.

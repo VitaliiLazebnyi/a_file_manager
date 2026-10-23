@@ -12,8 +12,8 @@ from the host Mac into the test VM. Branch: `quality-gates`.
   - **Coverage:** 100% of lines, functions and regions, everything covered (`Scripts/coverage-gate.py`). The gate's
     coverage run counts atomically (`-Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all`, owner's decision
     2026-10-21): Swift Testing runs a bundle's tests on several threads, and plain counters lose counts and wrap below
-    zero, so a region that ran could read 0 and one that never ran could read covered. The UI test build counts the
-    same way (`Scripts/build-app.sh`, `AFM_COVERAGE=1`).
+    zero, so a region that ran could read 0 and one that never ran could read covered. The UI test build counts the same
+    way (`Scripts/build-app.sh`, `AFM_COVERAGE=1`).
   - **Docs:** every non-private declaration documented (SwiftLint `missing_docs` for open, public, package and
     internal), plus DocC without warnings.
   - **Rollout:** fix everything first, then switch the gates on (CI, pre-commit hook).
@@ -100,9 +100,9 @@ is freed, and coverage could not reach 100%.
 
 Force unwraps (owner's decision, 2026-10-16, extended 2026-10-21): `force_unwrapping` stays on; exactly the system
 optionals that no input can make nil may use `!`, each with `// swiftlint:disable:next force_unwrapping` and a comment
-that says why it cannot fail: `VirtualLocation.url`'s `components.url`, `ZipFormat`'s `DOSTime` date, the error and
-the leaf certificate of a failed trust evaluation and the port in `NetStream`, the pasteboard items of the rename
-list's own drag in `MultiRenameWindowController`.
+that says why it cannot fail: `VirtualLocation.url`'s `components.url`, `ZipFormat`'s `DOSTime` date, the error and the
+leaf certificate of a failed trust evaluation and the port in `NetStream`, the pasteboard items of the rename list's own
+drag in `MultiRenameWindowController`.
 
 **Configured so SwiftLint and swift-format agree** (`.swiftlint.yml`, `.swift-format`):
 
@@ -200,17 +200,17 @@ reported every `Sources` finding a second time). The fuzz and stress drivers the
   runner signed with a certificate gets a protected container, from which the program may no longer read the test
   folders (`SystemPolicyAppDataDetailed` denied). That happened once to the runner's container
   `local.a-file-manager.uitests.runner`; the runner has been `local.a-file-manager.uitests.tests` since.
-- **Checks outside XCUITest** (`UITests/MouseHelper`, run by `run.sh` after the whole suite): in the VM, XCUITest's
-  drag gestures never arrive (its clicks do), and while it drives the desktop it holds back events from anyone else,
+- **Checks outside XCUITest** (`UITests/MouseHelper`, run by `run.sh` after the whole suite): in the VM, XCUITest's drag
+  gestures never arrive (its clicks do), and while it drives the desktop it holds back events from anyone else,
   including the events a process posts to another. So AFM UI Mouse starts the program itself (same settings as
   `AppSession`, counts into `codecov/`) and posts real events: `drag` drags from the thumbnails of a full folder onto
   the other panel and waits for the file; `finder-info` presses a key bound to Finder Info for the run and waits for
   Finder's new window, then closes it. It is started with `open`, so the permission asked is its own.
 - **Finder Info** walks to the item by name through Finder's own references (`FilePropertiesPlugin.finderPath`): on
-  macOS 27 Finder resolves no file path it is handed (`POSIX file`, alias or file URL: "Can't get alias", -1728),
-  while `item "x" of folder "y" of startup disk` works. Found 2026-10-21 by the UI tests.
-- **Brief and Thumbnails views:** the grid is an accessibility list whose children are the cells on screen, named as
-  the list writes them, the cursor's selected (`FileGridView+Accessibility.swift`).
+  macOS 27 Finder resolves no file path it is handed (`POSIX file`, alias or file URL: "Can't get alias", -1728), while
+  `item "x" of folder "y" of startup disk` works. Found 2026-10-21 by the UI tests.
+- **Brief and Thumbnails views:** the grid is an accessibility list whose children are the cells on screen, named as the
+  list writes them, the cursor's selected (`FileGridView+Accessibility.swift`).
 - **Audit findings (open):** the file lists have no accessibility label; the empty cells of the `[..]` row are static
   texts without a value; the Attr column, partly outside the visible panel, fails the contrast check; one element in the
   menu bar area (type 81) has no description. The audit test fails until they are fixed in `AFMShell`.
