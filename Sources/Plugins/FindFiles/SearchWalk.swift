@@ -125,7 +125,8 @@ internal final class SearchWalk {
     /// the listing is complete; false when the walk stopped.
     private func deliverEntries(of node: SearchNode, onMatch: (FileItem) -> Void) -> Bool {
         var index = 0
-        while true {
+        var finished = false
+        repeat {
             condition.lock()
             // A folder that is listed in parts grows while it is reported.
             let total = node.candidates.count
@@ -140,16 +141,13 @@ internal final class SearchWalk {
                 end = total
             }
             guard end > index else {
-                let finished = node.isFinal && index >= total
+                finished = node.isFinal && index >= total
                 if !finished, !isStopped {
                     condition.wait(until: Date(timeIntervalSinceNow: 0.05))
                 }
                 condition.unlock()
                 if isStopped {
                     return false
-                }
-                if finished {
-                    return true
                 }
                 continue
             }
@@ -163,7 +161,8 @@ internal final class SearchWalk {
                 onMatch(batch[offset])
             }
             index = end
-        }
+        } while !finished
+        return true
     }
 
     /// Whether this folder is still to be searched (`VisitedFolders.claim`); a location that is not a

@@ -177,9 +177,10 @@ public enum DuplicateFinder {
             }
         }
         var hash = SHA256()
+        var read = BlockRead.hashed
         do {
-            while true {
-                let read: BlockRead = try autoreleasepool {
+            repeat {
+                read = try autoreleasepool {
                     guard let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else {
                         return .ended
                     }
@@ -189,20 +190,11 @@ public enum DuplicateFinder {
                     hash.update(data: block)
                     return .hashed
                 }
-                switch read {
-                case .cancelled:
-                    return nil
-
-                case .ended:
-                    return Data(hash.finalize())
-
-                case .hashed:
-                    continue
-                }
-            }
+            } while read == .hashed
         } catch {
             return nil
         }
+        return read == .ended ? Data(hash.finalize()) : nil
     }
 
     /// The key an item is grouped by: its name (when the names count) and its size.
