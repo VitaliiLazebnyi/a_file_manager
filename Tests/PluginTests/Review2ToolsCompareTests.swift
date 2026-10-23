@@ -20,13 +20,13 @@ private struct Seeded: RandomNumberGenerator {
 private func isValid(_ segments: [DiffSegment], _ a: [Int], _ b: [Int]) -> Bool {
     var (i, j) = (0, 0)
     for segment in segments {
-        guard segment.a.lowerBound == i, segment.b.lowerBound == j, !(segment.a.isEmpty && segment.b.isEmpty) else {
+        guard segment.first.lowerBound == i, segment.second.lowerBound == j, !(segment.first.isEmpty && segment.second.isEmpty) else {
             return false
         }
-        if segment.isEqual, Array(a[segment.a]) != Array(b[segment.b]) {
+        if segment.isEqual, Array(a[segment.first]) != Array(b[segment.second]) {
             return false
         }
-        (i, j) = (segment.a.upperBound, segment.b.upperBound)
+        (i, j) = (segment.first.upperBound, segment.second.upperBound)
     }
     return i == a.count && j == b.count && Myers.apply(segments, to: a, from: b) == b
 }
@@ -261,8 +261,8 @@ internal struct Review2CompareSession {
             try CompareLoader.replace(
                 box.url("h/one.txt"),
                 with: Data("mine".utf8),
-                expected: loaded,
-                fileSystems: registry
+                fileSystems: registry,
+                expected: loaded
             )
         }
         #expect(box.read("h/one.txt") == "changed elsewhere, longer")

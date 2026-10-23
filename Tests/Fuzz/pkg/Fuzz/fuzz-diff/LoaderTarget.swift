@@ -43,7 +43,7 @@ internal func checkDocument(_ raw: [UInt8]) {
     for (index, line) in document.lines.enumerated() {
         fzCheck(line.number == index + 1, "loader-line-number", detail)
         fzCheck(!line.text.utf8.contains(0x0A) && !line.text.utf8.contains(0x0D), "loader-break-in-line", detail)
-        fzCheck(line.ending != .none || index == document.lines.count - 1, "loader-ending-inside", detail)
+        fzCheck(line.ending != .noBreak || index == document.lines.count - 1, "loader-ending-inside", detail)
     }
     _ = document.usualEnding
     // "The file's bytes: the same as were loaded as long as nothing was changed" - where

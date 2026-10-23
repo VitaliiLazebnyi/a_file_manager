@@ -31,9 +31,9 @@ internal struct CovCompareLoading {
         memory.addFile("/large1", "0123456789")
         memory.addFile("/large2", "0123456780")
         let identical = load("/same1", "/same2", limits: limits)
-        #expect(identical.isIdentical && identical.content.isNone && identical.message == nil)
+        #expect(identical.isIdentical && identical.content.isEmpty && identical.message == nil)
         let different = load("/same1", "/other", limits: limits)
-        #expect(!different.isIdentical && !different.content.isNone)
+        #expect(!different.isIdentical && !different.content.isEmpty)
         let large = load("/large1", "/large2", limits: limits)
         #expect(large.message?.hasPrefix("The two files are different. They are too large") == true)
         #expect(CompareLoader.Limits.standard.quickCheckFrom == 16 << 20)
@@ -75,7 +75,7 @@ internal struct CovCompareLoading {
         let cancellation = CancellationFlag()
         hooked.onNextRead { cancellation.cancel() }
         let cancelled = CompareLoader.load(left: left, right: right, fileSystems: registry, cancellation: cancellation)
-        #expect(cancelled.wasCancelled && cancelled.content.isNone && cancelled.message == nil)
+        #expect(cancelled.wasCancelled && cancelled.content.isEmpty && cancelled.message == nil)
         // The quick check before loading is cancelled as well.
         let check = CancellationFlag()
         hooked.onNextRead { check.cancel() }
@@ -96,7 +96,8 @@ internal struct CovCompareLoading {
         #expect(failed.message != nil && !failed.wasCancelled)
     }
 
-    /// The check for identical files ends with no answer when it is cancelled, read side by side or in stretches.
+    /// The check for identical files ends with the cancel, no answer, when it is cancelled, read side by side or in
+    /// stretches.
     @Test
     internal func aCancelledCheckForIdenticalFilesHasNoAnswer() throws {
         let hooked = CoverageArchivesFSHookedMemory()
@@ -116,21 +117,22 @@ internal struct CovCompareLoading {
             // In the first read of every reader: side by side, the workers that open their readers late may find
             // all the stretches taken, and the hook of a reader that never reads would never run.
             hooked.onEveryRead { cancellation.cancel() }
-            let answer = try CompareLoader.identical(
-                first,
-                second,
-                size: Int64(size),
-                fileSystems: registry,
-                cancellation: cancellation,
-                stretch: stretch
-            )
-            #expect(answer == nil, "local: \(isLocal)")
+            #expect(throws: CancellationError.self, "local: \(isLocal)") {
+                try CompareLoader.identical(
+                    first,
+                    second,
+                    size: Int64(size),
+                    fileSystems: registry,
+                    cancellation: cancellation,
+                    stretch: stretch
+                )
+            }
         }
         let cancelled = CancellationFlag()
         cancelled.cancel()
-        #expect(
-            try CompareLoader.identical(first, second, size: 64, fileSystems: registry, cancellation: cancelled) == nil
-        )
+        #expect(throws: CancellationError.self) {
+            try CompareLoader.identical(first, second, size: 64, fileSystems: registry, cancellation: cancelled)
+        }
     }
 
     /// A read that fails while two files are compared side by side is the failure.
@@ -150,8 +152,8 @@ internal struct CovCompareLoading {
     /// Nothing loaded is nothing to show.
     @Test
     internal func nothingLoadedIsNone() {
-        #expect(CompareContent.none.isNone)
-        #expect(!CompareLoader.text(left: TextDocument(), right: TextDocument(), options: DiffOptions()).isNone)
+        #expect(CompareContent.empty.isEmpty)
+        #expect(!CompareLoader.text(left: TextDocument(), right: TextDocument(), options: DiffOptions()).isEmpty)
     }
 
     /// A file system that cannot replace in one step: the old file is moved aside, the new one put in its place, and

@@ -35,13 +35,13 @@ private func longestCommon<T: Equatable>(_ a: [T], _ b: [T]) -> Int {
 private func isValid<T: Hashable>(_ segments: [DiffSegment], _ a: [T], _ b: [T]) -> Bool {
     var (i, j) = (0, 0)
     for segment in segments {
-        guard segment.a.lowerBound == i, segment.b.lowerBound == j, !(segment.a.isEmpty && segment.b.isEmpty) else {
+        guard segment.first.lowerBound == i, segment.second.lowerBound == j, !(segment.first.isEmpty && segment.second.isEmpty) else {
             return false
         }
-        if segment.isEqual, Array(a[segment.a]) != Array(b[segment.b]) {
+        if segment.isEqual, Array(a[segment.first]) != Array(b[segment.second]) {
             return false
         }
-        (i, j) = (segment.a.upperBound, segment.b.upperBound)
+        (i, j) = (segment.first.upperBound, segment.second.upperBound)
     }
     return i == a.count && j == b.count && Myers.apply(segments, to: a, from: b) == b
 }
@@ -51,21 +51,21 @@ internal struct MyersDiff {
     @Test
     internal func edgeCases() {
         #expect(Myers.diff([Int](), []) == [])
-        #expect(Myers.diff([], [1, 2]) == [DiffSegment(a: 0..<0, b: 0..<2, isEqual: false)])
-        #expect(Myers.diff([1, 2], []) == [DiffSegment(a: 0..<2, b: 0..<0, isEqual: false)])
-        #expect(Myers.diff([1, 2, 3], [1, 2, 3]) == [DiffSegment(a: 0..<3, b: 0..<3, isEqual: true)])
-        #expect(Myers.diff([1], [2]) == [DiffSegment(a: 0..<1, b: 0..<1, isEqual: false)])
-        #expect(Myers.diff([1, 2, 3], [4, 5]) == [DiffSegment(a: 0..<3, b: 0..<2, isEqual: false)])
+        #expect(Myers.diff([], [1, 2]) == [DiffSegment(first: 0..<0, second: 0..<2, isEqual: false)])
+        #expect(Myers.diff([1, 2], []) == [DiffSegment(first: 0..<2, second: 0..<0, isEqual: false)])
+        #expect(Myers.diff([1, 2, 3], [1, 2, 3]) == [DiffSegment(first: 0..<3, second: 0..<3, isEqual: true)])
+        #expect(Myers.diff([1], [2]) == [DiffSegment(first: 0..<1, second: 0..<1, isEqual: false)])
+        #expect(Myers.diff([1, 2, 3], [4, 5]) == [DiffSegment(first: 0..<3, second: 0..<2, isEqual: false)])
         #expect(
             Myers.diff(Array("abcd"), Array("abXcd")) == [
-                DiffSegment(a: 0..<2, b: 0..<2, isEqual: true), DiffSegment(a: 2..<2, b: 2..<3, isEqual: false),
-                DiffSegment(a: 2..<4, b: 3..<5, isEqual: true)
+                DiffSegment(first: 0..<2, second: 0..<2, isEqual: true), DiffSegment(first: 2..<2, second: 2..<3, isEqual: false),
+                DiffSegment(first: 2..<4, second: 3..<5, isEqual: true)
             ]
         )
         #expect(
             Myers.diff(Array("abcd"), Array("ad")) == [
-                DiffSegment(a: 0..<1, b: 0..<1, isEqual: true), DiffSegment(a: 1..<3, b: 1..<1, isEqual: false),
-                DiffSegment(a: 3..<4, b: 1..<2, isEqual: true)
+                DiffSegment(first: 0..<1, second: 0..<1, isEqual: true), DiffSegment(first: 1..<3, second: 1..<1, isEqual: false),
+                DiffSegment(first: 3..<4, second: 1..<2, isEqual: true)
             ]
         )
         // The classic example of the paper: five edits.
@@ -158,7 +158,7 @@ internal struct MyersDiff {
         }
         let segments = Myers.diff(a, b)
         #expect(isValid(segments, a, b))
-        #expect(segments.filter(\.isEqual).map(\.a) == [10..<11, 100_000..<100_001, 199_990..<199_991])
+        #expect(segments.filter(\.isEqual).map(\.first) == [10..<11, 100_000..<100_001, 199_990..<199_991])
     }
 
     @Test
@@ -231,16 +231,16 @@ internal struct TextComparing {
     internal func linesKeepTheirOwnLineBreaks() {
         let document = TextDocument(data: Data("one\ntwo\r\nthree\rfour\n\nlast".utf8))
         #expect(document.lines.map(\.text) == ["one", "two", "three", "four", "", "last"])
-        #expect(document.lines.map(\.ending) == [.lf, .crlf, .cr, .lf, .lf, .none])
-        #expect(document.lines.map(\.number) == [1, 2, 3, 4, 5, 6] && document.usualEnding == .lf)
+        #expect(document.lines.map(\.ending) == [.lineFeed, .carriageReturnLineFeed, .carriageReturn, .lineFeed, .lineFeed, .noBreak])
+        #expect(document.lines.map(\.number) == [1, 2, 3, 4, 5, 6] && document.usualEnding == .lineFeed)
         #expect(
             TextDocument.split("\n").map(\.text) == [""] && TextDocument.split("").isEmpty
-                && TextDocument.split("a\r").map(\.ending) == [.cr]
+                && TextDocument.split("a\r").map(\.ending) == [.carriageReturn]
         )
 
         // A line put after a last line without a break gets the file's usual break.
         var windows = TextDocument(data: Data("a\r\nb\r\nc".utf8))
-        windows.lines.append(TextLine("d", ending: .none))
+        windows.lines.append(TextLine("d", ending: .noBreak))
         #expect(String(decoding: windows.data(), as: UTF8.self) == "a\r\nb\r\nc\r\nd")
     }
 
@@ -281,7 +281,7 @@ internal struct TextComparing {
         #expect(kinds("A  b\n", "a b\n", DiffOptions(ignoreCase: true, ignoreRepeatedSpaces: false)) == "~")
         #expect(kinds("ÄÖ\n", "äö\n") == "=")
         #expect(DiffOptions().key(TextLine("\t Mixed   CASE ")) == "mixed case")
-        #expect(exact.key(TextLine(" x ", ending: .crlf)) == " x \r\n")
+        #expect(exact.key(TextLine(" x ", ending: .carriageReturnLineFeed)) == " x \r\n")
     }
 
     @Test
@@ -471,9 +471,9 @@ internal struct CompareLoading {
             CompareLoader.load(
                 left: memory.url(left),
                 right: memory.url(right),
+                fileSystems: fileSystems,
                 forceBinary: binary,
-                bytesPerLine: 8,
-                fileSystems: fileSystems
+                bytesPerLine: 8
             )
         }
         #expect(load("/a.txt", "/b.txt").isIdentical)
@@ -527,7 +527,7 @@ internal struct CompareLoading {
             try content.write(to: box.url(name))
         }
         func identical(_ name: String, stretch: Int = 64 * 1_024, _ flag: CancellationFlag = CancellationFlag()) throws
-            -> Bool?
+            -> Bool
         {
             try CompareLoader.identical(
                 box.url("a"),
@@ -542,7 +542,7 @@ internal struct CompareLoading {
         #expect(try identical("same", stretch: 1_000_003) == true && identical("last", stretch: 7_777) == false)
         let flag = CancellationFlag()
         flag.cancel()
-        #expect(try identical("same", flag) == nil)
+        #expect(throws: CancellationError.self) { try identical("same", flag) }
         #expect(throws: (any Error).self) { try identical("missing") }
     }
 
@@ -553,7 +553,7 @@ internal struct CompareLoading {
         memory.addFile("/a", text)
         memory.addFile("/b", text)
         memory.addFile("/c", text.dropLast() + "!")
-        func identical(_ name: String) throws -> Bool? {
+        func identical(_ name: String) throws -> Bool {
             try CompareLoader.identical(
                 memory.url("/a"),
                 memory.url(name),
