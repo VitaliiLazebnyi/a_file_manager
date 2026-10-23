@@ -11,10 +11,12 @@ import Testing
 // Review round 2, integration: the four defects of the last fuzz campaign (N1–N4 of
 // `status/harnesses.md`, reproducers under `Tests/Fuzz/repro/new/`).
 
+/// The four defects of the last fuzz campaign, each with its reproducer and its relatives.
 @Suite
 internal struct Review2IntegrationFuzz {
     // MARK: N1 — a yEnc part header with numbers nobody can mean
 
+    /// Decodes `text` as a yEnc post into `/out` of a fresh memory file system.
     private func decode(_ text: String) throws -> (outcome: Decoder.Outcome, memory: MemoryFileSystem) {
         let memory = MemoryFileSystem()
         let registry = FileSystemRegistry()
@@ -32,6 +34,7 @@ internal struct Review2IntegrationFuzz {
         )
     }
 
+    /// A part range that cannot be is reported as a damaged header, and no arithmetic traps on it.
     @Test
     internal func aPartRangeThatCannotBeIsADamagedHeaderAndNoTrap() throws {
         // The reproducer, and its relatives: every pair far apart, upside down, or before the first byte.
@@ -47,7 +50,8 @@ internal struct Review2IntegrationFuzz {
         }
         // The largest part there can be is a number like any other.
         let (whole, _) = try decode(
-            "=ybegin part=1 line=128 size=3 name=a.bin\n=ypart begin=1 end=9223372036854775807\nKLM\n=yend size=3 part=1\n"
+            "=ybegin part=1 line=128 size=3 name=a.bin\n=ypart begin=1 end=9223372036854775807\nKLM\n"
+                + "=yend size=3 part=1\n"
         )
         #expect(whole.problems.contains { $0.contains("the part holds 9223372036854775807") }, "\(whole.problems)")
         // A part that is what it says is decoded without a word.
@@ -59,6 +63,8 @@ internal struct Review2IntegrationFuzz {
 
     // MARK: N2 — the raw row scan at a segment's end
 
+    /// The ranges of the rows and the number of lines of `data`, indexed with the given segment
+    /// and chunk sizes by the raw scan or the decoding one.
     private func rows(_ data: Data, columns: Int, segment: Int, chunk: Int, raw: Bool, parallel: Bool = false) throws
         -> (ranges: [Range<Int64>], lines: Int)
     {
@@ -71,6 +77,8 @@ internal struct Review2IntegrationFuzz {
         return (try document.rows(from: 0, count: max(1, document.rowCount)).map(\.range), document.lineCount)
     }
 
+    /// The raw scan makes the same rows as the decoding one when a line reaches over a segment's
+    /// end and empty lines follow.
     @Test
     internal func aRunOfEmptyLinesBehindALineThatReachesOverASegmentsEndMakesNoRowOfItsOwn() throws {
         // The reproducer (segments of one byte): the decoding scan was right, the raw scan made a seventh row.
@@ -83,6 +91,7 @@ internal struct Review2IntegrationFuzz {
         }
     }
 
+    /// The same holds at the segment and chunk sizes the program uses, in one task and in several.
     @Test
     internal func theSameAtTheSizesTheProgramUses() throws {
         // Lines of 8 bytes up to just before the end of the first segment of 4 MiB; then a line
@@ -111,6 +120,7 @@ internal struct Review2IntegrationFuzz {
 
     // MARK: N3 — a comment file whose code-page bytes are valid UTF-8
 
+    /// A comment file written again reads back with every name it had, whatever its bytes.
     @Test
     internal func aRewriteOfACommentFileGivesEveryNameBack() {
         // The reproducer: read in the Windows code page (the first line is no UTF-8), one entry
@@ -139,6 +149,8 @@ internal struct Review2IntegrationFuzz {
 
     // MARK: N4 — a long plain search in a long name
 
+    /// A long wildcard search in a long name takes a bounded time, and the matcher finds what it
+    /// found before.
     @Test
     internal func aLongWildcardSearchInALongNameIsBoundedLikeARegularExpression() {
         var context = RenameContext()

@@ -17,11 +17,16 @@ import Testing
 @MainActor
 @Suite
 internal struct Review2IntegrationSettings {
+    /// The folders on disk: the two panels' `A` and `B`, and the settings file to import.
     internal let box: Sandbox
+    /// The settings the program keeps, in memory.
     internal let settings = MemorySettings()
+    /// The plugin that imports and exports settings files.
     internal let plugin: ConfigurationPlugin
+    /// The kernel with the plugin, the disk and the settings.
     internal let bench: TestBench
 
+    /// Starts the plugin and declares the keys as the network and viewer plugins do.
     internal init() throws {
         box = try Sandbox()
         try box.folder("A")
@@ -29,9 +34,8 @@ internal struct Review2IntegrationSettings {
         plugin = ConfigurationPlugin(
             launchesApplications: false,
             background: nil,
-            listFolder: box.url("lists"),
-            settingsKeys: { [] }
-        )
+            listFolder: box.url("lists")
+        ) { [] }
         bench = TestBench(
             plugins: [plugin],
             fileSystems: [LocalFileSystem()],
@@ -45,15 +49,19 @@ internal struct Review2IntegrationSettings {
         bench.kernel.settingsKeys.declare("viewer.helper", kind: .runsCode)
     }
 
+    /// The stored value of `key` as text, or nil when it is not set.
     private func stored(_ key: String) -> String? {
-        settings.data(forKey: key).map { String(decoding: $0, as: UTF8.self) }
+        settings.data(forKey: key).flatMap { String(bytes: $0, encoding: .utf8) }
     }
 
+    /// A key its plugin calls trust is shown in the import's form and comes in only when the
+    /// user ticks it; an ordinary key comes in as proposed.
     @Test
     internal func aKeyItsPluginCallsTrustIsImportedOnlyWhenTheUserTicksIt() throws {
         let url = box.url("in.json")
         let entries =
-            #""network.unprotectedPasswordHosts":["evil.example"],"network.passiveMode":false,"viewer.helper":["/tmp/evil","-x"]"#
+            #""network.unprotectedPasswordHosts":["evil.example"],"network.passiveMode":false,"#
+            + #""viewer.helper":["/tmp/evil","-x"]"#
         try Data("{\"format\":\"A File Manager settings\",\"version\":1,\"settings\":{\(entries)}}".utf8).write(to: url)
 
         // Accepted as proposed: the ordinary setting comes in, the trusted servers and what is run do not.
@@ -61,8 +69,8 @@ internal struct Review2IntegrationSettings {
         bench.commands.perform("afm_ImportSettings", .location(url))
         let fields = try #require(bench.interaction.forms.last)
         let parts =
-            fields.filter {
-                guard case .checkbox = $0.kind else {
+            fields.filter { field in
+                guard case .checkbox = field.kind else {
                     return false
                 }
                 return true
@@ -87,9 +95,11 @@ internal struct Review2IntegrationSettings {
         #expect(settings.data(forKey: "viewer.helper") == nil)
     }
 
+    /// The key is connection data, left out of an export like the rest, and only because its
+    /// plugin says so.
     @Test
-    internal func itIsLeftOutOfAnExportLikeTheOtherConnectionData() {
-        var schema = plugin.center!.settingsSchema()
+    internal func itIsLeftOutOfAnExportLikeTheOtherConnectionData() throws {
+        var schema = try #require(plugin.center).settingsSchema()
         #expect(schema.group(of: "network.unprotectedPasswordHosts", value: ["a"]) == .trust)
         #expect(schema.isConnectionData("network.unprotectedPasswordHosts"))
         #expect(schema.group(of: "network.passiveMode", value: false) == nil)
@@ -101,7 +111,7 @@ internal struct Review2IntegrationSettings {
     /// The schema's copy of the declarations answers on any thread exactly as the registry
     /// does on the main thread: the key itself first, else the longest family it belongs to.
     @Test
-    internal func theSchemaAnswersAsTheRegistryDoesOnAnyThread() async {
+    internal func theSchemaAnswersAsTheRegistryDoesOnAnyThread() async throws {
         let keys = bench.kernel.settingsKeys
         keys.declare(prefix: "findFiles.", kind: .ordinary)
         keys.declare(prefix: "findFiles.history.", kind: .history)
@@ -119,7 +129,7 @@ internal struct Review2IntegrationSettings {
             "viewer.helperX", "", "é.findFiles.x"
         ]
         let expected = probes.map { keys.kind(of: $0) }
-        let schema = plugin.center!.settingsSchema()
+        let schema = try #require(plugin.center).settingsSchema()
         // Declared after the copy: the schema does not see it.
         keys.declare(prefix: "viewer.", kind: .trust)
         let answered = await Task.detached { probes.map { schema.declaredKind($0) } }.value

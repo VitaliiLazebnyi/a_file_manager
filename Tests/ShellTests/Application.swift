@@ -26,7 +26,7 @@ internal struct Application {
     /// A file system in memory, registered when the program starts.
     internal var memory: MemoryFileSystem { fixture.memory }
     /// The user, as the test scripts them.
-    internal var ui: ScriptedInteraction { fixture.user }
+    internal var user: ScriptedInteraction { fixture.user }
     /// The settings the program keeps.
     internal var settings: MemorySettings { fixture.settings }
     /// A pasteboard of the test's own.

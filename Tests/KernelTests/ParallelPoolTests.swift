@@ -27,7 +27,7 @@ internal struct ParallelPoolTests {
             var name = [CChar](repeating: 0, count: 64)
             pthread_getname_np(thread, &name, name.count)
             let bytes = name.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
-            if String(decoding: bytes, as: UTF8.self) == "AFM.Parallel" {
+            if String(bytes: bytes, encoding: .utf8) == "AFM.Parallel" {
                 found += 1
             }
         }

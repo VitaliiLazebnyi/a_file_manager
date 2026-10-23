@@ -6,6 +6,7 @@ import Testing
 /// Review 2, second pass: G001, G003 and G004 of the general findings, all in `Format`.
 @Suite
 internal struct Review2KernelP2Format {
+    /// The largest and smallest sizes are written in k, in bytes and short, without a trap.
     @Test
     internal func theLargestSizesAreWrittenAndNotTrappedOn() {
         // G001: a ZIP64 entry or a server may say any size; the status line shows it in k.
@@ -23,6 +24,8 @@ internal struct Review2KernelP2Format {
         #expect(Format.shortSize(.max) == "8388608.00 T")
     }
 
+    /// Speeds and times that are no numbers, or huge, are written as a speed and a time, without
+    /// a trap.
     @Test
     internal func speedsAndTimesThatAreNoNumbersAreWrittenAndNotTrappedOn() {
         // G003: a speed over no time, an estimate from a speed of nothing.
@@ -39,6 +42,8 @@ internal struct Review2KernelP2Format {
         )
     }
 
+    /// Numbers and dates are written right from many threads at once while the region and the
+    /// time zone change.
     @Test
     internal func numbersAndDatesAreWrittenFromManyThreadsWhileTheRegionChanges() {
         // G004: no formatter is shared for numbers, and the one for dates is replaced, never
@@ -57,7 +62,7 @@ internal struct Review2KernelP2Format {
         nonisolated(unsafe) var wrong = 0
         DispatchQueue.concurrentPerform(iterations: 16) { thread in
             for round in 0..<2_000 {
-                if thread == 0, round % 50 == 0 {
+                if thread == 0, round.isMultiple(of: 50) {
                     center.post(name: Notification.Name("kCFLocaleCurrentLocaleDidChangeNotification"), object: nil)
                     center.post(name: .NSSystemTimeZoneDidChange, object: nil)
                 }

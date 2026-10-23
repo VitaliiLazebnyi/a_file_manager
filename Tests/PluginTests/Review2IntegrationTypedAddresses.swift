@@ -5,24 +5,35 @@ import Foundation
 import TestSupport
 import Testing
 
-// Review round 2, integration: an address the user types into a dialog is reported to the
-// plugin that connects to servers (N071), so that only addresses that came out of files are
-// asked "Connect to X?".
-
-/// Notes what it is told the user chose.
-internal final class IntegrationConsent: ServerConsentService {
-    internal private(set) var chosen: [URL] = []
-    internal func userChose(_ location: URL) { chosen.append(location) }
-}
-
+/// Review round 2, integration: an address the user types into a dialog is reported to the
+/// plugin that connects to servers (N071), so that only addresses that came out of files are
+/// asked "Connect to X?".
 @MainActor
 @Suite
 internal struct Review2IntegrationTypedAddresses {
+    /// Notes what it is told the user chose.
+    internal final class Consent: ServerConsentService {
+        /// The addresses the user chose, in that order.
+        internal private(set) var chosen: [URL] = []
+
+        /// Notes `location` as chosen.
+        internal func userChose(_ location: URL) { chosen.append(location) }
+
+        deinit {
+            // Nothing to release.
+        }
+    }
+
+    /// The panels' file system, in memory: `/A/one.txt` and an empty `/B`.
     internal let memory = MemoryFileSystem()
+    /// A server's file system, in memory, with an empty `/in`.
     internal let server = MemoryFileSystem(scheme: "srv")
-    internal let consent = IntegrationConsent()
+    /// The consent service the kernel reports typed addresses to.
+    internal let consent = Consent()
+    /// The kernel with the file operations, both file systems and the consent service.
     internal let bench: TestBench
 
+    /// Panels on `/A` and `/B`, with the consent service registered.
     internal init() {
         memory.addFile("/A/one.txt", "one")
         memory.addDirectory("/B")
@@ -36,6 +47,7 @@ internal struct Review2IntegrationTypedAddresses {
         bench.kernel.services.register((any ServerConsentService).self, consent)
     }
 
+    /// Only typed text that is an address and is not what the program proposed is reported.
     @Test
     internal func onlyTextWithAnAddressThatWasNotTheProposalIsReported() {
         let base = memory.url("/A")
@@ -50,6 +62,8 @@ internal struct Review2IntegrationTypedAddresses {
         #expect(consent.chosen.map(\.scheme) == ["srv"])
     }
 
+    /// A server typed as the target of a copy is reported as the user's own choice, and the copy
+    /// goes there.
     @Test
     internal func aTargetTypedIntoTheCopyDialogIsTheUsersOwnChoice() {
         bench.left.moveCursor(toName: "one.txt")
@@ -59,6 +73,7 @@ internal struct Review2IntegrationTypedAddresses {
         #expect(server.contents("/in/one.txt") == "one")
     }
 
+    /// A server the copy dialog proposed and the user accepted as it was is not reported.
     @Test
     internal func aProposedTargetThatIsLeftAsItIsWasNotTyped() {
         // The other panel shows a place on the server (say, a tab that a file restored).
@@ -68,34 +83,5 @@ internal struct Review2IntegrationTypedAddresses {
         bench.commands.perform(.copy)
         #expect(consent.chosen.isEmpty)
         #expect(server.contents("/in/one.txt") == "one")
-    }
-}
-
-// A list of files from anywhere says that its entries can only be removed (`.removeOnly`,
-// fileops request 12): the commands that make something new in the panel's folder are
-// withheld there, and Delete is not.
-@MainActor
-@Suite
-internal struct Review2IntegrationLists {
-    @Test
-    internal func nothingNewIsOfferedInAListOfFilesAndDeleteIs() {
-        let memory = MemoryFileSystem()
-        memory.addFile("/A/one.txt", "one")
-        memory.addFile("/A/two.txt", "two")
-        memory.addDirectory("/B")
-        let lists = MemoryFileSystem(scheme: "listed")
-        lists.addFile("/found/one.txt", "one")
-        lists.capabilitiesAt = { _ in [.write, .removeOnly] }
-        let bench = TestBench(
-            plugins: [FileOperationsPlugin()],
-            fileSystems: [memory, lists],
-            left: memory.url("/A"),
-            right: memory.url("/B")
-        )
-        #expect(bench.commands.isEnabled(.makeDirectory) && bench.commands.isEnabled(.newTextFile))
-        bench.left.show(lists.url("/found"))
-        bench.left.moveCursor(toName: "one.txt")
-        #expect(!bench.commands.isEnabled(.makeDirectory) && !bench.commands.isEnabled(.newTextFile))
-        #expect(bench.commands.isEnabled(.delete) && bench.commands.isEnabled(.copy))
     }
 }

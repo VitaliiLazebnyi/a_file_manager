@@ -6,6 +6,7 @@ import Testing
 /// Review 2, K035/K036: the formats shared by the whole program take any number, on any thread.
 @Suite
 internal struct Review2KernelFormat {
+    /// Every `Int64`, the ends of the range too, is written as a size in k, in bytes and short.
     @Test
     internal func anyNumberIsASize() {
         #expect(Format.kilobytes(.max) == "9,007,199,254,740,992 k")
@@ -28,6 +29,7 @@ internal struct Review2KernelFormat {
         #expect(Format.shortSize(.max).hasSuffix(" T") && Format.shortSize(.min).hasSuffix(" b"))
     }
 
+    /// A speed or a time that is no number, or out of all reason, is still written as something.
     @Test
     internal func speedsAndTimesThatAreNoNumbersAreShownAsSomething() {
         for speed in [Double.nan, .infinity, -.infinity, 1e300, -1e300, -5, 0] {
@@ -42,6 +44,7 @@ internal struct Review2KernelFormat {
         )
     }
 
+    /// Adding sizes and converting them stops at the ends of the range instead of trapping.
     @Test
     internal func sumsOfSizesStopAtTheEndsOfTheRange() {
         #expect(
@@ -52,6 +55,8 @@ internal struct Review2KernelFormat {
         #expect(Int.max.addingSaturated(1) == .max)
     }
 
+    /// A name is shown as it is, except for control, invisible and direction characters, which
+    /// are written as their code points.
     @Test
     internal func namesFromOutsideAreShownWithoutWhatWouldMislead() {
         #expect(
@@ -65,6 +70,7 @@ internal struct Review2KernelFormat {
         )
     }
 
+    /// Grouping the digits of sizes on many threads at once gives the right digits every time.
     @Test
     internal func groupingDigitsIsSafeOnManyThreadsAtOnce() {
         let wrong = Parallel.map(Array(0..<20_000)) { index -> Bool in

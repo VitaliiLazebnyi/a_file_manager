@@ -126,14 +126,14 @@ internal func describeItem(_ item: FileItem) -> String {
 internal func tagged(_ items: [FileItem]) -> [FileItem] {
     items.enumerated()
         .map { index, item in
-            var tagged = FileItem(
+            var entry = FileItem(
                 url: URL(fileURLWithPath: "/i/\(index)"),
                 name: item.name,
                 kind: .init(isDirectory: item.isDirectory, isPackage: item.isPackage, isHidden: item.isHidden),
                 stat: .init(size: item.size, modified: item.modified)
             )
-            tagged.computedSize = item.computedSize
-            return tagged
+            entry.computedSize = item.computedSize
+            return entry
         }
 }
 

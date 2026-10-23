@@ -33,6 +33,7 @@ import VirtualFoldersPlugin
 @MainActor
 @Suite
 internal struct PluginLifetimes {
+    /// The names of the plugins the program starts, in the order it starts them.
     nonisolated internal static let names = [
         "LocalFileSystem", "Archives", "Network", "VirtualFolders", "Navigation", "Places", "Viewer", "MacIntegration",
         "FileOperations", "FileProperties", "MultiRename", "CompareContent", "FileTools", "FindFiles", "DirectorySync",
@@ -64,6 +65,8 @@ internal struct PluginLifetimes {
         "Configuration": { _ in ConfigurationPlugin(launchesApplications: false, background: nil) { [] } }
     ]
 
+    /// The plugin, once started and asked about each of its commands, keeps neither the kernel
+    /// nor the commands when the bench goes.
     @Test(arguments: names)
     internal func thePluginGoesWithItsKernel(_ name: String) throws {
         let scratch = ScratchPasteboard()
@@ -92,6 +95,7 @@ internal struct PluginLifetimes {
         #expect(commands == nil, "\(name) keeps the commands")
     }
 
+    /// The network plugin's connection centre and session environment go with the plugin.
     @Test
     internal func theConnectionsGoWithTheNetworkPlugin() {
         weak var center: ConnectionCenter?
