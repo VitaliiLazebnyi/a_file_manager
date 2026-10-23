@@ -1,5 +1,3 @@
-import AFMKernel
-import Foundation
 import Testing
 
 @testable import NetworkPlugin

@@ -1,8 +1,8 @@
 import AFMKernel
 import Foundation
-import OSLog
 import TestSupport
 import Testing
+import os
 
 /// The program's log: one subsystem, a category per module, and what the kernel says in it.
 @MainActor

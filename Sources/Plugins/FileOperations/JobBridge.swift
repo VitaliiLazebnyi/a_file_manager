@@ -7,21 +7,7 @@ import Foundation
 /// **Threading.** The job calls from its own threads; every dialog is shown through
 /// `JobMonitor.ask`, which takes it to the main thread and waits. What needs to read files
 /// (comparing two files) runs on the calling job thread, between two dialogs.
-final class JobBridge: FileJobDelegate, Sendable {
-    private let monitor: any JobMonitor
-    private let ui: any UserInteraction
-    private let fileSystems: FileSystemRegistry
-
-    init(monitor: any JobMonitor, ui: any UserInteraction, fileSystems: FileSystemRegistry) {
-        self.monitor = monitor
-        self.ui = ui
-        self.fileSystems = fileSystems
-    }
-
-    func job(_: FileJob, progress: JobProgress) {
-        monitor.report(progress)
-    }
-
+internal final class JobBridge: FileJobDelegate, Sendable {
     /// What the Overwrite dialog came back with: an answer for the job, or a wish to compare first.
     private enum OverwriteStep: Sendable {
         case answer(ConflictChoice)
@@ -43,14 +29,37 @@ final class JobBridge: FileJobDelegate, Sendable {
         case smaller = "Copy all smaller files (overwrite larger)"
     }
 
-    /// The Overwrite dialog (spec 07 › Name collisions). The six everyday answers and Rename
-    /// are buttons; the rest is behind "More…".
-    func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
+    /// The button Return presses in the Overwrite dialog: Skip.
+    internal static let overwriteDefault = 2
+
+    /// The job's progress window: it shows the progress and puts the questions on the main thread.
+    private let monitor: any JobMonitor
+    /// The dialogs the questions become; used on the main thread only.
+    private let interaction: any UserInteraction
+    /// The file systems the compared files and the paths shown in dialogs belong to.
+    private let fileSystems: FileSystemRegistry
+
+    /// A bridge for one job, shown in `monitor`, asking through `interaction`.
+    internal init(monitor: any JobMonitor, interaction: any UserInteraction, fileSystems: FileSystemRegistry) {
+        self.monitor = monitor
+        self.interaction = interaction
+        self.fileSystems = fileSystems
+    }
+
+    /// Hands the job's progress to its window.
+    internal func job(_: FileJob, progress: JobProgress) {
+        monitor.report(progress)
+    }
+
+    /// The Overwrite dialog (spec 07 › Name collisions).
+    ///
+    /// The six everyday answers and Rename are buttons; the rest is behind "More…".
+    internal func job(_ job: FileJob, conflictAt target: FileItem, source: FileItem) -> ConflictChoice {
         func describe(_ item: FileItem) -> String {
             "\(shown(item.url))\n\(Format.bytes(item.size)) bytes, \(Format.date(item.modified))"
         }
-        let detail =
-            "\(describe(target))\n\nWith file:\n\(describe(source))\n\n\(OperationText.comparison(source: source, target: target))"
+        let comparison = OperationText.comparison(source: source, target: target)
+        let detail = "\(describe(target))\n\nWith file:\n\(describe(source))\n\n\(comparison)"
         var more: [MoreOption] = [.compare]
         // Append is not offered when the collision comes from a move (07 › Name conflicts during rename or move).
         // Only a plain file is continued: a link at the target would lead the writing elsewhere.
@@ -88,20 +97,26 @@ final class JobBridge: FileJobDelegate, Sendable {
         monitor.ask { @MainActor @Sendable in
             let paths = "\(shown(source.url))\n\(shown(target.url))"
             switch same {
-            case true?: ui.inform("The two files have the same content!", detail: paths, style: .information)
-            case false?: ui.inform("The two files are different!", detail: paths, style: .information)
-            default: ui.inform("The two files could not be compared.", detail: paths, style: .warning)
+            case .same:
+                interaction.inform("The two files have the same content!", detail: paths, style: .information)
+
+            case .different:
+                interaction.inform("The two files are different!", detail: paths, style: .information)
+
+            default:
+                interaction.inform("The two files could not be compared.", detail: paths, style: .warning)
             }
         }
         return resolve(job, target: target, source: source, detail: detail, more: more)
     }
 
-    /// One answer of the Overwrite dialog: what the job is to do, or Compare. A Rename or More… that is given up
-    /// asks again. Main thread.
+    /// One answer of the Overwrite dialog: what the job is to do, or Compare.
+    ///
+    /// A Rename or More… that is given up asks again. Main thread.
     @MainActor
     private func overwriteStep(target: FileItem, detail: String, more: [MoreOption]) -> OverwriteStep {
         // Return presses Skip: a file that is overwritten is gone, one that is skipped can still be copied.
-        let button = ui.choose(
+        let button = interaction.choose(
             "Overwrite:",
             detail: detail,
             buttons: [
@@ -111,11 +126,20 @@ final class JobBridge: FileJobDelegate, Sendable {
             defaultButton: Self.overwriteDefault
         )
         switch button {
-        case 0: return .answer(.overwrite)
-        case 1: return .answer(.overwriteAll)
-        case 2: return .answer(.skip)
-        case 3: return .answer(.skipAll)
-        case 4: return .answer(.overwriteAllOlder)
+        case 0:
+            return .answer(.overwrite)
+
+        case 1:
+            return .answer(.overwriteAll)
+
+        case 2:
+            return .answer(.skip)
+
+        case 3:
+            return .answer(.skipAll)
+
+        case 4:
+            return .answer(.overwriteAllOlder)
 
         case 5:
             if let name = newName("New name for the file being copied:", proposing: target.name) {
@@ -123,50 +147,78 @@ final class JobBridge: FileJobDelegate, Sendable {
             }
 
         case 6:
-            if let row = ui.pickRow("Overwrite: more options", rows: more.map(\.rawValue), detail: shown(target.url)),
+            if let row = interaction.pickRow(
+                "Overwrite: more options",
+                rows: more.map(\.rawValue),
+                detail: shown(target.url)
+            ),
                 let step = moreStep(more[row], target: target)
             {
                 return step
             }
 
-        default: return .answer(.cancel)
+        default:
+            return .answer(.cancel)
         }
         return overwriteStep(target: target, detail: detail, more: more)
     }
 
-    /// What an entry of More… answers; nil when renaming the target was given up. Main thread.
+    /// What an entry of More… answers; nil when renaming the target was given up.
+    ///
+    /// Main thread.
     @MainActor
     private func moreStep(_ option: MoreOption, target: FileItem) -> OverwriteStep? {
         switch option {
-        case .compare: return .compare
-        case .append: return .answer(.append)
-        case .resume: return .answer(.resume)
+        case .compare:
+            return .compare
+
+        case .append:
+            return .answer(.append)
+
+        case .resume:
+            return .answer(.resume)
+
         case .renameExisting:
             return newName("New name for the existing target file:", proposing: target.name)
-                .map {
-                    .answer(.renameExisting($0))
+                .map { name in
+                    .answer(.renameExisting(name))
                 }
-        case .autoRenameCopied: return .answer(.autoRenameCopied)
-        case .autoRenameExisting: return .answer(.autoRenameExisting)
-        case .renameOlderSkipNewer: return .answer(.renameOlderSkipNewer)
-        case .olderOrSame: return .answer(.overwriteAllOlderOrSame)
-        case .larger: return .answer(.copyAllLarger)
-        case .smaller: return .answer(.copyAllSmaller)
+
+        case .autoRenameCopied:
+            return .answer(.autoRenameCopied)
+
+        case .autoRenameExisting:
+            return .answer(.autoRenameExisting)
+
+        case .renameOlderSkipNewer:
+            return .answer(.renameOlderSkipNewer)
+
+        case .olderOrSame:
+            return .answer(.overwriteAllOlderOrSame)
+
+        case .larger:
+            return .answer(.copyAllLarger)
+
+        case .smaller:
+            return .answer(.copyAllSmaller)
         }
     }
 
-    /// Asks for a name; nil when the user gave none or kept the proposal's place by cancelling. Main thread.
+    /// Asks for a name; nil when the user gave none or kept the proposal's place by cancelling.
+    ///
+    /// Main thread.
     @MainActor
     private func newName(_ message: String, proposing name: String) -> String? {
-        guard let text = ui.prompt(message, value: name)?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
+        guard let text = interaction.prompt(message, value: name)?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
             !text.contains("/")
         else { return nil }
         return text
     }
 
-    func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
+    /// Asks what to do about an error with `url`: skip it, skip all such errors, retry or abort.
+    internal func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
         monitor.ask { @MainActor @Sendable in
-            ui.pick(
+            interaction.pick(
                 "Error with \(DisplayName.escaped(url.lastPathComponent))",
                 detail: error.localizedDescription,
                 [("Skip", .skip), ("Skip all", .skipAll), ("Retry", .retry), ("Abort", .abort)],
@@ -175,7 +227,8 @@ final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
-    func job(_: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
+    /// Asks whether a folder that is not empty is deleted with everything in it; Return presses Skip.
+    internal func job(_: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
         monitor.ask { @MainActor @Sendable in
             pick(
                 "The directory \(shown(directory)) is not empty!",
@@ -187,7 +240,10 @@ final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
-    func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
+    /// Asks whether a protected item (read-only, hidden, locked, or one the Trash cannot take) is changed anyway.
+    ///
+    /// Return presses Skip.
+    internal func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         let text = OperationText.protection(question, path: shown(question.item.url))
         return monitor.ask { @MainActor @Sendable in
             pick(
@@ -200,9 +256,10 @@ final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
-    func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
+    /// Asks whether a folder is copied into a folder of the same name that is already there.
+    internal func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
         monitor.ask { @MainActor @Sendable in
-            ui.pick(
+            interaction.pick(
                 "The folder \(shown(existing.url)) already exists!",
                 detail: "Do you want to copy into it? Files with the same names are asked about one by one.",
                 [("Merge", .merge), ("All", .mergeAll), ("Skip", .skip), ("Cancel", .cancel)],
@@ -211,8 +268,12 @@ final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
+    /// Asks whether the contents of a folder that is another volume are moved or deleted.
+    ///
     /// Skip comes first, so that Return keeps the other volume as it is.
-    func job(_: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose) -> ProtectionChoice {
+    internal func job(_: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose)
+        -> ProtectionChoice
+    {
         let (action, detail) =
             purpose == .move
             ? ("Move its contents", "Moving it would move everything on that volume away. Do you want that?")
@@ -223,33 +284,42 @@ final class JobBridge: FileJobDelegate, Sendable {
                 detail: detail,
                 [("Skip", .skip), (action, .proceed), ("All Volumes", .all), ("Cancel", .cancel)],
                 fallback: ProtectionChoice.cancel,
-                style: .critical,
-                returnPresses: 0
+                returnPresses: 0,
+                style: .critical
             )
         }
     }
 
-    /// The button Return presses in the Overwrite dialog: Skip.
-    static let overwriteDefault = 2
-
     /// A question whose first button destroys something (overwrites, deletes for good, empties
     /// another volume): Return presses the button at `safe`, which leaves things as they are,
-    /// and the destroying answer has to be chosen. Main thread.
+    /// and the destroying answer has to be chosen.
+    ///
+    /// Main thread.
     @MainActor
     private func pick<Choice>(
         _ message: String,
         detail: String,
         _ choices: [(String, Choice)],
         fallback: Choice,
-        style: QuestionStyle = .warning,
-        returnPresses safe: Int
+        returnPresses safe: Int,
+        style: QuestionStyle = .warning
     ) -> Choice {
-        let index = ui.choose(message, detail: detail, buttons: choices.map(\.0), style: style, defaultButton: safe)
+        let index = interaction.choose(
+            message,
+            detail: detail,
+            buttons: choices.map(\.0),
+            style: style,
+            defaultButton: safe
+        )
         return choices.indices.contains(index) ? choices[index].1 : fallback
     }
 
     /// A location as questions show it: with whatever could mislead the eye written out.
     private func shown(_ url: URL) -> String {
         DisplayName.escaped(fileSystems.displayPath(url))
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

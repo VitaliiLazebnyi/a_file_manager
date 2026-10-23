@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import Testing
 
@@ -7,7 +6,7 @@ import Testing
 /// The viewer's text: detection, decoding and HTML as text, in the cases the other tests leave out.
 @Suite
 internal struct CoverageViewerTextTests {
-    private static let wrapped = ViewerLayout.text(TextLayoutOptions(columns: 80, wordWrap: true))
+    private static let wrapped = ViewerLayout.text(TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 8))
 
     // MARK: Detection
 
@@ -31,12 +30,12 @@ internal struct CoverageViewerTextTests {
     @Test
     internal func weakSignaturesNeedMoreThanTheirFirstBytes() {
         let bitmap = Data("BM".utf8) + Data(count: 30)
-        #expect(ViewerDetection.content(name: "picture.bmp", sample: bitmap) == .image)
-        #expect(ViewerDetection.content(name: "notes.txt", sample: bitmap) == .other)
+        #expect(ViewerDetection.content(name: "picture.bmp", sample: bitmap, additionalMedia: [], vetoed: []) == .image)
+        #expect(ViewerDetection.content(name: "notes.txt", sample: bitmap, additionalMedia: [], vetoed: []) == .other)
         let webp = Data("RIFF".utf8) + Data(count: 4) + Data("WEBP".utf8)
         let wave = Data("RIFF".utf8) + Data(count: 4) + Data("WAVE".utf8)
-        #expect(ViewerDetection.content(name: "photo", sample: webp) == .image)
-        #expect(ViewerDetection.content(name: "sound", sample: wave) == .other)
+        #expect(ViewerDetection.content(name: "photo", sample: webp, additionalMedia: [], vetoed: []) == .image)
+        #expect(ViewerDetection.content(name: "sound", sample: wave, additionalMedia: [], vetoed: []) == .other)
     }
 
     /// The character sets an HTML head may name, and ones the viewer does not know.
@@ -79,7 +78,7 @@ internal struct CoverageViewerTextTests {
     @Test
     internal func anEncodingTheSystemLacksFallsBackToLatin1() {
         let unknown = ViewerEncoding(codePage: 99_999, name: "Unknown")
-        #expect(unknown.encode("a") == nil)
+        #expect(throws: CocoaError.self) { try unknown.encode("a") }
         let table = CodeTable.table(for: unknown)
         #expect(table.single[0xE9] == 0xE9 && table.single[0x80] == 0x20AC)
     }
@@ -130,14 +129,14 @@ internal struct CoverageViewerTextTests {
     /// A script without its end tag, or whose end tag is cut off, hides the rest of the page.
     @Test
     internal func anUnclosedScriptHidesTheRest() {
-        #expect(HTMLText.plainText(from: "<p>Before</p><script>var a = 1;").text == "Before\n")
-        #expect(HTMLText.plainText(from: "<p>Before</p><script>x</script").text == "Before\n")
+        #expect(HTMLText.plainText(from: "<p>Before</p><script>var a = 1;", linkBraces: true).text == "Before\n")
+        #expect(HTMLText.plainText(from: "<p>Before</p><script>x</script", linkBraces: true).text == "Before\n")
     }
 
     /// A tag name with letters beyond ASCII is no tag the viewer knows: only its text is kept.
     @Test
     internal func tagNamesBeyondASCIIAreUnknown() {
-        #expect(HTMLText.plainText(from: "<aé>text</aé>").text == "text\n")
+        #expect(HTMLText.plainText(from: "<aé>text</aé>", linkBraces: true).text == "text\n")
     }
 
     /// A link without braces is its text and its target, a space apart.

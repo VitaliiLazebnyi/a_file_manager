@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import AFMShell
 import AppKit
@@ -21,6 +20,7 @@ internal struct CoverageViewerWindowTests {
             kernel: setup.bench.kernel,
             settings: ListerSettings(setup.bench.kernel.settings),
             temporaryCopies: TemporaryCopies(),
+            internalOnly: false,
             followsCursor: followsCursor,
             followDelay: 0.01
         ) { _ in
@@ -64,7 +64,7 @@ internal struct CoverageViewerWindowTests {
             defer { controller.close() }
             kept = controller.window as? ToolWindow
             let flag = CancellationFlag()
-            controller.pane.activity = ("Searching", nil, flag)
+            controller.pane.activity = ViewerPane.Activity(text: "Searching", progress: nil, cancel: flag)
             #expect(kept?.onEscape?() == true && flag.isCancelled)
             controller.pane.activity = nil
             #expect(kept?.onEscape?() == false)

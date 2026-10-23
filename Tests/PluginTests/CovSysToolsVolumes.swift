@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 import Foundation
@@ -110,7 +109,7 @@ internal struct CovSysToolsVolumes {
     /// back.
     @Test
     internal func aRefusalIsExplained() {
-        let mine = EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")
+        let mine = EjectRefusal(reason: "busy", program: "AFileManager", isThisProgram: true)
         let refusals = Array(repeating: mine, count: VolumeEjection.ownRefusalRetries + 1)
         let drive = drive(refusals + [EjectRefusal(reason: "The volume is busy.")])
         let bench = bench(drive, fileSystems: [LocalFileSystem()])

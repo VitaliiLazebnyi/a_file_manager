@@ -1,6 +1,5 @@
 import AFMKernel
 import Foundation
-import TestSupport
 import Testing
 
 /// The command registry: running commands by name, and when it refuses to.

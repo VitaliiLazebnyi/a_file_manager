@@ -42,7 +42,7 @@ extension BigRun {
         let started = now()
         let fresh = Bench(flushDelay: nil)
         do {
-            let opened = try fresh.store.archive(at: archive)
+            let opened = try fresh.store.archive(at: archive, cancellation: nil)
             let files = opened.entries.filter { !$0.isDirectory }.count
             if files != expectedFiles {
                 Findings.shared.violation(

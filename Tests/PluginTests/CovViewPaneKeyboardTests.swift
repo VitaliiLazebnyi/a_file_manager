@@ -6,8 +6,9 @@ import Testing
 
 @testable import ViewerPlugin
 
-/// The keys of a Lister pane as the application delivers them, and who has the keyboard. The
-/// windows are never put on screen.
+/// The keys of a Lister pane as the application delivers them, and who has the keyboard.
+///
+/// The windows are never put on screen.
 @MainActor
 @Suite(.serialized)
 internal struct CovViewPaneKeyboardTests {
@@ -100,7 +101,7 @@ internal struct CovViewPaneKeyboardTests {
         window.contentView = content
         defer { window.contentView = nil }
         let flag = CancellationFlag()
-        pane.activity = ("Working", nil, flag)
+        pane.activity = ViewerPane.Activity(text: "Working", progress: nil, cancel: flag)
         #expect(window.makeFirstResponder(nil) && !pane.hasKeyboard)
         let escape = try Self.key("\u{1B}", 53, in: window)
         #expect(pane.monitored(escape) === escape && !flag.isCancelled)

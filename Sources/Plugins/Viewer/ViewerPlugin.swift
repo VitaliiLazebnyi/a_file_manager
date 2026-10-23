@@ -3,28 +3,13 @@ public import AFMKernel
 public import AFMShell
 public import AppKit
 
-/// Commands only the viewer uses, by their names in the specification (17 › Command catalogue).
-extension CommandID {
-    /// Lister with the file under the cursor (Shift+F3).
-    static let viewSingle: CommandID = "cm_ListOnly"
-    /// Lister with the marked files.
-    static let viewMarked: CommandID = "cm_ListMulti"
-    /// Lister with text modes only: no images, multimedia or Quick Look (Alt+Shift+F3).
-    static let viewInternalSingle: CommandID = "cm_ListInternalOnly"
-    static let viewInternalMarked: CommandID = "cm_ListInternalMulti"
-    static let quickViewInternalOnly: CommandID = "cm_SrcQuickInternalOnly"
-    static let hideQuickView: CommandID = "cm_SrcHideQuickView"
-    static let updateQuickView: CommandID = "cm_UpdateQuickView"
-    static let separateQuickView: CommandID = "cm_SeparateQuickView"
-    static let separateQuickViewInternalOnly: CommandID = "cm_SeparateQuickInternalOnly"
-    static let configureLister: CommandID = "cm_ConfigLister"
-}
-
 /// Lister, the built-in viewer (spec 10), and the Quick View panel (spec 03 › Quick View).
+///
 /// Files are read through their file-system providers, so everything works in archives and on
-/// servers as it does on the disk. The plugin and its windows live on the main thread; what
-/// reads files runs in the background (see `ViewerPane`).
+/// servers as it does on the disk. The plugin and its windows live on the main thread; what reads
+/// files runs in the background (see `ViewerPane`).
 public final class ViewerPlugin: Plugin, ViewerService {
+    /// The plugin's name in the plugin list.
     public let name = "Viewer"
     private let overlayHost: (any PanelHandle) -> any PanelOverlayHost?
     private let quickViewDelay: TimeInterval
@@ -33,12 +18,16 @@ public final class ViewerPlugin: Plugin, ViewerService {
     private weak var owner: Kernel?
     private var settings: ListerSettings?
     private let temporaryCopies = TemporaryCopies()
-    private(set) var windows: [ViewerWindowController] = []
-    private(set) var quickView: QuickViewPanel?
+    /// The open Lister windows, the separate quick view among them, oldest first.
+    internal private(set) var windows: [ViewerWindowController] = []
+    /// The Quick View panel while it covers a panel, nil otherwise.
+    internal private(set) var quickView: QuickViewPanel?
     /// What the panes play sounds and films with: the system's player, or a test's that plays nothing.
     internal var mediaPlayback: @MainActor () -> any MediaPlayback = { SystemMediaPlayback() }
-    /// Puts a Lister window on screen (with `showsWindows`). Tests replace it, so that no window
-    /// shows in the session they run in, and look at what it was asked to show.
+    /// Puts a Lister window on screen (with `showsWindows`).
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `overlayHost` finds the part of a panel that can be covered by the quick view;
@@ -55,102 +44,20 @@ public final class ViewerPlugin: Plugin, ViewerService {
         self.showsWindows = showsWindows
     }
 
+    /// Registers the viewer's commands, menu entries, toolbar buttons, preference page and the
+    /// `ViewerService`; the windows open later, when a command asks for one.
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
         self.owner = owner
         let listerSettings = ListerSettings(kernel.settings)
         settings = listerSettings
-        let commands = kernel.commands
         kernel.fileSystems.addVolumeReleaser { [weak self] volume in self?.letGo(of: volume) }
-        let model = { kernel.panels.source.model }
-        let cursorFile = { model().cursorItem.flatMap { $0.isDirectory ? nil : $0.url } }
-        /// The marked files, or without any the file under the cursor (spec 10 › Keys and commands).
-        let markedFiles = { model().operands().filter { !$0.isDirectory }.map(\.url) }
-        /// The toolbar asks `enabled` ten times a second, so it must not resolve the operands
-        /// (an O(n) pass with items marked); `canView` is a cheap test, `files` runs with the command.
-        func viewer(
-            _ id: CommandID,
-            _ title: String,
-            _ shortcuts: [Shortcut],
-            barLabel: String? = nil,
-            internalOnly: Bool = false,
-            canView: (() -> Bool)? = nil,
-            files: @escaping () -> [URL]
-        ) {
-            commands.register(
-                Command(id, title, shortcuts, barLabel: barLabel, runsDuringJobs: true),
-                enabled: { canView?() ?? !files().isEmpty },
-                parameterized: { [weak self] argument in
-                    // Not empty: the command is enabled only when there are files.
-                    let urls = argument.location.map { [$0] } ?? files()
-                    self?
-                        .open(
-                            urls.map { ViewerItem(source: .file($0), title: kernel.fileSystems.displayPath($0)) },
-                            internalOnly: internalOnly
-                        )
-                }
-            )
-        }
-        // Something marked must be a file, or without marks the cursor must be on one (the list of files is made when the command runs).
-        let canView = { model().hasOperandFile }
-        viewer(.view, "View", [.f(3)], barLabel: "View", canView: canView, files: markedFiles)
-        viewer(.viewSingle, "View File Under Cursor", [.f(3, .shift)]) { cursorFile().map { [$0] } ?? [] }
-        viewer(.viewMarked, "View Marked Files", [], canView: canView, files: markedFiles)
-        viewer(.viewInternalSingle, "View as Text Only", [.f(3, [.option, .shift])], internalOnly: true) {
-            cursorFile().map { [$0] } ?? []
-        }
-        viewer(
-            .viewInternalMarked,
-            "View Marked Files as Text Only",
-            [],
-            internalOnly: true,
-            canView: canView,
-            files: markedFiles
-        )
-
-        let isOn = { [weak self] in self?.quickView != nil }
-        commands.register(
-            Command(.quickView, "Quick View Panel", [Shortcut(.character("q"), .control)], runsDuringJobs: true),
-            checked: isOn
-        ) { [weak self] in
-            self?.toggleQuickView(internalOnly: false, kernel: kernel, settings: listerSettings)
-        }
-        commands.register(
-            Command(.quickViewInternalOnly, "Quick View Panel, Text Only", runsDuringJobs: true),
-            checked: isOn
-        ) { [weak self] in
-            self?.toggleQuickView(internalOnly: true, kernel: kernel, settings: listerSettings)
-        }
-        commands.register(Command(.hideQuickView, "Quick View Panel Off", runsDuringJobs: true), enabled: isOn) {
-            [weak self] in self?.hideQuickView()
-        }
-        commands.register(
-            Command(.updateQuickView, "Reload Quick View", runsDuringJobs: true),
-            enabled: { [weak self] in self?.quickView != nil || self?.windows.contains(where: \.followsCursor) == true
-            }
-        ) { [weak self] in
-            self?.quickView?.refresh()
-            self?.windows.filter(\.followsCursor).forEach { $0.refreshFollowing() }
-        }
-        let separateIsOpen = { [weak self] in self?.windows.contains(where: \.followsCursor) == true }
-        commands.register(
-            Command(
-                .separateQuickView,
-                "Separate Quick View Window",
-                [Shortcut(.character("q"), [.control, .shift])],
-                runsDuringJobs: true
-            ),
-            checked: separateIsOpen
-        ) { [weak self] in self?.toggleSeparateQuickView(internalOnly: false) }
-        commands.register(
-            Command(.separateQuickViewInternalOnly, "Separate Quick View Window, Text Only", runsDuringJobs: true),
-            checked: separateIsOpen
-        ) { [weak self] in self?.toggleSeparateQuickView(internalOnly: true) }
-        commands.register(Command(.configureLister, "Configure Lister…", runsDuringJobs: true)) { [weak self] in
+        registerViewCommands(kernel)
+        registerQuickViewCommands(kernel, settings: listerSettings)
+        kernel.commands.register(Command(.configureLister, "Configure Lister…", runsDuringJobs: true)) { [weak self] in
             self?.configure(kernel)
         }
-
         // The Files menu lists View only; the other ways of viewing have their keys.
         kernel.menus.add([.view], to: .filesOpen)
         kernel.menus.addToContextMenu([.view], in: .open, onItemOnly: true)
@@ -173,9 +80,12 @@ public final class ViewerPlugin: Plugin, ViewerService {
         kernel.services.register((any ViewerService).self, self)
     }
 
+    /// Closes the quick view and every Lister window and deletes the temporary copies left.
     public func stop() {
         hideQuickView()
-        windows.forEach { $0.close() }
+        for window in windows {
+            window.close()
+        }
         windows = []
         // Normally done by `prepareToQuit` already; what is left is deleted here, waiting a moment at most.
         temporaryCopies.removeAll()
@@ -183,30 +93,46 @@ public final class ViewerPlugin: Plugin, ViewerService {
 
     /// Closes the windows and deletes the temporary copies of remote files in the background, so the
     /// program does not wait for the disk on the main thread when it quits.
+    @preconcurrency
     public func prepareToQuit(cancellation _: CancellationFlag, completion: @escaping @Sendable () -> Void) {
         hideQuickView()
-        windows.forEach { $0.close() }
+        for window in windows {
+            window.close()
+        }
         windows = []
         temporaryCopies.removeAll(waiting: false) { completion() }
     }
 
     // MARK: ViewerService
 
+    /// Opens a Lister window on the file at `url`; nothing happens before `start(in:)`.
     public func view(_ url: URL) {
-        guard let kernel = owner else { return }
-        open([ViewerItem(source: .file(url), title: kernel.fileSystems.displayPath(url))], internalOnly: false)
+        guard let kernel = owner else {
+            return
+        }
+        open(
+            [ViewerItem(source: .file(url), title: kernel.fileSystems.displayPath(url))],
+            internalOnly: false,
+            followsCursor: false
+        )
     }
 
+    /// Opens a Lister window on `text`, with `title` in its title bar; nothing happens before `start(in:)`.
     public func view(text: String, title: String) {
-        open([ViewerItem(source: .text(text), title: title)], internalOnly: false)
+        open([ViewerItem(source: .text(text), title: title)], internalOnly: false, followsCursor: false)
     }
 
     // MARK: Windows
 
     /// Opens a Lister window on the files of a session; it fills when the first has been read.
+    ///
+    /// With `followsCursor` it is the separate quick view and shows what the source panel's
+    /// cursor is on instead of `items`. Nil before `start(in:)`.
     @discardableResult
-    func open(_ items: [ViewerItem], internalOnly: Bool, followsCursor: Bool = false) -> ViewerWindowController? {
-        guard let kernel = owner, let settings else { return nil }
+    internal func open(_ items: [ViewerItem], internalOnly: Bool, followsCursor: Bool) -> ViewerWindowController? {
+        guard let kernel = owner, let settings else {
+            return nil
+        }
         let controller = ViewerWindowController(
             kernel: kernel,
             settings: settings,
@@ -229,12 +155,70 @@ public final class ViewerPlugin: Plugin, ViewerService {
         return controller
     }
 
-    private func toggleSeparateQuickView(internalOnly: Bool) {
-        if let open = windows.first(where: \.followsCursor) {
-            open.close()
-        } else {
-            self.open([], internalOnly: internalOnly, followsCursor: true)
+    /// Before `volume` is ejected: the Lister windows that show one of its files close, and a
+    /// quick view of one shows nothing until the cursor moves on.
+    internal func letGo(of volume: URL) {
+        func isOnVolume(_ url: URL?) -> Bool {
+            guard let url, url.isFileURL else {
+                return false
+            }
+            return url.isSameLocation(as: volume) || url.isInside(volume)
         }
+        for window in windows
+        where isOnVolume(window.pane.item?.url) || window.items.contains(where: { isOnVolume($0.url) }) {
+            window.pane.clear()
+            window.close()
+        }
+        if let quickView, isOnVolume(quickView.pane.item?.url) || isOnVolume(quickView.shownItem?.url) {
+            quickView.pane.clear()
+        }
+    }
+
+    // MARK: Commands
+
+    /// The commands of the Quick View panel and of the separate quick view window.
+    private func registerQuickViewCommands(_ owner: Kernel, settings listerSettings: ListerSettings) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
+        let commands = kernel.commands
+        let isOn = { [weak self] in self?.quickView != nil }
+        commands.register(
+            Command(.quickView, "Quick View Panel", [Shortcut(.character("q"), .control)], runsDuringJobs: true),
+            checked: isOn
+        ) { [weak self] in
+            self?.toggleQuickView(internalOnly: false, kernel: kernel, settings: listerSettings)
+        }
+        commands.register(
+            Command(.quickViewInternalOnly, "Quick View Panel, Text Only", runsDuringJobs: true),
+            checked: isOn
+        ) { [weak self] in
+            self?.toggleQuickView(internalOnly: true, kernel: kernel, settings: listerSettings)
+        }
+        commands.register(
+            Command(.hideQuickView, "Quick View Panel Off", runsDuringJobs: true),
+            enabled: isOn
+        ) { [weak self] in self?.hideQuickView() }
+        commands.register(
+            Command(.updateQuickView, "Reload Quick View", runsDuringJobs: true),
+            enabled: { [weak self] in
+                self?.quickView != nil || self?.windows.contains(where: \.followsCursor) == true
+            },
+            { [weak self] in self?.refreshQuickViews() }
+        )
+        let separateIsOpen = { [weak self] in self?.windows.contains(where: \.followsCursor) == true }
+        commands.register(
+            Command(
+                .separateQuickView,
+                "Separate Quick View Window",
+                [Shortcut(.character("q"), [.control, .shift])],
+                runsDuringJobs: true
+            ),
+            checked: separateIsOpen
+        ) { [weak self] in self?.toggleSeparateQuickView(internalOnly: false) }
+        commands.register(
+            Command(.separateQuickViewInternalOnly, "Separate Quick View Window, Text Only", runsDuringJobs: true),
+            checked: separateIsOpen
+        ) { [weak self] in self?.toggleSeparateQuickView(internalOnly: true) }
     }
 
     // MARK: Quick View panel
@@ -266,20 +250,19 @@ public final class ViewerPlugin: Plugin, ViewerService {
         quickView?.pane.mediaPlayback = mediaPlayback
     }
 
-    /// Before `volume` is ejected: the Lister windows that show one of its files close, and a
-    /// quick view of one shows nothing until the cursor moves on.
-    func letGo(of volume: URL) {
-        func isOnVolume(_ url: URL?) -> Bool {
-            guard let url, url.isFileURL else { return false }
-            return url.isSameLocation(as: volume) || url.isInside(volume)
+    private func toggleSeparateQuickView(internalOnly: Bool) {
+        if let open = windows.first(where: \.followsCursor) {
+            open.close()
+        } else {
+            self.open([], internalOnly: internalOnly, followsCursor: true)
         }
-        for window in windows
-        where isOnVolume(window.pane.item?.url) || window.items.contains(where: { isOnVolume($0.url) }) {
-            window.pane.clear()
-            window.close()
-        }
-        if let quickView, isOnVolume(quickView.pane.item?.url) || isOnVolume(quickView.shownItem?.url) {
-            quickView.pane.clear()
+    }
+
+    /// `cm_UpdateQuickView`: the quick view and the separate quick views read what they show again.
+    private func refreshQuickViews() {
+        quickView?.refresh()
+        for window in windows where window.followsCursor {
+            window.refreshFollowing()
         }
     }
 
@@ -294,37 +277,49 @@ public final class ViewerPlugin: Plugin, ViewerService {
     /// Configure Lister (spec 10 › Configure Lister): the options of the preference page as
     /// one dialog, for the command and for Options › Configure… in a Lister window.
     private func configure(_ kernel: Kernel) {
-        let preferences = ListerSettings.preferences
-        let store = kernel.settings
-        let fields = preferences.map { preference -> FormField in
-            switch preference.kind {
-            case .flag(let value):
-                return .checkbox(preference.key, preference.label, store.flag(preference.key, default: value))
-
-            case .choice(let options, let value):
-                return .choice(
-                    preference.key,
-                    preference.label,
-                    options,
-                    selected: store.index(preference.key, default: value)
-                )
-
-            case .text(let value):
-                return .text(preference.key, preference.label, store.text(preference.key, default: value))
-            }
-        }
+        let fields = ListerSettings.formFields(in: kernel.settings)
         guard let answer = kernel.interaction.form("Configure Lister", detail: "", fields: fields, buttons: ["OK"])
         else {
             return
         }
-        for preference in preferences {
+        for preference in ListerSettings.preferences {
             if let value = answer.values[preference.key] { kernel.settings.set(value, for: preference) }
         }
         settingsChanged()
     }
 
     private func settingsChanged() {
-        windows.forEach { $0.pane.applySettings() }
+        for window in windows {
+            window.pane.applySettings()
+        }
         quickView?.pane.applySettings()
     }
+
+    deinit {
+        // Nothing to release.
+    }
+}
+
+/// Commands only the viewer uses, by their names in the specification (17 › Command catalogue).
+extension CommandID {
+    /// Lister with the file under the cursor (Shift+F3).
+    internal static let viewSingle: CommandID = "cm_ListOnly"
+    /// Lister with the marked files.
+    internal static let viewMarked: CommandID = "cm_ListMulti"
+    /// Lister with text modes only: no images, multimedia or Quick Look (Alt+Shift+F3).
+    internal static let viewInternalSingle: CommandID = "cm_ListInternalOnly"
+    /// Lister with the marked files, in text modes only.
+    internal static let viewInternalMarked: CommandID = "cm_ListInternalMulti"
+    /// The Quick View panel in text modes only.
+    internal static let quickViewInternalOnly: CommandID = "cm_SrcQuickInternalOnly"
+    /// Turns the Quick View panel off; nothing happens when it is not shown.
+    internal static let hideQuickView: CommandID = "cm_SrcHideQuickView"
+    /// Reads what the Quick View panel and the separate quick view show again.
+    internal static let updateQuickView: CommandID = "cm_UpdateQuickView"
+    /// A Lister window of its own that follows the cursor (Ctrl+Shift+Q), or closes it.
+    internal static let separateQuickView: CommandID = "cm_SeparateQuickView"
+    /// The separate quick view window in text modes only.
+    internal static let separateQuickViewInternalOnly: CommandID = "cm_SeparateQuickInternalOnly"
+    /// The Configure Lister dialog.
+    internal static let configureLister: CommandID = "cm_ConfigLister"
 }

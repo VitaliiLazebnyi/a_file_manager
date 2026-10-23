@@ -31,7 +31,8 @@ internal struct CoverageArchivesFSLocationTests {
     internal func aHostWhosePrefixIsNotHexadecimalIsNotRead() throws {
         let made = ArchiveURL.make(
             scheme: ArchiveURL.writableScheme,
-            archive: try #require(URL(string: "ftp://server/a.zip"))
+            archive: try #require(URL(string: "ftp://server/a.zip")),
+            innerPath: ""
         )
         let parts = try #require(made.host).split(separator: "-")
         #expect(parts.count == 3 && ArchiveURL.parse(made) != nil)
@@ -57,7 +58,7 @@ internal struct CoverageArchivesFSLocationTests {
         let expected = try #require(URL(string: "x:///folder/a.zip"))
         #expect(ArchiveURL.parse(made) == .inside(ArchiveLocation(archive: expected, innerPath: "inner")))
         let relative = try #require(URL(string: "folder/a.zip"))
-        let local = ArchiveURL.make(scheme: ArchiveURL.writableScheme, archive: relative)
+        let local = ArchiveURL.make(scheme: ArchiveURL.writableScheme, archive: relative, innerPath: "")
         #expect(ArchiveURL.location(of: local)?.archive.isFileURL == true)
     }
 

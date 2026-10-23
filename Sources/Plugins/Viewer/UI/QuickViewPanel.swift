@@ -3,19 +3,21 @@ import AFMShell
 import AppKit
 
 /// The Quick View panel (spec 03 › Quick View, 10 › Embedded Lister): a Lister over the file
-/// list of the other panel that shows whatever the cursor of the followed panel is on. A bar
-/// above it names the file; for a folder the pane tells what it holds.
+/// list of the other panel that shows whatever the cursor of the followed panel is on.
+///
+/// A bar above it names the file; for a folder the pane tells what it holds.
 ///
 /// It goes away when the user switches to the covered panel or shows another place in it
 /// (`onDismiss`). Main thread only; the pane does its reading in the background and drops the
 /// load of the item before when the cursor moves on.
 @MainActor
-final class QuickViewPanel {
-    let pane: ViewerPane
+internal final class QuickViewPanel {
+    /// The embedded Lister pane below the bar.
+    internal let pane: ViewerPane
     /// The panel whose list is covered.
-    private(set) weak var covered: any PanelHandle?
+    internal private(set) weak var covered: any PanelHandle?
     /// The panel whose cursor is followed.
-    private(set) weak var followed: any PanelHandle?
+    internal private(set) weak var followed: any PanelHandle?
     private weak var host: any PanelOverlayHost?
     private let container = NSView()
     private let header = NSTextField(labelWithString: "")
@@ -23,11 +25,15 @@ final class QuickViewPanel {
     private var subscription: AnyObject?
     private let kernel: Kernel
     /// What the bar above the pane says.
-    private(set) var headerText = "" { didSet { header.stringValue = headerText } }
+    internal private(set) var headerText = "" { didSet { header.stringValue = headerText } }
     /// The item that is shown, as the followed panel lists it.
-    private(set) var shownItem: FileItem?
+    internal private(set) var shownItem: FileItem?
 
-    init(
+    /// Puts the panel over the list of `covered` and shows what the cursor of `followed` is on,
+    /// `delay` seconds after it moved; `onDismiss` runs when the quick view should end.
+    ///
+    /// `internalOnly` shows every file as text (`cm_ListInternalOnly`).
+    internal init(
         kernel: Kernel,
         settings: ListerSettings,
         temporaryCopies: TemporaryCopies,
@@ -53,11 +59,16 @@ final class QuickViewPanel {
             }
             headerText = title
         }
-        follower = CursorFollower(kernel: kernel, delay: delay, panel: { [weak self] in self?.followed }) {
-            [weak self] in self?.show($0)
-        }
+        follower = CursorFollower(
+            kernel: kernel,
+            delay: delay,
+            panel: { [weak self] in self?.followed },
+            show: { [weak self] item in self?.show(item) }
+        )
         subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
-            guard let self, panel === self.covered else { return }
+            guard let self, panel === self.covered else {
+                return
+            }
             // Switching to the covered panel, or showing another place in it, ends the quick view.
             if event == .becameSource || event == .locationChanged { onDismiss() }
         }
@@ -100,15 +111,21 @@ final class QuickViewPanel {
     }
 
     /// Reads the shown item again (`cm_UpdateQuickView`).
-    func refresh() { follower?.refresh() }
+    internal func refresh() { follower?.refresh() }
 
-    /// Brings the file list back. Safe to call more than once.
-    func remove() {
+    /// Brings the file list back.
+    ///
+    /// Safe to call more than once.
+    internal func remove() {
         follower = nil
         subscription = nil
         pane.stopWork()
         // The keyboard goes back to the list that was followed.
         if pane.hasKeyboard { followed?.focus() }
         if host?.overlay === container { host?.overlay = nil }
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

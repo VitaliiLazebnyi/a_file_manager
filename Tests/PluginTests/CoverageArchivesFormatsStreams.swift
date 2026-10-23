@@ -44,7 +44,10 @@ internal struct CoverageArchivesFormatsStreams {
     @Test
     internal func aMissingFileCannotBeOpened() {
         let missing = box.url("missing.bin")
-        #expect(Support.failure { _ = try RandomAccessFile(missing) } == Support.systemError(ENOENT, missing.path))
+        #expect(
+            Support.failure { _ = try RandomAccessFile(missing, shownAs: nil) }
+                == Support.systemError(ENOENT, missing.path)
+        )
     }
 
     /// A read of more than the memory holds fails with an error instead of a crash.
@@ -57,7 +60,7 @@ internal struct CoverageArchivesFormatsStreams {
         let handle = try FileHandle(forWritingTo: url)
         try handle.truncate(atOffset: 1 << 50)
         try handle.close()
-        let file = try RandomAccessFile(url)
+        let file = try RandomAccessFile(url, shownAs: nil)
         #expect(Support.failure { _ = try file.read(at: 0, count: .max) } == Support.systemError(ENOMEM, url.path))
         // A part of it reads as zeros.
         #expect(try file.read(at: 1 << 40, count: 4) == Data(count: 4))
@@ -68,7 +71,7 @@ internal struct CoverageArchivesFormatsStreams {
     internal func aFolderOpenedAsAFileCannotBeRead() throws {
         let folder = try box.folder("folder")
         try box.file("folder/inside.txt")
-        let file = try RandomAccessFile(folder)
+        let file = try RandomAccessFile(folder, shownAs: nil)
         #expect(file.size > 0)
         #expect(Support.failure { _ = try file.read(at: 0, count: 10) } == Support.systemError(EISDIR, folder.path))
     }
@@ -77,8 +80,8 @@ internal struct CoverageArchivesFormatsStreams {
     @Test
     internal func aFileThatShrankAfterItWasOpenedEndsEarly() throws {
         let url = try box.file("shrinks.txt", "0123456789")
-        let file = try RandomAccessFile(url)
-        let stream = FileRangeStream(file)
+        let file = try RandomAccessFile(url, shownAs: nil)
+        let stream = FileRangeStream(file, offset: 0, length: nil)
         #expect(try stream.read(upToCount: 4) == Data("0123".utf8))
         let handle = try FileHandle(forWritingTo: url)
         try handle.truncate(atOffset: 0)
@@ -131,21 +134,21 @@ internal struct CoverageArchivesFormatsStreams {
     @Test
     internal func aCopyIsGivenUpAtItsLimitOrWhenTheRoomRunsOut() throws {
         let data = Data(repeating: 7, count: 100)
-        let small = try OutputFile(creating: box.url("small.copy"))
-        let tooSmall = TeeStream(DataStream(data), to: small, limit: 50)
+        let small = try OutputFile(creating: box.url("small.copy"), mode: 0o600)
+        let tooSmall = TeeStream(DataStream(data), to: small, limit: 50, room: nil)
         #expect(try tooSmall.readFully(100) == data)
         #expect(!tooSmall.isComplete && small.position == 0)
-        try small.close()
+        try small.close(durably: false)
         #expect(try Data(contentsOf: box.url("small.copy")).isEmpty)
 
-        let full = try OutputFile(creating: box.url("full.copy"))
+        let full = try OutputFile(creating: box.url("full.copy"), mode: 0o600)
         let watch = SpaceWatch(folder: box.root, reserve: 0, step: 10) { _, _ in false }
         let noRoom = TeeStream(DataStream(data), to: full, limit: .max, room: watch)
         #expect(try noRoom.readFully(100) == data)
         #expect(!noRoom.isComplete)
         // Once full, the watch does not look again.
         #expect(!watch.allows(1))
-        try full.close()
+        try full.close(durably: false)
     }
 
     /// A copy the disk refuses is given up while the data still goes through.
@@ -155,10 +158,10 @@ internal struct CoverageArchivesFormatsStreams {
         let url = try box.file("at-the-end.copy", "")
         let output = try OutputFile(extending: url, from: UInt64(Support.largestFileSize(in: box.root)))
         let block = Data(repeating: 1, count: 1 << 16)
-        let tee = TeeStream(DataStream(block), to: output, limit: .max)
+        let tee = TeeStream(DataStream(block), to: output, limit: .max, room: nil)
         #expect(try tee.read(upToCount: 1 << 16) == block)
         #expect(!tee.isComplete)
-        try output.close()
+        try output.close(durably: false)
     }
 
     // MARK: Writing
@@ -168,11 +171,14 @@ internal struct CoverageArchivesFormatsStreams {
     internal func aNewFileMustNotExistYet() throws {
         let url = try box.file("there.txt")
         #expect(
-            Support.failure { _ = try OutputFile(creating: url) }
+            Support.failure { _ = try OutputFile(creating: url, mode: 0o600) }
                 == FileSystemError.alreadyExists(url.path).errorDescription
         )
         let nowhere = box.url("no/such/folder.txt")
-        #expect(Support.failure { _ = try OutputFile(creating: nowhere) } == Support.systemError(ENOENT, nowhere.path))
+        #expect(
+            Support.failure { _ = try OutputFile(creating: nowhere, mode: 0o600) }
+                == Support.systemError(ENOENT, nowhere.path)
+        )
     }
 
     /// Only an existing plain file is continued, and only at an offset a file can have.
@@ -201,13 +207,13 @@ internal struct CoverageArchivesFormatsStreams {
     @Test
     internal func aWriteTheDiskRefusesFails() throws {
         let url = box.url("refused.bin")
-        let output = try OutputFile(creating: url)
+        let output = try OutputFile(creating: url, mode: 0o600)
         try output.write(Data("head".utf8))
         #expect(
             Support.failure { try output.rewrite(Data("x".utf8), at: UInt64(Int64.max - 1)) }
                 == Support.systemError(EFBIG, url.path)
         )
-        try output.close()
+        try output.close(durably: false)
         try output.close(durably: true)
         #expect(try Data(contentsOf: url) == Data("head".utf8))
     }

@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import FileOperationsPlugin
 import Foundation
@@ -63,7 +62,7 @@ internal final class CoverageNetworkBench {
         try box.file("srv/readme.txt", "read me")
         try box.file("local/up.txt", "upload")
         try box.folder("other")
-        server = try TestFTPServer(root: box.url("srv"))
+        server = try TestFTPServer(root: box.url("srv"), options: TestFTPServer.Options())
         settings.set("0", forKey: "network.keepAliveSeconds")
         // The longest the plugin waits for an answer: the test server answers at once, but on a
         // machine busy with other tests its thread may be long in getting to it.

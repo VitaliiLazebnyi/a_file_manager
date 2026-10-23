@@ -77,15 +77,17 @@ extension Hammer {
         let from = Int64(random.next() % UInt64(max(1, document.content.upperBound)))
         // Bounded: at most 256 MiB from a random place, so one call ends in time.
         let end = min(document.content.upperBound, from + (256 << 20))
-        if let hit = try ViewerSearch.find(
-            pattern,
-            in: document.source,
+        let request = ViewerSearch.Request(pattern: pattern, start: from, backwards: random.next().isMultiple(of: 4))
+        let subject = ViewerSearch.Subject(
+            source: document.source,
             content: document.content.lowerBound..<end,
-            from: from,
-            backwards: random.next().isMultiple(of: 4),
             encoding: document.encoding,
-            cancellation: flag
-        ) {
+            boundaries: nil
+        )
+        let found = try ViewerSearch.find(request, in: subject, tuning: .standard, cancellation: flag) { _ in
+            // No progress is wanted.
+        }
+        if let hit = found {
             fail("\(label): found a text that is not there", "\(hit)")
         }
     }

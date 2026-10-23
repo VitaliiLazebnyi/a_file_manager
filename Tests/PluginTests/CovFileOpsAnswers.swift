@@ -4,7 +4,9 @@ import Foundation
 import TestSupport
 
 /// Answers every question of a job from lists the test fills, the last answer of a list again once it runs out, and
-/// records what was asked. Any thread: everything is kept in `Shared` boxes.
+/// records what was asked.
+///
+/// Any thread: everything is kept in `Shared` boxes.
 internal final class CovFileOpsAnswers: FileJobDelegate, Sendable {
     /// The answers to name collisions.
     internal let conflicts = Shared<[ConflictChoice]>([.overwrite])

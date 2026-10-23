@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// A change of a tab's list that the model works out from the list as it is
 /// (`PanelModel.prepare`): a fresh reading compared with what is shown, a list that has grown,

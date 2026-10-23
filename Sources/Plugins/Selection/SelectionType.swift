@@ -3,75 +3,89 @@ import Foundation
 
 /// A predefined selection type: a mask with further conditions, saved under a name and used
 /// in Select group as `>name` (spec 03 › Select and unselect group, 18 › File masks and
-/// selection types). Total Commander saves a whole search here; this holds what a file list
-/// knows of its entries: kind, size, date of last change, hidden and link.
-struct SelectionType: Codable, Equatable {
-    enum Kind: Int, Codable {
-        case any, files, folders
+/// selection types).
+///
+/// Total Commander saves a whole search here; this holds what a file list knows of its entries:
+/// kind, size, date of last change, hidden and link.
+internal struct SelectionType: Codable, Equatable {
+    /// Which kind of entry the type takes; the raw value is the one saved and the place in the dialog's list.
+    internal enum Kind: Int, Codable {
+        /// Files and folders alike.
+        case any = 0
+        /// Files only.
+        case files = 1
+        /// Folders only.
+        case folders = 2
     }
 
-    /// A condition on a yes/no property.
-    enum Tri: Int, Codable {
-        case any, yes, no
+    /// A condition on a yes/no property; the raw value is the one saved and the place in the dialog's list.
+    internal enum Tri: Int, Codable {
+        /// The property does not matter.
+        case any = 0
+        /// Only entries without the property pass.
+        case excluded = 2
+        /// Only entries with the property pass.
+        case required = 1
 
-        func accepts(_ value: Bool) -> Bool { self == .any || (self == .yes) == value }
+        /// Whether an entry whose property is `value` passes.
+        internal func accepts(_ value: Bool) -> Bool { self == .any || (self == .required) == value }
     }
 
-    var name: String
-    var mask = "*.*"
-    var kind = Kind.any
-    /// Size limits in bytes; they are asked of files only, and a folder never passes them.
-    var minSize: Int64?
-    var maxSize: Int64?
-    var modifiedFrom: Date?
-    var modifiedTo: Date?
+    /// The name the type is saved and used under (`>name`), compared without regard to case.
+    internal var name: String
+    /// The file mask the names have to match first, in the syntax of Select group.
+    internal var mask = "*.*"
+    /// Whether files, folders or both are taken.
+    internal var kind = Kind.any
+    /// The smallest size in bytes, if any.
+    ///
+    /// Size limits are asked of files only, and a folder never passes them.
+    internal var minSize: Int64?
+    /// The largest size in bytes, if any; like `minSize`, a folder never passes it.
+    internal var maxSize: Int64?
+    /// The earliest date of last change that passes, if any.
+    internal var modifiedFrom: Date?
+    /// The latest date of last change that passes, if any.
+    internal var modifiedTo: Date?
     /// Changed within the last so many days, counted back from the moment of selecting.
-    var notOlderThanDays: Int?
-    var hidden = Tri.any
-    var links = Tri.any
-
-    /// The conditions beyond the mask.
-    func accepts(_ item: FileItem, now: Date = Date()) -> Bool {
-        switch kind {
-        case .any: break
-        case .files: if item.isFolder { return false }
-        case .folders: if !item.isFolder { return false }
-        }
-        if minSize != nil || maxSize != nil {
-            guard !item.isFolder else { return false }
-            if let minSize, item.size < minSize { return false }
-            if let maxSize, item.size > maxSize { return false }
-        }
-        if let modifiedFrom, item.modified < modifiedFrom { return false }
-        if let modifiedTo, item.modified > modifiedTo { return false }
-        if let notOlderThanDays, item.modified < now.addingTimeInterval(-Double(notOlderThanDays) * 86_400) {
-            return false
-        }
-        return hidden.accepts(item.isHidden) && links.accepts(item.isSymlink)
-    }
+    internal var notOlderThanDays: Int?
+    /// The condition on the hidden flag.
+    internal var hidden = Tri.any
+    /// The condition on being a symbolic link.
+    internal var links = Tri.any
 
     // MARK: Text forms of the dialog
 
     /// `1500`, `10k`, `1.5 M`, `2g`; nil for anything else.
-    static func size(from text: String) -> Int64? {
-        var text = text.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !text.isEmpty else { return nil }
-        var factor = 1.0
-        if let unit = text.last, let power = ["b": 0, "k": 1, "m": 2, "g": 3, "t": 4][unit] {
-            factor = pow(1_024, Double(power))
-            text = String(text.dropLast()).trimmingCharacters(in: .whitespaces)
+    internal static func size(from text: String) -> Int64? {
+        var digits = text.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !digits.isEmpty else {
+            return nil
         }
-        guard let number = Double(text.replacingOccurrences(of: ",", with: "")), number >= 0 else { return nil }
+        var factor = 1.0
+        if let unit = digits.last, let power = ["b": 0, "k": 1, "m": 2, "g": 3, "t": 4][unit] {
+            factor = pow(1_024, Double(power))
+            digits = String(digits.dropLast()).trimmingCharacters(in: .whitespaces)
+        }
+        guard let number = Double(digits.replacingOccurrences(of: ",", with: "")), number >= 0 else {
+            return nil
+        }
         // `1e30` or `inf` is a size larger than any file, not a crash.
         let bytes = number * factor
         return bytes.isFinite && bytes < 9.2e18 ? Int64(bytes) : Int64.max
     }
 
-    static func text(ofSize size: Int64?) -> String {
-        guard let size else { return "" }
+    /// The text form of a size for the dialog: `10k`, `2M`, `1G` when the size is a whole number of
+    /// such units, else the bytes; empty for no size.
+    internal static func text(ofSize size: Int64?) -> String {
+        guard let size else {
+            return ""
+        }
         for (unit, power) in [("G", 3), ("M", 2), ("k", 1)] {
             let factor = Int64(pow(1_024, Double(power)))
-            if size >= factor, size % factor == 0 { return "\(size / factor)\(unit)" }
+            if size >= factor, size.isMultiple(of: factor) {
+                return "\(size / factor)\(unit)"
+            }
         }
         return String(size)
     }
@@ -83,158 +97,76 @@ struct SelectionType: Codable, Equatable {
         return formatter
     }
 
-    /// `2026-10-11` or `2026-10-11 09:58`. A day without a time means its start, or with
-    /// `endOfDay` its last second, so that "to 2026-10-11" includes that day.
-    static func date(from text: String, endOfDay: Bool = false) -> Date? {
-        let text = text.trimmingCharacters(in: .whitespaces)
-        if let date = formatter("yyyy-MM-dd HH:mm").date(from: text) { return date }
-        guard let day = formatter("yyyy-MM-dd").date(from: text) else { return nil }
+    /// `2026-10-11` or `2026-10-11 09:58`.
+    ///
+    /// A day without a time means its start, or with `endOfDay` its last second, so that "to
+    /// 2026-10-11" includes that day.
+    internal static func date(from text: String, endOfDay: Bool) -> Date? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        if let date = formatter("yyyy-MM-dd HH:mm").date(from: trimmed) {
+            return date
+        }
+        guard let day = formatter("yyyy-MM-dd").date(from: trimmed) else {
+            return nil
+        }
         return endOfDay ? day.addingTimeInterval(86_399) : day
     }
 
-    static func text(ofDate date: Date?) -> String {
+    /// The text form of a date for the dialog, `2026-10-11 09:58`; empty for no date.
+    internal static func text(ofDate date: Date?) -> String {
         date.map(formatter("yyyy-MM-dd HH:mm").string(from:)) ?? ""
     }
-}
 
-/// A mask or a selection type, ready to be asked which entries of a list it selects.
-/// A value without shared state; `names` may run on any thread.
-struct SelectionRule {
-    let mask: SelectionMask
-    let type: SelectionType?
-
-    init(mask text: String) {
-        mask = SelectionMask(text)
-        type = nil
-    }
-
-    init(_ type: SelectionType) {
-        mask = SelectionMask(type.mask)
-        self.type = type
-    }
-
-    /// The names of the entries the rule selects, as a set (two names that read the same are
-    /// one member; use `matching` where each entry counts).
-    func names(among items: [FileItem], base: URL, now: Date = Date()) -> Set<String> {
-        Set(matching(among: items, base: base, now: now))
-    }
-
-    /// The names of the entries the rule selects, one per entry in list order, written as the
-    /// entries have them. `base` is the directory the list belongs to; path-limited masks are
-    /// read relative to it.
-    func matching(among items: [FileItem], base: URL, now: Date = Date()) -> [String] {
-        matching(among: items, base: base, now: now, cancelled: { false })
-    }
-
-    /// The same, ending early once `cancelled` says so (the names found so far are then of no
-    /// use). Whether a regular expression of the mask ran out of time is told by `mask.timedOut`.
-    func matching(among items: [FileItem], base: URL, now: Date = Date(), cancelled: () -> Bool) -> [String] {
-        matchingIndices(among: items, base: base, now: now, cancelled: cancelled).map { items[$0].name }
-    }
-
-    /// Whether the rule looks at other entries than the one it judges (`A>B` takes the files
-    /// that belong to the matching ones): such a rule has to be run over the whole list.
-    var isPairwise: Bool { mask.pairsRelatedFiles }
-
-    /// The same as places in `items`, of the entries `scope` lets through.
-    func matchingIndices(
-        among items: [FileItem],
-        base: URL,
-        now: Date = Date(),
-        scope: SelectionScope = .both,
-        cancelled: () -> Bool
-    ) -> [Int] {
-        let entry = entryMaker(base: base)
-        let entries = items.map(entry)
-        var found: [Int] = []
-        for (index, isSelected) in mask.selected(entries, cancelled: cancelled).enumerated()
-        where isSelected && scope.contains(items[index]) && (type?.accepts(items[index], now: now) ?? true) {
-            found.append(index)
+    /// The conditions beyond the mask; `now` is the moment the age in days is counted back from.
+    internal func accepts(_ item: FileItem, now: Date) -> Bool {
+        guard acceptsKind(of: item), acceptsSize(of: item) else {
+            return false
         }
-        return found
+        return acceptsDate(of: item, now: now) && hidden.accepts(item.isHidden) && links.accepts(item.isSymlink)
     }
 
-    /// Whether the rule selects one entry on its own, for a rule that is not `isPairwise`. A
-    /// function of the entry alone, so it may be asked from several threads at once.
-    func probe(base: URL, now: Date = Date()) -> @Sendable (FileItem) -> Bool {
-        let (mask, type, entry) = (self.mask, self.type, entryMaker(base: base))
-        return { item in mask.matches(entry(item)) && (type?.accepts(item, now: now) ?? true) }
-    }
+    /// Whether the entry is of the kind the type takes.
+    private func acceptsKind(of item: FileItem) -> Bool {
+        switch kind {
+        case .any:
+            true
 
-    /// What a mask is asked about an entry: `base` is the directory the list belongs to.
-    private func entryMaker(base: URL) -> @Sendable (FileItem) -> MaskEntry {
-        let needsDirectories = mask.needsDirectories
-        let baseParts = needsDirectories ? base.pathComponents.filter { $0 != "/" } : []
-        return { item in
-            // A list gathered from elsewhere (a branch view, a search result) names its entries
-            // by path; the mask is tried against the file's own name, and the selection is
-            // still keyed by the entry's name, which is unique in such a list.
-            let name = item.name.utf8.contains(UInt8(ascii: "/")) ? item.url.lastPathComponent : item.name
-            guard needsDirectories else { return MaskEntry(name: name, isFolder: item.isFolder) }
-            let parts = item.url.deletingLastPathComponent().pathComponents.filter { $0 != "/" }
-            // Entries of a list gathered from elsewhere (a search result) keep their whole path.
-            let directory = parts.starts(with: baseParts) ? Array(parts.dropFirst(baseParts.count)) : parts
-            return MaskEntry(name: name, isFolder: item.isFolder, directory: directory)
+        case .files:
+            !item.isFolder
+
+        case .folders:
+            item.isFolder
         }
     }
-}
 
-/// What the Mark menu remembers between sessions: the masks typed into Select group, the
-/// predefined selection types and the options of the configuration page. Main thread only.
-final class SelectionStore {
-    static let historyLimit = 20
-    static let scope = "selection"
-    /// Full settings keys of the options, as the configuration dialog writes them.
-    static let marksFoldersKey = scope + ".markDirectories"
-    static let oneHourKey = scope + ".oneHourDifference"
-
-    private let settings: any SettingsStore
-    private let scoped: any SettingsStore
-
-    init(settings: any SettingsStore) {
-        self.settings = settings
-        scoped = settings.scoped(to: Self.scope)
-    }
-
-    /// Whether Num +, Ctrl+Num + and Num * also affect folders (`MarkDirectories`).
-    var marksFolders: Bool { settings.flag(Self.marksFoldersKey, default: true) }
-    /// Whether comparing treats times exactly one hour apart as equal (`1hourdif`).
-    var ignoresOneHour: Bool { settings.flag(Self.oneHourKey, default: false) }
-
-    /// The masks used so far, the newest first.
-    var history: [String] { scoped.value([String].self, forKey: "maskHistory") ?? [] }
-
-    func remember(_ mask: String) {
-        var masks = history.filter { $0 != mask }
-        masks.insert(mask, at: 0)
-        scoped.set(Array(masks.prefix(Self.historyLimit)), forKey: "maskHistory")
-    }
-
-    func forget(mask: String) {
-        scoped.set(history.filter { $0 != mask }, forKey: "maskHistory")
-    }
-
-    /// The saved types; one that does not read is left out, the others stay.
-    var types: [SelectionType] {
-        (scoped.value([Readable<SelectionType>].self, forKey: "types") ?? []).compactMap(\.value)
-    }
-
-    func type(named name: String) -> SelectionType? {
-        types.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
-    }
-
-    /// Saves a type; one of the same name is replaced.
-    func save(_ type: SelectionType) {
-        var all = types
-        if let index = all.firstIndex(where: { $0.name.caseInsensitiveCompare(type.name) == .orderedSame }) {
-            all[index] = type
-        } else {
-            all.append(type)
+    /// Whether the entry is within the size limits; with a limit set, a folder never is.
+    private func acceptsSize(of item: FileItem) -> Bool {
+        guard minSize != nil || maxSize != nil else {
+            return true
         }
-        scoped.set(all, forKey: "types")
+        guard !item.isFolder else {
+            return false
+        }
+        if let minSize, item.size < minSize {
+            return false
+        }
+        if let maxSize, item.size > maxSize {
+            return false
+        }
+        return true
     }
 
-    func removeType(named name: String) {
-        scoped.set(types.filter { $0.name.caseInsensitiveCompare(name) != .orderedSame }, forKey: "types")
+    /// Whether the date of last change is within the dates and the age in days.
+    private func acceptsDate(of item: FileItem, now: Date) -> Bool {
+        if let modifiedFrom, item.modified < modifiedFrom {
+            return false
+        }
+        if let modifiedTo, item.modified > modifiedTo {
+            return false
+        }
+        if let notOlderThanDays, item.modified < now.addingTimeInterval(-Double(notOlderThanDays) * 86_400) {
+            return false
+        }
+        return true
     }
 }

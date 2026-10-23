@@ -14,8 +14,9 @@ internal final class CovCompareMovingMemory: FileSystemProvider, Sendable {
     internal let base = MemoryFileSystem(scheme: "moving")
     /// Paths from the root are this file system's own.
     internal let readsRootedPaths = true
-    /// Which moves fail: from the file named first to the one named second, replacing or not. Every move works to
-    /// begin with.
+    /// Which moves fail: from the file named first to the one named second, replacing or not.
+    ///
+    /// Every move works to begin with.
     internal let refuses = Shared<@Sendable (String, String, Bool) -> Bool> { _, _, _ in false }
     /// The moves asked for, as `from -> to`, by name.
     internal let moves = Shared<[String]>([])

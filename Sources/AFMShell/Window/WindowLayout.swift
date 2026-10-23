@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// What the main window shows around the panels and how the panels are arranged.
 ///

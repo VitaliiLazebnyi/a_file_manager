@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import Foundation
 import TestSupport
 import Testing
 
@@ -8,37 +7,62 @@ import Testing
 
 /// Sorting and filtering of long lists (review 2, C063 and its kin): the work is done away
 /// from the main thread, and when the list changed meanwhile it is done again there, never on
-/// the main thread. The test says when the background work and its return happen.
-@MainActor @Suite struct Review2ConfigAViewOptions {
+/// the main thread.
+///
+/// The test says when the background work and its return happen.
+@MainActor
+@Suite
+internal struct Review2ConfigAViewOptionsTests {
     /// Holds what the plugin hands to the background and back, until the test runs it.
-    /// Unchecked: used on the main thread only; the plugin hands its steps over there and the
-    /// test runs them there.
-    final class Steps: @unchecked Sendable {
-        var background: [@Sendable () -> Void] = []
-        var main: [@MainActor @Sendable () -> Void] = []
+    ///
+    /// Unchecked: used on the main thread only; the plugin hands its steps over there and the test
+    /// runs them there.
+    internal final class Steps: @unchecked Sendable {
+        /// The work handed to the background, not run yet.
+        internal var background: [@Sendable () -> Void] = []
+        /// The results handed back to the main thread, not run yet.
+        internal var main: [@MainActor @Sendable () -> Void] = []
 
-        func runBackground() {
+        /// Runs the background work handed over so far (what it hands over meanwhile waits).
+        internal func runBackground() {
             let work = background
             background = []
-            work.forEach { $0() }
+            for step in work {
+                step()
+            }
         }
 
-        @MainActor func runMain() {
+        /// Runs the results handed back so far, on the main thread.
+        @MainActor
+        internal func runMain() {
             let work = main
             main = []
-            work.forEach { $0() }
+            for step in work {
+                step()
+            }
+        }
+
+        deinit {
+            // Nothing to release.
         }
     }
 
-    let memory = MemoryFileSystem()
-    let plugin = ViewOptionsPlugin()
-    let steps = Steps()
-    let bench: TestBench
+    /// `/Big`, a folder as long as the background sort threshold plus one program, and an empty `/B`.
+    internal let memory = MemoryFileSystem()
+    /// The plugin, with the test's steps for its background and main-thread work.
+    internal let plugin = ViewOptionsPlugin()
+    /// What the plugin handed over and the test has not run yet.
+    internal let steps = Steps()
+    /// The kernel with the plugin, `/Big` on the left (the source).
+    internal let bench: TestBench
 
-    var commands: CommandRegistry { bench.commands }
-    var model: PanelModel { bench.left.model }
+    /// The bench's commands.
+    internal var commands: CommandRegistry { bench.commands }
+    /// The model of the left panel, which lists `/Big`.
+    internal var model: PanelModel { bench.left.model }
 
-    init() {
+    /// Builds the long folder and the bench, and takes over the plugin's background and main-thread work.
+    internal init() {
         for number in 0..<ViewOptionsPlugin.backgroundSortThreshold {
             memory.addFile("/Big/f\(number).txt", String(repeating: "x", count: number % 7))
         }
@@ -49,9 +73,13 @@ import Testing
         plugin.onMain = { [steps] in steps.main.append($0) }
     }
 
+    /// A long list that the folder changed under while it was sorted comes in the order asked for,
+    /// and nothing is sorted twice.
+    ///
     /// (Before the model kept the wish, `PanelModel.requestSort`, the stale result sent the
     /// new list to the background a second time; now the reading brings the order with it.)
-    @Test func aListThatChangedWhileItWasSortedArrivesInTheOrderThatWasAskedFor() {
+    @Test
+    internal func aListThatChangedWhileItWasSortedArrivesInTheOrderThatWasAskedFor() {
         #expect(model.sort.key == .name && model.listedItems.count > ViewOptionsPlugin.backgroundSortThreshold)
         commands.perform(.sortBySize)
         #expect(steps.background.count == 1 && model.sort.key == .name)
@@ -68,7 +96,9 @@ import Testing
         #expect(commands.isChecked(.sortBySize))
     }
 
-    @Test func anOrderSetByAnotherRouteMeanwhileIsNotOverwritten() {
+    /// An order set another way while a long list was sorted is kept, and the next command starts from it.
+    @Test
+    internal func anOrderSetByAnotherRouteMeanwhileIsNotOverwritten() {
         commands.perform(.sortBySize)
         // A click on a column sets the order directly.
         model.setSort(ListOrder(key: .ext, descending: false))
@@ -82,7 +112,9 @@ import Testing
         #expect(model.sort == ListOrder(key: .ext, descending: true))
     }
 
-    @Test func aLaterSortCommandTakesOver() {
+    /// Of two sort commands in a row, the later one's order is the one the list gets.
+    @Test
+    internal func aLaterSortCommandTakesOver() {
         commands.perform(.sortBySize)
         commands.perform(.sortByTime)
         #expect(steps.background.count == 2)
@@ -91,7 +123,9 @@ import Testing
         #expect(model.sort.key == .date && steps.background.isEmpty)
     }
 
-    @Test func aLongListIsFilteredInTheBackground() {
+    /// A long list is filtered in the background, again when it changed meanwhile, and a later filter wins.
+    @Test
+    internal func aLongListIsFilteredInTheBackground() {
         let all = model.items.count
         commands.perform(ViewOptionsPlugin.programs)
         #expect(steps.background.count == 1 && model.filter == nil && model.items.count == all)
@@ -114,7 +148,9 @@ import Testing
         #expect(model.filter == nil && model.items.count == all + 1)
     }
 
-    @Test func onlySelectedIsOfferedByTheNumberOfMarks() {
+    /// Only Selected Files is offered when files are marked; Last Custom Filter when a mask is stored.
+    @Test
+    internal func onlySelectedIsOfferedByTheNumberOfMarks() {
         #expect(!commands.isEnabled(ViewOptionsPlugin.onlySelected))
         model.setSelected(true, names: ["tool", "f1.txt"])
         #expect(commands.isEnabled(ViewOptionsPlugin.onlySelected))

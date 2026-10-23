@@ -17,7 +17,7 @@ internal final class MemorySink: DecodeSink {
         fzCheck(!open, "decode-begin-while-open", "")
         open = true
         files.append((name, 0))
-        if let safe = Decoder.safeName(name) {
+        if let safe = Decoder.safeName(name, replacingColon: true) {
             // By bytes: a `/` that carries a combining mark is still a separator to the file system.
             let raw = Array(safe.utf8)
             fzCheck(

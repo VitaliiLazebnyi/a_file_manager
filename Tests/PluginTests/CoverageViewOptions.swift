@@ -1,6 +1,4 @@
-import AFMContracts
 import AFMKernel
-import Foundation
 import TestSupport
 import Testing
 
@@ -17,7 +15,7 @@ internal struct CoverageViewOptions {
     /// The plugin, with background work and its return run when the test says.
     private let plugin = ViewOptionsPlugin()
     /// What the plugin handed over and has not run yet.
-    private let steps = Review2ConfigAViewOptions.Steps()
+    private let steps = Review2ConfigAViewOptionsTests.Steps()
     /// The kernel with the plugin and two columns to choose from.
     private let bench: TestBench
 
@@ -32,7 +30,7 @@ internal struct CoverageViewOptions {
         memory.addFile("/Big/tool", permissions: 0o755)
         memory.addDirectory("/B")
         bench = TestBench(
-            plugins: [ViewOptions.ColumnsPlugin(), plugin],
+            plugins: [ViewOptionsTests.ColumnsPlugin(), plugin],
             fileSystems: [memory],
             left: memory.url("/Big"),
             right: memory.url("/B")

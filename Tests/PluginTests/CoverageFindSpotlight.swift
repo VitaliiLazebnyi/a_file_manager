@@ -23,7 +23,9 @@ internal struct CoverageFindSpotlight {
     internal func aQuestionStartedTwiceAnswersOnce() async {
         let search = SpotlightSearch(
             "kMDItemFSName == \"Calculator.app\"",
-            scopes: [URL(fileURLWithPath: "/System/Applications")]
+            scopes: [URL(fileURLWithPath: "/System/Applications")],
+            limit: SpotlightSearch.resultLimit,
+            queue: OperationQueue()
         )
         var answers = 0
         search.start { _, _ in answers += 1 }

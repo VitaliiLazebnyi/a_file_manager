@@ -225,7 +225,9 @@ internal struct ConfigurationSettingsMigration {
         let (bench, _) = try Self.configuration(on: settings, in: box)
         let file = box.url("settings.json")
         try Data(Fixture.archive.utf8).write(to: file)
-        bench.interaction.formAnswers = [.values(["keys": .flag(true), "commands": .flag(true), "hotlist": .flag(true)])]
+        bench.interaction.formAnswers = [
+            .values(["keys": .flag(true), "commands": .flag(true), "hotlist": .flag(true)])
+        ]
         bench.commands.perform("afm_ImportSettings", .location(file))
         #expect(bench.interaction.log.last == "inform: The settings were imported")
         for (key, value) in Fixture.archiveValues.sorted(by: { $0.key < $1.key }) {

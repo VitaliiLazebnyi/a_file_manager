@@ -4,17 +4,20 @@ public import AppKit
 
 /// The Multi-Rename Tool (spec 09 › Multi-Rename Tool).
 public final class MultiRenamePlugin: Plugin {
+    /// The plugin's name in the list of plugins.
     public let name = "MultiRename"
     private let opensWindows: Bool
     private let logDirectory: URL?
     private var window: MultiRenameWindowController?
     /// The tool's state while it is open; without windows (tests) it is driven directly.
-    private(set) var session: MultiRenameSession?
+    internal private(set) var session: MultiRenameSession?
     /// The settings last used in this run of the program; they are not kept beyond it.
     private var lastSettings: RenameSettings?
     private var store: RenameStore?
-    /// Puts a window of the tool on screen. Tests replace it, so that no window shows in the
-    /// session they run in, and look at what it was asked to show.
+    /// Puts a window of the tool on screen.
+    ///
+    /// Tests replace it, so that no window shows in the session they run in, and look at what it
+    /// was asked to show.
     internal var present: @MainActor (NSWindowController) -> Void = { $0.showWindow(nil) }
 
     /// `opensWindows` false keeps the tool windowless, for tests, and computes previews at
@@ -25,6 +28,7 @@ public final class MultiRenamePlugin: Plugin {
         self.logDirectory = logDirectory
     }
 
+    /// Registers the command, its menu entries, the toolbar button and the preferences of the tool.
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
@@ -73,13 +77,13 @@ public final class MultiRenamePlugin: Plugin {
     /// Runs only while the source panel has operands (the command is enabled then).
     private func open(_ kernel: Kernel, settingsName: String?) {
         let items = kernel.panels.source.model.operands()
-        let store = RenameStore(settings: kernel.settings)
-        self.store = store
+        let opened = RenameStore(settings: kernel.settings)
+        store = opened
         lastSettings = session?.settings ?? lastSettings
         session?.close()
         // A name that is not known gives the defaults.
-        let wanted = settingsName ?? (store.startupSettingsName.isEmpty ? nil : store.startupSettingsName)
-        let settings = wanted.map { store.saved[$0] ?? .unchanged } ?? lastSettings ?? .unchanged
+        let wanted = settingsName ?? (opened.startupSettingsName.isEmpty ? nil : opened.startupSettingsName)
+        let settings = wanted.map { opened.saved[$0] ?? .unchanged } ?? lastSettings ?? .unchanged
         // The log of a run is kept in the user's own Logs folder, not in the temporary one.
         let product = kernel.productName.replacingOccurrences(of: "/", with: "_")
         let log = logDirectory ?? URL.libraryDirectory.appending(path: "Logs").appending(path: product)
@@ -91,18 +95,20 @@ public final class MultiRenamePlugin: Plugin {
             clipboard = { kernel.askUser { _ in NSPasteboard.general.string(forType: .string) } }
             changeCount = { NSPasteboard.general.changeCount }
         }
-        let session = MultiRenameSession(
+        let started = MultiRenameSession(
             kernel: kernel,
             items: items,
-            store: store,
+            store: opened,
             settings: settings,
             logDirectory: log,
             previewsInBackground: opensWindows,
             clipboard: clipboard,
             clipboardChangeCount: changeCount
         )
-        self.session = session
-        guard opensWindows else { return }
+        session = started
+        guard opensWindows else {
+            return
+        }
         // The tool that is open is closed first, and its closing is not told to anyone: it
         // would find the new session and let go of it.
         if let old = window {
@@ -110,7 +116,7 @@ public final class MultiRenamePlugin: Plugin {
             old.onClose = nil
             old.close()
         }
-        let controller = MultiRenameWindowController(kernel: kernel, session: session)
+        let controller = MultiRenameWindowController(kernel: kernel, session: started)
         window = controller
         // A closed tool lets go of its window and session (a running job holds on to the
         // session itself); the settings last used are kept for the next time.
@@ -120,13 +126,20 @@ public final class MultiRenamePlugin: Plugin {
 
     /// The window of the tool closed (one that was replaced is not told).
     private func windowClosed() {
-        if let settings = session?.settings { lastSettings = settings }
+        if let settings = session?.settings {
+            lastSettings = settings
+        }
         window = nil
         session = nil
     }
 
+    /// Closes the window and writes what the store holds.
     public func stop() {
         window?.close()
         store?.flush()
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

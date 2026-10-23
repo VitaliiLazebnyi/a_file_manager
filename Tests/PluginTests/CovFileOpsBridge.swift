@@ -16,11 +16,11 @@ internal struct CovFileOpsBridge {
     private let monitor = CovFileOpsMonitor()
 
     private var bridge: JobBridge {
-        JobBridge(monitor: monitor, ui: interaction, fileSystems: fileSystems)
+        JobBridge(monitor: monitor, interaction: interaction, fileSystems: fileSystems)
     }
 
     private var job: FileJob {
-        FileJob(kind: .copy, sources: [], fileSystems: fileSystems)
+        FileJob(kind: .copy, sources: [], target: nil, fileSystems: fileSystems)
     }
 
     /// `/A/new.txt` (two bytes) and `/B/old.txt` (one byte), and `/B/same.txt` like the new one.

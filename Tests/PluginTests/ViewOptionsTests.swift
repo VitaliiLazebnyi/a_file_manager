@@ -8,27 +8,43 @@ import Testing
 
 /// The Show menu's commands, driven against fake panels: views, plugin columns, display
 /// filters, and what the plugin registers.
-@MainActor @Suite struct ViewOptions {
-    let memory = MemoryFileSystem()
-    let settings = MemorySettings()
-    let bench: TestBench
-
-    var commands: CommandRegistry { bench.commands }
-    var left: FakePanel { bench.left }
-    var right: FakePanel { bench.right }
-
+@MainActor
+@Suite
+internal struct ViewOptionsTests {
     /// Offers two columns, as a content plugin would.
-    final class ColumnsPlugin: Plugin {
-        let name = "Columns"
-        func start(in kernel: Kernel) {
+    internal final class ColumnsPlugin: Plugin {
+        /// The plugin's name in the list of plugins.
+        internal let name = "Columns"
+
+        /// Registers the two columns: the name in capitals and its length.
+        internal func start(in kernel: Kernel) {
             kernel.columns.register(ContentColumn(id: "upper", title: "Upper") { $0.name.uppercased() })
             kernel.columns.register(
                 ContentColumn(id: "length", title: "Length", alignsRight: true) { "\($0.name.count)" }
             )
         }
+
+        deinit {
+            // Nothing to release.
+        }
     }
 
-    init() {
+    /// The files: `/A` with files of several kinds, a folder and a hidden folder, `/B` with one file.
+    internal let memory = MemoryFileSystem()
+    /// The settings the plugin reads, empty at the start.
+    internal let settings = MemorySettings()
+    /// The kernel with the two plugins, `/A` on the left (the source) and `/B` on the right.
+    internal let bench: TestBench
+
+    /// The bench's commands.
+    internal var commands: CommandRegistry { bench.commands }
+    /// The left panel, the source.
+    internal var left: FakePanel { bench.left }
+    /// The right panel.
+    internal var right: FakePanel { bench.right }
+
+    /// Builds the files and the bench.
+    internal init() {
         memory.addFile("/A/one.txt")
         memory.addFile("/A/two.md")
         memory.addFile("/A/run.sh")
@@ -47,7 +63,10 @@ import Testing
 
     // MARK: Registration
 
-    @Test func registersCommandsKeysMenusToolbarAndPreferences() {
+    /// The commands come with their keys (no clash), the Show menu, the toolbar's view buttons and
+    /// the Display page of the preferences.
+    @Test
+    internal func registersCommandsKeysMenusToolbarAndPreferences() {
         let kernel = bench.kernel
         #expect(kernel.keyClashes.isEmpty)
         #expect(
@@ -67,7 +86,7 @@ import Testing
         #expect(show.starts(with: [.viewBrief, .viewFull, .viewThumbnails, "cm_CustomColumnConfig", nil, .sortByName]))
         #expect(
             show.contains("cm_SrcUserDef") && show.contains(.showHidden)
-                && show.compactMap { $0 }.allSatisfy { commands[$0] != nil }
+                && show.compactMap(\.self).allSatisfy { commands[$0] != nil }
         )
         #expect(kernel.toolbar.defaultLayout.compactMap { $0?.command } == [.viewBrief, .viewFull, .viewThumbnails])
         #expect(
@@ -77,7 +96,9 @@ import Testing
 
     // MARK: Views and columns
 
-    @Test func theViewCommandsSwitchTheSourcePanel() {
+    /// A view command switches the source panel and is checked for the panel that has that view.
+    @Test
+    internal func theViewCommandsSwitchTheSourcePanel() {
         #expect(commands.isChecked(.viewFull) && !commands.isChecked(.viewBrief))
         commands.perform(.viewBrief)
         #expect(
@@ -92,7 +113,9 @@ import Testing
         #expect(right.viewMode == .full)
     }
 
-    @Test func customColumnsAreChosenInAForm() {
+    /// Custom Columns shows one checkbox per offered column and keeps the order of those that stay.
+    @Test
+    internal func customColumnsAreChosenInAForm() {
         left.viewMode = .brief
         bench.interaction.formAnswers = [.values(["length": .flag(true)])]
         commands.perform("cm_CustomColumnConfig")
@@ -115,19 +138,23 @@ import Testing
         #expect(left.extraColumns == ["gone", "upper"] && left.viewMode == .brief)
     }
 
-    @Test func withoutPluginColumnsThereIsNothingToChoose() {
+    /// Custom Columns is disabled when no plugin offers a column.
+    @Test
+    internal func withoutPluginColumnsThereIsNothingToChoose() throws {
         let bare = TestBench(
             plugins: [ViewOptionsPlugin()],
             fileSystems: [MemoryFileSystem()],
-            left: URL(string: "mem:///")!,
-            right: URL(string: "mem:///")!
+            left: try #require(URL(string: "mem:///")),
+            right: try #require(URL(string: "mem:///"))
         )
         #expect(!bare.commands.isEnabled("cm_CustomColumnConfig"))
     }
 
     // MARK: Display filters
 
-    @Test func programsShowsWhatCanBeRun() {
+    /// Programs lists folders, executable files and the files the user's masks name, in the source tab only.
+    @Test
+    internal func programsShowsWhatCanBeRun() {
         #expect(left.names == ["docs", "one.txt", "run.sh", "tool", "two.md"] && commands.isChecked("cm_SrcAllFiles"))
         commands.perform("cm_SrcExecs")
         #expect(
@@ -149,7 +176,9 @@ import Testing
         #expect(left.names == ["docs", "tool", "two.md"])
     }
 
-    @Test func aCustomFilterIsAskedForRememberedAndReset() {
+    /// Custom… asks for a specification, remembers it for Last Custom Filter, and `*.*` takes it away.
+    @Test
+    internal func aCustomFilterIsAskedForRememberedAndReset() {
         #expect(!commands.isEnabled("cm_SrcUserSpec"))
         bench.interaction.promptAnswers = [.text("*.txt *.md")]
         commands.perform("cm_SrcUserDef")
@@ -177,7 +206,9 @@ import Testing
         #expect(left.names == ["one.txt", "run.sh", "tool"] && commands.isChecked("cm_SrcUserDef"))
     }
 
-    @Test func onlySelectedFilesIsASnapshot() {
+    /// Only Selected Files keeps the files that were marked when it ran, whatever is marked later.
+    @Test
+    internal func onlySelectedFilesIsASnapshot() {
         #expect(!commands.isEnabled("cm_ShowOnlySelected"))
         left.model.select(mask: "*.txt *.sh")
         commands.perform("cm_ShowOnlySelected")
@@ -191,10 +222,12 @@ import Testing
         #expect(left.names.count == 5)
     }
 
-    @Test func aFilterLaidOverADisplayFilterKeepsItChecked() {
+    /// A filter whose title starts with the display filter's keeps the command checked; another does not.
+    @Test
+    internal func aFilterLaidOverADisplayFilterKeepsItChecked() throws {
         commands.perform("cm_SrcUserDef", .text("*.txt"))
         // What the quick filter does: its title starts with the one below.
-        let below = left.model.filter!
+        let below = try #require(left.model.filter)
         left.model.setFilter(PanelFilter(title: below.title + "  ⏷ on") { below.matches($0) && $0.name.contains("on") })
         #expect(commands.isChecked("cm_SrcUserDef") && left.names == ["one.txt"])
         // A filter someone else put in its place is not this plugin's.
@@ -202,7 +235,9 @@ import Testing
         #expect(!commands.isChecked("cm_SrcUserDef") && !commands.isChecked("cm_SrcAllFiles"))
     }
 
-    @Test func displayMasks() {
+    /// Inclusions, exclusions and folder exclusions (with `/` or `\\`) of a display specification.
+    @Test
+    internal func displayMasks() {
         func item(_ name: String, folder: Bool = false) -> FileItem {
             FileItem(url: URL(fileURLWithPath: "/x/" + name), name: name, kind: .init(isDirectory: folder))
         }
@@ -234,7 +269,9 @@ import Testing
 
     // MARK: Sorting and hidden files
 
-    @Test func hiddenFilesInBothPanelsOrInOne() {
+    /// Hidden Files switches both panels, or only the source when the setting says so; a sort command sorts.
+    @Test
+    internal func hiddenFilesInBothPanelsOrInOne() {
         memory.addFile("/A/.dot")
         memory.addFile("/B/.dot")
         commands.perform(.showHidden)

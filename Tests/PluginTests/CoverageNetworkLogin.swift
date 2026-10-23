@@ -62,9 +62,9 @@ internal struct CoverageNetworkLogin {
         let server = try CoverageNetworkServer(replies: [:])
         let connection = try server.connected()
         connection.close()
-        #expect(throws: NetworkError.self) { try connection.send("NOOP") }
-        #expect(!connection.isAlive())
-        #expect(connection.probeLink("/link") == nil)
+        #expect(throws: NetworkError.self) { try connection.send("NOOP", cancellation: nil) }
+        #expect(!connection.isAlive(cancellation: nil))
+        #expect(connection.probeLink("/link", cancellation: nil) == nil)
     }
 
     /// A reply without time left is a time-out, and the connection is not used again.
@@ -73,7 +73,9 @@ internal struct CoverageNetworkLogin {
         let server = try CoverageNetworkServer(replies: [:])
         let connection = try server.connected()
         defer { connection.close() }
-        let error = #expect(throws: NetworkError.self) { try connection.send("NOOP", replyWithin: 0) }
+        let error = #expect(throws: NetworkError.self) {
+            try connection.send("NOOP", shown: "NOOP", replyWithin: 0, cancellation: nil)
+        }
         #expect(CoverageNetworkServer.text(of: error) == "waiting for a reply")
         #expect(!connection.isUsable)
     }
@@ -84,8 +86,8 @@ internal struct CoverageNetworkLogin {
         let server = try CoverageNetworkServer(replies: [:])
         let connection = try server.connected { config in config.encoding = .isoLatin1 }
         defer { connection.close() }
-        #expect(throws: FileSystemError.self) { try connection.send("CWD /\u{65E5}\u{672C}") }
-        #expect(connection.isUsable && connection.isAlive())
+        #expect(throws: FileSystemError.self) { try connection.send("CWD /\u{65E5}\u{672C}", cancellation: nil) }
+        #expect(connection.isUsable && connection.isAlive(cancellation: nil))
     }
 
     /// A server that hangs up on NOOP is not alive.
@@ -94,7 +96,7 @@ internal struct CoverageNetworkLogin {
         let server = try CoverageNetworkServer(replies: ["NOOP": .hangUp])
         let connection = try server.connected()
         defer { connection.close() }
-        #expect(!connection.isAlive())
+        #expect(!connection.isAlive(cancellation: nil))
     }
 
     /// MLST refusals other than "not found" are errors.
@@ -103,8 +105,8 @@ internal struct CoverageNetworkLogin {
         let server = try CoverageNetworkServer(replies: ["MLST /missing": "550 No such file", "MLST /odd": "500 What"])
         let connection = try server.connected()
         defer { connection.close() }
-        #expect(try connection.status(of: "/missing") == nil)
-        #expect(throws: NetworkError.self) { try connection.status(of: "/odd") }
+        #expect(try connection.status(of: "/missing", cancellation: nil) == nil)
+        #expect(throws: NetworkError.self) { try connection.status(of: "/odd", cancellation: nil) }
     }
 
     /// Changing a date needs MFMT.
@@ -113,6 +115,8 @@ internal struct CoverageNetworkLogin {
         let server = try CoverageNetworkServer(replies: [:])
         let connection = try server.connected()
         defer { connection.close() }
-        #expect(throws: FileSystemError.self) { try connection.setModificationTime(Date(), of: "/a") }
+        #expect(throws: FileSystemError.self) {
+            try connection.setModificationTime(Date(), of: "/a", cancellation: nil)
+        }
     }
 }

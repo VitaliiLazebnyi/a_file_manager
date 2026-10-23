@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 
 @testable import DirectorySyncPlugin
 

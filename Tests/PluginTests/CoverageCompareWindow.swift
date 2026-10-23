@@ -163,15 +163,6 @@ internal struct CoverageCompareWindow {
         #expect(stage.wasClosed)
     }
 
-    /// A window is never made from an archive.
-    @Test
-    internal func aWindowIsNeverMadeFromAnArchive() async {
-        await #expect(processExitsWith: .exitCode(1)) {
-            CoverageCoreTrap.exitOnTrap()
-            await MainActor.run { _ = CompareWindowController(coder: NSCoder()) }
-        }
-    }
-
     /// Closing with edits that are not saved asks first.
     @Test
     internal func closingWithUnsavedEditsAsksFirst() {

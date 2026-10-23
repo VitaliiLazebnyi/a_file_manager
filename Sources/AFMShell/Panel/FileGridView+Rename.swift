@@ -1,4 +1,5 @@
-import AppKit
+import CoreGraphics
+import Foundation
 
 /// The in-place name editor in the Brief and Thumbnails views.
 extension FileGridView {

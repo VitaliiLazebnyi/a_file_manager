@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import TestSupport
 import Testing
@@ -24,7 +23,7 @@ internal struct CovNetAskpass {
     /// A question without the three parts is no question; the next one is read.
     @Test
     internal func aDamagedQuestionIsNoQuestion() throws {
-        let helper = try AskpassHelper()
+        let helper = try AskpassHelper(in: FileManager.default.temporaryDirectory)
         try ask(helper, "only one line\n\(end(of: helper))\n")
         #expect(helper.pendingQuestion() == nil)
         try ask(helper, "7.1\n\nPassword:\n\(end(of: helper))\n")
@@ -34,7 +33,7 @@ internal struct CovNetAskpass {
     /// Of a question that has no end, only the last part is kept; once it ends, the next question is read.
     @Test
     internal func ofAQuestionWithoutAnEndOnlyTheLastPartIsKept() throws {
-        let helper = try AskpassHelper()
+        let helper = try AskpassHelper(in: FileManager.default.temporaryDirectory)
         let piece = String(repeating: "x", count: 4_000)
         for _ in 0..<20 {
             try ask(helper, piece)

@@ -49,7 +49,12 @@ internal struct CoverageFileToolsFiles {
     internal func longLinesAndLargeOutputs() throws {
         let data = Data((0..<(ToolRun.blockSize + 1_000)).map { UInt8($0 % 251) })
         memory.addFile("/A/big.b64", data.base64EncodedString() + "\r")
-        let outcome = try Decoder.decodeChecked(try item("/A/big.b64"), into: memory.url("/B"), run: run)
+        let outcome = try Decoder.decodeChecked(
+            try item("/A/big.b64"),
+            into: memory.url("/B"),
+            autoRename: false,
+            run: run
+        )
         #expect(outcome.files.count == 1 && outcome.problems.isEmpty)
         #expect(try bytes("/B/big") == data)
     }
@@ -60,7 +65,7 @@ internal struct CoverageFileToolsFiles {
     internal func noUsableName() throws {
         memory.addFile("/A/..uue", "begin 644\n#86)C\n`\nend\n")
         #expect(throws: ToolError.failed("The decoded file has no usable name.")) {
-            try Decoder.decode(try item("/A/..uue"), into: memory.url("/B"), run: run)
+            try Decoder.decode(try item("/A/..uue"), into: memory.url("/B"), autoRename: false, run: run)
         }
     }
 
@@ -69,17 +74,22 @@ internal struct CoverageFileToolsFiles {
     /// read on.
     @Test
     internal func numberedPartsThatAreHardToRead() throws {
-        let encoded = SixBitText.encode(Data(String(repeating: "x", count: 90).utf8), xx: false)
+        let encoded = SixBitText.encode(Data(String(repeating: "x", count: 90).utf8), xxEncode: false)
         let lines = (String(bytes: encoded, encoding: .ascii) ?? "").split(separator: "\r\n")
         memory.addFile("/A/x001.uue", "begin 644 x\n\(lines[0])\n")
         memory.addFile("/A/x002.uue", "\r\n\r\n\(lines[1])\n")
         memory.addFile("/A/x003.uue", "\n\n")
         memory.addFile("/A/x004.uue", "end\n")
-        let decoded = try Decoder.decodeChecked(try item("/A/x001.uue"), into: memory.url("/B"), run: run)
+        let decoded = try Decoder.decodeChecked(
+            try item("/A/x001.uue"),
+            into: memory.url("/B"),
+            autoRename: false,
+            run: run
+        )
         #expect(decoded.files == [memory.url("/B/x")] && memory.contents("/B/x")?.count == 90)
         files.failingPaths = ["/A/x002.uue"]
         #expect(throws: CoverageSmallFiles.Failure.self) {
-            try Decoder.decode(try item("/A/x001.uue"), into: memory.url("/B"), run: run)
+            try Decoder.decode(try item("/A/x001.uue"), into: memory.url("/B"), autoRename: false, run: run)
         }
         files.failingPaths = []
         let opened = Shared(0)
@@ -90,7 +100,12 @@ internal struct CoverageFileToolsFiles {
             opened.modify { $0 += 1 }
             if opened.value == 2 { files.fail(.read, times: 1) }
         }
-        let again = try Decoder.decodeChecked(try item("/A/x001.uue"), into: memory.url("/B"), run: run)
+        let again = try Decoder.decodeChecked(
+            try item("/A/x001.uue"),
+            into: memory.url("/B"),
+            autoRename: false,
+            run: run
+        )
         #expect(again.files == [memory.url("/B/x")] && memory.contents("/B/x")?.count == 90)
     }
 
@@ -102,12 +117,29 @@ internal struct CoverageFileToolsFiles {
         let listed = try item("/A/grow.bin")
         memory.addFile("/A/grow.bin", String(repeating: "x", count: 57 * 3))
         #expect(throws: ToolError.failed("grow.bin changed while it was encoded (it needs more parts than planned).")) {
-            try Encoder.encode(listed, into: memory.url("/B"), method: .mime, linesPerFile: 1, run: run)
+            try Encoder.encode(
+                listed,
+                into: memory.url("/B"),
+                options: Encoder.Options(method: .mime, linesPerFile: 1),
+                run: run
+            )
         }
         memory.addFile("/B/grow.b64", "old")
-        let skipping = ToolRun(fileSystems: fileSystems, askExisting: Self.skip)
+        let skipping = ToolRun(
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            report: { _ in
+                // Not watched here.
+            },
+            askExisting: Self.skip
+        )
         #expect(throws: ToolError.cancelled) {
-            try Encoder.encode(try item("/A/grow.bin"), into: memory.url("/B"), method: .mime, run: skipping)
+            try Encoder.encode(
+                try item("/A/grow.bin"),
+                into: memory.url("/B"),
+                options: Encoder.Options(method: .mime),
+                run: skipping
+            )
         }
         #expect(memory.contents("/B/grow.b64") == "old")
     }
@@ -116,6 +148,8 @@ internal struct CoverageFileToolsFiles {
     @Test
     internal func aFileThatCannotBeCreated() {
         files.fails = [.create]
-        #expect(throws: CoverageSmallFiles.Failure.self) { try run.create(memory.url("/A/new.txt")) }
+        #expect(throws: CoverageSmallFiles.Failure.self) {
+            try run.create(memory.url("/A/new.txt"), autoRename: false, deferred: false)
+        }
     }
 }

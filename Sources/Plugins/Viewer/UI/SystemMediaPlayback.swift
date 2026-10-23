@@ -1,7 +1,9 @@
 import AVFoundation
 
-/// AVFoundation's player: what the Lister plays files with. It opens the audio device, so only
-/// the program and its UI tests use it; each member hands its call on.
+/// AVFoundation's player: what the Lister plays files with.
+///
+/// It opens the audio device, so only the program and its UI tests use it; each member hands its
+/// call on.
 @MainActor
 internal final class SystemMediaPlayback: MediaPlayback {
     private let avPlayer = AVPlayer()

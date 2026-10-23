@@ -50,7 +50,7 @@ extension BigRun {
             let fresh = Bench(flushDelay: nil)
             let opened = Locked(false)
             let thread = Thread { [archive] in
-                _ = try? fresh.store.archive(at: archive)
+                _ = try? fresh.store.archive(at: archive, cancellation: nil)
                 opened.value = true
             }
             thread.start()

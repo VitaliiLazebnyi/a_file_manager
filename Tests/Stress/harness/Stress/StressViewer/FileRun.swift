@@ -88,13 +88,14 @@ internal final class FileRun {
         var lastReport = Date.distantPast
         // As ViewerPane.search: progress to the main queue at most ten times a second.
         return try? ViewerSearch.find(
-            pattern,
-            in: document.source,
-            content: document.content,
-            from: start,
-            backwards: backwards,
-            encoding: document.encoding,
-            parallelism: ProcessInfo.processInfo.activeProcessorCount,
+            ViewerSearch.Request(pattern: pattern, start: start, backwards: backwards),
+            in: ViewerSearch.Subject(
+                source: document.source,
+                content: document.content,
+                encoding: document.encoding,
+                boundaries: nil
+            ),
+            tuning: .standard,
             cancellation: cancel
         ) { _ in
             guard Date().timeIntervalSince(lastReport) > 0.1 else {
@@ -109,8 +110,20 @@ internal final class FileRun {
 
     /// Shows a new document of the source in `layout`, at the place shown before when `keeping`.
     internal func show(_ layout: TextLayoutOptions, keeping: Bool) -> TextDocument {
-        let document = TextDocument(source: source, encoding: .utf8, layout: .text(layout), reusing: pager.document)
-        pager.show(document, at: keeping ? pager.topOffset : 0, keepingSelection: keeping, parallel: true)
+        let document = TextDocument(
+            source: source,
+            encoding: .utf8,
+            bomLength: 0,
+            layout: .text(layout),
+            reusing: pager.document
+        )
+        pager.show(
+            document,
+            at: keeping ? pager.topOffset : 0,
+            select: nil,
+            keepingSelection: keeping,
+            parallel: true
+        )
         return document
     }
 
@@ -170,7 +183,7 @@ internal final class FileRun {
             let started = now()
             openedSource = Harness.openSource(url, fileSystems: fileSystems)
             let opened = now() - started
-            let document = show(TextLayoutOptions(columns: fit, wordWrap: true), keeping: false)
+            let document = show(TextLayoutOptions(columns: fit, wordWrap: true, tabWidth: 8), keeping: false)
             openedDocument = document
             let got = pump(upTo: 880) { pager.document === document && pager.position != nil }
             say(
@@ -197,9 +210,9 @@ internal final class FileRun {
         searchMarker()
         searchAbsent()
         searchCancelled()
-        timedLayout("wider, wrap at \(fit + 23)", TextLayoutOptions(columns: fit + 23, wordWrap: true))
-        timedLayout("narrow, wrap at 40", TextLayoutOptions(columns: 40, wordWrap: true))
-        timedLayout("no wrap, cut at 1024", TextLayoutOptions(columns: 1_024, wordWrap: false))
+        timedLayout("wider, wrap at \(fit + 23)", TextLayoutOptions(columns: fit + 23, wordWrap: true, tabWidth: 8))
+        timedLayout("narrow, wrap at 40", TextLayoutOptions(columns: 40, wordWrap: true, tabWidth: 8))
+        timedLayout("no wrap, cut at 1024", TextLayoutOptions(columns: 1_024, wordWrap: false, tabWidth: 8))
         storm()
         close()
         let lines = relayouts.map { String(format: "%@: %.3fs (reused %d)", $0.label, $0.seconds, $0.reused) }

@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import TestSupport
 import Testing
@@ -9,9 +8,11 @@ import Testing
 extension ArchiveFixes {
     /// A wrong password of the old encryption that passes the check byte and whose data even
     /// starts like compressed data (a short stream that ends early) is a wrong password too: it
-    /// is asked for again and not kept. It used to give a CRC error. (About one in 300 of the
-    /// wrong passwords that pass the check byte is such a one; the archive is packed again,
-    /// with another random header, until one is found.)
+    /// is asked for again and not kept.
+    ///
+    /// It used to give a CRC error. (About one in 300 of the wrong passwords that pass the check
+    /// byte is such a one; the archive is packed again, with another random header, until one is
+    /// found.).
     @Test
     internal func aWrongPasswordWhoseDataStartsLikeCompressedDataIsAskedForAgain() throws {
         let tree = try bench.makeTree()
@@ -23,7 +24,9 @@ extension ArchiveFixes {
                 options.password = "right"
                 options.encryption = .legacy
             }
-            let record = try #require(ZipDirectory.read(RandomAccessFile(archive)).records.first)
+            let record = try #require(
+                ZipDirectory.read(RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil).records.first
+            )
             guard case .archive(let offset, let file) = record.source else {
                 return
             }
@@ -40,7 +43,7 @@ extension ArchiveFixes {
                 else {
                     return false
                 }
-                let probe = InflateStream(decrypted, wrapping: .raw)
+                let probe = InflateStream(decrypted, wrapping: .raw, control: nil)
                 defer { probe.close() }
                 return (try? probe.read(upToCount: 1 << 12)) != nil
             }

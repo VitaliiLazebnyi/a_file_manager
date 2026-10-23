@@ -1,6 +1,5 @@
 import AFMKernel
 import Foundation
-import TestSupport
 import Testing
 
 @testable import SelectionPlugin
@@ -40,9 +39,9 @@ internal struct CoverageSelectionRules {
     internal func namesPairWithoutRegardToCaseWhereTheVolumeSaysSo() {
         let left = [item("Photo.JPG"), item("Only.txt")]
         let right = [item("photo.jpg")]
-        let folded = DirectoryComparison.compare(left: left, right: right, foldingCase: true)
+        let folded = DirectoryComparison.compare(left: left, right: right, options: .init(foldingCase: true))
         #expect(folded.left == ["Only.txt"] && folded.right.isEmpty && folded.same == ["Photo.JPG", "photo.jpg"])
-        let apart = DirectoryComparison.compare(left: left, right: right)
+        let apart = DirectoryComparison.compare(left: left, right: right, options: .init())
         #expect(apart.left == ["Photo.JPG", "Only.txt"] && apart.right == ["photo.jpg"])
     }
 
@@ -53,7 +52,11 @@ internal struct CoverageSelectionRules {
         let right = [item("a.txt", size: 2)]
         for passes in [1, 2] {
             var asked = 0
-            let marks = DirectoryComparison.compareIndices(left: left, right: right, mode: .newerOrDifferent) {
+            let marks = DirectoryComparison.compareIndices(
+                left: left,
+                right: right,
+                options: .init(mode: .newerOrDifferent)
+            ) {
                 asked += 1
                 return asked > passes
             }
@@ -66,9 +69,16 @@ internal struct CoverageSelectionRules {
     @Test
     internal func loneSeparatorsAndFolderMasksOfOtherNames() {
         let mask = SelectionMask("\\ *.txt")
-        #expect(mask.matches("a.txt") && !mask.matches("a.md"))
+        #expect(mask.matches("a.txt", isFolder: false) && !mask.matches("a.md", isFolder: false))
         let folders = SelectionMask("*/")
         #expect(!folders.matches("é", isFolder: false) && folders.matches("é", isFolder: true))
+    }
+
+    /// A regular expression mask matches a name on its own, with nothing to stop it.
+    @Test
+    internal func aRegularExpressionMatchesANameOnItsOwn() {
+        let mask = SelectionMask("<^report-[0-9]+\\.txt$")
+        #expect(mask.matches("Report-12.TXT", isFolder: false) && !mask.matches("report-x.txt", isFolder: false))
     }
 
     /// A name that is not one piece of UTF-8 (one handed over by Foundation) is still matched.
@@ -77,7 +87,10 @@ internal struct CoverageSelectionRules {
         // Core Foundation keeps it in UTF-16: the string reaches Swift without UTF-8 of its own.
         let characters = Array("Résumé.TXT".utf16)
         let bridged = CFStringCreateWithCharacters(nil, characters, characters.count) as String
-        #expect(SelectionMask("*.txt").matches(bridged) && !SelectionMask("*.md").matches(bridged))
+        #expect(
+            SelectionMask("*.txt").matches(bridged, isFolder: false)
+                && !SelectionMask("*.md").matches(bridged, isFolder: false)
+        )
     }
 
     /// `A>` without a related mask pairs nothing; a file without its partner keeps only itself.
@@ -85,7 +98,7 @@ internal struct CoverageSelectionRules {
     internal func relatedMasksWithoutPartners() {
         #expect(!SelectionMask("*.jpg>").pairsRelatedFiles && !SelectionMask("*.jpg> ").pairsRelatedFiles)
         let entries = [MaskEntry(name: "a.jpg"), MaskEntry(name: "b.txt")]
-        #expect(SelectionMask("*.jpg>*.cr2").selected(entries) == [true, false])
+        #expect(SelectionMask("*.jpg>*.cr2").selected(entries) { false } == [true, false])
     }
 
     /// A rename mask that ends in a dot drops the extension, as in Total Commander: `*.jpg>*.`
@@ -95,7 +108,7 @@ internal struct CoverageSelectionRules {
         #expect(Wildcard.rename("report.txt", with: "*.") == "report")
         #expect(Wildcard.rename("report.txt", with: "?.") == "r" && Wildcard.rename("report", with: "*.*") == "report")
         let entries = [MaskEntry(name: "IMG.jpg"), MaskEntry(name: "IMG"), MaskEntry(name: "other")]
-        #expect(SelectionMask("*.jpg>*.").selected(entries) == [true, true, false])
+        #expect(SelectionMask("*.jpg>*.").selected(entries) { false } == [true, true, false])
     }
 
     /// A regular expression that ran out of time too often, or a cancelled run, matches
@@ -126,7 +139,7 @@ internal struct CoverageSelectionRules {
             stat: FileItem.Stat()
         )
         let base = URL(string: "mem:/A") ?? URL(fileURLWithPath: "/")
-        #expect(SelectionRule(mask: "a.*").names(among: [gathered], base: base) == ["sub/a.txt"])
-        #expect(SelectionRule(mask: "sub*").names(among: [gathered], base: base).isEmpty)
+        #expect(SelectionRule(mask: "a.*").names(among: [gathered], base: base, now: Date()) == ["sub/a.txt"])
+        #expect(SelectionRule(mask: "sub*").names(among: [gathered], base: base, now: Date()).isEmpty)
     }
 }

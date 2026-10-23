@@ -62,11 +62,11 @@ internal enum DecodeFuzz {
         // Nothing decodes into more than it was.
         fzCheck(total <= bytes.count + 16, "decode-grows", "\(total) bytes out of \(bytes.count)")
         for line in bytes.split(separator: 10).prefix(4) {
-            _ = SixBitText.decode(line, xx: false)
-            _ = SixBitText.decode(line, xx: true)
+            _ = (try? SixBitText.decode(line, xxEncode: false))
+            _ = (try? SixBitText.decode(line, xxEncode: true))
         }
         let name = ToolsFuzz.text(Array(bytes.prefix(80)))
-        _ = Decoder.safeName(name)
+        _ = Decoder.safeName(name, replacingColon: true)
         _ = Decoder.fallbackName(for: name)
         for method in EncodeMethod.allCases {
             _ = Encoder.outputNames(for: name, method: method, parts: 1 + bytes.count % 3)
@@ -121,8 +121,8 @@ internal enum DecodeFuzz {
         let base64 = payload.base64EncodedString(options: [
             .lineLength76Characters, .endLineWithCarriageReturn, .endLineWithLineFeed
         ])
-        let uue = ToolsFuzz.text(Array(SixBitText.encode(payload, xx: false)))
-        let xxe = ToolsFuzz.text(Array(SixBitText.encode(payload, xx: true)))
+        let uue = ToolsFuzz.text(Array(SixBitText.encode(payload, xxEncode: false)))
+        let xxe = ToolsFuzz.text(Array(SixBitText.encode(payload, xxEncode: true)))
         var seeds: [String] = []
         seeds.append(
             "MIME-Version: 1.0\r\nContent-Type: application/octet-stream; name=\"a.bin\"\r\n"

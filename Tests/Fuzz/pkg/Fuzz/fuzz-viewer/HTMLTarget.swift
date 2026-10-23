@@ -49,7 +49,7 @@ internal enum HTMLTarget {
         let braces = mode & 1 == 0
         let units = units(choices.rest(), mode: mode)
         let started = Date()
-        let fast = HTMLText.plainText(units: units, linkBraces: braces)
+        let fast = HTMLText.plainText(units: units, linkBraces: braces, cancellation: nil)
         noteTime(Date().timeIntervalSince(started), units: units)
         let reference = HTMLReference.plainText(units: units, linkBraces: braces)
         if fast != reference {
@@ -87,7 +87,7 @@ internal enum HTMLTarget {
             var best = Double.infinity
             for _ in 0..<3 {
                 let started = Date()
-                _ = HTMLText.plainText(units: units)
+                _ = HTMLText.plainText(units: units, linkBraces: true, cancellation: nil)
                 best = min(best, Date().timeIntervalSince(started))
             }
             let milliseconds = String(format: "%.3f", best * 1_000)

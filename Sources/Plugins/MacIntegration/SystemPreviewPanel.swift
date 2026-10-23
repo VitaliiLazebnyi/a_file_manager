@@ -1,8 +1,9 @@
 import AppKit
-import Quartz
+import QuickLookUI
 
-/// The system's shared Quick Look panel. The UI tests cover this; unit tests use a panel of
-/// their own.
+/// The system's shared Quick Look panel.
+///
+/// The UI tests cover this; unit tests use a panel of their own.
 @MainActor
 internal final class SystemPreviewPanel: PreviewPanel {
     /// The shared panel, made when it is first asked for: there always is one.
@@ -13,8 +14,10 @@ internal final class SystemPreviewPanel: PreviewPanel {
         QLPreviewPanel.sharedPreviewPanelExists() && shared.isVisible
     }
 
-    /// Shows the shared panel. It finds its feeder in the responder chain of the main window,
-    /// which the feeder joined when the command started.
+    /// Shows the shared panel.
+    ///
+    /// It finds its feeder in the responder chain of the main window, which the feeder joined when
+    /// the command started.
     internal func show(for _: QuickLookController) {
         shared.makeKeyAndOrderFront(nil)
         shared.reloadData()

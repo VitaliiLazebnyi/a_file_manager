@@ -9,8 +9,10 @@ import Testing
 @Suite
 internal struct CoverageArchivesFormatsSystemFailures {
     /// Closes the descriptor this process holds open for `url`; what its owner does with it
-    /// afterwards fails as after an error of the disk. Only in a process of its own (an exit
-    /// test), where no other thread can be given the number meanwhile.
+    /// afterwards fails as after an error of the disk.
+    ///
+    /// Only in a process of its own (an exit test), where no other thread can be given the number
+    /// meanwhile.
     private static func pullDescriptor(of url: URL) -> Bool {
         let wanted = Durable.realFile(url).path
         return pullDescriptor { $0 == wanted }
@@ -41,11 +43,19 @@ internal struct CoverageArchivesFormatsSystemFailures {
     }
 
     /// Writes `file.txt` into `folder`, pulling the descriptor of its temporary file first;
-    /// `puts` says whether anything is then written through it. The text of the error.
+    /// `puts` says whether anything is then written through it.
+    ///
+    /// The text of the error.
     private static func failedWrite(into folder: UnpackFolder, puts: Bool) -> String? {
         CoverageArchivesFormatsSupport.failure {
-            try folder.write(["file.txt"], replacing: false, permissions: 0o644, modified: Date(), quarantine: nil) {
-                put in
+            let file = UnpackFolder.NewFile(
+                names: ["file.txt"],
+                replacing: false,
+                permissions: 0o644,
+                modified: Date(),
+                quarantine: nil
+            )
+            return try folder.write(file, opened: nil) { put in
                 guard pullDescriptor(where: { $0.contains("/.afm-") }) else {
                     return
                 }
@@ -61,7 +71,7 @@ internal struct CoverageArchivesFormatsSystemFailures {
     private static func closeFails(_ close: (OutputFile) throws -> Void) -> Never {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("afm-exit-\(UUID().uuidString)")
         defer { unlink(url.path) }
-        guard let output = try? OutputFile(creating: url), pullDescriptor(of: url) else {
+        guard let output = try? OutputFile(creating: url, mode: 0o600), pullDescriptor(of: url) else {
             exit(EXIT_FAILURE)
         }
         let message = CoverageArchivesFormatsSupport.failure { try close(output) }
@@ -80,7 +90,7 @@ internal struct CoverageArchivesFormatsSystemFailures {
     @Test
     internal func aFileThatFailsToCloseIsReported() async {
         await #expect(processExitsWith: .success) {
-            Self.closeFails { try $0.close() }
+            Self.closeFails { try $0.close(durably: false) }
         }
     }
 

@@ -1,105 +1,135 @@
-import AFMKernel
 import Foundation
-
-/// What a mask is asked about: one entry of a list, with the folders that lead to it from the
-/// directory the list belongs to (empty for an entry of that directory itself).
-struct MaskEntry {
-    let name: String
-    let isFolder: Bool
-    let directory: [String]
-
-    init(name: String, isFolder: Bool = false, directory: [String] = []) {
-        self.name = name
-        self.isFolder = isFolder
-        self.directory = directory
-    }
-}
 
 /// The masks of Select group / Unselect group (spec 18 › File masks and selection types):
 /// `includes | excludes` with several masks separated by spaces or `;`, masks in double quotes
 /// for names with spaces, a trailing `/` (or the `\` of the specification) for masks that mean
 /// folders, path-limited masks (`/sub/*.txt`, `sub/**/*.txt`), a leading `<` for a regular
-/// expression and `A>B` for related files. Names are compared without regard to case.
+/// expression and `A>B` for related files.
+///
+/// Names are compared without regard to case.
 ///
 /// A value type without shared state: it may be used from any thread.
-struct SelectionMask {
+internal struct SelectionMask {
     /// One mask: an optional chain of folder patterns and the pattern of the name itself.
     private struct Token {
         /// Patterns of the folders leading to the entry; `**` stands for any number of levels.
         let folders: [[Character]]
+        /// The pattern of the name, in lower case.
         let name: [Character]
-        /// The same as ASCII bytes (without a carriage return, which is a letter of its own
-        /// to a `Character`), for names that are plain ASCII too; nil for any other pattern.
-        let nameBytes: [UInt8]?
+        /// The same as a mask on bytes, for a pattern of plain ASCII (without a carriage return,
+        /// which is a letter of its own to a `Character`) with no folder part; nil for any other.
+        let byteToken: ByteToken?
         /// The mask began with a separator: the chain starts at the base directory.
         let isAnchored: Bool
         /// The mask ended with a separator: it means folders, not files.
         let foldersOnly: Bool
 
-        /// Nil for a mask that names nothing in a list (a lone `\`, the base directory itself).
-        init?(_ text: String) {
-            let text = text.replacingOccurrences(of: "\\", with: "/").lowercased()
-            var parts = text.split(separator: "/").map(String.init).filter { $0 != "." }
-            guard let last = parts.popLast() else { return nil }
-            folders = parts.map(Array.init)
-            name = Array(last)
-            nameBytes = last.utf8.allSatisfy { $0 < 0x80 && $0 != 0x0D } ? Array(last.utf8) : nil
-            isAnchored = text.hasPrefix("/") || text.hasPrefix("./")
-            foldersOnly = text.hasSuffix("/")
-        }
-
+        /// Whether the mask says anything about the folders leading to the entry.
         var usesPath: Bool { isAnchored || !folders.isEmpty }
 
-        /// For a name of plain ASCII bytes and a mask with no folder part; nil when `nameBytes` is.
-        func matches(bytes name: UnsafeBufferPointer<UInt8>, isFolder: Bool) -> Bool? {
-            guard let nameBytes, !usesPath else { return nil }
-            if foldersOnly, !isFolder { return false }
-            return Wildcard.matches(ascii: nameBytes, name)
-        }
-
-        /// `chain` is the folders leading to the entry, in lower case.
-        func matches(_ name: [Character], isFolder: Bool, chain: [[Character]]) -> Bool {
-            if foldersOnly, !isFolder { return false }
-            guard Wildcard.matches(self.name, name) else { return false }
-            guard usesPath else { return true }
-            // Without a leading separator the chain may start below any subdirectory.
-            let patterns = isAnchored ? folders : [Array("**")] + folders
-            return Self.chain(patterns, matches: chain)
+        /// Nil for a mask that names nothing in a list (a lone `\`, the base directory itself).
+        init?(_ text: String) {
+            let path = text.replacingOccurrences(of: "\\", with: "/").lowercased()
+            var parts = path.split(separator: "/").map(String.init).filter { $0 != "." }
+            guard let last = parts.popLast() else {
+                return nil
+            }
+            folders = parts.map(Array.init)
+            name = Array(last)
+            isAnchored = path.hasPrefix("/") || path.hasPrefix("./")
+            foldersOnly = path.hasSuffix("/")
+            let isPlain = last.utf8.allSatisfy { $0 < 0x80 && $0 != 0x0D }
+            byteToken =
+                isPlain && !isAnchored && folders.isEmpty
+                ? ByteToken(name: Array(last.utf8), foldersOnly: foldersOnly) : nil
         }
 
         /// Whether the folder patterns fit the folders from the first to the last; `**` stands
-        /// for any number of them. The usual two-pointer match, going back to the last `**`
-        /// only: linear in practice and never more than patterns times folders, where trying
-        /// every number of levels for each `**` in turn grows with the power of their count.
+        /// for any number of them.
+        ///
+        /// The usual two-pointer match, going back to the last `**` only: linear in practice and
+        /// never more than patterns times folders, where trying every number of levels for each
+        /// `**` in turn grows with the power of their count.
         private static func chain(_ patterns: [[Character]], matches chain: [[Character]]) -> Bool {
             let anyLevels: [Character] = ["*", "*"]
-            var (p, c) = (0, 0)
+            var (pattern, level) = (0, 0)
             var star: Int?
             var mark = 0
-            while c < chain.count {
-                if p < patterns.count, patterns[p] == anyLevels {
-                    star = p
-                    mark = c
-                    p += 1
-                } else if p < patterns.count, Wildcard.matches(patterns[p], chain[c]) {
-                    p += 1
-                    c += 1
+            while level < chain.count {
+                if pattern < patterns.count, patterns[pattern] == anyLevels {
+                    star = pattern
+                    mark = level
+                    pattern += 1
+                } else if pattern < patterns.count, Wildcard.matches(patterns[pattern], chain[level]) {
+                    pattern += 1
+                    level += 1
                 } else if let star {
-                    p = star + 1
+                    pattern = star + 1
                     mark += 1
-                    c = mark
+                    level = mark
                 } else {
                     return false
                 }
             }
-            while p < patterns.count, patterns[p] == anyLevels { p += 1 }
-            return p == patterns.count
+            while pattern < patterns.count, patterns[pattern] == anyLevels { pattern += 1 }
+            return pattern == patterns.count
+        }
+
+        /// Whether the entry of that name (in lower case) matches; `chain` is the folders leading to
+        /// the entry, in lower case.
+        func matches(_ name: [Character], isFolder: Bool, chain: [[Character]]) -> Bool {
+            if foldersOnly, !isFolder {
+                return false
+            }
+            guard Wildcard.matches(self.name, name) else {
+                return false
+            }
+            guard usesPath else {
+                return true
+            }
+            // Without a leading separator the chain may start below any subdirectory.
+            let patterns = isAnchored ? folders : [Array("**")] + folders
+            return Self.chain(patterns, matches: chain)
         }
     }
 
-    let text: String
+    /// A mask of plain ASCII with no folder part, matched on the bytes of a plain ASCII name.
+    private struct ByteToken {
+        /// The pattern of the name, in lower case.
+        let name: [UInt8]
+        /// The mask means folders, not files.
+        let foldersOnly: Bool
+
+        /// Whether the name, of plain ASCII bytes in any case, matches.
+        func matches(_ entryName: UnsafeBufferPointer<UInt8>, isFolder: Bool) -> Bool {
+            if foldersOnly, !isFolder {
+                return false
+            }
+            return Wildcard.matches(ascii: name, entryName)
+        }
+    }
+
+    /// The masks of both parts as `ByteToken`s, for a mask whose every part can be one.
+    private struct ByteMasks {
+        /// The masks before the `|`.
+        let includes: [ByteToken]
+        /// The masks after the `|`.
+        let excludes: [ByteToken]
+
+        /// Whether the name, of plain ASCII bytes in any case, is selected.
+        func matches(_ name: UnsafeBufferPointer<UInt8>, isFolder: Bool) -> Bool {
+            func matching(_ token: ByteToken) -> Bool { token.matches(name, isFolder: isFolder) }
+            // An empty include part means everything.
+            return (includes.isEmpty || includes.contains(where: matching)) && !excludes.contains(where: matching)
+        }
+    }
+
+    /// The mask as typed, without the spaces around it.
+    internal let text: String
     private var includes: [Token] = []
     private var excludes: [Token] = []
+    /// The same as masks on bytes, when every mask of both parts can be one and there is no `A>B`.
+    private var byteMasks: ByteMasks?
     private var expression: NSRegularExpression?
     /// Counts the names the regular expression ran out of time on.
     private let trip = SelectionRegexTrip()
@@ -107,101 +137,42 @@ struct SelectionMask {
     /// the file that belongs to it.
     private var related: String?
     /// False for a regular expression that cannot be read; such a mask matches nothing.
-    private(set) var isValid = true
-
-    init(_ text: String) {
-        let text = text.trimmingCharacters(in: .whitespaces)
-        self.text = text
-        if text.hasPrefix("<") {
-            expression = try? NSRegularExpression(pattern: String(text.dropFirst()), options: [.caseInsensitive])
-            isValid = expression != nil
-            return
-        }
-        let (primary, related) = Self.split(text, at: ">")
-        self.related = related.map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
-        let (included, excluded) = Self.split(primary, at: "|")
-        includes = Self.tokens(included).compactMap(Token.init)
-        excludes = Self.tokens(excluded ?? "").compactMap(Token.init)
-    }
+    internal private(set) var isValid = true
 
     /// Whether the folders leading to an entry matter; when not, callers need not work them out.
-    var needsDirectories: Bool {
+    internal var needsDirectories: Bool {
         related != nil || includes.contains(where: \.usesPath) || excludes.contains(where: \.usesPath)
     }
 
     /// Whether the mask is a regular expression, which can take any time on a name.
-    var isRegex: Bool { expression != nil }
+    internal var isRegex: Bool { expression != nil }
 
     /// Whether the mask takes the files that belong to the matching ones (`A>B`): its answer
     /// for an entry then depends on the other entries of the list.
-    var pairsRelatedFiles: Bool { related != nil }
+    internal var pairsRelatedFiles: Bool { related != nil }
 
     /// Whether a regular expression of the mask ran out of time on some name: those were taken
     /// as not matching, and the mask's answer is not to be trusted.
-    var timedOut: Bool { trip.hasTimedOut }
+    internal var timedOut: Bool { trip.hasTimedOut }
 
-    /// Whether the entry matches the mask itself; related files (`A>B`) are found by `selected`.
-    /// `cancelled` ends a regular expression that is still working.
-    func matches(_ entry: MaskEntry, cancelled: () -> Bool = { false }) -> Bool {
-        if let expression {
-            return SelectionRegex.matches(expression, entry.name, trip: trip, cancelled: cancelled)
+    /// Reads a mask; one that cannot be read is not `isValid` and matches nothing.
+    internal init(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        self.text = trimmed
+        if trimmed.hasPrefix("<") {
+            expression = try? NSRegularExpression(pattern: String(trimmed.dropFirst()), options: [.caseInsensitive])
+            isValid = expression != nil
+            return
         }
-        guard isValid else { return false }
-        if !needsDirectories, let answer = quickAnswer(entry) { return answer }
-        let name = Array(entry.name.lowercased())
-        let chain = needsDirectories ? entry.directory.map { Array($0.lowercased()) } : []
-        func matching(_ token: Token) -> Bool { token.matches(name, isFolder: entry.isFolder, chain: chain) }
-        // An empty include part means everything.
-        return (includes.isEmpty || includes.contains(where: matching)) && !excludes.contains(where: matching)
-    }
-
-    /// The answer for a plain ASCII name, worked out on its UTF-8 in place (no array of
-    /// characters per name); nil when the name or a mask is not plain, or the name is not in
-    /// one piece of UTF-8.
-    private func quickAnswer(_ entry: MaskEntry) -> Bool? {
-        entry.name.utf8.withContiguousStorageIfAvailable { name -> Bool? in
-            for byte in name where byte >= 0x80 || byte == 0x0D { return nil }
-            var failed = false
-            func judge(_ token: Token) -> Bool {
-                guard let answer = token.matches(bytes: name, isFolder: entry.isFolder) else {
-                    failed = true
-                    return false
-                }
-                return answer
-            }
-            let included = includes.isEmpty || includes.contains(where: judge)
-            let excluded = !failed && excludes.contains(where: judge)
-            return failed ? nil : included && !excluded
-        } ?? nil
-    }
-
-    func matches(_ name: String, isFolder: Bool = false) -> Bool {
-        matches(MaskEntry(name: name, isFolder: isFolder))
-    }
-
-    /// For every entry, whether the mask selects it: the entries that match, and with `A>B`
-    /// the entries of the same folder whose names derive from them.
-    func selected(_ entries: [MaskEntry], cancelled: () -> Bool = { false }) -> [Bool] {
-        var result: [Bool] = []
-        result.reserveCapacity(entries.count)
-        for entry in entries {
-            // A cancelled run has no use for the rest.
-            result.append(!cancelled() && matches(entry, cancelled: cancelled))
+        let (primary, relatedPart) = Self.split(trimmed, at: ">")
+        related = relatedPart.map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
+        let (included, excluded) = Self.split(primary, at: "|")
+        includes = Self.tokens(included).compactMap(Token.init)
+        excludes = Self.tokens(excluded ?? "").compactMap(Token.init)
+        let (includeBytes, excludeBytes) = (includes.compactMap(\.byteToken), excludes.compactMap(\.byteToken))
+        if related == nil, includeBytes.count == includes.count, excludeBytes.count == excludes.count {
+            byteMasks = ByteMasks(includes: includeBytes, excludes: excludeBytes)
         }
-        guard let related else { return result }
-        func key(_ directory: [String], _ name: String) -> String {
-            directory.joined(separator: "/").lowercased() + "/" + name.lowercased()
-        }
-        var places: [String: [Int]] = [:]
-        for (index, entry) in entries.enumerated() {
-            places[key(entry.directory, entry.name), default: []].append(index)
-        }
-        for (index, entry) in entries.enumerated() where result[index] && !entry.isFolder {
-            for partner in places[key(entry.directory, Wildcard.rename(entry.name, with: related))] ?? [] {
-                result[partner] = true
-            }
-        }
-        return result
     }
 
     /// Splits at the first `separator` outside double quotes.
@@ -234,113 +205,65 @@ struct SelectionMask {
         if !current.isEmpty { tokens.append(current) }
         return tokens
     }
-}
 
-/// `*` and `?` matching as file masks use it (spec 18 › Core syntax).
-enum Wildcard {
-    /// Both sides are expected in lower case. `*.*` matches every name, `name.*` and `name.`
-    /// also match `name` without an extension, as they do under DOS.
-    static func matches(_ pattern: [Character], _ name: [Character]) -> Bool {
-        let (whole, wholeName) = (pattern[pattern.indices], name[name.indices])
-        if glob(whole, wholeName) { return true }
-        guard !name.contains(".") else { return false }
-        if pattern.count >= 2, pattern.suffix(2) == [".", "*"] { return glob(pattern.dropLast(2), wholeName) }
-        if pattern.last == "." { return glob(pattern.dropLast(), wholeName) }
-        return false
-    }
-
-    /// The same for a plain ASCII pattern in lower case and a plain ASCII name (of any case).
-    static func matches(ascii pattern: [UInt8], _ name: UnsafeBufferPointer<UInt8>) -> Bool {
-        if glob(pattern[pattern.indices], name) { return true }
-        guard !name.contains(UInt8(ascii: ".")) else { return false }
-        if pattern.count >= 2, pattern[pattern.count - 2] == UInt8(ascii: "."),
-            pattern[pattern.count - 1] == UInt8(ascii: "*")
-        {
-            return glob(pattern.dropLast(2), name)
+    /// Whether the entry matches the mask itself; related files (`A>B`) are found by `selected`.
+    /// `cancelled` ends a regular expression that is still working.
+    internal func matches(_ entry: MaskEntry, cancelled: () -> Bool) -> Bool {
+        if let expression {
+            return SelectionRegex.matches(expression, entry.name, trip: trip, cancelled: cancelled)
         }
-        if pattern.last == UInt8(ascii: ".") { return glob(pattern.dropLast(), name) }
-        return false
-    }
-
-    private static func glob(_ pattern: ArraySlice<UInt8>, _ name: UnsafeBufferPointer<UInt8>) -> Bool {
-        func lower(_ byte: UInt8) -> UInt8 { byte >= 0x41 && byte <= 0x5A ? byte | 0x20 : byte }
-        var (p, n) = (pattern.startIndex, 0)
-        var star: Int?
-        var mark = n
-        while n < name.count {
-            if p < pattern.endIndex, pattern[p] == UInt8(ascii: "?") || pattern[p] == lower(name[n]) {
-                p += 1
-                n += 1
-            } else if p < pattern.endIndex, pattern[p] == UInt8(ascii: "*") {
-                star = p
-                mark = n
-                p += 1
-            } else if let star {
-                p = star + 1
-                mark += 1
-                n = mark
-            } else {
-                return false
-            }
+        guard isValid else {
+            return false
         }
-        while p < pattern.endIndex, pattern[p] == UInt8(ascii: "*") { p += 1 }
-        return p == pattern.endIndex
-    }
-
-    /// The usual two-pointer match: linear in practice, without recursion.
-    private static func glob(_ pattern: ArraySlice<Character>, _ name: ArraySlice<Character>) -> Bool {
-        var (p, n) = (pattern.startIndex, name.startIndex)
-        var star: Int?
-        var mark = n
-        while n < name.endIndex {
-            if p < pattern.endIndex, pattern[p] == "?" || pattern[p] == name[n] {
-                p += 1
-                n += 1
-            } else if p < pattern.endIndex, pattern[p] == "*" {
-                star = p
-                mark = n
-                p += 1
-            } else if let star {
-                p = star + 1
-                mark += 1
-                n = mark
-            } else {
-                return false
-            }
+        guard let byteMasks else {
+            return matchesCharacters(entry)
         }
-        while p < pattern.endIndex, pattern[p] == "*" { p += 1 }
-        return p == pattern.endIndex
+        // A plain ASCII name is worked out on its UTF-8 in place (no array of characters per
+        // name); any other, or one that is not in one piece of UTF-8, by its characters.
+        return entry.name.utf8.withContiguousStorageIfAvailable { name in
+            name.allSatisfy { $0 < 0x80 && $0 != 0x0D }
+                ? byteMasks.matches(name, isFolder: entry.isFolder) : matchesCharacters(entry)
+        } ?? matchesCharacters(entry)
     }
 
-    /// Applies a rename mask to a name, part by part (name and extension): a letter replaces
-    /// the letter at its place, `?` keeps it and `*` keeps the rest. `*.cr2` turns
-    /// `IMG_1057.JPG` into `IMG_1057.cr2`, `crw*.cr2` into `crw_1057.cr2`, `*.` into `IMG_1057`.
-    static func rename(_ name: String, with mask: String) -> String {
-        func apply(_ mask: String, to source: String) -> String {
-            let source = Array(source)
-            var result = ""
-            var position = 0
-            for character in mask {
-                switch character {
-                case "*":
-                    if position < source.count { result += String(source[position...]) }
-                    position = source.count
+    /// The answer of `matches` worked out on the characters of the name, in lower case.
+    private func matchesCharacters(_ entry: MaskEntry) -> Bool {
+        let name = Array(entry.name.lowercased())
+        let chain = needsDirectories ? entry.directory.map { Array($0.lowercased()) } : []
+        func matching(_ token: Token) -> Bool { token.matches(name, isFolder: entry.isFolder, chain: chain) }
+        // An empty include part means everything.
+        return (includes.isEmpty || includes.contains(where: matching)) && !excludes.contains(where: matching)
+    }
 
-                case "?":
-                    if position < source.count { result.append(source[position]) }
-                    position += 1
+    /// Whether an entry of that name matches the mask, with no folders leading to it.
+    internal func matches(_ name: String, isFolder: Bool) -> Bool {
+        matches(MaskEntry(name: name, isFolder: isFolder)) { false }
+    }
 
-                default:
-                    result.append(character)
-                    position += 1
-                }
-            }
+    /// For every entry, whether the mask selects it: the entries that match, and with `A>B`
+    /// the entries of the same folder whose names derive from them.
+    internal func selected(_ entries: [MaskEntry], cancelled: () -> Bool) -> [Bool] {
+        var result: [Bool] = []
+        result.reserveCapacity(entries.count)
+        for entry in entries {
+            // A cancelled run has no use for the rest.
+            result.append(!cancelled() && matches(entry, cancelled: cancelled))
+        }
+        guard let related else {
             return result
         }
-        // A mask that ends in a dot gives names without an extension (`*.`).
-        let (maskBase, maskExt) = FileItem.split(mask.hasSuffix(".") ? String(mask.dropLast()) : mask)
-        let (base, ext) = FileItem.split(name)
-        let newExt = apply(maskExt, to: ext)
-        return apply(maskBase, to: base) + (newExt.isEmpty ? "" : "." + newExt)
+        func key(_ directory: [String], _ name: String) -> String {
+            directory.joined(separator: "/").lowercased() + "/" + name.lowercased()
+        }
+        var places: [String: [Int]] = [:]
+        for (index, entry) in entries.enumerated() {
+            places[key(entry.directory, entry.name), default: []].append(index)
+        }
+        for (index, entry) in entries.enumerated() where result[index] && !entry.isFolder {
+            for partner in places[key(entry.directory, Wildcard.rename(entry.name, with: related))] ?? [] {
+                result[partner] = true
+            }
+        }
+        return result
     }
 }

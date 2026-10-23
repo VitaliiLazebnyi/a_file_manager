@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import TestSupport
 import Testing
@@ -14,7 +13,9 @@ internal struct CoverageNetworkTransfers {
         let server = try CoverageNetworkServer(replies: ["EPSV": "229 Somewhere", "PASV": "500 No passive mode"])
         let connection = try server.connected()
         defer { connection.close() }
-        let error = #expect(throws: NetworkError.self) { try connection.beginTransfer("RETR a", type: "I") }
+        let error = #expect(throws: NetworkError.self) {
+            try connection.beginTransfer("RETR a", type: "I", restartAt: 0, cancellation: nil)
+        }
         #expect(CoverageNetworkServer.code(of: error) == 500)
     }
 
@@ -35,16 +36,18 @@ internal struct CoverageNetworkTransfers {
         let connection = try server.connected()
         defer { connection.close() }
         let refused = #expect(throws: NetworkError.self) {
-            try connection.beginTransfer("RETR a", type: "I", restartAt: 5)
+            try connection.beginTransfer("RETR a", type: "I", restartAt: 5, cancellation: nil)
         }
         #expect(CoverageNetworkServer.code(of: refused) == 502)
-        _ = try connection.beginTransfer("RETR a", type: "I")
-        let error = #expect(throws: NetworkError.self) { try connection.beginTransfer("RETR b", type: "I") }
+        _ = try connection.beginTransfer("RETR a", type: "I", restartAt: 0, cancellation: nil)
+        let error = #expect(throws: NetworkError.self) {
+            try connection.beginTransfer("RETR b", type: "I", restartAt: 0, cancellation: nil)
+        }
         #expect(CoverageNetworkServer.text(of: error)?.contains("still running") == true)
         connection.abandonTransfer()
         #expect(!connection.isUsable)
         // Nothing to end or drop any more.
-        try connection.finishTransfer()
+        try connection.finishTransfer(cancellation: nil)
         connection.abandonTransfer()
         connection.abortTransfer()
         #expect(!connection.isUsable)
@@ -59,13 +62,13 @@ internal struct CoverageNetworkTransfers {
         )
         let connection = try server.connected()
         defer { connection.close() }
-        let stream = try connection.beginTransfer("RETR a", type: "I")
+        let stream = try connection.beginTransfer("RETR a", type: "I", restartAt: 0, cancellation: nil)
         var received = Data()
-        while let block = try stream.read(upToCount: 100, timeout: Wait.ceiling) {
+        while let block = try stream.read(upToCount: 100, timeout: Wait.ceiling, cancellation: nil) {
             received += block
         }
         #expect(received == Data("data".utf8))
-        let error = #expect(throws: NetworkError.self) { try connection.finishTransfer() }
+        let error = #expect(throws: NetworkError.self) { try connection.finishTransfer(cancellation: nil) }
         #expect(CoverageNetworkServer.text(of: error) == "150 Still coming")
         #expect(!connection.isUsable)
     }
@@ -83,8 +86,8 @@ internal struct CoverageNetworkTransfers {
         )
         let connection = try server.connected()
         defer { connection.close() }
-        _ = try connection.beginTransfer("RETR a", type: "I")
+        _ = try connection.beginTransfer("RETR a", type: "I", restartAt: 0, cancellation: nil)
         connection.abortTransfer()
-        #expect(connection.isUsable && connection.isAlive())
+        #expect(connection.isUsable && connection.isAlive(cancellation: nil))
     }
 }

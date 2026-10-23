@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 import TestSupport
@@ -29,7 +28,7 @@ internal struct CoverageFindForm {
         form = SearchForm(
             fields: SearchField.builtIn(fileSystems: registry),
             store: SearchStore(settings: settings),
-            ui: answers
+            interaction: answers
         )
     }
 
@@ -77,7 +76,7 @@ internal struct CoverageFindForm {
         fields.last?.stringValue = "abc"
         let read = form.settings
         #expect(read.depth == 2)
-        #expect(read.criteria.hidden == .yes && read.criteria.directory == .no && read.criteria.symbolicLink == .any)
+        #expect(read.criteria.hidden == .set && read.criteria.directory == .unset && read.criteria.symbolicLink == .any)
         #expect(read.criteria.notOlderThan?.unit == .days && read.criteria.olderThan?.unit == .days)
         #expect(read.criteria.size?.comparison == .equal && read.criteria.size?.unit == .bytes)
         #expect(read.fieldRules.rules.first?.comparison == .contains)

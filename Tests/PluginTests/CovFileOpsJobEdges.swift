@@ -217,7 +217,12 @@ internal struct CovFileOpsJobEdges {
         disk.trashError.value = NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))
         let answers = CovFileOpsAnswers()
         answers.protections.value = [.skip]
-        let job = FileJob(kind: .delete(toTrash: true), sources: [disk.base.url("/A/f.txt")], fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .delete(toTrash: true),
+            sources: [disk.base.url("/A/f.txt")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         job.delegate = answers
         #expect(job.run().completed.isEmpty && disk.base.exists("/A/f.txt"))
         #expect(answers.asked.value.contains { $0.hasPrefix("protected: locked") })

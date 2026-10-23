@@ -94,11 +94,12 @@ internal final class IconStore {
         line.removeLast(count)
         waiting[folder] = line.isEmpty ? nil : line
         busy.insert(folder)
+        let fetch = source
         Background.storage(
             "icons",
             at: URL(fileURLWithPath: folder, isDirectory: true),
             qos: .utility,
-            work: { [source] in batch.map { source($0.path) } },
+            work: { batch.map { fetch($0.path) } },
             then: { [weak self] fetched in self?.take(fetched, for: batch, in: folder) }
         )
     }

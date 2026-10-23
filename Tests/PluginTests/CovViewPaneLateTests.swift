@@ -8,9 +8,10 @@ import Testing
 @testable import ViewerPlugin
 
 /// What a Lister pane does with results that come late (the pane moved on meanwhile), files of
-/// other file systems shown in the rich modes, and reads that fail or come back short. The work
-/// of a pane runs on its work queue; a barrier on that queue waits until what was handed to it
-/// has run, and its answers then wait for the main thread.
+/// other file systems shown in the rich modes, and reads that fail or come back short.
+///
+/// The work of a pane runs on its work queue; a barrier on that queue waits until what was handed
+/// to it has run, and its answers then wait for the main thread.
 @MainActor
 @Suite(.serialized)
 internal struct CovViewPaneLateTests {
@@ -211,8 +212,8 @@ internal struct CovViewPaneLateTests {
         #expect(await bench.textShown(pane))
         // The pager shows a text read straight from a source that then fails.
         let source = CoverageViewerHeldSource("https://example.com/a and more")
-        let document = TextDocument(source: source, encoding: .utf8, layout: pane.layout)
-        pane.pager.show(document, select: 0..<21, parallel: false)
+        let document = TextDocument(source: source, encoding: .utf8, bomLength: 0, layout: pane.layout, reusing: nil)
+        pane.pager.show(document, at: 0, select: 0..<21, keepingSelection: false, parallel: false)
         #expect(await bench.wait { pane.pager.document === document && pane.pager.selection == 0..<21 })
         source.fail(true)
         let menu = try #require(pane.makeContextMenu())

@@ -31,7 +31,7 @@ extension FileRun {
             let columns = 30 + Int(random.next() % 200)
             let wraps = !random.next().isMultiple(of: 4)
             let document = show(
-                TextLayoutOptions(columns: columns, wordWrap: wraps),
+                TextLayoutOptions(columns: columns, wordWrap: wraps, tabWidth: 8),
                 keeping: random.next().isMultiple(of: 2)
             )
             let hammer = Hammer(document, columns: columns, label: "during indexing")
@@ -63,7 +63,7 @@ extension FileRun {
 
     /// One last layout that nobody stops (a layout stopped with Esc stays unfinished by design).
     private func lastLayoutAfterStorm() {
-        let last = show(TextLayoutOptions(columns: fit, wordWrap: true), keeping: true)
+        let last = show(TextLayoutOptions(columns: fit, wordWrap: true, tabWidth: 8), keeping: true)
         let started = now()
         let done = pump(upTo: 900) { !pager.isIndexing }
         say(

@@ -1,8 +1,6 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 import Foundation
-import PDFKit
 import TestSupport
 import Testing
 
@@ -29,7 +27,7 @@ internal struct CoverageViewerPanePrintTests {
         let whole = try #require(bench.dialogs.operations.last?.operation)
         #expect(whole.printInfo.leftMargin == 10 && whole.printInfo.bottomMargin == 40)
         #expect(((whole.view as? TextPrintView)?.lines.count ?? 0) >= 200)
-        pane.pager.reveal(offset: 0, select: 0..<12)
+        pane.pager.reveal(offset: 0, select: 0..<12, rowsAbove: 0, keepingSelection: false)
         #expect(await bench.wait { pane.pager.selection != nil })
         bench.interaction.choiceAnswers = [0, 1]
         pane.printContent()
@@ -90,15 +88,31 @@ internal struct CoverageViewerPanePrintTests {
     @Test
     internal func theRowsForPrinting() {
         let source = DataByteSource(Data(Self.text.utf8))
-        let layout = ViewerLayout.text(TextLayoutOptions(columns: 80, wordWrap: true))
-        let unindexed = TextDocument(source: source, encoding: .utf8, layout: layout)
-        #expect(ViewerPane.printableText(of: unindexed, in: 0..<100).lines.isEmpty)
-        let document = TextDocument(source: source, encoding: .utf8, layout: layout)
-        document.buildIndex(parallel: false)
-        let part = ViewerPane.printableText(of: document, in: 0..<30)
+        let layout = ViewerLayout.text(TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 8))
+        let unindexed = TextDocument(source: source, encoding: .utf8, bomLength: 0, layout: layout, reusing: nil)
+        let pageRows = ViewerPane.printPageLimit * 60
+        #expect(
+            ViewerPane.printableText(of: unindexed, in: 0..<100, maxRows: pageRows, cancellation: CancellationFlag())
+                .lines.isEmpty
+        )
+        let document = TextDocument(source: source, encoding: .utf8, bomLength: 0, layout: layout, reusing: nil)
+        document.buildIndex(parallel: false, scanning: .standard) {
+            // Not watched here.
+        }
+        let part = ViewerPane.printableText(
+            of: document,
+            in: 0..<30,
+            maxRows: pageRows,
+            cancellation: CancellationFlag()
+        )
         #expect(part.lines == ["Line 1 of the text", "Line 2 of the text"] && !part.truncated)
         #expect(part.text == "Line 1 of the text\nLine 2 of the text\n")
-        let cut = ViewerPane.printableText(of: document, in: document.content, maxRows: 3)
+        let cut = ViewerPane.printableText(
+            of: document,
+            in: document.content,
+            maxRows: 3,
+            cancellation: CancellationFlag()
+        )
         #expect(cut.lines.count == 3 && cut.truncated)
     }
 

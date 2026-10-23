@@ -3,14 +3,17 @@ import Foundation
 
 /// What a running stream needs, apart from the watcher: the stream keeps it alive itself,
 /// so a report that is under way when the watcher stops or goes away finds everything
-/// it touches still there. All the streams of one watcher share one.
+/// it touches still there.
+///
+/// All the streams of one watcher share one.
 ///
 /// Unchecked: what changes is guarded by `lock`; the rest is fixed in `init`.
 internal final class FSEvWatch: @unchecked Sendable {
     /// A burst of reports is passed on once, this long after its first report; and never
     /// sooner than `minimumGap` after the previous one, however long the burst lasts
-    /// (a build running below a watched folder). A report that says "look at everything"
-    /// is given longer still.
+    /// (a build running below a watched folder).
+    ///
+    /// A report that says "look at everything" is given longer still.
     internal static let delay = 0.3, rescanDelay = 1.0, minimumGap = 0.5
 
     /// Resolved path as reported by the system → the directory the caller asked for.

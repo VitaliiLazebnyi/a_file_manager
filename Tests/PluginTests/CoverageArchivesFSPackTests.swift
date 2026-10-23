@@ -138,7 +138,7 @@ internal struct CoverageArchivesFSPackTests {
         ]
         commands.perform(.packFiles)
         #expect(interaction.log.suffix(4) == ["form: Pack files", "form: Encrypt", "form: Encrypt", "form: Encrypt"])
-        let archive = try archives.store.archive(at: box.url("B/aes.zip"))
+        let archive = try archives.store.archive(at: box.url("B/aes.zip"), cancellation: nil)
         #expect(archive.entry("notes.txt")?.isEncrypted == true)
         if case .zip(let record)? = archive.entry("notes.txt")?.content {
             #expect(record.method == 99)

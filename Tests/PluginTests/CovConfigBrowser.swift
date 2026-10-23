@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 import Foundation
@@ -70,7 +69,7 @@ internal struct CovConfigBrowser {
     @Test
     internal func onItsOwnItRunsTheChosenCommand() {
         defer { finish() }
-        browser.show()
+        browser.show(category: nil)
         #expect(stage.presented.last === browser)
         type("cov_beta")
         #expect(browser.rows.map(\.id) == ["cov_beta"])
@@ -93,7 +92,7 @@ internal struct CovConfigBrowser {
     @Test
     internal func typingAFilterRunsNothingUntilReturn() throws {
         defer { finish() }
-        browser.show()
+        browser.show(category: nil)
         let field = try #require(filter)
         #expect(field.action == nil && field.target == nil)
         type("cov_")
@@ -120,7 +119,7 @@ internal struct CovConfigBrowser {
     @Test
     internal func returnInTheListRunsTheCommand() throws {
         defer { finish() }
-        browser.show()
+        browser.show(category: nil)
         type("cov_alpha")
         let table = try #require(list?.tableView)
         table.keyDown(with: try #require(key("\r", code: 36)))
@@ -131,7 +130,7 @@ internal struct CovConfigBrowser {
     @Test
     internal func commandCCopiesTheName() throws {
         defer { finish() }
-        browser.show()
+        browser.show(category: nil)
         type("cov_alpha")
         let window = try #require(browser.window)
         let copy = try #require(key("c", code: 8, .command))

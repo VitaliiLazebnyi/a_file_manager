@@ -26,7 +26,7 @@ internal struct CoverageArchivesWriteTests {
             ["file.txt": "file", "target.txt": "target", "folder/inner.txt": "inner"],
             options: options
         )
-        return try bench.store.archive(at: url)
+        return try bench.store.archive(at: url, cancellation: nil)
     }
 
     /// Another archive, for putting in the place of the one under test.
@@ -35,13 +35,13 @@ internal struct CoverageArchivesWriteTests {
     }
 
     private func add(_ path: String, _ text: String, to archive: OpenArchive) throws {
-        let writer = try archive.write(path)
+        let writer = try archive.write(path, level: nil, password: nil)
         try writer.write(Data(text.utf8))
         try writer.close(attributes: FileAttributes())
     }
 
     private func read(_ archive: OpenArchive, _ path: String) throws -> String {
-        let stream = try archive.open(try #require(archive.entry(path)))
+        let stream = try archive.open(try #require(archive.entry(path)), slot: nil)
         defer { stream.close() }
         return try #require(String(bytes: try stream.readFully(1 << 20), encoding: .utf8))
     }
@@ -61,7 +61,7 @@ internal struct CoverageArchivesWriteTests {
         try add("new.txt", "new", to: archive)
         let other = try stranger(["other.txt": "other"], options: [])
         bench.environment.whileWriting = { [url] in try? CoverageArchives.replace(url, with: other) }
-        #expect { try archive.commit() } throws: { isChangedOutside($0) }
+        #expect { try archive.commit(cancellation: nil) { _, _ in true } } throws: { isChangedOutside($0) }
         #expect(archive.hasPendingChanges && CoverageArchives.listed(url) == ["other.txt"])
         #expect(!namesOnDisk(box.root).contains { $0.hasSuffix(".afm-zip.tmp") })
         bench.store.close()
@@ -70,10 +70,10 @@ internal struct CoverageArchivesWriteTests {
         try add("new.txt", "new", to: again)
         bench.environment.whileWriting = { [box] in _ = chmod(box.root.path, 0o555) }
         defer { chmod(box.root.path, 0o755) }
-        #expect(throws: (any Error).self) { try again.commit() }
+        #expect(throws: (any Error).self) { try again.commit(cancellation: nil) { _, _ in true } }
         chmod(box.root.path, 0o755)
         bench.environment.whileWriting = nil
-        try again.commit()
+        try again.commit(cancellation: nil) { _, _ in true }
         #expect(CoverageArchives.listed(url).contains("new.txt"))
         #expect(!namesOnDisk(box.root).contains { $0.hasSuffix(".afm-zip.tmp") })
     }
@@ -88,11 +88,11 @@ internal struct CoverageArchivesWriteTests {
         let archive = try opened()
         try add("gone.txt", "gone", to: archive)
         bench.environment.whileWriting = { try? archive.remove("gone.txt") }
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         bench.environment.whileWriting = nil
         #expect(CoverageArchives.listed(url).contains("gone.txt") && archive.hasPendingChanges)
         #expect(!clock.take().isEmpty)
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         #expect(!CoverageArchives.listed(url).contains("gone.txt") && CoverageArchives.isSound(url))
     }
 
@@ -111,11 +111,17 @@ internal struct CoverageArchivesWriteTests {
         let theirs = [(name: "README", data: Data("theirs".utf8)), (name: "notes.txt", data: Data("theirs".utf8))]
         try CoverageArchives.craft(other, theirs + [(name: "shared/", data: Data())], localExtra: nil) { record in
             if record.name.hasSuffix("/") {
-                record = .new(name: record.name, isDirectory: true, modified: Date(), permissions: 0o755)
+                record = .new(
+                    name: record.name,
+                    isDirectory: true,
+                    modified: Date(),
+                    permissions: 0o755,
+                    isSymbolicLink: false
+                )
             }
         }
         try CoverageArchives.replace(url, with: other)
-        #expect { try archive.commit() } throws: { isChangedOutside($0) }
+        #expect { try archive.commit(cancellation: nil) { _, _ in true } } throws: { isChangedOutside($0) }
         let listed = CoverageArchives.listed(url)
         #expect(listed.contains("README (2)") && listed.contains("notes (2).txt") && listed.contains("mine/"))
         #expect(listed.filter { $0 == "shared/" }.count == 1)
@@ -136,7 +142,7 @@ internal struct CoverageArchivesWriteTests {
             // Every record as it is.
         }
         try CoverageArchives.replace(url, with: twice)
-        #expect { try archive.commit() } throws: { isChangedOutside($0) }
+        #expect { try archive.commit(cancellation: nil) { _, _ in true } } throws: { isChangedOutside($0) }
         #expect(CoverageArchives.listed(url) == ["a.txt", "a.txt"])
     }
 
@@ -187,7 +193,7 @@ internal struct CoverageArchivesWriteTests {
                 && !CoverageArchives.listed(url).contains("arriving.txt")
         )
         #expect(archive.hasPendingChanges)
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         try archive.move("arriving.txt", to: "renamed.txt", replacing: false)
         #expect(CoverageArchives.contents(of: "renamed.txt", in: url) == "arriving" && !archive.hasPendingChanges)
     }
@@ -205,7 +211,7 @@ internal struct CoverageArchivesWriteTests {
         }
         let done = Signal<Bool>()
         OtherThread.start {
-            done.set((try? archive.commit()) != nil)
+            done.set((try? archive.commit(cancellation: nil) { _, _ in true }) != nil)
         }
         #expect(entered.wait() == true)
         let temporary = ".afm-\(UUID().uuidString).tmp"
@@ -215,7 +221,7 @@ internal struct CoverageArchivesWriteTests {
         #expect(done.wait() == true)
         bench.environment.whileWriting = nil
         #expect(!CoverageArchives.listed(url).contains("arrived.txt") && archive.hasPendingChanges)
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         #expect(CoverageArchives.listed(url).contains("arrived.txt"))
     }
 
@@ -226,11 +232,11 @@ internal struct CoverageArchivesWriteTests {
         let archive = try opened()
         try add("moving.txt", "moving", to: archive)
         bench.environment.whileWriting = { try? archive.move("moving.txt", to: "moved.txt", replacing: false) }
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         bench.environment.whileWriting = nil
         #expect(CoverageArchives.listed(url).contains("moving.txt") && archive.hasPendingChanges)
         #expect(try read(archive, "moved.txt") == "moving")
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         #expect(CoverageArchives.contents(of: "moved.txt", in: url) == "moving")
         #expect(!CoverageArchives.listed(url).contains("moving.txt"))
     }
@@ -243,7 +249,7 @@ internal struct CoverageArchivesWriteTests {
         #expect(archive.entry("folder")?.isImplicit == true)
         try add("new.txt", "new", to: archive)
         try CoverageArchives.replace(url, with: try stranger(["other.txt": "other"], options: []))
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         #expect(CoverageArchives.listed(url).sorted() == ["new.txt", "other.txt"])
     }
 }

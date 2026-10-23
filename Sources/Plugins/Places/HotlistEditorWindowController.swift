@@ -4,56 +4,63 @@ import AppKit
 
 /// The "Change directory menu" dialog (spec 12 › Directory hotlist editor): the hotlist as a
 /// list with its submenus indented, buttons to add, delete, rename and move entries, and the
-/// command and target path of the selected entry. It works on a copy of the list; only OK
-/// hands the copy back. Main thread only; nothing here touches a file system.
-final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
+/// command and target path of the selected entry.
+///
+/// It works on a copy of the list; only OK hands the copy back. Main thread only; nothing here
+/// touches a file system.
+internal final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate, NSTableViewDataSource,
     NSTableViewDelegate,
     NSTextFieldDelegate
 {
-    private final class EntryTableView: NSTableView {
-        var onKey: ((NSEvent) -> Bool)?
-
-        override func keyDown(with event: NSEvent) {
-            if onKey?(event) != true { super.keyDown(with: event) }
-        }
-    }
-
+    /// The kernel, for the dialogs the editor asks with.
     private let kernel: Kernel
+    /// The copy of the list being edited.
     private var hotlist: Hotlist
+    /// The list's lines as the table shows them.
     private var rows: [Hotlist.Row] = []
     /// The command a new entry starts with: `cd` to the source panel's directory.
     private let proposedCommand: String
+    /// The title a new entry starts with: the name of the source panel's directory.
     private let proposedTitle: String
+    /// Whether the dialog ended with OK.
     private var accepted = false
     /// The controller's window, which it always has.
     private let dialog: NSWindow
-
-    private let table = EntryTableView()
-    private let numberLabel = NSTextField(labelWithString: "")
-    private let commandField = NSTextField()
-    private let targetField = NSTextField()
-    private let hideBox = NSButton(
-        checkboxWithTitle: "Hide menu items starting with this character:",
-        target: nil,
-        action: nil
+    /// The list, the buttons and the fields.
+    private let controls = HotlistEditorControls(
+        addActions: [
+            ("Add Item…", #selector(addItem)), ("Add Submenu…", #selector(addSubmenu)),
+            ("Add Separator", #selector(addSeparator))
+        ],
+        entryActions: [
+            ("Delete Item", #selector(deleteEntry)), ("Change Title…", #selector(changeTitle)),
+            ("Move Up", #selector(moveEntryUp)), ("Move Down", #selector(moveEntryDown))
+        ],
+        cancel: #selector(cancel),
+        accept: #selector(accept)
     )
-    private let hideField = NSTextField()
-    private var entryButtons: [NSButton] = []
-
-    /// Shows the editor and waits for it. Returns the changed list on OK, nil on Cancel.
-    static func run(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) -> Hotlist? {
-        let controller = HotlistEditorWindowController(hotlist, kernel: kernel, currentDirectory: currentDirectory)
-        let window = controller.dialog
-        window.center()
-        NSApplication.shared.runModal(for: window)
-        window.orderOut(nil)
-        return controller.result
-    }
+    /// The list of entries.
+    private var table: NSTableView { controls.table }
 
     /// The changed list after OK; nil before and after Cancel.
-    var result: Hotlist? { accepted ? hotlist : nil }
+    internal var result: Hotlist? { accepted ? hotlist : nil }
 
-    init(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) {
+    /// The path of the selected entry; nil when no line is selected.
+    private var selectedPath: Hotlist.Path? {
+        rows.indices.contains(table.selectedRow) ? rows[table.selectedRow].path : nil
+    }
+
+    /// Where a new entry goes: right below the selected line, which is inside a submenu when
+    /// that line is the submenu's title.
+    private var insertionPath: Hotlist.Path {
+        guard let path = selectedPath, let index = path.last, let entry = hotlist.entry(at: path) else {
+            return [hotlist.entries.count]
+        }
+        return entry.kind == .submenu ? path + [0] : Array(path.dropLast()) + [index + 1]
+    }
+
+    /// An editor of a copy of `hotlist`; new entries lead to `currentDirectory`.
+    internal init(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) {
         self.hotlist = hotlist
         self.kernel = kernel
         proposedCommand = "cd " + kernel.fileSystems.displayPath(currentDirectory)
@@ -72,94 +79,65 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         dialog = window
         super.init(window: window)
         window.delegate = self
-        buildContent(in: window)
+        connectControls()
+        window.contentView = controls.content
         reload(selecting: hotlist.rows.first?.path)
     }
 
+    /// Not used: the editor is made in code.
     @available(*, unavailable)
-    required init?(coder _: NSCoder) { fatalError("not used") }
+    internal required init?(coder _: NSCoder) { fatalError("not used") }
 
-    // MARK: Layout
+    /// Shows the editor and waits for it.
+    ///
+    /// Returns the changed list on OK, nil on Cancel.
+    internal static func run(_ hotlist: Hotlist, kernel: Kernel, currentDirectory: URL) -> Hotlist? {
+        let controller = HotlistEditorWindowController(hotlist, kernel: kernel, currentDirectory: currentDirectory)
+        let window = controller.dialog
+        window.center()
+        NSApplication.shared.runModal(for: window)
+        window.orderOut(nil)
+        return controller.result
+    }
 
-    private func buildContent(in window: NSWindow) {
-        table.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("entry")))
-        table.headerView = nil
-        table.rowHeight = 18
-        table.style = .plain
+    /// A line of the editor's list: indented by its depth, submenus with a mark of their own.
+    nonisolated internal static func title(of row: Hotlist.Row) -> String {
+        let indent = String(repeating: "      ", count: row.depth)
+        switch row.entry.kind {
+        case .separator:
+            return indent + HotlistMenu.separatorTitle
+
+        case .submenu:
+            return indent + "▾ " + row.entry.title
+
+        case .item:
+            return indent + row.entry.title
+        }
+    }
+
+    // MARK: Controls
+
+    /// Makes the editor the target of the buttons, the list's data source and delegate and the fields' delegate.
+    private func connectControls() {
+        for button in controls.buttons {
+            button.target = self
+        }
+        controls.hideBox.action = #selector(hidingChanged)
+        controls.hideBox.state = hotlist.hidesMarked ? .on : .off
+        controls.hideField.stringValue = hotlist.hideCharacter
         table.dataSource = self
         table.delegate = self
         table.target = self
         table.doubleAction = #selector(toggleHidden)
-        table.onKey = { [weak self] event in self?.handleKey(event) == true }
-        let scroll = NSScrollView()
-        scroll.documentView = table
-        scroll.hasVerticalScroller = true
-        scroll.borderType = .bezelBorder
-
-        func button(_ title: String, _ action: Selector) -> NSButton {
-            let button = NSButton(title: title, target: self, action: action)
-            button.widthAnchor.constraint(equalToConstant: 140).isActive = true
-            return button
+        controls.table.onKey = { [weak self] event in self?.handleKey(event) == true }
+        for field in [controls.commandField, controls.targetField, controls.hideField] {
+            field.delegate = self
         }
-        let add = [
-            button("Add Item…", #selector(addItem)), button("Add Submenu…", #selector(addSubmenu)),
-            button("Add Separator", #selector(addSeparator))
-        ]
-        entryButtons = [
-            button("Delete Item", #selector(deleteEntry)), button("Change Title…", #selector(changeTitle)),
-            button("Move Up", #selector(moveEntryUp)), button("Move Down", #selector(moveEntryDown))
-        ]
-        let buttons = NSStackView(views: add + entryButtons)
-        buttons.orientation = .vertical
-        buttons.alignment = .leading
-        let top = NSStackView(views: [scroll, buttons])
-        top.alignment = .top
-
-        commandField.placeholderString = "cd /path/to/folder   (or the name of a command, e.g. cm_GoToRoot)"
-        targetField.placeholderString = "optional: a path shown in the other panel at the same time"
-        hideField.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        hideField.stringValue = hotlist.hideCharacter
-        hideBox.state = hotlist.hidesMarked ? .on : .off
-        hideBox.target = self
-        hideBox.action = #selector(hidingChanged)
-        for field in [commandField, targetField, hideField] { field.delegate = self }
-        func label(_ text: String) -> NSTextField {
-            let label = NSTextField(labelWithString: text)
-            label.alignment = .right
-            return label
-        }
-        let fields = NSGridView(views: [[label("Command:"), commandField], [label("Target path:"), targetField]])
-        fields.column(at: 0).xPlacement = .trailing
-        let hiding = NSStackView(views: [hideBox, hideField])
-        let hint = NSTextField(
-            labelWithString: "Double click a menu item to hide or show it. Shift+↑ and Shift+↓ move it."
-        )
-        hint.textColor = .secondaryLabelColor
-
-        let ok = NSButton(title: "OK", target: self, action: #selector(accept))
-        ok.keyEquivalent = "\r"
-        let footer = NSStackView(views: [
-            numberLabel, NSView(), NSButton(title: "Cancel", target: self, action: #selector(cancel)), ok
-        ])
-        numberLabel.textColor = .secondaryLabelColor
-
-        let stack = NSStackView(views: [top, fields, hiding, hint, footer])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 10
-        stack.edgeInsets = NSEdgeInsets(top: 14, left: 14, bottom: 12, right: 14)
-        for part in [top, fields, footer] as [NSView] {
-            part.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -28).isActive = true
-        }
-        window.contentView = stack
     }
 
     // MARK: The list
 
-    private var selectedPath: Hotlist.Path? {
-        rows.indices.contains(table.selectedRow) ? rows[table.selectedRow].path : nil
-    }
-
+    /// Shows the list again, with the line of `path` selected.
     private func reload(selecting path: Hotlist.Path?) {
         rows = hotlist.rows
         table.reloadData()
@@ -170,27 +148,23 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         showSelection()
     }
 
+    /// Shows the command and target of the selected entry and enables what can be done with it.
     private func showSelection() {
         let entry = selectedPath.flatMap(hotlist.entry(at:))
         let item = entry?.kind == .item ? entry : nil
-        commandField.stringValue = item?.command ?? ""
-        targetField.stringValue = item?.target ?? ""
-        commandField.isEnabled = item != nil
-        targetField.isEnabled = item != nil
-        entryButtons.forEach { $0.isEnabled = entry != nil }
-        entryButtons[1].isEnabled = entry != nil && entry?.kind != .separator
-        numberLabel.stringValue = rows.isEmpty ? "" : "Entry \(table.selectedRow + 1) of \(rows.count)"
-    }
-
-    /// Where a new entry goes: right below the selected line, which is inside a submenu when
-    /// that line is the submenu's title.
-    private var insertionPath: Hotlist.Path {
-        guard let path = selectedPath, let index = path.last, let entry = hotlist.entry(at: path) else {
-            return [hotlist.entries.count]
+        controls.commandField.stringValue = item?.command ?? ""
+        controls.targetField.stringValue = item?.target ?? ""
+        controls.commandField.isEnabled = item != nil
+        controls.targetField.isEnabled = item != nil
+        for button in controls.entryButtons {
+            button.isEnabled = entry != nil
         }
-        return entry.kind == .submenu ? path + [0] : Array(path.dropLast()) + [index + 1]
+        // "Change Title…": a separator has none.
+        controls.entryButtons[1].isEnabled = entry != nil && entry?.kind != .separator
+        controls.numberLabel.stringValue = rows.isEmpty ? "" : "Entry \(table.selectedRow + 1) of \(rows.count)"
     }
 
+    /// Puts `entry` below the selected line, or tells the user the list is full.
     private func add(_ entry: HotlistEntry) {
         guard let path = hotlist.insert(entry, at: insertionPath) else {
             kernel.interaction.inform(
@@ -203,7 +177,9 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         reload(selecting: path)
     }
 
-    @objc private func addItem() {
+    /// "Add Item…": asks for a title; the entry leads to the source panel's directory.
+    @objc
+    private func addItem() {
         guard
             let title = kernel.interaction.prompt(
                 "Title of the new entry:",
@@ -215,49 +191,76 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         add(.titled(title, command: proposedCommand))
     }
 
-    @objc private func addSubmenu() {
-        guard let title = kernel.interaction.prompt("Title of the new submenu:"), !title.isEmpty else { return }
+    /// "Add Submenu…": asks for a title and adds an empty submenu.
+    @objc
+    private func addSubmenu() {
+        guard let title = kernel.interaction.prompt("Title of the new submenu:"), !title.isEmpty else {
+            return
+        }
         add(.submenu(title))
     }
 
-    @objc private func addSeparator() {
+    /// "Add Separator".
+    @objc
+    private func addSeparator() {
         add(.separator)
     }
 
-    @objc private func deleteEntry() {
-        guard let path = selectedPath else { return }
+    /// "Delete Item": removes the selected entry; the line that takes its place is selected.
+    @objc
+    private func deleteEntry() {
+        guard let path = selectedPath else {
+            return
+        }
         let row = table.selectedRow
         hotlist.remove(at: path)
         rows = hotlist.rows
         reload(selecting: rows.isEmpty ? nil : rows[min(row, rows.count - 1)].path)
     }
 
-    @objc private func changeTitle() {
+    /// "Change Title…": asks for a new title of the selected entry.
+    @objc
+    private func changeTitle() {
         guard let path = selectedPath, let entry = hotlist.entry(at: path), entry.kind != .separator,
             let title = kernel.interaction.prompt("New title:", value: entry.title), !title.isEmpty
         else { return }
-        hotlist.update(at: path) { $0.title = title }
+        hotlist.update(at: path) { entry in entry.title = title }
         reload(selecting: path)
     }
 
-    @objc private func moveEntryUp() { move(-1) }
-    @objc private func moveEntryDown() { move(1) }
+    /// "Move Up" and Shift+Up.
+    @objc
+    private func moveEntryUp() { move(-1) }
 
+    /// "Move Down" and Shift+Down.
+    @objc
+    private func moveEntryDown() { move(1) }
+
+    /// Moves the selected entry one line (`Hotlist.move(at:by:)`).
     private func move(_ direction: Int) {
-        guard let path = selectedPath else { return }
+        guard let path = selectedPath else {
+            return
+        }
         reload(selecting: hotlist.move(at: path, by: direction))
     }
 
-    @objc private func toggleHidden() {
-        guard let path = selectedPath else { return }
+    /// A double click: hides or shows the selected entry.
+    @objc
+    private func toggleHidden() {
+        guard let path = selectedPath else {
+            return
+        }
         hotlist.toggleHideMark(at: path)
         reload(selecting: path)
     }
 
-    @objc private func hidingChanged() {
-        hotlist.hidesMarked = hideBox.state == .on
+    /// The hiding check box was clicked.
+    @objc
+    private func hidingChanged() {
+        hotlist.hidesMarked = controls.hideBox.state == .on
     }
 
+    /// Shift+Up, Shift+Down and Delete in the list; false for any other key.
     private func handleKey(_ event: NSEvent) -> Bool {
         if Shortcut(.upArrow, .shift).matches(event) {
             move(-1)
@@ -272,28 +275,30 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     /// The fields below the list belong to the selected entry and are taken over as typed.
-    func controlTextDidChange(_ notification: Notification) {
+    internal func controlTextDidChange(_ notification: Notification) {
         let field = notification.object as? NSTextField
-        if field === hideField {
+        if field === controls.hideField {
             // Any character but the dash, which already means separators and submenus.
-            let character = String(hideField.stringValue.prefix(1))
+            let character = String(controls.hideField.stringValue.prefix(1))
             hotlist.hideCharacter = character == "-" ? "" : character
         } else if let path = selectedPath {
             // The command field, or else the target path's.
             hotlist.update(at: path) { entry in
-                if field === commandField {
-                    entry.command = commandField.stringValue
+                if field === controls.commandField {
+                    entry.command = controls.commandField.stringValue
                 } else {
-                    entry.target = targetField.stringValue
+                    entry.target = controls.targetField.stringValue
                 }
             }
             rows = hotlist.rows
         }
     }
 
-    func numberOfRows(in _: NSTableView) -> Int { rows.count }
+    /// One row per line of the list.
+    internal func numberOfRows(in _: NSTableView) -> Int { rows.count }
 
-    func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
+    /// The cell of a line: its title, indented by its depth (`title(of:)`).
+    internal func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("entry")
         let cell =
             tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
@@ -307,36 +312,34 @@ final class HotlistEditorWindowController: NSWindowController, NSWindowDelegate,
         return cell
     }
 
-    /// A line of the editor's list: indented by its depth, submenus with a mark of their own.
-    nonisolated static func title(of row: Hotlist.Row) -> String {
-        let indent = String(repeating: "      ", count: row.depth)
-        switch row.entry.kind {
-        case .separator: return indent + HotlistMenu.separatorTitle
-        case .submenu: return indent + "▾ " + row.entry.title
-        case .item: return indent + row.entry.title
-        }
-    }
-
-    func tableViewSelectionDidChange(_: Notification) {
+    /// Another line was selected: the fields show its entry.
+    internal func tableViewSelectionDidChange(_: Notification) {
         showSelection()
     }
 
     // MARK: Result
 
-    @objc private func accept() {
+    /// OK: the changed list is handed back.
+    @objc
+    private func accept() {
         // A field that is still being edited hands in its text first.
         window?.makeFirstResponder(nil)
         accepted = true
         close()
     }
 
-    @objc private func cancel() {
+    /// Cancel: nothing is handed back.
+    @objc
+    private func cancel() {
         close()
     }
 
-    func windowWillClose(_: Notification) {
+    /// Ends the modal loop of the dialog, if it runs in one.
+    internal func windowWillClose(_: Notification) {
         // Only the loop this window runs in is ended: a stop without one would end whatever
         // loop the main thread runs.
-        if NSApplication.shared.modalWindow === window { NSApplication.shared.stopModal() }
+        if NSApplication.shared.modalWindow === window {
+            NSApplication.shared.stopModal()
+        }
     }
 }

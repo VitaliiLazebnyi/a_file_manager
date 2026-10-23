@@ -94,7 +94,9 @@ internal struct CoverageFolderTabs {
         #expect(paths(left) == ["/A/docs"] && left.model.sort == ListOrder(key: .name, descending: true))
     }
 
-    /// Loading asks for the file; cancelled, nothing is loaded. A folder is not a tab file.
+    /// Loading asks for the file; cancelled, nothing is loaded.
+    ///
+    /// A folder is not a tab file.
     @Test
     internal func loadingIsCancelledOrRefusesAFolder() {
         dialogs.promptAnswers = [.cancel]

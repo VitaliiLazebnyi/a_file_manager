@@ -1,5 +1,3 @@
-import AFMKernel
-import Foundation
 import TestSupport
 import Testing
 
@@ -122,7 +120,8 @@ internal struct CovNetSFTPLogin {
         let bench = try CovNetSFTPBench()
         let session = SFTPSession(
             profile: ConnectionProfile(key: bench.key, user: "-oProxyCommand=touch"),
-            environment: bench.environment
+            environment: bench.environment,
+            transport: nil
         )
         let error = #expect(throws: NetworkError.self) { _ = try session.connect(cancellation: nil) }
         #expect(CovNetErrorKind(error) == .loginFailed)

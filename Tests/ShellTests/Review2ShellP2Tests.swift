@@ -1,7 +1,6 @@
-import AFMContracts
 import AFMKernel
-import AppKit
-import StandardPlugins
+import Dispatch
+import Foundation
 import TestSupport
 import Testing
 

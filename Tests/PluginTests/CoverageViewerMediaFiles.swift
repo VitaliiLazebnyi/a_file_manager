@@ -69,45 +69,6 @@ internal enum CoverageViewerMediaFiles {
         try finish(writer)
     }
 
-    /// A film of `frames` frames, a tenth of a second each, without sound.
-    internal static func film(at url: URL, frames: Int) throws {
-        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-        let input = AVAssetWriterInput(
-            mediaType: .video,
-            outputSettings: [AVVideoCodecKey: AVVideoCodecType.jpeg, AVVideoWidthKey: 64, AVVideoHeightKey: 48]
-        )
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-            assetWriterInput: input,
-            sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-        )
-        writer.add(input)
-        guard writer.startWriting() else {
-            throw Failure.notMade
-        }
-        writer.startSession(atSourceTime: .zero)
-        for frame in 0..<frames {
-            var buffer: CVPixelBuffer?
-            CVPixelBufferCreate(nil, 64, 48, kCVPixelFormatType_32BGRA, nil, &buffer)
-            guard let buffer else {
-                throw Failure.notMade
-            }
-            CVPixelBufferLockBaseAddress(buffer, [])
-            if let base = CVPixelBufferGetBaseAddress(buffer) {
-                memset(base, Int32(frame * 40), CVPixelBufferGetDataSize(buffer))
-            }
-            CVPixelBufferUnlockBaseAddress(buffer, [])
-            while !input.isReadyForMoreMediaData {
-                Thread.sleep(forTimeInterval: 0.001)
-            }
-            guard adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: 10)) else {
-                throw Failure.notMade
-            }
-        }
-        input.markAsFinished()
-        writer.endSession(atSourceTime: CMTime(value: CMTimeValue(frames), timescale: 10))
-        try finish(writer)
-    }
-
     private static func item(_ identifier: AVMetadataIdentifier, _ value: AnyObject) -> AVMetadataItem {
         let item = AVMutableMetadataItem()
         item.identifier = identifier

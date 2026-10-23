@@ -1,5 +1,3 @@
-import Foundation
-
 @testable import NetworkPlugin
 
 /// Scripts made of fixed answers, connections to the server, and what errors carry.
@@ -64,13 +62,13 @@ extension CoverageNetworkServer {
     internal func connection(_ change: (inout FTPServerConfig) -> Void) -> FTPConnection {
         var config = FTPServerConfig(host: "127.0.0.1", port: port, timeout: 10)
         change(&config)
-        return FTPConnection(config: config, trust: CertificateTrust())
+        return FTPConnection(config: config, trust: CertificateTrust(), parts: .init())
     }
 
     /// A connection to this server, logged in; `change` adjusts its settings.
     internal func connected(_ change: (inout FTPServerConfig) -> Void) throws -> FTPConnection {
         let connection = connection(change)
-        try connection.connect()
+        try connection.connect(cancellation: nil)
         return connection
     }
 

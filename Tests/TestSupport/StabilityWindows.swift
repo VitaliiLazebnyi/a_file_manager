@@ -1,8 +1,10 @@
 public import AppKit
 
 /// Watches the windows of the test process from the moment it is made: which of the windows
-/// opened since then came on screen, and which are still open. Tests run in the session the
-/// owner watches, so a test must never show a window and must close every window it opens.
+/// opened since then came on screen, and which are still open.
+///
+/// Tests run in the session the owner watches, so a test must never show a window and must close
+/// every window it opens.
 ///
 /// A suite makes one in its `init`, naming the windows of its subject (the tests of other suites
 /// run at the same time and open windows of their own), and at the end of each test expects
@@ -29,8 +31,9 @@ public final class StabilityWindows {
     public var openTitles: [String] { open.map(\.title) }
 
     /// Starts watching the windows `isWatched` says yes to: those of the test's subject only.
-    /// (Watching all of them, a test counted the windows of the tests running beside it as its
-    /// own, failed, and closed them under their tests.)
+    ///
+    /// (Watching all of them, a test counted the windows of the tests running beside it as its own,
+    /// failed, and closed them under their tests.).
     public init(_ isWatched: @escaping (NSWindow) -> Bool) {
         self.isWatched = isWatched
         earlier = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))

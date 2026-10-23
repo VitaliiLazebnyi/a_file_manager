@@ -63,8 +63,9 @@ public final class Kernel {
             work: @escaping @Sendable (any JobMonitor) -> Result,
             completion: @escaping @MainActor (Result) -> Void
         ) {
-            service.run(title: title, work: work) { [weak kernel] result in
-                if kernel != nil { completion(result) }
+            weak let owner = kernel
+            service.run(title: title, work: work) { result in
+                if owner != nil { completion(result) }
             }
         }
 
@@ -139,8 +140,9 @@ public final class Kernel {
     ///
     /// Available to command handlers, not while a plugin starts.
     public var panels: any PanelSet { attachedShell.panels }
-    /// Runs long work with a progress window. A job's completion is not called once the kernel
-    /// has gone.
+    /// Runs long work with a progress window.
+    ///
+    /// A job's completion is not called once the kernel has gone.
     public var jobs: any JobService { LivingJobs(attachedShell.jobs, of: self) }
 
     private var attachedShell: any ShellServices {

@@ -2,11 +2,13 @@ import AFMKernel
 import Foundation
 
 /// File › Save as: what is shown, written to a file of the user's choice.
-enum ViewerSave {
+internal enum ViewerSave {
     /// Whether `target` is the file `viewed` (the same inode, or the same place when the target
     /// does not exist yet): saving onto it would replace what is being read.
-    static func isSameFile(_ viewed: URL?, _ target: URL) -> Bool {
-        guard let viewed, viewed.isFileURL, target.isFileURL else { return false }
+    internal static func isSameFile(_ viewed: URL?, _ target: URL) -> Bool {
+        guard let viewed, viewed.isFileURL, target.isFileURL else {
+            return false
+        }
         var first = stat()
         var second = stat()
         if stat(viewed.path, &first) == 0, stat(target.path, &second) == 0 {
@@ -19,13 +21,19 @@ enum ViewerSave {
     /// Writes the whole `source` to `target`: into a new file beside it that is then moved onto
     /// it, so a target that is being read, or a copy that stops half way (the file became
     /// shorter, the disk is full, the job is cancelled), never leaves a half-written file in
-    /// place of a whole one. Blocks. `progress` is given the bytes written.
-    static func save(
-        _ source: any ByteSource, to target: URL, cancellation: CancellationFlag, progress: (Int64) -> Void = { _ in }
+    /// place of a whole one.
+    ///
+    /// Blocks. `progress` is given the bytes written.
+    internal static func save(
+        _ source: any ByteSource,
+        to target: URL,
+        cancellation: CancellationFlag,
+        progress: (Int64) -> Void
     ) throws {
         let folder = target.deletingLastPathComponent()
         let temporary = folder.appendingPathComponent(
-            ".\(target.lastPathComponent).afm-saving-\(UUID().uuidString.prefix(8))")
+            ".\(target.lastPathComponent).afm-saving-\(UUID().uuidString.prefix(8))"
+        )
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
         guard descriptor >= 0 else {
             throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: folder.path])
@@ -54,7 +62,8 @@ enum ViewerSave {
                 .fileWriteUnknown,
                 userInfo: [
                     NSFilePathErrorKey: target.path, NSLocalizedFailureReasonErrorKey: String(cString: strerror(errno))
-                ])
+                ]
+            )
         }
         finished = true
     }

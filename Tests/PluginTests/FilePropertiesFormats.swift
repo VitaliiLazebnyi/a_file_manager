@@ -127,7 +127,7 @@ internal struct FilePropertiesFormats {
         #expect(TimestampChange(date: "", time: "25:00") == nil && TimestampChange(date: "x-1-y", time: "") != nil)
         #expect(TimestampChange(date: "", time: "")?.changesNothing == true)
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        #expect(TimestampChange.current.applied(to: original, now: now) == now)
+        #expect(TimestampChange.current.applied(to: original, now: now, calendar: .current) == now)
     }
 
     /// The parameters of the command read as Total Commander's; wrong ones are refused.
@@ -135,12 +135,13 @@ internal struct FilePropertiesFormats {
     internal func readsCommandParameters() throws {
         let parsed = try #require(AttributeChange.parse(parameters: "= +h -r +f +m640 +a -s +d2020-01-02 +t03:04"))
         #expect(
-            parsed.applyAtOnce && parsed.change.hidden == true && parsed.change.locked == false && parsed.change.recurse
+            parsed.applyAtOnce && parsed.change.hidden == .set && parsed.change.locked == .clear
+                && parsed.change.recurse
         )
         #expect(parsed.change.permissions == .absolute(0o640, keepingSpecialBits: false))
         #expect(parsed.change.timestamp?.parts == [2_020, 1, 2, 3, 4, 0])
         let dialog = try #require(AttributeChange.parse(parameters: "-h +mu+x"))
-        #expect(!dialog.applyAtOnce && dialog.change.hidden == false && dialog.change.timestamp == nil)
+        #expect(!dialog.applyAtOnce && dialog.change.hidden == .clear && dialog.change.timestamp == nil)
         // `+c +t`: the current date, and the time as it is.
         let dateOnly = try #require(AttributeChange.parse(parameters: "=+c +t"))
         #expect(

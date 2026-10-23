@@ -26,7 +26,7 @@ internal struct CoverageArchivesFormatsPack {
     }
 
     private func names(in archive: URL) throws -> [String] {
-        try bench.store.archive(at: archive).entries.map(\.path).sorted()
+        try bench.store.archive(at: archive, cancellation: nil).entries.map(\.path).sorted()
     }
 
     /// The archive of one operand is named after it: a file without its extension, a file
@@ -46,7 +46,7 @@ internal struct CoverageArchivesFormatsPack {
     internal func aLinkToAFolderElsewhereIsLeftOut() throws {
         let link = FileItem(url: bench.memory.url("link"), name: "link", kind: [.directory, .symlink])
         let archive = box.url("links.zip")
-        let result = packer(bench.monitor).run([link], archive: archive)
+        let result = packer(bench.monitor).run([link], archive: archive, innerFolder: "")
         #expect(result.failure == nil && result.archives == [archive])
         #expect(try names(in: archive).isEmpty)
     }
@@ -58,7 +58,7 @@ internal struct CoverageArchivesFormatsPack {
         try FileManager.default.createSymbolicLink(atPath: box.url("tree/link").path, withDestinationPath: "target.txt")
         let archive = box.url("links." + format.defaultExtension)
         try bench.pack([box.url("tree")], to: archive) { $0.format = format }
-        let entry = try #require(try bench.store.archive(at: archive).entry("tree/link"))
+        let entry = try #require(try bench.store.archive(at: archive, cancellation: nil).entry("tree/link"))
         #expect(entry.isSymbolicLink)
         #expect(try bench.read(bench.inside(archive, "tree/link")) == Data("target.txt".utf8))
     }
@@ -72,11 +72,11 @@ internal struct CoverageArchivesFormatsPack {
         try bench.pack([old], to: archive) { $0.format = .tar }
         let declined = packer(bench.monitor) { $0.format = .tar }
         declined.confirmReplace = { _ in false }
-        #expect(declined.run([try bench.item(new)], archive: archive).cancelled)
+        #expect(declined.run([try bench.item(new)], archive: archive, innerFolder: "").cancelled)
         #expect(try names(in: archive) == ["old.txt"])
         let agreed = packer(bench.monitor) { $0.format = .tar }
         agreed.confirmReplace = { _ in true }
-        #expect(agreed.run([try bench.item(new)], archive: archive).failure == nil)
+        #expect(agreed.run([try bench.item(new)], archive: archive, innerFolder: "").failure == nil)
         #expect(try names(in: archive) == ["new.txt"])
     }
 
@@ -84,7 +84,8 @@ internal struct CoverageArchivesFormatsPack {
     @Test
     internal func archivesOfAForeignTypeAreRefused() throws {
         let file = try bench.item(try box.file("a.txt"))
-        let result = packer(bench.monitor) { $0.format = .foreign }.run([file], archive: box.url("a.rar"))
+        let result = packer(bench.monitor) { $0.format = .foreign }
+            .run([file], archive: box.url("a.rar"), innerFolder: "")
         #expect(
             result.failure?.localizedDescription
                 == ArchiveError.unsupported("Creating archives of this type").errorDescription
@@ -109,7 +110,7 @@ internal struct CoverageArchivesFormatsPack {
         let url = try box.file("short.txt", "abc")
         let claimed = FileItem(url: url, name: "short.txt", stat: FileItem.Stat(size: 6))
         let archive = box.url("short.tar")
-        let result = packer(bench.monitor) { $0.format = .tar }.run([claimed], archive: archive)
+        let result = packer(bench.monitor) { $0.format = .tar }.run([claimed], archive: archive, innerFolder: "")
         #expect(result.failure == nil)
         #expect(try bench.read(bench.inside(archive, "short.txt")) == Data("abc".utf8) + Data(count: 3))
     }
@@ -127,7 +128,8 @@ internal struct CoverageArchivesFormatsPack {
         // While the file is read, the folder stops taking new names.
         monitor.whenReporting { _ in chmod(folder.path, 0o555) }
         defer { chmod(folder.path, 0o755) }
-        let result = packer(monitor) { $0.format = addsToZip ? .zip : .tar }.run([source], archive: archive)
+        let result = packer(monitor) { $0.format = addsToZip ? .zip : .tar }
+            .run([source], archive: archive, innerFolder: "")
         // (The message names the archive where it really lies.)
         let named = [archive.path, Durable.realFile(archive).path].map { Support.systemError(EACCES, $0) }
         #expect(named.contains(result.failure?.localizedDescription ?? ""))
@@ -154,7 +156,7 @@ internal struct CoverageArchivesFormatsPack {
             try? handle?.close()
         }
         let source = try bench.item(try box.file("second.txt"))
-        let result = packer(monitor).run([source], archive: archive)
+        let result = packer(monitor).run([source], archive: archive, innerFolder: "")
         #expect(
             result.failure?.localizedDescription == ArchiveError.changedOutside("changing.zip").errorDescription
         )
@@ -168,18 +170,25 @@ internal struct CoverageArchivesFormatsPack {
     internal func membersWithNamesThatCannotBeShownStay(clones: Bool) throws {
         bench.environment.clonesArchives = clones
         let archive = box.url("odd.zip")
-        let output = try OutputFile(creating: archive)
-        let packer = ZipPacker(output, level: 0)
-        let odd = ZipRecord.new(name: "../odd.txt", isDirectory: false, modified: Date(), permissions: 0o644)
+        let output = try OutputFile(creating: archive, mode: 0o600)
+        let packer = ZipPacker(output, level: 0, password: nil, encryption: .aes256, limits: .standard)
+        let odd = ZipRecord.new(
+            name: "../odd.txt",
+            isDirectory: false,
+            modified: Date(),
+            permissions: 0o644,
+            isSymbolicLink: false
+        )
         var sent = false
-        try packer.add(odd, expectedSize: 3) {
+        try packer.add(odd, expectedSize: 3, stored: false) {
             defer { sent = true }
             return sent ? nil : Data("odd".utf8)
         }
-        try packer.finish()
-        try output.close()
+        try packer.finish(comment: Data())
+        try output.close(durably: false)
         try bench.pack([try box.file("new.txt")], to: archive)
-        let records = try ZipDirectory.read(try RandomAccessFile(archive)).records.map(\.name)
+        let records = try ZipDirectory.read(try RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil)
+            .records.map(\.name)
         #expect(records == ["../odd.txt", "new.txt"])
     }
 
@@ -218,7 +227,7 @@ internal struct CoverageArchivesFormatsPack {
             options.verifies = true
             options.movesSources = true
         }
-        .run([try bench.item(source)], archive: archive)
+        .run([try bench.item(source)], archive: archive, innerFolder: "")
         let reason = "kept.txt: " + ArchiveError.crcMismatch("kept.txt").localizedDescription
         #expect(
             result.failure?.localizedDescription

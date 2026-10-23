@@ -2,18 +2,6 @@ public import AFMContracts
 public import AFMKernel
 public import Foundation
 
-extension CommandID {
-    /// Branch view of the selected folders only (spec 03 › Selected branch).
-    static let branchViewSelected: CommandID = "cm_DirBranchSel"
-    static let leftBranchView: CommandID = "cm_LeftDirBranch"
-    static let rightBranchView: CommandID = "cm_RightDirBranch"
-    static let leftBranchViewSelected: CommandID = "cm_LeftDirBranchSel"
-    static let rightBranchViewSelected: CommandID = "cm_RightDirBranchSel"
-    /// `.location` or `.text`: a text file with one path per line, shown like a search result
-    /// (spec 09 › Feed to listbox, `LOADLIST`); without, the user is asked for the file.
-    static let loadFileList: CommandID = "LOADLIST"
-}
-
 /// Branch view and file lists shown as folders (spec 03 › Branch view, 09 › Feed to listbox).
 ///
 /// The plugin provides the `vfolder:` file system, the commands that put a panel into branch
@@ -21,102 +9,46 @@ extension CommandID {
 /// show (Find Files). Commands and the service are used on the main thread; reading happens in
 /// the file system, on the panel's background threads.
 public final class VirtualFoldersPlugin: Plugin, FileListService {
+    /// A branch view command of one side, which works on that panel whichever is the source.
+    private struct SidedCommand {
+        /// The branch view commands of the left and the right panel.
+        static let all: [Self] = [
+            Self(id: .leftBranchView, title: "Left: Branch View", isLeft: true, selectedOnly: false),
+            Self(id: .rightBranchView, title: "Right: Branch View", isLeft: false, selectedOnly: false),
+            Self(
+                id: .leftBranchViewSelected,
+                title: "Left: Branch View of Selected Folders",
+                isLeft: true,
+                selectedOnly: true
+            ),
+            Self(
+                id: .rightBranchViewSelected,
+                title: "Right: Branch View of Selected Folders",
+                isLeft: false,
+                selectedOnly: true
+            )
+        ]
+
+        let id: CommandID
+        let title: String
+        let isLeft: Bool
+        let selectedOnly: Bool
+    }
+
+    /// The setting that has branch views list the folders too.
+    internal static let listsFoldersKey = "virtualFolders.listsFolders"
+    /// The setting that has branch views walk into packages.
+    internal static let entersPackagesKey = "virtualFolders.entersPackages"
+
+    /// The plugin's name, which the settings and the plugin list know it by.
     public let name = "VirtualFolders"
-    static let listsFoldersKey = "virtualFolders.listsFolders"
-    static let entersPackagesKey = "virtualFolders.entersPackages"
 
     /// The file system this plugin provides; nil until the plugin has started.
     public private(set) var fileSystem: VirtualFileSystem?
 
-    public init() {}
-
-    public func start(in owner: Kernel) {
-        // The kernel keeps what is registered here; it must not be kept by it in turn.
-        unowned let kernel = owner
-        let fileSystem = VirtualFileSystem(fileSystems: kernel.fileSystems)
-        self.fileSystem = fileSystem
-        kernel.fileSystems.register(fileSystem)
-        kernel.services.register((any FileListService).self, self)
-        Self.applyOptions(kernel.settings, to: fileSystem)
-
-        let commands = kernel.commands
-        let source = { kernel.panels.source }
-        let isVirtual = { (panel: (any PanelHandle)) in VirtualLocation(panel.model.directory) != nil }
-        let isBranch = { (panel: (any PanelHandle)) -> Bool in
-            switch VirtualLocation(panel.model.directory) {
-            case .branch, .picked: return true
-            default: return false
-            }
-        }
-
-        commands.register(
-            Command(.branchView, "Branch View (With Subdirs)", [Shortcut(.character("b"), .control)]),
-            checked: { isBranch(source()) },
-            parameterized: { [self] in
-                setBranchView($0, in: source(), selectedOnly: false, kernel: kernel, fileSystem: fileSystem)
-            }
-        )
-        commands.register(
-            Command(
-                .branchViewSelected,
-                "Branch View of Selected Folders",
-                [Shortcut(.character("b"), [.control, .shift])]
-            ),
-            enabled: { isVirtual(source()) || source().model.hasOperands },
-            parameterized: { [self] in
-                setBranchView($0, in: source(), selectedOnly: true, kernel: kernel, fileSystem: fileSystem)
-            }
-        )
-        let sided: [(CommandID, String, Bool, Bool)] = [
-            (.leftBranchView, "Left: Branch View", true, false),
-            (.rightBranchView, "Right: Branch View", false, false),
-            (.leftBranchViewSelected, "Left: Branch View of Selected Folders", true, true),
-            (.rightBranchViewSelected, "Right: Branch View of Selected Folders", false, true)
-        ]
-        for (id, title, isLeft, selectedOnly) in sided {
-            let panel = { isLeft ? kernel.panels.left : kernel.panels.right }
-            commands.register(
-                Command(id, title),
-                checked: { isBranch(panel()) },
-                parameterized: { [self] in
-                    setBranchView($0, in: panel(), selectedOnly: selectedOnly, kernel: kernel, fileSystem: fileSystem)
-                }
-            )
-        }
-        commands.register(
-            Command(.loadFileList, "Load File List into Panel…"),
-            parameterized: { [self] in loadList($0, kernel: kernel) }
-        )
-
-        kernel.menus.add([.branchView, .branchViewSelected], to: .commandsPlaces)
-        kernel.toolbar.add(
-            .branchView,
-            symbol: "list.bullet.indent",
-            group: 30,
-            hint: "Show the files of this folder and of all its subfolders in one list."
-        )
-        kernel.toolbar.setSymbol("list.bullet.rectangle", for: .loadFileList)
-        kernel.preferences.add(
-            PreferencePage(
-                title: "Branch View",
-                preferences: [
-                    Preference(
-                        Self.listsFoldersKey,
-                        "List the folders too, not only the files in them",
-                        .flag(default: false)
-                    ),
-                    Preference(
-                        Self.entersPackagesKey,
-                        "Show the contents of packages (applications, bundles)",
-                        .flag(default: false)
-                    )
-                ],
-                onChange: {
-                    Self.applyOptions(kernel.settings, to: fileSystem)
-                    for panel in kernel.panels.all where isVirtual(panel) { panel.reload() }
-                }
-            )
-        )
+    /// A plugin that does nothing until it is started.
+    public init() {
+        // The file system is made by `start`, with the kernel's registry.
     }
 
     /// Hands the user's options to the file system, which reads them on background threads.
@@ -125,6 +57,63 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
             listsFolders: settings.flag(listsFoldersKey, default: false),
             entersPackages: settings.flag(entersPackagesKey, default: false)
         )
+    }
+
+    /// Whether the panel shows a virtual folder of any kind.
+    private static func isVirtual(_ panel: any PanelHandle) -> Bool {
+        VirtualLocation(panel.model.directory) != nil
+    }
+
+    /// Whether the panel shows a branch view or a selected branch, not a list.
+    private static func isBranch(_ panel: any PanelHandle) -> Bool {
+        switch VirtualLocation(panel.model.directory) {
+        case .branch, .picked:
+            return true
+
+        default:
+            return false
+        }
+    }
+
+    /// The Branch View page of the configuration dialog; a change is handed to the file system
+    /// and every panel that shows a virtual folder reads it again.
+    private static func preferencePage(owner: Kernel, fileSystem: VirtualFileSystem) -> PreferencePage {
+        unowned let kernel = owner
+        return PreferencePage(
+            title: "Branch View",
+            preferences: [
+                Preference(listsFoldersKey, "List the folders too, not only the files in them", .flag(default: false)),
+                Preference(
+                    entersPackagesKey,
+                    "Show the contents of packages (applications, bundles)",
+                    .flag(default: false)
+                )
+            ]
+        ) {
+            applyOptions(kernel.settings, to: fileSystem)
+            for panel in kernel.panels.all where isVirtual(panel) { panel.reload() }
+        }
+    }
+
+    /// Registers the file system, the list service, the commands and the preference page.
+    public func start(in owner: Kernel) {
+        // The kernel keeps what is registered here; it must not be kept by it in turn.
+        unowned let kernel = owner
+        let virtual = VirtualFileSystem(fileSystems: kernel.fileSystems)
+        fileSystem = virtual
+        kernel.fileSystems.register(virtual)
+        kernel.services.register((any FileListService).self, self)
+        Self.applyOptions(kernel.settings, to: virtual)
+        registerCommands(in: kernel, fileSystem: virtual)
+        kernel.menus.add([.branchView, .branchViewSelected], to: .commandsPlaces)
+        kernel.toolbar.add(
+            .branchView,
+            symbol: "list.bullet.indent",
+            group: 30,
+            hint: "Show the files of this folder and of all its subfolders in one list."
+        )
+        kernel.toolbar.setSymbol("list.bullet.rectangle", for: .loadFileList)
+        kernel.preferences.add(Self.preferencePage(owner: kernel, fileSystem: virtual))
     }
 
     // MARK: FileListService
@@ -136,13 +125,59 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
 
     /// With `isUnique` the list is not looked through for doubles (see `register(files:…isUnique:)`).
     public func show(_ files: [URL], title: String, in panel: any PanelHandle, isUnique: Bool) {
-        guard let fileSystem else { return }
+        guard let fileSystem else {
+            return
+        }
         let directory = panel.model.directory
         let origin = VirtualLocation(directory).map(\.realDirectory) ?? directory
         panel.show(fileSystem.register(files: files, title: title, origin: origin, isUnique: isUnique))
     }
 
     // MARK: Branch view
+
+    /// Registers the branch view commands of the source panel and of each side, and Load File List.
+    private func registerCommands(in owner: Kernel, fileSystem: VirtualFileSystem) {
+        unowned let kernel = owner
+        let commands = kernel.commands
+        let source = { kernel.panels.source }
+        commands.register(
+            Command(.branchView, "Branch View (With Subdirs)", [Shortcut(.character("b"), .control)]),
+            checked: { Self.isBranch(source()) },
+            parameterized: { [self] argument in
+                setBranchView(argument, in: source(), selectedOnly: false, kernel: kernel, fileSystem: fileSystem)
+            }
+        )
+        commands.register(
+            Command(
+                .branchViewSelected,
+                "Branch View of Selected Folders",
+                [Shortcut(.character("b"), [.control, .shift])]
+            ),
+            enabled: { Self.isVirtual(source()) || source().model.hasOperands },
+            parameterized: { [self] argument in
+                setBranchView(argument, in: source(), selectedOnly: true, kernel: kernel, fileSystem: fileSystem)
+            }
+        )
+        for sided in SidedCommand.all {
+            let panel = { sided.isLeft ? kernel.panels.left : kernel.panels.right }
+            commands.register(
+                Command(sided.id, sided.title),
+                checked: { Self.isBranch(panel()) },
+                parameterized: { [self] argument in
+                    setBranchView(
+                        argument,
+                        in: panel(),
+                        selectedOnly: sided.selectedOnly,
+                        kernel: kernel,
+                        fileSystem: fileSystem
+                    )
+                }
+            )
+        }
+        commands.register(Command(.loadFileList, "Load File List into Panel…")) { [self] argument in
+            loadList(argument, kernel: kernel)
+        }
+    }
 
     /// The commands take the specification's tri-state parameter (17 › Command parameters):
     /// none or 0 toggles, 1 switches on, 2 or -1 off.
@@ -156,12 +191,20 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         let location = VirtualLocation(panel.model.directory)
         let isOn = location != nil
         let wanted: Bool
-        switch argument.index ?? argument.text.flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) }) ?? 0 {
-        case 1: wanted = true
-        case 2, -1: wanted = false
-        default: wanted = !isOn
+        let state = argument.index ?? argument.text.flatMap { Int($0.trimmingCharacters(in: .whitespaces)) } ?? 0
+        switch state {
+        case 1:
+            wanted = true
+
+        case 2, -1:
+            wanted = false
+
+        default:
+            wanted = !isOn
         }
-        guard wanted != isOn else { return }
+        guard wanted != isOn else {
+            return
+        }
         if let location {
             leave(panel, location, kernel: kernel, fileSystem: fileSystem)
         } else {
@@ -169,11 +212,14 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         }
     }
 
+    /// Shows the branch view of the panel's directory, or of its selected items only.
     private func enter(_ panel: any PanelHandle, selectedOnly: Bool, fileSystem: VirtualFileSystem) {
         let model = panel.model
         if selectedOnly {
             let items = model.operands()
-            guard !items.isEmpty else { return }
+            guard !items.isEmpty else {
+                return
+            }
             panel.show(fileSystem.registerPicked(items.map(\.url), in: model.directory))
         } else {
             panel.show(fileSystem.branch(of: model.directory))
@@ -181,9 +227,10 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
     }
 
     /// Leaves the view for the real folder of the item under the cursor, with the cursor on
-    /// it (spec 03 › Branch view, "Leaving with Ctrl+B"). On `[..]` the panel goes back to the
-    /// directory the view was made from; after a selected branch, the items it was made from
-    /// are selected again.
+    /// it (spec 03 › Branch view, "Leaving with Ctrl+B").
+    ///
+    /// On `[..]` the panel goes back to the directory the view was made from; after a selected
+    /// branch, the items it was made from are selected again.
     private func leave(
         _ panel: any PanelHandle,
         _ location: VirtualLocation,
@@ -203,7 +250,9 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         }
         func show(selecting names: [String]) {
             panel.show(directory, focus: names.last, history: .record) { worked in
-                guard worked, tab.directory.isSameLocation(as: directory) else { return }
+                guard worked, tab.directory.isSameLocation(as: directory) else {
+                    return
+                }
                 tab.setSelected(true, names: names)
             }
         }
@@ -217,7 +266,7 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
         kernel.jobs.run(
             title: "Leave selected branch",
             work: { _ in
-                (fileSystem.entries(of: virtual) ?? []).map(\.lastPathComponent)
+                fileSystem.entries(of: virtual).map(\.lastPathComponent)
             },
             completion: { names in show(selecting: names) }
         )
@@ -225,6 +274,8 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
 
     // MARK: Lists from files
 
+    /// Load File List: reads the list file named by the argument (or typed by the user) in the
+    /// background and shows its files in the source panel.
     private func loadList(_ argument: CommandArgument, kernel: Kernel) {
         let panel = kernel.panels.source
         let base = VirtualLocation(panel.model.directory).map(\.realDirectory) ?? panel.model.directory
@@ -245,157 +296,17 @@ public final class VirtualFoldersPlugin: Plugin, FileListService {
             },
             completion: { [self] result in
                 switch result {
-                case .success(let files): show(files, title: FileItem.split(file.lastPathComponent).base, in: panel)
+                case .success(let files):
+                    show(files, title: FileItem.split(file.lastPathComponent).base, in: panel)
+
                 case .failure(let error):
                     kernel.interaction.report(error, title: "The list of files could not be loaded.")
                 }
             }
         )
     }
-}
 
-/// A text file that names one file per line (spec 19 › List files). Lines are full paths or
-/// paths relative to a base directory; empty lines are skipped.
-///
-/// A name that holds a line break or another control character, or starts or ends with a
-/// space or a quote, cannot stand on a line as it is. It is written in quotes with backslash
-/// escapes (`"a\nb"`: `\\`, `\"`, `\n`, `\r`, `\t` and `\u{XXXX}`), and a quoted line is read
-/// back that way. Every other line is read as it stands, so list files made without quoting
-/// (and names with backslashes in them) keep their meaning.
-public enum FileListFile {
-    /// The most a list file may hold (bytes) and name (lines): more is not a list a person made.
-    public static let sizeLimit = 16 << 20
-    public static let lineLimit = 1_000_000
-
-    public struct TooLarge: LocalizedError {
-        public var errorDescription: String? { "The list of files is too large to load." }
-    }
-
-    /// The lines of a list file. UTF-8 with or without a byte-order mark and UTF-16 with one
-    /// are read; line ends may be LF or CRLF.
-    public static func lines(in data: Data) -> [String] {
-        let text: String?
-        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
-            text = String(data: data, encoding: .utf16)
-        } else {
-            text =
-                String(data: data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data, encoding: .utf8)
-                ?? String(data: data, encoding: .isoLatin1)
-        }
-        return (text ?? "").split(whereSeparator: \.isNewline)
-            .compactMap { raw in
-                let line = raw.trimmingCharacters(in: .whitespaces)
-                if line.isEmpty { return nil }
-                return unquoted(line) ?? line
-            }
-    }
-
-    /// The name a quoted line stands for; nil when the line is not quoted, or holds an escape
-    /// that is none of ours (then it is an old, unquoted line).
-    static func unquoted(_ line: String) -> String? {
-        guard line.unicodeScalars.count >= 2, line.unicodeScalars.first == "\"", line.unicodeScalars.last == "\"" else {
-            return nil
-        }
-        let body = Array(line.unicodeScalars.dropFirst().dropLast())
-        var result = String.UnicodeScalarView()
-        var index = 0
-        while index < body.count {
-            let scalar = body[index]
-            index += 1
-            guard scalar == "\\" else {
-                // An unescaped quote inside means the line is no quoted name.
-                if scalar == "\"" { return nil }
-                result.append(scalar)
-                continue
-            }
-            guard index < body.count else { return nil }
-            let escape = body[index]
-            index += 1
-            switch escape {
-            case "\\", "\"": result.append(escape)
-            case "n": result.append("\n")
-            case "r": result.append("\r")
-            case "t": result.append("\t")
-
-            case "u":
-                guard index < body.count, body[index] == "{", let close = body[index...].firstIndex(of: "}") else {
-                    return nil
-                }
-                let digits = String(String.UnicodeScalarView(body[(index + 1)..<close]))
-                guard !digits.isEmpty, digits.count <= 6, let value = UInt32(digits, radix: 16),
-                    let unicode = Unicode.Scalar(value)
-                else { return nil }
-                result.append(unicode)
-                index = close + 1
-
-            default: return nil
-            }
-        }
-        return String(result)
-    }
-
-    /// One line for a name: as it is when that reads back the same, otherwise quoted.
-    public static func line(for name: String) -> String {
-        let scalars = name.unicodeScalars
-        let needsQuotes =
-            scalars.first == "\"" || scalars.contains { isUnsafe($0) }
-            || scalars.first.map({ $0.properties.isWhitespace }) == true
-            || scalars.last.map({ $0.properties.isWhitespace }) == true
-        guard needsQuotes else { return name }
-        var text = "\""
-        for scalar in scalars {
-            switch scalar {
-            case "\\": text += "\\\\"
-            case "\"": text += "\\\""
-            case "\n": text += "\\n"
-            case "\r": text += "\\r"
-            case "\t": text += "\\t"
-
-            default:
-                if isUnsafe(scalar) {
-                    text += "\\u{" + String(scalar.value, radix: 16) + "}"
-                } else {
-                    text.unicodeScalars.append(scalar)
-                }
-            }
-        }
-        return text + "\""
-    }
-
-    /// The text of a list file naming `names`, one per line.
-    public static func text(for names: [String]) -> String {
-        names.map(line(for:)).joined(separator: "\n") + (names.isEmpty ? "" : "\n")
-    }
-
-    /// A scalar that cannot stand in a line as it is: a control character or a line or
-    /// paragraph break.
-    private static func isUnsafe(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar.properties.generalCategory {
-        case .control, .lineSeparator, .paragraphSeparator: return true
-        default: return false
-        }
-    }
-
-    /// Reads a list file from any file system. Blocks: for a background thread. Only files of
-    /// this computer and of the file system the list file is on are taken over from it: a
-    /// list file must not make the program connect to any host it names.
-    public static func read(_ file: URL, fileSystems: FileSystemRegistry, relativeTo base: URL) throws -> [URL] {
-        let reader = try fileSystems.provider(for: file).read(file)
-        defer { reader.close() }
-        var data = Data()
-        while let block = try reader.read(upToCount: 1 << 20), !block.isEmpty {
-            data.append(block)
-            if data.count > sizeLimit { throw TooLarge() }
-        }
-        let lines = lines(in: data)
-        if lines.count > lineLimit { throw TooLarge() }
-        return lines.map { fileSystems.location(from: $0, relativeTo: base) }.filter { isTrusted($0, listedIn: file) }
-    }
-
-    /// Whether a file named by a list file may be listed: a local file, or one on the very
-    /// server (scheme, host, port) the list file itself was read from.
-    static func isTrusted(_ url: URL, listedIn file: URL) -> Bool {
-        if url.isFileURL { return true }
-        return url.scheme == file.scheme && url.host == file.host && url.port == file.port
+    deinit {
+        // Nothing to release: the kernel holds what was registered.
     }
 }

@@ -2,9 +2,11 @@ import AFMKernel
 import Foundation
 
 /// Limits how many long jobs of one kind (building the row index of a text) are on threads at
-/// once. A read that cannot be interrupted (a share that stopped answering, a provider that
-/// ignores `interrupt`) keeps its thread after the job was cancelled; without a limit, paging
-/// quickly through files on such a volume would start a job, and strand a thread, for every file.
+/// once.
+///
+/// A read that cannot be interrupted (a share that stopped answering, a provider that ignores
+/// `interrupt`) keeps its thread after the job was cancelled; without a limit, paging quickly
+/// through files on such a volume would start a job, and strand a thread, for every file.
 ///
 /// - At most `live` jobs that nobody has cancelled run at once; the others wait their turn, and a
 ///   waiting job that is cancelled before its turn is dropped without ever running.
@@ -13,16 +15,7 @@ import Foundation
 ///   instead of the work) instead of making one thread more.
 ///
 /// All state is guarded by `lock`.
-final class ViewerWorkGate: @unchecked Sendable {
-    /// Index builds of text documents.
-    static let indexBuilds = ViewerWorkGate(
-        live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)),
-        stuck: 8
-    )
-
-    let live: Int
-    let stuck: Int
-    private let lock = NSLock()
+internal final class ViewerWorkGate: @unchecked Sendable {
     private struct Waiting {
         let flag: CancellationFlag
         let work: @Sendable () -> Void
@@ -31,35 +24,50 @@ final class ViewerWorkGate: @unchecked Sendable {
         let flag: CancellationFlag
         var token: AnyObject?
     }
+
+    /// Index builds of text documents.
+    internal static let indexBuilds = ViewerWorkGate(
+        live: max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2)),
+        stuck: 8
+    )
+
+    /// How many jobs that nobody has cancelled may run at once (at least 1).
+    internal let live: Int
+    /// How many threads cancelled jobs may hold before new jobs are refused (at least 1).
+    internal let stuck: Int
+    private let lock = NSLock()
     private var waiting: [Waiting] = []
     private var running: [Int: Running] = [:]
     private var lastID = 0
 
-    init(live: Int, stuck: Int) {
-        self.live = max(1, live)
-        self.stuck = max(1, stuck)
-    }
-
     /// Jobs that hold a thread now, cancelled or not (for tests).
-    var threadsInUse: Int {
+    internal var threadsInUse: Int {
         lock.lock()
         defer { lock.unlock() }
         return running.count
     }
 
     /// Jobs that wait for their turn (for tests).
-    var waitingCount: Int {
+    internal var waitingCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return waiting.filter { !$0.flag.isCancelled }.count
     }
 
+    /// A gate with the given limits; a limit below 1 counts as 1.
+    internal init(live: Int, stuck: Int) {
+        self.live = max(1, live)
+        self.stuck = max(1, stuck)
+    }
+
     /// Runs `work` on a background thread as soon as the limits allow, unless `flag` is set
     /// before; or calls `refused` (on this thread) when `stuck` threads are held by cancelled
-    /// jobs that have not come back. Any thread.
-    func submit(
+    /// jobs that have not come back.
+    ///
+    /// Any thread.
+    internal func submit(
         cancellation flag: CancellationFlag,
-        refused: @Sendable () -> Void = {},
+        refused: @Sendable () -> Void,
         _ work: @escaping @Sendable () -> Void
     ) {
         lock.lock()
@@ -115,7 +123,9 @@ final class ViewerWorkGate: @unchecked Sendable {
         let token = running.removeValue(forKey: id)?.token
         let ready = takeReady()
         lock.unlock()
-        withExtendedLifetime(token) {}
+        withExtendedLifetime(token) {
+            // The cancel registration is let go only here, after the lock is released.
+        }
         start(ready)
     }
 
@@ -124,5 +134,9 @@ final class ViewerWorkGate: @unchecked Sendable {
         let ready = takeReady()
         lock.unlock()
         start(ready)
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

@@ -1,8 +1,9 @@
 import CoreServices
-import Foundation
 
 /// What the directory watcher asks of the system: a stream for one folder, and how many
-/// descriptors the process has to spare. The system's answers by default; tests give their own.
+/// descriptors the process has to spare.
+///
+/// The system's answers by default; tests give their own.
 ///
 /// **Why one folder per stream, and why the checks before a stream is made.** When
 /// `FSEventStreamCreate` fails part-way, its clean-up closes descriptor 0, which the stream never

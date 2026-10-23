@@ -55,21 +55,21 @@ internal struct CoverageViewerImageTests {
     /// Nothing, a file that is not there, text and a file cut short in its frames decode to nothing.
     @Test
     internal func whatIsNoImageDecodesToNothing() throws {
-        #expect(ImageDecoder.decode(Data()) == nil)
-        #expect(ImageDecoder.decode(Data("plain text".utf8)) == nil)
-        #expect(ImageDecoder.decode(contentsOf: URL(fileURLWithPath: "/nonexistent/picture.png")) == nil)
+        #expect(ImageDecoder().decode(Data()) == nil)
+        #expect(ImageDecoder().decode(Data("plain text".utf8)) == nil)
+        #expect(ImageDecoder().decode(contentsOf: URL(fileURLWithPath: "/nonexistent/picture.png")) == nil)
         let tiff = try CoverageViewerImages.encoded(
             (0..<3).map { _ in try CoverageViewerImages.picture(60, 40) },
             type: "public.tiff"
         )
-        #expect(ImageDecoder.decode(tiff.prefix(tiff.count * 9 / 10)) == nil)
+        #expect(ImageDecoder().decode(tiff.prefix(tiff.count * 9 / 10)) == nil)
     }
 
     /// A PDF names no size in pixels: it is made at the size of its picture (it was one pixel).
     @Test
     internal func aPictureWithoutASizeIsMeasured() throws {
         let pdf = try CoverageViewerImages.encoded([CoverageViewerImages.picture(64, 32)], type: "com.adobe.pdf")
-        let image = try #require(ImageDecoder.decode(pdf))
+        let image = try #require(ImageDecoder().decode(pdf))
         #expect(image.pixelSize == CGSize(width: 64, height: 32) && image.size == CGSize(width: 64, height: 32))
     }
 
@@ -82,7 +82,7 @@ internal struct CoverageViewerImageTests {
             properties: [:],
             frameProperties: [kCGImagePropertyOrientation: 6]
         )
-        let image = try #require(ImageDecoder.decode(jpeg))
+        let image = try #require(ImageDecoder().decode(jpeg))
         #expect(image.pixelSize == CGSize(width: 10, height: 30) && image.size == CGSize(width: 10, height: 30))
     }
 
@@ -92,7 +92,7 @@ internal struct CoverageViewerImageTests {
         let flag = CancellationFlag()
         flag.cancel()
         let gif = try CoverageViewerImages.animation(count: 2, size: 10, delay: 0.1)
-        #expect(ImageDecoder.decode(gif, cancellation: flag) == nil)
+        #expect(ImageDecoder(cancellation: flag).decode(gif) == nil)
     }
 
     /// A HEIC sequence plays as an animation.
@@ -102,7 +102,7 @@ internal struct CoverageViewerImageTests {
             [CoverageViewerImages.picture(20, 10), CoverageViewerImages.picture(20, 10, red: 0.3)],
             type: "public.heics"
         )
-        #expect(ImageDecoder.decode(heics)?.frames.count == 2)
+        #expect(ImageDecoder().decode(heics)?.frames.count == 2)
     }
 
     /// The frames that would take too much memory are left out and counted; the first frame is
@@ -111,7 +111,7 @@ internal struct CoverageViewerImageTests {
     internal func framesBeyondTheMemoryLimitAreLeftOut() throws {
         let gif = try CoverageViewerImages.animation(count: 3, size: 20, delay: 0.1)
         var early: DecodedImage?
-        let image = try #require(ImageDecoder.decode(gif, memoryLimit: 1) { early = $0 })
+        let image = try #require(ImageDecoder(memoryLimit: 1) { early = $0 }.decode(gif))
         #expect(image.frames.count == 1 && image.framesDropped == 2)
         #expect(early?.frames.count == 1)
     }
@@ -124,7 +124,7 @@ internal struct CoverageViewerImageTests {
         #expect(ImageDecoder.properties(of: source, at: 9).isEmpty)
         #expect(ImageDecoder.number(kCGImagePropertyPixelWidth, in: [:]) == 0)
         #expect(DecodedImage(frames: [], pixelSize: .zero).size == .zero)
-        let small = try #require(ImageDecoder.decode(png, largestSide: 4))
+        let small = try #require(ImageDecoder(largestSide: 4).decode(png))
         #expect(small.isDownsampled && small.size == CGSize(width: 4, height: 4))
         // Taller than its frame, though as wide: downsampled too.
         let taller = DecodedImage(frames: small.frames, pixelSize: CGSize(width: 4, height: 8))
@@ -180,9 +180,10 @@ internal struct CoverageViewerImageTests {
     @Test
     internal func centredImagesAreDrawnInTheMiddle() throws {
         let image = try #require(
-            ImageDecoder.decode(
-                try CoverageViewerImages.encoded([CoverageViewerImages.picture(20, 20)], type: "public.png")
-            )
+            ImageDecoder()
+                .decode(
+                    try CoverageViewerImages.encoded([CoverageViewerImages.picture(20, 20)], type: "public.png")
+                )
         )
         let view = Self.view(image)
         let canvas = try #require(view.documentView)
@@ -198,9 +199,10 @@ internal struct CoverageViewerImageTests {
     @Test
     internal func theZoomFollowsTheFitAndTheGestures() throws {
         let image = try #require(
-            ImageDecoder.decode(
-                try CoverageViewerImages.encoded([CoverageViewerImages.picture(50, 50)], type: "public.png")
-            )
+            ImageDecoder()
+                .decode(
+                    try CoverageViewerImages.encoded([CoverageViewerImages.picture(50, 50)], type: "public.png")
+                )
         )
         let view = Self.view(image)
         let scale = ImageCanvasView.pixelsPerPoint(window: nil, screen: NSScreen.main)
@@ -227,9 +229,10 @@ internal struct CoverageViewerImageTests {
     @Test
     internal func aBigImageScrolls() throws {
         let image = try #require(
-            ImageDecoder.decode(
-                try CoverageViewerImages.encoded([CoverageViewerImages.picture(2_000, 2_000)], type: "public.png")
-            )
+            ImageDecoder()
+                .decode(
+                    try CoverageViewerImages.encoded([CoverageViewerImages.picture(2_000, 2_000)], type: "public.png")
+                )
         )
         let view = Self.view(image)
         view.setZoom(1)
@@ -259,7 +262,7 @@ internal struct CoverageViewerImageTests {
     @Test
     internal func animationsPlay() async throws {
         let gif = try CoverageViewerImages.animation(count: 3, size: 20, delay: 0.02)
-        let animation = try #require(ImageDecoder.decode(gif, minimumDelay: 0.02))
+        let animation = try #require(ImageDecoder(minimumDelay: 0.02).decode(gif))
         let first = DecodedImage(frames: [animation.frames[0]], pixelSize: animation.pixelSize)
         let view = Self.view(first)
         var changes = 0

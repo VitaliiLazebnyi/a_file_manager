@@ -40,7 +40,9 @@ internal final class CoverageArchivesClock: @unchecked Sendable {
     @discardableResult
     internal func runDue() -> Int {
         let due = take()
-        due.forEach { $0.work() }
+        for task in due {
+            task.work()
+        }
         return due.count
     }
 

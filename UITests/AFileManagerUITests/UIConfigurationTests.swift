@@ -1,8 +1,9 @@
 import XCTest
 
 /// The configuration's ways to the system: the command chooser run as a modal dialog, the key
-/// recorder, the settings file panels, the About panel and saving the window positions. Every
-/// dialog is cancelled: no setting changes.
+/// recorder, the settings file panels, the About panel and saving the window positions.
+///
+/// Every dialog is cancelled: no setting changes.
 @MainActor
 internal final class UIConfigurationTests: XCTestCase {
     /// The program of the running test, once started.
@@ -34,7 +35,9 @@ internal final class UIConfigurationTests: XCTestCase {
 
     /// Add Command… of the button-bar editor runs the command chooser as a modal dialog: a double
     /// click below its rows chooses nothing, OK chooses the command left by the filter, and the
-    /// editor lists it. Cancel keeps the button bar as it was.
+    /// editor lists it.
+    ///
+    /// Cancel keeps the button bar as it was.
     internal func testTheButtonBarEditorChoosesACommandInAModalChooser() throws {
         let (session, _) = try start()
         let desktop = UIDesktop(session)
@@ -78,7 +81,9 @@ internal final class UIConfigurationTests: XCTestCase {
     }
 
     /// Export Settings… asks what to export, then where, in the system's save panel; Import
-    /// Settings… asks for the file in its open panel. Both are cancelled.
+    /// Settings… asks for the file in its open panel.
+    ///
+    /// Both are cancelled.
     internal func testExportAndImportAskForTheSettingsFile() throws {
         let (session, _) = try start()
         let desktop = UIDesktop(session)

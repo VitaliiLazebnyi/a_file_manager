@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 import Foundation
@@ -12,13 +11,19 @@ import Testing
 @MainActor
 @Suite(.serialized)
 internal struct CoverageViewerPaneTextTests {
+    private static let text = (1...200).map { "Line \($0) of the text, with words\n" }.joined()
+
     /// Sends a button's action, as a click does. (`performClick` runs the event loop for a moment, which can end the
     /// run loop the test runner waits in, and the test process with it.)
     private static func press(_ button: NSButton) {
         button.sendAction(button.action, to: button.target)
     }
 
-    private static let text = (1...200).map { "Line \($0) of the text, with words\n" }.joined()
+    private static func buttons(of view: NSView) -> [NSButton] {
+        view.subviews.flatMap { subview -> [NSButton] in
+            (subview as? NSButton).map { [$0] } ?? buttons(of: subview)
+        }
+    }
 
     /// Find: the dialog, its history, repeating in every direction, and what is said when nothing
     /// is found or the pattern is wrong.
@@ -68,7 +73,7 @@ internal struct CoverageViewerPaneTextTests {
         defer { bench.close() }
         let pane = try #require(await bench.open(try bench.file("notes.txt", text: Self.text)))
         #expect(await bench.textShown(pane))
-        pane.pager.reveal(offset: 0, select: 0..<4)
+        pane.pager.reveal(offset: 0, select: 0..<4, rowsAbove: 0, keepingSelection: false)
         #expect(await bench.wait { pane.pager.selection == 0..<4 })
         #expect(CoverageViewerMenus.run("Copy as text", in: "Edit", of: pane))
         #expect(await bench.wait { bench.scratch.pasteboard.string(forType: .string) == "Line" })
@@ -137,7 +142,7 @@ internal struct CoverageViewerPaneTextTests {
         #expect(bench.scratch.pasteboard.string(forType: .string) == "https://example.com/page")
         linkMenu.performActionForItem(at: 1)
         #expect(bench.links.opened.last?.absoluteString == "https://example.com/page")
-        pane.pager.reveal(offset: 0, select: 0..<24)
+        pane.pager.reveal(offset: 0, select: 0..<24, rowsAbove: 0, keepingSelection: false)
         #expect(await bench.wait { pane.pager.selection == 0..<24 })
         let menu = try #require(pane.makeContextMenu())
         #expect(
@@ -183,7 +188,8 @@ internal struct CoverageViewerPaneTextTests {
         let other = try bench.file("other.txt", text: "Other\n")
         bench.setup.plugin.open(
             [ViewerItem(source: .file(notes), title: "notes"), ViewerItem(source: .file(other), title: "other")],
-            internalOnly: false
+            internalOnly: false,
+            followsCursor: false
         )
         let pane = try #require(bench.setup.plugin.windows.last?.pane)
         bench.prepare(pane)
@@ -199,7 +205,7 @@ internal struct CoverageViewerPaneTextTests {
         Self.press(try #require(Self.buttons(of: pane).first { $0.toolTip == "Go to position (in %)" }))
         #expect(bench.interaction.log.last?.hasPrefix("prompt: Go to position") == true)
         let flag = CancellationFlag()
-        pane.activity = ("Working", 0.5, flag)
+        pane.activity = ViewerPane.Activity(text: "Working", progress: 0.5, cancel: flag)
         #expect(pane.statusText == "Working")
         Self.press(try #require(button("Cancel")))
         #expect(flag.isCancelled)
@@ -223,11 +229,5 @@ internal struct CoverageViewerPaneTextTests {
         let fresh = CoverageViewerJobMonitor()
         #expect(ViewerPane.save(source, to: bench.folder.appendingPathComponent("y"), monitor: fresh) == nil)
         #expect(fresh.reports > 0)
-    }
-
-    private static func buttons(of view: NSView) -> [NSButton] {
-        view.subviews.flatMap { subview -> [NSButton] in
-            (subview as? NSButton).map { [$0] } ?? buttons(of: subview)
-        }
     }
 }

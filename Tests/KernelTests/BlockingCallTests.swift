@@ -45,7 +45,7 @@ internal struct BlockingCallTests {
         // Nobody else asks meanwhile: an absence, which no condition can show, so it is looked
         // for after a moment.
         usleep(50_000)
-        #expect(asked.count == 1 && back.count == 0)
+        #expect((asked.count, back.count) == (1, 0))
         release.signal()
         #expect(Wait.until { done.count == 12 })
         // Whoever came after the answer asked again; nobody asked while it was under way.
@@ -86,7 +86,7 @@ internal struct BlockingCallTests {
             // Giving up ends the wait at once, though the question itself goes on.
             #expect(returned.wait() == true)
         }
-        #expect(asked.count == 1 && back.count == 0)
+        #expect((asked.count, back.count) == (1, 0))
         // The question was told that nobody waits.
         #expect(flags.value.first?.isCancelled == true)
         // Another question to the same owner, and the same one to another owner, are not held up.

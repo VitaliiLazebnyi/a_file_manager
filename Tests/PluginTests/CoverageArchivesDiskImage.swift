@@ -1,8 +1,9 @@
 import Foundation
 import TestSupport
 
-/// A small HFS+ disk image attached to a folder: a volume that cannot clone files. Detached
-/// when it goes; nil where no image can be attached.
+/// A small HFS+ disk image attached to a folder: a volume that cannot clone files.
+///
+/// Detached when it goes; nil where no image can be attached.
 internal final class CoverageArchivesDiskImage {
     /// Where the volume is mounted.
     internal let mountPoint: URL

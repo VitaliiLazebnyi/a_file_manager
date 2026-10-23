@@ -1,3 +1,4 @@
+import AFMKernel
 import Foundation
 import FuzzCore
 
@@ -93,17 +94,18 @@ internal struct SearchInput {
         do {
             return .some(
                 try ViewerSearch.find(
-                    pattern,
-                    in: source,
-                    content: content,
-                    from: from,
-                    backwards: options.backwards,
-                    encoding: encoding,
-                    chunkSize: chunkSize,
-                    parallelism: parallelism,
-                    boundaries: boundaries,
-                    rawBytes: raw
-                )
+                    ViewerSearch.Request(pattern: pattern, start: from, backwards: options.backwards),
+                    in: ViewerSearch.Subject(
+                        source: source,
+                        content: content,
+                        encoding: encoding,
+                        boundaries: boundaries
+                    ),
+                    tuning: ViewerSearch.Tuning(chunkSize: chunkSize, parallelism: parallelism, rawBytes: raw),
+                    cancellation: CancellationFlag()
+                ) { _ in
+                    // No progress is wanted.
+                }
             )
         } catch {
             return nil

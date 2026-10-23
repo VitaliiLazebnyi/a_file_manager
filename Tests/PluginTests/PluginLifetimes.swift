@@ -26,17 +26,22 @@ import VirtualFoldersPlugin
 
 /// The kernel keeps every plugin and whatever a plugin registers (commands, file systems,
 /// openers, questions); none of that may keep the kernel in turn, or the program never lets go
-/// of any of it. Each plugin is started on its own, used a little, and must be gone with its
-/// kernel when the bench is.
-@MainActor @Suite struct PluginLifetimes {
-    nonisolated static let names = [
+/// of any of it.
+///
+/// Each plugin is started on its own, used a little, and must be gone with its kernel when the
+/// bench is.
+@MainActor
+@Suite
+internal struct PluginLifetimes {
+    /// The names of the plugins the program starts, in the order it starts them.
+    nonisolated internal static let names = [
         "LocalFileSystem", "Archives", "Network", "VirtualFolders", "Navigation", "Places", "Viewer", "MacIntegration",
         "FileOperations", "FileProperties", "MultiRename", "CompareContent", "FileTools", "FindFiles", "DirectorySync",
         "SystemTools", "Clipboard", "Selection", "ViewOptions", "FolderTabs", "Configuration"
     ]
 
     /// Each plugin as the tests start it: nothing is launched and nothing is written outside.
-    static let plugins: [String: (NSPasteboard) -> any Plugin] = [
+    internal static let plugins: [String: (NSPasteboard) -> any Plugin] = [
         "LocalFileSystem": { _ in LocalFileSystemPlugin() },
         "Archives": { _ in ArchivesPlugin(flushDelay: nil, launchesApplications: false) },
         "Network": { _ in NetworkPlugin(launchesApplications: false, passwords: MemoryPasswords()) },
@@ -60,7 +65,10 @@ import VirtualFoldersPlugin
         "Configuration": { _ in ConfigurationPlugin(launchesApplications: false, background: nil) { [] } }
     ]
 
-    @Test(arguments: names) func thePluginGoesWithItsKernel(_ name: String) throws {
+    /// The plugin, once started and asked about each of its commands, keeps neither the kernel
+    /// nor the commands when the bench goes.
+    @Test(arguments: names)
+    internal func thePluginGoesWithItsKernel(_ name: String) throws {
         let scratch = ScratchPasteboard()
         weak var kernel: Kernel?
         weak var commands: CommandRegistry?
@@ -71,7 +79,11 @@ import VirtualFoldersPlugin
             let make = try #require(Self.plugins[name])
             let plugin = make(scratch.pasteboard)
             let bench = TestBench(
-                plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/B"))
+                plugins: [plugin],
+                fileSystems: [memory],
+                left: memory.url("/A"),
+                right: memory.url("/B")
+            )
             // Every command is asked whether it may run, as the menus and buttons do.
             for command in bench.commands.all {
                 _ = bench.commands.isEnabled(command.id)
@@ -83,7 +95,9 @@ import VirtualFoldersPlugin
         #expect(commands == nil, "\(name) keeps the commands")
     }
 
-    @Test func theConnectionsGoWithTheNetworkPlugin() {
+    /// The network plugin's connection centre and session environment go with the plugin.
+    @Test
+    internal func theConnectionsGoWithTheNetworkPlugin() {
         weak var center: ConnectionCenter?
         weak var environment: SessionEnvironment?
         do {
@@ -91,7 +105,11 @@ import VirtualFoldersPlugin
             let memory = MemoryFileSystem()
             memory.addDirectory("/A")
             let bench = TestBench(
-                plugins: [plugin], fileSystems: [memory], left: memory.url("/A"), right: memory.url("/A"))
+                plugins: [plugin],
+                fileSystems: [memory],
+                left: memory.url("/A"),
+                right: memory.url("/A")
+            )
             (center, environment) = (plugin.center, plugin.center.environment)
             #expect(bench.kernel.plugins.count == 1)
         }

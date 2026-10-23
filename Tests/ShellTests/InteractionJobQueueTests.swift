@@ -1,6 +1,5 @@
-import AFMContracts
-import AFMKernel
-import AppKit
+import Dispatch
+import Foundation
 import TestSupport
 import Testing
 

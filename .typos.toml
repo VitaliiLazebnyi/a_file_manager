@@ -21,6 +21,8 @@ ba = "ba"                # base-26 counter in rename masks: aa, ab, … ba
 Ded = "Ded"              # "ANDed"
 iy = "iy"                # regex example M[ae][iy]er
 assotiate = "assotiate"  # Total Commander's own help-topic name
+ND = "ND"                # Myers' O(ND) difference algorithm
+nd = "nd"                # "ﬁnd" spelt with the ﬁ ligature in the viewer's search tests
 
 [default.extend-identifiers]
 NOOPs = "NOOPs"          # FTP NOOP command

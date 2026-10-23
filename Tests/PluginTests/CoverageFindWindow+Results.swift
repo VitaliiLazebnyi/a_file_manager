@@ -1,7 +1,6 @@
 import AFMContracts
 import AFMKernel
 import AppKit
-import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
@@ -77,11 +76,11 @@ extension CoverageFindWindow {
         table.selectRowIndexes([1], byExtendingSelection: false)
         table.keyDown(with: Controls.key(Controls.Code.character, "c", .command))
         #expect(scratch.pasteboard.string(forType: .string) == controller.copyText)
-        table.keyDown(with: Controls.key(Controls.Code.f3))
-        table.keyDown(with: Controls.key(Controls.Code.f4))
+        table.keyDown(with: Controls.key(Controls.Code.functionKey3))
+        table.keyDown(with: Controls.key(Controls.Code.functionKey4))
         #expect(performed.map(\.0) == [.view, .edit])
         // Another key goes to the list.
-        table.keyDown(with: Controls.key(Controls.Code.down))
+        table.keyDown(with: Controls.key(Controls.Code.downArrow))
         table.keyDown(with: Controls.key(Controls.Code.returnKey))
         #expect(performed.last?.0 == .changeDirectory)
     }
@@ -141,7 +140,7 @@ extension CoverageFindWindow {
     internal func searchingInTheFoundFiles() async {
         await search { settings in settings.searchFor = "*.txt" }
         #expect(button("F2 Search in found files/folders")?.isEnabled == true)
-        _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.f2))
+        _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.functionKey2))
         #expect(button("F2 Search in found files/folders")?.state == .on)
         controller.startSearch()
         #expect(await RunLoopWait.until { !self.controller.isSearching })
@@ -150,7 +149,7 @@ extension CoverageFindWindow {
         _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.character, "q", .command))
         // Without results there is nothing to search in.
         controller.newSearch()
-        _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.f2))
+        _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.functionKey2))
         #expect(button("F2 Search in found files/folders")?.state == .off)
     }
 

@@ -1,15 +1,16 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 import LocalFileSystemPlugin
-import Quartz
+import QuickLookUI
 import TestSupport
 import Testing
 
 @testable import MacIntegrationPlugin
 
 /// The feeder of the Quick Look panel on its own, the panel following a cursor that leaves the
-/// local disks, and the plugin as the program makes it. No panel is put on screen.
+/// local disks, and the plugin as the program makes it.
+///
+/// No panel is put on screen.
 @MainActor
 @Suite(.serialized)
 internal struct CovMacQuickLookTests {

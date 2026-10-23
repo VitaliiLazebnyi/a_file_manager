@@ -8,8 +8,9 @@ import Testing
 @testable import FindFilesPlugin
 
 /// Find Files through its commands, as the program opens it: the one window, the separate ones,
-/// the folder under the cursor and a volume that is about to go. The windows are presented to a
-/// recorder, never put on screen.
+/// the folder under the cursor and a volume that is about to go.
+///
+/// The windows are presented to a recorder, never put on screen.
 @MainActor
 @Suite(.serialized)
 internal struct CoverageFindPlugin {

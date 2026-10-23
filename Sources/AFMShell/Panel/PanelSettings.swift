@@ -1,5 +1,5 @@
 import AFMKernel
-import AppKit
+import CoreFoundation
 
 /// The user's options for the file lists, as the panels use them.
 ///

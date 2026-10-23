@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
@@ -66,8 +65,10 @@ internal struct CoverageNetworkPluginParts {
         #expect(NetworkSettings.values(from: settings).parallelConnections == 8)
     }
 
-    /// As the program starts it, the plugin can eject volumes through the system. (The store of
-    /// passwords is given: the program's own is the login Keychain, which no test touches.)
+    /// As the program starts it, the plugin can eject volumes through the system.
+    ///
+    /// (The store of passwords is given: the program's own is the login Keychain, which no test
+    /// touches.).
     @Test
     internal func theProgramsPluginCanEjectThroughTheSystem() throws {
         let box = try Sandbox()

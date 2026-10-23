@@ -1,11 +1,13 @@
 import Foundation
 import XCTest
 
-/// Quitting while a plugin still writes. A member removed from an archive that lies in another
-/// archive is written out only after a pause (copying a whole archive waits for one many times
-/// as long as the copy, `OpenArchive.idleDelay`); then the inner archive goes back into the outer
-/// one, compressed. A quit right after the removal has to do all that first: it shows a small
-/// window that says so, and quits by itself once both archives are written.
+/// Quitting while a plugin still writes.
+///
+/// A member removed from an archive that lies in another archive is written out only after a pause
+/// (copying a whole archive waits for one many times as long as the copy, `OpenArchive.idleDelay`);
+/// then the inner archive goes back into the outer one, compressed. A quit right after the removal
+/// has to do all that first: it shows a small window that says so, and quits by itself once both
+/// archives are written.
 @MainActor
 internal final class LastQuitTests: XCTestCase {
     /// How large the noise in the inner archive is, in MB: compressing it again takes seconds.

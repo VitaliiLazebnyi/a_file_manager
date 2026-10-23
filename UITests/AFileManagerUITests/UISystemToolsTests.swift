@@ -1,8 +1,10 @@
 import XCTest
 
 /// The System Tools' ways out of the program: an application started from the command line or
-/// chosen to open a file, the clipboard, printing, minimizing and quitting. TextEdit is quit
-/// again, the clipboard put back, the print sheet cancelled and the window brought back.
+/// chosen to open a file, the clipboard, printing, minimizing and quitting.
+///
+/// TextEdit is quit again, the clipboard put back, the print sheet cancelled and the window brought
+/// back.
 @MainActor
 internal final class UISystemToolsTests: XCTestCase {
     /// The program of the running test, once started.

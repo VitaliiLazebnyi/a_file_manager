@@ -18,7 +18,7 @@ internal struct CoverageArchivesRescueTests {
     }
 
     private func add(_ path: String, _ text: String, to archive: OpenArchive) throws {
-        let writer = try archive.write(path)
+        let writer = try archive.write(path, level: nil, password: nil)
         try writer.write(Data(text.utf8))
         try writer.close(attributes: FileAttributes())
     }
@@ -31,7 +31,7 @@ internal struct CoverageArchivesRescueTests {
         let writer = try bench.memory.write(url)
         try writer.write(try Data(contentsOf: local))
         try writer.close(attributes: FileAttributes())
-        return (url, try bench.store.archive(at: url))
+        return (url, try bench.store.archive(at: url, cancellation: nil))
     }
 
     /// Checks that new members are saved in an archive of their own next to the archive,
@@ -39,10 +39,10 @@ internal struct CoverageArchivesRescueTests {
     @Test
     internal func newMembersAreSavedUnderAFreeName() throws {
         let url = try CoverageArchives.zip("data.bin", in: box, ["a.txt": "a"], options: [])
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try add("one.txt", "one", to: archive)
         try box.file("data (unsaved changes).zip", "taken")
-        guard case .saved(let saved) = archive.rescue() else {
+        guard case .saved(let saved) = archive.rescue(quickly: false, before: .distantFuture) else {
             Issue.record("the new member was not saved")
             return
         }
@@ -55,12 +55,12 @@ internal struct CoverageArchivesRescueTests {
     internal func theRecoveryFolderTakesWhatTheArchivesFolderCannot() throws {
         try box.folder("locked")
         let url = try CoverageArchives.zip("locked/archive.zip", in: box, ["a.txt": "a"], options: [])
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try add("one.txt", "one", to: archive)
         bench.environment.recoveryFolder = box.url("recovery")
         #expect(chmod(box.url("locked").path, 0o555) == 0)
         defer { chmod(box.url("locked").path, 0o755) }
-        guard case .saved(let saved) = archive.rescue() else {
+        guard case .saved(let saved) = archive.rescue(quickly: false, before: .distantFuture) else {
             Issue.record("the new member was not saved")
             return
         }
@@ -72,14 +72,14 @@ internal struct CoverageArchivesRescueTests {
     @Test
     internal func membersThatCannotBeCopiedAreKeptWithAList() throws {
         let url = try CoverageArchives.zip("lost.zip", in: box, ["a.txt": "a"], options: [])
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try add("one.txt", "one", to: archive)
         try add("empty.txt", "", to: archive)
         let scratch = bench.environment.scratch.url
         for name in try FileManager.default.contentsOfDirectory(atPath: scratch.path) where name.hasSuffix(".zipdata") {
             try FileManager.default.removeItem(at: scratch.appendingPathComponent(name))
         }
-        guard case .kept(let folder) = archive.rescue() else {
+        guard case .kept(let folder) = archive.rescue(quickly: false, before: .distantFuture) else {
             Issue.record("the members were not kept")
             return
         }
@@ -93,9 +93,9 @@ internal struct CoverageArchivesRescueTests {
     @Test
     internal func onlyEmptyMembersLeaveTheListInTheTemporaryFolder() throws {
         let url = try CoverageArchives.zip("empty.zip", in: box, ["a.txt": "a"], options: [])
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try add("empty.txt", "", to: archive)
-        guard case .kept(let folder) = archive.rescue(quickly: true) else {
+        guard case .kept(let folder) = archive.rescue(quickly: true, before: .distantFuture) else {
             Issue.record("the member was not kept")
             return
         }
@@ -108,7 +108,7 @@ internal struct CoverageArchivesRescueTests {
     internal func membersOfARemoteArchiveAreNotSavedNextToIt() throws {
         let (_, archive) = try remote("rescued")
         try add("one.txt", "one", to: archive)
-        guard case .kept = archive.rescue() else {
+        guard case .kept = archive.rescue(quickly: false, before: .distantFuture) else {
             Issue.record("the member was saved next to a remote archive")
             return
         }
@@ -123,7 +123,7 @@ internal struct CoverageArchivesRescueTests {
         let fileSystems = bench.fileSystems
         bench.environment.fileSystems = { nil }
         #expect {
-            try archive.commit()
+            try archive.commit(cancellation: nil) { _, _ in true }
         } throws: { error in
             guard case ArchiveError.readOnly = error else {
                 return false
@@ -132,7 +132,7 @@ internal struct CoverageArchivesRescueTests {
         }
         bench.environment.fileSystems = { fileSystems }
         #expect {
-            try archive.commit { _, _ in false }
+            try archive.commit(cancellation: nil) { _, _ in false }
         } throws: { error in
             guard case ArchiveError.cancelled = error else {
                 return false
@@ -144,14 +144,14 @@ internal struct CoverageArchivesRescueTests {
         let flag = CancellationFlag()
         let failed = Signal<Bool>()
         OtherThread.start {
-            failed.set((try? archive.commit(cancellation: flag)) == nil)
+            failed.set((try? archive.commit(cancellation: flag) { _, _ in true }) == nil)
         }
         #expect(Wait.until { bench.memory.stalledTransfers > 0 })
         flag.cancel()
         #expect(failed.wait() == true)
         bench.memory.stallsWrites = false
         #expect(!bench.memory.allPaths.contains { $0.hasSuffix(".tmp") })
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         let reader = try bench.memory.read(url)
         var data = Data()
         while let block = try reader.read(upToCount: 1 << 16) {
@@ -169,14 +169,14 @@ internal struct CoverageArchivesRescueTests {
         let fileSystems = bench.fileSystems
         let lonely = try remote("lonely").archive
         bench.environment.fileSystems = { nil }
-        #expect(!lonely.isCurrent())
+        #expect(!lonely.isCurrent(cancellation: nil))
         bench.environment.fileSystems = { fileSystems }
         let flag = CancellationFlag()
         flag.cancel()
         #expect(try remote("asked").archive.isCurrent(cancellation: flag))
         let (gone, archive) = try remote("gone")
         try bench.memory.remove(gone)
-        #expect(!archive.isCurrent())
+        #expect(!archive.isCurrent(cancellation: nil))
 
         let (url, _) = try remote("unstamped")
         let copy = box.url("unstamped-copy.zip")
@@ -186,8 +186,10 @@ internal struct CoverageArchivesRescueTests {
             localURL: copy,
             fetchedCopy: TemporaryFile(copy),
             remoteStamp: nil,
+            quarantine: nil,
+            cancellation: nil,
             environment: bench.environment
         )
-        #expect(unstamped.isCurrent())
+        #expect(unstamped.isCurrent(cancellation: nil))
     }
 }

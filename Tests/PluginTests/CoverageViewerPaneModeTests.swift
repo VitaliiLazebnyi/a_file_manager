@@ -1,9 +1,6 @@
 import AFMKernel
 import AppKit
 import Foundation
-import ImageIO
-import PDFKit
-import Quartz
 import TestSupport
 import Testing
 

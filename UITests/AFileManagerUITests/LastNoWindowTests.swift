@@ -2,7 +2,9 @@ import XCTest
 
 /// What comes after the main window went off the screen: a file list of a large tree is read in
 /// the background, and the user minimizes the window meanwhile; the print panel then comes on
-/// its own, with no window to be a sheet of. It is cancelled, and the window brought back.
+/// its own, with no window to be a sheet of.
+///
+/// It is cancelled, and the window brought back.
 @MainActor
 internal final class LastNoWindowTests: XCTestCase {
     /// The program of the running test, once started.

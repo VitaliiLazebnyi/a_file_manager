@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 import TestSupport
 
 /// A panel model showing `/work` of a memory file system: the folders `bin` and `docs`, the files `a.txt` (2 KB) and

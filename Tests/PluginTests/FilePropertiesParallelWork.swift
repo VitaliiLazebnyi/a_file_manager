@@ -1,7 +1,5 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
@@ -123,15 +121,23 @@ internal struct FilePropertiesParallelWork {
         memory.addFile("/c/descript.ion", "a.txt first\r\nb.txt second\r\n")
         let store = CommentStore(fileSystems: fileSystems)
         let answers = Parallel.map(Array(0..<200)) { index in
-            store.comments(in: memory.url("/c"))[index.isMultiple(of: 2) ? "a.txt" : "b.txt"]
+            store.comments(in: memory.url("/c"), cancellation: CancellationFlag())[
+                index.isMultiple(of: 2) ? "a.txt" : "b.txt"
+            ]
         }
         #expect(answers.filter { $0 == "first" }.count == 100 && answers.filter { $0 == "second" }.count == 100)
         // A change made through the store is seen at once; the file disappears with its last comment.
-        try store.setComment("changed", for: "A.TXT", in: memory.url("/c"), hidden: true)
-        #expect(store.comments(in: memory.url("/c"))["a.txt"] == "changed")
+        try store.setComment(
+            "changed",
+            for: "A.TXT",
+            in: memory.url("/c"),
+            hidden: true,
+            cancellation: CancellationFlag()
+        )
+        #expect(store.comments(in: memory.url("/c"), cancellation: CancellationFlag())["a.txt"] == "changed")
         #expect(memory.contents("/c/descript.ion") == "a.txt changed\r\nb.txt second\r\n")
-        try store.setComment("", for: "a.txt", in: memory.url("/c"), hidden: true)
-        try store.setComment("", for: "b.txt", in: memory.url("/c"), hidden: true)
+        try store.setComment("", for: "a.txt", in: memory.url("/c"), hidden: true, cancellation: CancellationFlag())
+        try store.setComment("", for: "b.txt", in: memory.url("/c"), hidden: true, cancellation: CancellationFlag())
         #expect(!memory.exists("/c/descript.ion") && memory.allPaths == ["/c"])
     }
 
@@ -147,18 +153,36 @@ internal struct FilePropertiesParallelWork {
         change.permissions = try #require(PermissionChange("go-r"))
         change.timestamp = TimestampChange(date: "2001-02-03", time: "04:05:06")
         change.recurse = true
-        let outcome = AttributeJob(change: change, fileSystems: fileSystems).run([tree])
+        let outcome = AttributeJob(
+            change: change,
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run([tree])
         #expect(outcome.changed == 8 * 100 + 8 + 1 && outcome.failed == 0 && !outcome.cancelled)
         let file = try #require(fileSystems.item(at: box.url("t/d3/f42.txt")))
-        #expect(file.permissions == 0o600 && TimestampChange.fieldTexts(for: file.modified).date == "2001-02-03")
+        #expect(
+            file.permissions == 0o600
+                && TimestampChange.fieldTexts(for: file.modified, calendar: .current).date == "2001-02-03"
+        )
         #expect(fileSystems.item(at: box.url("t/d3"))?.permissions == 0o711)
 
         // Taking a folder's own permissions away does not lock the job out of its contents…
         change = AttributeChange(permissions: try #require(PermissionChange("000")), recurse: true)
-        #expect(AttributeJob(change: change, fileSystems: fileSystems).run([tree]).failed == 0)
+        #expect(
+            AttributeJob(change: change, fileSystems: fileSystems, cancellation: CancellationFlag(), meter: nil)
+                .run([tree]).failed == 0
+        )
         // …and giving them back opens the folders on the way down.
         change.permissions = try #require(PermissionChange("u+rwX"))
-        let restored = AttributeJob(change: change, fileSystems: fileSystems).run([tree])
+        let restored = AttributeJob(
+            change: change,
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run([tree])
         #expect(restored.failed == 0 && restored.changed == 809)
         #expect(
             fileSystems.item(at: box.url("t/d3/f42.txt"))?.permissions == 0o600

@@ -1,6 +1,5 @@
 import AFMKernel
 import Foundation
-import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
@@ -51,20 +50,22 @@ internal struct CovFileOpsJobRaces {
         let folder = FileItem(url: memory.url("/R"), name: "R", kind: .directory)
         let file = FileItem(url: memory.url("/R/g.txt"), name: "g.txt", stat: .init(size: 3))
         disk.seen.value = ["/V": folder, "/W/g.txt": file]
-        var result = runJob(
-            .copy,
-            [memory.url("/A/f.txt")],
-            to: TargetSpec(directory: disk.base.url("/V")),
-            fileSystems: fileSystems
-        )
+        var result = Answers()
+            .run(
+                .copy,
+                [memory.url("/A/f.txt")],
+                to: TargetSpec(directory: disk.base.url("/V")),
+                fileSystems: fileSystems
+            )
         #expect(result.completed.count == 1 && memory.contents("/R/f.txt") == "new")
         disk.base.addDirectory("/W")
-        result = runJob(
-            .copy,
-            [memory.url("/A/f.txt")],
-            to: TargetSpec(directory: disk.base.url("/W"), exactName: "g.txt"),
-            fileSystems: fileSystems
-        )
+        result = Answers()
+            .run(
+                .copy,
+                [memory.url("/A/f.txt")],
+                to: TargetSpec(directory: disk.base.url("/W"), exactName: "g.txt"),
+                fileSystems: fileSystems
+            )
         #expect(result.completed.count == 1 && memory.contents("/R/g.txt") == "new")
     }
 

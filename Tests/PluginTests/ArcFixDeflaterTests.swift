@@ -47,8 +47,9 @@ internal struct ArcFixDeflaterTests {
     @Test
     internal func piecesJoinIntoOneStream() throws {
         let joined =
-            try Deflater.piece(text, level: 1, final: false) + Deflater.piece(text, level: 12, final: false)
-            + Deflater.piece(Data(), level: 0, final: true)
-        #expect(try InflateStream(DataStream(joined), wrapping: .raw).readFully(1 << 20) == text + text)
+            try Deflater.piece(text, level: 1, final: false, calls: .zlib)
+            + Deflater.piece(text, level: 12, final: false, calls: .zlib)
+            + Deflater.piece(Data(), level: 0, final: true, calls: .zlib)
+        #expect(try InflateStream(DataStream(joined), wrapping: .raw, control: nil).readFully(1 << 20) == text + text)
     }
 }

@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import TestSupport
 import Testing
@@ -81,7 +80,7 @@ internal struct CovCompareEditing {
             Issue.record("not text")
             return
         }
-        #expect(left.lines.map(\.text) == ["y", "z"] && left.lines.allSatisfy { $0.ending == .crlf })
+        #expect(left.lines.map(\.text) == ["y", "z"] && left.lines.allSatisfy { $0.ending == .carriageReturnLineFeed })
 
         let middle = try CovCompareStage(left: "a\nb\nc\nd\n", right: "a\nd\n")
         let edited = middle.session(inline: true)

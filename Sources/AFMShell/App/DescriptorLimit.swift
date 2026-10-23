@@ -1,4 +1,4 @@
-public import Darwin
+public import Darwin.C.limits
 
 /// The number of files the program may have open at once.
 ///

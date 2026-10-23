@@ -4,8 +4,6 @@ import Network
 import TestSupport
 import Testing
 
-@testable import NetworkPlugin
-
 /// What the `AUTH TLS` framer does with Network's calls that the FTP connection never makes:
 /// a wakeup does nothing, and what is sent through it goes to the server as it is.
 ///

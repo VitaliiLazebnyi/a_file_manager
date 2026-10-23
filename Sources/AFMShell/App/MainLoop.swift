@@ -1,5 +1,4 @@
-import AFMKernel
-import AppKit
+import Foundation
 
 /// The way back to the main thread for everything that may end in a dialog.
 ///

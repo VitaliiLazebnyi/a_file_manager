@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
@@ -138,10 +137,11 @@ internal struct CovConfigRunner {
     internal func emptyAndUnknownStepsDoNothing() {
         let runner = runner()
         var finished = 0
-        runner.run(CommandAction(), title: "Nothing") { finished += 1 }
+        runner.run(CommandAction(), arguments: "", as: nil, title: "Nothing") { finished += 1 }
         #expect(finished == 0 && bench.interaction.log.isEmpty)
         runner.userCommand = { _ in nil }
-        runner.run(CommandAction(command: "em_plain, em_plain x, cd, cov_probe"), title: "Odd") { finished += 1 }
+        let odd = CommandAction(command: "em_plain, em_plain x, cd, cov_probe")
+        runner.run(odd, arguments: "", as: nil, title: "Odd") { finished += 1 }
         #expect(finished == 1 && probes.seen == ["em_plain:", "em_plain:x", "cov_probe:"])
         #expect(bench.left.model.directory == box.url("A"))
     }
@@ -205,7 +205,8 @@ internal struct CovConfigRunner {
         #expect(CommandRunner.applicationLine(for: "NoSuchApplicationHere.app") == nil)
         let bare = CommandRunner.applicationLine(for: "Calculator")
         #expect(bare?.hasPrefix("if command -v Calculator") == true && bare?.contains("open -a Calculator") == true)
-        #expect(CommandRunner.applicationLine(for: [.text("Calculator "), .value("x")]) == nil)
+        let withValue: [ExpandedPiece] = [.text("Calculator "), .value("x")]
+        #expect(CommandRunner.startLine(for: withValue) == withValue)
         #expect(CommandRunner.applicationLine(for: "-n") == nil && CommandRunner.applicationLine(for: "") == nil)
         #expect(CommandRunner.applicationLine(for: "./Calculator") == nil)
     }

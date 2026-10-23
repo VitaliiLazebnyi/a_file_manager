@@ -1,6 +1,4 @@
-import AFMContracts
 import AFMKernel
-import AFMShell
 import AppKit
 import TestSupport
 import Testing
@@ -9,12 +7,18 @@ import Testing
 
 /// The pane over a file system that is slow: closing it, switching files and laying a big text
 /// out again.
-@MainActor @Suite(.serialized) struct ViewerAdoptPane {
-    let memory = MemoryFileSystem()
-    let plugin: ViewerPlugin
-    let bench: TestBench
+@MainActor
+@Suite(.serialized)
+internal struct ViewerAdoptPaneTests {
+    /// The file system the files are read from; it can stall reads or pass for a remote one.
+    internal let memory = MemoryFileSystem()
+    /// The viewer, with a short quick view delay and no windows put on the screen.
+    internal let plugin: ViewerPlugin
+    /// The program around the viewer, its two panels on the memory file system.
+    internal let bench: TestBench
 
-    init() {
+    /// Sets up the viewer over the memory file system, with one small text file in the left folder.
+    internal init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
         plugin.mediaPlayback = CovViewPlayback.factory
@@ -22,24 +26,31 @@ import Testing
         memory.addFile("/A/small.txt", "small file\nsecond line")
     }
 
+    /// Waits until the condition holds or the tests' ceiling has passed, sleeping in between.
+    ///
+    /// Returns whether the condition holds at the end.
     @discardableResult
-    func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
-        let deadline = Date().addingTimeInterval(seconds)
+    private func wait(until condition: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
         }
         return condition()
     }
 
-    /// Whether everything the pane gave its work queue so far has ended. The main thread stays
-    /// free meanwhile: the tests of other suites run their main-thread work on it.
+    /// Whether everything the pane gave its work queue so far has ended.
+    ///
+    /// The main thread stays free meanwhile: the tests of other suites run their main-thread work
+    /// on it.
     private func drained(_ pane: ViewerPane) async -> Bool {
         let done = Shared(false)
         pane.workQueue.async(flags: .barrier) { done.value = true }
         return await wait { done.value }
     }
 
-    @Test func closingThePaneEndsAReadThatWaitsForTheServer() async throws {
+    /// Closing the pane interrupts a read that waits for a stalled server, and nothing is shown.
+    @Test
+    internal func closingThePaneEndsAReadThatWaitsForTheServer() async throws {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -53,7 +64,9 @@ import Testing
         #expect(pane.loaded == nil)
     }
 
-    @Test func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async {
+    /// In the quick view, the next file (or none) drops the one still being read, and its work ends.
+    @Test
+    internal func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
         memory.stallsReads = true
         defer { memory.releaseStalls() }
@@ -78,7 +91,10 @@ import Testing
         pane.stopWork()
     }
 
-    @Test func aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() async throws {
+    /// A big text of a remote file system is cached on disk, a new layout reuses its segments, and
+    /// closing the pane frees the cache.
+    @Test
+    internal func aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() async throws {
         // Above what is kept in memory (the pane's blocks are made small for the test, 1 MB in
         // all, as 64 MB are in the program); lines of about 25 bytes.
         let block = Data(String(repeating: "line of the big text\n", count: 5_000).utf8)

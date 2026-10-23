@@ -59,12 +59,13 @@ internal struct CovFileOpsFolders {
         try box.file("x/a/one.txt", "1")
         try box.file("y/a/two.txt", "2")
         try box.folder("T")
-        let result = runJob(
-            .move,
-            [box.url("x/a"), box.url("y/a")],
-            to: TargetSpec(directory: box.url("T")),
-            fileSystems: fileSystems
-        )
+        let result = Answers()
+            .run(
+                .move,
+                [box.url("x/a"), box.url("y/a")],
+                to: TargetSpec(directory: box.url("T")),
+                fileSystems: fileSystems
+            )
         #expect(result.completed.count == 2 && box.read("T/a/one.txt") == "1" && box.read("T/a/two.txt") == "2")
     }
 

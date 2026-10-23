@@ -48,17 +48,22 @@ internal struct CovSyncComparison {
         let (first, second) = (memory.url("/a"), memory.url("/b"))
         let before = CancellationFlag()
         before.cancel()
-        #expect(try SyncComparison.sameContent(first, second, fileSystems: fileSystems, cancellation: before) == nil)
+        #expect(throws: CancellationError.self) {
+            try SyncComparison.sameContent(first, second, fileSystems: fileSystems, cancellation: before) { _ in
+                // Nothing is read.
+            }
+        }
         let between = CancellationFlag()
         let cancel = { (_: Int) in between.cancel() }
-        let verdict = try SyncComparison.sameContent(
-            first,
-            second,
-            fileSystems: fileSystems,
-            cancellation: between,
-            progress: cancel
-        )
-        #expect(verdict == nil)
+        #expect(throws: CancellationError.self) {
+            try SyncComparison.sameContent(
+                first,
+                second,
+                fileSystems: fileSystems,
+                cancellation: between,
+                progress: cancel
+            )
+        }
     }
 
     /// A pair whose reading the cancel stops stays open; a file that cannot be read is an error.

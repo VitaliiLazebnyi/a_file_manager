@@ -35,6 +35,6 @@ internal struct CoverageFileToolsSHA3 {
                 #expect(own(data, length: 64, piece: piece) == Array(SHA3_512.hash(data: data)), "\(data.count)")
             }
         }
-        #expect(ChecksumMethod.sha3_256.makeHasher() is SHA3Hasher)
+        #expect(ChecksumMethod.sha3Bits256.makeHasher() is SHA3Hasher)
     }
 }

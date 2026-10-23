@@ -1,9 +1,10 @@
-import Foundation
+import Darwin
 
 /// What a branch walk asks the system about the disks under it: which disk and which entry of
 /// it a folder is, whether a disk is mounted at a folder, and whether a walk from a folder goes
-/// on to the firmlinked folders of other disks. The walk decides with these alone where one
-/// volume ends; a test gives answers of its own.
+/// on to the firmlinked folders of other disks.
+///
+/// The walk decides with these alone where one volume ends; a test gives answers of its own.
 internal struct VolumeProbe: Sendable {
     /// The answers of the system.
     internal static let system = Self(

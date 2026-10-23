@@ -4,7 +4,9 @@ import Foundation
 @testable import NetworkPlugin
 
 /// A session on a server that exists only in memory: a tree of entries by path, and answers
-/// the test can change for every call. It records the calls it gets.
+/// the test can change for every call.
+///
+/// It records the calls it gets.
 ///
 /// Unchecked: everything is guarded by `lock`; the answers are set before use or under it.
 internal final class CoverageNetworkSession: RemoteSession, @unchecked Sendable {
@@ -60,7 +62,7 @@ internal final class CoverageNetworkSession: RemoteSession, @unchecked Sendable 
         set { lock.withLock { cheap = newValue } }
     }
 
-    /// The calls, in order: `list /a`, `rename /a /b`, `disconnect`, …
+    /// The calls, in order: `list /a`, `rename /a /b`, `disconnect`, ….
     internal var calls: [String] { lock.withLock { log } }
 
     /// An empty server, for `profile`.
@@ -174,7 +176,7 @@ internal final class CoverageNetworkSession: RemoteSession, @unchecked Sendable 
     }
 
     /// Removes the entry, unless the hook throws.
-    internal func remove(_ path: String, isDirectory _: Bool?, cancellation _: CancellationFlag?) throws {
+    internal func remove(_ path: String, kind _: RemovedKind, cancellation _: CancellationFlag?) throws {
         record("remove \(path)")
         try lock.withLock { removeHook }(path)
         lock.withLock { entries[path] = nil }

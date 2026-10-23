@@ -1,6 +1,5 @@
-import AFMContracts
 import AFMKernel
-import AppKit
+import Foundation
 
 /// Reading a tab's folder again: when asked, when it was reported changed, and once more for a
 /// change that came while it could not be read (spec 03 › Panel anatomy, "Reading again").

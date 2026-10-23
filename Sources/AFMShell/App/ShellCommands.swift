@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import AppKit
 
 /// The commands only the window can provide.
 ///

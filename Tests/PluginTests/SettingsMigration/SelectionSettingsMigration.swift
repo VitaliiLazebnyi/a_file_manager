@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import TestSupport
 import Testing
@@ -45,9 +44,9 @@ internal struct SelectionSettingsMigration {
         let logs = try #require(store.type(named: "big LOGS"))
         #expect(logs.mask == "*.log" && logs.kind == .files && logs.minSize == 1_048_576 && logs.maxSize == nil)
         #expect(logs.modifiedFrom == Date(timeIntervalSinceReferenceDate: 788_918_400) && logs.modifiedTo == nil)
-        #expect(logs.notOlderThanDays == 30 && logs.hidden == .no && logs.links == .any)
+        #expect(logs.notOlderThanDays == 30 && logs.hidden == .excluded && logs.links == .any)
         let links = try #require(store.type(named: "Links"))
-        #expect(links.mask == "*" && links.kind == .folders && links.hidden == .any && links.links == .yes)
+        #expect(links.mask == "*" && links.kind == .folders && links.hidden == .any && links.links == .required)
         #expect(links.minSize == nil && links.modifiedFrom == nil && links.notOlderThanDays == nil)
     }
 

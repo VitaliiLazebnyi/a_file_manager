@@ -36,11 +36,17 @@ internal struct StallTextRowsOrder {
             let lower = Int(min(offset, length))
             return data.subdata(in: lower..<min(data.count, lower + count))
         }
+
+        deinit {
+            // Nothing to release.
+        }
     }
 
-    /// Two segments of 8 MB, each read on a thread of its own. The first waits until the second has read 4 MB, the
-    /// length after which a segment shows what it has found so far: the second is not the next to be shown, so
-    /// nothing is shown until the first is read; then all rows are there, in order.
+    /// Two segments of 8 MB, each read on a thread of its own.
+    ///
+    /// The first waits until the second has read 4 MB, the length after which a segment shows what
+    /// it has found so far: the second is not the next to be shown, so nothing is shown until the
+    /// first is read; then all rows are there, in order.
     @Test
     internal func aLaterSegmentShowsNothingBeforeTheEarlierOnes() {
         let line = String(repeating: "x", count: 79) + "\n"
@@ -64,12 +70,14 @@ internal struct StallTextRowsOrder {
             for signal in done { _ = signal.wait() }
         }
         index.build(
-            source: source,
-            content: 0..<Int64(data.count),
-            encoding: .utf8,
-            options: TextLayoutOptions(columns: 200, wordWrap: false),
+            TextRowIndex.Input(
+                source: source,
+                content: 0..<Int64(data.count),
+                encoding: .utf8,
+                options: TextLayoutOptions(columns: 200, wordWrap: false, tabWidth: 8)
+            ),
             parallel: true,
-            segmentSize: segment,
+            scanning: TextRowIndex.ScanOptions(segmentSize: segment, chunkSize: 1 << 20, rawScan: true),
             cancellation: CancellationFlag()
         ) { progress.add() }
         #expect(source.progressAtRelease == 0)

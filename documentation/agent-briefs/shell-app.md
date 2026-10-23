@@ -31,8 +31,8 @@ after the merge with per-test selection. Also:
    it and cover it.
 5. Where your code swallows errors or would benefit from diagnostics, use the kernel's `Log` (`Log.logger(_:)`) rather
    than print; do not add logging for its own sake.
-6. `Tests/ShellTests/ShellUnitTests.swift` has known lint and format findings from upstream: clear them.
-If you rename or remove anything public in AFMKernel/AFMContracts (you should not need to), run `Scripts/check.sh api`
-and acknowledge the break in `Scripts/api-breaks.txt` with a reason.
+6. `Tests/ShellTests/ShellUnitTests.swift` has known lint and format findings from upstream: clear them. If you rename
+   or remove anything public in AFMKernel/AFMContracts (you should not need to), run `Scripts/check.sh api` and
+   acknowledge the break in `Scripts/api-breaks.txt` with a reason.
 
 Report as the briefs say, including the coverage numbers for your files before and after.

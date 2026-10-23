@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import Testing
 
@@ -16,7 +15,7 @@ internal struct CoverageNetworkReplies {
     /// The last piece loses its carriage return.
     @Test
     internal func theLastPieceLosesItsCarriageReturn() {
-        var splitter = LineSplitter()
+        var splitter = LineSplitter(limit: FTPLimits.lineLength)
         #expect(splitter.feed(Data("one\r\ntwo\r".utf8)) == [Data("one".utf8)])
         #expect(splitter.finish() == Data("two".utf8))
         #expect(splitter.finish() == nil)

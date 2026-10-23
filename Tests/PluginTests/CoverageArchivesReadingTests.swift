@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import TestSupport
 import Testing
@@ -29,12 +28,12 @@ internal struct CoverageArchivesReadingTests {
     }
 
     private func archive() throws -> OpenArchive {
-        try bench.store.archive(at: box.url("tree.tar.gz"))
+        try bench.store.archive(at: box.url("tree.tar.gz"), cancellation: nil)
     }
 
     /// Reads a whole member.
     private func read(_ archive: OpenArchive, _ entry: ArchiveEntry) throws -> Data {
-        let stream = try archive.open(entry)
+        let stream = try archive.open(entry, slot: nil)
         defer { stream.close() }
         return try stream.readFully(1 << 20)
     }
@@ -84,7 +83,7 @@ internal struct CoverageArchivesReadingTests {
     @Test
     internal func aMemberThatOutlivesItsArchiveClosesItsReader() throws {
         var opened: OpenArchive? = try archive()
-        let stream = try #require(opened).open(try entry(try #require(opened), 0))
+        let stream = try #require(opened).open(try entry(try #require(opened), 0), slot: nil)
         bench.store.close()
         opened = nil
         _ = try? stream.readFully(1 << 20)
@@ -108,7 +107,7 @@ internal struct CoverageArchivesReadingTests {
             return true
         }
         #expect {
-            try opened.readInOnePass([try entry(opened, 0), beyond], throughTheEnd: false) { _, _ in
+            try opened.readInOnePass([try entry(opened, 0), beyond], cancellation: nil, throughTheEnd: false) { _, _ in
                 // Nothing is read.
             }
         } throws: { error in
@@ -124,7 +123,7 @@ internal struct CoverageArchivesReadingTests {
     internal func entriesOfAnotherKindOfArchiveAreNotFound() throws {
         try box.file("zip/one.txt", "one")
         #expect(runTool("/usr/bin/zip", ["-qr", "one.zip", "zip"], in: box.root).status == 0)
-        let zip = try bench.store.archive(at: box.url("one.zip"))
+        let zip = try bench.store.archive(at: box.url("one.zip"), cancellation: nil)
         var stranger = try #require(zip.entry("zip/one.txt"))
         for content in [ArchiveEntry.Content.whole, .member(index: 0)] {
             stranger.content = content
@@ -146,7 +145,7 @@ internal struct CoverageArchivesReadingTests {
             try box.file("tree/\(name).txt", String(repeating: name, count: 3_000))
         }
         #expect(runTool("/usr/bin/tar", ["--no-mac-metadata", "-czf", "six.tar.gz", "tree"], in: box.root).status == 0)
-        let opened = try bench.store.archive(at: box.url("six.tar.gz"))
+        let opened = try bench.store.archive(at: box.url("six.tar.gz"), cancellation: nil)
         // Read backwards, each member needs a pass of its own and leaves a reader behind.
         for number in (0..<5).reversed() {
             #expect(try read(opened, try entry(opened, number)).count == 3_000)

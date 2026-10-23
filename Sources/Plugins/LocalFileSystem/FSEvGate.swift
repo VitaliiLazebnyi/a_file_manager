@@ -1,6 +1,7 @@
 import Foundation
 
 /// Set once the watcher is stopped or has gone: reports still under way are dropped.
+///
 /// All state is guarded by `lock`.
 internal final class FSEvGate: @unchecked Sendable {
     private let lock = NSLock()

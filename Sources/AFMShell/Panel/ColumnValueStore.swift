@@ -134,12 +134,13 @@ internal final class ColumnValueStore {
         waiting.removeLast(count)
         let lane = folder ?? URL(fileURLWithPath: "/")
         let flag = cancellation
+        let batchGeneration = generation
         Background.storage(
             "columns",
             at: lane,
             qos: .utility,
             work: { Parallel.map(batch) { $0.column.cancellableValue($0.item, flag) } },
-            then: { [weak self, generation] texts in self?.take(texts, of: batch, for: shown, generation: generation) }
+            then: { [weak self] texts in self?.take(texts, of: batch, for: shown, generation: batchGeneration) }
         )
     }
 

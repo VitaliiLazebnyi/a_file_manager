@@ -2,8 +2,9 @@ import AFMKernel
 import CoreServices
 import Foundation
 
-/// Everything that is done to streams, on `control`. Held by the closures that are
-/// still to run, so the watcher itself may go away at any moment.
+/// Everything that is done to streams, on `control`.
+///
+/// Held by the closures that are still to run, so the watcher itself may go away at any moment.
 ///
 /// Unchecked: what changes is only touched on `control`, one block at a time; the rest is
 /// fixed in `init`.
@@ -18,11 +19,12 @@ internal final class FSEvCore: @unchecked Sendable {
     internal let queue: DispatchQueue
     /// Receives the watched folders whose contents changed.
     internal let onChange: @Sendable ([URL]) -> Void
-    /// Where everything is done to streams. Not at the lowest classes: while the program (or
-    /// the machine) keeps every core busy with work of a higher class, queues of the utility
-    /// class may get no thread for a long time, and a panel would then not hear of changes
-    /// for as long. Setting a stream up is a few steps; sifting reports is a look at the
-    /// length of each path.
+    /// Where everything is done to streams.
+    ///
+    /// Not at the lowest classes: while the program (or the machine) keeps every core busy with
+    /// work of a higher class, queues of the utility class may get no thread for a long time, and a
+    /// panel would then not hear of changes for as long. Setting a stream up is a few steps;
+    /// sifting reports is a look at the length of each path.
     internal let control = DispatchQueue(label: "AFM.DirectoryWatcher.control", qos: .userInitiated)
     /// Where the reports arrive and are sifted.
     internal let streamQueue = DispatchQueue(label: "AFM.DirectoryWatcher", qos: .default)
@@ -141,9 +143,10 @@ internal final class FSEvCore: @unchecked Sendable {
     }
 
     /// Asks for the real path of every folder not yet known, each on its own thread so that
-    /// one that hangs holds up nothing but itself. The streams are made as soon as all have
-    /// answered, or when the patience is spent without the ones that did not: those join
-    /// when they do answer.
+    /// one that hangs holds up nothing but itself.
+    ///
+    /// The streams are made as soon as all have answered, or when the patience is spent without the
+    /// ones that did not: those join when they do answer.
     private func resolve() {
         // (A URL's path has no slash at the end.)
         let wanted = Set(desired.map(\.path))
@@ -210,8 +213,9 @@ internal final class FSEvCore: @unchecked Sendable {
 
     /// The system did not give a stream (it has only so many for all programs together,
     /// and they may all be taken for a while): without one the folders would stay
-    /// unwatched until somebody asks for another set. Tried again after a pause that
-    /// grows, for as long as the watcher lives.
+    /// unwatched until somebody asks for another set.
+    ///
+    /// Tried again after a pause that grows, for as long as the watcher lives.
     private func retryLater() {
         // (A watcher stopped meanwhile does not try again: `reconcile` looks at the gate first.)
         guard !isRetryPending else {

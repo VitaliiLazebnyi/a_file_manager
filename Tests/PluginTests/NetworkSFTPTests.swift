@@ -5,18 +5,21 @@ import Testing
 
 @testable import NetworkPlugin
 
-/// The SFTP server that comes with macOS.
-let systemSFTPServer = "/usr/libexec/sftp-server"
-
 /// The SFTP client against the system's own `sftp-server`, run directly as a child process on
 /// a sandbox folder: the same protocol as through `ssh`, without a network or a login.
-@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: systemSFTPServer))) struct NetworkSFTP {
-    let box: Sandbox
-    let center: ConnectionCenter
-    let fileSystem: RemoteFileSystem
-    let key = ServerKey(scheme: "sftp", host: "test.invalid")
+@Suite(.enabled(if: FileManager.default.isExecutableFile(atPath: LocalSSHServer.systemSFTPServer)))
+internal struct NetworkSFTPTests {
+    /// The sandbox whose folders the server serves.
+    internal let box: Sandbox
+    /// The connections, whose sessions talk to `sftp-server` directly.
+    internal let center: ConnectionCenter
+    /// The file system over the center, as the panels use it.
+    internal let fileSystem: RemoteFileSystem
+    /// The server; its host name is never looked up.
+    internal let key = ServerKey(scheme: "sftp", host: "test.invalid")
 
-    init() throws {
+    /// A center whose sessions run `sftp-server -e` as their transport.
+    internal init() throws {
         box = try Sandbox()
         let environment = SessionEnvironment()
         var values = NetworkOptions.Values()
@@ -27,16 +30,19 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
             SFTPSession(
                 profile: profile,
                 environment: environment,
-                transport: SFTPTransport(executable: systemSFTPServer, arguments: ["-e"])
+                transport: SFTPTransport(executable: LocalSSHServer.systemSFTPServer, arguments: ["-e"])
             )
         }
         fileSystem = RemoteFileSystem(scheme: "sftp", center: center)
     }
 
     /// The location of a path inside the sandbox, as the server sees it.
-    func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
+    internal func url(_ path: String) -> URL { key.url(path: box.url(path).path) }
 
-    @Test func listsAndDescribes() throws {
+    /// A listing has names, kinds, links, sizes, dates and permissions; hidden names show only when asked, and
+    /// a missing folder is an error.
+    @Test
+    internal func listsAndDescribes() throws {
         let stamp = Date(timeIntervalSince1970: 1_500_000_000)
         try box.file("a.txt", "hello", modified: stamp)
         try box.file(".hidden", "h")
@@ -61,7 +67,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(center.isConnected(key) && fileSystem.places().count == 1)
     }
 
-    @Test func readsWritesAndSeeks() throws {
+    /// A large file written in pieces arrives whole with its date and permissions, is not written over, and reads
+    /// back from the start or from any offset.
+    @Test
+    internal func readsWritesAndSeeks() throws {
         let content = Data((0..<700_000).map { UInt8(truncatingIfNeeded: $0 &* 13 &+ $0 / 251) })
         let writer = try fileSystem.write(url("big.bin"))
         // In pieces like the copy job's, larger than one round of requests.
@@ -90,7 +99,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(throws: (any Error).self) { _ = try fileSystem.read(url("missing.bin")) }
     }
 
-    @Test func changes() throws {
+    /// Folders are made with their parents, moves replace only when asked, permissions change, and only empty
+    /// folders can be removed.
+    @Test
+    internal func changes() throws {
         try box.file("a.txt", "a")
         try box.file("b.txt", "b")
         try fileSystem.createDirectory(at: url("x/y/z"))
@@ -111,7 +123,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(!box.exists("x"))
     }
 
-    @Test func manyThreadsShareOneChannel() throws {
+    /// Listings and reads from twelve threads at once share the one connection and each get their own answers.
+    @Test
+    internal func manyThreadsShareOneChannel() throws {
         for index in 0..<12 { try box.file("d\(index)/f\(index).txt", String(repeating: "x", count: index * 1_000)) }
         let results = Parallel.map(Array(0..<12)) { index -> Int in
             let names = (try? fileSystem.list(url("d\(index)"), showHidden: true).map(\.name)) ?? []
@@ -130,7 +144,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         )
     }
 
-    @Test func reconnectsAfterDisconnect() throws {
+    /// After a disconnect the next listing connects again.
+    @Test
+    internal func reconnectsAfterDisconnect() throws {
         try box.file("a.txt", "a")
         #expect(try fileSystem.list(url(""), showHidden: true).count == 1)
         center.disconnect(key)
@@ -138,7 +154,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(try fileSystem.list(url(""), showHidden: true).count == 1)
     }
 
-    @Test func aTransportThatIsNotSFTPFails() throws {
+    /// A transport that does not speak SFTP fails the connection, which then counts as not connected.
+    @Test
+    internal func aTransportThatIsNotSFTPFails() throws {
         center.makeSession = { profile, environment in
             SFTPSession(
                 profile: profile,
@@ -150,7 +168,10 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(!center.isConnected(key))
     }
 
-    @Test func sshArguments() {
+    /// The arguments for `ssh` carry the timeouts, the port and the user, and the host after `--`, lowercased,
+    /// so a host name cannot pass as an option.
+    @Test
+    internal func sshArguments() {
         var values = NetworkOptions.Values()
         (values.timeout, values.keepAliveInterval) = (20, 45)
         let profile = ConnectionProfile(
@@ -164,8 +185,9 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     }
 
     /// The helper `ssh` calls for its questions, driven here by a shell that calls it the same way.
-    @Test func askpassCarriesQuestionAndAnswer() throws {
-        let helper = try AskpassHelper()
+    @Test
+    internal func askpassCarriesQuestionAndAnswer() throws {
+        let helper = try AskpassHelper(in: FileManager.default.temporaryDirectory)
         let process = Process()
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -182,7 +204,7 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         #expect(question?.text == "anna@host's password: " && question?.kind == .entry)
         helper.reply("s3cr\\et $HOME `x`", to: try #require(question))
         process.waitUntilExit()
-        let answer = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        let answer = String(bytes: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
         #expect(answer == "s3cr\\et $HOME `x`\n")
         // Nothing secret is in the environment or in the helper's folder.
         #expect(!helper.environment.values.contains { $0.contains("s3cr") })
@@ -194,10 +216,13 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
     }
 
     /// The whole way through `ssh`: a secure-shell server of the system on 127.0.0.1 with keys
-    /// made in the sandbox. The host is unknown and the key has a passphrase, so both of ssh's
-    /// questions come through the helper. Nothing of the user's own ssh setup is read or written.
-    @Test(.enabled(if: LocalSSHServer.isAvailable)) func logsInThroughSSH() throws {
-        let server = try LocalSSHServer(box: box, passphrase: "open sesame")
+    /// made in the sandbox.
+    ///
+    /// The host is unknown and the key has a passphrase, so both of ssh's questions come through
+    /// the helper. Nothing of the user's own ssh setup is read or written.
+    @Test(.enabled(if: LocalSSHServer.isAvailable))
+    internal func logsInThroughSSH() throws {
+        let server = try LocalSSHServer(box: box, passphrase: "open sesame", banner: nil)
         defer { server.stop() }
         try box.file("srv/hello.txt", "over ssh")
         let transport = SFTPTransport(
@@ -229,96 +254,5 @@ let systemSFTPServer = "/usr/libexec/sftp-server"
         let reader = try fileSystem.read(url("srv/hello.txt"))
         #expect(try reader.read(upToCount: 100) == Data("over ssh".utf8))
         reader.close()
-    }
-}
-
-/// `/usr/sbin/sshd` as a child process of the test, on a free port of 127.0.0.1, with a host
-/// key, a user key and an `authorized_keys` file that exist only in the sandbox.
-final class LocalSSHServer {
-    static var isAvailable: Bool {
-        ["/usr/sbin/sshd", "/usr/bin/ssh", "/usr/bin/ssh-keygen", systemSFTPServer]
-            .allSatisfy(
-                FileManager.default.isExecutableFile
-            )
-    }
-
-    let port: Int
-    let clientArguments: [String]
-    private let process = Process()
-
-    /// `banner`: a text the server shows before the login, as any server may.
-    init(box: Sandbox, passphrase: String, banner: String? = nil) throws {
-        let folder = try box.folder("ssh")
-        func run(_ tool: String, _ arguments: [String]) throws {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: tool)
-            process.arguments = arguments
-            (process.standardOutput, process.standardError) = (FileHandle.nullDevice, FileHandle.nullDevice)
-            try process.run()
-            process.waitUntilExit()
-        }
-        let (hostKey, userKey) = (
-            folder.appendingPathComponent("host").path, folder.appendingPathComponent("user").path
-        )
-        try run("/usr/bin/ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", hostKey])
-        try run("/usr/bin/ssh-keygen", ["-q", "-t", "ed25519", "-N", passphrase, "-f", userKey])
-        let authorized = folder.appendingPathComponent("authorized_keys")
-        try FileManager.default.copyItem(atPath: userKey + ".pub", toPath: authorized.path)
-
-        // A port that is free right now.
-        let probe = try TestFTPServer(root: folder)
-        port = probe.port
-        probe.stop()
-        let config = folder.appendingPathComponent("sshd_config")
-        let bannerFile = folder.appendingPathComponent("banner")
-        if let banner { try banner.write(to: bannerFile, atomically: true, encoding: .utf8) }
-        try """
-        \(banner == nil ? "" : "Banner \(bannerFile.path)")
-        Port \(port)
-        ListenAddress 127.0.0.1
-        HostKey \(hostKey)
-        PidFile \(folder.appendingPathComponent("sshd.pid").path)
-        AuthorizedKeysFile \(authorized.path)
-        StrictModes no
-        UsePAM no
-        PasswordAuthentication no
-        KbdInteractiveAuthentication no
-        Subsystem sftp \(systemSFTPServer)
-
-        """
-        .write(to: config, atomically: true, encoding: .utf8)
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/sshd")
-        process.arguments = ["-D", "-e", "-f", config.path]
-        (process.standardOutput, process.standardError) = (FileHandle.nullDevice, FileHandle.nullDevice)
-        try process.run()
-        clientArguments = [
-            "-F", "/dev/null", "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none", "-o",
-            "NumberOfPasswordPrompts=1",
-            "-o", "UserKnownHostsFile=\(folder.appendingPathComponent("known_hosts").path)", "-o",
-            "GlobalKnownHostsFile=/dev/null",
-            "-o", "StrictHostKeyChecking=ask", "-o", "ConnectionAttempts=20", "-i", userKey, "-p", String(port),
-            "-s", "--", "127.0.0.1", "sftp"
-        ]
-        // Until the server listens.
-        for _ in 0..<100 {
-            let descriptor = socket(AF_INET, SOCK_STREAM, 0)
-            var address = sockaddr_in()
-            address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-            address.sin_family = sa_family_t(AF_INET)
-            address.sin_port = UInt16(port).bigEndian
-            address.sin_addr.s_addr = inet_addr("127.0.0.1")
-            let result = withUnsafePointer(to: &address) {
-                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
-                }
-            }
-            close(descriptor)
-            if result == 0 { break }
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-    }
-
-    func stop() {
-        process.terminate()
     }
 }

@@ -32,12 +32,12 @@ internal struct CoverageArchivesFSLettingGoTests {
     @Test
     internal func theLeastRecentlyUsedArchivesAreLetGo() throws {
         let junk = try box.file("junk.zip", "no archive")
-        #expect(throws: ArchiveError.self) { _ = try store.archive(at: junk) }
+        #expect(throws: ArchiveError.self) { _ = try store.archive(at: junk, cancellation: nil) }
         let remote = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/tree.zip", on: memory)
         memory.stallsReads = true
         let (shared, first) = (store, Signal<Result<OpenArchive, any Error>>())
         Thread.detachNewThread {
-            first.set(Result { try shared.archive(at: remote) })
+            first.set(Result { try shared.archive(at: remote, cancellation: nil) })
         }
         #expect(Wait.until { memory.stalledTransfers == 1 })
         var locals: [URL] = []
@@ -45,7 +45,7 @@ internal struct CoverageArchivesFSLettingGoTests {
             let url = box.url("copy\(index).zip")
             try zipBytes.write(to: url)
             locals.append(url)
-            _ = try store.archive(at: url)
+            _ = try store.archive(at: url, cancellation: nil)
         }
         memory.releaseStalls()
         let opened = try #require(try first.wait()?.get())
@@ -60,8 +60,8 @@ internal struct CoverageArchivesFSLettingGoTests {
         bench.environment.scratchBudget = 0
         let first = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/one.zip", on: memory)
         let second = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/two.zip", on: memory)
-        _ = try store.archive(at: first)
-        _ = try store.archive(at: second)
+        _ = try store.archive(at: first, cancellation: nil)
+        _ = try store.archive(at: second, cancellation: nil)
         #expect(store.openArchive(at: first) == nil && store.openArchive(at: second) != nil)
     }
 
@@ -92,7 +92,7 @@ internal struct CoverageArchivesFSLettingGoTests {
     @Test
     internal func aChangeThatMeetsAnArchiveThatWasLetGoIsMadeAgain() throws {
         let url = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/tree.zip", on: hooked.base)
-        _ = try store.archive(at: url)
+        _ = try store.archive(at: url, cancellation: nil)
         let shared = store
         hooked.onNextItem { shared.release(on: url) }
         try bench.zip.createDirectory(at: bench.inside(url, "tree/made"))
@@ -100,7 +100,7 @@ internal struct CoverageArchivesFSLettingGoTests {
 
         // (Another archive: the server is asked about each at most once a second.)
         let other = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/other.zip", on: hooked.base)
-        _ = try store.archive(at: other)
+        _ = try store.archive(at: other, cancellation: nil)
         hooked.onNextItem { shared.release(on: other) }
         try bench.zip.move(
             bench.inside(other, "tree/readme.txt"),

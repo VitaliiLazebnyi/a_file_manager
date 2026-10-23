@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// A job monitor for work that runs on the main thread: its questions are asked at once, its reports are dropped.
 internal final class CovFileOpsMonitor: JobMonitor, Sendable {

@@ -1,7 +1,7 @@
 public import AFMKernel
 public import Foundation
 
-/// The log of file operations (spec 13 › Operation › Log file): one line per item,
+/// The log of file operations (spec 13 › Operation › Log file): one line per item,.
 ///
 ///     2026-10-12 14:03:22: Copy: /a/one.txt -> /b/one.txt
 ///     2026-10-12 14:03:22: Error: Delete: /a/two.txt: Permission denied
@@ -16,58 +16,14 @@ public import Foundation
 /// Unchecked `Sendable`: the mutable state is used on the log's queue only; the rest does not
 /// change after `init`.
 public final class OperationLog: @unchecked Sendable {
-    public enum Rotation: Equatable, Sendable {
-        case never
-        /// A new file with the first line written after midnight.
-        case daily
-        /// A new file when the log would grow beyond this many bytes.
-        case size(Int)
-    }
+    /// How long a burst of lines may wait before it is written.
+    private static let delay: TimeInterval = 0.25
 
-    /// What the Log file page of the configuration holds.
-    public struct Configuration: Equatable, Sendable {
-        public var isEnabled = false
-        public var file = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent(
-                "Library/Logs/A File Manager/operations.log"
-            )
-        public var logsTransfers = true
-        public var logsDeletes = true
-        public var logsFolders = true
-        public var logsSuccess = true
-        public var logsErrors = true
-        public var logsSkipped = true
-        public var rotation = Rotation.never
-        /// How many rotated copies are kept; 0 keeps all.
-        public var keepCount = 30
-
-        public init() {}
-
-        /// Whether a record is of a kind the user wants in the log.
-        public func wants(_ record: OperationRecord) -> Bool {
-            wants(record.verb, record.status)
-        }
-
-        /// The same, asked before the record is made.
-        public func wants(_ verb: OperationRecord.Verb, _ status: OperationRecord.Status) -> Bool {
-            let kind: Bool
-            switch verb {
-            case .copy, .move, .append, .rename, .newFile: kind = logsTransfers
-            case .delete, .trash: kind = logsDeletes
-            case .makeFolder, .removeFolder: kind = logsFolders
-            }
-            switch status {
-            case .done: return kind && logsSuccess
-            case .failed: return kind && logsErrors
-            case .skipped: return kind && logsSkipped
-            }
-        }
-    }
-
+    /// What is logged, where, and how the file is rotated; fixed for the log's life.
     public let configuration: Configuration
     private let queue = DispatchQueue(label: "afm.fileoperations.log", qos: .utility)
     private let now: @Sendable () -> Date
-    private let fm = FileManager.default
+    private let fileManager = FileManager.default
     private let stamp: DateFormatter
     private let day: DateFormatter
 
@@ -77,10 +33,9 @@ public final class OperationLog: @unchecked Sendable {
     private var handle: FileHandle?
     /// The file the handle writes to, to notice when somebody moved or deleted it.
     private var handleFile: UInt64?
-    /// How long a burst of lines may wait before it is written.
-    private static let delay: TimeInterval = 0.25
 
     /// `now` is the clock; tests bring their own.
+    @preconcurrency
     public init(_ configuration: Configuration, now: @escaping @Sendable () -> Date = { Date() }) {
         self.configuration = configuration
         self.now = now
@@ -92,23 +47,64 @@ public final class OperationLog: @unchecked Sendable {
         day.dateFormat = "yyyy-MM-dd"
     }
 
-    deinit {
-        try? handle?.close()
+    /// One record is one line, whatever the names hold: a line break or another control
+    /// character in a file name or an error text is written out (`<U+000A>`), so that no name
+    /// can add lines of its own to the log.
+    public static func line(for record: OperationRecord, at time: String) -> String {
+        let what =
+            record.verb.rawValue + ": " + DisplayName.escaped(record.source)
+            + (record.target.map { " -> " + DisplayName.escaped($0) } ?? "")
+        switch record.status {
+        case .done:
+            return "\(time): \(what)\n"
+
+        case .failed(let message):
+            return "\(time): Error: \(what): \(DisplayName.escaped(message))\n"
+
+        case .skipped:
+            return "\(time): Skipped: \(what)\n"
+        }
+    }
+
+    /// When a file was last changed, as its `stat` says.
+    private static func modified(_ info: stat) -> Date {
+        Date(
+            timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec) + TimeInterval(info.st_mtimespec.tv_nsec)
+                / 1e9
+        )
+    }
+
+    /// `operations.2026-10-12.log`, `operations.2026-10-12-2.log` and `operations.3.log` are
+    /// copies of `operations.log`.
+    internal static func isRotatedCopy(_ name: String, of log: String) -> Bool {
+        let url = URL(fileURLWithPath: log)
+        let (base, ext) = (url.deletingPathExtension().lastPathComponent, url.pathExtension)
+        let suffix = ext.isEmpty ? "" : "." + ext
+        guard name != log, name.hasPrefix(base + "."), name.hasSuffix(suffix),
+            name.count > base.count + 1 + suffix.count
+        else { return false }
+        let tag = name.dropFirst(base.count + 1).dropLast(suffix.count)
+        return tag.range(of: #"^(\d{4}-\d{2}-\d{2}(-\d+)?|\d+)$"#, options: .regularExpression) != nil
     }
 
     /// Any thread.
     public func write(_ record: OperationRecord) {
-        guard configuration.isEnabled, configuration.wants(record) else { return }
+        guard configuration.isEnabled, configuration.wants(record) else {
+            return
+        }
         let time = now()
         queue.async {
             self.pending.append((Self.line(for: record, at: self.stamp.string(from: time)), time))
-            guard !self.drainIsScheduled else { return }
+            guard !self.drainIsScheduled else {
+                return
+            }
             self.drainIsScheduled = true
             self.queue.asyncAfter(deadline: .now() + Self.delay) { self.drain() }
         }
     }
 
     /// Waits until everything handed in so far is in the file, and lets go of the file.
+    ///
     /// Blocks for as long as the disk takes: for a background thread, and for tests.
     public func flush() {
         queue.sync {
@@ -119,8 +115,9 @@ public final class OperationLog: @unchecked Sendable {
 
     /// The same for the end of the program, where the caller is the main thread: waits at most
     /// `timeout` seconds, so that a log on a volume that no longer answers cannot keep the
-    /// program from quitting. The writing itself goes on on the log's queue. False when the
-    /// time ran out.
+    /// program from quitting.
+    ///
+    /// The writing itself goes on on the log's queue. False when the time ran out.
     @discardableResult
     public func flush(timeout: TimeInterval) -> Bool {
         let done = DispatchSemaphore(value: 0)
@@ -135,17 +132,24 @@ public final class OperationLog: @unchecked Sendable {
     /// The same without anybody waiting on a thread: `completion` is called exactly once, on
     /// some thread, when everything handed in so far is in the file, or as soon as
     /// `cancellation` is set (the user does not want to wait for a disk that is not
-    /// answering). The writing itself goes on on the log's queue either way. Any thread.
+    /// answering).
+    ///
+    /// The writing itself goes on on the log's queue either way. Any thread.
+    @preconcurrency
     public func flush(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
-        /// Unchecked `Sendable`: all state is guarded by `lock`. What it lets go of (the
-        /// registration, whose release takes the flag's lock) is released outside the lock.
+        // Calls `completion` the first time it fires, never again.
+        //
+        // Unchecked `Sendable`: all state is guarded by `lock`. What it lets go of (the
+        // registration, whose release takes the flag's lock) is released outside the lock.
         final class Once: @unchecked Sendable {
             private let lock = NSLock()
             private var completion: (@Sendable () -> Void)?
             private var token: AnyObject?
+
             init(_ completion: @escaping @Sendable () -> Void) { self.completion = completion }
-            /// Holds the registration until `fire`; one that comes after it (the flag was set
-            /// already, or the log was quicker) is let go of at once.
+
+            // Holds the registration until `fire`; one that comes after it (the flag was set
+            // already, or the log was quicker) is let go of at once.
             func keep(_ token: AnyObject) {
                 lock.lock()
                 if completion != nil { self.token = token }
@@ -156,8 +160,14 @@ public final class OperationLog: @unchecked Sendable {
                 let (call, registration) = (completion, token)
                 (completion, token) = (nil, nil)
                 lock.unlock()
-                withExtendedLifetime(registration) {}
+                withExtendedLifetime(registration) {
+                    // The registration is let go of here, outside the lock.
+                }
                 call?()
+            }
+
+            deinit {
+                // Nothing to release: the registration went when it fired.
             }
         }
         let once = Once(completion)
@@ -170,9 +180,10 @@ public final class OperationLog: @unchecked Sendable {
         if cancellation.isCancelled { once.fire() }
     }
 
-    /// Runs `work` on the log's queue, in its turn. For tests, which hold the queue up with
-    /// it the way a disk that has stopped answering does.
-    func onQueue(_ work: @escaping @Sendable () -> Void) {
+    /// Runs `work` on the log's queue, in its turn.
+    ///
+    /// For tests, which hold the queue up with it the way a disk that has stopped answering does.
+    internal func onQueue(_ work: @escaping @Sendable () -> Void) {
         queue.async(execute: work)
     }
 
@@ -180,20 +191,6 @@ public final class OperationLog: @unchecked Sendable {
     /// for the answer.
     public func flushSoon() {
         queue.async { self.drain() }
-    }
-
-    /// One record is one line, whatever the names hold: a line break or another control
-    /// character in a file name or an error text is written out (`<U+000A>`), so that no name
-    /// can add lines of its own to the log.
-    public static func line(for record: OperationRecord, at time: String) -> String {
-        let what =
-            record.verb.rawValue + ": " + DisplayName.escaped(record.source)
-            + (record.target.map { " -> " + DisplayName.escaped($0) } ?? "")
-        switch record.status {
-        case .done: return "\(time): \(what)\n"
-        case .failed(let message): return "\(time): Error: \(what): \(DisplayName.escaped(message))\n"
-        case .skipped: return "\(time): Skipped: \(what)\n"
-        }
     }
 
     // MARK: On the log's queue
@@ -206,11 +203,13 @@ public final class OperationLog: @unchecked Sendable {
 
     private func drain() {
         drainIsScheduled = false
-        guard !pending.isEmpty else { return }
+        guard !pending.isEmpty else {
+            return
+        }
         let lines = pending
         pending.removeAll(keepingCapacity: true)
         let file = configuration.file
-        try? fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         // What the disk says about the file, once for the burst; after that it is known from what is written.
         var state = fileState()
         var chunk = Data()
@@ -236,6 +235,7 @@ public final class OperationLog: @unchecked Sendable {
     }
 
     /// The size of the file and the time it was last written; 0 and nil when there is none.
+    ///
     /// A handle that no longer points to the file at that place is dropped.
     private func fileState() -> (size: Int, modified: Date?) {
         var info = stat()
@@ -249,17 +249,11 @@ public final class OperationLog: @unchecked Sendable {
         return (Int(info.st_size), Self.modified(info))
     }
 
-    /// When a file was last changed, as its `stat` says.
-    private static func modified(_ info: stat) -> Date {
-        Date(
-            timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec) + TimeInterval(info.st_mtimespec.tv_nsec)
-                / 1e9
-        )
-    }
-
     private func writeChunk(_ chunk: inout Data) {
         defer { chunk.removeAll(keepingCapacity: true) }
-        guard !chunk.isEmpty else { return }
+        guard !chunk.isEmpty else {
+            return
+        }
         let file = configuration.file
         if handle == nil {
             // Opened for appending: every write goes to the end of the file as it is then,
@@ -268,7 +262,9 @@ public final class OperationLog: @unchecked Sendable {
             // opening, and with it the log's queue, until a reader came. Only a plain file is
             // written to.
             let descriptor = open(file.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NONBLOCK | O_NOCTTY, 0o644)
-            guard descriptor >= 0 else { return }
+            guard descriptor >= 0 else {
+                return
+            }
             var info = stat()
             guard fstat(descriptor, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG else {
                 close(descriptor)
@@ -281,8 +277,9 @@ public final class OperationLog: @unchecked Sendable {
         try? handle?.write(contentsOf: chunk)
     }
 
-    /// When the file to be rotated was last written, if adding `bytes` at `time` makes a rotation due. A file
-    /// with something in it (`size`) has been written (`modified`).
+    /// When the file to be rotated was last written, if adding `bytes` at `time` makes a rotation due.
+    ///
+    /// A file with something in it (`size`) has been written (`modified`).
     private func rotationDue(adding bytes: Int, size: Int, modified: Date?, at time: Date) -> Date? {
         switch configuration.rotation {
         case .never:
@@ -305,7 +302,9 @@ public final class OperationLog: @unchecked Sendable {
     /// Moves the log to its rotated name and removes the oldest copies beyond the limit.
     private func rotate(at written: Date) {
         let file = configuration.file
-        guard fm.fileExists(atPath: file.path) else { return }
+        guard fileManager.fileExists(atPath: file.path) else {
+            return
+        }
         let (base, ext) = (file.deletingPathExtension().lastPathComponent, file.pathExtension)
         func copy(_ tag: String) -> URL {
             file.deletingLastPathComponent()
@@ -317,21 +316,23 @@ public final class OperationLog: @unchecked Sendable {
         if case .daily = configuration.rotation {
             var target = copy(day.string(from: written))
             var counter = 2
-            while fm.fileExists(atPath: target.path) {
+            while fileManager.fileExists(atPath: target.path) {
                 target = copy("\(day.string(from: written))-\(counter)")
                 counter += 1
             }
-            try? fm.moveItem(at: file, to: target)
+            try? fileManager.moveItem(at: file, to: target)
         } else {
             var counter = 1
-            while fm.fileExists(atPath: copy(String(counter)).path) { counter += 1 }
-            try? fm.moveItem(at: file, to: copy(String(counter)))
+            while fileManager.fileExists(atPath: copy(String(counter)).path) { counter += 1 }
+            try? fileManager.moveItem(at: file, to: copy(String(counter)))
         }
-        guard configuration.keepCount > 0 else { return }
+        guard configuration.keepCount > 0 else {
+            return
+        }
         // The oldest copies beyond the limit go. Only files named the way this log names its
         // copies: a neighbour such as `operations.backup.log` is somebody else's.
         let folder = file.deletingLastPathComponent()
-        let copies = ((try? fm.contentsOfDirectory(atPath: folder.path)) ?? [])
+        let copies = ((try? fileManager.contentsOfDirectory(atPath: folder.path)) ?? [])
             .compactMap { name -> (url: URL, modified: Date)? in
                 let url = folder.appendingPathComponent(name)
                 var info = stat()
@@ -341,19 +342,10 @@ public final class OperationLog: @unchecked Sendable {
                 return (url, Self.modified(info))
             }
             .sorted { $0.modified > $1.modified }
-        for (url, _) in copies.dropFirst(configuration.keepCount) { try? fm.removeItem(at: url) }
+        for (url, _) in copies.dropFirst(configuration.keepCount) { try? fileManager.removeItem(at: url) }
     }
 
-    /// `operations.2026-10-12.log`, `operations.2026-10-12-2.log` and `operations.3.log` are
-    /// copies of `operations.log`.
-    static func isRotatedCopy(_ name: String, of log: String) -> Bool {
-        let url = URL(fileURLWithPath: log)
-        let (base, ext) = (url.deletingPathExtension().lastPathComponent, url.pathExtension)
-        let suffix = ext.isEmpty ? "" : "." + ext
-        guard name != log, name.hasPrefix(base + "."), name.hasSuffix(suffix),
-            name.count > base.count + 1 + suffix.count
-        else { return false }
-        let tag = name.dropFirst(base.count + 1).dropLast(suffix.count)
-        return tag.range(of: #"^(\d{4}-\d{2}-\d{2}(-\d+)?|\d+)$"#, options: .regularExpression) != nil
+    deinit {
+        try? handle?.close()
     }
 }

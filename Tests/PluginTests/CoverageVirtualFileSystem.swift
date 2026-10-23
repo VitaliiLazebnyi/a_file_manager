@@ -36,7 +36,7 @@ internal struct CoverageVirtualFileSystem {
 
     /// The location below the branch view of a real memory path.
     private func below(_ path: String) -> URL {
-        VirtualLocation.branch(of: memory.url(path)).url
+        VirtualLocation.branch(real: memory.url(path)).url
     }
 
     /// Every listing of `url`, gathered.
@@ -69,7 +69,7 @@ internal struct CoverageVirtualFileSystem {
     /// changed, and a location that is not virtual is not this file system's.
     @Test
     internal func whatCannotBeChanged() {
-        let elsewhere = VirtualLocation.branch(of: other.url("/D/y.txt")).url
+        let elsewhere = VirtualLocation.branch(real: other.url("/D/y.txt")).url
         let moved = #expect(throws: FileSystemError.self) {
             try virtual.move(below("/A/one.txt"), to: elsewhere, replacing: false)
         }
@@ -107,11 +107,11 @@ internal struct CoverageVirtualFileSystem {
     /// was forgotten is judged like every virtual folder.
     @Test
     internal func locationsWithoutEntries() throws {
-        #expect(virtual.entries(of: memory.url("/A")) == nil && virtual.entries(of: below("/A")) == nil)
+        #expect(virtual.entries(of: memory.url("/A")).isEmpty && virtual.entries(of: below("/A")).isEmpty)
         let forgotten = VirtualLocation.list(id: 1, title: "Gone", origin: nil).url
         #expect(virtual.capabilities(for: forgotten) == virtual.capabilities)
         #expect(throws: (any Error).self) { try names(memory.url("/A")) }
-        let picked = VirtualLocation.picked(id: 1, in: memory.url("/A")).url
+        let picked = VirtualLocation.picked(id: 1, real: memory.url("/A")).url
         #expect(throws: VirtualFileSystem.ForgottenList.self) { try names(picked) }
     }
 
@@ -149,7 +149,7 @@ internal struct CoverageVirtualFileSystem {
         let servers = try ["sftp://h:22/x", "sftp://h:2222/x", "sftp://g:22/x", "sftp://h:22/x"]
             .map { try #require(URL(string: $0)) }
         let list = virtual.register(files: servers, title: "Servers", origin: nil)
-        #expect(virtual.entries(of: list)?.count == 3)
+        #expect(virtual.entries(of: list).count == 3)
     }
 
     /// When every remembered list is shown, none is forgotten for a new one.
@@ -161,10 +161,13 @@ internal struct CoverageVirtualFileSystem {
         for index in 0..<VirtualFileSystem.listLimit {
             let list = virtual.register(files: [memory.url("/A/one.txt")], title: "L\(index)", origin: nil)
             lists.append(list)
-            tokens += [virtual.watch([list]) { _ in /* nothing */ }].compactMap(\.self)
+            let token = virtual.watch([list]) { _ in
+                // Only the watching itself counts here.
+            }
+            tokens += [token].compactMap(\.self)
         }
         _ = virtual.register(files: [memory.url("/A/one.txt")], title: "One more", origin: nil)
-        #expect(tokens.count == lists.count && lists.allSatisfy { virtual.entries(of: $0) != nil })
+        #expect(tokens.count == lists.count && lists.allSatisfy { !virtual.entries(of: $0).isEmpty })
     }
 
     /// Items go to the Trash on the file system they are on.

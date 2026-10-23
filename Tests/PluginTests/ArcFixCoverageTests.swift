@@ -1,4 +1,3 @@
-import AFMKernel
 import Compression
 import Foundation
 import TestSupport
@@ -34,7 +33,8 @@ internal struct ArcFixCoverageTests {
         try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: file.path)
         let archive = box.url("plain.zip")
         #expect(runTool("/usr/bin/zip", ["-q", "-X", archive.path, "plain.txt"], in: box.root).status == 0)
-        let records = try ZipDirectory.read(try RandomAccessFile(archive)).records
+        let records = try ZipDirectory.read(try RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil)
+            .records
         #expect(records.map(\.name) == ["plain.txt"])
         #expect(records.first?.modified == stamp)
     }
@@ -48,7 +48,7 @@ internal struct ArcFixCoverageTests {
         let box = bench.box
         let url = box.url("names.zip")
         try bench.pack([try box.file("kept.txt", "kept")], to: url)
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         // Put straight into the open archive, past the paths of its file system.
         try archive.makeDirectory("../escape")
         try archive.makeDirectory("/")

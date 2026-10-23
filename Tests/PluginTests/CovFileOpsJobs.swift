@@ -23,7 +23,7 @@ internal struct CovFileOpsJobs {
     /// Whoever does not care merges, goes ahead with what is protected and stays out of other volumes.
     @Test
     internal func theDelegatesDefaults() {
-        let job = FileJob(kind: .copy, sources: [], fileSystems: fileSystems)
+        let job = FileJob(kind: .copy, sources: [], target: nil, fileSystems: fileSystems)
         let folder = FileItem(url: memory.url("/A"), name: "A", kind: .directory)
         let answers = Answers()
         #expect(answers.job(job, mergeInto: folder, source: folder) == .merge)
@@ -40,7 +40,7 @@ internal struct CovFileOpsJobs {
     @Test
     internal func aTransferWithoutATargetDoesNothing() {
         memory.addFile("/A/one.txt", "1")
-        let result = runJob(.copy, [memory.url("/A/one.txt")], fileSystems: fileSystems)
+        let result = Answers().run(.copy, [memory.url("/A/one.txt")], to: nil, fileSystems: fileSystems)
         #expect(result.completed.isEmpty && !result.cancelled)
     }
 
@@ -48,7 +48,7 @@ internal struct CovFileOpsJobs {
     @Test
     internal func theFoldersLookedThroughAreForgottenAfterAWhile() {
         for number in 0...1_024 {
-            runJob(.copy, [], to: TargetSpec(directory: memory.url("/T\(number)")), fileSystems: fileSystems)
+            Answers().run(.copy, [], to: TargetSpec(directory: memory.url("/T\(number)")), fileSystems: fileSystems)
         }
         #expect(!memory.exists("/T0/x"))
     }
@@ -67,20 +67,22 @@ internal struct CovFileOpsJobs {
         memory.addDirectory("/T")
         memory.addDirectory("/U")
         disk.order.value = { $0.reversed() }
-        var result = runJob(
-            .copy,
-            sources + [disk.base.url("/S/dir")],
-            to: TargetSpec(directory: memory.url("/T")),
-            fileSystems: fileSystems
-        )
+        var result = Answers()
+            .run(
+                .copy,
+                sources + [disk.base.url("/S/dir")],
+                to: TargetSpec(directory: memory.url("/T")),
+                fileSystems: fileSystems
+            )
         #expect(result.completed.count == 4 && memory.contents("/T/dir/c") == "c")
         disk.order.value = { urls in urls.dropLast() + [URL(string: "scripted:/elsewhere")!] }
-        result = runJob(
-            .copy,
-            sources + [disk.base.url("/S/dir")],
-            to: TargetSpec(directory: memory.url("/U")),
-            fileSystems: fileSystems
-        )
+        result = Answers()
+            .run(
+                .copy,
+                sources + [disk.base.url("/S/dir")],
+                to: TargetSpec(directory: memory.url("/U")),
+                fileSystems: fileSystems
+            )
         #expect(result.completed.count == 4 && memory.contents("/U/dir/a") == "a")
     }
 
@@ -159,12 +161,13 @@ internal struct CovFileOpsJobs {
         disk.moveRule.value = { source, _ in
             source.lastPathComponent.hasPrefix(".afm-") ? nil : FileSystemError.crossesVolumes
         }
-        let result = runJob(
-            .move,
-            [disk.base.url("/A/f.txt"), disk.base.url("/A/dir")],
-            to: TargetSpec(directory: disk.base.url("/B")),
-            fileSystems: fileSystems
-        )
+        let result = Answers()
+            .run(
+                .move,
+                [disk.base.url("/A/f.txt"), disk.base.url("/A/dir")],
+                to: TargetSpec(directory: disk.base.url("/B")),
+                fileSystems: fileSystems
+            )
         #expect(result.completed.count == 2 && disk.base.contents("/B/dir/g.txt") == "inside")
         #expect(!disk.base.exists("/A/f.txt") && !disk.base.exists("/A/dir"))
     }
@@ -177,7 +180,8 @@ internal struct CovFileOpsJobs {
         #expect(mkfifo(pipe.path, 0o600) == 0)
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: pipe)
         let target = try box.folder("T")
-        let result = runJob(.copy, [box.url("link")], to: TargetSpec(directory: target), fileSystems: fileSystems)
+        let result = Answers()
+            .run(.copy, [box.url("link")], to: TargetSpec(directory: target), fileSystems: fileSystems)
         #expect(result.completed.count == 1)
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: box.url("T/link").path) == pipe.path)
     }

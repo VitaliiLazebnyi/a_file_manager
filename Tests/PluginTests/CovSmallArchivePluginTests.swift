@@ -26,7 +26,7 @@ internal struct CovSmallArchivePluginTests {
         )
         weak var opened: OpenArchive?
         autoreleasepool {
-            opened = try? archives.store.archive(at: url)
+            opened = try? archives.store.archive(at: url, cancellation: nil)
         }
         #expect(opened != nil && !archives.hasPendingChanges)
         archives.stop()
@@ -45,15 +45,15 @@ internal struct CovSmallArchivePluginTests {
         try bench.box.file("tree/a.txt", "a")
         let url = bench.box.url("tree.zip")
         try bench.pack([bench.box.url("tree")], to: url) { $0.format = .zip }
-        let first = try bench.store.archive(at: url)
+        let first = try bench.store.archive(at: url, cancellation: nil)
         let writer = try bench.zip.write(bench.inside(url, "tree/held.txt"))
         // Someone else touches the file: it is not the one that was read any more.
         try FileManager.default.setAttributes(
             [.modificationDate: Date(timeIntervalSince1970: 1_000)],
             ofItemAtPath: url.path
         )
-        #expect(try bench.store.archive(at: url) === first)
+        #expect(try bench.store.archive(at: url, cancellation: nil) === first)
         try writer.close(attributes: FileAttributes())
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
     }
 }

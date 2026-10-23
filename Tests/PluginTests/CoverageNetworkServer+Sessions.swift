@@ -1,6 +1,3 @@
-import AFMKernel
-import Foundation
-
 @testable import NetworkPlugin
 
 /// FTP sessions on the scripted server.

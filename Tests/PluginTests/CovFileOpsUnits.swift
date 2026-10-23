@@ -35,8 +35,8 @@ internal struct CovFileOpsUnits {
         #expect(FileIdentity.isSpecialNode(box.url("link"), followingLinks: true))
         #expect(!FileIdentity.isSpecialNode(box.url("link"), followingLinks: false))
         #expect(!FileIdentity.isSpecialNode(box.url("none"), followingLinks: false))
-        #expect(FileIdentity.isLocked(URL(string: "mem:/x")!) == nil)
-        #expect(FileIdentity.isLocked(box.url("none")) == nil)
+        #expect(FileIdentity.mayBeLocked(URL(string: "mem:/x")!))
+        #expect(FileIdentity.mayBeLocked(box.url("none")))
     }
 
     /// The grain of a volume's times goes by its type, and a share's is not known.

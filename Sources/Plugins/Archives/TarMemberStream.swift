@@ -1,7 +1,7 @@
 import Foundation
 
 /// The data of the member a `TarReader` stands on, as a stream.
-final class TarMemberStream: ByteStream {
+internal final class TarMemberStream: ByteStream {
     private let reader: TarReader
     private let closesReader: Bool
     private var onClose: ((Bool) -> Void)?
@@ -10,13 +10,16 @@ final class TarMemberStream: ByteStream {
     /// With `closesReader: false` the reader goes on to the next member afterwards; `onClose`
     /// is then told, once, that the reader is free again, and whether it can still be used
     /// (it cannot after an error).
-    init(_ reader: TarReader, closesReader: Bool = true, onClose: ((Bool) -> Void)? = nil) {
+    internal init(_ reader: TarReader, closesReader: Bool, onClose: ((Bool) -> Void)?) {
         self.reader = reader
         self.closesReader = closesReader
         self.onClose = onClose
     }
 
-    func read(upToCount count: Int) throws -> Data? {
+    /// The next block of the member's data, at most `count` bytes; nil at its end.
+    ///
+    /// An error of the reader is passed on, and the reader then counts as unusable.
+    internal func read(upToCount count: Int) throws -> Data? {
         do {
             return try reader.readData(upToCount: count)
         } catch {
@@ -25,9 +28,14 @@ final class TarMemberStream: ByteStream {
         }
     }
 
-    func close() {
+    /// Closes the reader (with `closesReader`) and tells `onClose` once.
+    internal func close() {
         if closesReader { reader.close() }
         onClose?(!failed)
         onClose = nil
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

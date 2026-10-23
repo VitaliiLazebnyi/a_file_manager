@@ -14,11 +14,15 @@ internal enum Harness {
             .async {
                 let source: any ByteSource
                 do {
-                    source = try ProviderByteSource.open(url, fileSystems: fileSystems)
+                    source = try ProviderByteSource.open(
+                        url,
+                        fileSystems: fileSystems,
+                        cancellation: CancellationFlag()
+                    )
                 } catch {
                     preconditionFailure("cannot open \(url.path): \(error)")
                 }
-                let cached = CachedByteSource(source)
+                let cached = CachedByteSource(source, policy: .standard)
                 DispatchQueue.main.async { opened.value = cached }
             }
         pump(upTo: 60) { opened.value != nil }

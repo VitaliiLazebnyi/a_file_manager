@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 import Foundation
@@ -114,7 +113,12 @@ internal struct CovSysToolsPrinting {
     /// The pages lie one below the other, each where its rectangle says, and a page is drawn only when asked for.
     @Test
     internal func thePagesAreDrawnWhereTheirRectanglesAre() throws {
-        let view = PagePrintView(pages: [["first", "line"], ["second"]], linesPerPage: 10, printInfo: NSPrintInfo())
+        let view = PagePrintView(
+            pages: [["first", "line"], ["second"]],
+            longestLine: nil,
+            linesPerPage: 10,
+            printInfo: NSPrintInfo()
+        )
         #expect(view.isFlipped && PagePrintView(coder: NSCoder()) == nil)
         var range = NSRange()
         #expect(view.knowsPageRange(&range) && range == NSRange(location: 1, length: 2))

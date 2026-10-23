@@ -4,7 +4,9 @@ import TestSupport
 
 /// A file system over memory whose listings deliver all their entries and then find the search
 /// cancelled before they return, as a cancel that comes while the last part of a big folder is
-/// taken in. Everything else is the memory's.
+/// taken in.
+///
+/// Everything else is the memory's.
 internal final class StabilityFindCancellingListing: FileSystemProvider, @unchecked Sendable {
     /// Where the files are.
     internal let base = MemoryFileSystem(scheme: "cancelling")

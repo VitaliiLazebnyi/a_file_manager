@@ -1,5 +1,4 @@
-import AFMKernel
-import Foundation
+import Darwin.C
 import Testing
 
 @testable import NetworkPlugin
@@ -25,7 +24,7 @@ internal struct CovNetFTPConnections {
             // The usual configuration.
         }
         defer { connection.close() }
-        let error = #expect(throws: NetworkError.self) { try connection.connect() }
+        let error = #expect(throws: NetworkError.self) { try connection.connect(cancellation: nil) }
         #expect(CovNetErrorKind(error) == .connectionFailed)
     }
 }

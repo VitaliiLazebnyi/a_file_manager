@@ -1,4 +1,4 @@
-import Foundation
+import CoreFoundation
 
 /// The autorelease pool of the program's event loop, for the main run loop of a test process.
 ///

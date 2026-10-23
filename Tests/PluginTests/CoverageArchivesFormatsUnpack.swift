@@ -33,7 +33,7 @@ internal struct CoverageArchivesFormatsUnpack {
             monitor: bench.monitor,
             options: options
         )
-        let result = packer.run([try bench.item(box.url(name))], archive: archive)
+        let result = packer.run([try bench.item(box.url(name))], archive: archive, innerFolder: "")
         #expect(result.failure == nil)
         return archive
     }
@@ -41,7 +41,7 @@ internal struct CoverageArchivesFormatsUnpack {
     private func unpack(
         _ archive: URL,
         into target: URL,
-        source: (Unpacker.Source) -> Unpacker.Source = { $0 },
+        source: (Unpacker.Source) -> Unpacker.Source = \.self,
         monitor: (any JobMonitor)? = nil,
         options: UnpackOptions = UnpackOptions(),
         whileUnpacking: (@Sendable (ArchiveEntry) -> Void)? = nil,
@@ -59,7 +59,7 @@ internal struct CoverageArchivesFormatsUnpack {
             return left.isEmpty ? .overwrite : left.removeFirst()
         }
         let result = unpacker.run(
-            [source(Unpacker.Source(archive: try bench.store.archive(at: archive)))],
+            [source(Unpacker.Source(archive: try bench.store.archive(at: archive, cancellation: nil)))],
             into: target
         )
         return (result, asked)
@@ -70,15 +70,12 @@ internal struct CoverageArchivesFormatsUnpack {
     internal func aSelectionOfNothingBringsNothing() throws {
         let archive = try archive(["a.txt": "a"])
         let target = try box.folder("target")
-        let outcome = try unpack(
-            archive,
-            into: target,
-            source: { source in
-                var chosen = source
-                chosen.selection = ["missing.txt"]
-                return chosen
-            }
-        )
+        let choosingNothing = { (source: Unpacker.Source) in
+            var chosen = source
+            chosen.selection = .paths(["missing.txt"])
+            return chosen
+        }
+        let outcome = try unpack(archive, into: target, source: choosingNothing)
         #expect(outcome.result.unpacked == 0 && outcome.result.problems.isEmpty)
     }
 
@@ -152,12 +149,8 @@ internal struct CoverageArchivesFormatsUnpack {
         try bench.pack([source], to: archive)
         let target = try box.folder("target")
         let monitor = CoverageArchivesFormatsMonitor()
-        let outcome = try unpack(
-            archive,
-            into: target,
-            monitor: monitor,
-            whileUnpacking: { _ in monitor.cancellation.cancel() }
-        )
+        let cancelling: @Sendable (ArchiveEntry) -> Void = { _ in monitor.cancellation.cancel() }
+        let outcome = try unpack(archive, into: target, monitor: monitor, whileUnpacking: cancelling)
         #expect(outcome.result.cancelled && outcome.result.unpacked == 1 && outcome.result.problems.isEmpty)
         #expect(try FileManager.default.contentsOfDirectory(atPath: target.appending(name: "linked").path).isEmpty)
     }
@@ -169,12 +162,8 @@ internal struct CoverageArchivesFormatsUnpack {
         bench.environment.hasRoom = { _, _ in false }
         let target = try box.folder("target")
         let monitor = CoverageArchivesFormatsMonitor()
-        let outcome = try unpack(
-            archive,
-            into: target,
-            monitor: monitor,
-            whileUnpacking: { _ in monitor.cancellation.cancel() }
-        )
+        let cancelling: @Sendable (ArchiveEntry) -> Void = { _ in monitor.cancellation.cancel() }
+        let outcome = try unpack(archive, into: target, monitor: monitor, whileUnpacking: cancelling)
         #expect(outcome.result.cancelled && outcome.result.unpacked == 0)
     }
 
@@ -186,11 +175,10 @@ internal struct CoverageArchivesFormatsUnpack {
         bench.environment.hasRoom = { _, _ in false }
         let target = try box.folder("target")
         defer { chmod(target.path, 0o755) }
-        let outcome = try unpack(
-            archive,
-            into: target,
-            whileUnpacking: { entry in chmod(target.path, entry.name == "a.txt" ? 0o555 : 0o755) }
-        )
+        let lockingAfterA: @Sendable (ArchiveEntry) -> Void = { entry in
+            chmod(target.path, entry.name == "a.txt" ? 0o555 : 0o755)
+        }
+        let outcome = try unpack(archive, into: target, whileUnpacking: lockingAfterA)
         let refused = "\(String(cString: strerror(EACCES))): \(target.path)/a.txt"
         #expect(outcome.result.problems == ["a.txt: \(refused)"])
         #expect(outcome.result.unpacked == 1 && box.read("target/b.txt") == "b")

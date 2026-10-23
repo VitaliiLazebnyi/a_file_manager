@@ -155,7 +155,7 @@ internal struct CoverageArchivesFSPluginTests {
     /// Ejecting a volume lets go of the archives that lie on it.
     @Test
     internal func ejectingAVolumeLetsGoOfTheArchivesOnIt() throws {
-        _ = try archives.store.archive(at: box.url("A/tree.zip"))
+        _ = try archives.store.archive(at: box.url("A/tree.zip"), cancellation: nil)
         #expect(archives.store.openArchive(at: box.url("A/tree.zip")) != nil)
         try bench.kernel.fileSystems.closeFiles(on: box.url("A"), cancellation: CancellationFlag())
         #expect(archives.store.openArchive(at: box.url("A/tree.zip")) == nil)

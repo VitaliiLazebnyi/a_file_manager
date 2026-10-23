@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
 import NavigationPlugin
@@ -28,6 +27,10 @@ internal struct SweepCommandRunnerTests {
                 defer { blocks = [] }
                 return blocks
             }
+        }
+
+        deinit {
+            // Nothing to release.
         }
     }
 

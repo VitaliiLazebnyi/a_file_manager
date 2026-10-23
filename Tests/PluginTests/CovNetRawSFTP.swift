@@ -81,7 +81,8 @@ internal enum CovNetRawSFTP {
             executable: FakeSFTPServer.python,
             arguments: [url.path, scene.rawValue],
             environment: environment,
-            writeTimeout: writeTimeout
+            writeTimeout: writeTimeout,
+            names: nil
         )
     }
 

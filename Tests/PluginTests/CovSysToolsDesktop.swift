@@ -5,7 +5,9 @@ import TestSupport
 @testable import SystemToolsPlugin
 
 /// A desktop for the system tools that does nothing outside the program: it records what the tools asked of it and
-/// answers as the test says. Any thread: everything is kept in `Shared` boxes.
+/// answers as the test says.
+///
+/// Any thread: everything is kept in `Shared` boxes.
 internal final class CovSysToolsDesktop: Sendable {
     /// The applications started.
     internal let started = Shared<[URL]>([])

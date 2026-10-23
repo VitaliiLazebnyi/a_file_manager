@@ -15,17 +15,18 @@ internal func checkSegments<T: Equatable>(
 ) {
     var (left, right) = (0, 0)
     for segment in segments {
-        fzCheck(segment.a.lowerBound == left && segment.b.lowerBound == right, key + "-cover", detail())
-        fzCheck(!(segment.a.isEmpty && segment.b.isEmpty), key + "-empty-segment", detail())
+        fzCheck(segment.first.lowerBound == left && segment.second.lowerBound == right, key + "-cover", detail())
+        fzCheck(!(segment.first.isEmpty && segment.second.isEmpty), key + "-empty-segment", detail())
         if segment.isEqual {
             fzCheck(
-                segment.a.count == segment.b.count && segment.a.upperBound <= first.count
-                    && segment.b.upperBound <= second.count && Array(first[segment.a]) == Array(second[segment.b]),
+                segment.first.count == segment.second.count && segment.first.upperBound <= first.count
+                    && segment.second.upperBound <= second.count
+                    && Array(first[segment.first]) == Array(second[segment.second]),
                 key + "-equal-not-equal",
                 detail()
             )
         }
-        (left, right) = (segment.a.upperBound, segment.b.upperBound)
+        (left, right) = (segment.first.upperBound, segment.second.upperBound)
     }
     fzCheck(left == first.count && right == second.count, key + "-cover-end", detail())
     fzCheck(Myers.apply(segments, to: first, from: second) == second, key + "-apply", detail())

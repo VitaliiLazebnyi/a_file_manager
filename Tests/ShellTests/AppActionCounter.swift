@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 
 /// The target of a control in a test: counts what its action asked.
 @MainActor

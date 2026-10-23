@@ -2,7 +2,7 @@ import AVKit
 import AppKit
 import Foundation
 import PDFKit
-import Quartz
+import QuickLookUI
 import TestSupport
 import Testing
 import WebKit

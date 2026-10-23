@@ -2,24 +2,38 @@ import AFMKernel
 import Foundation
 
 /// A file-type specification of Show › Custom…: `*.bmp *.gif`, `*.* | *.bak`, `*.txt | */`
-/// (spec 03 › Show files of type). The masks before the `|` say which files are shown, the
-/// ones after it which are left out; an exclusion that ends in a slash is about folders.
-/// Folders are shown unless such an exclusion names them. Pure, safe on any thread.
-struct DisplayMask: Sendable {
-    let text: String
+/// (spec 03 › Show files of type).
+///
+/// The masks before the `|` say which files are shown, the ones after it which are left out; an
+/// exclusion that ends in a slash is about folders. Folders are shown unless such an exclusion
+/// names them. Pure, safe on any thread.
+internal struct DisplayMask: Sendable {
+    /// The specification without the spaces around it; the title of the filter it makes.
+    internal let text: String
     private let includes: FileMask?
     private let excludes: FileMask?
     private let folderExcludes: FileMask?
 
-    init(_ text: String) {
-        let text = text.trimmingCharacters(in: .whitespaces)
-        self.text = text
-        let parts = text.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
-            .map {
-                $0.trimmingCharacters(in: .whitespaces)
+    /// True for `*.*`, `*` and nothing at all: every entry is shown, which is no filter.
+    internal var showsEverything: Bool {
+        excludes == nil && folderExcludes == nil && (includes == nil || ["*", "*.*"].contains(text))
+    }
+
+    /// The filter for a panel; nil when the specification shows everything.
+    internal var filter: PanelFilter? {
+        showsEverything ? nil : PanelFilter(title: text) { [self] in matches($0) }
+    }
+
+    /// Reads a specification as the user typed it; masks are separated by spaces or semicolons.
+    internal init(_ specification: String) {
+        let trimmed = specification.trimmingCharacters(in: .whitespaces)
+        text = trimmed
+        let parts = trimmed.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            .map { part in
+                part.trimmingCharacters(in: .whitespaces)
             }
         func words(_ part: String) -> [String] {
-            part.split(whereSeparator: { $0 == " " || $0 == ";" }).map(String.init)
+            part.split { $0 == " " || $0 == ";" }.map(String.init)
         }
         func mask(_ words: [String]) -> FileMask? { words.isEmpty ? nil : FileMask(words.joined(separator: " ")) }
         let excluded = parts.count > 1 ? words(parts[1]) : []
@@ -31,18 +45,12 @@ struct DisplayMask: Sendable {
         folderExcludes = mask(excluded.filter(isFolderMask).map { String($0.dropLast()) }.filter { !$0.isEmpty })
     }
 
-    /// True for `*.*`, `*` and nothing at all: every entry is shown, which is no filter.
-    var showsEverything: Bool {
-        excludes == nil && folderExcludes == nil && (includes == nil || ["*", "*.*"].contains(text))
-    }
-
-    func matches(_ item: FileItem) -> Bool {
-        if item.isFolder { return !(folderExcludes?.matches(item.name) ?? false) }
+    /// Whether the entry is listed: a folder unless a folder exclusion names it, a file when an
+    /// inclusion names it (or there is none) and no exclusion does.
+    internal func matches(_ item: FileItem) -> Bool {
+        if item.isFolder {
+            return !(folderExcludes?.matches(item.name) ?? false)
+        }
         return (includes?.matches(item.name) ?? true) && !(excludes?.matches(item.name) ?? false)
-    }
-
-    /// The filter for a panel; nil when the specification shows everything.
-    var filter: PanelFilter? {
-        showsEverything ? nil : PanelFilter(title: text) { [self] in matches($0) }
     }
 }

@@ -38,7 +38,7 @@ internal struct CovCompareText {
         #expect(given.lines.map(\.text) == ["aé"] && given.isLossless)
         let broken = TextDocument(data: Data([0xFF, 0xFE, 0x00, 0xD8, 0x61, 0x00]), encoding: .utf16LittleEndian)
         #expect(broken.lines.first?.text.contains("a") == true)
-        let latin = TextDocument(encoding: .latin1, lines: [TextLine("a€", ending: .none)])
+        let latin = TextDocument(encoding: .latin1, lines: [TextLine("a€", ending: .noBreak)])
         #expect(latin.data() == Data([0x61, 0x3F]))
     }
 
@@ -69,16 +69,17 @@ internal struct CovCompareText {
     internal func linesWithTheSameHashAreComparedAgain() {
         let left = [TextLine("one"), TextLine("two")]
         let right = [TextLine("one"), TextLine("TWO!")]
-        let diff = TextDiff.compute(
-            left: left,
-            right: right,
-            options: DiffOptions(),
-            anchors: [],
-            costLimit: nil,
-            cancellation: nil
-        ) { lines in
-            lines.map { _ in 7 }
-        }
+        let diff =
+            TextDiff.Comparison(
+                left: left,
+                right: right,
+                options: DiffOptions(),
+                costLimit: nil,
+                cancellation: nil
+            ) { lines in
+                lines.map { _ in 7 }
+            }
+            .diff(anchors: [])
         #expect(diff.rows.map(\.kind) == [.equal, .changed] && diff.blocks == [1..<2])
     }
 

@@ -1,5 +1,4 @@
 import AFMKernel
-import AppKit
 import Foundation
 import TestSupport
 import Testing
@@ -36,7 +35,9 @@ internal struct CoverageLocalFreeSpace {
                 return LocalFileSystem(probes: probes)
             }()
         ] {
-            local.spareLock.withLock { local.spareSpace[mount] = (0, lost, true, volume) }
+            local.spareLock.withLock {
+                local.spareSpace[mount] = .init(bytes: 0, measured: lost, isMeasuring: true, volume: volume)
+            }
             #expect(local.volume(of: box.root) != nil)
             #expect(
                 Wait.until {

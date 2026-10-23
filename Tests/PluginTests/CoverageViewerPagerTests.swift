@@ -1,4 +1,3 @@
-import AFMKernel
 import AppKit
 import Foundation
 import Testing
@@ -24,7 +23,7 @@ internal struct CoverageViewerPagerTests {
         pager.scroll(toPercent: 50)
         pager.scroll(toLine: 3)
         pager.selectAll()
-        pager.perform(.down)
+        pager.perform(.rowDown)
         #expect(pager.selection == nil && pager.position == nil)
     }
 
@@ -55,7 +54,7 @@ internal struct CoverageViewerPagerTests {
         var zooms: [Int] = []
         pager.onZoom = { zooms.append($0) }
         let long = String(repeating: "wide ", count: 100) + "\n" + Self.lines
-        let unwrapped = ViewerLayout.text(TextLayoutOptions(columns: 1_000, wordWrap: false))
+        let unwrapped = ViewerLayout.text(TextLayoutOptions(columns: 1_000, wordWrap: false, tabWidth: 8))
         #expect(await bench.show(bench.document(long, unwrapped)))
         pager.scrollWheel(with: try CoverageViewerEvents.scroll(lines: 2, flags: .maskControl))
         pager.scrollWheel(with: try CoverageViewerEvents.scroll(lines: -9, flags: .maskControl))
@@ -85,14 +84,14 @@ internal struct CoverageViewerPagerTests {
         pager.showsCaret = false
         #expect(await bench.show(bench.document(Self.lines, CoverageViewerPagerBench.wrapped)))
         func line() -> Int { pager.position?.line ?? 0 }
-        pager.perform(.down)
+        pager.perform(.rowDown)
         #expect(await bench.wait { line() == 2 })
         pager.perform(.pageDown)
         #expect(await bench.wait { line() > 2 })
         pager.perform(.fileEnd)
         #expect(await bench.wait { line() > 40 })
         pager.perform(.pageUp)
-        pager.perform(.up)
+        pager.perform(.rowUp)
         pager.perform(.fileStart)
         #expect(await bench.wait { line() == 1 })
         pager.perform(.rowEnd)
@@ -116,17 +115,17 @@ internal struct CoverageViewerPagerTests {
         #expect(await bench.wait { offset() == 1 })
         pager.perform(.wordRight)
         #expect(await bench.wait { offset() == 5 })
-        pager.perform(.down)
+        pager.perform(.rowDown)
         pager.perform(.pageDown)
         pager.perform(.pageUp)
-        pager.perform(.up)
+        pager.perform(.rowUp)
         #expect(await bench.wait { offset() == 5 })
         pager.perform(.wordLeft)
         #expect(await bench.wait { offset() == 0 })
         // At the start of a row Left goes to the end of the row above; at the very start nowhere.
         pager.perform(.left)
         #expect(await bench.wait { offset() == 0 })
-        pager.perform(.down)
+        pager.perform(.rowDown)
         pager.perform(.rowStart)
         let second = offset()
         pager.perform(.left)

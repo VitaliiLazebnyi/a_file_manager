@@ -14,7 +14,7 @@ internal struct CovNetSFTPChanges {
         let bench = try CovNetSFTPBench()
         let session = bench.session()
         defer { session.disconnect() }
-        #expect(throws: SFTPError.self) { try session.remove("/missing", isDirectory: nil, cancellation: nil) }
+        #expect(throws: SFTPError.self) { try session.remove("/missing", kind: .unknown, cancellation: nil) }
         #expect(bench.requests.suffix(2) == ["7", "13"])
     }
 

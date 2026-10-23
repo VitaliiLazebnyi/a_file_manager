@@ -60,7 +60,11 @@ internal struct SeedMaker {
             print("no item")
             return
         }
-        let result = packer.run([item], archive: URL(fileURLWithPath: dir + "/" + seed.folder + "/" + seed.name))
+        let result = packer.run(
+            [item],
+            archive: URL(fileURLWithPath: dir + "/" + seed.folder + "/" + seed.name),
+            innerFolder: ""
+        )
         print(seed.name, result.failure.map { "FAILED \($0)" } ?? "ok")
     }
 
@@ -72,7 +76,11 @@ internal struct SeedMaker {
             return
         }
         let packer = Packer(fileSystems: registry, store: store, monitor: QuietMonitor(), options: PackOptions())
-        let result = packer.run([tarSeed, text], archive: URL(fileURLWithPath: dir + "/zip/own-nested.zip"))
+        let result = packer.run(
+            [tarSeed, text],
+            archive: URL(fileURLWithPath: dir + "/zip/own-nested.zip"),
+            innerFolder: ""
+        )
         print("own-nested.zip", result.failure.map { "FAILED \($0)" } ?? "ok")
     }
 }

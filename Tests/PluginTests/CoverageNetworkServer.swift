@@ -2,8 +2,9 @@ import Foundation
 import TestSupport
 
 /// An FTP server whose every answer the test writes: a script gets each command line and the
-/// control connection, and replies, opens data connections or hangs up as it likes. What the
-/// script leaves alone `standard` answers like a plain, agreeable server. It listens on
+/// control connection, and replies, opens data connections or hangs up as it likes.
+///
+/// What the script leaves alone `standard` answers like a plain, agreeable server. It listens on
 /// 127.0.0.1; every control connection runs on a thread of its own.
 ///
 /// Unchecked: the record of commands, the sockets and the stop are guarded by `lock`; the rest
@@ -20,7 +21,9 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
         case standard
     }
 
-    /// One control connection, as the script sees it. Used by its own thread only.
+    /// One control connection, as the script sees it.
+    ///
+    /// Used by its own thread only.
     internal final class Line {
         /// The socket of the control connection.
         internal let socket: Int32
@@ -172,7 +175,9 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
 
     private var stopped: Bool { lock.withLock { isStopped } }
 
-    /// Starts listening. Each connection gets `greeting` first, then the script for each command.
+    /// Starts listening.
+    ///
+    /// Each connection gets `greeting` first, then the script for each command.
     internal init(onIPv6: Bool, greeting: [String], script: @escaping Script) throws {
         listener = onIPv6 ? try Self.listenOnIPv6() : try TestFTPServer.listen()
         port = TestFTPServer.port(of: listener)
@@ -270,7 +275,9 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
     internal func stop() {
         lock.withLock {
             isStopped = true
-            sockets.forEach { _ = shutdown($0, SHUT_RDWR) }
+            for socket in sockets {
+                _ = shutdown(socket, SHUT_RDWR)
+            }
         }
     }
 

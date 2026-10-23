@@ -68,8 +68,9 @@ internal struct CoverageSelectionBackground {
     }
 
     /// A list that keeps changing faster than the work is done is given up after a few tries.
-    /// (The work is held back, and each round changes the list before the work is done: its
-    /// result is always for a list the panel no longer shows.)
+    ///
+    /// (The work is held back, and each round changes the list before the work is done: its result
+    /// is always for a list the panel no longer shows.).
     @Test
     internal func aListThatKeepsChangingIsGivenUp() async {
         let held = Shared<[@Sendable () -> Void]>([])
@@ -94,7 +95,7 @@ internal struct CoverageSelectionBackground {
             rounds += 1
             memory.addFile("/A/more\(rounds).txt")
             holding.left.reload()
-            work.forEach { $0() }
+            for block in work { block() }
             #expect(await RunLoopWait.until { !held.value.isEmpty || rejected > 0 })
         }
         #expect(rejected == 1 && rounds == Selections.attempts && held.value.isEmpty)

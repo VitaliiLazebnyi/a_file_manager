@@ -1,5 +1,4 @@
-import AFMKernel
-import Foundation
+import ObjectiveC
 import TestSupport
 import Testing
 

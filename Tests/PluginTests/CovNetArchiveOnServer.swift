@@ -26,7 +26,7 @@ internal struct CovNetArchiveOnServer {
             monitor: bench.monitor,
             options: PackOptions()
         )
-        return packer.run([try bench.item(source)], archive: archive)
+        return packer.run([try bench.item(source)], archive: archive, innerFolder: "")
     }
 
     /// What is at the top of the archive.

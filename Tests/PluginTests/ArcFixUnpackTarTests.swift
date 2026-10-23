@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 import TestSupport
 import Testing
@@ -43,12 +42,14 @@ internal struct ArcFixUnpackTarTests {
 
     /// Unpacks the archive (only `selection`, when it names anything) into a new folder; the result.
     private func unpack(_ selection: [String] = []) throws -> UnpackResult {
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         #expect(!archive.allowsParallelReads)
         let target = try box.folder("out-\(UUID().uuidString)")
         let (files, monitor, options) = (bench.fileSystems, bench.monitor, UnpackOptions())
-        let unpacker = Unpacker(fileSystems: files, monitor: monitor, options: options) { _, _ in .overwrite }
-        let source = Unpacker.Source(archive: archive, selection: selection.isEmpty ? nil : selection)
+        let unpacker = Unpacker(fileSystems: files, monitor: monitor, options: options, whileUnpacking: nil) { _, _ in
+            .overwrite
+        }
+        let source = Unpacker.Source(archive: archive, selection: selection.isEmpty ? .all : .paths(selection))
         return unpacker.run([source], into: target)
     }
 
@@ -64,7 +65,7 @@ internal struct ArcFixUnpackTarTests {
     /// A damaged checksum is reported, whether the last file was unpacked or only the first.
     @Test(arguments: [[], ["tree/a.txt"]])
     internal func aDamagedChecksumIsReported(selection: [String]) throws {
-        _ = try bench.store.archive(at: url)
+        _ = try bench.store.archive(at: url, cancellation: nil)
         try damageTheChecksum()
         let result = try unpack(selection)
         #expect(result.problems == [ArchiveError.damaged("the compressed data cannot be decoded").localizedDescription])

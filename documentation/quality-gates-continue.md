@@ -1,8 +1,8 @@
 # Quality gates: where the work stands and how to continue
 
-State saved on 2026-10-21 (branch `quality-gates`, pushed). The plan, decisions and gotchas are in
-`documentation/quality-gates-handover.md`; the briefs every agent follows are in `documentation/agent-briefs/`
-(`coverage-brief.md` for the coverage work).
+State saved on 2026-10-23 (lint step 6, branch `worktree-agent-a25a67a2f61cdb73a`, not pushed). The plan, decisions and
+gotchas are in `documentation/quality-gates-handover.md`; the briefs every agent follows are in
+`documentation/agent-briefs/` (`coverage-brief.md` for the coverage work).
 
 ## Prompt to continue
 
@@ -114,8 +114,25 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   rows; XCUITest's drags do not arrive in the VM (see the hand-over, UI tests). A posted key event that only carries a
   modifier's flag leaves that modifier held for the whole system (a unit test of drop operations then saw Cmd held): the
   helper presses and releases modifier keys itself.
-- Next: lint step 6 (the touched files are clean, the rest of the repository is not), the mutation runs, gates repo-wide
-  at zero, benchmarks re-recorded, CI and pre-commit.
+- **Lint step 6 (2026-10-23):** the plugins and their tests had never been through the lint pass (29,731 SwiftLint and
+  3,235 swift-format findings over 316 files at `cfa408a`; the analyzer step had not run since the stress harness
+  stopped building against the shell). Mechanical passes first (swift-format; one-sentence doc summaries;
+  `switch_case_on_newline`, `conditional_returns_on_newline`, `attributes`, `explicit_acl`, `type_contents_order` with a
+  SwiftSyntax rewriter; SwiftLint's safe autofixes one rule at a time, each built), then nine group agents in worktrees
+  (network, archives, viewer, config, fileops, findrename, tools, places, rest) by hand: documentation of every
+  declaration, files split one type each, long functions in named steps, real names, no defaults, explicit raw values.
+  Then the analyzer: 743 findings (680 `unused_import`, 42 `unused_declaration`, 21 `capture_variable`) down to 13.
+- **Gates at the end of lint step 6:** SwiftLint lint 0 but `ArchiveURL.swift:52` (owner); `required-deinit.py` 0;
+  swift-format 6 `NeverForceUnwrap`: the five documented `!` and `ArchiveURL` (owner); Prettier, markdownlint, typos 0;
+  analyzer 13 (see "Next steps"). `swift test --parallel`: every test ran and passed (394 / 3,485 / 337) in four runs;
+  55 UI tests and both desktop checks passed. Coverage of the last run at `bfbb089` (unit and UI tests): lines 100,566 /
+  100,566, functions 16,385 / 16,385, regions 42,318 / 42,318. Earlier runs missed one or two race arms that come and go
+  (`ViewerPane+Presenting` 120/235 once; `CompareWindowEffects:37` and `DriveBarView:102` in a run under load whose UI
+  test `LastSheetTests.testCompareTakesTheFileChosenInItsSheet` timed out). lizard 345 → 178 findings (26 of them its
+  `init`/`set` misreading, decision 2), jscpd 39 → 36 clones.
+- Bugs found by the lint work: the Places and Selection commands kept the kernel (lifetime tests caught it); a Find
+  Files split did the same; `CheckedSettings` limited numbers to `Int64`, which reads back nil as `Int`; a test's
+  `flags ?? 0 & UF_IMMUTABLE != 0` precedence.
 - **Mutation, `Sources/Plugins/Navigation` (2026-10-23, branch of the Navigation agent): gate passed.** 31 mutants (17
   relational, 6 logical, 5 ternary, 3 removed calls), all killed, none equivalent. First run: 30 killed, 1 survived
   (`ClipboardText.path` kept an empty answer: no test put text on the clipboard after its change count moved). Second
@@ -171,6 +188,9 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   for the Archives owner); the second run: 394 / 3,458 / 337, all passed; Commands 100% lines, functions, regions. The
   final mutation run (at `4ab732a`, the commit of this note) killed the same 25 with the same tests in 444 s (18 s per
   mutant).
+- Next: the analyzer's last 13, the owner's two `!` questions, complexity and duplicates to zero, the mutation runs of
+  the other modules (Navigation, ViewOptions and AFMKernel/Commands are done), benchmarks re-recorded, CI and
+  pre-commit.
 - **Waiting for the owner** (before 2026-10-21; decided since, kept for the record): atomic counters for the coverage
   run; a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
   prompt); the drop on the thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`,
@@ -247,6 +267,20 @@ that only the UI tests reach (their coverage is merged by the gate once `UITests
 3. **Impossible optionals of Foundation**: decided 2026-10-16, a documented `!` is allowed in exactly those places.
 4. Exit tests: a process ended by a trap writes no coverage; `Tests/TestSupport/CoverageCoreTrap` (test-only) turns a
    trap into `exit(1)` so the counts are written. Use it, or return nil from `init?(coder:)` as the agents did.
+5. **swift-format on the documented `!`** (open, 2026-10-23): `NeverForceUnwrap` reports the five lines decision 3
+   allows (`DOSTime.swift:18`, `NetStream.swift:129`, `TLSSettings.swift:100`,
+   `MultiRenameWindowController+List.swift:98`, `VirtualLocation.swift:51`; SwiftLint is silenced there by the
+   documented disable). Either a `// swift-format-ignore: NeverForceUnwrap` beside each documented disable, or the rule
+   off in `.swift-format`.
+6. **`ArchiveURL.make`'s `components.url!`** (open): the same impossible optional as `VirtualLocation.url` (scheme, host
+   of letters, digits and `-`, a path from `/`); a fallback would be a region no test can reach. Add it to decision 3's
+   list?
+7. **SwiftLint 0.65's `unused_declaration` and protocol witnesses** (open): 13 analyzer findings are witnesses called
+   only through the protocol: `FTPSession`'s `makeDirectory`, `rename`, `setAttributes`, `canAppend`, `openAppend`,
+   `SFTPSession`'s `canAppend` and `rename`, `RemoteSession`'s default `onLinkResolved` (all reached through
+   `any RemoteSession`), and the `ListingOnly` / `MemoryBacked` test doubles' changing calls (witnesses of
+   `FileSystemProvider` for `HugeSizes`, `PlainCopier` and others, which the tests never call). Removing them breaks the
+   build. Options: a SwiftLint release that relates witnesses, calls of the concrete types in tests, or accept.
 
 ## Next steps, in order
 
@@ -296,9 +330,10 @@ that only the UI tests reach (their coverage is merged by the gate once `UITests
    packing a file over an empty folder of the same name in an archive on a server replaces the folder; `ProcessStream`
    read after close raises; closing a `QLPreviewView` outside a window ends the process; panels and windows are never
    freed after `Shell` goes away in the program tests (probable window leak).
-6. **Lint of the touched files** (the coverage agents left older findings in the plugin sources; their new test files
-   are mostly clean, except CompareContent, FindFiles, some Archives formats tests), then the mutation runs (panel run,
-   core-api hot files, the shell with the map), as in the hand-over.
+6. **Lint (done 2026-10-23, see State)**, left: decisions 5 to 7; the coverage race arms that come and go
+   (`ViewerPane+Presenting` 120/235: whether the cancelled HTML read throws or returns depends on timing; make the two
+   late-tags tests reach each arm on purpose); `LastSheetTests.testCompareTakesTheFileChosenInItsSheet` once timed out
+   under load. Then the mutation runs (panel run, core-api hot files, the shell with the map), as in the hand-over.
 7. Then: every gate repo-wide at zero, the full mutation run, re-record the benchmark limits on a quiet VM, switch the
    gates on in CI and in the pre-commit hook (`git config core.hooksPath .githooks`).
 

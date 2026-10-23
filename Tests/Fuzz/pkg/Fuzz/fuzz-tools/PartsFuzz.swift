@@ -62,7 +62,7 @@ internal enum PartsFuzz {
                 continue
             }
 
-            let parts = PartSeries.parts(startingAt: first, provider: ToolsFuzz.local)
+            let parts = PartSeries.parts(startingAt: first, provider: ToolsFuzz.local, cancellation: CancellationFlag())
             fzCheck(
                 parts.count <= lines.count + 1 && Set(parts.map(\.name)).count == parts.count,
                 "parts-row",

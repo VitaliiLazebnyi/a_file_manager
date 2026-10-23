@@ -54,8 +54,9 @@ internal struct NetworkSettingsMigration {
         internal static let trustedCertificates = #"{"files.example.com":["AA:BB:CC"]}"#
     }
 
-    /// The plugin started on the settings, with passwords in memory. The bench is returned with it: it
-    /// owns the kernel the plugin works with.
+    /// The plugin started on the settings, with passwords in memory.
+    ///
+    /// The bench is returned with it: it owns the kernel the plugin works with.
     private static func started(on settings: any SettingsStore) -> (bench: TestBench, plugin: NetworkPlugin) {
         let memory = MemoryFileSystem()
         let plugin = NetworkPlugin(launchesApplications: false, passwords: MemoryPasswords())
@@ -75,7 +76,11 @@ internal struct NetworkSettingsMigration {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.connections, forKey: "network.connections", in: settings)
         let (bench, plugin) = Self.started(on: settings)
-        defer { withExtendedLifetime(bench) {} }
+        defer {
+            withExtendedLifetime(bench) {
+                // Kept until here: the plugin works with the bench's kernel.
+            }
+        }
         let connections = plugin.connections
         try #require(connections.count == 2)
         let work = connections[0]
@@ -96,7 +101,11 @@ internal struct NetworkSettingsMigration {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.connectionsOtherFields, forKey: "network.connections", in: settings)
         let (bench, plugin) = Self.started(on: settings)
-        defer { withExtendedLifetime(bench) {} }
+        defer {
+            withExtendedLifetime(bench) {
+                // Kept until here: the plugin works with the bench's kernel.
+            }
+        }
         let connection = try #require(plugin.connections.first)
         #expect(connection.host == "old.example.com" && connection.port == nil && connection.kind == .ftp)
         #expect(connection.name.isEmpty && connection.user.isEmpty && connection.passive)
@@ -120,7 +129,11 @@ internal struct NetworkSettingsMigration {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.trustedCertificates, forKey: "network.trustedCertificates", in: settings)
         let (bench, plugin) = Self.started(on: settings)
-        defer { withExtendedLifetime(bench) {} }
+        defer {
+            withExtendedLifetime(bench) {
+                // Kept until here: the plugin works with the bench's kernel.
+            }
+        }
         let trust = plugin.center.environment.trust
         trust.prepare()
         #expect(!trust.isAccepted("AA:BB:CC", for: "files.example.com"))

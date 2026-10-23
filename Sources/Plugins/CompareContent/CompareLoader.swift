@@ -2,34 +2,10 @@ import AFMContracts
 public import AFMKernel
 public import Foundation
 
-/// Two files as the compare window shows them.
-public enum CompareContent: Sendable {
-    case none
-    /// `width` is the longest line in UTF-16 units, for the width of the panes.
-    case text(left: TextDocument, right: TextDocument, diff: TextDiff, width: Int)
-    case binary(left: Data, right: Data, diff: BinaryDiff)
-
-    var isNone: Bool {
-        if case .none = self { return true }
-        return false
-    }
-}
-
-/// The outcome of loading and comparing two files.
-public struct ComparedFiles: Sendable {
-    public var isIdentical = false
-    public var content = CompareContent.none
-    /// Why there is nothing to show: a file is missing, unreadable, or too large.
-    public var message: String?
-    public var wasCancelled = false
-    /// The two files as they were when loaded (nil for a link, which is saved where it leads): what
-    /// saving checks the files against, so that a file changed by someone else meanwhile is not overwritten.
-    public var leftItem: FileItem?
-    public var rightItem: FileItem?
-}
-
 /// Reads two files through their file systems and compares them (spec 09 › Loading, mode and
-/// encodings). UI-free.
+/// encodings).
+///
+/// UI-free.
 ///
 /// **Threading.** Everything here blocks and belongs on a background thread. The two files
 /// are read at the same time. Large files of the same size are first checked for being
@@ -58,51 +34,38 @@ public enum CompareLoader {
     /// How much of a large local file one worker compares at a time.
     public static let stretch = 4 * 1_024 * 1_024
 
+    /// Loads the two files and compares them: as text, or byte by byte when `forceBinary` is set or either file
+    /// looks binary (then `bytesPerLine` bytes make a row).
+    ///
+    /// Blocks; call it on a background thread. Never throws: what went wrong is the result's message, and a
+    /// cancel through `cancellation` is its `wasCancelled`.
     public static func load(
         left: URL,
         right: URL,
+        fileSystems: FileSystemRegistry,
         forceBinary: Bool = false,
         options: DiffOptions = DiffOptions(),
         bytesPerLine: Int = 16,
-        fileSystems: FileSystemRegistry,
         cancellation: CancellationFlag = CancellationFlag(),
         limits: Limits = .standard
     ) -> ComparedFiles {
         var result = ComparedFiles()
-        let items = Parallel.map([left, right]) { url in
-            (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation)
-        }
-        if cancellation.isCancelled {
-            result.wasCancelled = true
+        guard let (leftItem, rightItem) = files(left, right, fileSystems: fileSystems, cancellation, into: &result)
+        else {
             return result
         }
-        var files: [FileItem] = []
-        for (url, item) in zip([left, right], items) {
-            guard let item, !item.isDirectory else {
-                result.message = "\(fileSystems.displayPath(url)) is not a file."
-                return result
-            }
-            files.append(item)
-        }
-        let (leftItem, rightItem) = (files[0], files[1])
         result.leftItem = leftItem.isSymlink ? nil : leftItem
         result.rightItem = rightItem.isSymlink ? nil : rightItem
         do {
             if leftItem.size == rightItem.size, leftItem.size >= limits.quickCheckFrom {
-                guard
-                    let same = try identical(
-                        left,
-                        right,
-                        size: leftItem.size,
-                        fileSystems: fileSystems,
-                        cancellation: cancellation
-                    )
-                else {
-                    result.wasCancelled = true
-                    return result
-                }
-                if same {
-                    result.isIdentical = true
+                result.isIdentical = try identical(
+                    left,
+                    right,
+                    size: leftItem.size,
+                    fileSystems: fileSystems,
+                    cancellation: cancellation
+                )
+                if result.isIdentical {
                     return result
                 }
             }
@@ -118,24 +81,9 @@ public enum CompareLoader {
             let (first, second) = (try loaded[0].get(), try loaded[1].get())
             result.isIdentical = first == second
             if forceBinary || TextDocument.looksBinary(first) || TextDocument.looksBinary(second) {
-                result.content = .binary(
-                    left: first,
-                    right: second,
-                    diff: BinaryDiff.compute(
-                        left: first,
-                        right: second,
-                        bytesPerLine: bytesPerLine,
-                        cancellation: cancellation
-                    )
-                )
+                result.content = binary(first, second, bytesPerLine: bytesPerLine, cancellation: cancellation)
             } else {
-                let documents = Parallel.map([first, second]) { TextDocument(data: $0) }
-                result.content = text(
-                    left: documents[0],
-                    right: documents[1],
-                    options: options,
-                    cancellation: cancellation
-                )
+                result.content = text(first, second, options: options, cancellation: cancellation)
             }
             result.wasCancelled = cancellation.isCancelled
         } catch {
@@ -165,291 +113,86 @@ public enum CompareLoader {
             cancellation: cancellation
         )
         let widths = Parallel.map([left.lines, right.lines]) { lines in
-            lines.reduce(0) { max($0, $1.text.utf16.count) }
+            lines.reduce(0) { widest, line in max(widest, line.text.utf16.count) }
         }
         return .text(left: left, right: right, diff: diff, width: max(widths[0], widths[1]))
     }
 
     /// The whole file; throws `CancellationError` when cancelled before the end.
-    static func read(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag) throws -> Data {
+    internal static func read(_ url: URL, fileSystems: FileSystemRegistry, cancellation: CancellationFlag) throws
+        -> Data
+    {
         // What a plugin still holds back for this file (an archive written after a delay) is written first.
         try fileSystems.flushPendingWrites(to: url, cancellation: cancellation)
         let reader = try fileSystems.provider(for: url).read(url, cancellation: cancellation)
         defer { reader.close() }
         let token = cancellation.interrupting(reader)
-        defer { withExtendedLifetime(token) {} }
-        var data = Data()
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            // A part of the file is no file to compare.
-            if cancellation.isCancelled {
-                throw CancellationError()
-            }
-            guard let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else {
-                return false
-            }
-            data.append(block)
-            return true
-        }) {}
-        return data
-    }
-
-    // MARK: Identical?
-
-    /// Whether two files of `size` bytes have the same content; nil when cancelled.
-    public static func identical(
-        _ first: URL,
-        _ second: URL,
-        size: Int64,
-        fileSystems: FileSystemRegistry,
-        cancellation: CancellationFlag = CancellationFlag(),
-        stretch: Int = Self.stretch
-    ) throws -> Bool? {
-        if cancellation.isCancelled { return nil }
-        try fileSystems.flushPendingWrites(to: first, cancellation: cancellation)
-        try fileSystems.flushPendingWrites(to: second, cancellation: cancellation)
-        let systems = [try fileSystems.provider(for: first), try fileSystems.provider(for: second)]
-        let isLocal = zip(systems, [first, second])
-            .allSatisfy {
-                $0.volume(of: $1, cancellation: cancellation)?.isLocal ?? false
-            }
-        // (A size is what a file system says; a server may say anything.)
-        let stretches = Int(max(0, size).addingSaturated(Int64(stretch) - 1) / Int64(stretch))
-        guard isLocal, stretches > 1 else {
-            do {
-                return try sameStream(first, second, systems: systems, cancellation: cancellation)
-            } catch {
-                // A read that the cancel ended is the cancel, not a failure.
-                if cancellation.isCancelled { return nil }
-                throw error
-            }
-        }
-
-        // Shared by the workers, behind the lock: the next stretch to take and what was found.
-        let lock = NSLock()
-        /// Guarded by `lock`.
-        nonisolated(unsafe) var next = 0
-        /// Guarded by `lock`.
-        nonisolated(unsafe) var differs = false
-        /// Guarded by `lock`.
-        nonisolated(unsafe) var failure: (any Error)?
-        @Sendable func take() -> Int? {
-            lock.lock()
-            defer { lock.unlock() }
-            guard !differs, failure == nil, next < stretches, !cancellation.isCancelled else { return nil }
-            next += 1
-            return next - 1
-        }
-        // On the shared pool of `Parallel`, which starts more threads for workers that wait on a disk that does not answer;
-        // `concurrentPerform` would have its few threads stuck there.
-        _ = Parallel.map(Array(0..<min(stretches, ProcessInfo.processInfo.activeProcessorCount))) { _ in
-            // Every worker has its own two readers and moves them to the stretches it takes.
-            var readers: [any FileReader] = []
-            var tokens: [AnyObject] = []
-            defer {
-                readers.forEach { $0.close() }
-                withExtendedLifetime(tokens) {}
-            }
-            do {
-                for (system, url) in zip(systems, [first, second]) {
-                    let reader = try system.read(url, cancellation: cancellation)
-                    readers.append(reader)
-                    tokens.append(cancellation.interrupting(reader))
-                }
-                while let index = take() {
-                    let offset = UInt64(index) * UInt64(stretch)
-                    let count = Int(min(Int64(stretch), size - Int64(offset)))
-                    try autoreleasepool {
-                        try readers.forEach { try $0.seek(to: offset) }
-                        if try exactly(count, from: readers[0]) != exactly(count, from: readers[1]) {
-                            lock.lock()
-                            differs = true
-                            lock.unlock()
-                        }
-                    }
-                }
-            } catch {
-                lock.lock()
-                failure = failure ?? error
-                lock.unlock()
-            }
-        }
-        // A cancelled check has no answer, also when the reads it cut short came back different.
-        if cancellation.isCancelled { return nil }
-        if let failure { throw failure }
-        return !differs
-    }
-
-    /// Reads until `count` bytes are there or the file ends; readers may hand out less at a time.
-    private static func exactly(_ count: Int, from reader: any FileReader) throws -> Data {
-        var data = Data()
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard data.count < count, let block = try reader.read(upToCount: count - data.count), !block.isEmpty else {
-                return false
-            }
-            data.append(block)
-            return true
-        }) {}
-        return data
-    }
-
-    /// Reads the two files once, side by side, and stops at the first difference.
-    private static func sameStream(
-        _ first: URL,
-        _ second: URL,
-        systems: [any FileSystemProvider],
-        cancellation: CancellationFlag
-    ) throws -> Bool? {
-        var readers: [any FileReader] = []
-        var tokens: [AnyObject] = []
         defer {
-            readers.forEach { $0.close() }
-            withExtendedLifetime(tokens) {}
-        }
-        for (system, url) in zip(systems, [first, second]) {
-            let reader = try system.read(url, cancellation: cancellation)
-            readers.append(reader)
-            tokens.append(cancellation.interrupting(reader))
-        }
-        var verdict: Bool?
-        while verdict == nil, !cancellation.isCancelled {
-            verdict = try autoreleasepool {
-                let blocks = [try exactly(1 << 20, from: readers[0]), try exactly(1 << 20, from: readers[1])]
-                if blocks[0] != blocks[1] { return false }
-                return blocks[0].isEmpty ? true : nil
+            withExtendedLifetime(token) {
+                // Interrupts the reader up to here.
             }
         }
-        // Nil when cancelled before the end.
-        return verdict
-    }
-
-    // MARK: Saving
-
-    /// Why a file is not saved.
-    enum SaveError: LocalizedError {
-        case changedOnDisk(String)
-        case notRepresentable(String, TextEncoding)
-        case invalidSequences(String, TextEncoding)
-        case sameFile(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .changedOnDisk(let name):
-                return
-                    "\(name) was changed by someone else after it was loaded. It is not overwritten; compare the files again."
-
-            case .notRepresentable(let name, let encoding):
-                return
-                    "\(name) has characters that \(encoding.name) cannot hold, so it is not saved (that would turn them into question marks)."
-
-            case .invalidSequences(let name, let encoding):
-                return
-                    "\(name) has bytes that are not valid \(encoding.name). Saving would change them, so it is not saved."
-
-            case .sameFile(let name):
-                return "Both sides are the same file (\(name)) and both were edited, so it is not saved."
-            }
-        }
-    }
-
-    /// Whether two locations are one file: the same place, or on this Mac the same device and inode.
-    static func isSameFile(_ first: URL, _ second: URL) -> Bool {
-        first.isSameLocation(as: second) || first.isSameFile(as: second, followingLinks: true)
-    }
-
-    /// Replaces the file at `url` with `data`: the new content is written next to it under a
-    /// temporary name and moved over it, so the file is never half written. `expected` is how the
-    /// file looked when it was loaded: a file that is different now (changed by someone else) is
-    /// not overwritten. Returns the file as it is now.
-    ///
-    /// A local file with several hard links is written in place instead: a rename would give
-    /// this name a file of its own and leave the other names with the old content.
-    @discardableResult
-    public static func replace(_ url: URL, with data: Data, expected: FileItem? = nil, fileSystems: FileSystemRegistry)
-        throws -> FileItem?
-    {
-        var url = url
-        let fileSystem = try fileSystems.provider(for: url)
-        var existing = fileSystem.item(at: url)
-        // A file opened through a link is saved where the link leads; the link itself stays.
-        if existing?.isSymlink == true, url.isFileURL {
-            url = url.resolvingSymlinksInPath()
-            existing = fileSystem.item(at: url)
-        }
-        if let expected, let current = existing, !expected.isSymlink,
-            current.size != expected.size || abs(current.modified.timeIntervalSince(expected.modified)) > 0.001
-        {
-            throw SaveError.changedOnDisk(url.lastPathComponent)
-        }
-        if existing != nil, url.isFileURL, try writeInPlaceIfLinked(url, data, fileSystem) {
-            return fileSystem.item(at: url)
-        }
-        let name = url.lastPathComponent
-        let temporary = url.deletingLastPathComponent().appending(name: ".\(name).afm-save")
-        try? fileSystem.remove(temporary)
-        let writer = try fileSystem.write(temporary)
-        /// Set once the old file is out of the way and could not be put back: the temporary is then the only copy of the new text.
-        var mustKeepTemporary = false
-        do {
-            for start in stride(from: 0, to: data.count, by: 1 << 20) {
-                try writer.write(data.subdata(in: start..<min(start + (1 << 20), data.count)))
-            }
-            try writer.close(attributes: FileAttributes(modified: Date(), permissions: existing?.permissions))
-            if existing != nil, url.isFileURL { carryOverMetadata(from: url, to: temporary) }
-            do {
-                try fileSystem.move(temporary, to: url, replacing: true)
-            } catch  where existing != nil {
-                // A file system that cannot replace in one step: the old file is moved aside, not
-                // deleted, until the new one is in its place; if that fails the old one comes back.
-                let aside = url.deletingLastPathComponent().appending(name: ".\(name).afm-old")
-                try? fileSystem.remove(aside)
-                try fileSystem.move(url, to: aside, replacing: false)
-                do {
-                    try fileSystem.move(temporary, to: url, replacing: false)
-                } catch {
-                    do {
-                        try fileSystem.move(aside, to: url, replacing: false)
-                    } catch {
-                        // Neither is under the name: both are kept where they are.
-                        mustKeepTemporary = true
-                    }
-                    throw error
+        var data = Data()
+        var hasMore = true
+        while hasMore {
+            hasMore = try autoreleasepool { () throws -> Bool in
+                // A part of the file is no file to compare.
+                if cancellation.isCancelled {
+                    throw CancellationError()
                 }
-                try? fileSystem.remove(aside)
+                guard let block = try reader.read(upToCount: 1 << 20), !block.isEmpty else {
+                    return false
+                }
+                data.append(block)
+                return true
             }
-        } catch {
-            if !mustKeepTemporary { try? fileSystem.remove(temporary) }
-            throw error
         }
-        return fileSystem.item(at: url)
+        return data
     }
 
-    /// Writes into the file itself when it has more than one hard link; false when it has not.
-    ///
-    /// The file system continues the file from its start: it opens it without waiting, refuses
-    /// anything but a regular file there (a pipe that took the name since the look), and cuts it
-    /// through the descriptor it writes with.
-    private static func writeInPlaceIfLinked(_ url: URL, _ data: Data, _ fileSystem: any FileSystemProvider) throws
-        -> Bool
+    /// The two files as their file systems list them; nil when the look was cancelled or one is not a file, which
+    /// `result` then tells.
+    private static func files(
+        _ left: URL,
+        _ right: URL,
+        fileSystems: FileSystemRegistry,
+        _ cancellation: CancellationFlag,
+        into result: inout ComparedFiles
+    ) -> (left: FileItem, right: FileItem)? {
+        let items = Parallel.map([left, right]) { url in
+            (try? fileSystems.provider(for: url))?.item(at: url, cancellation: cancellation)
+        }
+        if cancellation.isCancelled {
+            result.wasCancelled = true
+            return nil
+        }
+        var files: [FileItem] = []
+        for (url, item) in zip([left, right], items) {
+            guard let item, !item.isDirectory else {
+                result.message = "\(fileSystems.displayPath(url)) is not a file."
+                return nil
+            }
+            files.append(item)
+        }
+        return (files[0], files[1])
+    }
+
+    /// Two files compared byte by byte, `bytesPerLine` bytes to a row.
+    private static func binary(_ left: Data, _ right: Data, bytesPerLine: Int, cancellation: CancellationFlag)
+        -> CompareContent
     {
-        var st = stat()
-        guard stat(url.path, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink > 1 else { return false }
-        let writer = try fileSystem.append(to: url, at: 0, cancellation: CancellationFlag())
-        for start in stride(from: 0, to: data.count, by: 1 << 20) {
-            try writer.write(data.subdata(in: start..<min(start + (1 << 20), data.count)))
-        }
-        try writer.close(attributes: FileAttributes(modified: Date()))
-        return true
+        .binary(
+            left: left,
+            right: right,
+            diff: BinaryDiff.compute(left: left, right: right, bytesPerLine: bytesPerLine, cancellation: cancellation)
+        )
     }
 
-    /// What a rename over the file would lose: extended attributes (tags, quarantine, Finder
-    /// info), ACLs, owner and creation date. Best effort; the data is what counts.
-    private static func carryOverMetadata(from original: URL, to copy: URL) {
-        _ = copyfile(original.path, copy.path, nil, copyfile_flags_t(COPYFILE_METADATA))
-        // The copying of the metadata also copied the old modification date; the file is saved now.
-        var values = URLResourceValues()
-        values.creationDate = (try? original.resourceValues(forKeys: [.creationDateKey]))?.creationDate
-        values.contentModificationDate = Date()
-        var target = copy
-        try? target.setResourceValues(values)
+    /// Two files decoded as text (both at once) and laid side by side.
+    private static func text(_ left: Data, _ right: Data, options: DiffOptions, cancellation: CancellationFlag)
+        -> CompareContent
+    {
+        let documents = Parallel.map([left, right]) { data in TextDocument(data: data) }
+        return text(left: documents[0], right: documents[1], options: options, cancellation: cancellation)
     }
 }

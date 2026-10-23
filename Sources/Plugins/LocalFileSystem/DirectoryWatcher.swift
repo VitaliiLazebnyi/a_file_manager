@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// Reports changes made by other programs to the watched folders, about half a second after
@@ -39,8 +38,10 @@ internal final class DirectoryWatcher: Sendable {
         self.init(queue: .main, system: .live, onChange: onChange)
     }
 
-    /// Replaces the set of watched folders. Only their direct contents are reported. Returns at
-    /// once; the streams follow in the background.
+    /// Replaces the set of watched folders.
+    ///
+    /// Only their direct contents are reported. Returns at once; the streams follow in the
+    /// background.
     internal func watch(_ directories: [URL]) {
         core.request(directories)
     }
