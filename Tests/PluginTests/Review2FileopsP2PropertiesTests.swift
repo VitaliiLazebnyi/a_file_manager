@@ -81,7 +81,7 @@ internal struct Review2FileopsP2PropertiesTests {
         var change = AttributeChange()
         change.recurse = true
         change.timestamp = .current
-        let job = AttributeJob(change: change, fileSystems: fileSystems, cancellation: flag)
+        let job = AttributeJob(change: change, fileSystems: fileSystems, cancellation: flag, meter: nil)
         // Written by the other thread before the wait ends, read here after it.
         nonisolated(unsafe) var outcome = AttributeJob.Outcome()
         P2Wait.cancel(flag, after: 0.2)
@@ -113,7 +113,13 @@ internal struct Review2FileopsP2PropertiesTests {
         var change = AttributeChange()
         change.recurse = true
         change.permissions = try #require(PermissionChange("go-rwx"))
-        let outcome = AttributeJob(change: change, fileSystems: fileSystems).run(items)
+        let outcome = AttributeJob(
+            change: change,
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run(items)
         #expect(outcome.changed == files + folders && outcome.failed == 0 && !outcome.cancelled)
         var info = stat()
         #expect(lstat(box.url("tree/a5/b4/f69.txt").path, &info) == 0 && info.st_mode & 0o077 == 0)
@@ -128,7 +134,7 @@ internal struct Review2FileopsP2PropertiesTests {
         probe.base.addFile("/A/a.txt")
         let store = CommentStore(fileSystems: fileSystems)
         let folder = probe.base.url("/A")
-        #expect(store.comments(in: folder)["a.txt"] == "the comment")
+        #expect(store.comments(in: folder, cancellation: CancellationFlag())["a.txt"] == "the comment")
         store.forget(folder)
         let alreadyRead = probe.reads.count
         // From now on the file does not arrive: its reads wait until they are interrupted.
@@ -161,7 +167,7 @@ internal struct Review2FileopsP2PropertiesTests {
         let patientEnded = P2Wait.finishes(
             rescue: { probe.base.releaseStalls() },
             work: {
-                let comments = store.comments(in: folder)
+                let comments = store.comments(in: folder, cancellation: CancellationFlag())
                 lock.withLock { answers[2] = comments }
             }
         )
@@ -173,7 +179,7 @@ internal struct Review2FileopsP2PropertiesTests {
         #expect(reader.wait(timeout: .now() + 60) == .success)
         #expect(lock.withLock { answers } == [[:], [:], [:]])
         probe.base.stallsReads = false
-        #expect(store.comments(in: folder)["a.txt"] == "the comment")
+        #expect(store.comments(in: folder, cancellation: CancellationFlag())["a.txt"] == "the comment")
     }
 
     /// A comment that is being saved is not written from a reading that was stopped.
@@ -188,7 +194,7 @@ internal struct Review2FileopsP2PropertiesTests {
         }
         #expect(memory.contents("/A/descript.ion") == "a.txt old\r\nb.txt other\r\n")
         #expect(memory.allPaths.filter { $0.hasPrefix("/A/") } == ["/A/descript.ion"])
-        try store.setComment("new", for: "a.txt", in: memory.url("/A"), hidden: false)
+        try store.setComment("new", for: "a.txt", in: memory.url("/A"), hidden: false, cancellation: CancellationFlag())
         #expect(memory.contents("/A/descript.ion") == "a.txt new\r\nb.txt other\r\n")
     }
 
@@ -237,10 +243,10 @@ internal struct Review2FileopsP2PropertiesTests {
             let writer = try memory.write(folder.appending(name: DescriptIon.fileName))
             try writer.write(Data(try bytes(name)))
             try writer.close(attributes: FileAttributes())
-            let store = CommentStore(fileSystems: fileSystems)
-            let before = store.comments(in: folder)
-            try store.setComment("fresh\ncomment", for: "new.txt", in: folder, hidden: false)
-            let after = store.comments(in: folder)
+            let (store, flag) = (CommentStore(fileSystems: fileSystems), CancellationFlag())
+            let before = store.comments(in: folder, cancellation: flag)
+            try store.setComment("fresh\ncomment", for: "new.txt", in: folder, hidden: false, cancellation: flag)
+            let after = store.comments(in: folder, cancellation: flag)
             #expect(after["new.txt"] == "fresh\ncomment", "\(name)")
             for (entry, comment) in before where entry != "new.txt" {
                 #expect(after[entry] == comment, "\(name): \(entry.debugDescription)")

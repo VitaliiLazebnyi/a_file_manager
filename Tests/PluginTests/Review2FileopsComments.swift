@@ -64,13 +64,35 @@ internal struct Review2FileopsComments {
         memory.addFile("/A/descript.ion", "keep.txt kept\r\n")
         let store = CommentStore(fileSystems: fileSystems)
         #expect(throws: CommentFileError.self) {
-            try store.setComment("x", for: "a \"b\" c", in: memory.url("/A"), hidden: false)
+            try store.setComment(
+                "x",
+                for: "a \"b\" c",
+                in: memory.url("/A"),
+                hidden: false,
+                cancellation: CancellationFlag()
+            )
         }
         #expect(memory.contents("/A/descript.ion") == "keep.txt kept\r\n")
         // Taking a comment away is always possible.
-        try store.setComment("", for: "a \"b\" c", in: memory.url("/A"), hidden: false)
-        try store.setComment("fine", for: "quote\"inside", in: memory.url("/A"), hidden: false)
-        #expect(store.comments(in: memory.url("/A")) == ["keep.txt": "kept", "quote\"inside": "fine"])
+        try store.setComment(
+            "",
+            for: "a \"b\" c",
+            in: memory.url("/A"),
+            hidden: false,
+            cancellation: CancellationFlag()
+        )
+        try store.setComment(
+            "fine",
+            for: "quote\"inside",
+            in: memory.url("/A"),
+            hidden: false,
+            cancellation: CancellationFlag()
+        )
+        #expect(
+            store.comments(in: memory.url("/A"), cancellation: CancellationFlag()) == [
+                "keep.txt": "kept", "quote\"inside": "fine"
+            ]
+        )
     }
 
     // F036, F065
@@ -88,17 +110,17 @@ internal struct Review2FileopsComments {
         // Written by the other thread before it signals, read here after the wait.
         nonisolated(unsafe) var stale: [String: String] = [:]
         Thread.detachNewThread {
-            stale = store.comments(in: folder)
+            stale = store.comments(in: folder, cancellation: CancellationFlag())
             first.signal()
         }
         // The reader has the old file in hand; now the comment changes.
         gated.entered.wait()
-        try store.setComment("new", for: "a.txt", in: folder, hidden: false)
+        try store.setComment("new", for: "a.txt", in: folder, hidden: false, cancellation: CancellationFlag())
         gated.gate.signal()
         first.wait()
         #expect(stale == ["a.txt": "old"])
         // What was read before the change was not kept: the next question reads the file again.
-        #expect(store.comments(in: folder) == ["a.txt": "new"])
+        #expect(store.comments(in: folder, cancellation: CancellationFlag()) == ["a.txt": "new"])
     }
 
     // F066
@@ -116,8 +138,15 @@ internal struct Review2FileopsComments {
         // Written by the other thread before it signals, read here after the wait.
         nonisolated(unsafe) var refused = false
         Thread.detachNewThread {
-            _ = store.comments(in: box.url("d"))
-            refused = (try? store.setComment("x", for: "a.txt", in: box.url("d"), hidden: false)) == nil
+            _ = store.comments(in: box.url("d"), cancellation: CancellationFlag())
+            refused =
+                (try? store.setComment(
+                    "x",
+                    for: "a.txt",
+                    in: box.url("d"),
+                    hidden: false,
+                    cancellation: CancellationFlag()
+                )) == nil
             done.signal()
         }
         let ended = done.wait(timeout: .now() + 60) == .success
@@ -141,12 +170,12 @@ internal struct Review2FileopsComments {
         let real = try box.file("shared/descript.ion", "a.txt old\r\n")
         try box.folder("d")
         try FileManager.default.createSymbolicLink(at: box.url("d/descript.ion"), withDestinationURL: real)
-        try store.setComment("new", for: "a.txt", in: box.url("d"), hidden: false)
+        try store.setComment("new", for: "a.txt", in: box.url("d"), hidden: false, cancellation: CancellationFlag())
         #expect(LocalInfo.isSymlink(box.url("d/descript.ion")) && box.read("shared/descript.ion") == "a.txt new\r\n")
         // Hidden by another program, with hiding switched off here: it stays hidden.
         let hidden = try box.file("h/descript.ion", "a.txt old\r\n")
         try LocalInfo.setFlag(UInt32(UF_HIDDEN), true, of: hidden)
-        try store.setComment("new", for: "a.txt", in: box.url("h"), hidden: false)
+        try store.setComment("new", for: "a.txt", in: box.url("h"), hidden: false, cancellation: CancellationFlag())
         #expect(LocalInfo.details(hidden)?.isHidden == true && box.read("h/descript.ion") == "a.txt new\r\n")
     }
 }

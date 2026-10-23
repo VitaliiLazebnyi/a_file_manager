@@ -2,25 +2,6 @@ import AFMKernel
 import Foundation
 import UniformTypeIdentifiers
 
-/// What the Mac's own file system knows about an item beyond the provider interface: owner,
-/// further dates, flags and the space it really takes.
-internal struct LocalDetails: Equatable {
-    internal var mode: UInt16
-    internal var ownerID: uid_t
-    internal var groupID: gid_t
-    internal var created: Date
-    internal var modified: Date
-    internal var accessed: Date
-    /// `st_flags`: `UF_HIDDEN`, `UF_IMMUTABLE` (Finder's Locked) and the rest.
-    internal var flags: UInt32
-    /// The bytes the item takes on its volume.
-    internal var allocated: Int64
-    internal var linkCount: Int
-
-    internal var isHidden: Bool { flags & UInt32(UF_HIDDEN) != 0 }
-    internal var isLocked: Bool { flags & UInt32(UF_IMMUTABLE) != 0 }
-}
-
 /// Questions and changes that only make sense for `file:` URLs, done with POSIX calls.
 ///
 /// **Threading.** Everything here blocks on the disk and is meant for background threads; all
@@ -46,6 +27,7 @@ internal enum LocalInfo {
         Date(timeIntervalSince1970: TimeInterval(time.tv_sec) + TimeInterval(time.tv_nsec) / 1_000_000_000)
     }
 
+    /// The error of a failed POSIX call: the system's text for `code` and the path.
     internal static func posixError(_ code: Int32, _ url: URL) -> any Error {
         NSError(
             domain: NSPOSIXErrorDomain,
@@ -61,20 +43,20 @@ internal enum LocalInfo {
         guard url.isFileURL else {
             return nil
         }
-        var st = stat()
-        guard lstat(url.path, &st) == 0 else {
+        var status = stat()
+        guard lstat(url.path, &status) == 0 else {
             return nil
         }
         return LocalDetails(
-            mode: UInt16(st.st_mode & 0o7777),
-            ownerID: st.st_uid,
-            groupID: st.st_gid,
-            created: date(st.st_birthtimespec),
-            modified: date(st.st_mtimespec),
-            accessed: date(st.st_atimespec),
-            flags: st.st_flags,
-            allocated: Int64(st.st_blocks) * 512,
-            linkCount: Int(st.st_nlink)
+            mode: UInt16(status.st_mode & 0o7777),
+            ownerID: status.st_uid,
+            groupID: status.st_gid,
+            created: date(status.st_birthtimespec),
+            modified: date(status.st_mtimespec),
+            accessed: date(status.st_atimespec),
+            flags: status.st_flags,
+            allocated: Int64(status.st_blocks) * 512,
+            linkCount: Int(status.st_nlink)
         )
     }
 
@@ -83,8 +65,8 @@ internal enum LocalInfo {
         guard url.isFileURL else {
             return false
         }
-        var st = stat()
-        return lstat(url.path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFLNK
+        var status = stat()
+        return lstat(url.path, &status) == 0 && (status.st_mode & S_IFMT) == S_IFLNK
     }
 
     /// False when reading `url` could wait for ever: it is, or leads to, a pipe, a device or
@@ -95,14 +77,17 @@ internal enum LocalInfo {
         guard url.isFileURL else {
             return true
         }
-        var st = stat()
-        guard stat(url.path, &st) == 0 else {
+        var status = stat()
+        guard stat(url.path, &status) == 0 else {
             return true
         }
-        let type = st.st_mode & S_IFMT
+        let type = status.st_mode & S_IFMT
         return type == S_IFREG || type == S_IFDIR
     }
 
+    /// The name of a user, or the number when the system knows no name for it.
+    ///
+    /// Each number is asked of the system once and then remembered.
     internal static func userName(_ id: uid_t) -> String {
         lock.lock()
         let known = userNames[id]
@@ -123,6 +108,9 @@ internal enum LocalInfo {
         return name
     }
 
+    /// The name of a group, or the number when the system knows no name for it.
+    ///
+    /// Each number is asked of the system once and then remembered.
     internal static func groupName(_ id: gid_t) -> String {
         lock.lock()
         let known = groupNames[id]
@@ -154,6 +142,7 @@ internal enum LocalInfo {
         return getpwnam_r(text, &entry, &buffer, buffer.count, &result) == 0 && result != nil ? entry.pw_uid : nil
     }
 
+    /// A group by name or number; nil when there is no such group.
     internal static func groupID(_ text: String) -> gid_t? {
         if let number = gid_t(text) {
             return number
@@ -175,7 +164,7 @@ internal enum LocalInfo {
             return nil
         }
         buffer[length] = 0
-        return buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        return String(cString: &buffer)
     }
 
     /// The item a link leads to: the target of a symbolic link (relative targets count from
@@ -211,12 +200,15 @@ internal enum LocalInfo {
         var buffer = [CChar](repeating: 0, count: length)
         // The names may have gone meanwhile: what the second call fills is what there is.
         let filled = listxattr(url.path, &buffer, length, XATTR_NOFOLLOW)
-        return buffer.prefix(max(filled, 0)).split(separator: 0)
-            .map {
-                (Array($0) + [0]).withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        return buffer.prefix(max(filled, 0))
+            .split(separator: 0)
+            .map { name in
+                var terminated = Array(name) + [0]
+                return String(cString: &terminated)
             }
     }
 
+    /// Finder's tags of a local item; none elsewhere.
     internal static func tags(_ url: URL) -> [String] {
         guard url.isFileURL else {
             return []
@@ -248,10 +240,10 @@ internal enum LocalInfo {
 
     /// Sets or clears a flag of `st_flags` on the item itself (a link is not followed).
     internal static func setFlag(_ flag: UInt32, _ isOn: Bool, of url: URL) throws {
-        var st = stat()
-        guard lstat(url.path, &st) == 0 else { throw posixError(errno, url) }
-        let flags = isOn ? st.st_flags | flag : st.st_flags & ~flag
-        guard flags != st.st_flags else {
+        var status = stat()
+        guard lstat(url.path, &status) == 0 else { throw posixError(errno, url) }
+        let flags = isOn ? status.st_flags | flag : status.st_flags & ~flag
+        guard flags != status.st_flags else {
             return
         }
         if lchflags(url.path, flags) != 0 { throw posixError(errno, url) }

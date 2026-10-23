@@ -244,14 +244,14 @@ internal struct FileOpsFixCommands {
         let store = CommentStore(fileSystems: fileSystems)
 
         // Absent: the comment is simply created.
-        try store.setComment("hello", for: "one.txt", in: box.url("A"), hidden: false)
+        try store.setComment("hello", for: "one.txt", in: box.url("A"), hidden: false, cancellation: CancellationFlag())
         #expect(box.exists("A/descript.ion"))
 
         // Not decodable (a UTF-8 mark followed by bytes that are no UTF-8).
         let broken = Data([0xEF, 0xBB, 0xBF, 0xFF, 0xFE, 0xC0])
         try broken.write(to: box.url("A/descript.ion"))
         #expect(throws: (any Error).self) {
-            try store.setComment("x", for: "one.txt", in: box.url("A"), hidden: false)
+            try store.setComment("x", for: "one.txt", in: box.url("A"), hidden: false, cancellation: CancellationFlag())
         }
         #expect(try Data(contentsOf: box.url("A/descript.ion")) == broken)
 
@@ -265,7 +265,13 @@ internal struct FileOpsFixCommands {
             )
         }
         #expect(throws: (any Error).self) {
-            try store.setComment("x", for: "other.txt", in: box.url("B"), hidden: false)
+            try store.setComment(
+                "x",
+                for: "other.txt",
+                in: box.url("B"),
+                hidden: false,
+                cancellation: CancellationFlag()
+            )
         }
         try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: box.url("B/descript.ion").path)
         #expect(box.read("B/descript.ion") == "two.txt keep me\r\n")
@@ -280,7 +286,13 @@ internal struct FileOpsFixCommands {
         memory.addFile("/A/descript.ion", String(repeating: "x", count: 17 * 1_024 * 1_024))
         let store = CommentStore(fileSystems: fileSystems)
         #expect(throws: (any Error).self) {
-            try store.setComment("x", for: "one.txt", in: memory.url("/A"), hidden: false)
+            try store.setComment(
+                "x",
+                for: "one.txt",
+                in: memory.url("/A"),
+                hidden: false,
+                cancellation: CancellationFlag()
+            )
         }
         #expect(memory.contents("/A/descript.ion")?.count == 17 * 1_024 * 1_024)
     }
