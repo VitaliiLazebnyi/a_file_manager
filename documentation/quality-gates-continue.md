@@ -124,11 +124,12 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   Then the analyzer: 743 findings (680 `unused_import`, 42 `unused_declaration`, 21 `capture_variable`) down to 13.
 - **Gates at the end of lint step 6:** SwiftLint lint 0 but `ArchiveURL.swift:52` (owner); `required-deinit.py` 0;
   swift-format 6 `NeverForceUnwrap`: the five documented `!` and `ArchiveURL` (owner); Prettier, markdownlint, typos 0;
-  analyzer 13 (see "Next steps"). `swift test --parallel`: every test ran and passed (394 / 3,485 / 337) in three runs;
-  55 UI tests and both desktop checks passed; coverage 100% of lines and functions, regions 100% but for one or two race
-  arms that come and go between runs (`ViewerPane+Presenting` 120/235 in one run, `CompareWindowEffects:37` and
-  `DriveBarView:102` in a run under load whose UI test `LastSheetTests.testCompareTakesTheFileChosenInItsSheet` timed
-  out). lizard 345 → 178 findings (26 of them its `init`/`set` misreading, decision 2), jscpd 39 → 36 clones.
+  analyzer 13 (see "Next steps"). `swift test --parallel`: every test ran and passed (394 / 3,485 / 337) in four runs;
+  55 UI tests and both desktop checks passed. Coverage of the last run at `bfbb089` (unit and UI tests): lines 100,566 /
+  100,566, functions 16,385 / 16,385, regions 42,318 / 42,318. Earlier runs missed one or two race arms that come and go
+  (`ViewerPane+Presenting` 120/235 once; `CompareWindowEffects:37` and `DriveBarView:102` in a run under load whose UI
+  test `LastSheetTests.testCompareTakesTheFileChosenInItsSheet` timed out). lizard 345 → 178 findings (26 of them its
+  `init`/`set` misreading, decision 2), jscpd 39 → 36 clones.
 - Bugs found by the lint work: the Places and Selection commands kept the kernel (lifetime tests caught it); a Find
   Files split did the same; `CheckedSettings` limited numbers to `Int64`, which reads back nil as `Int`; a test's
   `flags ?? 0 & UF_IMMUTABLE != 0` precedence.
