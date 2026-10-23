@@ -66,7 +66,7 @@ internal struct CoverageLocalMoves {
     @Test
     internal func theStoredNameAndTheTemporaryNamesAreToldApart() throws {
         let box = try Sandbox()
-        #expect(LocalFileSystem.storedName(of: box.url("missing")) == nil)
+        #expect(LocalFileSystem.storedName(of: box.url("missing")).isEmpty)
         try box.file("Name.txt")
         #expect(LocalFileSystem.storedName(of: box.url("name.txt")) == Array("Name.txt".utf8))
         for name in [".a.tmp", ".a.afm-save", ".afm-part"] {

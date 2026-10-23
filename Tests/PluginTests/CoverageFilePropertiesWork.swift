@@ -44,10 +44,21 @@ internal struct CoverageFilePropertiesWork {
         let box = try Sandbox()
         try box.file("mine.txt")
         let mine = try #require(fileSystems.item(at: box.url("mine.txt")))
-        let owned = AttributeJob(change: AttributeChange(owner: NSUserName()), fileSystems: fileSystems).run([mine])
+        let owned = AttributeJob(
+            change: AttributeChange(owner: NSUserName()),
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run([mine])
         #expect(owned.changed == 1 && owned.failed == 0)
-        let grouped = AttributeJob(change: AttributeChange(group: "afm-no-such-group"), fileSystems: fileSystems)
-            .run([mine, mine])
+        let grouped = AttributeJob(
+            change: AttributeChange(group: "afm-no-such-group"),
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run([mine, mine])
         #expect(grouped.failed == 2 && grouped.failures == ["There is no group called afm-no-such-group."])
     }
 
@@ -57,18 +68,19 @@ internal struct CoverageFilePropertiesWork {
     internal func cancelledJobsStop() throws {
         let flag = CancellationFlag()
         flag.cancel()
-        let early = AttributeJob(change: recursive, fileSystems: fileSystems, cancellation: flag).run([try item("/T")])
+        let early = AttributeJob(change: recursive, fileSystems: fileSystems, cancellation: flag, meter: nil)
+            .run([try item("/T")])
         #expect(early.changed == 0 && early.cancelled)
         let stopping = CancellationFlag()
         files.onCall = { call in if call == .setAttributes { stopping.cancel() } }
-        let stopped = AttributeJob(change: recursive, fileSystems: fileSystems, cancellation: stopping)
+        let stopped = AttributeJob(change: recursive, fileSystems: fileSystems, cancellation: stopping, meter: nil)
             .run([try item("/T")])
         #expect(stopped.changed == 1 && stopped.failed == 0 && stopped.cancelled)
         let failing = CancellationFlag()
         files.onCall = nil
         files.fails = [.setAttributes]
         files.onFailure = { _ in failing.cancel() }
-        let failed = AttributeJob(change: recursive, fileSystems: fileSystems, cancellation: failing)
+        let failed = AttributeJob(change: recursive, fileSystems: fileSystems, cancellation: failing, meter: nil)
             .run([try item("/T/a.txt")])
         #expect(failed.failed == 0 && failed.cancelled)
     }
@@ -78,11 +90,17 @@ internal struct CoverageFilePropertiesWork {
     @Test
     internal func foldersThatCannotBeListed() throws {
         memory.unreadable = ["/T"]
-        let left = AttributeJob(change: recursive, fileSystems: fileSystems).run([try item("/T")])
+        let left = AttributeJob(
+            change: recursive,
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run([try item("/T")])
         #expect(left.changed == 1 && files.changedAttributes == ["/T"])
         let stopping = CancellationFlag()
         files.onCall = { call in if call == .setAttributes { stopping.cancel() } }
-        let stopped = AttributeJob(change: recursive, fileSystems: fileSystems, cancellation: stopping)
+        let stopped = AttributeJob(change: recursive, fileSystems: fileSystems, cancellation: stopping, meter: nil)
             .run([try item("/T")])
         #expect(stopped.changed == 1 && stopped.cancelled)
     }
@@ -94,8 +112,13 @@ internal struct CoverageFilePropertiesWork {
     internal func changesThatStartFromTheItem() throws {
         let relative = try #require(PermissionChange("u+x"))
         files.fails = [.item]
-        let listed = AttributeJob(change: AttributeChange(permissions: relative), fileSystems: fileSystems)
-            .run([try item("/T/b.txt")])
+        let listed = AttributeJob(
+            change: AttributeChange(permissions: relative),
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run([try item("/T/b.txt")])
         #expect(listed.changed == 1)
         files.fails = []
         let stopping = CancellationFlag()
@@ -103,7 +126,8 @@ internal struct CoverageFilePropertiesWork {
         let stopped = AttributeJob(
             change: AttributeChange(permissions: relative),
             fileSystems: fileSystems,
-            cancellation: stopping
+            cancellation: stopping,
+            meter: nil
         )
         .run([try item("/T/b.txt")])
         #expect(stopped.changed == 0 && stopped.failed == 0 && stopped.cancelled)
@@ -111,13 +135,22 @@ internal struct CoverageFilePropertiesWork {
         // 31 January with the month made February: there is no such day.
         let february = try #require(TimestampChange(date: "yyyy-02-dd", time: ""))
         var change = AttributeChange(timestamp: february)
-        let impossible = AttributeJob(change: change, fileSystems: fileSystems).run([try item("/T/a.txt")])
+        let impossible = AttributeJob(
+            change: change,
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run([try item("/T/a.txt")])
         #expect(
             impossible.failed == 1 && impossible.failures.first?.hasSuffix("does not exist in the calendar.") == true
         )
         change.timestamp = TimestampChange(date: "", time: "")
         change.permissions = .absolute(0o640, keepingSpecialBits: false)
-        #expect(AttributeJob(change: change, fileSystems: fileSystems).run([try item("/T/a.txt")]).changed == 1)
+        #expect(
+            AttributeJob(change: change, fileSystems: fileSystems, cancellation: CancellationFlag(), meter: nil)
+                .run([try item("/T/a.txt")]).changed == 1
+        )
     }
 
     /// The comment store keeps a limited memory, and a reader can be told how long to wait.
@@ -126,10 +159,10 @@ internal struct CoverageFilePropertiesWork {
         let store = CommentStore(fileSystems: fileSystems)
         store.waitLimit = 0.5
         #expect(store.waitLimit == 0.5)
-        for index in 0...257 { _ = store.comments(in: memory.url("/many/\(index)")) }
+        for index in 0...257 { _ = store.comments(in: memory.url("/many/\(index)"), cancellation: CancellationFlag()) }
         for index in 0...4_097 { store.forget(memory.url("/many/\(index)")) }
         memory.addFile("/T/descript.ion", "a.txt first\r\n")
-        #expect(store.comments(in: memory.url("/T")) == ["a.txt": "first"])
+        #expect(store.comments(in: memory.url("/T"), cancellation: CancellationFlag()) == ["a.txt": "first"])
     }
 
     /// A comment file is not taken from a reading the job's cancel cut short, nor when it is
@@ -143,7 +176,7 @@ internal struct CoverageFilePropertiesWork {
         #expect(store.load(memory.url("/T"), cancellation: flag).isEmpty)
         files.onCall = nil
         memory.addFile("/T/sub/descript.ion", String(repeating: "x", count: 16 * 1_024 * 1_024 + 1))
-        #expect(store.load(memory.url("/T/sub")).isEmpty)
+        #expect(store.load(memory.url("/T/sub"), cancellation: CancellationFlag()).isEmpty)
     }
 
     /// For a change, a comment file that cannot be read whole is not used, and a cancel says so.
@@ -152,7 +185,9 @@ internal struct CoverageFilePropertiesWork {
         let store = CommentStore(fileSystems: fileSystems)
         memory.addFile("/T/descript.ion", "a.txt first\r\n")
         files.fails = [.read]
-        #expect(throws: CommentFileError.self) { try store.loadForUpdate(memory.url("/T")) }
+        #expect(throws: CommentFileError.self) {
+            try store.loadForUpdate(memory.url("/T"), cancellation: CancellationFlag())
+        }
         let failing = CancellationFlag()
         files.onFailure = { _ in failing.cancel() }
         #expect(throws: CocoaError.self) { try store.loadForUpdate(memory.url("/T"), cancellation: failing) }
@@ -171,7 +206,13 @@ internal struct CoverageFilePropertiesWork {
         memory.addFile("/T/descript.ion", "a.txt first\r\n")
         files.fails = [.write]
         #expect(throws: CoverageSmallFiles.Failure.self) {
-            try store.setComment("second", for: "b.txt", in: memory.url("/T"), hidden: false)
+            try store.setComment(
+                "second",
+                for: "b.txt",
+                in: memory.url("/T"),
+                hidden: false,
+                cancellation: CancellationFlag()
+            )
         }
         files.fails = []
         let flag = CancellationFlag()

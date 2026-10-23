@@ -29,19 +29,19 @@ internal struct CoverageVirtualFormats {
         #expect(VirtualLocation(try url("vfolder://pick.h" + hex("file://") + "/x")) == nil)
         #expect(VirtualLocation(try url("vfolder://branch.h666/x")) == nil)
         let root = VirtualLocation(try url("vfolder://branch.h" + hex("file://")))
-        #expect(root == .branch(of: URL(fileURLWithPath: "/", isDirectory: false)))
+        #expect(root == .branch(real: URL(fileURLWithPath: "/", isDirectory: false)))
     }
 
     /// A list knows it is one; a location without an authority keeps having none.
     @Test
     internal func listsAndLocationsWithoutAuthority() throws {
         #expect(VirtualLocation.list(id: 1, title: "T", origin: nil).isList)
-        #expect(!VirtualLocation.branch(of: URL(fileURLWithPath: "/")).isList)
+        #expect(!VirtualLocation.branch(real: URL(fileURLWithPath: "/")).isList)
         let plain = try url("x:/a/b")
-        let back = VirtualLocation(VirtualLocation.branch(of: plain).url)?.realDirectory
+        let back = VirtualLocation(VirtualLocation.branch(real: plain).url)?.realDirectory
         #expect(back?.scheme == "x" && back?.path == "/a/b")
         let bare = try url("sftp://host")
-        #expect(VirtualLocation(VirtualLocation.branch(of: bare).url)?.realDirectory?.path == "/")
+        #expect(VirtualLocation(VirtualLocation.branch(real: bare).url)?.realDirectory?.path == "/")
     }
 
     /// Lines that are not text in UTF-8 are read as Latin-1; UTF-16 that does not read is no
@@ -148,11 +148,11 @@ internal struct CoverageVirtualFormats {
     internal func prefixesOfEveryKind() throws {
         let server = try url("sftp://us%40er@[::1]:22/srv")
         #expect(
-            VirtualLocation(VirtualLocation.branch(of: server).url)?.realDirectory?.absoluteString
+            VirtualLocation(VirtualLocation.branch(real: server).url)?.realDirectory?.absoluteString
                 == "sftp://us%40er@[::1]:22/srv"
         )
         let relative = try url("a/b")
-        #expect(VirtualLocation(VirtualLocation.branch(of: relative).url)?.realDirectory?.isFileURL == true)
+        #expect(VirtualLocation(VirtualLocation.branch(real: relative).url)?.realDirectory?.isFileURL == true)
     }
 
     /// A walk that crosses disks passes over a folder where a disk is mounted, and walks into a

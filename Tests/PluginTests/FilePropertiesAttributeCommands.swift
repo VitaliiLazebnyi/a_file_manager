@@ -77,7 +77,10 @@ internal struct FilePropertiesAttributeCommands {
         }
         #expect(fixture.notes(form).contains { $0.hasPrefix("Owner (now \(NSUserName()))") })
         #expect(fixture.mode("A/one.txt") == 0o600 && fixture.flags("A/one.txt") & UInt32(UF_IMMUTABLE) != 0)
-        let texts = TimestampChange.fieldTexts(for: left.model.items.first { $0.name == "one.txt" }?.modified ?? Date())
+        let texts = TimestampChange.fieldTexts(
+            for: left.model.items.first { $0.name == "one.txt" }?.modified ?? Date(),
+            calendar: .current
+        )
         #expect(texts.date == "2001-02-03" && texts.time.hasSuffix(":00:00"))
 
         // A locked file is unlocked before anything else is changed.

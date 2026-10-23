@@ -86,7 +86,7 @@ internal struct Review2ConfigBVirtualFileSystem {
         #expect(watcher != nil)
         #expect(provider.watchedCount <= VirtualFileSystem.watchLimit)
         // Waits for the background preparation: every file once.
-        #expect(virtual.entries(of: list)?.count == 20_000)
+        #expect(virtual.entries(of: list).count == 20_000)
         #expect(virtual.volume(of: list)?.isLocal == false)
     }
 
@@ -100,7 +100,7 @@ internal struct Review2ConfigBVirtualFileSystem {
         let composed = provider.url("/d/caf\u{E9}.txt")
         let decomposed = provider.url("/d/cafe\u{301}.txt")
         let list = virtual.register(files: [composed, decomposed, composed], title: "T", origin: nil)
-        let entries = try #require(virtual.entries(of: list))
+        let entries = virtual.entries(of: list)
         #expect(entries.count == 2)
         let items = try virtual.list(list, showHidden: false)
         #expect(items.count == 2 && Set(items.map { Array($0.name.utf8) }).count == 2)
@@ -137,7 +137,7 @@ internal struct Review2ConfigBVirtualFileSystem {
         // Using the first list makes the second the one that has been left alone longest.
         _ = virtual.entries(of: first)
         _ = virtual.register(files: [provider.url("/a/new")], title: "new", origin: nil)
-        #expect(virtual.entries(of: first) != nil && virtual.entries(of: second) == nil)
+        #expect(!virtual.entries(of: first).isEmpty && virtual.entries(of: second).isEmpty)
     }
 
     /// The capabilities without a location claim nothing that a folder shown before cannot do.
@@ -163,7 +163,7 @@ internal struct Review2ConfigBVirtualFileSystem {
         let registry = FileSystemRegistry()
         let virtual = VirtualFileSystem(fileSystems: registry)
         let real = URL(fileURLWithPath: "/Users/x/dir/a.txt")
-        #expect(virtual.realLocation(of: VirtualLocation.branch(of: real).url) == real)
+        #expect(virtual.realLocation(of: VirtualLocation.branch(real: real).url) == real)
         #expect(virtual.realLocation(of: real) == nil)
         #expect(virtual.realLocation(of: VirtualLocation.list(id: 1, title: "T", origin: nil).url) == nil)
     }

@@ -72,7 +72,13 @@ internal struct Review2FileopsAttributes {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
         var change = AttributeChange()
         change.permissions = try #require(PermissionChange("u+x"))
-        var outcome = AttributeJob(change: change, fileSystems: fileSystems).run([listed])
+        var outcome = AttributeJob(
+            change: change,
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            meter: nil
+        )
+        .run([listed])
         #expect(outcome.failed == 0 && LocalInfo.details(file)?.mode == 0o700)
         // A locked file with "Locked: unchanged" is reported and stays locked and as it was.
         let lockedFile = try box.file("d/locked.txt")
@@ -80,14 +86,16 @@ internal struct Review2FileopsAttributes {
         try LocalInfo.setFlag(UInt32(UF_IMMUTABLE), true, of: lockedFile)
         defer { try? LocalInfo.setFlag(UInt32(UF_IMMUTABLE), false, of: lockedFile) }
         change.permissions = try #require(PermissionChange("644"))
-        outcome = AttributeJob(change: change, fileSystems: fileSystems).run([try #require(local.item(at: lockedFile))])
+        outcome = AttributeJob(change: change, fileSystems: fileSystems, cancellation: CancellationFlag(), meter: nil)
+            .run([try #require(local.item(at: lockedFile))])
         #expect(
             outcome.failed == 1 && LocalInfo.details(lockedFile)?.isLocked == true
                 && LocalInfo.details(lockedFile)?.mode == 0o444
         )
         // With "Locked: clear" the same change goes through.
-        change.locked = false
-        outcome = AttributeJob(change: change, fileSystems: fileSystems).run([try #require(local.item(at: lockedFile))])
+        change.locked = .clear
+        outcome = AttributeJob(change: change, fileSystems: fileSystems, cancellation: CancellationFlag(), meter: nil)
+            .run([try #require(local.item(at: lockedFile))])
         #expect(outcome.failed == 0 && LocalInfo.details(lockedFile)?.mode == 0o644)
         // Listed as a file, replaced by a link since: the link's target keeps its mode.
         let victim = try box.file("private/key", "k")
@@ -98,7 +106,8 @@ internal struct Review2FileopsAttributes {
         try FileManager.default.createSymbolicLink(at: swapped, withDestinationURL: victim)
         change = AttributeChange()
         change.permissions = try #require(PermissionChange("777"))
-        _ = AttributeJob(change: change, fileSystems: fileSystems).run([before])
+        _ = AttributeJob(change: change, fileSystems: fileSystems, cancellation: CancellationFlag(), meter: nil)
+            .run([before])
         #expect(LocalInfo.details(victim)?.mode == 0o600)
     }
 
@@ -109,6 +118,6 @@ internal struct Review2FileopsAttributes {
         let failures = (0..<20).map { "item \($0): no" }
         let text = PropertyActions.summary(of: failures, total: 300_000)
         #expect(text.split(separator: "\n").count == 21 && text.hasSuffix("… and 299980 more"))
-        #expect(PropertyActions.summary(of: ["one: no"]) == "one: no")
+        #expect(PropertyActions.summary(of: ["one: no"], total: 1) == "one: no")
     }
 }

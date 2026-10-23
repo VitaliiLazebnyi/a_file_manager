@@ -36,14 +36,23 @@ internal enum DescriptStoreTarget {
             return
         }
         let store = CommentStore(fileSystems: registry)
-        let comments = store.comments(in: dir)
-        _ = store.comment(for: FileItem(url: dir.appending(name: "a.txt"), name: "a.txt"))
+        let comments = store.comments(in: dir, cancellation: CancellationFlag())
+        _ = store.comment(
+            for: FileItem(url: dir.appending(name: "a.txt"), name: "a.txt"),
+            cancellation: CancellationFlag()
+        )
         do {
-            try store.setComment("fresh\ncomment", for: "new.txt", in: dir, hidden: false)
+            try store.setComment(
+                "fresh\ncomment",
+                for: "new.txt",
+                in: dir,
+                hidden: false,
+                cancellation: CancellationFlag()
+            )
         } catch {
             return
         }
-        checkEdit(before: comments, after: store.comments(in: dir))
+        checkEdit(before: comments, after: store.comments(in: dir, cancellation: CancellationFlag()))
     }
 
     /// The new comment is stored, and every other comment stays as it was.

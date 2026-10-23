@@ -277,7 +277,10 @@ public final class CoverageSmallFiles: FileSystemProvider, @unchecked Sendable {
     @preconcurrency
     @MainActor
     public func report(_ directories: [URL]) {
-        lock.withLock { watchers }.forEach { $0(directories) }
+        let current = lock.withLock { watchers }
+        for watcher in current {
+            watcher(directories)
+        }
     }
 
     /// A reader of the memory file, unless `.open` fails.

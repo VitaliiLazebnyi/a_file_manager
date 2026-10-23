@@ -47,10 +47,14 @@ internal struct CoverageLocalVolumes {
         let (mount, volume) = CoverageLocalProbes.mount(of: box.root)
         let now = DispatchTime.now().uptimeNanoseconds
         let other = CoverageLocalProbes.spaced { _ in (100, 300) }
-        other.spareLock.withLock { other.spareSpace[mount] = (7, now, false, fsid_t(val: (1, 2))) }
+        other.spareLock.withLock {
+            other.spareSpace[mount] = .init(bytes: 7, measured: now, isMeasuring: false, volume: fsid_t(val: (1, 2)))
+        }
         #expect(other.volume(of: box.root)?.freeBytes == 300)
         let negative = CoverageLocalProbes.spaced { _ in (100, 300) }
-        negative.spareLock.withLock { negative.spareSpace[mount] = (-1_000, now, false, volume) }
+        negative.spareLock.withLock {
+            negative.spareSpace[mount] = .init(bytes: -1_000, measured: now, isMeasuring: false, volume: volume)
+        }
         #expect(negative.volume(of: box.root)?.freeBytes == 100)
     }
 
@@ -71,7 +75,9 @@ internal struct CoverageLocalVolumes {
         }
         let (mount, volume) = CoverageLocalProbes.mount(of: box.root)
         let local = CoverageLocalProbes.spaced(figures)
-        local.spareLock.withLock { local.spareSpace[mount] = (50, old, false, volume) }
+        local.spareLock.withLock {
+            local.spareSpace[mount] = .init(bytes: 50, measured: old, isMeasuring: false, volume: volume)
+        }
         let free = local.volume(of: box.root)?.freeBytes
         // The old difference, and behind the scenes a new measurement: nothing important is free any more.
         #expect(free == 150)

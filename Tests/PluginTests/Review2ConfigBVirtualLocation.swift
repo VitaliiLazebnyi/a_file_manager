@@ -10,7 +10,7 @@ internal struct Review2ConfigBVirtualLocation {
     @Test
     internal func aPasswordIsNeverWrittenIntoALocation() throws {
         let server = try #require(URL(string: "ftp://someone:s3cret@files.example.org/pub"))
-        let url = VirtualLocation.branch(of: server).url
+        let url = VirtualLocation.branch(real: server).url
         #expect(!url.absoluteString.contains("s3cret"))
         let hostText = try #require(url.host)
         let hex = hostText.split(separator: ".")

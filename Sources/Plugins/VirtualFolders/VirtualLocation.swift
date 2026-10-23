@@ -14,15 +14,18 @@ public import Foundation
 /// its path: scheme, user, host and port.
 public enum VirtualLocation: Equatable {
     /// Every file below a directory in one list (spec 03 › Branch view).
-    case branch(of: URL)
-    /// The branch view of some items of a directory only (spec 03 › Selected branch).
-    case picked(id: Int, in: URL)
-    /// A list of files from anywhere (spec 09 › Feed to listbox). `origin` is the real
-    /// directory the panel showed before; `[..]` leads back to it.
+    case branch(real: URL)
+    /// A list of files from anywhere (spec 09 › Feed to listbox).
+    ///
+    /// `origin` is the real directory the panel showed before; `[..]` leads back to it.
     case list(id: Int, title: String, origin: URL?)
+    /// The branch view of some items of a directory only (spec 03 › Selected branch).
+    case picked(id: Int, real: URL)
 
+    /// The URL scheme of every virtual folder, which the file system registry routes by.
     public static let scheme = "vfolder"
 
+    /// The `vfolder:` URL that stands for this location, of one of the forms above.
     public var url: URL {
         var components = URLComponents()
         components.scheme = Self.scheme
@@ -48,6 +51,7 @@ public enum VirtualLocation: Equatable {
         return components.url!
     }
 
+    /// Whether this is a list of files, which has nothing in it that could be changed or written.
     internal var isList: Bool {
         if case .list = self {
             return true
@@ -87,22 +91,21 @@ public enum VirtualLocation: Equatable {
             guard let real = Self.realURL(prefix: prefix, path: path) else {
                 return nil
             }
-            self = .branch(of: real)
+            self = .branch(real: real)
 
         case "pick":
             guard let id, let real = Self.realURL(prefix: prefix, path: path) else {
                 return nil
             }
-            self = .picked(id: id, in: real)
+            self = .picked(id: id, real: real)
 
         case "list":
             guard let id else {
                 return nil
             }
-            // The path starts with a slash, so the folder is at least the root.
-            let folder = (path as NSString).deletingLastPathComponent
+            let (folder, title) = Self.split(path)
             let origin = prefix.isEmpty ? nil : Self.realURL(prefix: prefix, path: folder)
-            self = .list(id: id, title: (path as NSString).lastPathComponent, origin: origin)
+            self = .list(id: id, title: title, origin: origin)
 
         default:
             return nil
@@ -134,9 +137,23 @@ public enum VirtualLocation: Equatable {
         return text
     }
 
-    private static func realURL(prefix: String, path: String) -> URL? {
+    /// The folder a path names and its last component; the root is its own last component.
+    ///
+    /// The path starts with a slash (it is a URL's), so the folder is at least the root.
+    private static func split(_ path: String) -> (folder: String, last: String) {
+        guard path != "/", let slash = path.lastIndex(of: "/") else {
+            return ("/", path)
+        }
+        let folder = slash == path.startIndex ? "/" : String(path[..<slash])
+        return (folder, String(path[path.index(after: slash)...]))
+    }
+
+    /// The real location a URL of this scheme names, from the prefix written in its host and its path.
+    ///
+    /// Nil when the prefix holds more than a scheme, user, host and port.
+    private static func realURL(prefix: String, path written: String) -> URL? {
         // Written into a URL by anyone, so the path is made plain: no `..` leads out of the place.
-        let path = Self.plain(path)
+        let path = Self.plain(written)
         if prefix == "file://" {
             return URL(fileURLWithPath: path, isDirectory: false)
         }
@@ -177,8 +194,10 @@ public enum VirtualLocation: Equatable {
         return labels
     }
 
+    /// The text that `hexLabels` wrote, read back from the hex digits of the labels; nil for
+    /// anything that is not hex of UTF-8.
     private static func text(fromHex hex: String) -> String? {
-        guard hex.count % 2 == 0 else {
+        guard hex.count.isMultiple(of: 2) else {
             return nil
         }
         var bytes: [UInt8] = []

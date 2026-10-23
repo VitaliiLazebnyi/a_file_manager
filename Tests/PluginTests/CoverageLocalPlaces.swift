@@ -44,7 +44,13 @@ internal struct CoverageLocalPlaces {
     @Test
     internal func theKindOfAVolumeFollowsWhatTheSystemSaysOfIt() {
         #expect(
-            LocalFileSystem.volumeKind(path: "/", isInternal: nil, isLocal: nil, isRemovable: nil, isEjectable: nil)
+            LocalFileSystem.volumeKind(
+                path: "/",
+                isInternal: false,
+                isLocal: false,
+                isRemovable: false,
+                isEjectable: false
+            )
                 == .internalDisk
         )
         #expect(
@@ -68,7 +74,13 @@ internal struct CoverageLocalPlaces {
                 == .externalDisk
         )
         #expect(
-            LocalFileSystem.volumeKind(path: "/V", isInternal: nil, isLocal: nil, isRemovable: nil, isEjectable: nil)
+            LocalFileSystem.volumeKind(
+                path: "/V",
+                isInternal: false,
+                isLocal: false,
+                isRemovable: false,
+                isEjectable: false
+            )
                 == .externalDisk
         )
     }

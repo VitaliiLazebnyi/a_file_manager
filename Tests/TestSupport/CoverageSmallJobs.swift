@@ -114,7 +114,9 @@ public final class CoverageSmallJobs: JobService {
 
     /// Cancels every job started so far; from any thread (a file system's hook, say).
     nonisolated public func cancelAll() {
-        started.value.forEach { $0.cancel() }
+        for flag in started.value {
+            flag.cancel()
+        }
     }
 
     /// Waits on the main thread, letting it run what was queued for it, until `condition`
