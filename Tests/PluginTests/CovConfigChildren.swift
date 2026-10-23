@@ -14,7 +14,8 @@ internal struct CovConfigChildren {
                 executable: "/bin/sleep",
                 arguments: ["600"],
                 environment: [:],
-                directory: "/"
+                directory: "/",
+                calls: .system
             )
             .get()
         let table = ChildTable()

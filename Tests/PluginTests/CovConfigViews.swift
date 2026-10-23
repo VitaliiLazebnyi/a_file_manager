@@ -55,7 +55,7 @@ internal struct CovConfigViews {
     @Test
     internal func cellsOfShortRowsAndUnknownSymbols() {
         let list = table()
-        list.show([["only"]], symbols: ["no.such.symbol.here"])
+        list.show([["only"]], symbols: ["no.such.symbol.here"], selecting: nil)
         let columns = list.tableView.tableColumns
         #expect(
             text(list, column: columns[0], row: 0) == "only" && text(list, column: columns[1], row: 0)?.isEmpty == true
@@ -69,7 +69,7 @@ internal struct CovConfigViews {
     @Test
     internal func returnAndEnterActivateTheRow() throws {
         let list = table()
-        list.show([["a"], ["b"]])
+        list.show([["a"], ["b"]], symbols: [], selecting: nil)
         var activated = 0
         list.onActivate = { activated += 1 }
         list.tableView.keyDown(with: try #require(key(36, "\r")))

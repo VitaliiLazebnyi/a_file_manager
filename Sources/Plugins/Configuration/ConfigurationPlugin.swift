@@ -14,28 +14,46 @@ public final class ConfigurationPlugin: Plugin {
     private static let listsParent = FileManager.default.temporaryDirectory.appendingPathComponent("AFileManager-lists")
 
     // Commands only this plugin has (spec 17 › Configuration, Help, User).
+
+    /// Opens the options on the Keyboard page.
     internal static let redefineHotkeys: CommandID = "cm_Confirmation"
+    /// Opens the options on the Button Bar page.
     internal static let buttonBarConfig: CommandID = "cm_ButtonConfig"
+    /// Opens the options on the Start Menu page.
     internal static let changeStartMenu: CommandID = "cm_ChangeStartMenu"
+    /// Opens the *Choose command* dialog on every command.
     internal static let commandBrowser: CommandID = "cm_CommandBrowser"
+    /// Opens the *Choose command* dialog on the user commands.
     internal static let userCommands: CommandID = "afm_UserCommands"
+    /// Opens the editor for a new user command.
     internal static let newUserCommand: CommandID = "afm_NewUserCommand"
+    /// Stores the window's position and the panels' layout now.
     internal static let savePosition: CommandID = "cm_ConfigSavePos"
+    /// Writes every setting to disk now.
     internal static let saveSettings: CommandID = "cm_ConfigSaveSettings"
+    /// Exports the settings to a file (asked for, or the argument's).
     internal static let exportSettings: CommandID = "afm_ExportSettings"
+    /// Imports the settings from a file (asked for, or the argument's).
     internal static let importSettings: CommandID = "afm_ImportSettings"
+    /// Puts every setting back to its default, after asking.
     internal static let resetSettings: CommandID = "afm_ResetSettings"
+    /// Ends the chains of user commands that are waiting.
     internal static let stopUserCommands: CommandID = "afm_StopUserCommands"
+    /// Shows the keys in force in a text window.
     internal static let keyboardHelp: CommandID = "cm_Keyboard"
+    /// Shows *What Is Where*, the guide for Total Commander users.
     internal static let helpIndex: CommandID = "cm_HelpIndex"
+    /// Shows the About panel.
     internal static let about: CommandID = "cm_About"
 
+    /// The plugin's name, "Configuration".
     public let name = "Configuration"
     private let launchesApplications: Bool
     private let background: DispatchQueue?
     private let listFolder: URL
     private let sweepsStaleFolders: Bool
     private let settingsKeys: (() -> [String])?
+    /// The center that holds the configuration's state and windows; nil before `start(in:)`.
     internal private(set) var center: ConfigurationCenter?
 
     /// The lines of user commands that were started without a command-line plugin.
@@ -92,6 +110,10 @@ public final class ConfigurationPlugin: Plugin {
             .sorted()
     }
 
+    /// Makes the configuration center and registers the windows, the settings commands, the user
+    /// commands and the Start menu with the kernel.
+    ///
+    /// Main thread.
     public func start(in owner: Kernel) {
         // The kernel keeps what is registered here; it must not be kept by it in turn.
         unowned let kernel = owner
@@ -101,28 +123,33 @@ public final class ConfigurationPlugin: Plugin {
             background: background,
             listFolder: listFolder
         )
-        let keys = settingsKeys ?? { [unowned kernel] in Self.storedKeys(of: kernel.settings) }
-        let center = ConfigurationCenter(
+        let keys = settingsKeys ?? { Self.storedKeys(of: kernel.settings) }
+        let configuration = ConfigurationCenter(
             kernel: kernel,
             runner: runner,
             effects: launchesApplications ? .system : .silent,
             enumeratedKeys: keys
         )
-        self.center = center
+        center = configuration
         runner.removeListFiles()
         if sweepsStaleFolders {
             let parent = Self.listsParent
-            runner.offMain({ CommandRunner.removeStaleListFolders(in: parent) }, then: { _ in })
+            runner.offMain(
+                { CommandRunner.removeStaleListFolders(in: parent) },
+                then: { _ in
+                    // Nothing is left to do on the main thread.
+                }
+            )
         }
 
-        registerWindows(center, in: kernel)
-        registerSettingsCommands(center, in: kernel)
+        registerWindows(configuration, in: kernel)
+        registerSettingsCommands(configuration, in: kernel)
 
         // The user's own commands and Start menu.
-        center.store.userCommands.forEach(center.register)
-        center.ensureSlots(center.store.startMenu.count)
-        center.applySymbols()
-        for (index, section) in center.startMenuSections().enumerated() {
+        configuration.store.userCommands.forEach(configuration.register)
+        configuration.ensureSlots(configuration.store.startMenu.count)
+        configuration.applySymbols()
+        for (index, section) in configuration.startMenuSections().enumerated() {
             kernel.menus.add(section, to: MenuSection(.start, order: 10 + index))
         }
         kernel.menus.add(
@@ -140,7 +167,7 @@ public final class ConfigurationPlugin: Plugin {
         window(Self.redefineHotkeys, "Redefine Hotkeys…") { center.showOptions(.keyboard) }
         window(Self.buttonBarConfig, "Button Bar…") { center.showOptions(.buttonBar) }
         window(Self.changeStartMenu, "Change Start Menu…") { center.showOptions(.startMenu) }
-        window(Self.commandBrowser, "Choose Command…") { center.browser().show() }
+        window(Self.commandBrowser, "Choose Command…") { center.browser().show(category: nil) }
         window(Self.userCommands, "User Commands…") {
             center.browser().show(category: CommandRow.userCategory)
         }
@@ -184,38 +211,33 @@ public final class ConfigurationPlugin: Plugin {
             center.saveSettingsNow()
         }
         // `.location`: the file to write or read; without, the user is asked for it.
-        commands.register(
-            Command(Self.exportSettings, "Export Settings…", runsDuringJobs: true),
-            parameterized: { argument in
-                // With a file given, the export holds the settings alone and says so afterwards.
-                if let url = argument.location {
-                    guard url.isFileURL else {
-                        return
-                    }
-                    return center.exportSettings(to: url)
+        commands.register(Command(Self.exportSettings, "Export Settings…", runsDuringJobs: true)) { argument in
+            // With a file given, the export holds the settings alone and says so afterwards.
+            if let url = argument.location {
+                guard url.isFileURL else {
+                    return
                 }
-                guard let options = center.askExportOptions(),
-                    let url = center.effects.chooseSettingsFile(true, kernel.productName),
-                    url.isFileURL
-                else { return }
-                center.exportSettings(to: url, options: options, tellsWhatIsIncluded: false)
+                return center.exportSettings(to: url, options: SettingsExportOptions(), tellsWhatIsIncluded: true)
             }
-        )
-        commands.register(
-            Command(Self.importSettings, "Import Settings…"),
-            parameterized: { argument in
-                guard let url = argument.location ?? center.effects.chooseSettingsFile(false, kernel.productName),
-                    url.isFileURL
-                else { return }
-                center.importSettings(from: url)
-            }
-        )
+            guard let options = center.askExportOptions(),
+                let url = center.effects.chooseSettingsFile(true, kernel.productName),
+                url.isFileURL
+            else { return }
+            center.exportSettings(to: url, options: options, tellsWhatIsIncluded: false)
+        }
+        commands.register(Command(Self.importSettings, "Import Settings…")) { argument in
+            guard let url = argument.location ?? center.effects.chooseSettingsFile(false, kernel.productName),
+                url.isFileURL
+            else { return }
+            center.importSettings(from: url)
+        }
         commands.register(Command(Self.resetSettings, "Reset All Settings…")) { center.resetSettings() }
         // A chain of commands that waits (`cm_wait`, a program it started) can be ended.
         commands.register(
             Command(Self.stopUserCommands, "Stop Waiting User Commands", runsDuringJobs: true),
-            enabled: { center.runner.isWaiting }
-        ) { center.runner.stopWaiting() }
+            enabled: { center.runner.isWaiting },
+            parameterized: { _ in center.runner.stopWaiting() }
+        )
         kernel.menus.add([Self.savePosition, Self.saveSettings], to: .configurationSave)
         kernel.menus.add(
             [
@@ -226,8 +248,13 @@ public final class ConfigurationPlugin: Plugin {
         )
     }
 
+    /// Closes the configuration's windows and removes the list files at once.
     public func stop() {
         center?.closeWindows()
         center?.runner.removeListFilesNow()
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

@@ -127,8 +127,6 @@ internal enum PexpandTarget {
         _ = ShellLine.script(ShellLine.pieces(fromPrompt: prompt.text, values: prompt.values))
         _ = ShellLine.pieces(fromPrompt: template, values: prompt.values)
         _ = ParameterExpander.usesSelection(pieces)
-        if let applicationPieces = CommandRunner.applicationLine(for: pieces) {
-            _ = ShellLine.script(applicationPieces)
-        }
+        _ = ShellLine.script(CommandRunner.startLine(for: pieces))
     }
 }

@@ -447,7 +447,7 @@ internal struct Review2PluginsA2SystemTools {
     @Test
     internal func theLongestLineIsMeasuredWithoutCuttingEveryLineIntoCharacters() {
         let pages = [[String(repeating: "e\u{301}", count: 40), "short"], ["x"]]
-        let view = PagePrintView(pages: pages, linesPerPage: 60, printInfo: NSPrintInfo())
+        let view = PagePrintView(pages: pages, longestLine: nil, linesPerPage: 60, printInfo: NSPrintInfo())
         var range = NSRange()
         #expect(withUnsafeMutablePointer(to: &range) { view.knowsPageRange($0) } && range.length == 2)
     }
