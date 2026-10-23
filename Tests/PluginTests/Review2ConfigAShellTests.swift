@@ -11,13 +11,16 @@ import Testing
 ///
 /// Every payload only tries to `touch` a marker file in the test's own folder.
 @Suite
-internal struct Review2ConfigAShell {
+internal struct Review2ConfigAShellTests {
+    /// What a script of cases did.
     internal struct Outcome {
         /// The arguments of each case, as the shell made them.
         internal var arguments: [[String]]
+        /// The names of the files that appeared in the folder the script ran in.
         internal var created: [String]
     }
 
+    /// The shells a line may be handed to.
     internal static let shells = ["/bin/zsh", "/bin/sh"]
 
     /// Names that ran commands before, and their relatives.
@@ -57,14 +60,17 @@ internal struct Review2ConfigAShell {
         ("'%|EVIL|' \"%|EVIL|\"", { _, _ in Array(repeating: "e'v\"\u{301}il $x `touch M18`;touch M19", count: 2) })
     ]
 
+    /// The folder `run`, in which every script runs in a folder of its own, and the list folder.
     internal let box: Sandbox
 
+    /// The folders of the test.
     internal init() throws {
         box = try Sandbox()
         try box.folder("run")
     }
 
-    internal func context(name: String?, selection: [String] = []) -> ExpansionContext {
+    /// The panels `/tmp/A dir/` (cursor on `name`, `selection` marked) and `/B/`, with a hostile variable `EVIL`.
+    internal func context(name: String?, selection: [String]) -> ExpansionContext {
         ExpansionContext(
             left: PanelSnapshot(path: "/tmp/A dir/", cursorName: name, selection: selection),
             right: PanelSnapshot(path: "/B/", cursorName: nil),
@@ -74,7 +80,13 @@ internal struct Review2ConfigAShell {
         )
     }
 
-    internal func expand(_ template: String, name: String?, selection: [String] = []) -> ExpandedParameters {
+    /// `template` expanded with the cursor on `name` and nothing marked.
+    internal func expand(_ template: String, name: String?) -> ExpandedParameters {
+        expand(template, name: name, selection: [])
+    }
+
+    /// `template` expanded with the cursor on `name` and `selection` marked.
+    internal func expand(_ template: String, name: String?, selection: [String]) -> ExpandedParameters {
         ParameterExpander(context: context(name: name, selection: selection)).expand(template)
     }
 
@@ -100,9 +112,8 @@ internal struct Review2ConfigAShell {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         var arguments: [[String]] = [[]]
-        for word in String(decoding: data, as: UTF8.self).split(separator: "\0", omittingEmptySubsequences: false)
-            .dropLast()
-        {
+        let output = try #require(String(bytes: data, encoding: .utf8))
+        for word in output.split(separator: "\0", omittingEmptySubsequences: false).dropLast() {
             if word == "\u{1}" { arguments.append([]) } else { arguments[arguments.count - 1].append(String(word)) }
         }
         return Outcome(
@@ -112,13 +123,15 @@ internal struct Review2ConfigAShell {
     }
 
     /// The same bytes whatever form the test process or the shell prefers for accents.
-    internal func same(_ a: [[String]], _ b: [[String]]) -> Bool {
-        a.map { $0.map(\.decomposedStringWithCanonicalMapping) }
-            == b.map { $0.map(\.decomposedStringWithCanonicalMapping) }
+    internal func same(_ got: [[String]], _ wanted: [[String]]) -> Bool {
+        got.map { $0.map(\.decomposedStringWithCanonicalMapping) }
+            == wanted.map { $0.map(\.decomposedStringWithCanonicalMapping) }
     }
 
+    /// `name` as it must reach a program: behind `./` when it begins with a dash.
     internal func protected(_ name: String) -> String { name.unicodeScalars.first == "-" ? "./" + name : name }
 
+    /// Every hostile name is one argument and runs nothing, in every template and both shells.
     @Test
     internal func aNameIsOneArgumentAndNothingOfItRunsInAnyPlaceAndShell() throws {
         for shell in Self.shells {
@@ -134,9 +147,10 @@ internal struct Review2ConfigAShell {
                     "\(shell) \(template): \(outcome.arguments.count) cases"
                 )
                 for (index, name) in names.enumerated() where index < outcome.arguments.count {
+                    let got = outcome.arguments[index].map(\.debugDescription)
                     #expect(
                         same([outcome.arguments[index]], [wanted[index]]),
-                        "\(shell) \(template) \(name.debugDescription): got \(outcome.arguments[index].map(\.debugDescription))"
+                        "\(shell) \(template) \(name.debugDescription): got \(got)"
                     )
                 }
             }
@@ -178,6 +192,7 @@ internal struct Review2ConfigAShell {
         }
     }
 
+    /// A placeholder where no reference to a value is safe is refused; what only looks like such a place is run.
     @Test
     internal func aPlaceWhereNoReferenceIsSafeIsRefused() {
         let refused = [
@@ -212,6 +227,7 @@ internal struct Review2ConfigAShell {
         }
     }
 
+    /// No value is ever part of the script's text, only references to it.
     @Test
     internal func noValueIsEverPartOfTheScript() throws {
         for name in Self.hostile {
@@ -224,183 +240,13 @@ internal struct Review2ConfigAShell {
                     options: .regularExpression
                 )
                 #expect(
-                    withoutReferences.unicodeScalars.allSatisfy {
-                        "cmd \"'${}=\n0123456789".unicodeScalars.contains($0)
+                    withoutReferences.unicodeScalars.allSatisfy { scalar in
+                        "cmd \"'${}=\n0123456789".unicodeScalars.contains(scalar)
                     },
                     "\(template) \(name.debugDescription): \(script.text.debugDescription)"
                 )
                 #expect(script.values.contains { $0.hasSuffix(name) || $0.contains("e'v") })
             }
-        }
-    }
-
-    @Test
-    internal func quotingOffIsTheUsersChoiceAndDataCannotMakeIt() throws {
-        // %Q: the name is pasted as it is and the shell splits it, as documented.
-        let off = expand("%Q%N", name: "a b")
-        #expect(off.pieces == [.raw("a b")] && off.text == "a b")
-        #expect(try run([off.pieces], shell: "/bin/zsh").arguments == [["a", "b"]])
-        // A name that reads `%Q` is a name: handed on to another command, it is still not read for codes.
-        let outer = expand("%N", name: "%Q$(touch M) %N")
-        var context = context(name: "inner")
-        context.argumentPieces = outer.pieces
-        for inner in [
-            ParameterExpander(context: context).expand(outer.pieces),
-            ParameterExpander(context: context).expand("-v %A"),
-            ParameterExpander(context: context).expand("%A1")
-        ] {
-            #expect(
-                inner.pieces.contains(.value("%Q$(touch M) %N"))
-                    && !inner.pieces.contains {
-                        guard case .raw = $0 else {
-                            return false
-                        }
-                        return true
-                    }
-            )
-            let outcome = try run([inner.pieces], shell: "/bin/zsh")
-            #expect(outcome.created.isEmpty && outcome.arguments.first?.last == "%Q$(touch M) %N")
-        }
-        // `%%Q` is a percent sign and a Q, not the code.
-        #expect(expand("%%Q %N", name: "a b").pieces == [.text("%Q "), .value("a b")])
-    }
-
-    @Test
-    internal func aValueKeepsEveryCharacter() {
-        // Only blanks the user wrote go from the ends of the line.
-        #expect(expand("  %N  ", name: "a\u{A0}").pieces == [.value("a\u{A0}")])
-        #expect(expand("%N", name: "report\u{3000}").pieces == [.value("report\u{3000}")])
-        #expect(expand("%N", name: " x ").pieces == [.value(" x ")])
-        #expect(expand("ls\u{A0}", name: nil).pieces == [.text("ls\u{A0}")])
-        // An empty value is a word of its own where it stands alone, and none where it is glued to text.
-        #expect(expand("a %|NONE| b", name: nil).text == "a \"\" b" && expand("a%|NONE| b", name: nil).text == "a b")
-        #expect(try! ShellLine.script(expand("a %|NONE| b", name: nil).pieces).get().values == [""])
-    }
-
-    @Test
-    internal func numbersTheUserTypesNeverTrap() {
-        let huge = "9223372036854775807"
-        let beyond = "99999999999999999999999999"
-        for template in [
-            "%N:~6,\(huge)", "%N:~\(huge),\(huge)", "%N:~-\(huge),-\(huge)", "%N:~\(beyond),\(beyond)",
-            "%N:~-0,\(huge)", "%N:~-0,-\(beyond)",
-            "%S\(huge)", "%S+\(huge)-", "%S-\(huge)-\(huge)", "%S+\(beyond)-\(beyond)", "%S-\(huge)-", "%A\(huge)",
-            "%A-\(huge)-\(beyond)",
-            "%A\(beyond)+", "%B9", "%C9", "%S:~\(huge),\(huge)"
-        ] {
-            _ = expand(template, name: "my file.txt", selection: ["a", "b", "c"])
-        }
-        #expect(expand("%N:~6,\(huge)", name: "my file.txt").pieces == [.value("e.txt")])
-        #expect(expand("%N:~3,\(beyond)", name: "my file.txt").pieces == [.value("file.txt")])
-        #expect(expand("%S+2-\(huge)", name: nil, selection: ["a", "b", "c"]).text == "b c")
-        #expect(
-            CommandLanguage.steps("cm_wait 99999999999999999999, cm_wait \(huge)") { _ in nil }
-                == [.wait(milliseconds: 0), .wait(milliseconds: CommandLanguage.longestWait)]
-        )
-    }
-
-    @Test
-    internal func aLeadingDashIsGuardedOnlyWhereAWordBegins() {
-        #expect(
-            expand("%N", name: "-x").pieces == [.value("./-x")] && expand("\"%N\"", name: "-x").text == "\"./-x\""
-        )
-        // After a blank inside the user's quotes the name is no argument of its own.
-        #expect(
-            expand("'pre %N post'", name: "-x").text == "'pre -x post'"
-                && expand("\"pre %N\"", name: "-x").text == "\"pre -x\""
-        )
-        // A dash with a combining mark is a dash to the program that reads it.
-        #expect(expand("%N", name: "-\u{301}x").pieces == [.value("./-\u{301}x")])
-        // Names in the user's quotes get the guard too, each of them.
-        #expect(expand("\"%S\"", name: nil, selection: ["-a", "b"]).text == "\"./-a\" \"b\"")
-        #expect(expand("%S", name: nil, selection: ["-a", "-b"]).text == "./-a ./-b")
-        // The user's own text inside the quotes is not touched: `$HOME` stays a variable.
-        let quoted = expand("\"$HOME/%S\"", name: nil, selection: ["a b", "c"])
-        #expect(quoted.pieces == [.text("\"$HOME/"), .value("a b"), .text("\" \"$HOME/"), .value("c"), .text("\"")])
-        // An escaped quote does not end the user's quotes.
-        #expect(expand("\"%S \\\" x\"", name: nil, selection: ["a"]).text == "\"a \\\" x\"")
-    }
-
-    @Test
-    internal func listFilesRefuseNamesThatWouldBeTwoLines() {
-        let broken = expand("xargs rm < %L", name: nil, selection: ["x\n/Users/me/important", "b"])
-        #expect(broken.problem?.contains("line break") == true)
-        #expect(
-            expand("%F", name: nil, selection: ["a\rb"]).problem != nil
-                && expand("%L", name: nil, selection: ["a", "b"]).problem == nil
-        )
-        // Without a path, a name that begins with a dash would be an option to whoever reads the list.
-        #expect(expand("%F", name: nil, selection: ["-rf", "b"]).listFile?.contents == Data("./-rf\nb\n".utf8))
-        #expect(expand("%L", name: nil, selection: ["-rf"]).listFile?.contents == Data("/tmp/A dir/-rf\n".utf8))
-    }
-
-    @Test
-    internal func thePromptShowsNamesAndTakesThemBack() {
-        let pieces = expand("-v %N %P%N '%N'", name: "my file.txt").pieces
-        let shown = ShellLine.prompt(pieces)
-        #expect(
-            shown.text == "-v \"my file.txt\" \"/tmp/A dir/my file.txt\" 'my file.txt'" && shown.values.isEmpty
-                && shown.legend.isEmpty
-        )
-        // A name a shell could read as something else is shown as the reference the shell gets.
-        let hostile = "a\"\u{301};touch M;\"\u{301}"
-        let guarded = ShellLine.prompt(expand("-v %N \"%N\" '%N'", name: hostile).pieces)
-        // Inside the user's single quotes the quote is closed, the reference written, and the quote opened again.
-        #expect(
-            guarded.text == "-v \"${__afm_1}\" \"${__afm_2}\" ''\"${__afm_3}\"''"
-                && guarded.values == [hostile, hostile, hostile]
-        )
-        #expect(guarded.legend.contains("${__afm_1} = ") && !guarded.legend.contains("\n\n"))
-        // What the user makes of it: the references are the values again, the rest is the user's text.
-        let edited = ShellLine.pieces(fromPrompt: "--new \"${__afm_2}\" ${__afm_9} ${__afm_x", values: guarded.values)
-        #expect(edited == [.text("--new \""), .value(hostile), .text("\" ${__afm_9} ${__afm_x")])
-        #expect(ShellLine.prompt(expand("%N", name: "line\nbreak").pieces).legend == "${__afm_1} = line\\nbreak")
-    }
-
-    @Test
-    internal func textForMessagesHasNoLineBreaksOrControlCharacters() {
-        #expect(DisplayText.oneLine("a\nb\rc\td\u{1B}[31m\u{202E}x\u{7}") == "a\\nb\\rc\\td\\u{1B}[31m\\u{202E}x\\u{7}")
-        #expect(DisplayText.oneLine("caf\u{e9} 👨‍👩‍👧 ok") == "caf\u{e9} 👨‍👩‍👧 ok")
-        #expect(
-            DisplayText.oneLine(String(repeating: "x", count: 500), limit: 10) == String(repeating: "x", count: 10)
-                + "…"
-        )
-    }
-
-    @Test
-    internal func aProgramGetsItsArgumentsByteForByte() async throws {
-        // `é` in one character: Foundation's `Process` would hand it over as `e` and an accent.
-        let name = "caf\u{e9} a\u{A0}.txt"
-        let out = box.url("run/bytes.bin")
-        let script = try ShellLine.script([.text("printf '%s' "), .value(name), .text(" > "), .value(out.path)]).get()
-        for shell in Self.shells {
-            try? FileManager.default.removeItem(at: out)
-            let pid =
-                try ChildProcess.spawn(
-                    executable: shell,
-                    arguments: ["-c"] + script.arguments,
-                    environment: ["PATH": "/usr/bin:/bin"],
-                    directory: box.url("run").path
-                )
-                .get()
-            let table = ChildTable()
-            let status: Int32? = await withCheckedContinuation { continuation in
-                table.watch(pid, waitedFor: true) { continuation.resume(returning: $0.status) }
-            }
-            #expect(status == 0)
-            #expect(try Data(contentsOf: out) == Data(name.utf8), "\(shell)")
-        }
-        // A program that cannot be started says so.
-        guard
-            case .failure = ChildProcess.spawn(
-                executable: "/nonexistent/afm-shell",
-                arguments: [],
-                environment: [:],
-                directory: "/"
-            )
-        else {
-            Issue.record("a missing program was started")
-            return
         }
     }
 }

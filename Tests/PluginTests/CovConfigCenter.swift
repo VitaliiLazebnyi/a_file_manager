@@ -70,12 +70,14 @@ internal struct CovConfigCenter {
             .values(["shortcut": .text("not a key!")]),
             .values(["shortcut": .text("f7")])
         ]
-        #expect(stage.center.editStartMenuRow(row) == nil)
-        #expect(stage.center.editStartMenuRow(row) == nil)
-        let unkeyed = try #require(stage.center.editStartMenuRow(row))
+        #expect(stage.center.editStartMenuRow(row, proposing: CommandAction(), title: "") == nil)
+        #expect(stage.center.editStartMenuRow(row, proposing: CommandAction(), title: "") == nil)
+        let unkeyed = try #require(stage.center.editStartMenuRow(row, proposing: CommandAction(), title: ""))
         #expect(unkeyed.shortcut.isEmpty && unkeyed.entry.title == "Old")
         #expect(stage.interaction.log.contains("inform: “not a key!” is not a shortcut"))
-        #expect(try #require(stage.center.editStartMenuRow(row)).shortcut == "f7")
+        #expect(
+            try #require(stage.center.editStartMenuRow(row, proposing: CommandAction(), title: "")).shortcut == "f7"
+        )
         #expect(stage.interaction.log.filter { $0 == "form: Change Start Menu Item" }.count == 4)
     }
 
@@ -126,7 +128,11 @@ internal struct CovConfigCenter {
     internal func anExportThatCannotBeWrittenSaysSo() throws {
         let stage = try CovConfigStage()
         defer { stage.close() }
-        stage.center.exportSettings(to: stage.box.url("missing/settings.json"))
+        stage.center.exportSettings(
+            to: stage.box.url("missing/settings.json"),
+            options: SettingsExportOptions(),
+            tellsWhatIsIncluded: true
+        )
         #expect(stage.interaction.log == ["inform: The settings could not be exported"])
     }
 
@@ -206,7 +212,7 @@ internal struct CovConfigCenter {
         stage.commands.perform(ConfigurationPlugin.importSettings)
         #expect(stage.fileRequests.map(\.saving) == [false, false] && stage.interaction.log.isEmpty)
         let file = stage.box.url("same.json")
-        stage.center.exportSettings(to: file)
+        stage.center.exportSettings(to: file, options: SettingsExportOptions(), tellsWhatIsIncluded: true)
         stage.chosenFile = file
         stage.commands.perform(ConfigurationPlugin.importSettings)
         #expect(stage.interaction.log.last == "inform: Nothing to import")

@@ -26,7 +26,7 @@ internal struct CovConfigModels {
         }
         #expect(ShortcutText.display(Shortcut(.character("q"), [.control, .option, .shift])) == "⌃⌥⇧Q")
         #expect(ShortcutText.display(Shortcut.f(5, .shift)) == "⇧F5")
-        #expect(Set(ShortcutText.namedKeys.map(ShortcutText.name(of:))).count == ShortcutText.namedKeys.count)
+        #expect(Set(ShortcutText.namedKeys.map(\.macSymbol)).count == ShortcutText.namedKeys.count)
     }
 
     /// A key owned by a command that is not registered names that command by its name.

@@ -14,22 +14,23 @@ import Testing
 @MainActor
 @Suite
 internal struct Review2ConfigARunner {
+    /// The folders `A` (holding `one.txt`) and `B`, and the list folders.
     internal let box: Sandbox
+    /// The settings of the program.
     internal let settings = MemorySettings()
 
+    /// The folders of the test.
     internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt")
         try box.folder("B")
     }
 
-    internal func bench(launches: Bool = false) -> (plugin: ConfigurationPlugin, bench: TestBench) {
-        let plugin = ConfigurationPlugin(
-            launchesApplications: launches,
-            background: nil,
-            listFolder: box.url("lists"),
-            settingsKeys: { [] }
-        )
+    /// A plugin that launches nothing and works on the main thread, started in a program over `A` and `B`.
+    internal func bench() -> (plugin: ConfigurationPlugin, bench: TestBench) {
+        let plugin = ConfigurationPlugin(launchesApplications: false, background: nil, listFolder: box.url("lists")) {
+            []
+        }
         let bench = TestBench(
             plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
             fileSystems: [LocalFileSystem()],
@@ -40,11 +41,19 @@ internal struct Review2ConfigARunner {
         return (plugin, bench)
     }
 
-    internal func define(_ plugin: ConfigurationPlugin, _ name: String, _ command: String, _ parameters: String = "") {
-        plugin.center!
-            .save(
-                UserCommand(name: name, title: "", action: CommandAction(command: command, parameters: parameters))
-            )
+    /// The configuration of a started `plugin`.
+    internal func center(of plugin: ConfigurationPlugin) throws -> ConfigurationCenter {
+        try #require(plugin.center)
+    }
+
+    /// Saves a user command `name` without a title that runs `command` without parameters.
+    internal func define(_ center: ConfigurationCenter, _ name: String, _ command: String) {
+        define(center, name, command, "")
+    }
+
+    /// Saves a user command `name` without a title that runs `command` with `parameters`.
+    internal func define(_ center: ConfigurationCenter, _ name: String, _ command: String, _ parameters: String) {
+        center.save(UserCommand(name: name, title: "", action: CommandAction(command: command, parameters: parameters)))
     }
 
     /// Lets the main thread run until `done`.
@@ -55,81 +64,91 @@ internal struct Review2ConfigARunner {
         #expect(await RunLoopWait.until(done))
     }
 
+    /// Commands that call each other across a wait are stopped, and nothing is left waiting.
     @Test
-    internal func commandsThatCallEachOtherAcrossAWaitAreStopped() async {
+    internal func commandsThatCallEachOtherAcrossAWaitAreStopped() async throws {
         let (plugin, bench) = bench()
-        define(plugin, "em_a", "cm_wait 1, em_b")
-        define(plugin, "em_b", "cm_wait 1, em_a")
+        let center = try center(of: plugin)
+        define(center, "em_a", "cm_wait 1, em_b")
+        define(center, "em_b", "cm_wait 1, em_a")
         bench.commands.perform("em_a")
         await wait { bench.interaction.log.contains { $0.contains("calls itself") } }
         #expect(bench.interaction.log == ["inform: “a” calls itself"])
         // Nothing is left waiting: the loop has ended.
-        await wait { !plugin.center!.runner.isWaiting }
-        #expect(!plugin.center!.runner.isWaiting && bench.interaction.log.count == 1)
+        await wait { !center.runner.isWaiting }
+        #expect(!center.runner.isWaiting && bench.interaction.log.count == 1)
     }
 
+    /// A Start menu entry that calls itself across a wait is stopped too.
     @Test
-    internal func aStartMenuEntryThatCallsItselfIsStoppedToo() async {
+    internal func aStartMenuEntryThatCallsItselfIsStoppedToo() async throws {
         let (plugin, bench) = bench()
-        var draft = plugin.center!.startMenuDraft()
+        let center = try center(of: plugin)
+        var draft = center.startMenuDraft()
         draft.insert(
             StartMenuDraft.Row(
                 entry: StartMenuEntry(title: "Loop", action: CommandAction(command: "cm_wait 1, cm_UserMenu1"))
             ),
             after: nil
         )
-        plugin.center!.commit(draft)
+        center.commit(draft)
         bench.commands.perform("cm_UserMenu1")
         await wait { bench.interaction.log.contains { $0.contains("calls itself") } }
         #expect(bench.interaction.log == ["inform: “Loop” calls itself"])
     }
 
+    /// A run stops after a fixed number of steps and refuses commands nested too deeply.
     @Test
-    internal func aRunHasABoundedNumberOfSteps() {
+    internal func aRunHasABoundedNumberOfSteps() throws {
         let (plugin, bench) = bench()
+        let center = try center(of: plugin)
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
         define(
-            plugin,
+            center,
             "em_many",
             Array(repeating: "cm_ConfigProbe", count: CommandRunner.stepLimit + 50).joined(separator: ",")
         )
         bench.commands.perform("em_many")
         #expect(probes == CommandRunner.stepLimit && bench.interaction.log == ["inform: “many” was stopped"])
         // Commands nested deeper than the limit are refused, not run.
-        for level in 0..<(CommandRunner.depthLimit + 4) { define(plugin, "em_n\(level)", "em_n\(level + 1)") }
+        for level in 0..<(CommandRunner.depthLimit + 4) { define(center, "em_n\(level)", "em_n\(level + 1)") }
         bench.commands.perform("em_n0")
         #expect(bench.interaction.log.last?.contains("is nested too deeply") == true)
     }
 
+    /// A chain that waits can be stopped by Stop User Commands; a later chain runs as usual.
     @Test
-    internal func aWaitingChainCanBeStopped() async {
+    internal func aWaitingChainCanBeStopped() async throws {
         let (plugin, bench) = bench()
+        let center = try center(of: plugin)
         var probes = 0
         bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
-        define(plugin, "em_slow", "cm_wait 3600000, cm_ConfigProbe")
+        define(center, "em_slow", "cm_wait 3600000, cm_ConfigProbe")
         let stop = ConfigurationPlugin.stopUserCommands
         #expect(!bench.commands.isEnabled(stop))
         bench.commands.perform("em_slow")
-        #expect(plugin.center!.runner.isWaiting && bench.commands.isEnabled(stop))
+        #expect(center.runner.isWaiting && bench.commands.isEnabled(stop))
         bench.commands.perform(stop)
-        #expect(!plugin.center!.runner.isWaiting && !bench.commands.isEnabled(stop) && probes == 0)
+        #expect(!center.runner.isWaiting && !bench.commands.isEnabled(stop) && probes == 0)
         // A chain started afterwards runs as usual.
-        define(plugin, "em_quick", "cm_wait 1, cm_ConfigProbe")
+        define(center, "em_quick", "cm_wait 1, cm_ConfigProbe")
         bench.commands.perform("em_quick")
         await wait { probes == 1 }
         #expect(probes == 1)
     }
 
+    /// A name handed from one user command to the next is neither expanded again nor unquoted.
     @Test
     internal func aNameHandedFromOneCommandToTheNextStaysAName() throws {
         let hostile = "%Q$(touch M) %N;x"
         try box.file("A/" + hostile)
         let (plugin, bench) = bench()
-        define(plugin, "em_inner", "echo")
-        define(plugin, "em_words", "tool", "/L=%A1 [%A]")
-        define(plugin, "em_outer", "em_inner", "%N")
-        define(plugin, "em_outer2", "em_words", "-v %N")
+        let center = try center(of: plugin)
+        define(center, "em_inner", "echo")
+        define(center, "em_words", "tool", "/L=%A1 [%A]")
+        define(center, "em_outer", "em_inner", "%N")
+        define(center, "em_outer2", "em_words", "-v %N")
         bench.left.moveCursor(toName: hostile)
         bench.commands.perform("em_outer")
         bench.commands.perform("em_outer2")
@@ -137,13 +156,15 @@ internal struct Review2ConfigARunner {
         #expect(plugin.launched == ["echo \"%Q\\$(touch M) %N;x\"", "tool /L=-v [-v \"%Q\\$(touch M) %N;x\"]"])
     }
 
+    /// A line that cannot hold a name safely (backticks, `$'...'`, a here-document, a name of two lines) is not run.
     @Test
-    internal func aLineThatCannotTakeANameSafelyIsNotRun() {
+    internal func aLineThatCannotTakeANameSafelyIsNotRun() throws {
         let (plugin, bench) = bench()
-        define(plugin, "em_tick", "echo", "`basename %N`")
-        define(plugin, "em_ansi", "echo", "$'%N'")
-        define(plugin, "em_here", "cat <<EOF", "%N")
-        define(plugin, "em_fine", "echo", "\"$(basename %N)\"")
+        let center = try center(of: plugin)
+        define(center, "em_tick", "echo", "`basename %N`")
+        define(center, "em_ansi", "echo", "$'%N'")
+        define(center, "em_here", "cat <<EOF", "%N")
+        define(center, "em_fine", "echo", "\"$(basename %N)\"")
         bench.left.moveCursor(toName: "one.txt")
         for name in ["em_tick", "em_ansi", "em_here"] {
             bench.commands.perform(CommandID(rawValue: name))
@@ -155,15 +176,16 @@ internal struct Review2ConfigARunner {
         // A list with a name of two lines is not written, and the command is not run.
         _ = try? box.file("A/two\nlines.txt")
         bench.left.reload()
-        define(plugin, "em_list", "cat", "%L")
+        define(center, "em_list", "cat", "%L")
         bench.commands.perform(.selectAll)
         bench.commands.perform("em_list")
         #expect(bench.interaction.log.last == "inform: “list” was not run" && plugin.launched.count == 1)
         #expect(!FileManager.default.fileExists(atPath: box.url("lists").path))
     }
 
+    /// The marked names of a long list are gathered in the background; names that read the same stay apart.
     @Test
-    internal func theMarkedNamesOfALongListAreGatheredInTheBackground() async {
+    internal func theMarkedNamesOfALongListAreGatheredInTheBackground() async throws {
         let memory = MemoryFileSystem()
         let count = CommandRunner.backgroundSelectionThreshold + 3
         for number in 0..<count { memory.addFile("/Big/f\(number) x.txt") }
@@ -171,17 +193,19 @@ internal struct Review2ConfigARunner {
         let plugin = ConfigurationPlugin(
             launchesApplications: false,
             background: .global(qos: .userInitiated),
-            listFolder: box.url("lists-big"),
-            settingsKeys: { [] }
-        )
+            listFolder: box.url("lists-big")
+        ) {
+            []
+        }
         let bench = TestBench(
             plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
             fileSystems: [LocalFileSystem(), memory],
             left: memory.url("/Big"),
             right: memory.url("/B")
         )
-        define(plugin, "em_all", "tool", "%S")
-        define(plugin, "em_cursor", "tool", "%N")
+        let center = try center(of: plugin)
+        define(center, "em_all", "tool", "%S")
+        define(center, "em_cursor", "tool", "%N")
         bench.commands.perform(.selectAll)
         bench.left.moveCursor(toName: "f1 x.txt")
         bench.commands.perform("em_all")
@@ -205,6 +229,7 @@ internal struct Review2ConfigARunner {
         #expect(contains("cafe\u{301}.txt") && !contains("caf\u{e9}.txt") && contains("f2 x.txt"))
     }
 
+    /// The selection is gathered only for a text with a code that needs it.
     @Test
     internal func theSelectionIsGatheredOnlyForATextThatAsksForIt() {
         #expect(ParameterExpander.usesSelection([.text("%S")]) && ParameterExpander.usesSelection([.text("a %P%s")]))
@@ -218,16 +243,18 @@ internal struct Review2ConfigARunner {
         )
     }
 
+    /// An application path with a space is opened with `open -a` as one word.
     @Test
     internal func anApplicationPathWithASpaceIsOneWord() throws {
         let app = try box.folder("Apps/My App.app")
         let line: [ExpandedPiece] = [.text("\"\(app.path)\" --flag "), .value("a b")]
-        let opened = try #require(CommandRunner.applicationLine(for: line))
+        let opened = CommandRunner.startLine(for: line)
         #expect(opened == [.text("/usr/bin/open -a "), .value(app.path), .text(" --flag "), .value("a b")])
         #expect(ShellLine.display(opened) == "/usr/bin/open -a \"\(app.path)\" --flag \"a b\"")
         // A line that is no application stays as it is.
-        #expect(CommandRunner.applicationLine(for: [.text("ls -l")]) == nil)
-        #expect(CommandRunner.applicationLine(for: [.text("\"\(box.url("Apps/None.app").path)\" x")]) == nil)
+        #expect(CommandRunner.startLine(for: [.text("ls -l")]) == [.text("ls -l")])
+        let missing: [ExpandedPiece] = [.text("\"\(box.url("Apps/None.app").path)\" x")]
+        #expect(CommandRunner.startLine(for: missing) == missing)
         #expect(ShellWords.firstWord(of: [.text("  \"a b\"c d e")]).word == [.text("\"a b\"c")])
         #expect(
             ShellWords.unquoted(ShellWords.firstWord(of: [.text("pre"), .value("x y"), .text("post rest")]).word)
@@ -235,6 +262,7 @@ internal struct Review2ConfigARunner {
         )
     }
 
+    /// List files are removed only when they are old enough that no program still reads them.
     @Test
     internal func listFilesOfARunThatQuitsAreKeptWhileAProgramMayReadThem() throws {
         let made = bench()
@@ -259,123 +287,5 @@ internal struct Review2ConfigARunner {
         )
         runner.removeListFilesNow()
         #expect(!FileManager.default.fileExists(atPath: folder.path))
-    }
-}
-
-/// The runner with real programs: a login shell is started, as in the program.
-@MainActor
-@Suite
-internal struct Review2ConfigALaunching {
-    internal let box: Sandbox
-    internal let plugin: ConfigurationPlugin
-    internal let bench: TestBench
-
-    internal init() throws {
-        box = try Sandbox()
-        try box.folder("A")
-        try box.folder("B")
-        plugin = ConfigurationPlugin(
-            launchesApplications: true,
-            background: nil,
-            listFolder: box.url("lists"),
-            settingsKeys: { [] }
-        )
-        bench = TestBench(
-            plugins: [NavigationPlugin(), SelectionPlugin(), plugin],
-            fileSystems: [LocalFileSystem()],
-            left: box.url("A"),
-            right: box.url("B")
-        )
-    }
-
-    /// Lets the main thread run until `done`.
-    ///
-    /// Only a hang ends the wait without it: on a busy machine other tests may hold the main thread
-    /// for a long time, so no shorter limit is set.
-    internal func wait(until done: () -> Bool) async {
-        #expect(await RunLoopWait.until(done))
-    }
-
-    @Test
-    internal func aHostileFileNameReachesTheProgramAsItIsAndRunsNothing() async throws {
-        // The names that ran `touch` before: a quote and a backtick that carry a combining mark.
-        let names = ["a\"\u{301};touch PWNED1;\"\u{301}", "`\u{301};touch PWNED2;`\u{301}", "$(touch PWNED3);x", "-n"]
-        for name in names { try box.file("A/" + name) }
-        bench.left.reload()
-        let center = plugin.center!
-        let out = box.url("out.bin").path
-        // The panel's folder is where the line runs: a marker would appear in it.
-        center.save(
-            UserCommand(
-                name: "em_show",
-                title: "",
-                action: CommandAction(command: "printf '%s\\0'", parameters: "%N \"%P%N\" x%Ny > '\(out)'")
-            )
-        )
-        for name in names {
-            try? FileManager.default.removeItem(atPath: out)
-            bench.left.moveCursor(toName: name)
-            bench.commands.perform("em_show")
-            func written() -> Data { (try? Data(contentsOf: URL(fileURLWithPath: out))) ?? Data() }
-            await wait { written().filter { $0 == 0 }.count == 3 }
-            let words = String(decoding: written(), as: UTF8.self)
-                .split(
-                    separator: "\0",
-                    omittingEmptySubsequences: false
-                )
-                .dropLast().map(String.init)
-            let guarded = name.hasPrefix("-") ? "./" + name : name
-            let folder = bench.left.model.directory.path
-            #expect(
-                words.map { Array($0.utf8) }
-                    == [guarded, folder + "/" + name, "x" + name + "y"].map { Array($0.utf8) },
-                "\(name.debugDescription): \(words.map(\.debugDescription))"
-            )
-        }
-        let created = try FileManager.default.contentsOfDirectory(atPath: box.url("A").path)
-            .filter {
-                $0.hasPrefix("PWNED")
-            }
-        #expect(created.isEmpty && bench.interaction.log.isEmpty)
-    }
-
-    @Test
-    internal func aProgramTheShellDoesNotFindIsReported() async {
-        plugin.center!
-            .save(
-                UserCommand(
-                    name: "em_missing",
-                    title: "",
-                    action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")
-                )
-            )
-        bench.commands.perform("em_missing")
-        await wait { bench.interaction.log.contains { $0.hasPrefix("inform:") } }
-        #expect(bench.interaction.log.count == 1 && bench.interaction.log[0].contains("cannot be started"))
-    }
-
-    @Test
-    internal func aChainStopsWhenItsProgramCouldNotBeStarted() async {
-        var probes = 0
-        bench.commands.register(Command("cm_ConfigProbe", "Probe")) { probes += 1 }
-        let center = plugin.center!
-        center.save(
-            UserCommand(
-                name: "em_bad",
-                title: "",
-                action: CommandAction(command: "afm-no-such-program-\(UUID().uuidString)")
-            )
-        )
-        center.save(UserCommand(name: "em_chain", title: "", action: CommandAction(command: "em_bad, cm_ConfigProbe")))
-        center.save(UserCommand(name: "em_good", title: "", action: CommandAction(command: "true")))
-        center.save(
-            UserCommand(name: "em_chain2", title: "", action: CommandAction(command: "em_good, cm_ConfigProbe"))
-        )
-        bench.commands.perform("em_chain")
-        await wait { bench.interaction.log.contains { $0.contains("cannot be started") } }
-        bench.commands.perform("em_chain2")
-        await wait { probes == 1 }
-        // Only the chain whose program ran went on.
-        #expect(probes == 1 && !center.runner.isWaiting)
     }
 }

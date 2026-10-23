@@ -11,9 +11,12 @@ import AppKit
 /// The categories are the menus the commands are in; this program has no `totalcmd.inc` with
 /// numbers, so the Nr. column is replaced by the keys.
 internal final class CommandBrowserController: NSWindowController, NSWindowDelegate, NSSearchFieldDelegate {
+    /// The dialog's window: Cmd+C goes to `onCopy` before the menus see it.
     private final class Window: ToolWindow {
+        /// Copies the selected command's name; true when it did.
         var onCopy: (() -> Bool)?
 
+        /// Cmd+C copies through `onCopy` when that copies something; other keys go the usual way.
         override func performKeyEquivalent(with event: NSEvent) -> Bool {
             if Shortcut.cmd("c").matches(event), onCopy?() == true {
                 return true
@@ -28,6 +31,7 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
     private let categories = NSPopUpButton(frame: .zero, pullsDown: false)
     private var primaryButton = NSButton()
     private var userButtons: [NSButton] = []
+    /// The commands the list shows, after the filter and the category.
     internal private(set) var rows: [CommandRow] = []
     private var isPicking = false
     private var picked: CommandRow?
@@ -35,6 +39,7 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
     private var selected: CommandRow? { table.selectedRow.flatMap { rows.dropFirst($0).first } }
     private var selectedUserCommand: UserCommand? { selected.flatMap { center.userCommand(named: $0.id.rawValue) } }
 
+    /// Makes the dialog (not yet on screen) for the center's commands.
     internal init(center: ConfigurationCenter) {
         self.center = center
         let window = Window(
@@ -53,6 +58,7 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
         buildContent(in: window)
     }
 
+    /// Not used: the dialog is made in code.
     @available(*, unavailable)
     internal required init?(coder _: NSCoder) { fatalError("not used") }
 
@@ -66,28 +72,19 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
         categories.action = #selector(categoryChanged)
         table.onSelect = { [weak self] in self?.updateButtons() }
         table.onActivate = { [weak self] in self?.accept() }
-        let top = filledStack([categories, filter], vertical: false)
-        primaryButton = ActionButton("Run") { [unowned self] in accept() }
+        let top = filledStack([categories, filter], vertical: false, spacing: 8)
+        primaryButton = ActionButton("Run") { [weak self] in self?.accept() }
         primaryButton.keyEquivalent = "\r"
         userButtons = [
-            ActionButton("New…") { [unowned self] in
-                guard let command = center.editUserCommand(nil) else {
-                    return
-                }
-                reload(selecting: command.id)
-            },
-            ActionButton("Edit…") { [unowned self] in
-                guard let existing = selectedUserCommand, let command = center.editUserCommand(existing) else {
-                    return
-                }
-                reload(selecting: command.id)
-            },
-            ActionButton("Delete") { [unowned self] in deleteSelected() },
-            ActionButton("Rename/Copy…") { [unowned self] in renameOrCopy() }
+            ActionButton("New…") { [weak self] in self?.newCommand() },
+            ActionButton("Edit…") { [weak self] in self?.editSelected() },
+            ActionButton("Delete") { [weak self] in self?.deleteSelected() },
+            ActionButton("Rename/Copy…") { [weak self] in self?.renameOrCopy() }
         ]
         let bottom = filledStack(
-            userButtons + [spacer(), ActionButton("Cancel") { [unowned self] in self.window?.close() }, primaryButton],
-            vertical: false
+            userButtons + [spacer(), ActionButton("Cancel") { [weak self] in self?.window?.close() }, primaryButton],
+            vertical: false,
+            spacing: 8
         )
         window.contentView = padded(filledStack([top, table, bottom], vertical: true, spacing: 10), by: 12)
     }
@@ -95,7 +92,7 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
     // MARK: Showing
 
     /// Opens the dialog on its own: the chosen command is run.
-    internal func show(category: String? = nil) {
+    internal func show(category: String?) {
         prepare(picking: false, category: category)
         center.effects.present(self)
         window?.makeFirstResponder(filter)
@@ -137,12 +134,13 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
     private func reload(selecting id: CommandID? = nil) {
         let category = categories.indexOfSelectedItem > 0 ? categories.titleOfSelectedItem : nil
         rows = CommandCatalog.filter(center.commandRows(), text: filter.stringValue, category: category)
-            .filter {
-                !$0.id.rawValue.hasPrefix(UserCommand.prefix) || center.userCommand(named: $0.id.rawValue) != nil
+            .filter { row in
+                !row.id.rawValue.hasPrefix(UserCommand.prefix) || center.userCommand(named: row.id.rawValue) != nil
             }
         table.show(
             rows.map { [$0.id.rawValue, $0.title, $0.keys] },
-            selecting: id.flatMap { id in rows.firstIndex { $0.id == id } } ?? 0
+            symbols: [],
+            selecting: id.flatMap { wanted in rows.firstIndex { $0.id == wanted } } ?? 0
         )
         updateButtons()
     }
@@ -152,7 +150,9 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
         for button in userButtons.dropFirst() { button.isEnabled = selectedUserCommand != nil }
     }
 
+    /// Each change of the filter narrows the list again.
     internal func controlTextDidChange(_: Notification) { reload() }
+
     @objc
     private func categoryChanged() { reload() }
 
@@ -192,6 +192,20 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
         return true
     }
 
+    private func newCommand() {
+        guard let command = center.editUserCommand(nil) else {
+            return
+        }
+        reload(selecting: command.id)
+    }
+
+    private func editSelected() {
+        guard let existing = selectedUserCommand, let command = center.editUserCommand(existing) else {
+            return
+        }
+        reload(selecting: command.id)
+    }
+
     private func deleteSelected() {
         guard let command = selectedUserCommand else {
             return
@@ -213,9 +227,9 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
         guard let command = selectedUserCommand else {
             return
         }
-        let ui = center.kernel.interaction
+        let interaction = center.kernel.interaction
         guard
-            let answer = ui.form(
+            let answer = interaction.form(
                 "Rename or Copy \(command.name)",
                 detail: "",
                 fields: [.text("name", "New name:  em_", String(command.name.dropFirst(UserCommand.prefix.count)))],
@@ -223,7 +237,7 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
             )
         else { return }
         guard let name = UserCommand.name(from: answer.text("name")), center.userCommand(named: name) == nil else {
-            ui.inform(
+            interaction.inform(
                 "The name cannot be used",
                 detail: "It is empty, in use, or has characters other than letters, digits and _.",
                 style: .warning
@@ -236,77 +250,8 @@ internal final class CommandBrowserController: NSWindowController, NSWindowDeleg
         reload(selecting: renamed.id)
     }
 
+    /// Closing the window while an editor waits for a pick ends the modal run (nothing picked).
     internal func windowWillClose(_: Notification) {
         if isPicking { center.effects.stopModal() }
-    }
-}
-
-extension ConfigurationCenter {
-    /// Lets the user pick a command for an editor (the magnifier button of spec 14).
-    internal func pickCommand() -> CommandRow? {
-        browser().pick()
-    }
-
-    internal func browser() -> CommandBrowserController {
-        if let browserWindow {
-            return browserWindow
-        }
-        let controller = CommandBrowserController(center: self)
-        browserWindow = controller
-        return controller
-    }
-
-    internal func showOptions(_ section: OptionsWindowController.Section) {
-        let controller = optionsWindow ?? OptionsWindowController(center: self)
-        optionsWindow = controller
-        controller.show(section)
-    }
-
-    internal func showText(_ text: String, title: String) {
-        let controller = textWindows[title] ?? TextWindowController(title: title)
-        textWindows[title] = controller
-        controller.show(text, present: effects.present)
-    }
-
-    internal func closeWindows() {
-        optionsWindow?.close()
-        browserWindow?.close()
-        textWindows.values.forEach { $0.close() }
-    }
-
-    /// The keyboard help, from the bindings in force (spec 17 › Help, `cm_Keyboard`).
-    internal func keyboardHelp() -> String {
-        "Keyboard shortcuts of \(kernel.productName)\nChange them in Configuration › Options › Keyboard.\n\n"
-            + CommandCatalog.shortcutSheet(commandRows(), menus: kernel.menus.menus)
-    }
-
-    /// Where the things a Total Commander user looks for are in this program.
-    internal func whatIsWhere() -> String {
-        """
-        \(kernel.productName): what is where
-
-        Options            Configuration › Options (⌘,). The pages come from the program's
-                           parts; changes apply with Apply or OK.
-        Keys               Options › Keyboard: select a command, press Set Shortcut and
-                           then the key. A key that is in use names its command first.
-                           Help › Keyboard Shortcuts lists the keys in force.
-        Button bar         Options › Button Bar: add commands and separators, reorder,
-                           choose a symbol, or go back to the default bar.
-        User commands      Configuration › User Commands: commands of your own (em_name)
-                           that run a program, a shell line, cd <folder> or other
-                           commands, with parameters such as %P %N %S %L. They can be
-                           given keys, put on the button bar and typed on the command line.
-        Start menu         Options › Start Menu. The n-th entry is also cm_UserMenu<n>.
-        All commands       Configuration › Choose Command lists every command with its
-                           name and keys, and runs the one you choose.
-        Settings           They are kept in the macOS preferences and stored the moment
-                           they change; there is no wincmd.ini. Options › Settings File
-                           exports them to a file, imports them and resets them.
-        Language           The program is in English. Total Commander's language files
-                           (.LNG, .MNU) are Windows resources and are not read.
-        Not on the Mac     Run as administrator (*), 8.3 short names (the lower-case
-                           parameter codes insert the long names), icon libraries
-                           (buttons use system symbols), submenus in the Start menu.
-        """
     }
 }

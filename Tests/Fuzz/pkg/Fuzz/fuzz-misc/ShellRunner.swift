@@ -51,7 +51,8 @@ internal enum ShellRunner {
             executable: shell,
             arguments: options + script.arguments,
             environment: environment,
-            directory: folder
+            directory: folder,
+            calls: .system
         )
         guard case .success(let pid) = started else {
             fzFail("quote-shell-not-started", shell)

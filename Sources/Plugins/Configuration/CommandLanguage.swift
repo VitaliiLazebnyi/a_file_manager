@@ -1,76 +1,6 @@
 import AFMKernel
 import Foundation
 
-/// What a button, a Start-menu item or a user command does: the three fields the editors of
-/// Total Commander share (spec 14 › The command language).
-internal struct CommandAction: Codable, Equatable {
-    /// A command of the program (`cm_…`, `em_…`), several of them separated by commas,
-    /// `cd <path>`, or a program or shell line.
-    internal var command = ""
-    /// Parameters with placeholders (spec 18 › Button and command parameters).
-    internal var parameters = ""
-    /// The folder a program starts in; with `cd`, the folder the other panel shows.
-    internal var startPath = ""
-}
-
-/// A command the user defined (spec 14 › User commands (`em_`)).
-///
-/// It is registered like any other command, so keys, the button bar, menus and the command line
-/// reach it by its name.
-internal struct UserCommand: Codable, Equatable {
-    internal static let prefix = "em_"
-
-    /// The full name, `em_backup`.
-    internal var name: String
-    internal var title: String
-    internal var action = CommandAction()
-    /// A system symbol for the button bar; empty for none.
-    internal var symbol = ""
-
-    internal var id: CommandID { CommandID(rawValue: name) }
-    /// What menus and lists show.
-    internal var caption: String { title.isEmpty ? String(name.dropFirst(Self.prefix.count)) : title }
-
-    /// The name as it is stored: letters, digits and `_` after `em_`.
-    ///
-    /// Nil when nothing usable is left of what the user typed.
-    internal static func name(from text: String) -> String? {
-        var text = text.trimmingCharacters(in: .whitespaces)
-        if text.lowercased().hasPrefix(prefix) { text.removeFirst(prefix.count) }
-        let allowed = text.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) || $0 == "_" }
-        return allowed && !text.isEmpty ? prefix + text : nil
-    }
-}
-
-/// An entry of the Start menu (spec 14 › Start menu).
-///
-/// The n-th entry runs as `cm_UserMenu<n>`.
-internal struct StartMenuEntry: Codable, Equatable {
-    internal static let separator = Self(title: "-")
-
-    /// A title of `-` makes a separator, as in Total Commander.
-    internal var title: String
-    internal var action = CommandAction()
-    internal var isSeparator: Bool { title == "-" }
-
-    /// The name of the command that runs the entry at `index` (counted from 0).
-    internal static func commandID(at index: Int) -> CommandID { CommandID(rawValue: "cm_UserMenu\(index + 1)") }
-}
-
-/// One thing a Command field asks for.
-internal enum CommandStep: Equatable {
-    /// A command of the program with what was written after its name.
-    case perform(CommandID, parameter: String)
-    /// `cd <path>`; an empty path stands for what the Parameters field holds.
-    case changeDirectory(String)
-    /// `cm_wait <ms>`: a pause between two commands of a chain.
-    case wait(milliseconds: Int)
-    /// A program or shell line, handed to whoever runs command lines.
-    case external(String)
-    /// Looks like a command of the program but no plugin provides it.
-    case unknown(String)
-}
-
 /// Reads a Command field (spec 14 › The command language, Grammar and Rules).
 ///
 /// Pure.
@@ -121,19 +51,18 @@ internal enum CommandLanguage {
     /// `resolve` finds a registered command by its name, whatever its case. A field in which not
     /// every comma-separated item is a command of the program is one external line, commas
     /// included.
-    internal static func steps(_ command: String, environment: [String: String] = [:], resolve: (String) -> CommandID?)
+    internal static func steps(_ command: String, environment: [String: String], resolve: (String) -> CommandID?)
         -> [CommandStep]
     {
-        let command = expandingEnvironment(command, environment).trimmingCharacters(in: .whitespaces)
-        guard !command.isEmpty else {
+        let line = expandingEnvironment(command, environment).trimmingCharacters(in: .whitespaces)
+        guard !line.isEmpty else {
             return []
         }
-        let items = ShellWords.split(command, at: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter {
-                !$0.isEmpty
-            }
+        let items = ShellWords.split(line, at: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
         let steps = items.map { step($0, resolve: resolve) }
-        return steps.contains(nil) ? [.external(command)] : steps.compactMap { $0 }
+        return steps.contains(nil) ? [.external(line)] : steps.compactMap(\.self)
     }
 
     /// Nil when the item is not a command of the program.
@@ -171,40 +100,5 @@ internal enum CommandLanguage {
             return .location(location(plain))
         }
         return .text(plain)
-    }
-}
-
-// Stored data is read leniently: a missing key takes its default and an unknown one is ignored,
-// so a field added or removed by another version never makes the whole list unreadable.
-extension CommandAction {
-    private enum Keys: String, CodingKey { case command, parameters, startPath }
-
-    internal init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: Keys.self)
-        command = try container.decodeIfPresent(String.self, forKey: .command) ?? ""
-        parameters = try container.decodeIfPresent(String.self, forKey: .parameters) ?? ""
-        startPath = try container.decodeIfPresent(String.self, forKey: .startPath) ?? ""
-    }
-}
-
-extension UserCommand {
-    private enum Keys: String, CodingKey { case name, title, action, symbol }
-
-    internal init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: Keys.self)
-        name = try container.decode(String.self, forKey: .name)
-        title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
-        action = try container.decodeIfPresent(CommandAction.self, forKey: .action) ?? CommandAction()
-        symbol = try container.decodeIfPresent(String.self, forKey: .symbol) ?? ""
-    }
-}
-
-extension StartMenuEntry {
-    private enum Keys: String, CodingKey { case title, action }
-
-    internal init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: Keys.self)
-        title = try container.decode(String.self, forKey: .title)
-        action = try container.decodeIfPresent(CommandAction.self, forKey: .action) ?? CommandAction()
     }
 }
