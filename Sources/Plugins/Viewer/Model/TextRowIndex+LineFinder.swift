@@ -1,4 +1,4 @@
-import Foundation
+import Darwin.C
 
 /// How the fast scan finds line ends in raw bytes.
 extension TextRowIndex {

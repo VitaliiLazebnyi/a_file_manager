@@ -1,4 +1,4 @@
-import Foundation
+import Darwin.C
 
 /// A name that is equal to another only when it is written with the same bytes (a `String`
 /// treats `é` and `e` + U+0301 as one name).

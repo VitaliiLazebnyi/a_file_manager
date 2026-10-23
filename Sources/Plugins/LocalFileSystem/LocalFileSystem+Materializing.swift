@@ -1,4 +1,4 @@
-import Foundation
+import Darwin.C
 
 /// What the local file system does to the thread it runs on.
 extension LocalFileSystem {

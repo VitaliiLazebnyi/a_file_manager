@@ -1,5 +1,4 @@
 import Darwin
-import Foundation
 
 /// What a branch walk asks the system about the disks under it: which disk and which entry of
 /// it a folder is, whether a disk is mounted at a folder, and whether a walk from a folder goes

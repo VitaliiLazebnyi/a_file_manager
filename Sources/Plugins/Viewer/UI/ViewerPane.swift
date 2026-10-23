@@ -2,7 +2,7 @@ import AFMKernel
 import AppKit
 import Foundation
 import PDFKit
-import Quartz
+import QuickLookUI
 
 /// A Lister: the menu strip, the content in one of the display modes and the status line
 /// (spec 10 › The Lister window).

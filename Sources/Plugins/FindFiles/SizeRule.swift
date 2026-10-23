@@ -1,4 +1,4 @@
-import Foundation
+import Darwin.C
 
 /// "File size > 1.5 Mbytes" (spec 09 › Advanced tab).
 public struct SizeRule: Codable, Equatable, Sendable {

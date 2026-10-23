@@ -2,7 +2,6 @@ import AFMKernel
 import TestSupport
 import Testing
 
-@testable import CompareContentPlugin
 @testable import DirectorySyncPlugin
 
 /// Synchronize directories run through its session: the dialog, the actions of the rows, and what the

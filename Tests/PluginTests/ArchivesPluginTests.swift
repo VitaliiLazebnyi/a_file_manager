@@ -5,8 +5,6 @@ import MacIntegrationPlugin
 import TestSupport
 import Testing
 
-@testable import ArchivesPlugin
-
 /// The archives plugin in panels: its parts, archives entered and left like folders, and the files
 /// Enter opens as archives.
 @MainActor

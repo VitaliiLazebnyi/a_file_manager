@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+import Darwin.C
 import Testing
 
 @testable import CompareContentPlugin

@@ -1,4 +1,4 @@
-import Foundation
+import Darwin.C
 import Testing
 
 @testable import NetworkPlugin

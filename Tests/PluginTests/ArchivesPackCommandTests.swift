@@ -4,8 +4,6 @@ import Foundation
 import TestSupport
 import Testing
 
-@testable import ArchivesPlugin
-
 /// The pack command: where and how it packs, its options, encryption and adding to an archive.
 @MainActor
 @Suite

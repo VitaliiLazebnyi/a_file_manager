@@ -1,5 +1,5 @@
 import AFMKernel
-import CoreFoundation
+import CoreFoundation.CFCGTypes
 import Testing
 
 @testable import AFMShell

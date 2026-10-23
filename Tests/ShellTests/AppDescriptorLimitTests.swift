@@ -1,4 +1,4 @@
-import Darwin
+import Darwin.C
 import Testing
 
 @testable import AFMShell

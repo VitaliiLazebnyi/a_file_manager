@@ -1,5 +1,5 @@
 import AppKit
-import Quartz
+import QuickLookUI
 
 /// The system's shared Quick Look panel.
 ///
