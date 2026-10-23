@@ -23,7 +23,7 @@ internal final class Running {
     /// The kernel's commands.
     internal var commands: CommandRegistry { kernel.commands }
     /// True when no panel is loading and no job runs.
-    internal var isSettled: Bool { !shell.panelCoordinator.isLoading && !kernel.jobs.isBusy }
+    internal var isSettled: Bool { !left.isLoading && !right.isLoading && !kernel.jobs.isBusy }
 
     /// Starts the program with the panels at `left` and `right` and `providers` registered.
     internal init(left: URL, right: URL, home: URL, providers: [any FileSystemProvider]) {
