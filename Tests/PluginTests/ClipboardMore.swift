@@ -14,16 +14,24 @@ import Testing
 @MainActor
 @Suite
 internal struct ClipboardMore {
+    /// The folders the panels show: `/A` with two files and a folder, an empty `/B`.
     internal let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
+    /// The test's own clipboard, which the plugin uses.
     internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    /// A kernel with the file operations, clipboard and selection plugins.
     internal let bench: TestBench
+    /// The modification date the memory file system gives its files.
     internal let modified = Date(timeIntervalSince1970: 1_000_000)
 
+    /// The bench's commands.
     internal var commands: CommandRegistry { bench.commands }
+    /// The left panel, the source.
     internal var left: FakePanel { bench.left }
+    /// The text on the clipboard.
     internal var text: String? { pasteboard.string(forType: .string) }
 
+    /// Fills the memory file system and starts the bench.
     internal init() {
         memory.addFile("/A/one.txt", "new")
         memory.addFile("/A/two.txt", "2", permissions: 0o600)
@@ -37,6 +45,7 @@ internal struct ClipboardMore {
         )
     }
 
+    /// Names, paths and URLs are copied one per line, folders with a trailing slash.
     @Test
     internal func namesAreOneLineEachAndFoldersEndWithASlash() {
         commands.perform(.selectAll)
@@ -61,6 +70,7 @@ internal struct ClipboardMore {
         #expect(text == "mem:/B")
     }
 
+    /// Without a selection the item under the cursor is copied; on `[..]` only the folder's path.
     @Test
     internal func withoutASelectionTheCursorItemIsMeant() {
         left.moveCursor(toName: "two.txt")
@@ -73,6 +83,7 @@ internal struct ClipboardMore {
         #expect(text == "mem:/A")
     }
 
+    /// The details commands copy tab-separated columns, with headers and a column mask where asked.
     @Test
     internal func detailsAreTabSeparatedColumns() {
         let date = Format.date(modified)
@@ -99,6 +110,7 @@ internal struct ClipboardMore {
         #expect(text == "Name\tSize\none.txt\t3")
     }
 
+    /// The details include the plugin columns the panel shows in the Full view, worked out in a job.
     @Test
     internal func detailsIncludeThePluginColumnsThePanelShows() {
         bench.kernel.columns.register(ContentColumn(id: "shout", title: "Shout") { $0.name.uppercased() + "\t!" })
@@ -115,6 +127,7 @@ internal struct ClipboardMore {
         #expect(text?.hasPrefix("Name\tSize\tDate\tAttr\n") == true)
     }
 
+    /// The details are saved to a named or asked-for file, replacing one only after a question.
     @Test
     internal func detailsCanBeSavedToAFile() {
         left.moveCursor(toName: "one.txt")
@@ -139,6 +152,7 @@ internal struct ClipboardMore {
         #expect(bench.jobService.titles.count == 3)
     }
 
+    /// A text on the clipboard is pasted as `Clipboard.txt`, then `Clipboard (2).txt`.
     @Test
     internal func aTextOnTheClipboardIsPastedAsANewFile() {
         #expect(!commands.isEnabled(.pasteFromClipboard))
@@ -154,6 +168,7 @@ internal struct ClipboardMore {
         )
     }
 
+    /// A picture wins over the text beside it and is pasted converted to PNG.
     @Test
     internal func aPictureOnTheClipboardIsPastedAsPNG() throws {
         let bitmap = try #require(
@@ -179,6 +194,7 @@ internal struct ClipboardMore {
         #expect(try reader.read(upToCount: 4) == Data([0x89, 0x50, 0x4E, 0x47]))
     }
 
+    /// Pasting a text needs a writable folder and is not offered when the setting is off.
     @Test
     internal func pastingContentsNeedsAWritableFolderAndCanBeSwitchedOff() {
         pasteboard.clearContents()
@@ -191,6 +207,7 @@ internal struct ClipboardMore {
         #expect(!commands.isEnabled(.pasteFromClipboard))
     }
 
+    /// Files on the clipboard are pasted as files; a text pasted on the disk becomes a file too.
     @Test
     internal func filesOnTheClipboardWinOverText() throws {
         let box = try Sandbox()
@@ -210,11 +227,12 @@ internal struct ClipboardMore {
         #expect(box.read("B/Clipboard.txt") == "note")
     }
 
+    /// Every command of the specification is registered, every menu entry is a command, no key clashes.
     @Test
     internal func registration() {
         let inMenus =
-            bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
-            + bench.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
+            bench.kernel.menus.menus.flatMap(\.items).compactMap(\.self)
+            + bench.kernel.menus.contextMenu(onItem: true).compactMap(\.self)
         #expect(inMenus.allSatisfy { commands[$0] != nil })
         #expect(bench.kernel.keyClashes.isEmpty)
         #expect(bench.kernel.preferences.pages.map(\.title).contains("Clipboard"))
@@ -233,6 +251,7 @@ internal struct ClipboardMore {
 
     // MARK: Pure types
 
+    /// The free names count up from `Clipboard.txt` past the names that are taken.
     @Test
     internal func freeNamesCountUp() {
         #expect(PastedContent.freeName(extension: "txt") { _ in false } == "Clipboard.txt")
@@ -240,13 +259,14 @@ internal struct ClipboardMore {
         #expect(PastedContent.freeName(extension: "png", isTaken: taken.contains) == "Clipboard (3).png")
     }
 
+    /// A calculated folder size replaces `<DIR>`; a package is listed like a file.
     @Test
     internal func aCalculatedFolderSizeReplacesDIR() {
-        let list = NameList(displayPath: { $0.path })
+        let list = NameList { url in url.path }
         var folder = FileItem(url: URL(fileURLWithPath: "/x/docs"), name: "docs", kind: .directory)
-        #expect(list.details([folder], .fullPath, headers: false, mask: 3) == "/x/docs/\t<DIR>")
+        #expect(list.details([folder], .fullPath, headers: false, extra: [], mask: 3) == "/x/docs/\t<DIR>")
         folder.computedSize = 4_096
-        #expect(list.details([folder], .name, headers: false, mask: 3) == "docs/\t4096")
+        #expect(list.details([folder], .name, headers: false, extra: [], mask: 3) == "docs/\t4096")
         // A package is listed like a file and gets no slash.
         let app = FileItem(
             url: URL(fileURLWithPath: "/x/A.app"),

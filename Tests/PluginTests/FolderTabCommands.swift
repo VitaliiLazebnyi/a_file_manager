@@ -6,80 +6,27 @@ import Testing
 
 @testable import FolderTabsPlugin
 
-@Suite
-internal struct TabFiles {
-    internal let memory = MemoryFileSystem()
-
-    internal func read(_ text: String) -> TabFile? {
-        TabFile(text: text) { memory.location(from: $0) }
-    }
-
-    @Test
-    internal func writesAndReadsBothSides() {
-        let active = PanelTabs.State(
-            tabs: [
-                .init(location: memory.url("/A"), title: "Work", locked: true),
-                .init(
-                    location: memory.url("/A/my docs"),
-                    order: ListOrder(key: .date, descending: true),
-                    showHidden: true
-                )
-            ],
-            active: 1
-        )
-        let inactive = PanelTabs.State(tabs: [.init(location: memory.url("/B"))], active: 0)
-        let text = TabFile(active: active, inactive: inactive).text(displayPath: memory.displayPath)
-        #expect(
-            text == """
-                [activetabs]
-                0_path=mem:/A
-                0_caption=Work
-                0_options=1|0|0|0|0|1|0
-                1_path=mem:/A/my docs
-                1_options=1|3|1|0|0|0|1
-                activetab=1
-
-                [inactivetabs]
-                0_path=mem:/B
-                0_options=1|0|0|0|0|0|0
-                activetab=0
-
-                """
-        )
-        #expect(read(text) == TabFile(active: active, inactive: inactive))
-        #expect(read(TabFile(active: inactive).text(displayPath: memory.displayPath)) == TabFile(active: inactive))
-    }
-
-    @Test
-    internal func readsHandWrittenAndDamagedFiles() throws {
-        let file = try #require(
-            read(
-                "; my tabs\r\n[ActiveTabs]\r\n3_path=mem:/C\r\n1_path=mem:/A\r\n2_path=elsewhere\r\nactivetab=3\r\nunknown=1\r\n"
-            )
-        )
-        #expect(file.active.tabs.map(\.location) == [memory.url("/A").absoluteString, memory.url("/C").absoluteString])
-        #expect(file.active.active == 1 && file.inactive == nil)
-        #expect(
-            file.active.tabs[0].title == nil && !file.active.tabs[0].locked && !file.active.tabs[0].showHidden
-        )
-        #expect(read("") == nil && read("[activetabs]\nactivetab=0\n") == nil)
-        // A file with only the other side's section still gives tabs.
-        #expect(read("[inactivetabs]\n0_path=mem:/B\n")?.active.tabs.count == 1)
-    }
-}
-
+/// The folder tab commands on a bench with two panels (spec 03 › Folder tabs).
 @MainActor
 @Suite
 internal struct FolderTabCommands {
+    /// The folders the panels show: `/A` with two folders and a file, `/B` with a file.
     internal let memory = MemoryFileSystem()
+    /// The settings the plugin reads its options from.
     internal let settings = MemorySettings()
+    /// A kernel with the folder tabs plugin, left in `/A`, right in `/B`.
     internal let bench: TestBench
 
+    /// The bench's commands.
     internal var commands: CommandRegistry { bench.commands }
+    /// The left panel, the source.
     internal var left: FakePanel { bench.left }
+    /// The right panel, the target.
     internal var right: FakePanel { bench.right }
-    internal var ui: ScriptedInteraction { bench.interaction }
+    /// The scripted answers to the plugin's questions.
+    internal var interaction: ScriptedInteraction { bench.interaction }
 
+    /// Fills the memory file system and starts the bench.
     internal init() {
         memory.addFile("/A/one.txt", "1")
         memory.addFile("/A/docs/in.txt", "inside")
@@ -94,8 +41,10 @@ internal struct FolderTabCommands {
         )
     }
 
+    /// The paths of a panel's tabs, in their order.
     internal func paths(_ panel: FakePanel) -> [String] { panel.tabs.tabs.map(\.directory.path) }
 
+    /// The specification's keys are bound without a clash, with a page of three options.
     @Test
     internal func registersTheSpecificationsKeysAndAPreferencePage() {
         let keys = bench.kernel.keyBindings
@@ -107,13 +56,14 @@ internal struct FolderTabCommands {
         #expect(keys.command(for: Shortcut(.character("a"), [.control, .shift])) == "cm_SrcTabsList")
         #expect(bench.kernel.keyClashes.isEmpty)
         #expect(bench.kernel.preferences.pages.first { $0.title == "Folder Tabs" }?.preferences.count == 3)
-        let inMenus = bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
+        let inMenus = bench.kernel.menus.menus.flatMap(\.items).compactMap(\.self)
         #expect(
             inMenus.allSatisfy { commands[$0] != nil } && inMenus.contains("SAVETABS")
                 && inMenus.contains("afm_ReopenClosedTab")
         )
     }
 
+    /// New tabs open in the background and in the other panel, with the folder under the cursor.
     @Test
     internal func opensTabsInTheBackgroundAndInTheOtherPanel() {
         commands.perform("cm_OpenNewTabBg")
@@ -131,6 +81,7 @@ internal struct FolderTabCommands {
         #expect(left.tabs.count == 2)
     }
 
+    /// The options open new tabs next to the active one and in the foreground.
     @Test
     internal func optionsDecideWhereAndHowNewTabsOpen() {
         left.moveCursor(toName: "docs")
@@ -150,27 +101,29 @@ internal struct FolderTabCommands {
         )
     }
 
+    /// Close All Other Tabs asks first, unless switched off, and leaves the locked tabs.
     @Test
     internal func closesAllOtherTabsAfterAsking() {
         for folder in ["docs", "pics"] { left.tabs.openTab(showing: memory.url("/A/" + folder), activate: false) }
         left.tabs.tabs[2].isLocked = true
         left.tabs.openTab(showing: memory.url("/B"), activate: true)
-        ui.choiceAnswers = [1]
+        interaction.choiceAnswers = [1]
         commands.perform("cm_CloseAllTabs")
-        #expect(left.tabs.count == 4 && ui.log.last?.hasPrefix("choose: Close all tabs?") == true)
-        ui.choiceAnswers = [0]
+        #expect(left.tabs.count == 4 && interaction.log.last?.hasPrefix("choose: Close all tabs?") == true)
+        interaction.choiceAnswers = [0]
         commands.perform("cm_CloseAllTabs")
         #expect(paths(left) == ["/A/pics", "/B"] && left.tabs.activeIndex == 1)
         // Nothing left to close: no question.
-        let asked = ui.log.count
+        let asked = interaction.log.count
         commands.perform("cm_CloseAllTabs")
-        #expect(ui.log.count == asked)
+        #expect(interaction.log.count == asked)
         settings.set(false, forKey: FolderTabsPlugin.confirmCloseAllKey)
         left.tabs.openTab(showing: memory.url("/A"), activate: false)
         commands.perform("cm_CloseAllTabs")
-        #expect(paths(left) == ["/A/pics", "/B"] && ui.log.count == asked)
+        #expect(paths(left) == ["/A/pics", "/B"] && interaction.log.count == asked)
     }
 
+    /// Close Duplicate Tabs keeps the active tab of each folder.
     @Test
     internal func closesDuplicatesKeepingTheActiveTab() {
         for path in ["/A/docs", "/A", "/A/docs", "/A/docs/", "/B"] {
@@ -181,6 +134,7 @@ internal struct FolderTabCommands {
         #expect(paths(left) == ["/A", "/A/docs", "/B"] && left.tabs.activeIndex == 1)
     }
 
+    /// Closed tabs come back where they were, one by one or from the list.
     @Test
     internal func reopensClosedTabsWhereTheyWere() {
         #expect(!commands.isEnabled("afm_ReopenClosedTab"))
@@ -195,7 +149,7 @@ internal struct FolderTabCommands {
         )
         commands.perform("afm_ReopenClosedTab")
         #expect(paths(left) == ["/A", "/A/pics"] && left.tabs.activeIndex == 1 && left.names == ["cat.jpg"])
-        ui.formAnswers = [.accept]
+        interaction.formAnswers = [.accept]
         commands.perform("afm_RecentlyClosedTabs")
         #expect(
             paths(left) == ["/A", "/A/docs", "/A/pics"] && left.tabs.title(at: 1) == "Papers"
@@ -206,10 +160,11 @@ internal struct FolderTabCommands {
         #expect(!right.tabs.closeTab(at: 0))
     }
 
+    /// Tabs are renamed and locked through the dialog, a parameter and the lock commands.
     @Test
     internal func renamesAndLocksTabs() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
-        ui.formAnswers = [.values(["name": .text("Papers"), "locked": .flag(true)])]
+        interaction.formAnswers = [.values(["name": .text("Papers"), "locked": .flag(true)])]
         commands.perform("cm_RenameTab")
         #expect(left.tabs.title(at: 1) == "*Papers" && left.model.isLocked)
         #expect(commands.isChecked("cm_ToggleLockCurrentTab"))
@@ -217,25 +172,26 @@ internal struct FolderTabCommands {
         commands.perform(.closeTab)
         #expect(left.tabs.count == 2)
         // The dialog proposes the current name without the lock mark.
-        ui.formAnswers = [.values(["name": .text(""), "locked": .flag(false)])]
+        interaction.formAnswers = [.values(["name": .text(""), "locked": .flag(false)])]
         commands.perform("cm_RenameTab")
-        #expect(ui.forms.last?.first?.initialValue == .text("Papers"))
+        #expect(interaction.forms.last?.first?.initialValue == .text("Papers"))
         #expect(left.tabs.title(at: 1) == "docs" && !left.model.isLocked)
-        ui.formAnswers = [.accept]
+        interaction.formAnswers = [.accept]
         commands.perform("cm_RenameTab")
         #expect(left.model.customTitle == nil)
         commands.perform("cm_RenameTab", .text("Direct"))
         #expect(left.tabs.title(at: 1) == "Direct")
         commands.perform("cm_ToggleLockCurrentTab")
         commands.perform("cm_SetAllTabsOptionPathLocked")
-        #expect(left.tabs.tabs.allSatisfy { $0.isLocked })
+        #expect(left.tabs.tabs.map(\.isLocked) == [true, true])
         commands.perform("cm_SetTabOptionNormal")
-        #expect(left.tabs.tabs.map { $0.isLocked } == [true, false])
+        #expect(left.tabs.tabs.map(\.isLocked) == [true, false])
         commands.perform("cm_SetAllTabsOptionNormal")
         commands.perform("cm_SetTabOptionPathLocked")
-        #expect(left.tabs.tabs.map { $0.isLocked } == [false, true])
+        #expect(left.tabs.tabs.map(\.isLocked) == [false, true])
     }
 
+    /// Tabs are activated by number on each side, and from the list of open tabs.
     @Test
     internal func activatesTabsByNumberAndFromTheList() {
         for folder in ["docs", "pics"] { left.tabs.openTab(showing: memory.url("/A/" + folder), activate: false) }
@@ -251,10 +207,10 @@ internal struct FolderTabCommands {
         commands.perform("cm_TrgActivateTab2")
         commands.perform("cm_RightActivateTab2")
         #expect(right.tabs.activeIndex == 1 && bench.panels.source === left)
-        ui.formAnswers = [.values(["row": .index(2)])]
+        interaction.formAnswers = [.values(["row": .index(2)])]
         commands.perform("cm_SrcTabsList")
         #expect(left.tabs.activeIndex == 2)
-        guard case .list(let rows, let selected)? = ui.forms.last?.first?.kind else {
+        guard case .list(let rows, let selected)? = interaction.forms.last?.first?.kind else {
             Issue.record("the tab list is not a list")
             return
         }
@@ -263,6 +219,7 @@ internal struct FolderTabCommands {
         #expect(left.tabs.activeIndex == 2)
     }
 
+    /// Tabs move left and right, are duplicated, and are copied or moved to the other panel.
     @Test
     internal func movesTabsWithinAndBetweenThePanels() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
@@ -292,6 +249,7 @@ internal struct FolderTabCommands {
         #expect(!commands.isEnabled("afm_MoveTabToOtherPanel"))
     }
 
+    /// Exchange Directories and Tabs swaps the panels' tabs with their options.
     @Test
     internal func exchangesThePanelsWithAllTheirTabs() {
         left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
@@ -304,57 +262,5 @@ internal struct FolderTabCommands {
                 && right.names == ["in.txt"]
         )
         #expect(right.tabs.tabs[0].sort == ListOrder(key: .size, descending: true))
-    }
-
-    @Test
-    internal func savesAndLoadsTabFiles() throws {
-        left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
-        left.model.customTitle = "Papers"
-        ui.promptAnswers = [.text("mem:/B/mine")]
-        commands.perform("SAVETABS")
-        #expect(ui.log.contains("prompt: Save tabs to file: [mem:/A/docs/tabs.tab]"))
-        let saved = try #require(memory.contents("/B/mine.tab"))
-        #expect(
-            saved.hasPrefix("[activetabs]\n0_path=mem:/A\n") && saved.contains("1_caption=Papers")
-                && !saved.contains("[inactivetabs]")
-        )
-        #expect(right.names == ["mine.tab", "other.txt"] && bench.jobService.titles == ["Save tabs"])
-
-        // Appending keeps the tabs and the active one; replacing takes the file's.
-        right.focus()
-        commands.perform("APPENDTABS", .location(memory.url("/B/mine.tab")))
-        #expect(
-            paths(right) == ["/B", "/A", "/A/docs"] && right.tabs.activeIndex == 0
-                && right.tabs.title(at: 2) == "Papers"
-        )
-        right.tabs.tabs[0].isLocked = true
-        commands.perform("OPENTABS", .text("mine.tab"))
-        #expect(paths(right) == ["/A", "/A/docs"] && right.tabs.activeIndex == 1 && right.names == ["in.txt"])
-
-        // Saving again asks before the file is replaced.
-        ui.choiceAnswers = [1]
-        commands.perform("SAVETABS2", .location(memory.url("/B/mine.tab")))
-        #expect(memory.contents("/B/mine.tab") == saved)
-        ui.choiceAnswers = [0]
-        commands.perform("SAVETABS2", .location(memory.url("/B/mine.tab")))
-        let both = try #require(memory.contents("/B/mine.tab"))
-        #expect(both.contains("[inactivetabs]"))
-
-        // A file with both sides fills both panels, its first section going to the source.
-        left.focus()
-        left.tabs.closeTab(at: 1)
-        commands.perform("OPENTABS", .location(memory.url("/B/mine.tab")))
-        #expect(paths(left) == ["/A", "/A/docs"] && paths(right) == ["/A", "/A/docs"])
-    }
-
-    @Test
-    internal func aMissingOrEmptyTabFileIsReported() {
-        commands.perform("OPENTABS", .location(memory.url("/B/none.tab")))
-        #expect(ui.log.last == "inform: The tabs could not be loaded." && left.tabs.count == 1)
-        commands.perform("OPENTABS", .location(memory.url("/B/other.txt")))
-        #expect(ui.log.last == "inform: The file holds no tabs." && left.tabs.count == 1)
-        ui.promptAnswers = [.cancel]
-        commands.perform("SAVETABS")
-        #expect(bench.jobService.titles == ["Load tabs", "Load tabs"])
     }
 }

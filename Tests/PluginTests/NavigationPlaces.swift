@@ -11,16 +11,24 @@ import Testing
 @MainActor
 @Suite
 internal struct NavigationPlaces {
+    /// The home folder and the two folders the panels start in.
     internal let memory = MemoryFileSystem()
+    /// A second volume, for Next and Previous Volume.
     internal let other = MemoryFileSystem(scheme: "disk")
     private let scratch = ScratchPasteboard()
+    /// The test's own clipboard, which the plugin reads.
     internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    /// A kernel with the navigation plugin, left in `/A`, right in `/B`.
     internal let bench: TestBench
 
+    /// The bench's commands.
     internal var commands: CommandRegistry { bench.commands }
+    /// The left panel, the source.
     internal var left: FakePanel { bench.left }
+    /// The right panel, the target.
     internal var right: FakePanel { bench.right }
 
+    /// Fills the file systems and starts the bench.
     internal init() {
         memory.addFile("/home/Desktop/note.txt")
         memory.addFile("/home/Documents/letter.txt")
@@ -38,6 +46,7 @@ internal struct NavigationPlaces {
         )
     }
 
+    /// The specification's keys are bound without a clash, and every menu entry is a registered command.
     @Test
     internal func registersTheSpecificationsKeysWithoutConflicts() {
         let keys = bench.kernel.keyBindings
@@ -49,7 +58,7 @@ internal struct NavigationPlaces {
         #expect(keys.command(for: Shortcut(.character("r"), .control)) == .reread)
         #expect(keys.command(for: Shortcut(.character("\\"), .control)) == .goToRoot)
         #expect(bench.kernel.keyClashes.isEmpty)
-        let inMenus = bench.kernel.menus.menus.flatMap(\.items).compactMap { $0 }
+        let inMenus = bench.kernel.menus.menus.flatMap(\.items).compactMap(\.self)
         #expect(
             inMenus.allSatisfy { commands[$0] != nil } && inMenus.contains("afm_GoDesktop")
                 && inMenus.contains("cm_GoToNextDrive")
@@ -61,6 +70,7 @@ internal struct NavigationPlaces {
         )
     }
 
+    /// Ctrl+← / Ctrl+→ show the folder under the cursor, or the current directory, in the panel on that side.
     @Test
     internal func showsTheFolderUnderTheCursorInTheOtherPanel() {
         left.moveCursor(toName: "docs")
@@ -81,6 +91,7 @@ internal struct NavigationPlaces {
         #expect(left.model.directory.path == "/A/docs")
     }
 
+    /// Target = Source and Source = Target copy the directory from one panel to the other.
     @Test
     internal func mirrorsThePathEitherWay() {
         commands.perform(.targetEqualsSource)
@@ -90,6 +101,7 @@ internal struct NavigationPlaces {
         #expect(left.model.directory.path == "/B")
     }
 
+    /// The commands of the standard places and Home show those folders of the home folder.
     @Test
     internal func goesToTheStandardPlaces() {
         for (command, path) in [
@@ -108,6 +120,7 @@ internal struct NavigationPlaces {
         )
     }
 
+    /// Next and Previous Volume go round the volumes, wrapping at the ends.
     @Test
     internal func cyclesThroughTheVolumes() {
         commands.perform("cm_GoToNextDrive")
@@ -119,6 +132,7 @@ internal struct NavigationPlaces {
         #expect(left.model.directory == memory.url("/"))
     }
 
+    /// The neighbour place cycles over the disks when there are several, over every place otherwise.
     @Test
     internal func choosesTheNeighbourPlace() {
         func place(_ name: String, _ path: String, _ kind: Place.Kind) -> Place {
@@ -148,6 +162,7 @@ internal struct NavigationPlaces {
         #expect(NavigationPlugin.neighbourPlace(of: URL(fileURLWithPath: "/x"), in: [], delta: 1) == nil)
     }
 
+    /// Go to Path from Clipboard is offered while the clipboard holds text and follows the path it starts with.
     @Test
     internal func goesToThePathOnTheClipboard() {
         #expect(!commands.isEnabled("afm_CdFromClipboard"))

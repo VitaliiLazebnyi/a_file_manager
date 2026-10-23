@@ -29,27 +29,47 @@ public import Foundation
 /// captions longer than `captionLimit` characters are dropped, and a byte-order mark at the
 /// start of the file is ignored.
 public struct TabFile: Equatable, Sendable {
+    /// The most tabs read for one side.
     public static let tabLimit = 256
+    /// The longest path read, in characters; a longer one is dropped with its tab.
     public static let pathLimit = 4_096
+    /// The longest caption read, in characters; a longer one is dropped, the tab stays.
     public static let captionLimit = 256
 
+    /// The tabs of the panel the file was saved from, or the only side it holds.
     public var active: PanelTabs.State
     /// The other panel's tabs, when both sides were saved.
     public var inactive: PanelTabs.State?
 
+    /// A tab file of one side, or of both.
     public init(active: PanelTabs.State, inactive: PanelTabs.State? = nil) {
         self.active = active
         self.inactive = inactive
     }
 
-    /// Reads a file's text; nil when it names no tab at all. `location` reads a path as the
-    /// user would type it; a line it cannot read is skipped.
+    /// Reads a file's text; nil when it names no tab at all.
+    ///
+    /// `location` reads a path as the user would type it; a line it cannot read is skipped.
     public init?(text: String, location: (String) -> URL?) {
+        let sections = Self.sections(of: text)
+        func state(_ name: String) -> PanelTabs.State? {
+            sections[name].flatMap { keys in Self.state(of: keys, location: location) }
+        }
+        guard let first = state("activetabs") ?? state("inactivetabs") else {
+            return nil
+        }
+        active = first
+        inactive = sections["activetabs"] == nil ? nil : state("inactivetabs")
+    }
+
+    /// The keys of each section of an INI text, both in lower case; a byte-order mark at the
+    /// start and lines starting with `;` are ignored.
+    private static func sections(of text: String) -> [String: [String: String]] {
         var sections: [String: [String: String]] = [:]
         var current = ""
-        let text = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
-        for line in text.split(whereSeparator: \.isNewline) {
-            let line = line.trimmingCharacters(in: .whitespaces)
+        let body = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
+        for rawLine in body.split(whereSeparator: \.isNewline) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("["), line.hasSuffix("]") {
                 current = line.dropFirst().dropLast().lowercased()
             } else if let equals = line.firstIndex(of: "="), !line.hasPrefix(";") {
@@ -58,48 +78,45 @@ public struct TabFile: Equatable, Sendable {
                 )
             }
         }
+        return sections
+    }
 
-        func state(_ name: String) -> PanelTabs.State? {
-            guard let keys = sections[name] else {
-                return nil
-            }
-            let numbers = keys.keys
-                .compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil
-                }
-                .sorted()
-            var tabs: [PanelTabState] = []
-            var active = 0
-            let wanted = keys["activetab"].flatMap(Int.init) ?? 0
-            for number in numbers {
-                guard tabs.count < Self.tabLimit else { break }
-                guard let path = keys["\(number)_path"].map(Self.unquoted), path.count <= Self.pathLimit,
-                    let url = location(path)
-                else { continue }
-                let fields = (keys["\(number)_options"] ?? "").split(separator: "|", omittingEmptySubsequences: false)
-                    .map { Int($0) ?? 0 }
-                func field(_ index: Int) -> Int { fields.indices.contains(index) ? fields[index] : 0 }
-                if number == wanted { active = tabs.count }
-                var tab = PanelTabState(
-                    location: url,
-                    showHidden: field(6) == 1,
-                    title: keys["\(number)_caption"].map(Self.unquoted)
-                        .flatMap {
-                            $0.isEmpty || $0.count > Self.captionLimit ? nil : $0
-                        },
-                    locked: field(5) == 1
-                )
-                // The sort key as the file has it, known or not.
-                (tab.sortKey, tab.descending) = (field(1), field(2) == 1)
-                tabs.append(tab)
-            }
-            return tabs.isEmpty ? nil : PanelTabs.State(tabs: tabs, active: active)
+    /// The tabs of one section, in the order of their numbers; nil when none can be read.
+    private static func state(of keys: [String: String], location: (String) -> URL?) -> PanelTabs.State? {
+        let numbers = keys.keys
+            .compactMap { key in key.hasSuffix("_path") ? Int(key.dropLast("_path".count)) : nil }
+            .sorted()
+        var tabs: [PanelTabState] = []
+        var shown = 0
+        let wanted = keys["activetab"].flatMap(Int.init) ?? 0
+        for number in numbers {
+            guard tabs.count < tabLimit else { break }
+            guard let path = keys["\(number)_path"].map(unquoted), path.count <= pathLimit,
+                let url = location(path)
+            else { continue }
+            if number == wanted { shown = tabs.count }
+            tabs.append(tab(number, at: url, keys: keys))
         }
+        return tabs.isEmpty ? nil : PanelTabs.State(tabs: tabs, active: shown)
+    }
 
-        guard let active = state("activetabs") ?? state("inactivetabs") else {
-            return nil
-        }
-        self.active = active
-        inactive = sections["activetabs"] == nil ? nil : state("inactivetabs")
+    /// The tab numbered `number` of a section, showing `url`, with its caption and options.
+    private static func tab(_ number: Int, at url: URL, keys: [String: String]) -> PanelTabState {
+        let fields = (keys["\(number)_options"] ?? "")
+            .split(separator: "|", omittingEmptySubsequences: false)
+            .map { Int($0) ?? 0 }
+        func field(_ index: Int) -> Int { fields.indices.contains(index) ? fields[index] : 0 }
+        var tab = PanelTabState(
+            location: url,
+            showHidden: field(6) == 1,
+            title: keys["\(number)_caption"]
+                .map(unquoted)
+                .flatMap { caption in caption.isEmpty || caption.count > captionLimit ? nil : caption },
+            locked: field(5) == 1
+        )
+        // The sort key as the file has it, known or not.
+        (tab.sortKey, tab.descending) = (field(1), field(2) == 1)
+        return tab
     }
 
     /// A value as it stands on a line: in quotes with escapes when it would not read back the same.
@@ -161,47 +178,59 @@ public struct TabFile: Equatable, Sendable {
         while index < scalars.count - 1 {
             let scalar = scalars[index]
             index += 1
+            if scalar == "\"" {
+                return value
+            }
             guard scalar == "\\" else {
-                if scalar == "\"" {
-                    return value
-                }
                 result.append(scalar)
                 continue
             }
-            guard index < scalars.count - 1 else {
+            guard let escaped = escape(in: scalars, at: &index) else {
                 return value
             }
-            let escape = scalars[index]
-            index += 1
-            switch escape {
-            case "\\", "\"":
-                result.append(escape)
-
-            case "n":
-                result.append("\n")
-
-            case "r":
-                result.append("\r")
-
-            case "t":
-                result.append("\t")
-
-            case "u":
-                guard index < scalars.count - 1, scalars[index] == "{",
-                    let close = scalars[index...].firstIndex(of: "}"), close < scalars.count - 1
-                else { return value }
-                let digits = String(String.UnicodeScalarView(scalars[(index + 1)..<close]))
-                guard !digits.isEmpty, digits.count <= 6, let number = UInt32(digits, radix: 16),
-                    let unicode = Unicode.Scalar(number)
-                else { return value }
-                result.append(unicode)
-                index = close + 1
-
-            default:
-                return value
-            }
+            result.append(escaped)
         }
         return String(result)
+    }
+
+    /// The character the escape at `index` (just after its backslash) of a quoted value stands
+    /// for; `index` moves past the escape.
+    ///
+    /// Nil for an escape that is not ours, or one the closing quote cuts off.
+    private static func escape(in scalars: [Unicode.Scalar], at index: inout Int) -> Unicode.Scalar? {
+        // The last scalar is the closing quote.
+        let end = scalars.count - 1
+        guard index < end else {
+            return nil
+        }
+        let escape = scalars[index]
+        index += 1
+        switch escape {
+        case "\\", "\"":
+            return escape
+
+        case "n":
+            return "\n"
+
+        case "r":
+            return "\r"
+
+        case "t":
+            return "\t"
+
+        case "u":
+            guard index < end, scalars[index] == "{", let close = scalars[index...].firstIndex(of: "}"), close < end
+            else { return nil }
+            let digits = String(String.UnicodeScalarView(scalars[(index + 1)..<close]))
+            guard !digits.isEmpty, digits.count <= 6, let number = UInt32(digits, radix: 16),
+                let unicode = Unicode.Scalar(number)
+            else { return nil }
+            index = close + 1
+            return unicode
+
+        default:
+            return nil
+        }
     }
 
     /// The text of a tab file's bytes: UTF-8, with or without a byte-order mark, or UTF-16 with
@@ -214,10 +243,33 @@ public struct TabFile: Equatable, Sendable {
                 return text
             }
         }
-        return String(decoding: data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data, as: UTF8.self)
+        return repairedUTF8(data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data)
     }
 
-    /// The file's text. `displayPath` writes a location the way the user reads it.
+    /// The text of UTF-8 bytes; every sequence that is not valid UTF-8 becomes U+FFFD, as
+    /// `String(decoding:as:)` does, where the failable `String(bytes:encoding:)` gives nothing.
+    private static func repairedUTF8(_ bytes: Data) -> String {
+        var scalars = String.UnicodeScalarView()
+        var iterator = bytes.makeIterator()
+        var decoder = UTF8()
+        decoding: while true {
+            switch decoder.decode(&iterator) {
+            case .scalarValue(let scalar):
+                scalars.append(scalar)
+
+            case .emptyInput:
+                break decoding
+
+            case .error:
+                scalars.append("\u{FFFD}")
+            }
+        }
+        return String(scalars)
+    }
+
+    /// The file's text.
+    ///
+    /// `displayPath` writes a location the way the user reads it.
     public func text(displayPath: (URL) -> String) -> String {
         func section(_ name: String, _ state: PanelTabs.State) -> String {
             var lines = ["[\(name)]"]
@@ -233,6 +285,6 @@ public struct TabFile: Equatable, Sendable {
             lines.append("activetab=\(state.active)")
             return lines.joined(separator: "\n") + "\n"
         }
-        return section("activetabs", active) + (inactive.map { "\n" + section("inactivetabs", $0) } ?? "")
+        return section("activetabs", active) + (inactive.map { other in "\n" + section("inactivetabs", other) } ?? "")
     }
 }
