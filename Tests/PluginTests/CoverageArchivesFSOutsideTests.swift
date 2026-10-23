@@ -25,7 +25,7 @@ internal struct CoverageArchivesFSOutsideTests {
 
     /// A place on the file system of `archive` that does not run through it.
     private static func outside(_ archive: URL, _ path: String) throws -> URL {
-        let root = ArchiveURL.make(scheme: ArchiveURL.writableScheme, archive: archive)
+        let root = ArchiveURL.make(scheme: ArchiveURL.writableScheme, archive: archive, innerPath: "")
         var components = try #require(URLComponents(url: root, resolvingAgainstBaseURL: false))
         components.path = path
         return try #require(components.url)
@@ -155,8 +155,10 @@ internal struct CoverageArchivesFSOutsideTests {
         #expect(provider.displayPath(inside("tree")) == box.url("tree.zip").path + "/tree")
         #expect(provider.displayPath(try outside("made")) == box.url("made").path)
         #expect(throws: FileSystemError.self) { try provider.createDirectory(at: try outside("made")) }
-        #expect(throws: FileSystemError.self) { _ = try alone.archive(at: bench.memory.url("/a.zip")) }
-        let scheme = ArchiveFileSystem.scheme(forArchive: box.url("tree.zip"), fileSystems: nil)
+        #expect(throws: FileSystemError.self) {
+            _ = try alone.archive(at: bench.memory.url("/a.zip"), cancellation: nil)
+        }
+        let scheme = ArchiveFileSystem.scheme(forArchive: box.url("tree.zip"), fileSystems: nil, isKnownZip: false)
         #expect(scheme == ArchiveURL.readOnlyScheme)
     }
 

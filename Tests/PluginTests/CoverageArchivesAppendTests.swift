@@ -19,7 +19,7 @@ internal struct CoverageArchivesAppendTests {
     }
 
     private func read(_ archive: OpenArchive, _ path: String) throws -> String {
-        let stream = try archive.open(try #require(archive.entry(path)))
+        let stream = try archive.open(try #require(archive.entry(path)), slot: nil)
         defer { stream.close() }
         return try #require(String(bytes: try stream.readFully(1 << 20), encoding: .utf8))
     }
@@ -42,11 +42,11 @@ internal struct CoverageArchivesAppendTests {
     @Test(arguments: ["last.txt", "../unlisted"])
     internal func membersRunningIntoTheDirectoryAreKept(last: String) throws {
         let url = try memberRunningIntoTheDirectory(last: last)
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try archive.move("first.txt", to: "renamed.txt", replacing: false)
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         bench.store.close()
-        let reopened = try bench.store.archive(at: url)
+        let reopened = try bench.store.archive(at: url, cancellation: nil)
         #expect(try read(reopened, "renamed.txt") == "first")
         #expect(CoverageArchives.listed(url).sorted() == [last, "renamed.txt"].sorted())
     }
@@ -56,12 +56,12 @@ internal struct CoverageArchivesAppendTests {
     @Test
     internal func aCopyMadeWhileTheFileIsWrittenIsWrittenNextTime() throws {
         let url = try CoverageArchives.zip("copy.zip", in: box, ["file.txt": "file", "other.txt": "other"], options: [])
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try archive.setAttributes(FileAttributes(permissions: 0o600), of: "other.txt")
         bench.environment.whileWriting = { _ = try? archive.duplicate("file.txt", to: "copy.txt") }
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         bench.environment.whileWriting = nil
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         #expect(CoverageArchives.contents(of: "copy.txt", in: url) == "file" && CoverageArchives.isSound(url))
     }
 
@@ -81,11 +81,11 @@ internal struct CoverageArchivesAppendTests {
                 // Every record as it is.
             }
         }
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try archive.setAttributes(FileAttributes(modified: stamp), of: "plain.txt")
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         bench.store.close()
-        let reopened = try bench.store.archive(at: url)
+        let reopened = try bench.store.archive(at: url, cancellation: nil)
         #expect(try read(reopened, "plain.txt") == "plain")
         #expect(abs((reopened.entry("plain.txt")?.modified ?? .distantPast).timeIntervalSince(stamp)) < 2)
         // (The header of the last shape is damaged on purpose.)
@@ -97,40 +97,42 @@ internal struct CoverageArchivesAppendTests {
     @Test
     internal func aTimeIsNotWrittenWhereNoHeaderIs() throws {
         let url = box.url("pointing.zip")
-        let output = try OutputFile(creating: url)
-        let writer = ZipWriter(output)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
         var first = ZipRecord.new(
             name: "first.txt",
             isDirectory: false,
             modified: Date(timeIntervalSince1970: 1_600_000_000),
-            permissions: 0o644
+            permissions: 0o644,
+            isSymbolicLink: false
         )
         let payload = Data(String(repeating: "first member data ", count: 4).utf8)
         (first.crc, first.compressedSize, first.uncompressedSize) = (
             CRC32.of(payload), UInt64(payload.count), UInt64(payload.count)
         )
-        let opened = try writer.begin(first, localExtra: nil)
+        let opened = try writer.begin(first, localExtra: nil, expectedSize: nil)
         try writer.append(payload)
         try writer.end(opened, first, headerChanged: false)
         var second = ZipRecord.new(
             name: "second.txt",
             isDirectory: false,
             modified: Date(timeIntervalSince1970: 1_600_000_000),
-            permissions: 0o644
+            permissions: 0o644,
+            isSymbolicLink: false
         )
         (second.crc, second.compressedSize, second.uncompressedSize) = (first.crc, 4, 4)
         // Its header would lie in the middle of the first member's data.
         writer.adopt(second, at: 40)
-        try writer.finish()
-        try output.close()
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
         let before = try Data(contentsOf: url)
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try archive.setAttributes(
             FileAttributes(modified: Date(timeIntervalSince1970: 1_700_000_000)),
             of: "second.txt"
         )
         #expect {
-            try archive.commit()
+            try archive.commit(cancellation: nil) { _, _ in true }
         } throws: { error in
             guard case ArchiveError.damaged = error else {
                 return false
@@ -144,7 +146,7 @@ internal struct CoverageArchivesAppendTests {
     @Test
     internal func aWriteEndedWhileItCopiesAMemberChangesNothing() throws {
         let url = try CoverageArchives.zip("ended.zip", in: box, ["a.txt": "a", "b.txt": "b"], options: [])
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try archive.remove("a.txt")
         let before = try Data(contentsOf: url)
         let flag = CancellationFlag()
@@ -171,7 +173,7 @@ internal struct CoverageArchivesAppendTests {
         let reported = Signal<Bool>()
         bench.environment.reportFailure = { _, _ in reported.set(true) }
         let url = try CoverageArchives.zip("quit.zip", in: box, ["a.txt": "a"], options: [])
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try archive.remove("a.txt")
         bench.environment.quitting.cancel()
         clock.runDue()
@@ -190,14 +192,14 @@ internal struct CoverageArchivesAppendTests {
         let source = try CoverageArchives.zip("source.zip", in: box, ["a.txt": "a", "b.txt": "b"], options: [])
         let url = image.mountPoint.appendingPathComponent("archive.zip")
         try FileManager.default.copyItem(at: source, to: url)
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         if !probeTells {
             // The look at the volume cannot clone a file it cannot read.
             #expect(chmod(url.path, 0o200) == 0)
         }
         try archive.move("a.txt", to: "c.txt", replacing: false)
         #expect(chmod(url.path, 0o644) == 0)
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         #expect(CoverageArchives.listed(url).sorted() == ["b.txt", "c.txt"] && CoverageArchives.isSound(url))
     }
 }

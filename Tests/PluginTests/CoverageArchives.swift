@@ -54,25 +54,26 @@ internal enum CoverageArchives {
         localExtra: Data?,
         shape: (inout ZipRecord) -> Void
     ) throws {
-        let output = try OutputFile(creating: url)
-        let writer = ZipWriter(output)
+        let output = try OutputFile(creating: url, mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
         for member in members {
             var record = ZipRecord.new(
                 name: member.name,
                 isDirectory: false,
                 modified: Date(timeIntervalSince1970: 1_600_000_000),
-                permissions: 0o644
+                permissions: 0o644,
+                isSymbolicLink: false
             )
             (record.crc, record.compressedSize, record.uncompressedSize) = (
                 CRC32.of(member.data), UInt64(member.data.count), UInt64(member.data.count)
             )
             shape(&record)
-            let opened = try writer.begin(record, localExtra: localExtra)
+            let opened = try writer.begin(record, localExtra: localExtra, expectedSize: nil)
             try writer.append(member.data)
             try writer.end(opened, record, headerChanged: false)
         }
-        try writer.finish()
-        try output.close()
+        try writer.finish(comment: Data())
+        try output.close(durably: false)
     }
 
     /// Puts another archive in the place of `archive`, as another program would: a new file

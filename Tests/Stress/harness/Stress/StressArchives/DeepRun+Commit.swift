@@ -70,7 +70,8 @@ extension DeepRun {
         if added.data != Data("added at the bottom\n".utf8) {
             Findings.shared.violation("deep: committed member reads back wrong (fresh reader)", "")
         }
-        let count = (try? fresh.store.archive(at: archive).entries.filter { !$0.isDirectory }.count) ?? -1
+        let count =
+            (try? fresh.store.archive(at: archive, cancellation: nil).entries.filter { !$0.isDirectory }.count) ?? -1
         if count != 8_194 {
             Findings.shared.violation("deep: fresh reader counts wrong", "\(count) instead of 8194")
         }

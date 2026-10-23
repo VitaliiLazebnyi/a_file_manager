@@ -25,7 +25,9 @@ extension ArchiveFixes {
                 options.password = "right"
                 options.encryption = .legacy
             }
-            let record = try #require(ZipDirectory.read(RandomAccessFile(archive)).records.first)
+            let record = try #require(
+                ZipDirectory.read(RandomAccessFile(archive, shownAs: nil), maxEntries: .max, check: nil).records.first
+            )
             guard case .archive(let offset, let file) = record.source else {
                 return
             }
@@ -42,7 +44,7 @@ extension ArchiveFixes {
                 else {
                     return false
                 }
-                let probe = InflateStream(decrypted, wrapping: .raw)
+                let probe = InflateStream(decrypted, wrapping: .raw, control: nil)
                 defer { probe.close() }
                 return (try? probe.read(upToCount: 1 << 12)) != nil
             }

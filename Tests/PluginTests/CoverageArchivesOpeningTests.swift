@@ -26,7 +26,7 @@ internal struct CoverageArchivesOpeningTests {
     /// Reads a whole member.
     private func read(_ archive: OpenArchive, _ path: String) throws -> Data {
         let entry = try #require(archive.entry(path))
-        let stream = try archive.open(entry)
+        let stream = try archive.open(entry, slot: nil)
         defer { stream.close() }
         return try stream.readFully(1 << 20)
     }
@@ -37,7 +37,7 @@ internal struct CoverageArchivesOpeningTests {
         var bytes = Data([0x1F, 0x8B, 8, 0, 0, 0, 0, 0, 0, 3])
         bytes.append(Data(repeating: 0xFF, count: 600))
         try bytes.write(to: box.url("broken.gz"))
-        #expect(throws: (any Error).self) { try bench.store.archive(at: box.url("broken.gz")) }
+        #expect(throws: (any Error).self) { try bench.store.archive(at: box.url("broken.gz"), cancellation: nil) }
     }
 
     /// Checks that a file with the signature of a foreign format that bsdtar does not recognise
@@ -49,7 +49,7 @@ internal struct CoverageArchivesOpeningTests {
         bytes.append(Data("garbage that is no table of contents".utf8))
         try bytes.write(to: box.url("bad.xar"))
         #expect {
-            try bench.store.archive(at: box.url("bad.xar"))
+            try bench.store.archive(at: box.url("bad.xar"), cancellation: nil)
         } throws: { error in
             guard case ArchiveError.notAnArchive = error else {
                 return false
@@ -66,7 +66,7 @@ internal struct CoverageArchivesOpeningTests {
         try box.file("tree/b.txt", "second")
         run("/usr/bin/bsdtar", ["--format", "7zip", "-cf", "tree.7z", "tree"])
         bench.environment.materializeLimit = 0
-        let archive = try bench.store.archive(at: box.url("tree.7z"))
+        let archive = try bench.store.archive(at: box.url("tree.7z"), cancellation: nil)
         #expect(!archive.allowsParallelReads)
         #expect(try read(archive, "tree/a.txt") == Data("first".utf8))
         try CoverageArchives.replace(box.url("tree.7z"), with: box.url("tree/b.txt"))
@@ -87,19 +87,19 @@ internal struct CoverageArchivesOpeningTests {
         try box.file("tree/a.txt", "hello")
         run("/usr/bin/tar", ["--no-mac-metadata", "-cf", "tree.tar", "tree"])
         run("/usr/bin/compress", ["-f", "tree.tar"])
-        let archive = try bench.store.archive(at: box.url("tree.tar.Z"))
+        let archive = try bench.store.archive(at: box.url("tree.tar.Z"), cancellation: nil)
         #expect(try read(archive, "tree/a.txt") == Data("hello".utf8))
         bench.store.close()
 
         bench.environment.materializeLimit = 0
-        let streamed = try bench.store.archive(at: box.url("tree.tar.Z"))
+        let streamed = try bench.store.archive(at: box.url("tree.tar.Z"), cancellation: nil)
         try CoverageArchives.replace(box.url("tree.tar.Z"), with: box.url("tree/a.txt"))
         #expect(throws: ArchiveError.self) { try read(streamed, "tree/a.txt") }
 
         try box.file("plain.txt", "no archive at all")
         run("/usr/bin/compress", ["-f", "plain.txt"])
         #expect {
-            try bench.store.archive(at: box.url("plain.txt.Z"))
+            try bench.store.archive(at: box.url("plain.txt.Z"), cancellation: nil)
         } throws: { error in
             guard case ArchiveError.notAnArchive = error else {
                 return false
@@ -118,7 +118,7 @@ internal struct CoverageArchivesOpeningTests {
             // Every record as it is.
         }
         #expect {
-            try bench.store.archive(at: box.url("deep.zip"))
+            try bench.store.archive(at: box.url("deep.zip"), cancellation: nil)
         } throws: { error in
             guard case ArchiveError.unsupported(let what) = error else {
                 return false
@@ -134,7 +134,7 @@ internal struct CoverageArchivesOpeningTests {
         try box.file("tree/a.txt", String(repeating: "spacious ", count: 200))
         run("/usr/bin/tar", ["--no-mac-metadata", "-czf", "tree.tar.gz", "tree"])
         bench.environment.unpackedLimit = 100
-        let archive = try bench.store.archive(at: box.url("tree.tar.gz"))
+        let archive = try bench.store.archive(at: box.url("tree.tar.gz"), cancellation: nil)
         #expect(archive.scratchBytes == 0 && !archive.allowsParallelReads)
         #expect(try read(archive, "tree/a.txt") == Data(String(repeating: "spacious ", count: 200).utf8))
     }
@@ -146,10 +146,10 @@ internal struct CoverageArchivesOpeningTests {
         try box.file("content.txt", "inside")
         let gzip = runTool("/bin/sh", ["-c", "/usr/bin/gzip -n -c content.txt > blob; cp blob ...gz"], in: box.root)
         #expect(gzip.status == 0)
-        let blob = try bench.store.archive(at: box.url("blob"))
+        let blob = try bench.store.archive(at: box.url("blob"), cancellation: nil)
         #expect(blob.entries.map(\.path) == ["blob.unpacked"])
         #expect(try read(blob, "blob.unpacked") == Data("inside".utf8))
-        let dots = try bench.store.archive(at: box.url("...gz"))
+        let dots = try bench.store.archive(at: box.url("...gz"), cancellation: nil)
         #expect(dots.entries.map(\.path) == ["unpacked"])
     }
 
@@ -167,7 +167,7 @@ internal struct CoverageArchivesOpeningTests {
             bench.environment.hasRoom = { _, _ in false }
         }
         for name in ["data.txt.gz", "data.txt.bz2"] {
-            let archive = try bench.store.archive(at: box.url(name))
+            let archive = try bench.store.archive(at: box.url(name), cancellation: nil)
             let entry = try #require(archive.entry("data.txt"))
             #expect(entry.size == Int64(text.utf8.count) && archive.scratchBytes == 0)
             #expect(try read(archive, "data.txt") == Data(text.utf8))
@@ -183,7 +183,7 @@ internal struct CoverageArchivesOpeningTests {
         run("/usr/bin/tar", ["--no-mac-metadata", "-cf", "many.tar", "many"])
         bench.environment.maxEntries = 2
         #expect {
-            try bench.store.archive(at: box.url("many.tar"))
+            try bench.store.archive(at: box.url("many.tar"), cancellation: nil)
         } throws: { error in
             guard case ArchiveError.unsupported(let what) = error else {
                 return false
@@ -200,7 +200,7 @@ internal struct CoverageArchivesOpeningTests {
         compressed.append(Data(repeating: 0xFF, count: 64))
         try compressed.write(to: box.url("broken.Z"))
         #expect {
-            try bench.store.archive(at: box.url("broken.Z"))
+            try bench.store.archive(at: box.url("broken.Z"), cancellation: nil)
         } throws: { error in
             guard case ArchiveError.notAnArchive = error else {
                 return false
@@ -211,7 +211,7 @@ internal struct CoverageArchivesOpeningTests {
         sevenZip.append(Data("garbage garbage garbage garbage".utf8))
         try sevenZip.write(to: box.url("broken.7z"))
         #expect {
-            try bench.store.archive(at: box.url("broken.7z"))
+            try bench.store.archive(at: box.url("broken.7z"), cancellation: nil)
         } throws: { error in
             guard case ArchiveError.toolFailed = error else {
                 return false

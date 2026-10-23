@@ -24,10 +24,10 @@ internal struct CovSmallArchiveStreamTests {
     /// program).
     @Test
     internal func aClosedToolStreamCannotBeRead() throws {
-        let unread = try ProcessStream("/bin/echo", ["out"])
+        let unread = try ProcessStream("/bin/echo", ["out"], control: nil)
         unread.close()
         #expect(Self.readIsStopped(unread))
-        let partly = try ProcessStream("/usr/bin/yes", [])
+        let partly = try ProcessStream("/usr/bin/yes", [], control: nil)
         #expect(try partly.read(upToCount: 4)?.isEmpty == false)
         partly.close()
         #expect(Self.readIsStopped(partly))

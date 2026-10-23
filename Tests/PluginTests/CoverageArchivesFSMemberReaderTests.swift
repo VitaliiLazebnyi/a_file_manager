@@ -55,7 +55,7 @@ internal struct CoverageArchivesFSMemberReaderTests {
     @Test
     internal func aClosedReaderOpensTheMemberAgain() throws {
         let openings = Openings()
-        let reader = try ArchiveMemberReader { _ in openings.open("member text") }
+        let reader = try ArchiveMemberReader(cancellation: nil) { _ in openings.open("member text") }
         #expect(try reader.read(upToCount: 6) == Data("member".utf8))
         reader.close()
         #expect(openings.streams.count == 1 && openings.streams[0].isClosed)
@@ -71,7 +71,7 @@ internal struct CoverageArchivesFSMemberReaderTests {
     /// A seek past the end of a member that is read front to back stops at the end.
     @Test
     internal func aSeekPastTheEndStopsAtTheEnd() throws {
-        let reader = try ArchiveMemberReader { _ in MemberBytes("short") }
+        let reader = try ArchiveMemberReader(cancellation: nil) { _ in MemberBytes("short") }
         try reader.seek(to: 1_000)
         #expect(try reader.read(upToCount: 10) == nil)
     }

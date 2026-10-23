@@ -66,7 +66,7 @@ internal struct CoverageArchivesFormatsTar {
     }
 
     private static func reader(_ data: Data) -> TarReader {
-        TarReader(DataStream(data))
+        TarReader(DataStream(data), control: nil)
     }
 
     /// A block too short to be a header is none.
@@ -207,7 +207,7 @@ internal struct CoverageArchivesFormatsTar {
     @Test
     internal func aMembersStreamClosesTheReaderItOwns() {
         let source = ClosingStream()
-        TarMemberStream(TarReader(source)).close()
+        TarMemberStream(TarReader(source, control: nil), closesReader: true, onClose: nil).close()
         #expect(source.isClosed)
     }
 }

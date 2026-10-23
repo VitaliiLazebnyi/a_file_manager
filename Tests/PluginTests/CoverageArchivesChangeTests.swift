@@ -28,17 +28,17 @@ internal struct CoverageArchivesChangeTests {
             ["file.txt": "file", "folder/inner.txt": "inner"],
             options: options
         )
-        return try bench.store.archive(at: url)
+        return try bench.store.archive(at: url, cancellation: nil)
     }
 
     private func add(_ path: String, _ text: String, to archive: OpenArchive) throws {
-        let writer = try archive.write(path)
+        let writer = try archive.write(path, level: nil, password: nil)
         try writer.write(Data(text.utf8))
         try writer.close(attributes: FileAttributes())
     }
 
     private func read(_ archive: OpenArchive, _ path: String) throws -> String {
-        let stream = try archive.open(try #require(archive.entry(path)))
+        let stream = try archive.open(try #require(archive.entry(path)), slot: nil)
         defer { stream.close() }
         return try #require(String(bytes: try stream.readFully(1 << 20), encoding: .utf8))
     }
@@ -49,8 +49,8 @@ internal struct CoverageArchivesChangeTests {
     internal func changesThatCannotBeMadeAreRefused() throws {
         let archive = try archive()
         #expect(throws: ArchiveError.self) { try archive.makeDirectory("file.txt/sub") }
-        #expect(throws: ArchiveError.self) { _ = try archive.write("") }
-        #expect(throws: ArchiveError.self) { _ = try archive.write("file.txt/below.txt") }
+        #expect(throws: ArchiveError.self) { _ = try archive.write("", level: nil, password: nil) }
+        #expect(throws: ArchiveError.self) { _ = try archive.write("file.txt/below.txt", level: nil, password: nil) }
         #expect(throws: ArchiveError.self) { try archive.move("file.txt", to: "", replacing: false) }
         #expect(throws: ArchiveError.self) { try archive.move("missing.txt", to: "other.txt", replacing: false) }
         #expect(throws: FileSystemError.self) { try archive.move("folder", to: "folder/deeper", replacing: false) }
@@ -79,14 +79,17 @@ internal struct CoverageArchivesChangeTests {
     @Test
     internal func ofTwoWritersOfOneNameTheLastToFinishWins() throws {
         let archive = try archive()
-        let first = try archive.write("twice.txt")
-        let second = try archive.write("twice.txt")
+        let first = try archive.write("twice.txt", level: nil, password: nil)
+        let second = try archive.write("twice.txt", level: nil, password: nil)
         try second.write(Data("second".utf8))
         try second.close(attributes: FileAttributes())
         try first.write(Data("first".utf8))
         try first.close(attributes: FileAttributes())
         #expect(try read(archive, "twice.txt") == "first")
-        #expect(bench.store.flushAll().isEmpty && CoverageArchives.listed(box.url("changes.zip")).contains("twice.txt"))
+        #expect(
+            bench.store.flushAll(cancellation: nil).isEmpty
+                && CoverageArchives.listed(box.url("changes.zip")).contains("twice.txt")
+        )
     }
 
     /// Checks that a writer that cannot make its temporary file fails at once and leaves the archive idle.
@@ -96,7 +99,7 @@ internal struct CoverageArchivesChangeTests {
         let scratch = try bench.environment.scratch.newFile("probe").deletingLastPathComponent()
         #expect(chmod(scratch.path, 0o500) == 0)
         defer { chmod(scratch.path, 0o700) }
-        #expect(throws: (any Error).self) { _ = try archive.write("refused.txt") }
+        #expect(throws: (any Error).self) { _ = try archive.write("refused.txt", level: nil, password: nil) }
         #expect(!archive.isBusy && archive.entry("refused.txt") == nil)
     }
 
@@ -109,11 +112,11 @@ internal struct CoverageArchivesChangeTests {
         try archive.remove("file.txt")
         let due = clock.take()
         #expect(due.count == 2)
-        var abandoned: (any FileWriter)? = try archive.write("abandoned.txt")
+        var abandoned: (any FileWriter)? = try archive.write("abandoned.txt", level: nil, password: nil)
         try abandoned?.write(Data("half".utf8))
         abandoned = nil
         #expect(archive.isBusy && archive.entry("abandoned.txt") == nil)
-        let crowded = try archive.write("crowded.txt")
+        let crowded = try archive.write("crowded.txt", level: nil, password: nil)
         try crowded.write(Data("data".utf8))
         bench.environment.hasRoom = { _, _ in false }
         #expect(throws: ArchiveError.self) { try crowded.close(attributes: FileAttributes()) }
@@ -130,7 +133,7 @@ internal struct CoverageArchivesChangeTests {
         let archive = try archive()
         let room = OSAllocatedUnfairLock(initialState: true)
         bench.environment.hasRoom = { _, _ in room.withLock { $0 } }
-        let writer = try archive.write("growing.txt")
+        let writer = try archive.write("growing.txt", level: nil, password: nil)
         try writer.write(Data("fits".utf8))
         room.withLock { $0 = false }
         // The room is looked at every 32 MB.
@@ -144,7 +147,7 @@ internal struct CoverageArchivesChangeTests {
         try add("fresh.txt", "fresh", to: archive)
         #expect(try archive.duplicate("fresh.txt", to: "fresh copy.txt") == 5)
         #expect(try archive.duplicate("file.txt", to: "file copy.txt") == 4)
-        #expect(bench.store.flushAll().isEmpty)
+        #expect(bench.store.flushAll(cancellation: nil).isEmpty)
         #expect(CoverageArchives.contents(of: "fresh copy.txt", in: box.url("changes.zip")) == "fresh")
         #expect(CoverageArchives.contents(of: "file copy.txt", in: box.url("changes.zip")) == "file")
     }
@@ -159,7 +162,7 @@ internal struct CoverageArchivesChangeTests {
         try archive.setAttributes(FileAttributes(modified: stamp, permissions: 0o700), of: "folder")
         #expect(archive.entry("folder")?.isImplicit == false && archive.entry("folder")?.modified == stamp)
         let plain = try CoverageArchives.zip("plain.zip", in: box, ["a/b/c.txt": "c"], options: ["-D"])
-        let other = try bench.store.archive(at: plain)
+        let other = try bench.store.archive(at: plain, cancellation: nil)
         try other.move("a", to: "z", replacing: false)
         #expect(try read(other, "z/b/c.txt") == "c" && other.entry("a") == nil)
     }
@@ -181,7 +184,7 @@ internal struct CoverageArchivesChangeTests {
         #expect(told.withLock { $0 } == 1)
         try archive.setAttributes(FileAttributes(permissions: 0o600), of: "arrived.txt")
         let next = clock.take()
-        try archive.commit()
+        try archive.commit(cancellation: nil) { _, _ in true }
         next.first?.work()
         #expect(told.withLock { $0 } == 2)
     }
@@ -205,7 +208,7 @@ internal struct CoverageArchivesChangeTests {
         )
         let scratch = bench.environment.scratch.url.deletingLastPathComponent().path
         bench.environment.volume = { path in path == scratch ? 1 : 2 }
-        let archive = try bench.store.archive(at: url)
+        let archive = try bench.store.archive(at: url, cancellation: nil)
         try add("new.txt", "new", to: archive)
         #expect(try read(archive, "new.txt") == "new")
         #expect(try FileManager.default.contentsOfDirectory(atPath: deep.path) == ["a.zip"])

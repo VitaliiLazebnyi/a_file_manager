@@ -33,18 +33,24 @@ internal struct CoverageArchivesFormatsUnpackByPath {
         _ archive: URL,
         into target: URL,
         monitor: (any JobMonitor)? = nil,
-        whenAsked: @escaping () -> Void = {}
+        whenAsked: @escaping () -> Void = {
+            // Nothing to note.
+        }
     ) throws -> UnpackResult {
         let unpacker = Unpacker(
             fileSystems: bench.fileSystems,
             monitor: monitor ?? bench.monitor,
-            options: UnpackOptions()
+            options: UnpackOptions(),
+            whileUnpacking: nil
         ) { _, _ in
             whenAsked()
             return .overwrite
         }
         unpacker.isOnLocalVolume = { _ in false }
-        return unpacker.run([Unpacker.Source(archive: try bench.store.archive(at: archive))], into: target)
+        return unpacker.run(
+            [Unpacker.Source(archive: try bench.store.archive(at: archive, cancellation: nil))],
+            into: target
+        )
     }
 
     /// Files, rights and links arrive by path as they do through an open folder.

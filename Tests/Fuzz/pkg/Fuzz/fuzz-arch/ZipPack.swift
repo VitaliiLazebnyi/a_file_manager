@@ -59,7 +59,7 @@ private func pack(_ input: PackInput, from source: String, into archive: URL) ->
         options.encryption = .legacy
     }
     let packer = Packer(fileSystems: registry, store: store, monitor: QuietMonitor(), options: options)
-    let result = packer.run([item], archive: archive)
+    let result = packer.run([item], archive: archive, innerFolder: "")
     if let failure = result.failure {
         fzFail("zippack-pack-failed", "\(failure) name \(input.name.debugDescription) \(input.contents.count) bytes")
     }

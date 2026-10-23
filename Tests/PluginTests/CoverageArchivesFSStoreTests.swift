@@ -88,7 +88,7 @@ internal struct CoverageArchivesFSStoreTests {
         let first = opening(url, cancellation: nil)
         #expect(Wait.until { memory.stalledTransfers == 1 })
         let shared = store
-        let second = Self.waitingThread { Result { try shared.archive(at: url) } }
+        let second = Self.waitingThread { Result { try shared.archive(at: url, cancellation: nil) } }
         memory.releaseStalls()
         let one = try #require(try first.wait()?.get())
         let other = try #require(try second.wait()?.get())
@@ -120,7 +120,7 @@ internal struct CoverageArchivesFSStoreTests {
         let first = opening(url, cancellation: flag)
         #expect(Wait.until { memory.stalledTransfers == 1 })
         let shared = store
-        let second = Self.waitingThread { Result { try shared.archive(at: url) } }
+        let second = Self.waitingThread { Result { try shared.archive(at: url, cancellation: nil) } }
         memory.stallsReads = false
         flag.cancel()
         #expect(throws: ArchiveError.self) { _ = try first.wait()?.get() }
@@ -136,8 +136,8 @@ internal struct CoverageArchivesFSStoreTests {
     internal func aFileOnAServerThatIsNoArchiveIsNotFetchedAgainAtOnce() throws {
         let junk = Data("no archive at all".utf8)
         let url = try CoverageArchivesFSHookedMemory.put(junk, at: "/store/junk.zip", on: hooked.base)
-        #expect(throws: ArchiveError.self) { _ = try store.archive(at: url) }
-        #expect(throws: ArchiveError.self) { _ = try store.archive(at: url) }
+        #expect(throws: ArchiveError.self) { _ = try store.archive(at: url, cancellation: nil) }
+        #expect(throws: ArchiveError.self) { _ = try store.archive(at: url, cancellation: nil) }
         #expect(hooked.opened == 1)
     }
 
@@ -145,10 +145,10 @@ internal struct CoverageArchivesFSStoreTests {
     @Test
     internal func aLocalFileThatBecameAnArchiveIsReadAgain() throws {
         let url = try box.file("late.zip", "not yet an archive")
-        #expect(throws: ArchiveError.self) { _ = try store.archive(at: url) }
+        #expect(throws: ArchiveError.self) { _ = try store.archive(at: url, cancellation: nil) }
         try FileManager.default.removeItem(at: url)
         try zipBytes.write(to: url)
-        #expect(try store.archive(at: url).entry("tree/readme.txt") != nil)
+        #expect(try store.archive(at: url, cancellation: nil).entry("tree/readme.txt") != nil)
     }
 
     /// An opening that is cancelled while the archive is fetched from a server ends with
@@ -160,7 +160,7 @@ internal struct CoverageArchivesFSStoreTests {
         hooked.onNextRead { flag.cancel() }
         let error = #expect(throws: ArchiveError.self) { _ = try store.archive(at: url, cancellation: flag) }
         #expect(error.map(Self.isCancelled) == true)
-        #expect(try store.archive(at: url).entry("tree/readme.txt") != nil)
+        #expect(try store.archive(at: url, cancellation: nil).entry("tree/readme.txt") != nil)
     }
 
     /// A folder on a server is no archive; a look at the file that is given up says
@@ -168,7 +168,7 @@ internal struct CoverageArchivesFSStoreTests {
     @Test
     internal func aFolderOnAServerIsNoArchive() throws {
         let folder = hooked.base.addDirectory("/store/folder.zip")
-        #expect(throws: ArchiveError.self) { _ = try store.archive(at: folder) }
+        #expect(throws: ArchiveError.self) { _ = try store.archive(at: folder, cancellation: nil) }
         let url = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/tree.zip", on: hooked.base)
         let (flag, base) = (CancellationFlag(), hooked.base)
         // The look is given up, and finds nothing.
@@ -184,7 +184,7 @@ internal struct CoverageArchivesFSStoreTests {
     @Test
     internal func anArchiveWithoutAnEndingOpens() throws {
         let url = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/blob", on: memory)
-        #expect(try store.archive(at: url).entry("tree/readme.txt") != nil)
+        #expect(try store.archive(at: url, cancellation: nil).entry("tree/readme.txt") != nil)
     }
 
     /// A copy from a server that outgrows the room on the disk is given up.
@@ -196,7 +196,7 @@ internal struct CoverageArchivesFSStoreTests {
             asked.modify { $0 += 1 }
             return asked.value == 1
         }
-        let error = #expect(throws: ArchiveError.self) { _ = try store.archive(at: url) }
+        let error = #expect(throws: ArchiveError.self) { _ = try store.archive(at: url, cancellation: nil) }
         #expect(error?.errorDescription == ArchiveError.noScratchRoom("big.zip").errorDescription)
         #expect(asked.value == 2)
     }
@@ -206,14 +206,14 @@ internal struct CoverageArchivesFSStoreTests {
     @Test
     internal func anArchiveInWhichAChangeBeganIsNotLetGo() throws {
         let url = try CoverageArchivesFSHookedMemory.put(zipBytes, at: "/store/tree.zip", on: hooked.base)
-        let first = try store.archive(at: url)
+        let first = try store.archive(at: url, cancellation: nil)
         let (base, bytes) = (hooked.base, zipBytes)
         let writer = Shared<(any FileWriter)?>(nil)
         hooked.onNextItem {
             _ = try? CoverageArchivesFSHookedMemory.put(bytes + Data("changed".utf8), at: "/store/tree.zip", on: base)
-            writer.value = try? first.write("begun.txt")
+            writer.value = try? first.write("begun.txt", level: nil, password: nil)
         }
-        #expect(try store.archive(at: url) === first)
+        #expect(try store.archive(at: url, cancellation: nil) === first)
         #expect(writer.value != nil && first.isBusy)
         try writer.value?.close(attributes: FileAttributes())
     }

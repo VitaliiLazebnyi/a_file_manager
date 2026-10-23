@@ -24,18 +24,24 @@ internal struct CoverageArchivesFormatsZipDirectory {
         comment: Data = Data()
     ) throws -> URL {
         let url = box.url("\(UUID().uuidString).zip")
-        let output = try OutputFile(creating: url)
+        let output = try OutputFile(creating: url, mode: 0o600)
         let packer = ZipPacker(output, level: 0, password: password, encryption: .legacy, limits: limits)
         for member in members {
-            let record = ZipRecord.new(name: member.name, isDirectory: false, modified: Date(), permissions: 0o644)
+            let record = ZipRecord.new(
+                name: member.name,
+                isDirectory: false,
+                modified: Date(),
+                permissions: 0o644,
+                isSymbolicLink: false
+            )
             var sent = false
-            try packer.add(record, expectedSize: UInt64(member.text.utf8.count)) {
+            try packer.add(record, expectedSize: UInt64(member.text.utf8.count), stored: false) {
                 defer { sent = true }
                 return sent ? nil : Data(member.text.utf8)
             }
         }
         try packer.finish(comment: comment)
-        try output.close()
+        try output.close(durably: false)
         return url
     }
 
@@ -49,7 +55,7 @@ internal struct CoverageArchivesFormatsZipDirectory {
     }
 
     private func directory(_ url: URL) throws -> ZipDirectory.Contents {
-        try ZipDirectory.read(try RandomAccessFile(url))
+        try ZipDirectory.read(try RandomAccessFile(url, shownAs: nil), maxEntries: .max, check: nil)
     }
 
     private func failure(_ url: URL) -> String? {
@@ -155,8 +161,8 @@ internal struct CoverageArchivesFormatsZipDirectory {
     @Test
     internal func aHeaderThatIsNotThereIsDamage() throws {
         let url = try zip([("a.txt", "abc")])
-        let file = try RandomAccessFile(url)
-        let record = try #require(try ZipDirectory.read(file).records.first)
+        let file = try RandomAccessFile(url, shownAs: nil)
+        let record = try #require(try ZipDirectory.read(file, maxEntries: .max, check: nil).records.first)
         #expect(
             Support.failure { _ = try ZipDirectory.localHeader(of: record, at: 1, in: file) }
                 == ArchiveError.damaged("the entry a.txt is not where the directory says").errorDescription
@@ -171,8 +177,8 @@ internal struct CoverageArchivesFormatsZipDirectory {
     internal func largeMembersGetTheWideFieldsEverywhere() throws {
         let limits = ZipLimits(maxField: 4, maxEntries: 0xFFFE)
         let url = try zip([("a.txt", "some text")], password: "pw", limits: limits)
-        let file = try RandomAccessFile(url)
-        let contents = try ZipDirectory.read(file)
+        let file = try RandomAccessFile(url, shownAs: nil)
+        let contents = try ZipDirectory.read(file, maxEntries: .max, check: nil)
         let record = try #require(contents.records.first)
         #expect(record.uncompressedSize == 9 && record.compressedSize == UInt64(9 + ZipCrypto.headerSize))
         let header = try ZipDirectory.localHeader(of: record, at: 0, in: file)
@@ -191,31 +197,43 @@ internal struct CoverageArchivesFormatsZipDirectory {
     /// for them cannot be ended.
     @Test
     internal func aMemberThatGrewPastTheFieldsCannotBeEnded() throws {
-        let output = try OutputFile(creating: box.url("grown.zip"))
+        let output = try OutputFile(creating: box.url("grown.zip"), mode: 0o600)
         let writer = ZipWriter(output, limits: ZipLimits(maxField: 4, maxEntries: 10))
-        var record = ZipRecord.new(name: "a", isDirectory: false, modified: Date(), permissions: 0o644)
-        let member = try writer.begin(record)
+        var record = ZipRecord.new(
+            name: "a",
+            isDirectory: false,
+            modified: Date(),
+            permissions: 0o644,
+            isSymbolicLink: false
+        )
+        let member = try writer.begin(record, localExtra: nil, expectedSize: nil)
         record.uncompressedSize = 100
         #expect(
-            Support.failure { try writer.end(member, record) }
+            Support.failure { try writer.end(member, record, headerChanged: true) }
                 == ArchiveError.unsupported("A file that grew past 4 GB while it was packed").errorDescription
         )
-        try output.close()
+        try output.close(durably: false)
     }
 
     /// A member whose waiting data is shorter than its record says is not copied.
     @Test
     internal func aMemberWhoseDataIsCutOffIsNotCopied() throws {
         let spooled = try box.file("spool.bin", "12345")
-        var record = ZipRecord.new(name: "m", isDirectory: false, modified: Date(), permissions: 0o644)
+        var record = ZipRecord.new(
+            name: "m",
+            isDirectory: false,
+            modified: Date(),
+            permissions: 0o644,
+            isSymbolicLink: false
+        )
         record.source = .spool(TemporaryFile(spooled))
         record.compressedSize = 10
-        let output = try OutputFile(creating: box.url("copy.zip"))
-        let writer = ZipWriter(output)
+        let output = try OutputFile(creating: box.url("copy.zip"), mode: 0o600)
+        let writer = ZipWriter(output, limits: .standard)
         #expect(
-            Support.failure { try writer.copyMember(record) }
+            Support.failure { try writer.copyMember(record, check: nil) }
                 == ArchiveError.damaged("the data of m is cut off").errorDescription
         )
-        try output.close()
+        try output.close(durably: false)
     }
 }
