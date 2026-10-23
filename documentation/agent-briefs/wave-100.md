@@ -1,4 +1,6 @@
-# Wave 100: assignments (2026-10-16)
+# Waves 100 to 107: assignments
+
+## Wave 100: assignments (2026-10-16)
 
 Goal of the wave: **100% of lines and regions** (branch coverage) of every source file, plus the known issues of
 `documentation/quality-gates-continue.md` ("Next steps" 1, 2 and 5) fixed. Functions count too, as far as the
@@ -27,7 +29,7 @@ Shared rules of this wave:
 - Report: commits, coverage of your files before/after (lines, functions, regions), bugs fixed, code removed, what is
   left and why.
 
-## w100-stability (prefix `Stability`)
+### w100-stability (prefix `Stability`)
 
 Next steps 1 and 2 of the continue notes, plugin and kernel side, and Find Files.
 
@@ -49,7 +51,7 @@ Next steps 1 and 2 of the continue notes, plugin and kernel side, and Find Files
 - Files: `Sources/Plugins/FindFiles/**`, `Sources/AFMKernel/**` (only for the flaky causes), the tests named above,
   `Tests/PluginTests/FindFiles*`, `Tests/PluginTests/CoverageFind*`, `Tests/KernelTests/**`, new files `Stability*`.
 
-## w100-config-sync (prefix `CovConfig`, `CovSync`)
+### w100-config-sync (prefix `CovConfig`, `CovSync`)
 
 Coverage of `Sources/Plugins/Configuration/**` and `Sources/Plugins/DirectorySync/**` to 100% (next step 3: the beep
 seam for `OptionsWindow` and `CommandBrowser`; `CommandBrowser.pick` and the plugin's open/save panels behind seams;
@@ -57,7 +59,7 @@ seam for `OptionsWindow` and `CommandBrowser`; `CommandBrowser.pick` and the plu
 open-panel seam for the folder buttons; a closed sync window lets go of its list). Files: those folders, their tests
 (`Tests/PluginTests/*Config*`, `*DirectorySync*`, `*Sync*` that test these plugins), new files with your prefixes.
 
-## w100-fileops-tools (prefix `CovFileOps`, `CovSysTools`, `CovCompare`)
+### w100-fileops-tools (prefix `CovFileOps`, `CovSysTools`, `CovCompare`)
 
 Coverage of `Sources/Plugins/FileOperations/**`, `Sources/Plugins/SystemTools/**`, `Sources/Plugins/CompareContent/**`
 to 100% (SystemTools' open, print, quit, minimise through a desktop seam; `CompareLoader` 16/128 MB limits, cancel, read
@@ -65,7 +67,7 @@ errors; `CompareSession`, `TextDocument`, `TextDiff`, the plugin). Also the lint
 `Tests/PluginTests/CoverageCompare*.swift` (zero findings). Files: those folders and their tests, new files with your
 prefixes. `FileJobTests.swift:160` belongs to w100-stability.
 
-## w100-shell (prefix `Shell` + the module name, e.g. `PanelCov`, `WindowCov`, `InteractionCov`, `AppCov`)
+### w100-shell (prefix `Shell` + the module name, e.g. `PanelCov`, `WindowCov`, `InteractionCov`, `AppCov`)
 
 Coverage of `Sources/AFMShell/**` to 100% (the lists of next step 3 for Window, Panel, Interaction, App). Also:
 
@@ -79,7 +81,7 @@ Coverage of `Sources/AFMShell/**` to 100% (the lists of next step 3 for Window, 
   fix, with a test that checks the windows go (weak references), and `Scripts/check.sh leaks` clean.
 - Files: `Sources/AFMShell/**`, `Sources/AFileManager/**`, `Tests/ShellTests/**`, new files with your prefixes.
 
-## w100-network (prefix `CovNet`)
+### w100-network (prefix `CovNet`)
 
 Coverage of `Sources/Plugins/Network/**` to 100% (SFTPSession/SFTPChannel: end the endless loops in `open()`/`start()`,
 hold `lock` while the process starts, more `FakeSFTPServer` modes; FTPSession injectable clock; NetStream). Bug: packing
@@ -89,7 +91,7 @@ say so). Also `aTransferOnACutConnectionFails` was running when a PluginTests pr
 anything that can end the process. Files: `Sources/Plugins/Network/**`, network tests (`Tests/PluginTests/*Network*`,
 `*SFTP*`, `*FTP*`, `CoverageNet*`), new files `CovNet*`.
 
-## w100-viewer-mac-small (prefix `CovView`, `CovMac`, `CovSmall`)
+### w100-viewer-mac-small (prefix `CovView`, `CovMac`, `CovSmall`)
 
 Coverage to 100% of `Sources/Plugins/Viewer/**`, `Sources/Plugins/MacIntegration/**` and the remaining small ones:
 `Archives`, `Places`, `VirtualFolders`, `MultiRename`, `FileProperties`, `LocalFileSystem` (and `AFMKernel` lines
@@ -106,11 +108,11 @@ The one-line system adapters (`SystemDialogs`, `SystemLinks`, `SystemDesktop`, `
 Archives `openInApplication`, Places' editor `run`) stay for the UI tests: list what is left there. Files: those source
 folders, their tests, new files with your prefixes.
 
-# Wave 102: what the wave-100 reports left (2026-10-16)
+## Wave 102: what the wave-100 reports left (2026-10-16)
 
 Base: `quality-gates` at `99566b9` or later. Same reading and shared rules as wave 100.
 
-## w102-shell (prefix `ShellFix`)
+### w102-shell (prefix `ShellFix`)
 
 - The 80 uncovered regions of `Sources/AFMShell/**` the w100-shell report lists that are not system adapters:
   `PanelRememberedVisit` (9), `ReadAhead` (8: the stall/join path, the pause limit), `+QuickFilter` (8), `+Rereading`
@@ -123,7 +125,7 @@ Base: `quality-gates` at `99566b9` or later. Same reading and shared rules as wa
 - `Shell` / `MainWindowController` checks of a key window or an active app: through a seam if that improves the design.
 - Files: `Sources/AFMShell/**`, `Tests/ShellTests/**`.
 
-## w102-sweep (prefix `Sweep`)
+### w102-sweep (prefix `Sweep`)
 
 - Tests that wait a fixed 60 s (or 10, 20, 30, 90) where the condition can take longer under load: `Wait.ceiling`
   everywhere (search `Tests/` for literal timeouts in waits; not timeouts that are part of what a test checks).
@@ -145,9 +147,9 @@ Base: `quality-gates` at `99566b9` or later. Same reading and shared rules as wa
   the arm; report what is left and why.
 - Not: FileOperations, SystemTools, CompareContent (w100-fileops-tools is still on them), AFMShell (w102-shell).
 
-# Wave 103: coverage that does not depend on the run (2026-10-16)
+## Wave 103: coverage that does not depend on the run (2026-10-16)
 
-## w103-determinism (prefix `Determ`)
+### w103-determinism (prefix `Determ`)
 
 Two whole-suite coverage runs of `52a2623` (`documentation/agent-briefs/w103/`: a plain one and one with atomic
 counters, script `atomic-run.sh`) left different regions uncovered outside the system adapters: covered in one, not the
@@ -167,9 +169,9 @@ that reaches a region only sometimes (timing, a skip, load) makes the gate fail 
 - Owner questions you must not decide: `NetStream:242/444`, `MultiRenameWindowController:785` (impossible optionals),
   `ArchiveFileSystem:100`.
 
-# Wave 105: the main-thread stall and the last timing arms (2026-10-20)
+## Wave 105: the main-thread stall and the last timing arms (2026-10-20)
 
-## w105-stall (prefix `Stall`)
+### w105-stall (prefix `Stall`)
 
 Base `quality-gates` at `f8fa15e` or later.
 
@@ -191,9 +193,9 @@ Base `quality-gates` at `f8fa15e` or later.
 - Tests that still skip when background work is slow: `NetworkAdoptTests:309`, `Review2NetworkFTPTests:562`: make them
   deterministic instead.
 
-# Wave 106: the UI tests (2026-10-20)
+## Wave 106: the UI tests (2026-10-20)
 
-## w106-uitests (prefix `UI`)
+### w106-uitests (prefix `UI`)
 
 Base `quality-gates` at `839c9a8` or later. The only agent: you run `UITests/run.sh` (it takes over the VM's keyboard
 and mouse; the VM's sound is muted). Read the hand-over's section "UI tests, accessibility audit, snapshot tests" first.
@@ -219,9 +221,9 @@ and mouse; the VM's sound is muted). Read the hand-over's section "UI tests, acc
 - After the UI tests: run `Scripts/check.sh test` (unit tests, test-run check, coverage gate with the UI counts merged)
   and report the files still below 100% and why.
 
-# Wave 107: the last 20 files (2026-10-20)
+## Wave 107: the last 20 files (2026-10-20)
 
-## w107-last (prefix `Last`)
+### w107-last (prefix `Last`)
 
 Base `quality-gates` at `c91244e` or later. `Scripts/check.sh test` there, with the UI counts of `UITests/run.sh`
 merged: every test ran and passed; lines 99.92%, functions 99.88%, regions 99.91%; the 20 files below 100% are in
