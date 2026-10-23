@@ -333,6 +333,9 @@ elif [[ $status -ne 0 || ! -s "$report_dir/muter.json" ]]; then
   echo "Muter failed (status $status); the full log: $report_dir/muter.log" >&2
   exit 1
 fi
+# The logs of an earlier run go first: `cp -R` into an existing folder would nest this run's logs
+# in it and leave the old ones where this run's are looked for.
+rm -rf "$report_dir/logs" "$report_dir/baseline"
 cp -R "${project}_mutated/.mutation/logs" "$report_dir/logs" 2> /dev/null || true
 cp -R "${project}_mutated/.mutation/baseline" "$report_dir/baseline" 2> /dev/null || true
 echo "Muter finished in $((SECONDS - start)) s"
