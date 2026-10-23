@@ -23,16 +23,26 @@ internal struct ConfigPlacesFixSystemTools {
         #expect(TypedCommand.isOnPath("sh", path: "/bin:/usr/bin"))
         // A name that no program has still opens the application.
         let app = try #require(TypedCommand("afmnotaprogram"))
-        #expect(app.application(relativeTo: box.root, searching: [box.url("Apps")]) != nil)
+        #expect(
+            app.application(relativeTo: box.root, searching: [box.url("Apps")], path: TypedCommand.processPath) != nil
+        )
         // `mail` is a program of the system, so it is left to the shell.
-        if TypedCommand.isOnPath("mail") {
+        if TypedCommand.isOnPath("mail", path: TypedCommand.processPath) {
             #expect(
-                try #require(TypedCommand("mail")).application(relativeTo: box.root, searching: [box.url("Apps")])
+                try #require(TypedCommand("mail"))
+                    .application(relativeTo: box.root, searching: [box.url("Apps")], path: TypedCommand.processPath)
                     == nil
             )
         }
         // A path ending in .app is an application whatever the PATH holds.
-        #expect(try #require(TypedCommand(box.url("Apps/mail.app").path)).application(relativeTo: box.root) != nil)
+        #expect(
+            try #require(TypedCommand(box.url("Apps/mail.app").path))
+                .application(
+                    relativeTo: box.root,
+                    searching: TypedCommand.applicationFolders,
+                    path: TypedCommand.processPath
+                ) != nil
+        )
     }
 
     @Test
@@ -48,7 +58,7 @@ internal struct ConfigPlacesFixSystemTools {
             flag.cancel()
         }
         let started = Date()
-        let outcome = runner.run(cancellation: flag)
+        let outcome = runner.run(cancellation: flag, progress: nil)
         #expect(outcome.wasCancelled && Date().timeIntervalSince(started) < 10)
     }
 }

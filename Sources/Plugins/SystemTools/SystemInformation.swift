@@ -9,14 +9,28 @@ import Foundation
 /// A plain value; `gather` asks the system and the volumes and may block, so it runs on a job's
 /// thread.
 internal struct SystemInformation: Equatable {
+    /// A titled part of the dialog: Hardware, Software, Volumes.
     internal struct Section: Equatable {
+        /// The heading of the part.
         internal let title: String
+        /// The values of the part, in the order they are shown.
         internal var rows: [Row]
     }
 
+    /// One value of the dialog with its label.
     internal struct Row: Equatable {
+        /// What the value is: `Model`, `Installed RAM`, a volume's name.
         internal let label: String
+        /// The value as shown.
         internal let value: String
+    }
+
+    /// What a volume tells about itself; nil where it does not say.
+    private struct VolumeValues: Sendable {
+        let name: String?
+        let format: String?
+        let available: Int?
+        let total: Int?
     }
 
     /// What `gather` asks the system: its named values and its volumes.
@@ -26,26 +40,32 @@ internal struct SystemInformation: Equatable {
         /// The system's own.
         internal static let system = Self(
             text: SystemInformation.systemText,
-            number: SystemInformation.systemNumber,
-            volumes: {
-                FileManager.default.mountedVolumeURLs(
-                    includingResourceValuesForKeys: nil,
-                    options: [.skipHiddenVolumes]
-                )
-            }
-        )
+            number: SystemInformation.systemNumber
+        ) {
+            Array(
+                [
+                    FileManager.default.mountedVolumeURLs(
+                        includingResourceValuesForKeys: nil,
+                        options: [.skipHiddenVolumes]
+                    )
+                ]
+                .compactMap(\.self)
+                .joined()
+            )
+        }
 
         /// A named value as text.
         internal var text: @Sendable (String) -> String?
         /// A named value as a number.
         internal var number: @Sendable (String) -> Int?
-        /// The volumes to list; nil when the system does not tell.
-        internal var volumes: @Sendable () -> [URL]?
+        /// The volumes to list; none when the system does not tell.
+        internal var volumes: @Sendable () -> [URL]
     }
 
     /// Stands for the volumes in `BlockingCalls`.
     private static let volumeCalls = CallOwner()
 
+    /// The parts of the dialog, in the order they are shown.
     internal var sections: [Section]
 
     /// The sections as lines of text with the values in one column.
@@ -54,8 +74,8 @@ internal struct SystemInformation: Equatable {
         return
             sections.map { section in
                 ([section.title]
-                    + section.rows.map {
-                        "  " + ($0.label + ":").padding(toLength: width + 2, withPad: " ", startingAt: 0) + $0.value
+                    + section.rows.map { row in
+                        "  " + (row.label + ":").padding(toLength: width + 2, withPad: " ", startingAt: 0) + row.value
                     })
                     .joined(separator: "\n")
             }
@@ -116,8 +136,8 @@ internal struct SystemInformation: Equatable {
         var statistics = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &statistics) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { integers in
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, integers, &count)
             }
         }
         guard result == KERN_SUCCESS, total > 0 else {
@@ -192,59 +212,38 @@ internal struct SystemInformation: Equatable {
     /// A volume that has stopped answering never returns from the question. The question is
     /// therefore asked through `BlockingCalls`: it goes on alone, and this function comes back
     /// as soon as `cancellation` is set, so the job that called it can end.
-    internal static func volumes(_ mounted: [URL]?, cancellation: CancellationFlag) -> [Row] {
+    internal static func volumes(_ mounted: [URL], cancellation: CancellationFlag) -> [Row] {
         let keys: Set<URLResourceKey> = [
             .volumeNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityKey,
             .volumeLocalizedFormatDescriptionKey
         ]
-        return Parallel.map(mounted ?? []) { url in
-            let answer = BlockingCalls.answer(from: volumeCalls, to: "space " + url.path, cancellation: cancellation) {
-                _ -> (
-                    volumeName: String?, volumeLocalizedFormatDescription: String?, volumeAvailableCapacity: Int?,
-                    volumeTotalCapacity: Int?
-                )? in
+        return Parallel.map(mounted) { url in
+            let answer = BlockingCalls.answer(
+                from: volumeCalls,
+                to: "space " + url.path,
+                cancellation: cancellation
+            ) { _ -> VolumeValues? in
                 // The values are taken out here: the set of them cannot be handed to another thread.
                 (try? url.resourceValues(forKeys: keys))
-                    .map {
-                        (
-                            $0.volumeName, $0.volumeLocalizedFormatDescription, $0.volumeAvailableCapacity,
-                            $0.volumeTotalCapacity
+                    .map { values in
+                        VolumeValues(
+                            name: values.volumeName,
+                            format: values.volumeLocalizedFormatDescription,
+                            available: values.volumeAvailableCapacity,
+                            total: values.volumeTotalCapacity
                         )
                     }
             }
             guard let values = answer else {
                 return Row(label: url.lastPathComponent, value: "\(url.path): not answering")
             }
-            let name = values?.volumeName ?? url.lastPathComponent
-            let format = values?.volumeLocalizedFormatDescription.map { ", \($0)" } ?? ""
+            let name = values?.name ?? url.lastPathComponent
+            let format = values?.format.map { ", \($0)" } ?? ""
             let free = space(
-                free: values?.volumeAvailableCapacity.map(Int64.init),
-                total: values?.volumeTotalCapacity.map(Int64.init)
+                free: values?.available.map(Int64.init),
+                total: values?.total.map(Int64.init)
             )
             return Row(label: name, value: "\(url.path): \(free)\(format)")
         }
-    }
-}
-
-/// The rules for a volume's name (spec 12 › Volume label, adapted: the Mac allows long names
-/// and most characters, but neither `/` nor `:` nor a leading dot).
-internal enum VolumeName {
-    internal static let maximumLength = 255
-
-    /// Nil when the name is fine, else what is wrong with it.
-    internal static func problem(with name: String) -> String? {
-        if name.isEmpty {
-            return "The name must not be empty."
-        }
-        if name.utf8.count > maximumLength {
-            return "The name is too long."
-        }
-        if name.contains("/") || name.contains(":") {
-            return "The name must not contain / or :."
-        }
-        if name.hasPrefix(".") {
-            return "The name must not start with a dot."
-        }
-        return nil
     }
 }

@@ -13,7 +13,7 @@ internal struct CovSysToolsInformation {
     @Test
     internal func whatTheSystemDoesNotTellIsUnknownOrLeftOut() {
         let numbers = ["hw.perflevel0.physicalcpu": 4, "hw.perflevel1.physicalcpu": 2]
-        let questions = SystemInformation.Questions(text: { _ in nil }, number: { numbers[$0] }, volumes: { nil })
+        let questions = SystemInformation.Questions(text: { _ in nil }, number: { numbers[$0] }, volumes: { [] })
         let information = SystemInformation.gather(
             displays: ["1x1", "2x2"],
             cancellation: CancellationFlag(),

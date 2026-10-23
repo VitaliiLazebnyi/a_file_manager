@@ -1,124 +1,5 @@
 import AFMKernel
-public import AppKit
-import Darwin
-
-/// What is known of the volume a folder is on.
-public struct VolumeFacts: Equatable, Sendable {
-    public var url: URL?
-    public var name = ""
-    public var canBeEjected = false
-    /// A share of a server: unmounted, there is no disk to eject.
-    public var isNetwork = false
-
-    public init(url: URL? = nil, name: String = "", canBeEjected: Bool = false, isNetwork: Bool = false) {
-        (self.url, self.name, self.canBeEjected, self.isNetwork) = (url, name, canBeEjected, isNetwork)
-    }
-}
-
-/// Why a volume was not ejected: who keeps it in use, if the system says.
-public struct EjectRefusal: Error, Equatable {
-    /// The program that has something open on the volume, by name; nil when not known.
-    public var program: String?
-    /// True when that program is this one.
-    public var isThisProgram = false
-    /// What the system said.
-    public var reason: String
-
-    public init(program: String? = nil, isThisProgram: Bool = false, reason: String) {
-        (self.program, self.isThisProgram, self.reason) = (program, isThisProgram, reason)
-    }
-}
-
-/// How volumes are looked at and ejected.
-///
-/// Both calls ask the volume and may wait on it: they run on a job's thread. Tests put a stand-in
-/// in place of the system.
-public protocol VolumeAccess: AnyObject, Sendable {
-    func facts(of directory: URL) -> VolumeFacts
-    /// Ejects gently: the system writes what is pending and refuses while any program has a
-    /// file of the volume open. Nil when the volume is gone.
-    func eject(_ volume: VolumeFacts) -> EjectRefusal?
-}
-
-/// The volumes of this Mac, ejected by `unmount`: the system's, or a stand-in that ejects nothing.
-internal final class SystemVolumes: VolumeAccess {
-    /// Unmounts a volume and then calls back, on a queue of its own, with what went wrong, if anything.
-    internal typealias Unmount =
-        @Sendable (URL, FileManager.UnmountOptions, @escaping @Sendable ((any Error)?) -> Void) -> Void
-
-    /// The system's.
-    internal static let unmount: Unmount = {
-        FileManager.default.unmountVolume(at: $0, options: $1, completionHandler: $2)
-    }
-
-    private let unmountVolume: Unmount
-
-    internal init(unmount: @escaping Unmount) {
-        unmountVolume = unmount
-    }
-
-    /// The name the user knows a program by: the application's, else the process's.
-    internal static func programName(_ pid: pid_t) -> String? {
-        guard pid > 0 else {
-            return nil
-        }
-        if let name = NSRunningApplication(processIdentifier: pid)?.localizedName {
-            return name
-        }
-        var buffer = [CChar](repeating: 0, count: 256)
-        guard proc_name(pid, &buffer, UInt32(buffer.count)) > 0 else {
-            return nil
-        }
-        return SystemText.string(buffer)
-    }
-
-    internal func facts(of directory: URL) -> VolumeFacts {
-        let keys: Set<URLResourceKey> = [
-            .volumeURLKey, .volumeNameKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey,
-            .volumeIsLocalKey, .volumeIsRootFileSystemKey
-        ]
-        // Every mounted volume has a name.
-        guard let values = try? directory.resourceValues(forKeys: keys), let url = values.volume,
-            let name = values.volumeName
-        else {
-            return VolumeFacts()
-        }
-        let canBeEjected = Place.VolumeTraits(path: url.path, values: values).mayBeEjected
-        return VolumeFacts(url: url, name: name, canBeEjected: canBeEjected, isNetwork: values.volumeIsLocal == false)
-    }
-
-    internal func eject(_ volume: VolumeFacts) -> EjectRefusal? {
-        guard let url = volume.url else {
-            return EjectRefusal(reason: "The volume is not known.")
-        }
-        // Never forced: a drive something still writes to is refused, not cut off. A disk
-        // goes as a whole, with its other volumes, so that it can be taken out.
-        let options: FileManager.UnmountOptions = volume.isNetwork ? [] : [.allPartitionsAndEjectDisk]
-        let done = DispatchSemaphore(value: 0)
-        /// Set by the callback before `done` is signalled, and read only after the wait.
-        nonisolated(unsafe) var failure: (any Error)?
-        unmountVolume(url, options) { error in
-            failure = error
-            done.signal()
-        }
-        done.wait()
-        guard let failure else {
-            return nil
-        }
-        let error = failure as NSError
-        let dissenter = (error.userInfo[NSFileManagerUnmountDissentingProcessIdentifierErrorKey] as? NSNumber)?
-            .int32Value
-        return EjectRefusal(
-            program: dissenter.flatMap(Self.programName),
-            isThisProgram: dissenter == getpid(),
-            reason: error.localizedDescription
-        )
-    }
-
-    deinit {
-        // Nothing to release.
-    }
-}
+import Foundation
 
 /// Ejects a drive the way the user expects it to.
 ///
@@ -141,11 +22,13 @@ internal final class VolumeEjection {
     private struct Departure {
         weak var panel: any PanelHandle?
         weak var tab: PanelModel?
-        let from: URL
-        var to: URL
+        let origin: URL
+        var destination: URL
     }
-    /// How often, and how long apart, an eject that this program itself refused is tried again.
+
+    /// How often an eject that this program itself refused is tried again.
     nonisolated internal static let ownRefusalRetries = 4
+    /// How long apart, in seconds, those tries are.
     nonisolated internal static let retryDelay: TimeInterval = 0.5
 
     /// Stands for the volumes in `BlockingCalls`: the questions to them are counted together.
@@ -157,10 +40,16 @@ internal final class VolumeEjection {
     private let home: () -> URL
     private let note: (String) -> Void
 
-    private var ui: any UserInteraction { kernel.interaction }
+    private var interaction: any UserInteraction { kernel.interaction }
 
-    internal init(kernel: Kernel, access: any VolumeAccess, home: @escaping () -> URL, note: @escaping (String) -> Void)
-    {
+    /// Ejects through `access`; a tab with nowhere else to go goes to `home`, and each eject is
+    /// written to the log through `note`.
+    internal init(
+        kernel: Kernel,
+        access: any VolumeAccess,
+        home: @escaping () -> URL,
+        note: @escaping (String) -> Void
+    ) {
         self.kernel = kernel
         self.access = access
         self.home = home
@@ -188,20 +77,59 @@ internal final class VolumeEjection {
         }
     }
 
+    /// Writes what is pending on `volume` and ejects it; tries again a few times while it is this
+    /// program itself that refuses.
+    ///
+    /// Blocks: on the job's thread.
+    nonisolated private static func unmount(
+        _ facts: VolumeFacts,
+        volume: URL,
+        access: any VolumeAccess,
+        fileSystems: FileSystemRegistry,
+        cancellation: CancellationFlag
+    ) -> Result<Void, any Error> {
+        do {
+            try fileSystems.closeFiles(on: volume, cancellation: cancellation)
+        } catch {
+            return .failure(error)
+        }
+        var refusal = access.eject(facts)
+        // What this program let go of may take a moment to be gone (a folder watch
+        // is closed on a thread of its own).
+        for _ in 0..<ownRefusalRetries where refusal?.isThisProgram == true && !cancellation.isCancelled {
+            Thread.sleep(forTimeInterval: retryDelay)
+            refusal = access.eject(facts)
+        }
+        return refusal.map { .failure($0) } ?? .success(())
+    }
+
+    /// What the user is told of a refusal: who keeps the drive in use, as far as that is known.
+    private static func detail(of refusal: EjectRefusal) -> String {
+        if refusal.isThisProgram {
+            return "Something in this program still uses it: a window that shows its files, "
+                + "a search or a comparison. Close it, then eject the drive again."
+        }
+        if let program = refusal.program {
+            return "It is in use by \(program). Close the files of the drive there, then eject it again."
+        }
+        return refusal.reason
+    }
+
     /// Ejects the drive `directory` is on.
     internal func eject(driveOf directory: URL) {
-        let access = self.access
+        let volumeAccess = access
         kernel.jobs.run(
             title: "Volume:",
-            work: { monitor in Self.ask("volume", of: directory, monitor) { access.facts(of: directory) } },
+            work: { monitor in Self.ask("volume", of: directory, monitor) { volumeAccess.facts(of: directory) } },
             completion: { [self] answer in
                 // Nil: the question was cancelled.
                 guard let facts = answer else {
                     return
                 }
                 guard let volume = facts.url, facts.canBeEjected else {
-                    return ui.inform(
-                        "\(DisplayText.oneLine(facts.name.isEmpty ? directory.path : facts.name)) cannot be ejected.",
+                    let shown = DisplayText.oneLine(facts.name.isEmpty ? directory.path : facts.name, limit: 200)
+                    return interaction.inform(
+                        "\(shown) cannot be ejected.",
                         detail: "",
                         style: .warning
                     )
@@ -216,26 +144,19 @@ internal final class VolumeEjection {
 
     private func eject(_ facts: VolumeFacts, volume: URL, departures: [Departure]) {
         let name = "“\(DisplayText.oneLine(facts.name, limit: 80))”"
-        let access = self.access
+        let volumeAccess = access
         let fileSystems = kernel.fileSystems
         kernel.jobs.run(
             title: "Ejecting \(name):",
             work: { monitor -> Result<Void, any Error>? in
-                Self.ask("eject", of: volume, monitor) { () -> Result<Void, any Error> in
-                    do {
-                        try fileSystems.closeFiles(on: volume, cancellation: monitor.cancellation)
-                    } catch {
-                        return .failure(error)
-                    }
-                    var refusal = access.eject(facts)
-                    // What this program let go of may take a moment to be gone (a folder watch
-                    // is closed on a thread of its own).
-                    for _ in 0..<Self.ownRefusalRetries
-                    where refusal?.isThisProgram == true && !monitor.cancellation.isCancelled {
-                        Thread.sleep(forTimeInterval: Self.retryDelay)
-                        refusal = access.eject(facts)
-                    }
-                    return refusal.map { .failure($0) } ?? .success(())
+                Self.ask("eject", of: volume, monitor) {
+                    Self.unmount(
+                        facts,
+                        volume: volume,
+                        access: volumeAccess,
+                        fileSystems: fileSystems,
+                        cancellation: monitor.cancellation
+                    )
                 }
             },
             completion: { [self] answer in
@@ -243,66 +164,62 @@ internal final class VolumeEjection {
                 guard let answer else {
                     return
                 }
-                switch answer {
-                case .success:
-                    note("eject: \(volume.path)")
-                    ui.notice("\(name) can now be removed safely.")
-
-                case .failure(let refusal as EjectRefusal):
-                    comeBack(departures, from: volume)
-                    let detail: String
-                    if refusal.isThisProgram {
-                        detail =
-                            "Something in this program still uses it: a window that shows its files, a search or a comparison. "
-                            + "Close it, then eject the drive again."
-                    } else if let program = refusal.program {
-                        detail = "It is in use by \(program). Close the files of the drive there, then eject it again."
-                    } else {
-                        detail = refusal.reason
-                    }
-                    ui.inform(
-                        "\(name) cannot be ejected",
-                        detail: detail + "\nNothing on the drive was changed.",
-                        style: .warning
-                    )
-
-                case .failure(let error):
-                    comeBack(departures, from: volume)
-                    ui.inform(
-                        "\(name) was not ejected",
-                        detail: "What is still to be written to it could not be written: "
-                            + "\(error.localizedDescription)\nThe drive stays connected, so that nothing is lost.",
-                        style: .warning
-                    )
-                }
+                report(answer, name: name, volume: volume, departures: departures)
             }
         )
+    }
+
+    /// Tells the user how the eject of `volume` went; when it did not go, the tabs that left it
+    /// come back.
+    private func report(_ answer: Result<Void, any Error>, name: String, volume: URL, departures: [Departure]) {
+        switch answer {
+        case .success:
+            note("eject: \(volume.path)")
+            interaction.notice("\(name) can now be removed safely.")
+
+        case .failure(let refusal as EjectRefusal):
+            comeBack(departures, from: volume)
+            interaction.inform(
+                "\(name) cannot be ejected",
+                detail: Self.detail(of: refusal) + "\nNothing on the drive was changed.",
+                style: .warning
+            )
+
+        case .failure(let error):
+            comeBack(departures, from: volume)
+            interaction.inform(
+                "\(name) was not ejected",
+                detail: "What is still to be written to it could not be written: "
+                    + "\(error.localizedDescription)\nThe drive stays connected, so that nothing is lost.",
+                style: .warning
+            )
+        }
     }
 
     /// Takes every tab off the drive; `then` runs once the panels show where they went.
     private func leave(_ volume: URL, then proceed: @escaping ([Departure]) -> Void) {
         var departures: [Departure] = []
         var pending = 1
-        func finished() {
+        let finished = {
             pending -= 1
             if pending == 0 { proceed(departures) }
         }
         for panel in kernel.panels.all {
             for tab in panel.tabs.tabs where Self.isOn(tab.directory, volume) {
-                let to = tab.lastVisited { $0.isFileURL && !Self.isOn($0, volume) } ?? home()
+                let destination = tab.lastVisited { $0.isFileURL && !Self.isOn($0, volume) } ?? home()
                 let index = departures.count
-                departures.append(Departure(panel: panel, tab: tab, from: tab.directory, to: to))
+                departures.append(Departure(panel: panel, tab: tab, origin: tab.directory, destination: destination))
                 guard panel.model === tab else {
-                    retarget(tab, to: to)
+                    retarget(tab, to: destination)
                     continue
                 }
                 pending += 1
-                panel.show(to, focus: nil, history: .record) { [self] succeeded in
+                panel.show(destination, focus: nil, history: .record) { [self] succeeded in
                     guard !succeeded else {
                         return finished()
                     }
                     // The folder before is gone too: home.
-                    departures[index].to = home()
+                    departures[index].destination = home()
                     panel.show(home(), focus: nil, history: .record) { _ in finished() }
                 }
             }
@@ -314,12 +231,12 @@ internal final class VolumeEjection {
     private func comeBack(_ departures: [Departure], from _: URL) {
         for departure in departures {
             guard let panel = departure.panel, let tab = departure.tab, panel.tabs.tabs.contains(where: { $0 === tab }),
-                tab.directory.isSameLocation(as: departure.to)
+                tab.directory.isSameLocation(as: departure.destination)
             else { continue }
             if panel.model === tab {
-                panel.show(departure.from, focus: nil, history: .record, completion: nil)
+                panel.show(departure.origin, focus: nil, history: .record, completion: nil)
             } else {
-                retarget(tab, to: departure.from)
+                retarget(tab, to: departure.origin)
             }
         }
     }
@@ -333,5 +250,9 @@ internal final class VolumeEjection {
             root: provider?.root(of: location) ?? location,
             history: .record
         )
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

@@ -13,16 +13,24 @@ import Testing
 @MainActor
 @Suite
 internal struct Review2ConfigASystemTools {
+    /// The plugin under test, kept from acting outside the program.
     internal let tools = SystemToolsPlugin(launchesApplications: false)
+    /// The settings the bench's kernel keeps, read back by the tests.
     internal let settings = MemorySettings()
+    /// The kernel and panels the plugin runs in.
     internal let bench: TestBench
+    /// The folders of the test: `A` (with `one.txt` and `sub`) and `B`.
     internal let box: Sandbox
 
+    /// The bench's commands.
     internal var commands: CommandRegistry { bench.commands }
-    internal var ui: ScriptedInteraction { bench.interaction }
+    /// The bench's scripted user.
+    internal var interaction: ScriptedInteraction { bench.interaction }
 
-    internal var history: [String]? { settings.value([String].self, forKey: "systemTools.history") }
+    /// The remembered lines, newest first; none when nothing is stored.
+    internal var history: [String] { settings.value([String].self, forKey: "systemTools.history") ?? [] }
 
+    /// Makes the folders and a bench with the left panel in `A`, the right in `B`.
     internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt", "1")
@@ -37,9 +45,10 @@ internal struct Review2ConfigASystemTools {
         )
     }
 
+    /// A line typed with a blank in front is not remembered, and switching remembering off forgets what was.
     @Test
     internal func aLineTypedWithABlankInFrontIsNotRemembered() {
-        ui.formAnswers = Array(repeating: .accept, count: 8)
+        interaction.formAnswers = Array(repeating: .accept, count: 8)
         commands.perform(.runCommandLine, .text("echo one"))
         commands.perform(.runCommandLine, .text(" echo secret"))
         commands.perform(.runCommandLine, .text("\techo secret"))
@@ -50,11 +59,12 @@ internal struct Review2ConfigASystemTools {
         #expect(page?.preferences.map(\.key).contains(SystemToolsPlugin.recordHistoryKey) == true)
         settings.set(false, forKey: SystemToolsPlugin.recordHistoryKey)
         page?.onChange()
-        #expect(history == nil)
+        #expect(history.isEmpty)
         commands.perform(.runCommandLine, .text("echo two"))
-        #expect(history == nil && tools.log.last == "ran: echo two")
+        #expect(history.isEmpty && tools.log.last == "ran: echo two")
     }
 
+    /// Print File Contents is offered when a file is among the operands, not for folders alone.
     @Test
     internal func printIsOfferedForFilesWithoutMakingTheListOfThem() {
         bench.left.moveCursor(toName: "one.txt")
@@ -67,6 +77,8 @@ internal struct Review2ConfigASystemTools {
         #expect(!commands.isEnabled(SystemToolsCommands.printFile))
     }
 
+    /// An installed application comes before one of the same name in the panel's folder, unless
+    /// that one is asked for by path.
     @Test
     internal func anInstalledApplicationComesBeforeOneOfTheSameNameInThePanelsFolder() throws {
         let installed = try box.folder("Apps/Tool.app")
@@ -74,7 +86,7 @@ internal struct Review2ConfigASystemTools {
         let only = try box.folder("Here/Only.app")
         let (here, folders) = (box.url("Here"), [box.url("Apps")])
         func found(_ line: String) -> String? {
-            TypedCommand(line)?.application(relativeTo: here, searching: folders)?.path
+            TypedCommand(line)?.application(relativeTo: here, searching: folders, path: TypedCommand.processPath)?.path
         }
         #expect(found("Tool.app") == installed.path && found("Tool.app notes.txt") == installed.path)
         // Asked for by path, the one in the folder is meant.
@@ -86,6 +98,7 @@ internal struct Review2ConfigASystemTools {
         )
     }
 
+    /// Whether a bare name is a program or an application is decided by the PATH it is given.
     @Test
     internal func whetherABareNameIsAProgramIsDecidedByThePathItIsGiven() throws {
         try box.folder("Apps/mytool.app")
@@ -107,6 +120,7 @@ internal struct Review2ConfigASystemTools {
         )
     }
 
+    /// System Information ends when it is cancelled, and lists hardware, software and volumes when it is not.
     @Test
     internal func systemInformationEndsWhenItIsCancelled() {
         let cancelled = CancellationFlag()
@@ -123,6 +137,7 @@ internal struct Review2ConfigASystemTools {
         )
     }
 
+    /// A cancelled list with subfolders enters no further folder.
     @Test
     internal func aCancelledListWithSubfoldersEntersNoFolder() throws {
         try box.file("A/sub/deep/far.txt")
@@ -148,15 +163,17 @@ internal struct Review2ConfigASystemTools {
         #expect(stopped.rows(of: items).map(\.name) == ["one.txt", "sub"])
     }
 
+    /// Log lines stay on one line, and the log keeps only its newest lines.
     @Test
     internal func logLinesStayOneLineAndTheLogIsBounded() {
         commands.perform(.runCommandLine, .text("make 'a\nb'"))
         #expect(tools.log == ["skipped: make 'a\\nb'"])
         for number in 0..<1_200 { commands.perform(.runCommandLine, .text(" make \(number)")) }
         #expect(tools.log.count <= 512 && tools.log.last == "skipped: make 1199")
-        #expect(DisplayText.oneLine("x\u{1B}[0m\ny") == "x\\u{1B}[0m\\ny")
+        #expect(DisplayText.oneLine("x\u{1B}[0m\ny", limit: 200) == "x\\u{1B}[0m\\ny")
     }
 
+    /// The shell is always a POSIX shell, whatever the user's login shell is.
     @Test
     internal func theShellIsAlwaysAPosixShell() {
         #expect(LoginShell.posix.executable == "/bin/zsh" && LoginShell.posix.options.last == "-c")

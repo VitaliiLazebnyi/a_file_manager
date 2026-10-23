@@ -97,7 +97,7 @@ internal enum LoginShell {
         }
         let data = pipe.fileHandleForReading.availableData
         // Start files may print lines of their own: the PATH is the last one.
-        let line = String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline).last ?? ""
+        let line = String(repairingUTF8: data).split(whereSeparator: \.isNewline).last ?? ""
         return line.hasPrefix("/") && line.utf8.count < 16_384 ? String(line) : nil
     }
 
@@ -108,63 +108,5 @@ internal enum LoginShell {
             environment["PATH"] = path
         }
         return environment
-    }
-}
-
-/// Text of the system: a C string in a buffer.
-internal enum SystemText {
-    /// The characters before the first zero, read as UTF-8; all of them when there is no zero.
-    internal static func string(_ buffer: [CChar]) -> String {
-        String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
-    }
-}
-
-/// Text that came from outside (a file name, a path, a stored value) made fit for a message, a
-/// log line or a dialog: line breaks and control characters cannot draw a second line or hide
-/// what follows, and a very long text is cut.
-internal enum DisplayText {
-    /// `text` on one line, cut after `limit` characters.
-    internal static func oneLine(_ text: String, limit: Int = 200) -> String {
-        var result = String.UnicodeScalarView()
-        var count = 0
-        for scalar in text.unicodeScalars {
-            if count >= limit {
-                result.append("…")
-                break
-            }
-            count += 1
-            switch scalar {
-            case "\n":
-                result.append(contentsOf: "\\n".unicodeScalars)
-
-            case "\r":
-                result.append(contentsOf: "\\r".unicodeScalars)
-
-            case "\t":
-                result.append(contentsOf: "\\t".unicodeScalars)
-
-            default:
-                switch scalar.properties.generalCategory {
-                // The joiners of emoji and of some scripts are format characters too, and harmless.
-                case .format where scalar.value == 0x200C || scalar.value == 0x200D:
-                    result.append(scalar)
-
-                case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate:
-                    result.append(contentsOf: "\\u{\(String(scalar.value, radix: 16, uppercase: true))}".unicodeScalars)
-
-                default:
-                    result.append(scalar)
-                }
-            }
-        }
-        return String(result)
-    }
-}
-
-/// Stands for what questions are asked of in `BlockingCalls`, which counts them by their owner:
-/// only its identity is used.
-internal final class CallOwner: Sendable {
-    deinit {
-        // Nothing to release.
     }
 }

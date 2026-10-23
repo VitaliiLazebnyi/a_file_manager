@@ -98,21 +98,21 @@ internal struct CovSysToolsShell {
             directory: nil
         )
         runner.environment = ["AFM_COVERAGE": "given"]
-        #expect(runner.run(cancellation: CancellationFlag()).output == "given")
+        #expect(runner.run(cancellation: CancellationFlag(), progress: nil).output == "given")
         let bytes = ProcessRunner(
             executable: URL(fileURLWithPath: "/bin/sh"),
             arguments: ["-c", "printf 'a\\377b'"],
             directory: nil
         )
-        #expect(bytes.run(cancellation: CancellationFlag()).output == "a\u{FFFD}b")
+        #expect(bytes.run(cancellation: CancellationFlag(), progress: nil).output == "a\u{FFFD}b")
     }
 
     /// Line breaks, tabs and format characters are written out; the joiners of emoji stay; a long text is cut.
     @Test
     internal func textFromOutsideStaysOnOneLine() {
-        #expect(DisplayText.oneLine("a\rb\tc") == "a\\rb\\tc")
-        #expect(DisplayText.oneLine("x\u{200D}y\u{200C}z") == "x\u{200D}y\u{200C}z")
-        #expect(DisplayText.oneLine("x\u{200B}y") == "x\\u{200B}y")
+        #expect(DisplayText.oneLine("a\rb\tc", limit: 200) == "a\\rb\\tc")
+        #expect(DisplayText.oneLine("x\u{200D}y\u{200C}z", limit: 200) == "x\u{200D}y\u{200C}z")
+        #expect(DisplayText.oneLine("x\u{200B}y", limit: 200) == "x\\u{200B}y")
         #expect(DisplayText.oneLine("abcdef", limit: 3) == "abc…")
     }
 

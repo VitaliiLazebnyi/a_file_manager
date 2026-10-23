@@ -7,50 +7,19 @@ import Testing
 
 @testable import SystemToolsPlugin
 
-/// A drive that is a folder of the sandbox: what it answers and how its ejects go is up to the test.
-///
-/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-private final class StandInDrive: VolumeAccess, @unchecked Sendable {
-    let volume: URL
-    private let lock = NSLock()
-    private var refusals: [EjectRefusal?]
-    private var ejectCount = 0
-
-    var ejects: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return ejectCount
-    }
-
-    init(_ volume: URL, refusals: [EjectRefusal?] = []) {
-        self.volume = volume
-        self.refusals = refusals
-    }
-
-    func facts(of directory: URL) -> VolumeFacts {
-        guard directory.isSameLocation(as: volume) || directory.isInside(volume) else {
-            return VolumeFacts(url: URL(fileURLWithPath: "/"), name: "Macintosh HD")
-        }
-        return VolumeFacts(url: volume, name: "STICK", canBeEjected: true)
-    }
-
-    func eject(_: VolumeFacts) -> EjectRefusal? {
-        lock.lock()
-        defer { lock.unlock() }
-        ejectCount += 1
-        return refusals.isEmpty ? nil : refusals.removeFirst()
-    }
-}
-
 /// Ejecting a drive: the panels leave it for where they came from, the program lets go of it,
 /// and a refusal brings the panels back.
 @MainActor
 @Suite
 internal struct VolumeEjectionTests {
+    /// The folders of the test: `A` and `B` on the Mac, `Stick` the drive.
     internal let box: Sandbox
+    /// The folder that stands for the drive.
     internal let stick: URL
+    /// Where a tab goes that was never anywhere else.
     internal let home = FileManager.default.homeDirectoryForCurrentUser
 
+    /// Makes the folders, the drive with a photo in it.
     internal init() throws {
         box = try Sandbox()
         try box.file("A/one.txt", "1")
@@ -67,9 +36,11 @@ internal struct VolumeEjectionTests {
         )
     }
 
+    /// The panels on the drive go back to where they were before it, a background tab goes home,
+    /// and the user is told the drive can be removed.
     @Test
     internal func thePanelsGoBackToWhereTheyCameFromAndTheUserIsTold() {
-        let drive = StandInDrive(stick)
+        let drive = StandInDrive(stick, refusals: [])
         let (bench, tools) = bench(drive)
         var released: [URL] = []
         bench.kernel.fileSystems.addVolumeReleaser { released.append($0) }
@@ -89,18 +60,20 @@ internal struct VolumeEjectionTests {
         )
     }
 
+    /// With a location, the drive of that location is ejected, whichever panel is active.
     @Test
     internal func theDriveOfAGivenLocationIsEjectedWhicheverPanelIsActive() {
-        let drive = StandInDrive(stick)
+        let drive = StandInDrive(stick, refusals: [])
         let (bench, _) = bench(drive)
         bench.right.show(stick)
         bench.commands.perform(SystemToolsCommands.ejectVolume, .location(stick))
         #expect(bench.right.model.directory.isSameLocation(as: box.url("B")) && drive.ejects == 1)
     }
 
+    /// A drive another program uses is not ejected: the panels come back to it and the user is told who uses it.
     @Test
     internal func aDriveInUseIsNotEjectedAndThePanelsComeBack() {
-        let drive = StandInDrive(stick, refusals: [EjectRefusal(program: "Preview", reason: "The volume is in use.")])
+        let drive = StandInDrive(stick, refusals: [EjectRefusal(reason: "The volume is in use.", program: "Preview")])
         let (bench, tools) = bench(drive)
         bench.left.show(box.url("Stick/photos"))
         bench.commands.perform(SystemToolsCommands.ejectVolume)
@@ -110,11 +83,12 @@ internal struct VolumeEjectionTests {
         )
     }
 
+    /// When this program itself still holds the drive, the eject is tried again a moment later.
     @Test
     internal func whatThisProgramLetGoOfIsGivenAMoment() {
         let drive = StandInDrive(
             stick,
-            refusals: [EjectRefusal(program: "AFileManager", isThisProgram: true, reason: "busy")]
+            refusals: [EjectRefusal(reason: "busy", program: "AFileManager", isThisProgram: true)]
         )
         let (bench, _) = bench(drive)
         bench.left.show(stick)
@@ -122,10 +96,11 @@ internal struct VolumeEjectionTests {
         #expect(drive.ejects == 2 && bench.interaction.log.last == "notice: “STICK” can now be removed safely.")
     }
 
+    /// A pending write that fails stops the eject: the drive stays, and so does the panel on it.
     @Test
     internal func aWriteThatFailsKeepsTheDrive() {
         struct Unwritable: Error {}
-        let drive = StandInDrive(stick)
+        let drive = StandInDrive(stick, refusals: [])
         let (bench, _) = bench(drive)
         let volume = stick
         bench.kernel.fileSystems.addFlusher { url, _ in if url.isSameLocation(as: volume) { throw Unwritable() } }
@@ -135,48 +110,60 @@ internal struct VolumeEjectionTests {
         #expect(bench.left.model.directory.isSameLocation(as: stick))
     }
 
+    /// The start-up disk cannot be ejected, and the panel stays where it is.
     @Test
     internal func theSystemDiskIsNotEjected() {
-        let drive = StandInDrive(stick)
+        let drive = StandInDrive(stick, refusals: [])
         let (bench, _) = bench(drive)
         bench.commands.perform(SystemToolsCommands.ejectVolume)
         #expect(drive.ejects == 0 && bench.interaction.log.last == "inform: Macintosh HD cannot be ejected.")
         #expect(bench.left.model.directory.isSameLocation(as: box.url("A")))
     }
 
+    /// Only drives that can leave the Mac (sticks, cards, disk images, external disks, shares) may be ejected.
     @Test
     internal func onlyDrivesThatLeaveTheMacCanBeEjected() {
+        let (yes, never, unknown) = (Place.Fact.known(true), Place.Fact.known(false), Place.Fact.unknown)
         func ejectable(
             _ path: String,
-            root: Bool? = false,
-            internal inside: Bool?,
-            local: Bool? = true,
-            removable: Bool? = false,
-            ejectable: Bool? = false
+            internal inside: Place.Fact,
+            root: Place.Fact = .known(false),
+            local: Place.Fact = .known(true),
+            removable: Place.Fact = .known(false),
+            ejectable: Place.Fact = .known(false)
         ) -> Bool {
-            func fact(_ value: Bool?) -> Place.Fact { value.map(Place.Fact.known) ?? .unknown }
             var traits = Place.VolumeTraits(path: path, values: nil)
-            (traits.isRootFileSystem, traits.isInternal, traits.isLocal) = (fact(root), fact(inside), fact(local))
-            (traits.isRemovable, traits.isEjectable) = (fact(removable), fact(ejectable))
+            (traits.isRootFileSystem, traits.isInternal, traits.isLocal) = (root, inside, local)
+            (traits.isRemovable, traits.isEjectable) = (removable, ejectable)
             return traits.mayBeEjected
         }
         // Never: the start-up disk, a system volume, a second disk or partition inside the Mac,
         // or a disk the system says nothing about.
-        #expect(!ejectable("/", root: true, internal: true))
-        #expect(!ejectable("/System/Volumes/Data", internal: true))
-        #expect(!ejectable("/Volumes/Archive", internal: true))
-        #expect(!ejectable("/Volumes/Mystery", root: nil, internal: nil, local: nil, removable: nil, ejectable: nil))
+        #expect(!ejectable("/", internal: yes, root: yes))
+        #expect(!ejectable("/System/Volumes/Data", internal: yes))
+        #expect(!ejectable("/Volumes/Archive", internal: yes))
+        #expect(
+            !ejectable(
+                "/Volumes/Mystery",
+                internal: unknown,
+                root: unknown,
+                local: unknown,
+                removable: unknown,
+                ejectable: unknown
+            )
+        )
         // Yes: a USB stick, a card in the Mac's reader, a disk image, an external disk, a share.
-        #expect(ejectable("/Volumes/STICK", internal: false, removable: true, ejectable: true))
-        #expect(ejectable("/Volumes/CARD", internal: true, removable: true))
-        #expect(ejectable("/Volumes/Installer", internal: nil, ejectable: true))
-        #expect(ejectable("/Volumes/Backup", internal: false))
-        #expect(ejectable("/Volumes/Public", internal: nil, local: false))
+        #expect(ejectable("/Volumes/STICK", internal: never, removable: yes, ejectable: yes))
+        #expect(ejectable("/Volumes/CARD", internal: yes, removable: yes))
+        #expect(ejectable("/Volumes/Installer", internal: unknown, ejectable: yes))
+        #expect(ejectable("/Volumes/Backup", internal: never))
+        #expect(ejectable("/Volumes/Public", internal: unknown, local: never))
     }
 
+    /// A panel's history tells the last folder it showed outside the drive.
     @Test
     internal func theHistoryKnowsWhereThePanelWasBeforeTheDrive() {
-        let (bench, _) = bench(StandInDrive(stick))
+        let (bench, _) = bench(StandInDrive(stick, refusals: []))
         #expect(bench.left.model.lastVisited { _ in true } == nil)
         for folder in ["B", "Stick", "Stick/photos"] { bench.left.show(box.url(folder)) }
         let volume = stick
