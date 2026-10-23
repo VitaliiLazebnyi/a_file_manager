@@ -5,11 +5,12 @@ import Foundation
 /// The directory history: Alt+Down and Alt+Shift+Down, and saving and deleting the histories.
 extension PlacesPlugin {
     /// Alt+Down, Alt+Shift+Down and the "Save now" and "Delete now" of the history page.
-    internal func registerHistoryCommands(in kernel: Kernel, tracker: DirectoryHistoryTracker) {
+    internal func registerHistoryCommands(in owner: Kernel, tracker: DirectoryHistoryTracker) {
+        // The kernel keeps the commands; they must not keep it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         let settings = kernel.settings
-        commands.register(Command(.directoryHistory, "Directory History…", [Shortcut(.downArrow, .option)])) {
-            [self, unowned kernel] in
+        commands.register(Command(.directoryHistory, "Directory History…", [Shortcut(.downArrow, .option)])) { [self] in
             showHistory(
                 in: kernel,
                 tracker: tracker,
@@ -24,7 +25,7 @@ extension PlacesPlugin {
                 "Directory History (All Folders)…",
                 [Shortcut(.downArrow, [.option, .shift])]
             )
-        ) { [self, unowned kernel] in
+        ) { [self] in
             showHistory(in: kernel, tracker: tracker, thinning: false, limited: false, selected: nil)
         }
         commands.register(Command(.saveDirectoryHistory, "Save Directory History Now", runsDuringJobs: true)) {

@@ -172,18 +172,19 @@ public final class PlacesPlugin: Plugin {
     }
 
     /// Ctrl+D, the hotlist toggle and the hotlist editor.
-    private func registerHotlistCommands(in kernel: Kernel) {
+    private func registerHotlistCommands(in owner: Kernel) {
+        // The kernel keeps the commands; they must not keep it in turn.
+        unowned let kernel = owner
         let commands = kernel.commands
         commands.register(
             Command(.directoryHotlist, "Directory Hotlist…", [Shortcut(.character("d"), .control)])
-        ) { [self, unowned kernel] in
+        ) { [self] in
             showHotlist(in: kernel)
         }
-        commands.register(Command(.toggleHotlistEntry, "Add or Remove Current Directory in Hotlist")) {
-            [self, unowned kernel] in
+        commands.register(Command(.toggleHotlistEntry, "Add or Remove Current Directory in Hotlist")) { [self] in
             toggleCurrentDirectory(at: [], in: kernel)
         }
-        commands.register(Command(.configureHotlist, "Configure Directory Hotlist…")) { [self, unowned kernel] in
+        commands.register(Command(.configureHotlist, "Configure Directory Hotlist…")) { [self] in
             configureHotlist(in: kernel)
         }
     }
