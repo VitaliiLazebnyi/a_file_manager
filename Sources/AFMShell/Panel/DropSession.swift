@@ -1,5 +1,4 @@
 import AFMContracts
-import AFMKernel
 import Foundation
 
 /// What a drag carries and where its sources are, worked out once for the whole drag: the mouse
@@ -90,8 +89,9 @@ internal final class DropSession {
             places = DragSources(sources)
             return
         }
+        let dragged = sources
         Background.compute(
-            work: { [sources] in DragSources(sources) },
+            work: { DragSources(dragged) },
             then: { [weak self] places in self?.settle(places) }
         )
     }

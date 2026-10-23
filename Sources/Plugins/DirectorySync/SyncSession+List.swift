@@ -148,8 +148,12 @@ extension SyncSession {
             status = "Preparing the list of \(rows.count) files…"
         }
         changed()
-        startWorker("Synchronize directories: list") { [weak self, rows, show, sort] in
-            let layout = Self.layout(rows: rows, show: show, sort: sort)
+        // The list as it is now: the rows and the choices may change while the layout is made.
+        let listed = rows
+        let shown = show
+        let order = sort
+        startWorker("Synchronize directories: list") { [weak self] in
+            let layout = Self.layout(rows: listed, show: shown, sort: order)
             DispatchQueue.main.async { [weak self] in
                 guard let self, layoutGeneration == generation else {
                     return

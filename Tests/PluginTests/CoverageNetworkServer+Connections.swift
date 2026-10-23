@@ -1,5 +1,3 @@
-import Foundation
-
 @testable import NetworkPlugin
 
 /// Scripts made of fixed answers, connections to the server, and what errors carry.

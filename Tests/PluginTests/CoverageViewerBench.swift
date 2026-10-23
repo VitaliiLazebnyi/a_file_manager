@@ -1,5 +1,4 @@
 import AFMKernel
-import AFMShell
 import AppKit
 import LocalFileSystemPlugin
 import TestSupport

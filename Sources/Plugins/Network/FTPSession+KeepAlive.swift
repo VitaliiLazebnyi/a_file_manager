@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// The keep-alive of the idle connections.

@@ -1,7 +1,5 @@
-import AFMContracts
 public import AFMKernel
 public import Foundation
-import os
 
 /// One file operation (spec 07 › Job sequence, 20 › File-operation job).
 ///

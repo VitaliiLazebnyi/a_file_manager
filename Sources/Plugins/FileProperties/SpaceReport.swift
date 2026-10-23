@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import Foundation
 
 /// The wording of the result box of Calculate Occupied Space.
 internal enum SpaceReport {

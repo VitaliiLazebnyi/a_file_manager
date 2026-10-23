@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+import Dispatch
 
 /// Work of an archive job that runs on another thread while the job's thread keeps reporting.
 internal enum Background {

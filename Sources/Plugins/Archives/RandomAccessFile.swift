@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// A file on the local disk that is read at any position, from any number of threads at once

@@ -1,5 +1,3 @@
-import Foundation
-
 /// The three ways bytes are laid out in rows (spec 10 › Display modes 1–3; Unicode and UTF-8
 /// are text in another encoding).
 internal enum ViewerLayout: Equatable {

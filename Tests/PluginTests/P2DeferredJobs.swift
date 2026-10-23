@@ -1,6 +1,4 @@
-import AFMContracts
 import AFMKernel
-import Foundation
 
 /// Runs the work of a job at once, on the calling thread, and keeps its completion until
 /// `deliver()`: the time in which the user goes on working while a job is under way.

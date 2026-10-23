@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 
@@ -76,8 +75,6 @@ internal final class Selections {
 
     /// Lists longer than this are worked on off the main thread.
     internal static let longList = 20_000
-    /// How many names are applied to the model in one piece of main-thread work.
-    internal static let applyPiece = 20_000
 
     /// How often a result that the list outgrew is worked out again before it is given up.
     internal static let attempts = 8

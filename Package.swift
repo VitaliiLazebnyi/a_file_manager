@@ -113,7 +113,8 @@ private let kTestTargets: [Target] = [
     )
 ]
 
-private let kPackage = Package(
+// The package. SwiftPM keeps the value that `Package(...)` makes; nothing refers to it by name.
+_ = Package(
     name: "AFileManager",
     platforms: [.macOS(.v14)],
     dependencies: [

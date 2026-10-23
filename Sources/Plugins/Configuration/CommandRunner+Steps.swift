@@ -1,6 +1,6 @@
 import AFMContracts
 import AFMKernel
-import Foundation
+import Dispatch
 
 /// Performing the steps of a command one after the other, across waits.
 extension CommandRunner {

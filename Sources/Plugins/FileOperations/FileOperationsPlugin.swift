@@ -1,7 +1,6 @@
 import AFMContracts
 public import AFMKernel
 import AppKit
-import Foundation
 
 /// Copy, move, rename, new folder, new file and delete (spec 07 › File operations), the
 /// Copy/Delete and Log file pages of the configuration, and the operation log.

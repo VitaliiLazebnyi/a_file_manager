@@ -1,5 +1,4 @@
 import AFMContracts
-import AFMKernel
 import Foundation
 
 /// How the plugin's dialogs and messages write names, modes, sizes and dates.

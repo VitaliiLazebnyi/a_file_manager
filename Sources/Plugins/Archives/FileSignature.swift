@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// What identifies the state of a file on disk: when any of it changes, the file was rewritten.

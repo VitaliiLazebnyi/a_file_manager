@@ -1,6 +1,6 @@
 import AFMKernel
 import AppKit
-import Quartz
+import QuickLookUI
 
 /// Feeds the system's Quick Look panel with the files of the active panel.
 ///

@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// The masks of Select group / Unselect group (spec 18 › File masks and selection types):

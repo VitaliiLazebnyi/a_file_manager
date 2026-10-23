@@ -1,6 +1,6 @@
 import AFMContracts
 public import AFMKernel
-import Foundation
+import Dispatch
 
 /// The Show menu: the view of the file list, the plugin columns, which files are listed, the
 /// sort order and hidden files (spec 03 › View types, 03 › Custom columns, 03 › Display

@@ -1,6 +1,3 @@
-import AFMKernel
-import Foundation
-
 /// "Only files of this type" of the Copy and Move dialogs (spec 07 › Only files of this type):
 /// `include-masks | exclude-masks`, masks separated by spaces, a name with spaces in double
 /// quotes.

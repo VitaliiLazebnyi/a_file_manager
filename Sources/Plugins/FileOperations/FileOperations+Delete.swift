@@ -1,6 +1,4 @@
-import AFMContracts
 import AFMKernel
-import Foundation
 
 /// Delete: to the Trash or for good (spec 07 › Delete).
 extension FileOperations {

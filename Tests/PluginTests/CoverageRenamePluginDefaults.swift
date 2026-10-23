@@ -1,7 +1,6 @@
 import AFMContracts
 import AFMKernel
-import AppKit
-import LocalFileSystemPlugin
+import Foundation
 import TestSupport
 import Testing
 

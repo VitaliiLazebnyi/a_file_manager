@@ -1,4 +1,3 @@
-import AFMKernel
 import AppKit
 
 /// The rule rows of the Plugins tab.

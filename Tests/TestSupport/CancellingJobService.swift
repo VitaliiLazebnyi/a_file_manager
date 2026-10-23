@@ -98,8 +98,9 @@ public final class CancellingJobService: JobService, ShellServices {
     ) {
         titles.append(title)
         isBusy = true
-        let job: @MainActor () -> Void = { [moment] in
-            let result = work(Monitor(moment))
+        let when = moment
+        let job: @MainActor () -> Void = {
+            let result = work(Monitor(when))
             self.isBusy = false
             completion(result)
         }

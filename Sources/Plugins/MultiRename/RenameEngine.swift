@@ -1,5 +1,3 @@
-import Foundation
-
 /// The whole rename pipeline for one set of settings (spec 09 › Rename pipeline): masks, then
 /// Search & Replace, then the case conversion.
 ///

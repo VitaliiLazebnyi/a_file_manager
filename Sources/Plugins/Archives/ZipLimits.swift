@@ -1,5 +1,3 @@
-import Foundation
-
 /// Above these values ZIP needs its 64-bit extension (ZIP64).
 ///
 /// They are parameters so that the rules can be tested without files of four gigabytes.

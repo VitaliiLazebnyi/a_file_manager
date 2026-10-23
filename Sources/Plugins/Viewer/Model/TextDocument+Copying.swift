@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// The text of a part of the file, for the clipboard.
 extension TextDocument {

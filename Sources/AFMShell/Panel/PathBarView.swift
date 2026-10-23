@@ -1,4 +1,3 @@
-import AFMKernel
 import AppKit
 
 /// The current-directory bar: the path with the display mask, coloured by whether its panel is the

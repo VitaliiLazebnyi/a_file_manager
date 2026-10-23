@@ -1,6 +1,5 @@
-import AFMContracts
 import AFMKernel
-import AppKit
+import CoreFoundation
 import Testing
 
 @testable import AFMShell

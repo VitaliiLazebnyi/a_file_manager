@@ -1,8 +1,6 @@
 import AFMKernel
 import Foundation
 
-@testable import ArchivesPlugin
-
 /// A monitor for packing and unpacking outside a job service.
 ///
 /// Unchecked: the reports are guarded by `lock`.

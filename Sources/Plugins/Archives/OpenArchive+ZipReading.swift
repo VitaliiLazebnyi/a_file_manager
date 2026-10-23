@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// Reading the members of a ZIP.

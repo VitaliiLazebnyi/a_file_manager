@@ -1,5 +1,4 @@
 import CoreServices
-import Foundation
 
 /// What the directory watcher asks of the system: a stream for one folder, and how many
 /// descriptors the process has to spare.

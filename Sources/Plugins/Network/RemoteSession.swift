@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// A live connection to one server, whatever protocol it speaks.
 ///

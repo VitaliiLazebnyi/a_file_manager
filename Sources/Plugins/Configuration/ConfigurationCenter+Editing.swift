@@ -1,7 +1,5 @@
-import AFMContracts
 import AFMKernel
-import AFMShell
-import AppKit
+import Foundation
 
 /// The definition dialogs of user commands and Start-menu entries, and the Start menu as a draft.
 extension ConfigurationCenter {

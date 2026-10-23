@@ -1,4 +1,4 @@
-import Foundation
+import Dispatch
 
 /// The queues the work for one document runs on, so that a read that never returns (a share that
 /// stopped answering) holds up that document only, not the next file shown.

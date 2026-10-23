@@ -1,5 +1,4 @@
 import AFMContracts
-import Foundation
 
 /// Why a copy was not made, and what the pane says about it.
 extension TemporaryCopies {

@@ -1,6 +1,4 @@
-import AFMContracts
 import AFMKernel
-import AFMShell
 import AppKit
 
 /// What the configuration windows and commands share: the user's commands and Start menu, the

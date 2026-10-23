@@ -1,4 +1,3 @@
-import AFMContracts
 import Testing
 
 @testable import AFMShell

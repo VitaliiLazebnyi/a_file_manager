@@ -1,7 +1,5 @@
-import AFMContracts
 import AFMKernel
-import AFMShell
-import AppKit
+import Foundation
 
 /// The settings as a whole: their schema, export, import and reset.
 extension ConfigurationCenter {

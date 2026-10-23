@@ -1,7 +1,6 @@
 import AFMContracts
 import AFMKernel
 import AppKit
-import TestSupport
 import Testing
 
 @testable import AFMShell

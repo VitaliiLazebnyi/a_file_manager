@@ -1,5 +1,4 @@
 public import AFMKernel
-import AppKit
 import Foundation
 
 /// The places the user goes to: home and its usual folders, and the mounted volumes.

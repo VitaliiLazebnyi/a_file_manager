@@ -1,8 +1,7 @@
-import AFMContracts
 import AFMKernel
 import AppKit
 import LocalFileSystemPlugin
-import Quartz
+import QuickLookUI
 import TestSupport
 import Testing
 

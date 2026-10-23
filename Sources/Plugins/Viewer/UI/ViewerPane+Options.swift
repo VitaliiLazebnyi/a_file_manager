@@ -1,5 +1,6 @@
 import AFMKernel
-import AppKit
+import CoreFoundation
+import Foundation
 
 /// The Options and Encoding menus: the font, the encoding, the zoom and the fitting of images.
 extension ViewerPane {

@@ -63,8 +63,9 @@ public final class Kernel {
             work: @escaping @Sendable (any JobMonitor) -> Result,
             completion: @escaping @MainActor (Result) -> Void
         ) {
-            service.run(title: title, work: work) { [weak kernel] result in
-                if kernel != nil { completion(result) }
+            weak let owner = kernel
+            service.run(title: title, work: work) { result in
+                if owner != nil { completion(result) }
             }
         }
 

@@ -1,7 +1,6 @@
 import AFMContracts
 import AFMKernel
 import Foundation
-import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
@@ -18,10 +17,6 @@ internal struct CompareContentEditing {
 
     /// The two folders.
     private var memory: MemoryFileSystem { fixture.memory }
-    /// The plugin.
-    private var plugin: CompareContentPlugin { fixture.plugin }
-    /// The settings of the bench.
-    private var settings: MemorySettings { fixture.settings }
     /// The kernel with the plugin.
     private var bench: TestBench { fixture.bench }
     /// The scripted answers of the user, and what was asked.

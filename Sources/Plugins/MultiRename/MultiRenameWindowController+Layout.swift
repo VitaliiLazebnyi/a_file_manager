@@ -1,4 +1,3 @@
-import AFMKernel
 import AppKit
 
 /// The content of the window: the four groups of fields, the menus, the list and the buttons.

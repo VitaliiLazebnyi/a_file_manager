@@ -1,5 +1,3 @@
-import Foundation
-
 /// What the index keeps of the rows of a text.
 extension TextRowIndex {
     /// A row whose start is kept: every `stride`th row of a segment.

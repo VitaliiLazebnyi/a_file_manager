@@ -1,5 +1,3 @@
-import Foundation
-
 /// The system's Quick Look panel, as `QuickLookController` uses it.
 @MainActor
 internal protocol PreviewPanel: AnyObject {

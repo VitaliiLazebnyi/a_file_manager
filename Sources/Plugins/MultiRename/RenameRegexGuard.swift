@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// Counts the names a regular expression of Search & Replace ran out of time on.

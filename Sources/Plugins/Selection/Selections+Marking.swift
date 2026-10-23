@@ -1,6 +1,5 @@
-import AFMContracts
 import AFMKernel
-import AppKit
+import Foundation
 
 /// Select all, Invert selection, the commands that go by the item under the cursor, and steps.
 extension Selections {

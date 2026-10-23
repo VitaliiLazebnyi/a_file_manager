@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// The optional parts of a GZIP header: the original file name and time.

@@ -1,10 +1,6 @@
 import AFMContracts
 import AFMKernel
-import FileOperationsPlugin
 import Foundation
-import LocalFileSystemPlugin
-import MacIntegrationPlugin
-import NavigationPlugin
 import TestSupport
 import Testing
 
@@ -19,8 +15,6 @@ internal struct ArchivesPackCommandTests {
 
     /// The sandbox that holds `A` and `B`.
     private var box: Sandbox { fixture.box }
-    /// The plugin under test.
-    private var archives: ArchivesPlugin { fixture.archives }
     /// The kernel with the plugins and the two panels.
     private var bench: TestBench { fixture.bench }
     /// The commands of the kernel.

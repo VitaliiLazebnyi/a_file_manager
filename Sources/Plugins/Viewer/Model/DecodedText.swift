@@ -1,5 +1,3 @@
-import Foundation
-
 /// Decoded text with, for every UTF-16 unit, the position of the byte it came from.
 ///
 /// The positions are what let a place in the shown text be found in the file again (selection,

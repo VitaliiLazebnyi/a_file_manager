@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
@@ -21,8 +20,6 @@ internal struct Review2FileopsP2DataLossTests {
         private let lock = NSLock()
         private var messages: [String] = []
         let conflict: ConflictChoice
-
-        var errors: [String] { lock.withLock { messages } }
 
         init(conflict: ConflictChoice) { self.conflict = conflict }
 

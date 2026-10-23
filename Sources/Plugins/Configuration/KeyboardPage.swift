@@ -1,5 +1,4 @@
 import AFMKernel
-import AFMShell
 import AppKit
 
 /// Redefine hotkeys (spec 14 › Redefining hotkeys and aliases; 06 › Redefining keys): every

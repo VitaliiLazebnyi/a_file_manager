@@ -1,5 +1,3 @@
-import Foundation
-
 /// How the converter finds tags and tells their kinds.
 extension HTMLText {
     /// What a tag name stands for.

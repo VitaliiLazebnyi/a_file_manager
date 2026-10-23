@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// Which file a local path really is: the device and inode, which are the same for a hard

@@ -1,6 +1,6 @@
 import AFMKernel
 import AppKit
-import Quartz
+import QuickLookUI
 
 /// Opening a file or a folder in the background, and the mode a file opens in.
 extension ViewerPane {

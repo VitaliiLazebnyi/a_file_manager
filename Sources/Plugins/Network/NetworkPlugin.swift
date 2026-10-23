@@ -1,6 +1,5 @@
 import AFMContracts
 public import AFMKernel
-import Foundation
 
 /// FTP, FTP over TLS and SFTP servers as file systems, the connection dialogs, the download
 /// list, and mounting network volumes (spec 11).

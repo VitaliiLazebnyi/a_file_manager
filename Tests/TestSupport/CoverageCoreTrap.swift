@@ -1,4 +1,4 @@
-import Foundation
+import Darwin
 
 /// For exit tests of a `preconditionFailure` or `fatalError`: the counts of a process that a trap ends.
 ///

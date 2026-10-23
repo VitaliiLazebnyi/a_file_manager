@@ -1,5 +1,4 @@
 import CoreGraphics
-import Foundation
 
 /// The frame scaled to the size it is shown at, so that scrolling and resizing a large image do
 /// not resample all of it again at every draw.

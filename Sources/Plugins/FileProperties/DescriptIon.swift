@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// The file comments of one folder, as Total Commander keeps them in `descript.ion`

@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// ASCII needles in the raw bytes.

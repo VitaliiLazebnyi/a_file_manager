@@ -130,6 +130,7 @@ internal final class FileOperations: FileTransferService {
     ) {
         let record = recorder()
         let wantsRecord = recordFilter()
+        let operationLog = log
         kernel.jobs.run(
             title: title,
             work: { [interaction, fileSystems] monitor -> (JobResult, Summary) in
@@ -150,8 +151,8 @@ internal final class FileOperations: FileTransferService {
                 }
                 return (result, summary(result))
             },
-            completion: { [interaction, log] result, summary in
-                log?.flushSoon()
+            completion: { [interaction] result, summary in
+                operationLog?.flushSoon()
                 if let refusal = result.refusal, !refusal.isEmpty {
                     interaction.inform(refusal, detail: "", style: .warning)
                 }

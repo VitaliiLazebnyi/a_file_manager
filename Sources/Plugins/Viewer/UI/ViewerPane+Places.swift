@@ -1,5 +1,5 @@
 import AFMKernel
-import AppKit
+import Foundation
 
 /// Going to a place: a position in percent (or the zoom of an image), an offset, a line.
 extension ViewerPane {

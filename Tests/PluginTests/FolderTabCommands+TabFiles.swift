@@ -1,10 +1,7 @@
-import AFMContracts
 import AFMKernel
 import Foundation
 import TestSupport
 import Testing
-
-@testable import FolderTabsPlugin
 
 /// Saving and loading tab files through the commands.
 extension FolderTabCommands {

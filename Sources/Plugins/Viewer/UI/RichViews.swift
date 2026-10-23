@@ -1,6 +1,6 @@
 import AppKit
 import PDFKit
-import Quartz
+import QuickLookUI
 
 /// Factories for the views that need no class of their own.
 @MainActor

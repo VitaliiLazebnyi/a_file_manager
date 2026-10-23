@@ -1,5 +1,4 @@
 public import AFMKernel
-import Foundation
 
 /// The names of the Mark commands that only this plugin uses (spec 17 › Command catalogue);
 /// the ones other plugins and the shell refer to are in the shared vocabulary.

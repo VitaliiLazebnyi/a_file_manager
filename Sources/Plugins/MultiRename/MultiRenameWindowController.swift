@@ -1,6 +1,4 @@
-import AFMContracts
 import AFMKernel
-import AFMShell
 import AppKit
 
 /// The window of the Multi-Rename Tool (spec 09 › Window and scope).

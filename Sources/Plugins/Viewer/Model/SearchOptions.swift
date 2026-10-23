@@ -1,5 +1,3 @@
-import Foundation
-
 /// The switches of the Find dialog (spec 10 › Find dialog); all off by default.
 internal struct SearchOptions: Equatable, Codable {
     /// Only whole words: a match must not be part of a longer word.

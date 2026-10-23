@@ -129,8 +129,9 @@ internal final class ConfigurationStore {
         let message =
             list.map { "\($0.skipped) of the stored \(what) could not be read and were left out." }
             ?? "The stored \(what) could not be read."
-        MainLoop.perform { [onProblem] in
-            onProblem?(message + " The original data is kept in the setting “\(Self.owner).\(backup)”.")
+        let report = onProblem
+        MainLoop.perform {
+            report?(message + " The original data is kept in the setting “\(Self.owner).\(backup)”.")
         }
         return list?.elements ?? []
     }

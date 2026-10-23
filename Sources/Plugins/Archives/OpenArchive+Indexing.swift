@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// Reading the directory of a ZIP file and the headers of a TAR stream.

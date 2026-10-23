@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// The converter that `plainText` runs over a page.
 extension HTMLText {

@@ -1,6 +1,3 @@
-import AFMKernel
-import Foundation
-
 /// The choices of the Copy and Move dialogs and of the Copy/Delete configuration page that
 /// the engine acts on (spec 07 › Copy dialog, Advanced options; 13 › Operation › Copy/Delete).
 ///

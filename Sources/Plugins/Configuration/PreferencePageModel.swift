@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// A page of the Options window while it is open (spec 13 › The dialog framework): the values
 /// the user sees, which reach the settings only with Apply or OK. Main thread only.

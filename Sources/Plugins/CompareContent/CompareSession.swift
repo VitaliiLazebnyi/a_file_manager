@@ -178,17 +178,22 @@ internal final class CompareSession {
             completion(false)
             return
         }
+        // The choices as they are now: they may change while the files load.
+        let asBinary = forceBinary
+        let textOptions = options
+        let rowWidth = bytesPerLine
+        let loadLimits = limits
         background(
-            { [fileSystems, forceBinary, options, bytesPerLine, limits] cancellation in
+            { [fileSystems] cancellation in
                 CompareLoader.load(
                     left: leftURL,
                     right: rightURL,
                     fileSystems: fileSystems,
-                    forceBinary: forceBinary,
-                    options: options,
-                    bytesPerLine: bytesPerLine,
+                    forceBinary: asBinary,
+                    options: textOptions,
+                    bytesPerLine: rowWidth,
                     cancellation: cancellation,
-                    limits: limits
+                    limits: loadLimits
                 )
             },
             finish: { [self, interaction = kernel.interaction] result, wasCancelled in
@@ -250,9 +255,10 @@ internal final class CompareSession {
             return
 
         case .binary(let left, let right, _):
+            let rowWidth = bytesPerLine
             background(
-                { [bytesPerLine] cancellation in
-                    BinaryDiff.compute(left: left, right: right, bytesPerLine: bytesPerLine, cancellation: cancellation)
+                { cancellation in
+                    BinaryDiff.compute(left: left, right: right, bytesPerLine: rowWidth, cancellation: cancellation)
                 },
                 finish: { [self] diff, cancelled in
                     show(.binary(left: left, right: right, diff: diff), cancelled: cancelled)
@@ -260,12 +266,14 @@ internal final class CompareSession {
             )
 
         case .text(let left, let right, _, let width):
-            let work: @Sendable (CancellationFlag?) -> CompareContent = { [options, anchors] cancellation in
+            let textOptions = options
+            let textAnchors = anchors
+            let work: @Sendable (CancellationFlag?) -> CompareContent = { cancellation in
                 CompareLoader.text(
                     left: left,
                     right: right,
-                    options: options,
-                    anchors: anchors,
+                    options: textOptions,
+                    anchors: textAnchors,
                     cancellation: cancellation
                 )
             }

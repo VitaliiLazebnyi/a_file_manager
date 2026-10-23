@@ -1,5 +1,3 @@
-import Foundation
-
 /// The parts of an import the user is asked about: their checkbox titles and what they hold.
 extension SettingsImportPlan {
     /// The part of `group` made of `keys`, with at most 200 lines of what it holds.

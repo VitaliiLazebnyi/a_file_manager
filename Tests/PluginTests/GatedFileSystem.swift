@@ -20,9 +20,6 @@ internal final class GatedFileSystem: FileSystemProvider, @unchecked Sendable {
     private var waits = false
     private var count = 0
 
-    /// How many reads were opened.
-    internal var reads: Int { lock.withLock { count } }
-
     /// Makes the next read wait at `gate` after it has opened its reader.
     internal func holdNextRead() { lock.withLock { waits = true } }
 

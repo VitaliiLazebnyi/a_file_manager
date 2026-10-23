@@ -1,4 +1,3 @@
-import AFMKernel
 import Compression
 import Foundation
 import TestSupport

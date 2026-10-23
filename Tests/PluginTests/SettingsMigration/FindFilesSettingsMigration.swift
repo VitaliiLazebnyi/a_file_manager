@@ -1,4 +1,3 @@
-import AFMKernel
 import FindFilesPlugin
 import Foundation
 import TestSupport

@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import FileOperationsPlugin
 import Foundation

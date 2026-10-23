@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// Finding out in the background where the links of a listing lead.

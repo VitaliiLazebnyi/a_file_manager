@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+import Dispatch
 
 /// Where things that wait for a file system are done that nobody is waiting for: closing the
 /// readers of a file that is no longer shown (an SFTP or FTP close is a request to the server

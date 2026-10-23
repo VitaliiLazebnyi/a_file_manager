@@ -59,7 +59,8 @@ extension ViewerPane {
             return
         }
         let info = printInfo()
-        let run = { [dialogs] (operation: NSPrintOperation) in dialogs.run(operation, sheetOf: window) }
+        let paneDialogs = dialogs
+        let run = { (operation: NSPrintOperation) in paneDialogs.run(operation, sheetOf: window) }
         if let frame = imageView?.currentFrame {
             run(NSPrintOperation(view: printableImage(frame, on: info), printInfo: info))
         } else if let pdfView {

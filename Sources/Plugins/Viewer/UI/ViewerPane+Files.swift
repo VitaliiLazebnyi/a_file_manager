@@ -1,6 +1,6 @@
 import AFMContracts
 import AFMKernel
-import AppKit
+import Foundation
 
 /// The File menu: open another file, save what is shown under another name, edit it.
 extension ViewerPane {

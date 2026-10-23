@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// One pass of `ParameterExpander` over a text.
 ///

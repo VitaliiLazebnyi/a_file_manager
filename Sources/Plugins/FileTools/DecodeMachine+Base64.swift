@@ -1,5 +1,3 @@
-import Foundation
-
 /// Base64: the digits of the lines collected and decoded four at a time, up to the padding, a boundary or the
 /// next file.
 extension DecodeMachine {

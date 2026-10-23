@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// `*` and `?` matching as file masks use it (spec 18 › Core syntax).
 internal enum Wildcard {

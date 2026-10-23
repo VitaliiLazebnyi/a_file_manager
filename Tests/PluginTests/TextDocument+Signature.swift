@@ -1,5 +1,3 @@
-import Foundation
-
 @testable import ViewerPlugin
 
 /// The rows of a document in one comparable value, for the tests that index a text in more than one way.

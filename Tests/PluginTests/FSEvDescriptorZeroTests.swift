@@ -1,5 +1,3 @@
-import AFMKernel
-import CoreServices
 import Foundation
 import TestSupport
 import Testing

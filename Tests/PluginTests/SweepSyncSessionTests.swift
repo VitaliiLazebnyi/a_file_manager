@@ -1,5 +1,5 @@
 import AFMKernel
-import Foundation
+import Dispatch
 import TestSupport
 import Testing
 

@@ -1,4 +1,3 @@
-import AFMKernel
 import AppKit
 
 /// The histories of the text fields, and the box that needs a selection.

@@ -12,8 +12,6 @@ internal final class ViewerRemoteLike: ByteSource {
     internal var length: Int64 { Int64(data.count) }
     /// The bytes read from the file so far.
     internal var fetched: Int64 { counter.value.bytes }
-    /// The reads made so far.
-    internal var requests: Int { counter.value.requests }
 
     /// A file of these bytes, nothing read from it yet.
     internal init(_ data: Data) { self.data = data }

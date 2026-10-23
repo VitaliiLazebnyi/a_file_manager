@@ -1,4 +1,3 @@
-import AFMKernel
 import AppKit
 
 /// The pages of the form and the options that are offered only while their main option is ticked.

@@ -1,7 +1,7 @@
 import AFMContracts
 public import AFMKernel
 import AFMShell
-public import AppKit
+public import Foundation
 
 /// The configuration dialog, hotkeys, button bar and user commands (spec 13, 14), the settings
 /// as a whole (spec 19 › What is saved when) and the Help menu.

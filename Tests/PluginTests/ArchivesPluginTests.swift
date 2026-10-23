@@ -1,10 +1,7 @@
 import AFMContracts
 import AFMKernel
-import FileOperationsPlugin
 import Foundation
-import LocalFileSystemPlugin
 import MacIntegrationPlugin
-import NavigationPlugin
 import TestSupport
 import Testing
 
@@ -22,8 +19,6 @@ internal struct ArchivesPluginTests {
     private var box: Sandbox { fixture.box }
     /// The Mac integration, which notes what it would open.
     private var mac: MacIntegrationPlugin { fixture.mac }
-    /// The plugin under test.
-    private var archives: ArchivesPlugin { fixture.archives }
     /// The settings of the bench.
     private var settings: MemorySettings { fixture.settings }
     /// The kernel with the plugins and the two panels.

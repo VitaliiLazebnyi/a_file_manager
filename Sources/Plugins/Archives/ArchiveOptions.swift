@@ -1,6 +1,3 @@
-import AFMKernel
-import Foundation
-
 /// The options of the Packer page as the working threads see them.
 ///
 /// The settings store belongs to the main thread; this copy is refreshed there and read anywhere.

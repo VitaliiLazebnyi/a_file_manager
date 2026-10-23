@@ -1,5 +1,4 @@
 import Foundation
-import TestSupport
 
 @testable import ArchivesPlugin
 

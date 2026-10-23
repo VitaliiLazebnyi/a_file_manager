@@ -34,7 +34,6 @@ internal enum ZipDirectory {
         internal var isZip64: Bool
     }
 
-    private static let endSignature: UInt32 = 0x0605_4B50
     private static let end64Signature: UInt32 = 0x0606_4B50
     private static let locator64Signature: UInt32 = 0x0706_4B50
     private static let centralSignature: UInt32 = 0x0201_4B50

@@ -1,5 +1,3 @@
-import Foundation
-
 /// The segments an index has published, and how a row, an offset or a line is found in them.
 extension TextRowIndex {
     /// A segment that was read (or failed), waiting for those before it to be published.

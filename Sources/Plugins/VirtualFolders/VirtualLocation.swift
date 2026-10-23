@@ -1,4 +1,3 @@
-import AFMKernel
 public import Foundation
 
 /// What a `vfolder:` URL stands for. Everything a virtual folder needs to find its way back to

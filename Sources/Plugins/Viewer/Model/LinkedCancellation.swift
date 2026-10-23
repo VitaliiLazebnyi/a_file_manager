@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// A flag that is set when any of its parents is, for work that has a stop of its own and also
 /// ends with the document or the pane it belongs to.

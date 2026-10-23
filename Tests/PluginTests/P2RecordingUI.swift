@@ -1,6 +1,4 @@
-import AFMContracts
 import AFMKernel
-import Foundation
 
 /// Shows no dialogs: keeps every question with the button Return would press, and answers
 /// the way `answer` says (by default: Return).

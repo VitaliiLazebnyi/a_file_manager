@@ -1,6 +1,5 @@
-import AFMContracts
 import AFMKernel
-import AppKit
+import Foundation
 
 /// Select group and Unselect group, by a mask or a saved selection type, and the types themselves.
 extension Selections {

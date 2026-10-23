@@ -1,11 +1,9 @@
 import AFMKernel
 import Darwin
 import Foundation
-import ImageIO
 import LocalFileSystemPlugin
 import TestSupport
 import Testing
-import UniformTypeIdentifiers
 
 @testable import ViewerPlugin
 

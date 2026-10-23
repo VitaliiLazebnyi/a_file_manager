@@ -1,5 +1,3 @@
-import Foundation
-
 /// Cuts decoded text into rows.
 ///
 /// CR, LF and CR+LF each end a line; a line longer than the allowed width continues in further

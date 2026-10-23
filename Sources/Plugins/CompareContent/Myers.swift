@@ -1,5 +1,4 @@
 public import AFMKernel
-import Foundation
 
 /// The difference of two sequences by Myers' O(ND) algorithm in its linear-space form
 /// ("An O(ND) Difference Algorithm and Its Variations", 1986): the middle of a shortest edit

@@ -1,7 +1,5 @@
-import AFMContracts
 public import AFMKernel
 public import AppKit
-import UniformTypeIdentifiers
 
 /// What the Mac itself does with files: opening them with their application or one the user
 /// picks, editing in the editor of the user's choice, Quick Look, sharing, Finder tags, showing

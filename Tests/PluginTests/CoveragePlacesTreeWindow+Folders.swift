@@ -1,7 +1,4 @@
-import AFMKernel
 import AppKit
-import Foundation
-import TestSupport
 import Testing
 
 @testable import PlacesPlugin

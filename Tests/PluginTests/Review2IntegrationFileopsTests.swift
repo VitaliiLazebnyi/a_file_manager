@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import Foundation
 import LocalFileSystemPlugin
@@ -86,7 +85,6 @@ internal struct Review2IntegrationFileopsTests {
         var onProgress: ((JobProgress) -> Void)?
 
         var errors: [String] { lock.withLock { messages } }
-        var progressReports: Int { lock.withLock { reports } }
 
         func job(_: FileJob, progress: JobProgress) {
             lock.withLock { reports += 1 }

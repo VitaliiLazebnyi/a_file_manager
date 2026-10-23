@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import AppKit
 import Foundation
 import LocalFileSystemPlugin
 import NavigationPlugin

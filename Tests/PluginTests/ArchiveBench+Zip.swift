@@ -3,8 +3,6 @@ import Foundation
 import TestSupport
 import Testing
 
-@testable import ArchivesPlugin
-
 /// A ZIP of the standard tree, and text written to a member, for the suites that change archives.
 extension ArchiveBench {
     /// A ZIP of the standard tree made by the system's zip, in the sandbox under `name`.

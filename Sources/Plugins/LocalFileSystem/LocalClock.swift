@@ -1,4 +1,4 @@
-import Foundation
+import Dispatch
 
 /// The local file system's own clock: what has to happen "a moment later" whatever else the
 /// program is doing (the second signal to a call that is to be ended, giving up on a

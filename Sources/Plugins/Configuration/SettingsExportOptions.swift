@@ -1,5 +1,3 @@
-import Foundation
-
 /// What an export holds.
 internal struct SettingsExportOptions: Equatable {
     /// What is left out without `includesHistory`, as the user is told it.

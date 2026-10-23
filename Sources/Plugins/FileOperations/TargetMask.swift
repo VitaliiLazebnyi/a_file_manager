@@ -1,5 +1,3 @@
-import Foundation
-
 /// Target masks of Copy and Move (spec 07 › Wildcard target names).
 public enum TargetMask {
     /// The name `sourceName` gets under the target mask `mask`: `*` stands for the source's name or

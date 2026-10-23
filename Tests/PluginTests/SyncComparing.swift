@@ -14,8 +14,6 @@ internal struct SyncComparing {
 
     /// The trees.
     private var memory: MemoryFileSystem { fixture.memory }
-    /// The local and the memory file system.
-    private var fileSystems: FileSystemRegistry { fixture.fileSystems }
     /// The date most files are dated.
     private var early: Date { SyncTreeFixture.early }
 

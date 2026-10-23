@@ -1,4 +1,3 @@
-import AFMKernel
 import AppKit
 
 /// The small window that is shown when quitting takes a while because plugins are still writing.

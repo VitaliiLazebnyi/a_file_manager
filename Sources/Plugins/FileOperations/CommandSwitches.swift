@@ -1,5 +1,3 @@
-import Foundation
-
 /// The options a command carries after its name, as in `cm_Copy /V1 O2 T="/tmp/" W="*.txt" G`
 /// (spec 17 › Commands with parameters): a letter, then a number or `="text"`; a quote inside
 /// the text is doubled.

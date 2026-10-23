@@ -1,5 +1,5 @@
 import AppKit
-import Quartz
+import UniformTypeIdentifiers
 
 /// The Mac's desktop itself: each request goes to the system as it is.
 ///

@@ -1,5 +1,3 @@
-import Foundation
-
 /// What `flushAll` and `rescueAll` report about each archive.
 extension ArchiveStore {
     /// An archive whose changes could not be written (`flushAll`).

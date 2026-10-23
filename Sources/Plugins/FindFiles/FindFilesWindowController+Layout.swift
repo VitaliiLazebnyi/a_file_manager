@@ -1,4 +1,3 @@
-import AFMKernel
 import AppKit
 
 /// The content of the window: the form and its buttons, the result list and the buttons under it.

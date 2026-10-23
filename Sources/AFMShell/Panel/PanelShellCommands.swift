@@ -1,6 +1,6 @@
 import AFMContracts
 import AFMKernel
-import AppKit
+import Foundation
 
 /// The commands of the file list that need the panel on screen: the quick filter, stepping sideways
 /// through the Brief and Thumbnails views, and the colours by file type (spec 03 › Quick search and

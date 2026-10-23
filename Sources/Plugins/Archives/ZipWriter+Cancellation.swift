@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// Copying members with a cancellation flag instead of a check.
 extension ZipWriter {

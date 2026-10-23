@@ -1,5 +1,3 @@
-import Foundation
-
 /// Counts what a lenient decode had to leave out, so whoever loads can tell the user.
 ///
 /// Made for one decode and used only by the thread that runs it: the decode runs synchronously inside

@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import AppKit
 
 /// Registering the commands of the Mark menu, and adding them to the menus, the toolbar and the
 /// options.

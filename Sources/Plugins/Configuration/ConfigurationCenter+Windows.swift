@@ -1,6 +1,4 @@
-import AFMContracts
 import AFMKernel
-import AFMShell
 import AppKit
 
 /// The center's windows: the command browser, the options, the text windows and the help texts. Main thread only.

@@ -75,8 +75,9 @@ extension CompareSession {
             completion(Self.search(content, needle, from: row, forward: forward, cancellation: nil))
             return
         }
-        CompareWorker.run("Compare find") { [weak self, content] in
-            let found = Self.search(content, needle, from: row, forward: forward, cancellation: cancellation)
+        let compared = content
+        CompareWorker.run("Compare find") { [weak self] in
+            let found = Self.search(compared, needle, from: row, forward: forward, cancellation: cancellation)
             DispatchQueue.main.async { [weak self] in
                 // Stale when another search started, or the texts changed, meanwhile.
                 guard let self, !cancellation.isCancelled, findGeneration == generation else {

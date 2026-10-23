@@ -1,6 +1,5 @@
-import CoreServices
+import CoreFoundation
 import Darwin
-import Foundation
 
 /// The descriptors of the process, as far as the directory watcher is concerned (see
 /// `FSEvSystem` for why it counts them).

@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// The passwords of encrypted members.

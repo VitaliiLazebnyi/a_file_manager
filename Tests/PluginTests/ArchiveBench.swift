@@ -158,16 +158,6 @@ internal final class ArchiveBench: @unchecked Sendable {
         try unpack(archive, to: target, options: UnpackOptions())
     }
 
-    /// Unpacks `archive` into `target` with the options as `configure` sets them, overwriting what is there.
-    @discardableResult
-    internal func unpack(_ archive: URL, to target: URL, _ configure: (inout UnpackOptions) -> Void) throws
-        -> UnpackResult
-    {
-        var options = UnpackOptions()
-        configure(&options)
-        return try unpack(archive, to: target, options: options)
-    }
-
     /// Unpacks `archive` into `target` with `options`, overwriting what is there.
     private func unpack(_ archive: URL, to target: URL, options: UnpackOptions) throws -> UnpackResult {
         let unpacker = Unpacker(

@@ -1,5 +1,3 @@
-import Foundation
-
 /// One row as it is drawn, with what is needed to find a place in it in the file again.
 internal struct DisplayRow {
     /// The number of the row, counted from 0.

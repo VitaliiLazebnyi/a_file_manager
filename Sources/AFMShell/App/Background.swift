@@ -1,5 +1,5 @@
 import AFMKernel
-import AppKit
+import Foundation
 
 /// The program's own threads for work off the main thread.
 ///

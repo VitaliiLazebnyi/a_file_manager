@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import AppKit
 
 /// The commands of the window around the panels.
 ///

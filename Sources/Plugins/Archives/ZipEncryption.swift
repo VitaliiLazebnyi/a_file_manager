@@ -1,5 +1,3 @@
-import Foundation
-
 /// How the members of a new ZIP are encrypted.
 internal enum ZipEncryption: Equatable {
     /// AES with a 256-bit key as WinZip defined it (AE-2): what protects the contents. Opened

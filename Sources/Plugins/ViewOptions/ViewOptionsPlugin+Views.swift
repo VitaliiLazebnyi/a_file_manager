@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import Foundation
 
 /// The view types of the Show menu and the plugin columns of the Full view.
 extension ViewOptionsPlugin {

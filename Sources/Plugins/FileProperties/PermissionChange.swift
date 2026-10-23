@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// What happens to the permissions of an item (spec 07 › Change attributes, adapted: the Mac

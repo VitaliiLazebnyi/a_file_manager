@@ -1,7 +1,4 @@
-import AFMContracts
 import AFMKernel
-import Foundation
-import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
@@ -20,10 +17,6 @@ internal struct DirectorySyncRuns {
 
     /// The two folders.
     private var memory: MemoryFileSystem { fixture.memory }
-    /// The plugin.
-    private var plugin: DirectorySyncPlugin { fixture.plugin }
-    /// The comparison tool.
-    private var compareTool: CompareContentPlugin { fixture.compareTool }
     /// The settings of the bench.
     private var settings: MemorySettings { fixture.settings }
     /// The kernel with both plugins.

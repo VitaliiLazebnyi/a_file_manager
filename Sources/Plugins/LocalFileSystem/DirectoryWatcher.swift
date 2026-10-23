@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// Reports changes made by other programs to the watched folders, about half a second after

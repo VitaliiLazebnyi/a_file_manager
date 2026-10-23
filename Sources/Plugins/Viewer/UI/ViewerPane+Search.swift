@@ -1,5 +1,6 @@
 import AFMKernel
-import AppKit
+import Dispatch
+import Foundation
 
 /// Find, and the repeating of a search (spec 10 › Find dialog, Result and repeating).
 extension ViewerPane {

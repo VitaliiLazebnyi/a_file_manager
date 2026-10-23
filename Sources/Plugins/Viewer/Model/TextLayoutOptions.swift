@@ -1,5 +1,3 @@
-import Foundation
-
 /// How text is cut into rows (spec 10 › Text).
 ///
 /// With wrapping on, a row breaks at a word boundary after at most `columns` characters; with

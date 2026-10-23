@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// Writing a settings file.

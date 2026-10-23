@@ -1,4 +1,3 @@
-import AFMContracts
 import AFMKernel
 import AFMShell
 import AppKit

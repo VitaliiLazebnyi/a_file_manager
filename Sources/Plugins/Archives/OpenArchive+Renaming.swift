@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// Renaming members.
 extension OpenArchive {

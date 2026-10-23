@@ -9,8 +9,6 @@ import Testing
 /// this machine (a network volume, taken for one here) and onto a server.
 @Suite
 internal struct CoverageArchivesFormatsUnpackByPath {
-    private typealias Support = CoverageArchivesFormatsSupport
-
     private let bench: ArchiveBench
     private var box: Sandbox { bench.box }
 

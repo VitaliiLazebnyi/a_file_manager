@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import Foundation
 
 /// The sort commands of the Show menu, and the sorting of long lists in the background.
 extension ViewOptionsPlugin {

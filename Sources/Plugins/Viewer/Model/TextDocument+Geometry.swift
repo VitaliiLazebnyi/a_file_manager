@@ -1,5 +1,3 @@
-import Foundation
-
 /// Where the bytes of a row are in its text, and the other way round; no file access.
 extension TextDocument {
     /// The byte offset of the place before UTF-16 unit `textIndex` of a row's text.

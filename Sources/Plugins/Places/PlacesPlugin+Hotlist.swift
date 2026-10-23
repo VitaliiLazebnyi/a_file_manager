@@ -1,4 +1,3 @@
-import AFMContracts
 public import AFMKernel
 import Foundation
 

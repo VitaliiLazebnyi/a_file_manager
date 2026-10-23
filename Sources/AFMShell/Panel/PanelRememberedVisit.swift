@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// Show old, refresh behind: a visit of a location the listing cache remembers.
 ///

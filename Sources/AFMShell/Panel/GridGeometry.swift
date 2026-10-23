@@ -1,5 +1,4 @@
 import CoreGraphics
-import Foundation
 
 /// Where the cells of the Brief and Thumbnails views are (spec 03 › Brief, 03 › Thumbnails).
 ///

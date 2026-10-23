@@ -1,6 +1,5 @@
-import AFMContracts
 import AFMKernel
-import AppKit
+import Foundation
 
 /// Compare Directories and Mark Newer, Hide Same Files: marks by what differs between the two panels.
 extension Selections {

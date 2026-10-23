@@ -1,5 +1,3 @@
-import Foundation
-
 // The same as in the Configuration plugin: plugins share no code but the kernel's.
 
 /// Text that came from outside (a file name, a path, a stored value) made fit for a message, a

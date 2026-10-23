@@ -1,5 +1,4 @@
 import AFMKernel
-import Foundation
 
 /// What a set of files and folders adds up to (spec 07 › Calculate occupied space).
 internal struct SpaceTotals: Equatable {

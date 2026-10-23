@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// The timer that writes the changes a while after the last one.

@@ -1,4 +1,3 @@
-import AFMKernel
 public import Foundation
 
 /// Registering lists and the selected branches, and what was registered.

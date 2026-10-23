@@ -72,11 +72,14 @@ extension SyncSession {
         let offset = compared.offsetHours
         status = "Preparing the plan…"
         changed()
-        startWorker("Synchronize directories: plan") { [weak self, rows, entries] in
+        // The list as it is now, which may change while the plan is made.
+        let listed = rows
+        let shownEntries = entries
+        startWorker("Synchronize directories: plan") { [weak self] in
             var visible: [SyncRow] = []
-            visible.reserveCapacity(entries.count)
-            for case .row(let index) in entries where rows.indices.contains(index) {
-                visible.append(rows[index])
+            visible.reserveCapacity(shownEntries.count)
+            for case .row(let index) in shownEntries where listed.indices.contains(index) {
+                visible.append(listed[index])
             }
             let plan = SyncPlan(rows: visible, timeOffsetHours: offset)
             DispatchQueue.main.async { [weak self] in

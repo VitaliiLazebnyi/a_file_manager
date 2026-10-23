@@ -1,4 +1,3 @@
-import AFMKernel
 import Foundation
 
 /// A line typed on the command line, taken apart as far as the program needs to know it

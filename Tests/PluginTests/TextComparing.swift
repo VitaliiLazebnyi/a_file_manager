@@ -1,7 +1,4 @@
-import AFMKernel
 import Foundation
-import LocalFileSystemPlugin
-import TestSupport
 import Testing
 
 @testable import CompareContentPlugin

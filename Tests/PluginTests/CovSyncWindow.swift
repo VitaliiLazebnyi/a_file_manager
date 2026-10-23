@@ -1,12 +1,8 @@
-import AFMContracts
-import AFMKernel
 import AppKit
 import Foundation
-import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
-@testable import CompareContentPlugin
 @testable import DirectorySyncPlugin
 
 /// The Synchronize directories window, driven as the user would: nothing is put on screen, the
