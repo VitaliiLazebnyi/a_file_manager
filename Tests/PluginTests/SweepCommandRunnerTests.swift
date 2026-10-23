@@ -29,6 +29,10 @@ internal struct SweepCommandRunnerTests {
                 return blocks
             }
         }
+
+        deinit {
+            // Nothing to release.
+        }
     }
 
     /// A program that ended after its runner went tells nothing.

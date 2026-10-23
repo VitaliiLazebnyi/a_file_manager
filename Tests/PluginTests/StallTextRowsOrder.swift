@@ -36,6 +36,10 @@ internal struct StallTextRowsOrder {
             let lower = Int(min(offset, length))
             return data.subdata(in: lower..<min(data.count, lower + count))
         }
+
+        deinit {
+            // Nothing to release.
+        }
     }
 
     /// Two segments of 8 MB, each read on a thread of its own.
