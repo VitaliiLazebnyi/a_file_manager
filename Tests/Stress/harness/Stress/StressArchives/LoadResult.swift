@@ -25,7 +25,12 @@ internal func panelLoad(_ bench: Bench, _ location: URL) -> LoadResult {
     var ended = false
     var failure: (any Error)?
     let loading = PanelLoading(
-        PanelLoading.Source(location: location, showHidden: true, fileSystems: bench.fileSystems, cache: ListingCache()),
+        PanelLoading.Source(
+            location: location,
+            showHidden: true,
+            fileSystems: bench.fileSystems,
+            cache: ListingCache()
+        ),
         order: PanelLoading.OrderBox(ListOrder()),
         cancellation: CancellationFlag()
     )
