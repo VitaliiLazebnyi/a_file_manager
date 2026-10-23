@@ -132,6 +132,25 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   and can kill a mutant that no real test notices, so a kill by an unrelated test needs a look. Full suite after it
   (`swift test --parallel --enable-code-coverage -j 3`): 394 / 3,456 / 337, all passed; Navigation 100% lines,
   functions, regions.
+- **Mutation, `Sources/Plugins/ViewOptions` (2026-10-23, branch of the ViewOptions agent): gate passed.** 66 mutants (15
+  in `DisplayMask.swift`, 51 in `ViewOptionsPlugin.swift`): 65 killed, 1 equivalent. First run: 62 killed, 4 survived:
+  the removed `toolbar.setSymbol("eye", for: .showHidden)` (no test looked at the symbol), the two clean-ups at the
+  start of `apply` (`applied` and `filterTickets` keep the entries of live models; no test gave one panel a filter while
+  the other's was at work in the background, which the mutants dropped together with its check mark), and
+  `sortInBackground`'s `!= .stale || model.sort == order` turned into `&&`, which is equivalent: `PanelModel` never
+  holds a requested sort equal to its sort, so the guard after it does the same (entry and reason in
+  `Tests/Mutation/equivalent-mutants.txt`; the `|| model.sort == order` could go, but it states the case without leaning
+  on the kernel's invariant). Two tests in `CoverageViewOptions` kill the three; each was checked by applying the mutant
+  by hand. Every kill of both runs was checked in the logs to come from a test that drives the Show menu (some through a
+  crash inside a ViewOptions test: the force unwrap at `ViewOptionsTests.swift:197`, an index out of range in
+  `DisplayMask.init`). Time: 2,395 s for the first run (36 s per mutant), 1,555 s for the passing run (24 s per mutant),
+  plus about 10 minutes for the map and builds each run, with `-j 3` and another agent's builds beside. Failed alone for
+  the map: `AppFileWorkTests/changesMadeByOtherProgramsAppearByThemselves` (first run),
+  `CoverageSelectionFiles/namesThatReadAlikeAndNamesOfNothing` and
+  `PanelRememberedVisitTests/aFreshListingThatComesFirstIsShownInstead` (second run); they killed nothing here. No bug
+  found. The ViewOptions sources still have SwiftLint findings (lint step 6); the test file is clean. Full suite after
+  it (clean build, `swift test --parallel --enable-code-coverage -j 3`): 394 / 3,458 / 337, all passed; ViewOptions 100%
+  lines, functions, regions. The final mutation run was made at the branch tip, after this note.
 - **Waiting for the owner** (before 2026-10-21; decided since, kept for the record): atomic counters for the coverage
   run; a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
   prompt); the drop on the thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`,

@@ -6,8 +6,9 @@ import Testing
 
 @testable import ViewOptionsPlugin
 
-/// What the other Show menu suites leave out: a column dialog that changes nothing, and a long
-/// list that changes while its filter is worked out in the background.
+/// What the other Show menu suites leave out: a column dialog that changes nothing, a long list
+/// that changes while its filter is worked out in the background, a filter for one panel while
+/// the other's is at work, and the toolbar symbols.
 @MainActor
 @Suite
 internal struct CoverageViewOptions {
@@ -81,5 +82,37 @@ internal struct CoverageViewOptions {
         #expect(
             model.filter?.title == "<programs>" && model.items.map(\.name).sorted() == ["new0", "new1", "new2", "tool"]
         )
+    }
+
+    /// A filter given to one panel leaves the other panel's alone: its check mark, and its
+    /// filter still being worked out in the background, which arrives afterwards.
+    @Test
+    internal func aFilterForOnePanelLeavesTheOtherPanelsFilterAlone() {
+        bench.commands.perform(ViewOptionsPlugin.programs)
+        #expect(steps.background.count == 1 && model.filter == nil)
+        bench.right.focus()
+        bench.commands.perform(ViewOptionsPlugin.customFilter, .text("*.txt"))
+        #expect(
+            bench.right.model.filter?.title == "*.txt" && bench.commands.isChecked(ViewOptionsPlugin.customFilter)
+        )
+        steps.runBackground()
+        steps.runMain()
+        #expect(model.filter?.title == "<programs>" && model.items.map(\.name) == ["tool"])
+        bench.left.focus()
+        #expect(
+            bench.commands.isChecked(ViewOptionsPlugin.programs)
+                && !bench.commands.isChecked(ViewOptionsPlugin.customFilter)
+        )
+    }
+
+    /// The views and Hidden Files come with the symbols a toolbar button shows.
+    @Test
+    internal func theViewsAndHiddenFilesHaveToolbarSymbols() {
+        let symbols: [CommandID: String] = [
+            .viewBrief: "list.bullet", .viewFull: "list.dash", .viewThumbnails: "square.grid.2x2", .showHidden: "eye"
+        ]
+        for (command, symbol) in symbols {
+            #expect(bench.kernel.toolbar.symbol(for: command) == symbol, "\(command)")
+        }
     }
 }
