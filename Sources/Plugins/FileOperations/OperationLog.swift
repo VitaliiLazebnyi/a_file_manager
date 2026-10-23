@@ -16,70 +16,14 @@ public import Foundation
 /// Unchecked `Sendable`: the mutable state is used on the log's queue only; the rest does not
 /// change after `init`.
 public final class OperationLog: @unchecked Sendable {
-    public enum Rotation: Equatable, Sendable {
-        case never
-        /// A new file with the first line written after midnight.
-        case daily
-        /// A new file when the log would grow beyond this many bytes.
-        case size(Int)
-    }
-
-    /// What the Log file page of the configuration holds.
-    public struct Configuration: Equatable, Sendable {
-        public var isEnabled = false
-        public var file = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent(
-                "Library/Logs/A File Manager/operations.log"
-            )
-        public var logsTransfers = true
-        public var logsDeletes = true
-        public var logsFolders = true
-        public var logsSuccess = true
-        public var logsErrors = true
-        public var logsSkipped = true
-        public var rotation = Rotation.never
-        /// How many rotated copies are kept; 0 keeps all.
-        public var keepCount = 30
-
-        public init() {}
-
-        /// Whether a record is of a kind the user wants in the log.
-        public func wants(_ record: OperationRecord) -> Bool {
-            wants(record.verb, record.status)
-        }
-
-        /// The same, asked before the record is made.
-        public func wants(_ verb: OperationRecord.Verb, _ status: OperationRecord.Status) -> Bool {
-            let kind: Bool
-            switch verb {
-            case .copy, .move, .append, .rename, .newFile:
-                kind = logsTransfers
-
-            case .delete, .trash:
-                kind = logsDeletes
-
-            case .makeFolder, .removeFolder:
-                kind = logsFolders
-            }
-            switch status {
-            case .done:
-                return kind && logsSuccess
-
-            case .failed:
-                return kind && logsErrors
-
-            case .skipped:
-                return kind && logsSkipped
-            }
-        }
-    }
     /// How long a burst of lines may wait before it is written.
     private static let delay: TimeInterval = 0.25
 
+    /// What is logged, where, and how the file is rotated; fixed for the log's life.
     public let configuration: Configuration
     private let queue = DispatchQueue(label: "afm.fileoperations.log", qos: .utility)
     private let now: @Sendable () -> Date
-    private let fm = FileManager.default
+    private let fileManager = FileManager.default
     private let stamp: DateFormatter
     private let day: DateFormatter
 
@@ -193,15 +137,19 @@ public final class OperationLog: @unchecked Sendable {
     /// The writing itself goes on on the log's queue either way. Any thread.
     @preconcurrency
     public func flush(cancellation: CancellationFlag, completion: @escaping @Sendable () -> Void) {
-        /// Unchecked `Sendable`: all state is guarded by `lock`. What it lets go of (the
-        /// registration, whose release takes the flag's lock) is released outside the lock.
+        // Calls `completion` the first time it fires, never again.
+        //
+        // Unchecked `Sendable`: all state is guarded by `lock`. What it lets go of (the
+        // registration, whose release takes the flag's lock) is released outside the lock.
         final class Once: @unchecked Sendable {
             private let lock = NSLock()
             private var completion: (@Sendable () -> Void)?
             private var token: AnyObject?
+
             init(_ completion: @escaping @Sendable () -> Void) { self.completion = completion }
-            /// Holds the registration until `fire`; one that comes after it (the flag was set
-            /// already, or the log was quicker) is let go of at once.
+
+            // Holds the registration until `fire`; one that comes after it (the flag was set
+            // already, or the log was quicker) is let go of at once.
             func keep(_ token: AnyObject) {
                 lock.lock()
                 if completion != nil { self.token = token }
@@ -212,8 +160,14 @@ public final class OperationLog: @unchecked Sendable {
                 let (call, registration) = (completion, token)
                 (completion, token) = (nil, nil)
                 lock.unlock()
-                withExtendedLifetime(registration) {}
+                withExtendedLifetime(registration) {
+                    // The registration is let go of here, outside the lock.
+                }
                 call?()
+            }
+
+            deinit {
+                // Nothing to release: the registration went when it fired.
             }
         }
         let once = Once(completion)
@@ -255,7 +209,7 @@ public final class OperationLog: @unchecked Sendable {
         let lines = pending
         pending.removeAll(keepingCapacity: true)
         let file = configuration.file
-        try? fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         // What the disk says about the file, once for the burst; after that it is known from what is written.
         var state = fileState()
         var chunk = Data()
@@ -348,7 +302,7 @@ public final class OperationLog: @unchecked Sendable {
     /// Moves the log to its rotated name and removes the oldest copies beyond the limit.
     private func rotate(at written: Date) {
         let file = configuration.file
-        guard fm.fileExists(atPath: file.path) else {
+        guard fileManager.fileExists(atPath: file.path) else {
             return
         }
         let (base, ext) = (file.deletingPathExtension().lastPathComponent, file.pathExtension)
@@ -362,15 +316,15 @@ public final class OperationLog: @unchecked Sendable {
         if case .daily = configuration.rotation {
             var target = copy(day.string(from: written))
             var counter = 2
-            while fm.fileExists(atPath: target.path) {
+            while fileManager.fileExists(atPath: target.path) {
                 target = copy("\(day.string(from: written))-\(counter)")
                 counter += 1
             }
-            try? fm.moveItem(at: file, to: target)
+            try? fileManager.moveItem(at: file, to: target)
         } else {
             var counter = 1
-            while fm.fileExists(atPath: copy(String(counter)).path) { counter += 1 }
-            try? fm.moveItem(at: file, to: copy(String(counter)))
+            while fileManager.fileExists(atPath: copy(String(counter)).path) { counter += 1 }
+            try? fileManager.moveItem(at: file, to: copy(String(counter)))
         }
         guard configuration.keepCount > 0 else {
             return
@@ -378,7 +332,7 @@ public final class OperationLog: @unchecked Sendable {
         // The oldest copies beyond the limit go. Only files named the way this log names its
         // copies: a neighbour such as `operations.backup.log` is somebody else's.
         let folder = file.deletingLastPathComponent()
-        let copies = ((try? fm.contentsOfDirectory(atPath: folder.path)) ?? [])
+        let copies = ((try? fileManager.contentsOfDirectory(atPath: folder.path)) ?? [])
             .compactMap { name -> (url: URL, modified: Date)? in
                 let url = folder.appendingPathComponent(name)
                 var info = stat()
@@ -388,7 +342,7 @@ public final class OperationLog: @unchecked Sendable {
                 return (url, Self.modified(info))
             }
             .sorted { $0.modified > $1.modified }
-        for (url, _) in copies.dropFirst(configuration.keepCount) { try? fm.removeItem(at: url) }
+        for (url, _) in copies.dropFirst(configuration.keepCount) { try? fileManager.removeItem(at: url) }
     }
 
     deinit {

@@ -137,7 +137,8 @@ internal struct MemoryGrowthTests {
             )
             .run()
             let copies = sources.map { target.appending(name: $0.lastPathComponent) }
-            let deleted = FileJob(kind: .delete(toTrash: false), sources: copies, fileSystems: fileSystems).run()
+            let deleted = FileJob(kind: .delete(toTrash: false), sources: copies, target: nil, fileSystems: fileSystems)
+                .run()
             #expect(copied.failureCount == 0 && deleted.failureCount == 0)
         }
         Self.expectNoGrowth(footprints, perRound: perRound)

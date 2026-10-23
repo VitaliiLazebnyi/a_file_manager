@@ -47,7 +47,13 @@ extension LocalScenario {
             configure: nil
         )
         let outcome = JobRunner.run(plan) { flag in
-            FileJob(kind: .delete(toTrash: false), sources: sources, fileSystems: tree.fileSystems, cancellation: flag)
+            FileJob(
+                kind: .delete(toTrash: false),
+                sources: sources,
+                target: nil,
+                fileSystems: tree.fileSystems,
+                cancellation: flag
+            )
         }
         say(describe("delete", seed, outcome, interference))
         note("delete", outcome)

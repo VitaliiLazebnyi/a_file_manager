@@ -22,8 +22,8 @@ internal enum StorageMedium {
         guard statfs(url.path, &info) == 0 else {
             return false
         }
-        let device = withUnsafePointer(to: &info.f_mntfromname) {
-            $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
+        let device = withUnsafePointer(to: &info.f_mntfromname) { name in
+            name.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { String(cString: $0) }
         }
         guard device.hasPrefix("/dev/") else {
             return false

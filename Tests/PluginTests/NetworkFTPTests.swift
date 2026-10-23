@@ -439,19 +439,20 @@ internal struct NetworkFTP {
         try fixture.box.file("small.txt", "small")
         // Upload with the real copy job: complete once, then cancelled half-way.
         let target = TargetSpec(directory: fixture.url("/"))
-        var result = runJob(.copy, [fixture.box.url("small.txt")], to: target, fileSystems: fileSystems)
+        var result = Answers().run(.copy, [fixture.box.url("small.txt")], to: target, fileSystems: fileSystems)
         #expect(result.completed.count == 1 && fixture.box.read("srv/small.txt") == "small")
         let answers = Answers()
         answers.cancelAtBytes = 1_000_000
-        result = runJob(.copy, [fixture.box.url("big.bin")], to: target, answers: answers, fileSystems: fileSystems)
+        result = answers.run(.copy, [fixture.box.url("big.bin")], to: target, fileSystems: fileSystems)
         #expect(result.cancelled && namesOnDisk(fixture.box.url("srv")) == ["small.txt"])
         // And the way back, under another name.
-        result = runJob(
-            .copy,
-            [fixture.url("/small.txt")],
-            to: TargetSpec(directory: fixture.box.url("srv"), mask: "copy.txt"),
-            fileSystems: fileSystems
-        )
+        result = Answers()
+            .run(
+                .copy,
+                [fixture.url("/small.txt")],
+                to: TargetSpec(directory: fixture.box.url("srv"), mask: "copy.txt"),
+                fileSystems: fileSystems
+            )
         #expect(result.completed.count == 1 && fixture.box.read("srv/copy.txt") == "small")
         #expect(try fixture.names("/") == ["copy.txt", "small.txt"])
     }

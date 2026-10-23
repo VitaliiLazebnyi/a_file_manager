@@ -21,119 +21,170 @@ public import Foundation
 ///
 /// Pure: everything it needs to know comes in through `Context`. Usable on any thread.
 public enum NameTemplate {
-    public struct Context: Sendable {
-        /// The item under the cursor: its name with extension; empty on `[..]`.
-        public var cursorName = ""
-        public var cursorIsFolder = false
-        public var cursorSize: Int64 = 0
-        /// The folder the panel shows (for `[P]`) and the one above it (for `[G]`).
-        public var parentName = ""
-        public var grandparentName = ""
-        /// The moment the dialog was opened.
-        public var now = Date()
-        public var calendar = Calendar.current
-        public var clipboard: String?
-        public var environment: [String: String] = ProcessInfo.processInfo.environment
-        /// Whether a name is taken already, for the optional digit `[C]`.
-        ///
-        /// May touch a file system.
-        public var exists: @Sendable (String) -> Bool = { _ in false }
-
-        public init() {}
+    /// How the letters of a run of text are cased, as the switches `[U] [L] [F] [f] [n]` set it.
+    private enum Case {
+        /// `[f]`: title case, the small words of English titles kept small.
+        case englishTitle
+        /// `[L]`: lower case.
+        case lower
+        /// `[n]`: as typed or as the placeholder gives it.
+        case original
+        /// `[F]`: every word starts with a capital.
+        case title
+        /// A counter's text, which no switch changes.
+        case untouched
+        /// `[U]`: upper case.
+        case upper
     }
 
-    public enum Failure: LocalizedError, Equatable {
-        case emptyClipboard
-        case noFreeName(String)
+    /// The number a counter `[C]` stands for in one name.
+    private struct Number {
+        /// The number; nil for a name without one (the plain name of the optional digit).
+        let value: Int?
+        /// Whether the name is the first of a range or the plain name of the optional digit: with text
+        /// around it, a counter there gives nothing.
+        let isFirst: Bool
+        /// The width the number is padded to with zeros, unless the counter gives its own.
+        let width: Int
+    }
 
-        public var errorDescription: String? {
-            switch self {
-            case .emptyClipboard:
-                return "The clipboard holds no text for [X]."
+    /// One expansion of a mask into a name: the runs of text so far, each with its case, and the
+    /// switches in force.
+    private struct Expansion {
+        /// The switches that set the case of what follows.
+        static let caseSwitches: [String: Case] = [
+            "U": .upper, "L": .lower, "F": .title, "f": .englishTitle, "n": .original
+        ]
 
-            case .noFreeName(let name):
-                return "No free name was found for \(name)."
+        let context: Context
+        let dates: DateTexts
+        let number: Number
+        var runs: [(text: String, mode: Case)] = []
+        var mode = Case.original
+        /// The moment the date and time placeholders show; a time switch moves it.
+        var moment: Date
+
+        /// The name: the runs in their cases, without spaces at either end.
+        var name: String {
+            runs.map { run in cased(run.text, run.mode) }.joined().trimmingCharacters(in: .whitespaces)
+        }
+
+        init(context: Context, dates: DateTexts, number: Number) {
+            self.context = context
+            self.dates = dates
+            self.number = number
+            moment = context.now
+        }
+
+        /// Adds text in the case in force, or in `forced`.
+        mutating func emit(_ text: String, as forced: Case? = nil) {
+            guard !text.isEmpty else {
+                return
+            }
+            let runMode = forced ?? mode
+            if let last = runs.last, last.mode == runMode {
+                runs[runs.count - 1].text += text
+            } else {
+                runs.append((text, runMode))
+            }
+        }
+
+        /// Adds what the placeholder `body` stands for, or takes the switch it is.
+        mutating func apply(_ body: String) throws {
+            if let switched = Self.caseSwitches[body] {
+                mode = switched
+                return
+            }
+            switch body {
+            case "[", "]":
+                emit(body)
+
+            case "X", "X+":
+                let text = clipboardText(context.clipboard ?? "")
+                if text.isEmpty, body == "X" { throw Failure.emptyClipboard }
+                emit(text)
+
+            default:
+                applyValue(body)
+            }
+        }
+
+        /// Adds the value of a counter, a date, a part of a name or a variable; a placeholder that
+        /// is none of them stays as typed.
+        private mutating func applyValue(_ body: String) {
+            if let counter = Placeholder.counter(body) {
+                // With text around it, the first name of a range (and the plain name of
+                // the optional digit) carries no number at all.
+                guard let value = number.value, !(number.isFirst && counter.hasAffix) else {
+                    return
+                }
+                let digits = String(value)
+                let padded =
+                    String(repeating: "0", count: max(0, (counter.width ?? number.width) - digits.count)) + digits
+                emit(counter.prefix + padded + counter.suffix, as: .untouched)
+            } else if let shifted = Placeholder.timeSwitch(body, from: context.now, context.calendar) {
+                moment = shifted
+            } else if let text = Placeholder.dateText(body, moment, context.calendar, dates) {
+                emit(text)
+            } else if let text = Placeholder.namePart(body, context) {
+                emit(text)
+            } else {
+                emit("[" + body + "]")
             }
         }
     }
 
-    /// The formatters behind `[d]` and `[t]`, made once per text and only when asked for.
-    private final class DateTexts {
-        private let calendar: Calendar
-        private var formatters: [Character: DateFormatter] = [:]
-
-        init(_ calendar: Calendar) { self.calendar = calendar }
-
-        func text(_ letter: Character, _ moment: Date) -> String {
-            let formatter =
-                formatters[letter]
-                ?? {
-                    let formatter = DateFormatter()
-                    formatter.calendar = calendar
-                    formatter.timeZone = calendar.timeZone
-                    formatter.dateStyle = letter == "d" ? .short : .none
-                    formatter.timeStyle = letter == "t" ? .short : .none
-                    formatters[letter] = formatter
-                    return formatter
-                }()
-            return formatter.string(from: moment).replacingOccurrences(of: "/", with: "-")
-                .replacingOccurrences(
-                    of: ":",
-                    with: "."
-                )
-        }
-    }
-
-    private enum Case { case original, upper, lower, title, englishTitle, untouched }
-
-    /// No name is longer than this, so no width of a counter or a range may be either.
-    private static let maxWidth = 255
-    /// Positions in a range are cut to this; no value a range is applied to is that long.
-    private static let positionLimit = 1 << 20
-
     /// Every name the text asks for, in the order they are to be created. `quotedLists` also
     /// reads `"a b.txt" "c.txt"` as several names (New file).
     public static func names(from text: String, context: Context, quotedLists: Bool = false) throws -> [String] {
-        let text = text.trimmingCharacters(in: .whitespaces)
-        guard text.hasPrefix("<") else {
-            return plainNames(text, quotedLists: quotedLists)
+        let typed = text.trimmingCharacters(in: .whitespaces)
+        guard typed.hasPrefix("<") else {
+            return plainNames(typed, quotedLists: quotedLists)
         }
-        var mask = String(text.dropFirst())
+        var mask = String(typed.dropFirst())
         // One set of date formatters for all the names of this text: making one costs more
         // than everything else an expansion does.
         let dates = DateTexts(context.calendar)
         if let range = leadingRange(&mask) {
             let width = String(range.upperBound).count
             return
-                try range.map {
-                    try expand(mask, context, dates, counter: $0, isFirst: $0 == range.lowerBound, width: width)
+                try range.map { counter in
+                    let number = Number(value: counter, isFirst: counter == range.lowerBound, width: width)
+                    return try expand(mask, context, dates, number)
                 }
                 .filter { !$0.isEmpty }
         }
-        return try mask.split(separator: "|").map(String.init)
-            .compactMap { part -> String? in
-                let part = part.trimmingCharacters(in: .whitespaces)
+        return try mask.split(separator: "|")
+            .map(String.init)
+            .compactMap { piece -> String? in
+                let part = piece.trimmingCharacters(in: .whitespaces)
                 guard !part.isEmpty else {
                     return nil
                 }
-                guard hasCounter(part) else {
-                    // A mask that comes to nothing (only a switch such as `[T2+1D]`) names nothing.
-                    let name = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
-                    return name.isEmpty ? nil : name
-                }
-                // The optional digit: the name without a number, then with 2, 3, … until one is free.
-                let plain = try expand(part, context, dates, counter: nil, isFirst: true, width: 1)
-                if !plain.isEmpty, !context.exists(plain) {
-                    return plain
-                }
-                for counter in 2...9_999 {
-                    let name = try expand(part, context, dates, counter: counter, isFirst: false, width: 1)
-                    if !name.isEmpty, !context.exists(name) {
-                        return name
-                    }
-                }
-                throw Failure.noFreeName(plain)
+                return try name(part, context, dates)
             }
+    }
+
+    /// The name one part of a mask gives; nil when it comes to nothing.
+    ///
+    /// With a counter it is the optional digit: the name without a number, then with 2, 3, … until
+    /// one is free.
+    private static func name(_ part: String, _ context: Context, _ dates: DateTexts) throws -> String? {
+        let plain = try expand(part, context, dates, Number(value: nil, isFirst: true, width: 1))
+        guard hasCounter(part) else {
+            // A mask that comes to nothing (only a switch such as `[T2+1D]`) names nothing.
+            return plain.isEmpty ? nil : plain
+        }
+        if !plain.isEmpty, !context.exists(plain) {
+            return plain
+        }
+        for counter in 2...9_999 {
+            let name = try expand(part, context, dates, Number(value: counter, isFirst: false, width: 1))
+            if !name.isEmpty, !context.exists(name) {
+                return name
+            }
+        }
+        throw Failure.noFreeName(plain)
     }
 
     /// The first and the last name of a counter range, as the dialog previews them; nil when
@@ -146,6 +197,7 @@ public enum NameTemplate {
         return leadingRange(&mask) == nil ? nil : (first, last)
     }
 
+    /// The names of a text without placeholders: split at `|`, and with `quotedLists` at the quotes too.
     private static func plainNames(_ text: String, quotedLists: Bool) -> [String] {
         var names: [String] = []
         var current = ""
@@ -175,17 +227,19 @@ public enum NameTemplate {
             return nil
         }
         let bounds = mask[..<close].split(separator: "-", omittingEmptySubsequences: false)
-        guard bounds.count == 2, let from = Int(bounds[0]), let to = Int(bounds[1]), from >= 0, from <= to,
-            to - from < 100_000
+        guard bounds.count == 2, let first = Int(bounds[0]), let last = Int(bounds[1]), first >= 0, first <= last,
+            last - first < 100_000
         else { return nil }
         mask = String(mask[mask.index(after: close)...])
-        return from...to
+        return first...last
     }
 
+    /// Whether the mask holds a counter `[C]`.
     private static func hasCounter(_ mask: String) -> Bool {
-        brackets(in: mask).contains { counterParts($0) != nil }
+        brackets(in: mask).contains { Placeholder.counter($0) != nil }
     }
 
+    /// The texts between the brackets of the mask's placeholders, in their order.
     private static func brackets(in mask: String) -> [String] {
         var found: [String] = []
         var rest = Substring(mask)
@@ -210,86 +264,24 @@ public enum NameTemplate {
         }
     }
 
-    private static func expand(
-        _ mask: String,
-        _ context: Context,
-        _ dates: DateTexts,
-        counter: Int?,
-        isFirst: Bool,
-        width: Int
-    ) throws -> String {
-        var runs: [(text: String, mode: Case)] = []
-        var mode = Case.original
-        var moment = context.now
-        func emit(_ text: String, as forced: Case? = nil) {
-            guard !text.isEmpty else {
-                return
-            }
-            let mode = forced ?? mode
-            if let last = runs.last, last.mode == mode {
-                runs[runs.count - 1].text += text
-            } else {
-                runs.append((text, mode))
-            }
-        }
+    /// The name `mask` gives with the counter at `number`.
+    private static func expand(_ mask: String, _ context: Context, _ dates: DateTexts, _ number: Number)
+        throws -> String
+    {
+        var expansion = Expansion(context: context, dates: dates, number: number)
         var rest = Substring(mask)
         while let open = rest.firstIndex(of: "[") {
-            emit(String(rest[..<open]))
+            expansion.emit(String(rest[..<open]))
             let after = rest[rest.index(after: open)...]
             guard let close = closingBracket(after) else {
                 rest = rest[open...]
                 break
             }
-            let body = String(after[..<close])
             rest = after[after.index(after: close)...]
-            switch body {
-            case "[":
-                emit("[")
-
-            case "]":
-                emit("]")
-
-            case "U":
-                mode = .upper
-
-            case "L":
-                mode = .lower
-
-            case "F":
-                mode = .title
-
-            case "f":
-                mode = .englishTitle
-
-            case "n":
-                mode = .original
-
-            case "X", "X+":
-                let text = clipboardText(context.clipboard ?? "")
-                if text.isEmpty, body == "X" { throw Failure.emptyClipboard }
-                emit(text)
-
-            default:
-                if let parts = counterParts(body) {
-                    // With text around it, the first name of a range (and the plain name of
-                    // the optional digit) carries no number at all.
-                    guard let counter, !(isFirst && parts.hasAffix) else { break }
-                    let digits = String(counter)
-                    let padded = String(repeating: "0", count: max(0, (parts.width ?? width) - digits.count)) + digits
-                    emit(parts.prefix + padded + parts.suffix, as: .untouched)
-                } else if let shifted = timeSwitch(body, from: context.now, context.calendar) {
-                    moment = shifted
-                } else if let text = dateText(body, moment, context.calendar, dates) {
-                    emit(text)
-                } else if let text = namePart(body, context) {
-                    emit(text)
-                } else {
-                    emit("[" + body + "]")
-                }
-            }
+            try expansion.apply(String(after[..<close]))
         }
-        emit(String(rest))
-        return runs.map { cased($0.text, $0.mode) }.joined().trimmingCharacters(in: .whitespaces)
+        expansion.emit(String(rest))
+        return expansion.name
     }
 
     /// What `[X]` puts into a name: the first line of the clipboard, as one part of a name.
@@ -311,6 +303,7 @@ public enum NameTemplate {
         return text
     }
 
+    /// The text in the case `mode` asks for.
     private static func cased(_ text: String, _ mode: Case) -> String {
         switch mode {
         case .original, .untouched:
@@ -331,7 +324,7 @@ public enum NameTemplate {
                     "but", "or", "nor", "yet", "so", "vs"
                 ]
             var words = text.components(separatedBy: " ")
-            let real = words.indices.filter { !words[$0].isEmpty }
+            let real = words.indices.filter { index in !words[index].isEmpty }
             for index in real {
                 let lower = words[index].lowercased()
                 // The small words of a title stay small, except as its first or last word.
@@ -343,212 +336,5 @@ public enum NameTemplate {
             }
             return words.joined(separator: " ")
         }
-    }
-
-    /// `C`, `C:3`, `C10+5:3`, `" ("C")"`: the width and the text around the number.
-    ///
-    /// In a new name the number comes from the range, so an inline start and step are read and
-    /// ignored.
-    private static func counterParts(_ body: String) -> (prefix: String, suffix: String, width: Int?, hasAffix: Bool)? {
-        var core = body
-        var prefix = ""
-        var suffix = ""
-        if core.hasPrefix("\""), let end = core.dropFirst().firstIndex(of: "\"") {
-            prefix = String(core[core.index(after: core.startIndex)..<end])
-            core = String(core[core.index(after: end)...])
-        }
-        if core.hasSuffix("\""), let start = core.dropLast().lastIndex(of: "\"") {
-            suffix = String(core[core.index(after: start)..<core.index(before: core.endIndex)])
-            core = String(core[..<start])
-        }
-        guard core.hasPrefix("C") else {
-            return nil
-        }
-        let options = core.dropFirst()
-        guard options.allSatisfy({ $0.isNumber || $0 == "+" || $0 == "-" || $0 == ":" || $0 == "a" }) else {
-            return nil
-        }
-        let width = options.split(separator: ":", omittingEmptySubsequences: false).dropFirst().first
-            .flatMap {
-                Int($0)
-            }
-            .map { min(max($0, 0), maxWidth) }
-        return (prefix, suffix, width, body.contains("\""))
-    }
-
-    /// `T1`…`T4`, optionally with an offset such as `+60m` or `-1D`.
-    private static func timeSwitch(_ body: String, from now: Date, _ calendar: Calendar) -> Date? {
-        guard body.count >= 2, body.hasPrefix("T"), let source = body.dropFirst().first, "1234".contains(source) else {
-            return nil
-        }
-        let offset = body.dropFirst(2)
-        if offset.isEmpty {
-            return now
-        }
-        guard let unit = offset.last, let amount = Int(offset.dropLast()) else {
-            return nil
-        }
-        let components: [Character: Calendar.Component] = [
-            "s": .second, "m": .minute, "h": .hour, "D": .day, "M": .month, "Y": .year
-        ]
-        guard let component = components[unit] else {
-            return nil
-        }
-        return calendar.date(byAdding: component, value: amount, to: now)
-    }
-
-    /// A bracket made of date and time letters, with any separators between them.
-    private static func dateText(_ body: String, _ moment: Date, _ calendar: Calendar, _ dates: DateTexts) -> String? {
-        let letters = "YyMDhHmsvidt"
-        guard body.contains(where: { letters.contains($0) }),
-            body.allSatisfy({ letters.contains($0) || "-_. ,1".contains($0) })
-        else { return nil }
-        func part(_ component: Calendar.Component) -> Int { calendar.component(component, from: moment) }
-        let (year, hour) = (part(.year), part(.hour))
-        func two(_ value: Int) -> String { String(format: "%02d", value) }
-        var text = ""
-        var characters = ArraySlice(body)
-        while let letter = characters.popFirst() {
-            switch letter {
-            case "Y":
-                text += String(format: "%04d", year)
-
-            case "y":
-                text += two(year % 100)
-
-            case "M":
-                text += two(part(.month))
-
-            case "D":
-                text += two(part(.day))
-
-            case "h":
-                text += two(hour)
-
-            case "H":
-                text += two(hour % 12 == 0 ? 12 : hour % 12)
-
-            case "m":
-                text += two(part(.minute))
-
-            case "s":
-                text += two(part(.second))
-
-            case "v":
-                text += String(format: "%03d", part(.nanosecond) / 1_000_000)
-
-            case "i":
-                let short = characters.first == "1"
-                if short { characters.removeFirst() }
-                text += hour < 12 ? (short ? "a" : "am") : (short ? "p" : "pm")
-
-            case "d", "t":
-                text += dates.text(letter, moment)
-
-            default:
-                text.append(letter)
-            }
-        }
-        return text
-    }
-
-    /// `N`, `E`, `A`, `P`, `G`, `S` and `%VAR%`, each with an optional range.
-    private static func namePart(_ body: String, _ context: Context) -> String? {
-        if body.hasPrefix("%"), let end = body.dropFirst().firstIndex(of: "%") {
-            let value = context.environment[String(body[body.index(after: body.startIndex)..<end])] ?? ""
-            return slice(value, String(body[body.index(after: end)...]))
-        }
-        guard let letter = body.first else {
-            return nil
-        }
-        let split = context.cursorIsFolder ? (base: context.cursorName, ext: "") : FileItem.split(context.cursorName)
-        let value: String
-        switch letter {
-        case "N":
-            value = split.base
-
-        case "E":
-            value = split.ext
-
-        case "A":
-            value = context.cursorName
-
-        case "P":
-            value = context.parentName
-
-        case "G":
-            value = context.grandparentName
-
-        case "S":
-            value = String(context.cursorSize)
-
-        default:
-            return nil
-        }
-        return slice(value, String(body.dropFirst()))
-    }
-
-    /// Applies a range (spec 18 › Range forms) to a value; nil when `range` is not one.
-    private static func slice(_ value: String, _ range: String) -> String? {
-        if range.isEmpty {
-            return value
-        }
-        var text = Substring(range)
-        var pad: Character?
-        if let first = text.first, first == "0" || first == " ", text.count > 1 {
-            pad = first
-            text = text.dropFirst()
-        }
-        let characters = Array(value)
-        /// A position counted from 1, or from the end when negative, as an index from 0.
-        /// No position is larger than `positionLimit`: beyond it lies nothing, and the sums
-        /// below stay far from the ends of `Int`.
-        func position(_ text: inout Substring, fromEnd: Bool = false) -> Int? {
-            let negative = text.hasPrefix("-") || fromEnd
-            if text.hasPrefix("-") { text = text.dropFirst() }
-            let digits = text.prefix { $0.isASCII && $0.isNumber }
-            guard !digits.isEmpty, digits.count <= 18, let typed = Int(digits), typed > 0 else {
-                return nil
-            }
-            let number = min(typed, positionLimit)
-            text = text.dropFirst(digits.count)
-            return negative ? characters.count - number : number - 1
-        }
-        let countsFromEnd = text.hasPrefix("-")
-        guard let start = position(&text) else {
-            return nil
-        }
-        var end = start
-        var width: Int?
-        if text.hasPrefix(",") {
-            // A length is a count: never negative, and no longer than a name can be.
-            let digits = text.dropFirst()
-            guard !digits.isEmpty, digits.count <= 18, digits.allSatisfy({ $0.isASCII && $0.isNumber }),
-                let typed = Int(digits)
-            else { return nil }
-            let length = min(typed, maxWidth)
-            end = start + length - 1
-            width = length
-        } else if text.hasPrefix("-") {
-            text = text.dropFirst()
-            if text.isEmpty {
-                end = characters.count - 1
-            } else {
-                // After a start counted from the end, the end is counted from there too: `[N-8-5]`.
-                guard let last = position(&text, fromEnd: countsFromEnd), text.isEmpty else {
-                    return nil
-                }
-                end = last
-                width = last - start + 1
-            }
-        } else if !text.isEmpty {
-            return nil
-        }
-        let (from, to) = (max(0, start), min(characters.count - 1, end))
-        let part = from <= to ? String(characters[from...to]) : ""
-        guard let pad, let width = width.map({ min($0, maxWidth) }), part.count < width else {
-            return part
-        }
-        return String(repeating: String(pad), count: width - part.count) + part
     }
 }

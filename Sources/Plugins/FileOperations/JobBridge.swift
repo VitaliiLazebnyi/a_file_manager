@@ -32,16 +32,21 @@ internal final class JobBridge: FileJobDelegate, Sendable {
     /// The button Return presses in the Overwrite dialog: Skip.
     internal static let overwriteDefault = 2
 
+    /// The job's progress window: it shows the progress and puts the questions on the main thread.
     private let monitor: any JobMonitor
-    private let ui: any UserInteraction
+    /// The dialogs the questions become; used on the main thread only.
+    private let interaction: any UserInteraction
+    /// The file systems the compared files and the paths shown in dialogs belong to.
     private let fileSystems: FileSystemRegistry
 
-    internal init(monitor: any JobMonitor, ui: any UserInteraction, fileSystems: FileSystemRegistry) {
+    /// A bridge for one job, shown in `monitor`, asking through `interaction`.
+    internal init(monitor: any JobMonitor, interaction: any UserInteraction, fileSystems: FileSystemRegistry) {
         self.monitor = monitor
-        self.ui = ui
+        self.interaction = interaction
         self.fileSystems = fileSystems
     }
 
+    /// Hands the job's progress to its window.
     internal func job(_: FileJob, progress: JobProgress) {
         monitor.report(progress)
     }
@@ -53,8 +58,8 @@ internal final class JobBridge: FileJobDelegate, Sendable {
         func describe(_ item: FileItem) -> String {
             "\(shown(item.url))\n\(Format.bytes(item.size)) bytes, \(Format.date(item.modified))"
         }
-        let detail =
-            "\(describe(target))\n\nWith file:\n\(describe(source))\n\n\(OperationText.comparison(source: source, target: target))"
+        let comparison = OperationText.comparison(source: source, target: target)
+        let detail = "\(describe(target))\n\nWith file:\n\(describe(source))\n\n\(comparison)"
         var more: [MoreOption] = [.compare]
         // Append is not offered when the collision comes from a move (07 › Name conflicts during rename or move).
         // Only a plain file is continued: a link at the target would lead the writing elsewhere.
@@ -92,14 +97,14 @@ internal final class JobBridge: FileJobDelegate, Sendable {
         monitor.ask { @MainActor @Sendable in
             let paths = "\(shown(source.url))\n\(shown(target.url))"
             switch same {
-            case true?:
-                ui.inform("The two files have the same content!", detail: paths, style: .information)
+            case .same:
+                interaction.inform("The two files have the same content!", detail: paths, style: .information)
 
-            case false?:
-                ui.inform("The two files are different!", detail: paths, style: .information)
+            case .different:
+                interaction.inform("The two files are different!", detail: paths, style: .information)
 
             default:
-                ui.inform("The two files could not be compared.", detail: paths, style: .warning)
+                interaction.inform("The two files could not be compared.", detail: paths, style: .warning)
             }
         }
         return resolve(job, target: target, source: source, detail: detail, more: more)
@@ -111,7 +116,7 @@ internal final class JobBridge: FileJobDelegate, Sendable {
     @MainActor
     private func overwriteStep(target: FileItem, detail: String, more: [MoreOption]) -> OverwriteStep {
         // Return presses Skip: a file that is overwritten is gone, one that is skipped can still be copied.
-        let button = ui.choose(
+        let button = interaction.choose(
             "Overwrite:",
             detail: detail,
             buttons: [
@@ -142,7 +147,11 @@ internal final class JobBridge: FileJobDelegate, Sendable {
             }
 
         case 6:
-            if let row = ui.pickRow("Overwrite: more options", rows: more.map(\.rawValue), detail: shown(target.url)),
+            if let row = interaction.pickRow(
+                "Overwrite: more options",
+                rows: more.map(\.rawValue),
+                detail: shown(target.url)
+            ),
                 let step = moreStep(more[row], target: target)
             {
                 return step
@@ -171,8 +180,8 @@ internal final class JobBridge: FileJobDelegate, Sendable {
 
         case .renameExisting:
             return newName("New name for the existing target file:", proposing: target.name)
-                .map {
-                    .answer(.renameExisting($0))
+                .map { name in
+                    .answer(.renameExisting(name))
                 }
 
         case .autoRenameCopied:
@@ -200,15 +209,16 @@ internal final class JobBridge: FileJobDelegate, Sendable {
     /// Main thread.
     @MainActor
     private func newName(_ message: String, proposing name: String) -> String? {
-        guard let text = ui.prompt(message, value: name)?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
+        guard let text = interaction.prompt(message, value: name)?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
             !text.contains("/")
         else { return nil }
         return text
     }
 
+    /// Asks what to do about an error with `url`: skip it, skip all such errors, retry or abort.
     internal func job(_: FileJob, failedAt url: URL, error: any Error) -> ErrorChoice {
         monitor.ask { @MainActor @Sendable in
-            ui.pick(
+            interaction.pick(
                 "Error with \(DisplayName.escaped(url.lastPathComponent))",
                 detail: error.localizedDescription,
                 [("Skip", .skip), ("Skip all", .skipAll), ("Retry", .retry), ("Abort", .abort)],
@@ -217,6 +227,7 @@ internal final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
+    /// Asks whether a folder that is not empty is deleted with everything in it; Return presses Skip.
     internal func job(_: FileJob, confirmDeleteNonEmpty directory: URL) -> FolderDeleteChoice {
         monitor.ask { @MainActor @Sendable in
             pick(
@@ -229,6 +240,9 @@ internal final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
+    /// Asks whether a protected item (read-only, hidden, locked, or one the Trash cannot take) is changed anyway.
+    ///
+    /// Return presses Skip.
     internal func job(_: FileJob, confirm question: ProtectionQuestion) -> ProtectionChoice {
         let text = OperationText.protection(question, path: shown(question.item.url))
         return monitor.ask { @MainActor @Sendable in
@@ -242,9 +256,10 @@ internal final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
+    /// Asks whether a folder is copied into a folder of the same name that is already there.
     internal func job(_: FileJob, mergeInto existing: FileItem, source _: FileItem) -> MergeChoice {
         monitor.ask { @MainActor @Sendable in
-            ui.pick(
+            interaction.pick(
                 "The folder \(shown(existing.url)) already exists!",
                 detail: "Do you want to copy into it? Files with the same names are asked about one by one.",
                 [("Merge", .merge), ("All", .mergeAll), ("Skip", .skip), ("Cancel", .cancel)],
@@ -253,6 +268,8 @@ internal final class JobBridge: FileJobDelegate, Sendable {
         }
     }
 
+    /// Asks whether the contents of a folder that is another volume are moved or deleted.
+    ///
     /// Skip comes first, so that Return keeps the other volume as it is.
     internal func job(_: FileJob, crossVolumeAt folder: FileItem, purpose: ProtectionQuestion.Purpose)
         -> ProtectionChoice
@@ -267,8 +284,8 @@ internal final class JobBridge: FileJobDelegate, Sendable {
                 detail: detail,
                 [("Skip", .skip), (action, .proceed), ("All Volumes", .all), ("Cancel", .cancel)],
                 fallback: ProtectionChoice.cancel,
-                style: .critical,
-                returnPresses: 0
+                returnPresses: 0,
+                style: .critical
             )
         }
     }
@@ -284,15 +301,25 @@ internal final class JobBridge: FileJobDelegate, Sendable {
         detail: String,
         _ choices: [(String, Choice)],
         fallback: Choice,
-        style: QuestionStyle = .warning,
-        returnPresses safe: Int
+        returnPresses safe: Int,
+        style: QuestionStyle = .warning
     ) -> Choice {
-        let index = ui.choose(message, detail: detail, buttons: choices.map(\.0), style: style, defaultButton: safe)
+        let index = interaction.choose(
+            message,
+            detail: detail,
+            buttons: choices.map(\.0),
+            style: style,
+            defaultButton: safe
+        )
         return choices.indices.contains(index) ? choices[index].1 : fallback
     }
 
     /// A location as questions show it: with whatever could mislead the eye written out.
     private func shown(_ url: URL) -> String {
         DisplayName.escaped(fileSystems.displayPath(url))
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

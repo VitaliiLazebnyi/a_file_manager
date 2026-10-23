@@ -411,12 +411,13 @@ internal struct ArchiveFileSystems {
         let tree = bench.inside(archive, "tree")
         // Out: a folder with everything in it, onto the disk.
         try box.folder("out")
-        var result = runJob(
-            .copy,
-            [tree.appending(name: "sub"), tree.appending(name: "readme.txt")],
-            to: TargetSpec(directory: box.url("out")),
-            fileSystems: bench.fileSystems
-        )
+        var result = Answers()
+            .run(
+                .copy,
+                [tree.appending(name: "sub"), tree.appending(name: "readme.txt")],
+                to: TargetSpec(directory: box.url("out")),
+                fileSystems: bench.fileSystems
+            )
         #expect(result.completed.count == 2 && !result.cancelled)
         #expect(snapshot(box.url("out/sub")) == snapshot(box.url("tree/sub")))
         #expect(try Data(contentsOf: box.url("out/readme.txt")) == Data(contentsOf: box.url("tree/readme.txt")))
@@ -429,11 +430,10 @@ internal struct ArchiveFileSystems {
         try box.file("in/more/beta.txt", String(repeating: "beta ", count: 50_000))
         try box.file("in/readme.txt", "replaced")
         let answers = Answers()
-        result = runJob(
+        result = answers.run(
             .copy,
             [box.url("in/alpha.txt"), box.url("in/more"), box.url("in/readme.txt")],
             to: TargetSpec(directory: tree),
-            answers: answers,
             fileSystems: bench.fileSystems
         )
         #expect(result.completed.count == 3 && answers.conflicts == ["readme.txt"] && answers.errors.isEmpty)
@@ -445,30 +445,34 @@ internal struct ArchiveFileSystems {
         #expect(runTool("/usr/bin/unzip", ["-p", archive.path, "tree/more/beta.txt"]).output.count == 250_000)
 
         // Move inside the archive is a rename; delete walks the tree.
-        result = runJob(
-            .move,
-            [tree.appending(name: "more")],
-            to: TargetSpec(directory: tree.appending(name: "hollow")),
-            fileSystems: bench.fileSystems
-        )
+        result = Answers()
+            .run(
+                .move,
+                [tree.appending(name: "more")],
+                to: TargetSpec(directory: tree.appending(name: "hollow")),
+                fileSystems: bench.fileSystems
+            )
         #expect(
             try result.completed.count == 1
                 && bench.names(tree.appending(name: "hollow").appending(name: "more")) == ["beta.txt"]
         )
-        result = runJob(
-            .delete(toTrash: false),
-            [tree.appending(name: "hollow"), tree.appending(name: "big.log")],
-            fileSystems: bench.fileSystems
-        )
+        result = Answers()
+            .run(
+                .delete(toTrash: false),
+                [tree.appending(name: "hollow"), tree.appending(name: "big.log")],
+                to: nil,
+                fileSystems: bench.fileSystems
+            )
         #expect(result.completed.count == 2)
         // From one archive into another.
         try bench.pack([box.url("in/alpha.txt")], to: box.url("second.zip"))
-        result = runJob(
-            .copy,
-            [tree.appending(name: "sub")],
-            to: TargetSpec(directory: bench.inside(box.url("second.zip"))),
-            fileSystems: bench.fileSystems
-        )
+        result = Answers()
+            .run(
+                .copy,
+                [tree.appending(name: "sub")],
+                to: TargetSpec(directory: bench.inside(box.url("second.zip"))),
+                fileSystems: bench.fileSystems
+            )
         #expect(result.completed.count == 1 && bench.store.flushAll().isEmpty)
         let listed = runTool("/usr/bin/unzip", ["-Z1", box.url("second.zip").path]).output.split(separator: "\n")
             .map(
