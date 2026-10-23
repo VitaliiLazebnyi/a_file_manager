@@ -41,10 +41,12 @@ public final class FileJob: @unchecked Sendable {
     /// Folders nested deeper than this are not entered; the walk goes one call deeper per
     /// level, on a thread of its own whose stack has room for exactly this many.
     internal static let depthLimit = 1_024
+    /// The stack of the job's thread: room for `depthLimit` folders, one call each.
     private static let stackSize = 64 << 20
     /// Top-level sources on a server are remembered from the first count up to this many, so
     /// that each is asked about once and not three times.
-    private static let rememberedSources = 4_096
+    internal static let rememberedSources = 4_096
+    /// A folder with at least this many items is still remembered past `rememberedLimit`.
     internal static let worthKeepingPastLimit = 64
 
     /// Where the patience runs out.
@@ -63,6 +65,7 @@ public final class FileJob: @unchecked Sendable {
     /// How old an unfinished copy must be before it counts as left behind.
     internal static let staleTemporaryAge: TimeInterval = 24 * 60 * 60
 
+    /// The user's umask: what a file streamed from another file system may not keep of its rights.
     internal static let umask: UInt16 = {
         let mask = Darwin.umask(0o022)
         Darwin.umask(mask)
@@ -76,7 +79,9 @@ public final class FileJob: @unchecked Sendable {
     /// up and let go: the listings of a whole level at once could be the whole tree.
     internal static let measuredAtOnce = 256
 
+    /// What the job does with its sources.
     public let kind: JobKind
+    /// The items the job works on, in processing order.
     public let sources: [URL]
     /// Where the job goes.
     ///
@@ -90,6 +95,7 @@ public final class FileJob: @unchecked Sendable {
     /// the source's `locationKey`: such a source goes to that name in its own folder, and
     /// `target` only says which file system the job writes to.
     public var newNames: [String: String] = [:]
+    /// The choices of the dialog and the configuration that the job acts on.
     public var options = TransferOptions()
     /// Held weakly; whoever starts the job keeps the delegate alive while it runs.
     ///
@@ -114,26 +120,45 @@ public final class FileJob: @unchecked Sendable {
     /// The limit this job goes by; tests set a small one.
     internal var depthLimit = FileJob.depthLimit
 
+    /// The file systems of the sources and the target.
     internal let fileSystems: FileSystemRegistry
+    /// Set by whoever stops the job (`cancel()`, the progress window); ends waiting reads and writes.
     internal let cancellation: CancellationFlag
     /// Set when the user chose Abort or Cancel in a question; stops the workers too.
     internal let stop = CancellationFlag()
 
+    /// Guards the answers that hold "for all", and lets only one question be open at a time.
     internal let decisions = NSLock()
+    /// What happens to a file whose name is taken: the rule for the job, or "ask".
     internal var mode = OverwriteMode.ask
-    internal var skipAllErrors = false, deleteAllNonEmpty = false, mergeAll = false, entersVolumes = false
+    /// Errors are skipped without a question ("Skip all").
+    internal var skipAllErrors = false
+    /// Folders that are not empty are deleted without a question ("All").
+    internal var deleteAllNonEmpty = false
+    /// Folders are merged into folders of the same name without a question ("All").
+    internal var mergeAll = false
+    /// Other volumes are entered without a question ("All Volumes").
+    internal var entersVolumes = false
+    /// The protection questions answered "All", as "reason-purpose".
     internal var confirmedForAll: [String] = []
     /// How coarsely the volume of a folder keeps dates, by the folder's key.
     ///
     /// Guarded by `decisions`.
     internal var grains: [String: TimeInterval] = [:]
 
+    /// Guards the progress, the failures and `createdFolders`.
     internal let counters = NSLock()
-    internal var done = Measure(), total = Measure()
+    /// What is done so far.
+    internal var done = Measure()
+    /// What the job has to do, as the first count found it.
+    internal var total = Measure()
+    /// The bytes of the files that are being copied right now.
     internal var inFlightBytes: Int64 = 0
+    /// The lines the progress shows for the item being worked on.
     internal var currentLines: [String] = []
     /// The lines of the item now being worked on, put together only when a report goes out.
     internal var pendingLines: (() -> [String])?
+    /// When the last report went out (uptime in nanoseconds); 0 before the first.
     internal var lastReport: UInt64 = 0
     /// Held while the delegate is told the progress, so that the reports arrive in order and
     /// one at a time.
@@ -141,10 +166,14 @@ public final class FileJob: @unchecked Sendable {
     /// Taken before `counters`, never the other way round. A delegate that holds a report back (a
     /// paused job) holds only this: the counters stay free.
     internal let delivery = NSLock()
+    /// How many steps failed, whatever was answered.
     internal var failureCount = 0
+    /// The first failures (up to 20), as "path: message".
     internal var failures: [String] = []
+    /// The target folders the job created outside the walk (`ensureFolder`), by their keys.
     internal var createdFolders: Set<String> = []
 
+    /// The workers that copy small files side by side; nil where the disks do not allow it.
     internal var pool: Pool?
     /// The workers that delete the files of a folder side by side; delete jobs only.
     internal var deletePool: Pool?
@@ -158,17 +187,19 @@ public final class FileJob: @unchecked Sendable {
     /// to twice the limit: walking a big one again costs a lot, a small one little, and the small
     /// ones are the many that would otherwise crowd out the big ones that a later rename asks for.
     internal let remembered = NSLock()
+    /// The counts of the folders, by the hash of their locations; guarded by `remembered`.
     internal var measures: [Int: Measure] = [:]
+    /// How many folders `measures` keeps (twice as many of those worth it); tests set a small number.
     internal var rememberedLimit = 50_000
     /// Sources (folders of a move) that the first count took for a plain rename and counted as
     /// one item.
     ///
     /// Job thread only; filled before the walk starts.
     internal var predictedRenames: Set<String> = []
-    /// What the first count learned about the top-level sources on a server.
+    /// What the first count learned about the top-level sources on a server; empty when it kept nothing.
     ///
     /// Job thread only.
-    private var topItems: [FileItem?]?
+    internal var topItems: [FileItem?] = []
     /// The target folders this job has written into (hashes of their `claimKey`): a second
     /// source folder that lands in one of them meets files the job itself put there.
     ///
@@ -181,7 +212,9 @@ public final class FileJob: @unchecked Sendable {
     ///
     /// Set before the walk starts; the list is guarded by `pendingRemovals`.
     internal var defersRemovals = false
+    /// Guards `deferred` and `kept`.
     internal let pendingRemovals = NSLock()
+    /// The removals that wait for the commit, in the order they were found.
     internal var deferred: [DeferredRemoval] = []
     /// Sources whose removal did not happen (skipped, failed, or the commit failed): they stay,
     /// and so does everything above them.
@@ -200,8 +233,11 @@ public final class FileJob: @unchecked Sendable {
     /// stopped (to take a temporary file away again) before the job goes on without it.
     internal var cleanupPatience: TimeInterval = 10
 
+    /// Whether the job is a move.
     internal var isMove: Bool { kind == .move }
+    /// Whether the job is being stopped, by the user or by an answer.
     internal var isStopping: Bool { cancellation.isCancelled || stop.isCancelled }
+    /// Whether links are copied as what they point to (never in a move).
     internal var followsLinks: Bool { options.links == .followLinks && kind != .move }
 
     /// True when the job would copy or move the items onto themselves.
@@ -210,16 +246,19 @@ public final class FileJob: @unchecked Sendable {
             return false
         }
         // A move onto another spelling of its own name is a rename (letter case), not a refusal.
-        return sources.contains {
-            let destination = destination(for: $0, in: target)
-            return destination.isSameLocation(as: $0) || (kind == .copy && FileIdentity.sameEntry(destination, $0))
+        return sources.contains { source in
+            let destination = destination(for: source, in: target)
+            return destination.isSameLocation(as: source)
+                || (kind == .copy && FileIdentity.sameEntry(destination, source))
         }
     }
 
+    /// A job of `kind` on `sources`, to `target` for a copy or move (nil for a delete), on
+    /// `fileSystems`; `cancellation` stops it.
     public init(
         kind: JobKind,
         sources: [URL],
-        target: TargetSpec? = nil,
+        target: TargetSpec?,
         fileSystems: FileSystemRegistry,
         cancellation: CancellationFlag = CancellationFlag()
     ) {
@@ -237,6 +276,7 @@ public final class FileJob: @unchecked Sendable {
         self.cancellation = cancellation
     }
 
+    /// Stops the job, from any thread; a read or write that waits for a server ends at once.
     public func cancel() {
         cancellation.cancel()
     }
@@ -246,15 +286,21 @@ public final class FileJob: @unchecked Sendable {
     /// The work is done on a thread of the job's own, whose stack has room for the deepest tree the
     /// job enters (`depthLimit`); the calling thread waits for it.
     public func run() -> JobResult {
-        /// Unchecked `Sendable`: written by the job's thread before it signals `finished`, read
-        /// here only after the wait.
-        final class Box: @unchecked Sendable { var result = JobResult() }
+        // Unchecked `Sendable`: written by the job's thread before it signals `finished`, read
+        // here only after the wait.
+        final class Box: @unchecked Sendable {
+            var result = JobResult()
+
+            deinit {
+                // Nothing to release.
+            }
+        }
         let box = Box()
         let finished = DispatchSemaphore(value: 0)
-        // Unowned: the caller holds the job until `run()` returns, which is after the work. The
+        // Weak: the caller holds the job until `run()` returns, which is after the work. The
         // thread lives on for a moment after it signals, and must not keep the job alive meanwhile.
-        let thread = Thread { [unowned self] in
-            box.result = work()
+        let thread = Thread { [weak self] in
+            if let self { box.result = work() }
             finished.signal()
         }
         thread.name = "afm.fileoperations.job"
@@ -265,6 +311,7 @@ public final class FileJob: @unchecked Sendable {
         return box.result
     }
 
+    /// The whole job, on its own thread: the count, the walk, and the result.
     internal func work() -> JobResult {
         var result = JobResult()
         decisions.withLock {
@@ -281,43 +328,14 @@ public final class FileJob: @unchecked Sendable {
             spec.directory = found.url
             target = spec
         }
-        // Trashing takes each item whole; everything else is counted item by item.
-        var measured = Measure(items: sources.count)
-        if kind != .delete(toTrash: true) {
-            // Asking a server about a file is a trip there: what the count learns is kept for the walk.
-            let remembers = sources.count <= Self.rememberedSources && sources.contains { !$0.isFileURL }
-            var items: [FileItem?] = []
-            measured = Measure()
-            for source in sources {
-                let item = autoreleasepool { (try? entry(at: source)) ?? nil }
-                if remembers { items.append(item) }
-                measured += measureForTotal(source, item)
-            }
-            if remembers { topItems = items }
-        }
+        let measured = countTotal()
         counters.withLock { total = measured }
         switch kind {
         case .transfer:
             runTransfer(&result)
 
         case .delete(let toTrash):
-            do {
-                for (slot, source) in sources.enumerated() {
-                    try checkCancelled()
-                    let deleted = try autoreleasepool { () throws -> Bool in
-                        guard try hasSafeName(source, verb: toTrash ? .trash : .delete) else {
-                            return false
-                        }
-                        return try toTrash
-                            ? trash(source)
-                            : deleteTree(source, item: topItem(slot, source), isTopLevel: true, tree: nil, depth: 0)
-                    }
-                    if deleted { result.completed.append(source) }
-                }
-            } catch {
-                result.cancelled = true
-                halt()
-            }
+            runDelete(toTrash: toTrash, &result)
         }
         counters.withLock {
             result.failureCount = failureCount
@@ -330,12 +348,7 @@ public final class FileJob: @unchecked Sendable {
         return result
     }
 
-    /// The entry of a top-level source: what the first count found, where that was kept.
-    internal func topItem(_ slot: Int, _ source: URL) throws -> FileItem? {
-        if let known = topItems?[slot] {
-            try checkCancelled()
-            return known
-        }
-        return try entry(at: source)
+    deinit {
+        // Nothing to release: the workers are done when `run()` returns.
     }
 }

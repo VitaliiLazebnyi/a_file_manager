@@ -1,8 +1,7 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// The names a job reads and makes, and how it reads the errors the system answers with.
 extension FileJob {
     /// `.afm-<UUID>.tmp`, the name every unfinished copy carries.
     internal static func isTemporaryName(_ name: String) -> Bool {
@@ -15,7 +14,7 @@ extension FileJob {
     /// touched for a day.
     ///
     /// Local folders only.
-    internal static func sweepStaleTemporaries(in directory: URL, now: Date = Date()) {
+    internal static func sweepStaleTemporaries(in directory: URL, now: Date) {
         guard directory.isFileURL, let stream = opendir(directory.path) else {
             return
         }
@@ -23,8 +22,8 @@ extension FileJob {
         let limit = Int(now.timeIntervalSince1970 - staleTemporaryAge)
         while let entry = readdir(stream) {
             guard entry.pointee.d_namlen == 45 else { continue }
-            let name = withUnsafePointer(to: &entry.pointee.d_name) {
-                $0.withMemoryRebound(to: CChar.self, capacity: 46) { String(cString: $0) }
+            let name = withUnsafePointer(to: &entry.pointee.d_name) { field in
+                field.withMemoryRebound(to: CChar.self, capacity: 46) { String(cString: $0) }
             }
             guard isTemporaryName(name) else { continue }
             let path = directory.path + "/" + name
@@ -34,6 +33,16 @@ extension FileJob {
             else { continue }
             unlink(path)
         }
+    }
+
+    /// Looks through `folder` for old temporary files, once per folder and run of the program:
+    /// reading a very large folder takes a moment.
+    internal static func sweepOnFirstVisit(_ folder: URL) {
+        let isFirstVisit = swept.withLock { swept in
+            if swept.count >= 1_024 { swept.removeAll() }
+            return swept.insert(folder.locationKey).inserted
+        }
+        if isFirstVisit { sweepStaleTemporaries(in: folder, now: Date()) }
     }
 
     /// Exactly `count` bytes, or nil when the file ends first.
@@ -54,24 +63,24 @@ extension FileJob {
         if case .notSupported? = error as? FileSystemError {
             return true
         }
-        let error = error as NSError
-        if error.domain == NSCocoaErrorDomain, error.code == CocoaError.featureUnsupported.rawValue {
+        let bridged = error as NSError
+        if bridged.domain == NSCocoaErrorDomain, bridged.code == CocoaError.featureUnsupported.rawValue {
             return true
         }
-        if error.domain == NSPOSIXErrorDomain, error.code == Int(ENOTSUP) || error.code == Int(EOPNOTSUPP) {
+        if bridged.domain == NSPOSIXErrorDomain, bridged.code == Int(ENOTSUP) || bridged.code == Int(EOPNOTSUPP) {
             return true
         }
-        return (error.userInfo[NSUnderlyingErrorKey] as? (any Error)).map(isNoTrash) ?? false
+        return (bridged.userInfo[NSUnderlyingErrorKey] as? (any Error)).map(isNoTrash) ?? false
     }
 
     /// "Operation not permitted": what the system answers for a locked item, as opposed to a
     /// folder one has no right to change.
     internal static func isRefusedAsLocked(_ error: any Error) -> Bool {
-        let error = error as NSError
-        if error.domain == NSPOSIXErrorDomain {
-            return error.code == Int(EPERM)
+        let bridged = error as NSError
+        if bridged.domain == NSPOSIXErrorDomain {
+            return bridged.code == Int(EPERM)
         }
-        return (error.userInfo[NSUnderlyingErrorKey] as? (any Error)).map(isRefusedAsLocked) ?? false
+        return (bridged.userInfo[NSUnderlyingErrorKey] as? (any Error)).map(isRefusedAsLocked) ?? false
     }
 
     /// A name that stands for one entry of its folder: not empty, not `.` or `..`, no `/`, no NUL.
@@ -95,6 +104,7 @@ extension FileJob {
         claimKey(url).hashValue
     }
 
+    /// The sources in the order a job works through them: by name, without regard to case (07 › Processing order).
     internal static func inProcessingOrder(_ urls: [URL]) -> [URL] {
         Sorter.sorted(urls, byName: \.lastPathComponent)
     }

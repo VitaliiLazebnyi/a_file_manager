@@ -34,7 +34,7 @@ internal struct CovFileOpsJobStops {
         answers.onProgress.value = { job, progress in
             if progress.itemsDone >= 2 { job.cancel() }
         }
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], fileSystems: fileSystems)
+        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], target: nil, fileSystems: fileSystems)
         job.delegate = answers
         #expect(job.run().cancelled && box.exists("d"))
     }
@@ -51,7 +51,7 @@ internal struct CovFileOpsJobStops {
         }
         let answers = CovFileOpsAnswers()
         answers.failures.value = [.skip]
-        let job = FileJob(kind: .delete(toTrash: false), sources: [file], fileSystems: fileSystems)
+        let job = FileJob(kind: .delete(toTrash: false), sources: [file], target: nil, fileSystems: fileSystems)
         job.delegate = answers
         _ = job.run()
         #expect(box.exists("d/f.txt") && FileIdentity.flags(of: file).map { $0 & UInt32(UF_IMMUTABLE) != 0 } == true)
@@ -166,7 +166,12 @@ internal struct CovFileOpsJobStops {
         answers.onProgress.value = { job, progress in
             if progress.lines.first == "Deleting: \(mount)" { job.cancel() }
         }
-        let job = FileJob(kind: .delete(toTrash: false), sources: [image.mountPoint], fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [image.mountPoint],
+            target: nil,
+            fileSystems: fileSystems
+        )
         job.delegate = answers
         #expect(job.run().cancelled && !answers.asked.value.contains { $0.hasPrefix("volume") })
         #expect(FileManager.default.fileExists(atPath: image.mountPoint.appendingPathComponent("f.txt").path))
@@ -182,7 +187,7 @@ internal struct CovFileOpsJobStops {
             try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: file.path)
         }
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: box.url("d/f0.txt").path)
-        var job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], fileSystems: fileSystems)
+        var job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], target: nil, fileSystems: fileSystems)
         let held = Shared<FileJob?>(job)
         let answers = CovFileOpsAnswers()
         answers.onQuestion.value = { question in
@@ -192,7 +197,7 @@ internal struct CovFileOpsJobStops {
         #expect(job.run().cancelled)
         answers.onQuestion.value = nil
         answers.protections.value = [.cancel]
-        job = FileJob(kind: .delete(toTrash: false), sources: [box.url("p")], fileSystems: fileSystems)
+        job = FileJob(kind: .delete(toTrash: false), sources: [box.url("p")], target: nil, fileSystems: fileSystems)
         job.delegate = answers
         #expect(job.run().cancelled && box.exists("p/f19.txt"))
         // Cancelled at the question about the one protected file, which is kept, once the workers have deleted
@@ -204,7 +209,7 @@ internal struct CovFileOpsJobStops {
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: kept.path)
         let folder = box.url("q")
         answers.protections.value = [.skip]
-        job = FileJob(kind: .delete(toTrash: false), sources: [folder], fileSystems: fileSystems)
+        job = FileJob(kind: .delete(toTrash: false), sources: [folder], target: nil, fileSystems: fileSystems)
         held.value = job
         answers.onQuestion.value = { question in
             guard question.hasPrefix("protected") else {

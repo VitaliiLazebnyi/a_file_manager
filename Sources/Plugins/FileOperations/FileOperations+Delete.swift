@@ -40,6 +40,7 @@ extension FileOperations {
                 let job = FileJob(
                     kind: .delete(toTrash: toTrash),
                     sources: picked.items().map(\.url),
+                    target: nil,
                     fileSystems: fileSystems,
                     cancellation: cancellation
                 )

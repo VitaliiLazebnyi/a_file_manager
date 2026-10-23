@@ -182,7 +182,12 @@ internal struct Review2FileopsP2DataLossTests {
         defer { _ = hdiutil(["detach", mount.path, "-force"]) }
         let precious = mount.appendingPathComponent("precious.txt")
         try "on the volume".write(to: precious, atomically: true, encoding: .utf8)
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [box.url("tree")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         let answers = OldAnswers(conflict: .overwrite)
         job.delegate = answers
         _ = job.run()

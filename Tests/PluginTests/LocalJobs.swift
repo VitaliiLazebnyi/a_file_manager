@@ -211,8 +211,13 @@ internal struct LocalJobs {
         )
         #expect(job.targetsSourceFolder)
         #expect(
-            !FileJob(kind: .delete(toTrash: false), sources: [box.url("A/one.txt")], fileSystems: fileSystems)
-                .targetsSourceFolder
+            !FileJob(
+                kind: .delete(toTrash: false),
+                sources: [box.url("A/one.txt")],
+                target: nil,
+                fileSystems: fileSystems
+            )
+            .targetsSourceFolder
         )
         let answers = Answers()
         answers.run(

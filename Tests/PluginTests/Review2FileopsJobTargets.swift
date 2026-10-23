@@ -104,6 +104,7 @@ internal struct Review2FileopsJobTargets {
         let job = FileJob(
             kind: .delete(toTrash: false),
             sources: [box.url("locked/link"), plain],
+            target: nil,
             fileSystems: fileSystems
         )
         job.options.asksAboutReadOnly = false
@@ -126,7 +127,7 @@ internal struct Review2FileopsJobTargets {
         #expect(chflags(file.path, UInt32(UF_IMMUTABLE)) == 0)
         defer { chflags(file.path, 0) }
         let replies = Review2Replies()
-        let job = FileJob(kind: .delete(toTrash: false), sources: [file], fileSystems: fileSystems)
+        let job = FileJob(kind: .delete(toTrash: false), sources: [file], target: nil, fileSystems: fileSystems)
         job.delegate = replies
         #expect(job.run().completed.count == 1 && replies.locked == 1 && !box.exists("d/locked.txt"))
     }

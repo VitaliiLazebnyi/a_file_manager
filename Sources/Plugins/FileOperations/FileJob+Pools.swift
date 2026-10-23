@@ -1,8 +1,7 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// The pools of workers, where the disks allow several files at once.
 extension FileJob {
     /// Several files at once only where both ends answer at once: local volumes that are not
     /// spinning disks.

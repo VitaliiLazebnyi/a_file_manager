@@ -85,7 +85,7 @@ internal struct Review2FileopsJobTrees {
                 && !FileJob.isTemporaryName("a.tmp")
         )
         // Fresh: it may belong to a copy that is running.
-        FileJob.sweepStaleTemporaries(in: box.url("t"))
+        FileJob.sweepStaleTemporaries(in: box.url("t"), now: Date())
         #expect(box.exists("t/\(stale)"))
         FileJob.sweepStaleTemporaries(in: box.url("t"), now: Date().addingTimeInterval(FileJob.staleTemporaryAge + 60))
         #expect(!box.exists("t/\(stale)"))
@@ -161,7 +161,12 @@ internal struct Review2FileopsJobTrees {
         #expect(copying.errors.count == 1 && copying.errors[0].contains("nested too deep") && result.completed.isEmpty)
         #expect(memory.contents("/t/deep/top.txt") == "top")
         let deleting = Review2Replies()
-        let delete = FileJob(kind: .delete(toTrash: false), sources: [memory.url("/deep")], fileSystems: fileSystems)
+        let delete = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [memory.url("/deep")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         delete.depthLimit = limit
         delete.delegate = deleting
         #expect(

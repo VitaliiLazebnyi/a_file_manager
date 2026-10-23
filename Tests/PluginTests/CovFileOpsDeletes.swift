@@ -35,6 +35,7 @@ internal struct CovFileOpsDeletes {
         let job = FileJob(
             kind: .delete(toTrash: true),
             sources: [disk.base.url("/A/gone.txt"), disk.base.url("/A/g.txt"), disk.base.url("/A/h.txt")],
+            target: nil,
             fileSystems: fileSystems
         )
         job.delegate = answers
@@ -77,12 +78,18 @@ internal struct CovFileOpsDeletes {
         var job = FileJob(
             kind: .delete(toTrash: false),
             sources: [disk.base.url("/D/a"), disk.base.url("/D/b")],
+            target: nil,
             fileSystems: fileSystems
         )
         job.delegate = answers
         #expect(job.run().completed.count == 2 && answers.asked.value.filter { $0.hasPrefix("not empty") }.count == 1)
         answers.nonEmpty.value = [.cancel]
-        job = FileJob(kind: .delete(toTrash: false), sources: [disk.base.url("/D/c")], fileSystems: fileSystems)
+        job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [disk.base.url("/D/c")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         job.delegate = answers
         #expect(job.run().cancelled && disk.base.exists("/D/c/f.txt"))
     }
@@ -95,7 +102,12 @@ internal struct CovFileOpsDeletes {
         let answers = CovFileOpsAnswers()
         answers.protections.value = [.proceed]
         answers.failures.value = [.skip]
-        let job = FileJob(kind: .delete(toTrash: false), sources: [disk.base.url("/L/f.txt")], fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [disk.base.url("/L/f.txt")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         job.options.asksAboutReadOnly = false
         job.delegate = answers
         _ = job.run()
@@ -117,7 +129,12 @@ internal struct CovFileOpsDeletes {
         defer { _ = chflags(locked.path, 0) }
         let answers = CovFileOpsAnswers()
         answers.protections.value = [.skip]
-        var job = FileJob(kind: .delete(toTrash: false), sources: [box.url("kept")], fileSystems: fileSystems)
+        var job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [box.url("kept")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         job.delegate = answers
         _ = job.run()
         #expect(box.exists("kept/f3.txt") && !box.exists("kept/f4.txt"))
@@ -126,14 +143,19 @@ internal struct CovFileOpsDeletes {
         #expect(chflags(workerLocked.path, UInt32(UF_IMMUTABLE)) == 0)
         defer { _ = chflags(workerLocked.path, 0) }
         answers.protections.value = [.cancel]
-        job = FileJob(kind: .delete(toTrash: false), sources: [box.url("cancelled")], fileSystems: fileSystems)
+        job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [box.url("cancelled")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         job.delegate = answers
         #expect(job.run().cancelled && box.exists("cancelled/f5.txt"))
 
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: box.url("asked/f7.txt").path)
         try box.file("asked/.hidden", "h")
         answers.protections.value = [.cancel]
-        job = FileJob(kind: .delete(toTrash: false), sources: [box.url("asked")], fileSystems: fileSystems)
+        job = FileJob(kind: .delete(toTrash: false), sources: [box.url("asked")], target: nil, fileSystems: fileSystems)
         job.options.asksAboutHidden = true
         job.delegate = answers
         #expect(job.run().cancelled && box.exists("asked/f7.txt"))
@@ -149,7 +171,7 @@ internal struct CovFileOpsDeletes {
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: box.url("d/f1.txt").path)
         try FileManager.default.createSymbolicLink(atPath: box.url("d/link").path, withDestinationPath: "f2.txt")
         let answers = CovFileOpsAnswers()
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], fileSystems: fileSystems)
+        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], target: nil, fileSystems: fileSystems)
         job.options.ignoresProtection = true
         job.delegate = answers
         #expect(job.run().completed.count == 1 && !box.exists("d"))

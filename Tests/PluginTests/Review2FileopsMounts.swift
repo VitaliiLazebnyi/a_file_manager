@@ -74,7 +74,12 @@ internal struct Review2FileopsMounts {
         #expect(FileIdentity.isMountPoint(mount) && !FileIdentity.isMountPoint(box.url("tree")))
         // Nobody answers the question (the default says no): the volume is left alone and that is noted.
         let quiet = Answers()
-        var job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], fileSystems: fileSystems)
+        var job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [box.url("tree")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         job.delegate = quiet
         var result = job.run()
         #expect(FileManager.default.fileExists(atPath: mount.appendingPathComponent("precious.txt").path))
@@ -86,7 +91,7 @@ internal struct Review2FileopsMounts {
         // Asked, and answered with Skip.
         let replies = Review2Replies()
         replies.volume = .skip
-        job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], fileSystems: fileSystems)
+        job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], target: nil, fileSystems: fileSystems)
         job.delegate = replies
         result = job.run()
         #expect(
@@ -130,7 +135,12 @@ internal struct Review2FileopsMounts {
         let fileSystems = makeFileSystems().0
         let replies = Review2Replies()
         replies.volume = .proceed
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("tree")], fileSystems: fileSystems)
+        let job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [box.url("tree")],
+            target: nil,
+            fileSystems: fileSystems
+        )
         job.delegate = replies
         _ = job.run()
         #expect(

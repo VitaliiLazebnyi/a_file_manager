@@ -1,61 +1,26 @@
 import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// Copy and move: the walk through the sources, and what happens to each file whose turn has come.
 extension FileJob {
+    /// Copies or moves every source to the target; job thread.
     internal func runTransfer(_ result: inout JobResult) {
         guard let target else {
             return
         }
         pool = makePool()
         defersRemovals = isMove && fileSystems.capabilities(for: target.directory).contains(.deferredWrites)
-        // Once per folder and run of the program: reading a very large folder takes a moment.
-        let isFirstVisit = Self.swept.withLock { swept in
-            if swept.count >= 1_024 { swept.removeAll() }
-            return swept.insert(target.directory.locationKey).inserted
-        }
-        if isFirstVisit { Self.sweepStaleTemporaries(in: target.directory) }
+        Self.sweepOnFirstVisit(target.directory)
         let batch = Batch(count: sources.count)
         do {
             var taken: Set<String> = []
             let slots = slotsInReadOrder()
             batch.isSerial = slots != Array(sources.indices)
             for slot in slots {
-                let source = sources[slot]
                 try checkCancelled()
                 try autoreleasepool {
-                    guard try hasSafeName(source, verb: isMove ? .move : .copy) else {
-                        return batch.set(slot, .skipped)
-                    }
-                    var destination = destination(for: source, in: target)
-                    if renamesSelfCopies, destination.isSameLocation(as: source) {
-                        destination = UniqueName.available(
-                            for: destination,
-                            in: fileSystems,
-                            cancellation: cancellation
-                        ) {
-                            taken.contains(Self.claimKey($0))
-                        }
-                        try checkCancelled()
-                        taken.insert(Self.claimKey(destination))
-                    }
-                    let shownTarget = destination
-                    report { ["From: \(self.display(source))", "To: \(self.display(shownTarget))"] }
-                    guard let item = try topItem(slot, source) else {
-                        add(Measure(items: 1))
-                        _ = try attempt(.copy, at: source) { throw FileJobError.sourceMissing(self.display(source)) }
-                        return batch.set(slot, .skipped)
-                    }
-                    try transfer(
-                        item,
-                        to: destination,
-                        from: options.filter.base,
-                        batch: batch,
-                        slot: slot,
-                        isTopLevel: true,
-                        depth: 0
-                    )
+                    try transferSource(at: slot, to: target, batch: batch, taken: &taken)
                 }
             }
         } catch {
@@ -63,6 +28,12 @@ extension FileJob {
             // The workers stop with the job, and so does a progress window that holds them back.
             halt()
         }
+        finishTransfer(batch, &result)
+    }
+
+    /// Waits for the workers, commits and carries out the removals that waited for it, and puts
+    /// what was finished into `result`.
+    private func finishTransfer(_ batch: Batch, _ result: inout JobResult) {
         // Whatever the pool still copies is waited for, also after a cancel: nothing of the
         // job goes on once `run()` has returned.
         let settled = batch.settled()
@@ -78,8 +49,43 @@ extension FileJob {
         for (slot, source) in sources.enumerated() {
             guard let outcome = settled.outcomes[slot], outcome.finished, !isKept(source) else { continue }
             result.completed.append(source)
-            if let target = outcome.target { result.lastTarget = target }
+            if let arrived = outcome.target { result.lastTarget = arrived }
         }
+    }
+
+    /// Copies or moves the source at `slot` to its place in `target`; its outcome goes to `batch`.
+    ///
+    /// A copy into the folder it came from (`renamesSelfCopies`) gets a free name that no other
+    /// source has `taken` yet.
+    private func transferSource(at slot: Int, to target: TargetSpec, batch: Batch, taken: inout Set<String>) throws {
+        let source = sources[slot]
+        guard try hasSafeName(source, verb: isMove ? .move : .copy) else {
+            batch.set(slot, .skipped)
+            return
+        }
+        var destination = destination(for: source, in: target)
+        if renamesSelfCopies, destination.isSameLocation(as: source) {
+            let claimed = taken
+            let isTaken = { (candidate: URL) in claimed.contains(Self.claimKey(candidate)) }
+            destination = UniqueName.available(
+                for: destination,
+                in: fileSystems,
+                cancellation: cancellation,
+                isTaken: isTaken
+            )
+            try checkCancelled()
+            taken.insert(Self.claimKey(destination))
+        }
+        let shownTarget = destination
+        report { ["From: \(self.display(source))", "To: \(self.display(shownTarget))"] }
+        guard let item = try topItem(slot, source) else {
+            add(Measure(items: 1))
+            _ = try attempt(.copy, at: source, target: nil) { throw FileJobError.sourceMissing(self.display(source)) }
+            batch.set(slot, .skipped)
+            return
+        }
+        let place = Place(batch: batch, slot: slot, position: options.filter.base, tree: nil, depth: 0)
+        try transfer(item, to: destination, at: place)
     }
 
     /// The order the sources are worked through: as they are (by name), unless their file
@@ -90,8 +96,9 @@ extension FileJob {
     private func slotsInReadOrder() -> [Int] {
         let slots = Array(sources.indices)
         guard sources.count > 1, let first = sources.first, !first.isFileURL, let target,
-            let from = try? fileSystems.provider(for: first), let to = try? fileSystems.provider(for: target.directory),
-            from !== to,
+            let from = try? fileSystems.provider(for: first),
+            let onto = try? fileSystems.provider(for: target.directory),
+            from !== onto,
             !sources.contains(where: { $0.scheme != first.scheme })
         else { return slots }
         let ordered = from.readOrder(of: sources)
@@ -138,63 +145,43 @@ extension FileJob {
         return result
     }
 
-    // MARK: Copy and move
-
-    /// Copies or moves one item with everything below it; its outcome goes to `batch`.
-    /// `position` is where the copy filter stands in the folder that holds the item;
-    /// `isTopLevel` is true for the job's own sources, whose targets are checked against them.
-    /// `tree` is the job's own source that the item lies below (nil for such a source itself): a
-    /// move that takes the item away afterwards walks down from there (`remove(_:below:)`).
-    internal func transfer(
-        _ listed: FileItem,
-        to destination: URL,
-        from position: CopyFilter.Position,
-        batch: Batch,
-        slot: Int,
-        isTopLevel: Bool = false,
-        tree: URL? = nil,
-        depth: Int
-    ) throws {
+    /// Copies or moves one item with everything below it; its outcome goes to the batch of `place`.
+    ///
+    /// The filter's position is where it stands in the folder that holds the item. A move that
+    /// takes the item away afterwards walks down from the job's own source the item lies below
+    /// (`remove(_:below:)`).
+    internal func transfer(_ listed: FileItem, to destination: URL, at place: Place) throws {
         try checkCancelled()
         let item = followsLinks ? resolvingLink(listed) : listed
         if item.isRealDirectory {
-            guard let inside = options.filter.entering(item.name, from: position) else {
+            guard let inside = options.filter.entering(item.name, from: place.position) else {
                 add(measuredBefore(item))
-                batch.set(slot, .skipped)
+                place.batch.set(place.slot, .skipped)
                 return
             }
-            guard depth < depthLimit else {
+            guard place.depth < depthLimit else {
                 add(measuredBefore(item))
-                _ = try attempt(isMove ? .move : .copy, at: item.url) {
+                _ = try attempt(isMove ? .move : .copy, at: item.url, target: nil) {
                     throw FileJobError.nestedTooDeep(self.display(item.url))
                 }
-                batch.set(slot, .skipped)
+                place.batch.set(place.slot, .skipped)
                 return
             }
-            batch.set(
-                slot,
-                try transferFolder(
-                    item,
-                    to: destination,
-                    position: inside,
-                    isTopLevel: isTopLevel,
-                    tree: tree,
-                    depth: depth
-                )
-            )
+            place.batch.set(place.slot, try transferFolder(item, to: destination, inside: inside, at: place))
             return
         }
-        guard options.filter.admitsFile(item.name, at: position) else {
+        guard options.filter.admitsFile(item.name, at: place.position) else {
             add(Measure(items: 1, bytes: item.size))
-            batch.set(slot, .skipped)
+            place.batch.set(place.slot, .skipped)
             return
         }
-        try transferFile(item, to: destination, batch: batch, slot: slot, tree: tree)
+        try transferFile(item, to: destination, at: place)
     }
 
     /// Decides what happens to one file, here and now, and has it done: by the pool when the
     /// file is small and there is one, else on the spot.
-    private func transferFile(_ item: FileItem, to destination: URL, batch: Batch, slot: Int, tree: URL?) throws {
+    private func transferFile(_ item: FileItem, to destination: URL, at place: Place) throws {
+        let batch = place.batch
         // Two items of one batch can aim at one name (a mask like `fixed.txt`, equally named
         // files from two folders of a list, names that differ only in letter case on a volume
         // that does not tell them apart): the second must find the first one finished, to see
@@ -206,80 +193,95 @@ extension FileJob {
             pool?.drain()
             try flushDeferred()
         }
-        var plan: Plan?
-        let planned = try attempt(isMove ? .move : .copy, at: item.url, target: destination) {
-            plan = try self.plan(for: item, at: destination, ownOutput: collides || batch.isShared) {
-                batch.produced.contains(Self.claimHash($0))
-            }
-            return true
-        }
-        guard planned, let decided = plan else {
-            add(Measure(items: 1, bytes: item.size))
-            if planned { record(isMove ? .move : .copy, item.url, destination, .skipped) }
-            batch.set(slot, .skipped)
+        guard let decided = try decide(item, at: destination, ownOutput: collides || batch.isShared, batch: batch)
+        else {
+            batch.set(place.slot, .skipped)
             return
         }
-        let target = decided.target
-        batch.produced.insert(Self.claimHash(target))
+        batch.produced.insert(Self.claimHash(decided.target))
         // Asked here, on the job thread, once per source folder; the workers only use the answer.
-        let origin = originMark(of: item.url.deletingLastPathComponent(), copiedTo: target)
-        let work = { @Sendable () throws -> Outcome in
-            let flight = Flight()
-            flight.origin = origin
-            defer { self.land(flight, Measure(items: 1, bytes: item.size)) }
-            var removesSource = false
-            let arrived = try self.attempt(self.verb(of: decided), at: item.url, target: target) {
-                self.advance(flight, to: 0)
-                // A Retry after a try that kept its partial file under the real name: that
-                // file is the job's own and makes room for the next try.
-                self.removePartial(of: flight)
-                // A plugin that still holds changes to this file (an archive that is written
-                // after a delay) writes them first: what is copied or moved is the file as the
-                // user sees it. If that fails the file is not touched, and the user hears why.
-                try self.fileSystems.flushPendingWrites(to: item.url, cancellation: self.cancellation)
-                removesSource = try self.execute(decided, item, flight)
-                return true
-            }
-            guard arrived else {
-                return .skipped
-            }
-            if removesSource, self.isStillTheSource(target, of: item.url) {
-                // Never reached as far as anyone knows: the plan refuses a target that is the
-                // source. But a source is removed only when what was written is another file.
-                return Outcome(finished: true, emptied: false, target: target)
-            }
-            if removesSource, self.defersRemovals {
-                // The copy is not durable yet; the original goes after the commit.
-                self.postponeRemoval(of: item.url, isFolder: false, tree: tree)
-            } else if removesSource {
-                // A move between volumes has copied the file; taking the original away is a step
-                // of its own, so that a Retry here does not copy a second time. A locked
-                // original is asked about, as it is when it is deleted.
-                let removed = try self.attempt(.delete, at: item.url) {
-                    try self.removing(item, at: item.url) { try self.remove(item.url, below: tree) }
-                }
-                if !removed {
-                    return Outcome(finished: false, emptied: false, target: target)
-                }
-            }
-            return Outcome(finished: true, emptied: self.isMove, target: target)
-        }
+        let origin = originMark(of: item.url.deletingLastPathComponent(), copiedTo: decided.target)
+        let tree = place.tree
         guard let pool, !batch.isSerial, item.size <= Self.smallFileLimit, !decided.isRename,
-            !renamesInPlace(item.url, target, batch)
+            !renamesInPlace(item.url, decided.target, batch)
         else {
-            batch.set(slot, try work())
+            batch.set(place.slot, try carry(item, decided, origin: origin, tree: tree))
             return
         }
         pool.slots.wait()
         pool.start(in: batch.group) {
             do {
-                batch.set(slot, try work())
+                batch.set(place.slot, try self.carry(item, decided, origin: origin, tree: tree))
             } catch {
                 // Abort or Cancel in a question a worker asked: the whole job ends.
                 self.halt()
                 batch.setCancelled()
             }
         }
+    }
+
+    /// The plan for a file, with the questions it takes; nil when the file is skipped, which is
+    /// then counted and logged.
+    private func decide(_ item: FileItem, at destination: URL, ownOutput: Bool, batch: Batch) throws -> Plan? {
+        var plan: Plan?
+        let planned = try attempt(isMove ? .move : .copy, at: item.url, target: destination) {
+            plan = try self.plan(for: item, at: destination, ownOutput: ownOutput) { candidate in
+                batch.produced.contains(Self.claimHash(candidate))
+            }
+            return true
+        }
+        guard planned, let plan else {
+            add(Measure(items: 1, bytes: item.size))
+            if planned { record(isMove ? .move : .copy, item.url, destination, .skipped) }
+            return nil
+        }
+        return plan
+    }
+
+    /// Carries out the plan for one file and, for a move, takes the source away; any thread of the job.
+    ///
+    /// `origin` is the mark the copy gets; `tree` is the job's own source the file lies below.
+    private func carry(_ item: FileItem, _ decided: Plan, origin: Data?, tree: URL?) throws -> Outcome {
+        let target = decided.target
+        let flight = Flight()
+        flight.origin = origin
+        defer { land(flight, Measure(items: 1, bytes: item.size)) }
+        var removesSource = false
+        let arrived = try attempt(verb(of: decided), at: item.url, target: target) {
+            self.advance(flight, to: 0)
+            // A Retry after a try that kept its partial file under the real name: that
+            // file is the job's own and makes room for the next try.
+            self.removePartial(of: flight)
+            // A plugin that still holds changes to this file (an archive that is written
+            // after a delay) writes them first: what is copied or moved is the file as the
+            // user sees it. If that fails the file is not touched, and the user hears why.
+            try self.fileSystems.flushPendingWrites(to: item.url, cancellation: self.cancellation)
+            removesSource = try self.execute(decided, item, flight)
+            return true
+        }
+        guard arrived else {
+            return .skipped
+        }
+        if removesSource, isStillTheSource(target, of: item.url) {
+            // Never reached as far as anyone knows: the plan refuses a target that is the
+            // source. But a source is removed only when what was written is another file.
+            return Outcome(finished: true, emptied: false, target: target)
+        }
+        if removesSource, defersRemovals {
+            // The copy is not durable yet; the original goes after the commit.
+            postponeRemoval(of: item.url, isFolder: false, tree: tree)
+        } else if removesSource {
+            // A move between volumes has copied the file; taking the original away is a step
+            // of its own, so that a Retry here does not copy a second time. A locked
+            // original is asked about, as it is when it is deleted.
+            let removed = try attempt(.delete, at: item.url, target: nil) {
+                try self.removing(item, at: item.url) { try self.remove(item.url, below: tree) }
+            }
+            if !removed {
+                return Outcome(finished: false, emptied: false, target: target)
+            }
+        }
+        return Outcome(finished: true, emptied: isMove, target: target)
     }
 
     /// A move inside one file system is a rename when the system can do it; that is quick and
@@ -290,11 +292,11 @@ extension FileJob {
     /// are looked at once per batch.
     private func renamesInPlace(_ source: URL, _ destination: URL, _ batch: Batch) -> Bool {
         guard isMove, let from = try? fileSystems.provider(for: source),
-            let to = try? fileSystems.provider(for: destination),
-            from === to
+            let onto = try? fileSystems.provider(for: destination),
+            from === onto
         else { return false }
-        if let known = batch.staysOnVolume {
-            return known
+        if batch.knowsVolume {
+            return batch.staysOnVolume
         }
         guard source.isFileURL, destination.isFileURL else {
             return true
@@ -306,10 +308,12 @@ extension FileJob {
         // Unknown counts as one volume, the way it always was.
         let stays = here == nil || there == nil || here == there
         batch.staysOnVolume = stays
+        batch.knowsVolume = true
         return stays
     }
 
-    internal func verb(of plan: Plan) -> OperationRecord.Verb {
+    /// The verb a plan is logged with: an append, or the job's copy or move.
+    private func verb(of plan: Plan) -> OperationRecord.Verb {
         if case .append = plan {
             return .append
         }

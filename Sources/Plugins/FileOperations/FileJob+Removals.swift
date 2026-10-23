@@ -1,11 +1,10 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// The removal of the sources of a move after the commit of a file system that writes later
+/// (`defersRemovals`), and the removal of one entry of a tree the job walked.
 extension FileJob {
-    // MARK: Removing sources after a commit
-
+    /// Notes a source of a move whose removal waits for the commit; any thread of the job.
     internal func postponeRemoval(of url: URL, isFolder: Bool, tree: URL?) {
         pendingRemovals.withLock { deferred.append(DeferredRemoval(url: url, isFolder: isFolder, tree: tree)) }
     }
@@ -48,7 +47,7 @@ extension FileJob {
     /// What still waits when the job is over was not removed.
     internal func keepPendingRemovals() {
         pendingRemovals.withLock {
-            deferred.forEach { keep($0.url) }
+            for removal in deferred { keep(removal.url) }
             deferred = []
         }
     }
@@ -68,7 +67,11 @@ extension FileJob {
         }
         var done = 0
         // Whatever was not removed stays, however this is left.
-        defer { pendingRemovals.withLock { pending[done...].forEach { keep($0.url) } } }
+        defer {
+            pendingRemovals.withLock {
+                for removal in pending[done...] { keep(removal.url) }
+            }
+        }
         try checkCancelled()
         let folder = target.directory
         // Said before the writing starts, which is also where a paused job waits: a commit
@@ -89,7 +92,7 @@ extension FileJob {
             if isStopping { throw Cancelled() }
             // Nothing written since the last commit can be relied on. A Retry would only ask
             // again for the same answer, never remove anything.
-            _ = try attempt(.move, at: folder) { throw error }
+            _ = try attempt(.move, at: folder, target: nil) { throw error }
             stop.cancel()
             throw Cancelled()
         }
@@ -102,7 +105,7 @@ extension FileJob {
                 done += 1
                 continue
             }
-            let removed = try attempt(removal.isFolder ? .removeFolder : .delete, at: removal.url) {
+            let removed = try attempt(removal.isFolder ? .removeFolder : .delete, at: removal.url, target: nil) {
                 try self.remove(removal.url, below: removal.tree)
                 return true
             }

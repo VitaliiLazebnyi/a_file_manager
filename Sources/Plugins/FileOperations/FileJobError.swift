@@ -1,24 +1,34 @@
 public import Foundation
 
+/// Why one step of a job failed, as the user is told.
 public enum FileJobError: LocalizedError {
-    case copyToItself
-    case intoOwnSubfolder(String)
-    case targetIsFolder(String)
-    case targetIsFile(String)
-    case sourceMissing(String)
-    case folderNotEmpty(String)
-    case verifyFailed(String)
+    /// Append or Resume met a target with nothing of the source in it.
     case cannotResume(String)
-    /// A listed entry whose name could lead out of its folder (`..`, a name with `/`).
-    case unsafeName(String)
-    /// A pipe, a device or a socket: there is nothing in it to copy, and reading it may never end.
-    case specialFile(String)
+    /// The source and the target are one file.
+    case copyToItself
+    /// A folder still holds items that could not be processed.
+    case folderNotEmpty(String)
+    /// A folder would be copied or moved into one of its own subfolders.
+    case intoOwnSubfolder(String)
+    /// A folder lies deeper than the job goes (`FileJob.depthLimit`).
+    case nestedTooDeep(String)
     /// Append and Resume only continue a plain file; a link at the target would lead elsewhere.
     case notPlainFile(String)
     /// A folder that is another volume, which the user did not want entered.
     case otherVolume(String)
-    case nestedTooDeep(String)
-
+    /// A source was gone by the time its turn came.
+    case sourceMissing(String)
+    /// A pipe, a device or a socket: there is nothing in it to copy, and reading it may never end.
+    case specialFile(String)
+    /// A file of that name is already there, where a folder was to go.
+    case targetIsFile(String)
+    /// A folder of that name is already there, where a file was to go.
+    case targetIsFolder(String)
+    /// A listed entry whose name could lead out of its folder (`..`, a name with `/`).
+    case unsafeName(String)
+    /// The copy, read again, is not the same as the source; it was removed.
+    case verifyFailed(String)
+    /// The message for the user, naming the place as it is shown.
     public var errorDescription: String? {
         switch self {
         case .copyToItself:

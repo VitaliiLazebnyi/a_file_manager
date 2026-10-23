@@ -1,16 +1,30 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// Copy and move of a folder: its target made ready, its entries walked, its attributes and
+/// marks put on last, and the questions about merging and other volumes.
 extension FileJob {
+    /// How the target of a folder was made ready.
+    private enum FolderStart: Equatable {
+        /// Not at all: the user did not want it merged into the folder that is there.
+        case declined
+        /// The folder was moved there as a whole; nothing is left to walk.
+        case moved
+        /// The target is ready for the entries; `createdHere` when the job made it.
+        case ready(createdHere: Bool)
+
+        /// Whether the job made the target folder.
+        var createdHere: Bool { self == .ready(createdHere: true) }
+    }
+
+    /// Copies or moves a folder with everything in it to `destination`.
+    ///
+    /// `position` is where the copy filter stands inside the folder.
     internal func transferFolder(
         _ folder: FileItem,
         to destination: URL,
-        position: CopyFilter.Position,
-        isTopLevel: Bool,
-        tree: URL?,
-        depth: Int
+        inside position: CopyFilter.Position,
+        at place: Place
     ) throws -> Outcome {
         let source = folder.url
         let verb: OperationRecord.Verb = isMove ? .move : .copy
@@ -26,62 +40,22 @@ extension FileJob {
         let createsLater = !options.filter.isEmpty && (options.filter.skipsEmptyFolders || !position.admitted)
         // The first count took this folder for one rename and counted it as one item.
         let predicted = isMove && predictedRenames.contains(source.locationKey)
-        var movedWhole = false
-        var createdHere = false
+        var start = FolderStart.declined
         let ready = try attempt(verb, at: source, target: destination) {
-            if destination.isSameLocation(as: source) { throw FileJobError.copyToItself }
-            if destination.isInside(source) || (isTopLevel && FileIdentity.isInside(destination, folder: source)) {
-                throw FileJobError.intoOwnSubfolder(self.display(source))
-            }
-            if let existing = try self.entry(at: destination) {
-                if FileIdentity.sameEntry(existing.url, source) {
-                    // The folder under another spelling (letter case): a move renames it, a copy
-                    // would merge it into itself.
-                    guard self.isMove else { throw FileJobError.copyToItself }
-                    try self.fileSystems.provider(for: source)
-                        .move(
-                            source,
-                            to: destination,
-                            replacing: true,
-                            cancellation: self.cancellation
-                        )
-                    // (A folder whose name is taken, by itself, was not taken for one rename.)
-                    self.add(self.measuredBefore(folder))
-                    movedWhole = true
-                    self.record(.move, source, destination, .done)
-                    return true
-                }
-                // An existing folder is merged with the incoming one.
-                guard existing.isRealDirectory else { throw FileJobError.targetIsFile(self.display(destination)) }
-                return try self.mayMerge(into: existing, folder)
-            }
-            let (from, to) = (
-                try self.fileSystems.provider(for: source), try self.fileSystems.provider(for: destination)
+            start = try self.prepare(
+                folder,
+                at: destination,
+                isTopLevel: place.isTopLevel,
+                createsLater: createsLater,
+                predicted: predicted
             )
-            if self.isMove, from === to, self.options.filter.isEmpty {
-                // A folder that does not exist at the target moves as a whole, when renaming can do it.
-                // The size of what moves is known from the first count; only a folder that no one
-                // has counted is walked, and it is not walked when the rename comes first.
-                do {
-                    try from.move(source, to: destination, replacing: false, cancellation: self.cancellation)
-                    self.add(predicted ? Measure(items: 1) : self.measuredBefore(folder))
-                    movedWhole = true
-                    self.record(.move, source, destination, .done)
-                    return true
-                } catch FileSystemError.crossesVolumes {}
-            }
-            if !createsLater {
-                try self.createFolder(destination, in: to)
-                createdHere = true
-                self.record(.makeFolder, destination, nil, .done)
-            }
-            return true
+            return start != .declined
         }
         guard ready else {
             add(predicted ? Measure(items: 1) : measuredBefore(folder))
             return .skipped
         }
-        if movedWhole {
+        if start == .moved {
             return Outcome(finished: true, emptied: true, target: destination)
         }
         if predicted {
@@ -92,61 +66,135 @@ extension FileJob {
 
         add(Measure(items: 1))
         // A folder whose contents could not be read was not transferred; it must stay.
-        guard let listed = try listing(of: source) else {
+        guard let listed = try listing(of: source, sorted: true) else {
             return .skipped
         }
+        let outcomes = try transferChildren(listed.items, of: source, to: destination, inside: position, at: place)
+        // What was refused for its name stays where it is.
+        let outcome = Outcome(
+            finished: listed.rejected == 0 && outcomes.allSatisfy { $0?.finished == true },
+            emptied: listed.rejected == 0 && outcomes.allSatisfy { $0?.emptied == true },
+            target: destination
+        )
+        // A folder that waited for its first file (a filter was in the way) is the job's too, if one came.
+        let madeLate = createsLater && !start.createdHere && (try? entry(at: destination)) != nil
+        try finishFolder(folder, at: destination, createdHere: start.createdHere || madeLate)
+        return try settle(outcome, of: source, tree: place.tree)
+    }
+
+    /// Makes the target of a folder ready: checks that it does not lie inside the folder itself,
+    /// merges with a folder of the name that is there, moves the folder as a whole where a rename
+    /// can, or creates the target (unless a filter makes that wait for the first file).
+    private func prepare(
+        _ folder: FileItem,
+        at destination: URL,
+        isTopLevel: Bool,
+        createsLater: Bool,
+        predicted: Bool
+    ) throws -> FolderStart {
+        let source = folder.url
+        if destination.isSameLocation(as: source) { throw FileJobError.copyToItself }
+        if destination.isInside(source) || (isTopLevel && FileIdentity.isInside(destination, folder: source)) {
+            throw FileJobError.intoOwnSubfolder(display(source))
+        }
+        if let existing = try entry(at: destination) {
+            return try meet(existing, with: folder, at: destination)
+        }
+        let (from, onto) = (try fileSystems.provider(for: source), try fileSystems.provider(for: destination))
+        if isMove, from === onto, options.filter.isEmpty {
+            // A folder that does not exist at the target moves as a whole, when renaming can do it.
+            // The size of what moves is known from the first count; only a folder that no one
+            // has counted is walked, and it is not walked when the rename comes first.
+            do {
+                try from.move(source, to: destination, replacing: false, cancellation: cancellation)
+                add(predicted ? Measure(items: 1) : measuredBefore(folder))
+                record(.move, source, destination, .done)
+                return .moved
+            } catch FileSystemError.crossesVolumes {
+                // The two places lie on different volumes: the folder is copied item by item.
+            }
+        }
+        if createsLater {
+            return .ready(createdHere: false)
+        }
+        try createFolder(destination, in: onto)
+        record(.makeFolder, destination, nil, .done)
+        return .ready(createdHere: true)
+    }
+
+    /// What happens to a folder whose name is taken at the target by `existing`.
+    ///
+    /// The folder itself under another spelling (letter case) is renamed by a move and refused by
+    /// a copy, which would merge it into itself. A folder there is merged with, if the user
+    /// agrees; a file there is in the way.
+    private func meet(_ existing: FileItem, with folder: FileItem, at destination: URL) throws -> FolderStart {
+        let source = folder.url
+        if FileIdentity.sameEntry(existing.url, source) {
+            guard isMove else { throw FileJobError.copyToItself }
+            try fileSystems.provider(for: source)
+                .move(source, to: destination, replacing: true, cancellation: cancellation)
+            // (A folder whose name is taken, by itself, was not taken for one rename.)
+            add(measuredBefore(folder))
+            record(.move, source, destination, .done)
+            return .moved
+        }
+        // An existing folder is merged with the incoming one.
+        guard existing.isRealDirectory else { throw FileJobError.targetIsFile(display(destination)) }
+        return try mayMerge(into: existing, folder) ? .ready(createdHere: false) : .declined
+    }
+
+    /// Copies or moves the entries of the folder at `source` into `destination`; returns how each
+    /// ended, in the order of `listed` (nil for one that was not reached).
+    private func transferChildren(
+        _ listed: [FileItem],
+        of source: URL,
+        to destination: URL,
+        inside position: CopyFilter.Position,
+        at place: Place
+    ) throws -> [Outcome?] {
         // Between two file systems the files are read in the order the source reads them best.
-        var children = listed.items
+        var children = listed
         if !source.isFileURL, let from = try? fileSystems.provider(for: source),
-            let to = try? fileSystems.provider(for: destination), from !== to
+            let onto = try? fileSystems.provider(for: destination), from !== onto
         {
             children = inReadOrder(children, from: from)
         }
         let batch = Batch(count: children.count)
-        batch.isSerial =
-            children.count == listed.items.count && zip(children, listed.items).contains { $0.url != $1.url }
+        batch.isSerial = children.count == listed.count && zip(children, listed).contains { $0.url != $1.url }
         // A second source folder that lands in this target folder meets what the first one
         // brought; that is this job's own work and no rule "for all" overwrites it.
         batch.isShared = !enteredTargets.insert(Self.claimHash(destination)).inserted
         // Nothing of this folder is still being written when this function is left, however it is left.
         defer { batch.group.wait() }
+        let tree = place.tree ?? source
         for (slot, child) in children.enumerated() {
             try autoreleasepool {
                 let childTarget = destination.appending(name: child.name)
                 report { ["From: \(self.display(child.url))", "To: \(self.display(childTarget))"] }
-                try transfer(
-                    child,
-                    to: childTarget,
-                    from: position,
-                    batch: batch,
-                    slot: slot,
-                    tree: tree ?? source,
-                    depth: depth + 1
-                )
+                let inner = Place(batch: batch, slot: slot, position: position, tree: tree, depth: place.depth + 1)
+                try transfer(child, to: childTarget, at: inner)
             }
         }
         let settled = batch.settled()
         if settled.cancelled { throw Cancelled() }
-        // What was refused for its name stays where it is.
-        var outcome = Outcome(
-            finished: listed.rejected == 0 && settled.outcomes.allSatisfy { $0?.finished == true },
-            emptied: listed.rejected == 0 && settled.outcomes.allSatisfy { $0?.emptied == true },
-            target: destination
-        )
-        // A folder that waited for its first file (a filter was in the way) is the job's too, if one came.
-        let madeLate = createsLater && !createdHere && (try? entry(at: destination)) != nil
-        try finishFolder(folder, at: destination, createdHere: createdHere || madeLate)
+        return settled.outcomes
+    }
+
+    /// The end of a folder whose entries were dealt with: a move takes the folder away when
+    /// nothing is left in it (or notes it for after the commit), and with a filter a folder that
+    /// was entered counts as processed (07 › Only files of this type).
+    private func settle(_ walked: Outcome, of source: URL, tree: URL?) throws -> Outcome {
+        var outcome = walked
         if isMove, outcome.emptied, defersRemovals {
             postponeRemoval(of: source, isFolder: true, tree: tree)
         } else if isMove, outcome.emptied {
             // The provider removes only an empty folder, so whatever was not moved survives.
-            outcome.emptied = try attempt(.removeFolder, at: source) {
+            outcome.emptied = try attempt(.removeFolder, at: source, target: nil) {
                 try self.remove(source, below: tree)
                 return true
             }
             outcome.finished = outcome.finished && outcome.emptied
         }
-        // With a filter, a folder that was entered counts as processed (07 › Only files of this type).
         if !options.filter.isEmpty { outcome.finished = true }
         return outcome
     }
@@ -158,9 +206,9 @@ extension FileJob {
             modified: options.preservesFolderDates ? folder.modified : nil,
             permissions: createdHere && options.preservesAttributes ? folder.permissions : nil
         )
-        let to = try fileSystems.provider(for: destination)
+        let onto = try fileSystems.provider(for: destination)
         if attributes.modified != nil || attributes.permissions != nil {
-            try? to.setAttributes(attributes, of: destination, cancellation: cancellation)
+            try? onto.setAttributes(attributes, of: destination, cancellation: cancellation)
         }
         guard createdHere else {
             return
@@ -169,10 +217,10 @@ extension FileJob {
         // would forbid the changes above. A file system that cannot do it does without.
         // The origin mark goes on before them: a lock among the flags would refuse it.
         if let origin = originMark(of: folder.url, copiedTo: destination) {
-            mark(destination, with: origin, in: to, shownAs: folder.url)
+            mark(destination, with: origin, in: onto, shownAs: folder.url)
         }
         if options.preservesAttributes {
-            try? to.copyMetadata(from: folder.url, to: destination, cancellation: cancellation)
+            try? onto.copyMetadata(from: folder.url, to: destination, cancellation: cancellation)
         }
     }
 
@@ -221,8 +269,8 @@ extension FileJob {
     /// Nil inside one file system, which does its own copying. Job thread only, where asking the file
     /// system is allowed to take long.
     internal func originMark(of folder: URL, copiedTo destination: URL) -> Data? {
-        guard let from = try? fileSystems.provider(for: folder), let to = try? fileSystems.provider(for: destination),
-            from !== to
+        guard let from = try? fileSystems.provider(for: folder), let onto = try? fileSystems.provider(for: destination),
+            from !== onto
         else { return nil }
         let key = folder.locationKey
         if let known = origins[key] {

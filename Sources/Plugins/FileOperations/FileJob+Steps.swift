@@ -1,8 +1,8 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// The steps every part of a job is made of: one step with its error question, the records
+/// of the log, and the looks at the file system that end with the job.
 extension FileJob {
     /// The flag for a call that tidies up.
     ///
@@ -36,8 +36,8 @@ extension FileJob {
         return target.url(for: source.lastPathComponent)
     }
 
-    // MARK: Helpers
-
+    /// The delegate, or the end of the job when it is gone: a job without one stops at its first
+    /// question instead of guessing an answer.
     internal func delegateOrStop() throws -> any FileJobDelegate {
         guard let delegate else { throw Cancelled() }
         return delegate
@@ -63,7 +63,7 @@ extension FileJob {
     /// Runs one step; on failure asks Skip / Skip all / Retry / Abort.
     ///
     /// Used on every thread of the job.
-    internal func attempt(_ verb: OperationRecord.Verb, at url: URL, target: URL? = nil, _ step: () throws -> Bool)
+    internal func attempt(_ verb: OperationRecord.Verb, at url: URL, target: URL?, _ step: () throws -> Bool)
         throws -> Bool
     {
         do {
@@ -78,18 +78,7 @@ extension FileJob {
                 if failures.count < 20 { failures.append("\(display(url)): \(error.localizedDescription)") }
             }
             record(verb, url, target, .failed(error.localizedDescription))
-            let choice: ErrorChoice = try decisions.withLock {
-                if skipAllErrors {
-                    return .skip
-                }
-                // Another worker's question may have ended the job while this one waited its turn.
-                if isStopping { throw Cancelled() }
-                let choice = try delegateOrStop().job(self, failedAt: url, error: error)
-                if choice == .skipAll { skipAllErrors = true }
-                if choice == .abort { halt() }
-                return choice
-            }
-            switch choice {
+            switch try answer(to: error, at: url) {
             case .skip, .skipAll:
                 record(verb, url, target, .skipped)
                 return false
@@ -103,16 +92,39 @@ extension FileJob {
         }
     }
 
+    /// What to do after the step at `url` failed with `error`: the rule "skip all", or the
+    /// user's answer, asked under `decisions`.
+    private func answer(to error: any Error, at url: URL) throws -> ErrorChoice {
+        try decisions.withLock {
+            if skipAllErrors {
+                return .skip
+            }
+            // Another worker's question may have ended the job while this one waited its turn.
+            if isStopping { throw Cancelled() }
+            let choice = try delegateOrStop().job(self, failedAt: url, error: error)
+            if choice == .skipAll { skipAllErrors = true }
+            if choice == .abort { halt() }
+            return choice
+        }
+    }
+
+    /// Throws `Cancelled` when the job is being stopped.
     internal func checkCancelled() throws {
         if isStopping { throw Cancelled() }
     }
 
+    /// A location as the user is shown it.
     internal func display(_ url: URL) -> String {
         fileSystems.displayPath(url)
     }
 
-    internal func record(_ verb: OperationRecord.Verb, _ source: URL, _ target: URL?, _ status: OperationRecord.Status)
-    {
+    /// Hands a record of what was done to `onRecord`, unless nobody wants that kind.
+    internal func record(
+        _ verb: OperationRecord.Verb,
+        _ source: URL,
+        _ target: URL?,
+        _ status: OperationRecord.Status
+    ) {
         guard let onRecord, wantsRecord?(verb, status) ?? true else {
             return
         }
@@ -129,7 +141,7 @@ extension FileJob {
             return true
         }
         add(Measure(items: 1))
-        _ = try attempt(verb, at: source) { throw FileJobError.unsafeName(name) }
+        _ = try attempt(verb, at: source, target: nil) { throw FileJobError.unsafeName(name) }
         return false
     }
 }

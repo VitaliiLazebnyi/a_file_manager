@@ -120,6 +120,7 @@ extension FileOpsFixJobs {
         let job = FileJob(
             kind: .delete(toTrash: true),
             sources: [odd.base.url("/a/one.txt")],
+            target: nil,
             fileSystems: fileSystems
         )
         let delegate = RetryOnce()

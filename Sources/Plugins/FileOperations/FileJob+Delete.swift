@@ -1,17 +1,18 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// Delete: to the Trash, or for good one entry at a time, with the questions about protected
+/// items, folders that are not empty and other volumes.
 extension FileJob {
-    // MARK: Delete
-
+    /// Moves a source to the Trash; where there is none, the user may have it deleted for good instead.
+    ///
+    /// False when it stays.
     internal func trash(_ source: URL) throws -> Bool {
         report(["Deleting: \(display(source))"])
         defer { add(Measure(items: 1)) }
         let item = try entry(at: source)
         var unsupported: any Error?
-        let trashed = try attempt(.trash, at: source) {
+        let trashed = try attempt(.trash, at: source, target: nil) {
             do {
                 try self.flushBeforeRemoving(source, item)
                 let removed = try self.removing(item, at: source) {
@@ -30,7 +31,7 @@ extension FileJob {
             return trashed
         }
         guard let item else {
-            return try attempt(.trash, at: source) { throw error }
+            return try attempt(.trash, at: source, target: nil) { throw error }
         }
         guard try confirm(.noTrash, .delete, item) else {
             record(.trash, source, nil, .skipped)
@@ -56,7 +57,9 @@ extension FileJob {
         if let item, isFolder {
             guard depth < depthLimit else {
                 add(measuredBefore(item))
-                _ = try attempt(.removeFolder, at: url) { throw FileJobError.nestedTooDeep(self.display(url)) }
+                _ = try attempt(.removeFolder, at: url, target: nil) {
+                    throw FileJobError.nestedTooDeep(self.display(url))
+                }
                 return false
             }
             // A folder that is another volume (a mounted disk image, a share) is not walked
@@ -94,7 +97,7 @@ extension FileJob {
             record(verb, url, nil, .skipped)
             return false
         }
-        return try attempt(verb, at: url) {
+        return try attempt(verb, at: url, target: nil) {
             if !isFolder { try self.flushBeforeRemoving(url, item) }
             let removed = try self.removing(item, at: url) { try self.remove(url, below: tree) }
             self.record(verb, url, nil, removed ? .done : .skipped)
@@ -154,12 +157,16 @@ extension FileJob {
     /// asked under the same lock as any other. An Abort or Cancel in any of them stops the others,
     /// and the function returns only when the workers are done.
     private func deleteLeaves(asking: [FileItem], quiet: [FileItem], tree: URL, with pool: Pool) throws -> Bool {
-        /// What the workers found out, under a lock of its own. Unchecked `Sendable`: all state
-        /// is guarded by `lock`.
+        // What the workers found out, under a lock of its own. Unchecked `Sendable`: all state
+        // is guarded by `lock`.
         final class Tally: @unchecked Sendable {
             let lock = NSLock()
             var kept = false
-            var failure: any Error?
+            var failure: (any Error)?
+
+            deinit {
+                // Nothing to release.
+            }
         }
         let tally = Tally()
         let group = DispatchGroup()
@@ -272,6 +279,27 @@ extension FileJob {
                 if let flags { FileIdentity.restoreFlags(flags, of: url) }
                 throw error
             }
+        }
+    }
+
+    /// Deletes every source, to the Trash or for good; job thread.
+    internal func runDelete(toTrash: Bool, _ result: inout JobResult) {
+        do {
+            for (slot, source) in sources.enumerated() {
+                try checkCancelled()
+                let deleted = try autoreleasepool { () throws -> Bool in
+                    guard try hasSafeName(source, verb: toTrash ? .trash : .delete) else {
+                        return false
+                    }
+                    return try toTrash
+                        ? trash(source)
+                        : deleteTree(source, item: topItem(slot, source), isTopLevel: true, tree: nil, depth: 0)
+                }
+                if deleted { result.completed.append(source) }
+            }
+        } catch {
+            result.cancelled = true
+            halt()
         }
     }
 }

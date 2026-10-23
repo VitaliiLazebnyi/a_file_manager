@@ -1,15 +1,61 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// The overwrite rules: what happens to a file whose name is taken, and the questions about
+/// protected items.
 extension FileJob {
+    /// Where an answer to a name that is taken leads: to a plan (nil: skip the file), or to
+    /// planning again at another location.
+    private enum Next {
+        /// The file is planned again for this location: another name, or the old one made free.
+        case again(URL)
+        /// The plan for the file; nil skips it.
+        case decided(Plan?)
+    }
+
+    /// The rule for the rest of the job that an answer "for all" sets; nil for an answer that
+    /// holds for one file only.
+    private static func rule(of answer: ConflictChoice) -> OverwriteMode? {
+        switch answer {
+        case .overwriteAll:
+            return .overwriteAll
+
+        case .skipAll:
+            return .skipAll
+
+        case .overwriteAllOlder:
+            return .overwriteOlder
+
+        case .overwriteAllOlderOrSame:
+            return .overwriteOlderOrSame
+
+        case .copyAllLarger:
+            return .copyLarger
+
+        case .copyAllSmaller:
+            return .copySmaller
+
+        case .renameOlderSkipNewer:
+            return .renameOlderSkipNewer
+
+        case .autoRenameCopied:
+            return .autoRenameCopied
+
+        case .autoRenameExisting:
+            return .autoRenameExisting
+
+        default:
+            return nil
+        }
+    }
+
     /// Applies the overwrite rules (07 › Name collisions) to one file.
     ///
     /// Job thread only. `ownOutput`: what is found at the target may be a file this very job wrote,
     /// from another source that maps to the same name. `isTaken` names targets that are spoken for.
     /// Nil: the file is skipped.
-    internal func plan(for item: FileItem, at destination: URL, ownOutput: Bool, isTaken: (URL) -> Bool) throws -> Plan?
+    internal func plan(for item: FileItem, at destination: URL, ownOutput: Bool, isTaken: (URL) -> Bool) throws
+        -> Plan?
     {
         if destination.isSameLocation(as: item.url) { throw FileJobError.copyToItself }
         guard let existing = try entry(at: destination) else {
@@ -32,67 +78,79 @@ extension FileJob {
         // Another name of the very same file (a hard link): there is nothing to copy.
         if FileIdentity.sameFile(existing.url, item.url) { throw FileJobError.copyToItself }
         if existing.isRealDirectory { throw FileJobError.targetIsFolder(display(destination)) }
+        let choice = try conflictChoice(existing, item, ownOutput: ownOutput)
+        switch try follow(choice, for: item, meeting: existing, at: destination, isTaken: isTaken) {
+        case .again(let location):
+            return try plan(for: item, at: location, ownOutput: ownOutput, isTaken: isTaken)
+
+        case .decided(let plan):
+            return plan
+        }
+    }
+
+    /// What an answer for one file means for `item`, whose name at `destination` is taken by `existing`.
+    private func follow(
+        _ choice: ConflictChoice,
+        for item: FileItem,
+        meeting existing: FileItem,
+        at destination: URL,
+        isTaken: (URL) -> Bool
+    ) throws -> Next {
         let folder = destination.deletingLastPathComponent()
-        switch try conflictChoice(existing, item, ownOutput: ownOutput) {
+        switch choice {
         case .skip, .skipAll, .cancel:
-            return nil
+            return .decided(nil)
 
         case .rename(let name):
-            return try plan(for: item, at: folder.appending(name: name), ownOutput: ownOutput, isTaken: isTaken)
+            return .again(folder.appending(name: name))
 
         case .autoRenameCopied:
-            let free = UniqueName.available(
-                for: destination,
-                in: fileSystems,
-                cancellation: cancellation,
-                isTaken: isTaken
-            )
-            // A name found while the job was being stopped is not known to be free.
-            try checkCancelled()
-            return .write(free, replacing: false)
+            return .decided(.write(try freeName(for: destination, isTaken: isTaken), replacing: false))
 
         case .renameExisting(let name):
-            try fileSystems.provider(for: destination)
-                .move(
-                    destination,
-                    to: folder.appending(name: name),
-                    replacing: false,
-                    cancellation: cancellation
-                )
-            record(.rename, destination, folder.appending(name: name), .done)
-            return try plan(for: item, at: destination, ownOutput: ownOutput, isTaken: isTaken)
+            try moveAside(destination, to: folder.appending(name: name))
+            return .again(destination)
 
         case .autoRenameExisting:
-            let free = UniqueName.available(
-                for: destination,
-                in: fileSystems,
-                cancellation: cancellation,
-                isTaken: isTaken
-            )
-            try checkCancelled()
-            try fileSystems.provider(for: destination)
-                .move(
-                    destination,
-                    to: free,
-                    replacing: false,
-                    cancellation: cancellation
-                )
-            record(.rename, destination, free, .done)
-            return try plan(for: item, at: destination, ownOutput: ownOutput, isTaken: isTaken)
+            try moveAside(destination, to: try freeName(for: destination, isTaken: isTaken))
+            return .again(destination)
 
-        case .append:
-            guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
-            return try mayTouch(existing, for: .overwrite) ? .append(destination) : nil
-
-        case .resume:
-            // A link has no length of its own and would pass for the start of anything.
-            guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
-            guard existing.size < item.size else { throw FileJobError.cannotResume(display(destination)) }
-            return .resume(destination)
+        case .append, .resume:
+            return .decided(try continuing(existing, with: item, at: destination, resuming: choice == .resume))
 
         default:
-            return try mayTouch(existing, for: .overwrite) ? .write(destination, replacing: true) : nil
+            return .decided(try mayTouch(existing, for: .overwrite) ? .write(destination, replacing: true) : nil)
         }
+    }
+
+    /// A free name next to `destination`, none of those `isTaken` names.
+    private func freeName(for destination: URL, isTaken: (URL) -> Bool) throws -> URL {
+        let free = UniqueName.available(for: destination, in: fileSystems, cancellation: cancellation, isTaken: isTaken)
+        // A name found while the job was being stopped is not known to be free.
+        try checkCancelled()
+        return free
+    }
+
+    /// Renames the file at `destination` to `aside`, to make room for the one that is copied.
+    private func moveAside(_ destination: URL, to aside: URL) throws {
+        try fileSystems.provider(for: destination)
+            .move(destination, to: aside, replacing: false, cancellation: cancellation)
+        record(.rename, destination, aside, .done)
+    }
+
+    /// The plan to Append to `existing`, or to Resume it, which only a plain file allows.
+    ///
+    /// A resumed target must be shorter than the source; an appended one is asked about when it is protected.
+    private func continuing(_ existing: FileItem, with item: FileItem, at destination: URL, resuming: Bool) throws
+        -> Plan?
+    {
+        // A link has no length of its own and would pass for the start of anything.
+        guard isPlainFile(existing) else { throw FileJobError.notPlainFile(display(destination)) }
+        if resuming {
+            guard existing.size < item.size else { throw FileJobError.cannotResume(display(destination)) }
+            return .resume(destination)
+        }
+        return try mayTouch(existing, for: .overwrite) ? .append(destination) : nil
     }
 
     /// A file with contents of its own: not a link (a write would land on what it points to),
@@ -112,87 +170,71 @@ extension FileJob {
     private func conflictChoice(_ existing: FileItem, _ source: FileItem, ownOutput: Bool) throws -> ConflictChoice {
         try decisions.withLock {
             if mode == .ask {
-                switch try delegateOrStop().job(self, conflictAt: existing, source: source) {
-                case .overwriteAll:
-                    mode = .overwriteAll
-
-                case .skipAll:
-                    mode = .skipAll
-
-                case .overwriteAllOlder:
-                    mode = .overwriteOlder
-
-                case .overwriteAllOlderOrSame:
-                    mode = .overwriteOlderOrSame
-
-                case .copyAllLarger:
-                    mode = .copyLarger
-
-                case .copyAllSmaller:
-                    mode = .copySmaller
-
-                case .renameOlderSkipNewer:
-                    mode = .renameOlderSkipNewer
-
-                case .autoRenameCopied:
-                    mode = .autoRenameCopied
-
-                case .autoRenameExisting:
-                    mode = .autoRenameExisting
-
-                case .cancel:
-                    throw Cancelled()
-
-                case let single:
-                    return single
+                let answer = try delegateOrStop().job(self, conflictAt: existing, source: source)
+                if answer == .cancel { throw Cancelled() }
+                guard let rule = Self.rule(of: answer) else {
+                    return answer
                 }
+                mode = rule
             }
-            if ownOutput {
-                // The file at the target is one this job wrote a moment ago, from another source
-                // of the same name. No rule "for all" was given with that in mind: only an
-                // answer for this one file overwrites it. Under a rule both files are kept.
-                switch mode {
-                case .skipAll:
-                    return .skip
+            return ownOutput ? choiceForOwnOutput(existing, source) : choiceByRule(existing, source)
+        }
+    }
 
-                case .autoRenameExisting:
-                    return .autoRenameExisting
+    /// The answer for a file whose name is taken by one this job wrote a moment ago.
+    ///
+    /// That file came from another source of the same name. No rule "for all" was given with
+    /// that in mind: only an answer for this one file overwrites it. Under a rule both files are
+    /// kept.
+    ///
+    /// Called with `decisions` held.
+    private func choiceForOwnOutput(_ existing: FileItem, _ source: FileItem) -> ConflictChoice {
+        switch mode {
+        case .skipAll:
+            return .skip
 
-                case .renameOlderSkipNewer:
-                    return isNewer(source, than: existing) ? .autoRenameExisting : .skip
+        case .autoRenameExisting:
+            return .autoRenameExisting
 
-                default:
-                    return .autoRenameCopied
-                }
-            }
-            switch mode {
-            case .ask, .overwriteAll:
-                return .overwrite
+        case .renameOlderSkipNewer:
+            return isNewer(source, than: existing) ? .autoRenameExisting : .skip
 
-            case .skipAll:
-                return .skip
+        default:
+            return .autoRenameCopied
+        }
+    }
 
-            case .overwriteOlder:
-                return isNewer(source, than: existing) ? .overwrite : .skip
+    /// The answer the rule of the job gives for one file.
+    ///
+    /// Called with `decisions` held.
+    private func choiceByRule(_ existing: FileItem, _ source: FileItem) -> ConflictChoice {
+        switch mode {
+        case .ask, .overwriteAll:
+            return .overwrite
 
-            case .overwriteOlderOrSame:
-                return !isNewer(existing, than: source) ? .overwrite : .skip
+        case .skipAll:
+            return .skip
 
-            case .copyLarger:
-                return source.size > existing.size ? .overwrite : .skip
+        case .overwriteOlder:
+            return isNewer(source, than: existing) ? .overwrite : .skip
 
-            case .copySmaller:
-                return source.size < existing.size ? .overwrite : .skip
+        case .overwriteOlderOrSame:
+            return !isNewer(existing, than: source) ? .overwrite : .skip
 
-            case .autoRenameCopied:
-                return .autoRenameCopied
+        case .copyLarger:
+            return source.size > existing.size ? .overwrite : .skip
 
-            case .autoRenameExisting:
-                return .autoRenameExisting
+        case .copySmaller:
+            return source.size < existing.size ? .overwrite : .skip
 
-            case .renameOlderSkipNewer:
-                return isNewer(source, than: existing) ? .autoRenameExisting : .skip
-            }
+        case .autoRenameCopied:
+            return .autoRenameCopied
+
+        case .autoRenameExisting:
+            return .autoRenameExisting
+
+        case .renameOlderSkipNewer:
+            return isNewer(source, than: existing) ? .autoRenameExisting : .skip
         }
     }
 
@@ -234,20 +276,20 @@ extension FileJob {
         return true
     }
 
-    internal func confirm(_ reason: ProtectionQuestion.Reason, _ purpose: ProtectionQuestion.Purpose, _ item: FileItem)
-        throws -> Bool
-    {
+    /// Asks the second question about a protected item, unless "all" was answered for the same
+    /// question before; false: leave it.
+    internal func confirm(
+        _ reason: ProtectionQuestion.Reason,
+        _ purpose: ProtectionQuestion.Purpose,
+        _ item: FileItem
+    ) throws -> Bool {
         try decisions.withLock {
             let key = "\(reason)-\(purpose)"
             if confirmedForAll.contains(key) {
                 return true
             }
-            switch try delegateOrStop()
-                .job(
-                    self,
-                    confirm: ProtectionQuestion(reason: reason, purpose: purpose, item: item)
-                )
-            {
+            let question = ProtectionQuestion(reason: reason, purpose: purpose, item: item)
+            switch try delegateOrStop().job(self, confirm: question) {
             case .proceed:
                 return true
 

@@ -86,7 +86,7 @@ internal struct Review2FileopsP2PluginTests {
         let fileSystems = FileSystemRegistry()
         fileSystems.register(memory)
         let bridge = JobBridge(monitor: P2DeferredJobs.Monitor(), interaction: interaction, fileSystems: fileSystems)
-        let job = FileJob(kind: .copy, sources: [], fileSystems: fileSystems)
+        let job = FileJob(kind: .copy, sources: [], target: nil, fileSystems: fileSystems)
         let old = FileItem(url: memory.url("/B/one.txt"), name: "one.txt", stat: .init(size: 1))
         let new = FileItem(url: memory.url("/A/one.txt"), name: "one.txt", stat: .init(size: 2))
         // Each is answered with Return.

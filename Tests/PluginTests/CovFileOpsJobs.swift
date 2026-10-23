@@ -23,7 +23,7 @@ internal struct CovFileOpsJobs {
     /// Whoever does not care merges, goes ahead with what is protected and stays out of other volumes.
     @Test
     internal func theDelegatesDefaults() {
-        let job = FileJob(kind: .copy, sources: [], fileSystems: fileSystems)
+        let job = FileJob(kind: .copy, sources: [], target: nil, fileSystems: fileSystems)
         let folder = FileItem(url: memory.url("/A"), name: "A", kind: .directory)
         let answers = Answers()
         #expect(answers.job(job, mergeInto: folder, source: folder) == .merge)

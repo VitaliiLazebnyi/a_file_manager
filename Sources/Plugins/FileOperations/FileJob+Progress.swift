@@ -1,8 +1,7 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// The progress of a job: the counters, and the reports to the delegate.
 extension FileJob {
     /// Whether enough time has passed for the next report.
     ///
@@ -55,6 +54,7 @@ extension FileJob {
         }
     }
 
+    /// Counts `measure` as done.
     internal func add(_ measure: Measure) {
         counters.withLock { done += measure }
     }

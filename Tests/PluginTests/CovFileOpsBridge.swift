@@ -20,7 +20,7 @@ internal struct CovFileOpsBridge {
     }
 
     private var job: FileJob {
-        FileJob(kind: .copy, sources: [], fileSystems: fileSystems)
+        FileJob(kind: .copy, sources: [], target: nil, fileSystems: fileSystems)
     }
 
     /// `/A/new.txt` (two bytes) and `/B/old.txt` (one byte), and `/B/same.txt` like the new one.

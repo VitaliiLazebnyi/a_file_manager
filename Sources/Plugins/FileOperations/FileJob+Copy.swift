@@ -1,8 +1,8 @@
-import AFMContracts
 import AFMKernel
 import Foundation
-import os
 
+/// Writing one file: by the file system's own move or copy where it can, else as a stream,
+/// always under a temporary name until it is complete.
 extension FileJob {
     /// True when the item has been copied for a move and its source is still to be removed.
     internal func execute(_ plan: Plan, _ item: FileItem, _ flight: Flight) throws -> Bool {
@@ -41,13 +41,15 @@ extension FileJob {
     /// True when it was copied for a move: the caller removes the source, as a step that can be
     /// retried.
     private func put(_ item: FileItem, at destination: URL, replacing: Bool, _ flight: Flight) throws -> Bool {
-        let (from, to) = (try fileSystems.provider(for: item.url), try fileSystems.provider(for: destination))
-        try ensureFolder(destination.deletingLastPathComponent(), in: to)
-        if isMove, from === to {
+        let (from, onto) = (try fileSystems.provider(for: item.url), try fileSystems.provider(for: destination))
+        try ensureFolder(destination.deletingLastPathComponent(), in: onto)
+        if isMove, from === onto {
             do {
                 try from.move(item.url, to: destination, replacing: replacing, cancellation: cancellation)
                 return false
-            } catch FileSystemError.crossesVolumes {}
+            } catch FileSystemError.crossesVolumes {
+                // The two places lie on different volumes: the file is copied and the source removed.
+            }
         }
         // From here on the file is read and written anew, which must never happen onto the file
         // itself: the copy would take the source's place, and a move would then remove it.
@@ -55,7 +57,7 @@ extension FileJob {
         // A pipe or a device is not read: there is nothing in it to copy, and opening it may
         // never return. A link to one is still copied where links are copied as links.
         if item.isSpecial || FileIdentity.isSpecialNode(item.url, followingLinks: true) {
-            let copiesLink = from === to && !followsLinks && (item.isSymlink || FileIdentity.isSymlink(item.url))
+            let copiesLink = from === onto && !followsLinks && (item.isSymlink || FileIdentity.isSymlink(item.url))
             if !copiesLink { throw FileJobError.specialFile(display(item.url)) }
         }
         // The copy is written under a temporary name next to the target and renamed when it is
@@ -63,21 +65,21 @@ extension FileJob {
         // leaves a partial one under the real name.
         let temporary = temporaryName(next: destination)
         do {
-            try copyContents(of: item, to: temporary, from: from, to: to, flight)
+            try copyContents(of: item, to: temporary, from: from, to: onto, flight)
             if options.verifies { try verify(temporary, against: item.url) }
-            try to.move(temporary, to: destination, replacing: replacing, cancellation: cancellation)
+            try onto.move(temporary, to: destination, replacing: replacing, cancellation: cancellation)
         } catch {
             // What arrived of a stream can be kept for Resume, when that was asked for.
-            let tidying = patience(with: to)
+            let tidying = patience(with: onto)
             if options.keepsPartialFiles, !replacing, !(error is FileJobError),
-                let left = to.item(at: temporary, cancellation: tidying),
+                let left = onto.item(at: temporary, cancellation: tidying),
                 left.size > 0, !left.isSymlink,
-                (try? to.move(temporary, to: destination, replacing: false, cancellation: tidying)) != nil
+                (try? onto.move(temporary, to: destination, replacing: false, cancellation: tidying)) != nil
             {
                 flight.partial = (destination, left.size)
                 throw error
             }
-            discard(temporary, in: to)
+            discard(temporary, in: onto)
             throw error
         }
         return isMove
@@ -133,13 +135,16 @@ extension FileJob {
                     return
                 }
             }
-        } catch {}
+        } catch {
+            // Any other failure: whether the file is still there is looked at below.
+        }
         // Still there (a job that is being stopped does not ask): the user hears of it.
         if !isStopping, provider.item(at: temporary, cancellation: cancellation) != nil {
             note(.delete, at: temporary, "This temporary file of an interrupted copy could not be removed.")
         }
     }
 
+    /// A new temporary name in the folder of `destination` (`.afm-<UUID>.tmp`).
     internal func temporaryName(next destination: URL) -> URL {
         destination.deletingLastPathComponent().appending(name: ".afm-\(UUID().uuidString).tmp")
     }
@@ -152,14 +157,14 @@ extension FileJob {
         of item: FileItem,
         to destination: URL,
         from: any FileSystemProvider,
-        to: any FileSystemProvider,
+        to onto: any FileSystemProvider,
         _ flight: Flight
     ) throws {
         // A link that is followed is read through, which only a stream does.
         // (A link that was not followed, because it leads back into its own folder, comes
         // here as the link it is and is copied as one.)
         let followed = try followsLinks && !item.isSymlink && entry(at: item.url)?.isSymlink == true
-        if from === to, !followed {
+        if from === onto, !followed {
             do {
                 // With the job's flag: a copy the file system makes in one piece (a clone, a
                 // copy on a server) never asks how far it is, and ends with the job all the same.
@@ -168,7 +173,7 @@ extension FileJob {
                     return !self.isStopping
                 }
                 if !options.preservesAttributes, !item.isSymlink {
-                    try? to.setAttributes(
+                    try? onto.setAttributes(
                         FileAttributes(modified: Date(), permissions: 0o644),
                         of: destination,
                         cancellation: cancellation
@@ -184,22 +189,26 @@ extension FileJob {
         // Between two file systems the contents are read from one and written to the other.
         let reader = try from.read(item.url, cancellation: cancellation)
         defer { reader.close() }
-        let writer = try to.write(destination, cancellation: cancellation)
+        let writer = try onto.write(destination, cancellation: cancellation)
         // A read or write that waits for a server ends when the job is cancelled or aborted.
         let tokens = interrupting(reader) + interrupting(writer)
-        defer { withExtendedLifetime(tokens) {} }
+        defer { keepArmed(tokens) }
         do {
             try stream(reader, into: writer, flight, alreadyCopied: 0)
-            try writer.close(attributes: attributes(for: item, from: from, to: to))
+            try writer.close(attributes: attributes(for: item, from: from, to: onto))
         } catch {
             try? writer.close(attributes: FileAttributes())
             throw error
         }
-        if let origin = flight.origin { mark(destination, with: origin, in: to, shownAs: item.url) }
+        if let origin = flight.origin { mark(destination, with: origin, in: onto, shownAs: item.url) }
         // A followed link is streamed within one file system, which loses what copying would
         // have kept: tags, flags, creation date. They come from what the link points to.
-        if followed, from === to, options.preservesAttributes, item.url.isFileURL {
-            try? to.copyMetadata(from: item.url.resolvingSymlinksInPath(), to: destination, cancellation: cancellation)
+        if followed, from === onto, options.preservesAttributes, item.url.isFileURL {
+            try? onto.copyMetadata(
+                from: item.url.resolvingSymlinksInPath(),
+                to: destination,
+                cancellation: cancellation
+            )
         }
     }
 
@@ -209,6 +218,7 @@ extension FileJob {
         [cancellation.interrupting(reader), stop.interrupting(reader)]
     }
 
+    /// The same for a writer.
     internal func interrupting(_ writer: any FileWriter) -> [AnyObject] {
         [cancellation.interrupting(writer), stop.interrupting(writer)]
     }
@@ -218,16 +228,16 @@ extension FileJob {
     /// Rights that come from another file system (an archive, a server) were chosen by somebody
     /// else: set-user-ID, set-group-ID and the sticky bit never come along, and on the local disk
     /// the rest is cut by the user's umask, the way `tar` and `unzip` unpack.
-    internal func attributes(for item: FileItem, from: any FileSystemProvider, to: any FileSystemProvider)
+    internal func attributes(for item: FileItem, from: any FileSystemProvider, to onto: any FileSystemProvider)
         -> FileAttributes
     {
         guard options.preservesAttributes else {
             return FileAttributes()
         }
         var permissions = item.permissions
-        if from !== to {
+        if from !== onto {
             permissions &= 0o777
-            if to.scheme == "file" { permissions &= ~Self.umask }
+            if onto.scheme == "file" { permissions &= ~Self.umask }
         }
         return FileAttributes(modified: item.modified, permissions: permissions)
     }
@@ -256,15 +266,25 @@ extension FileJob {
         throws
     {
         var copied = alreadyCopied
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard let block = try reader.read(upToCount: 1 << 20) else {
-                return false
+        var more = true
+        while more {
+            more = try autoreleasepool { () throws -> Bool in
+                guard let block = try reader.read(upToCount: 1 << 20) else {
+                    return false
+                }
+                try checkCancelled()
+                try writer.write(block)
+                copied += Int64(block.count)
+                advance(flight, to: copied)
+                return true
             }
-            try checkCancelled()
-            try writer.write(block)
-            copied += Int64(block.count)
-            advance(flight, to: copied)
-            return true
-        }) {}
+        }
+    }
+
+    /// Keeps the interruptions of a stream armed until here; for a `defer` after the stream's last use.
+    internal func keepArmed(_ tokens: [AnyObject]) {
+        withExtendedLifetime(tokens) {
+            // Nothing to do: the tokens only have to live until now.
+        }
     }
 }

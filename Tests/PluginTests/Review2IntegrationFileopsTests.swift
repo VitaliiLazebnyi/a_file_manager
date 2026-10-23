@@ -143,6 +143,7 @@ internal struct Review2IntegrationFileopsTests {
         let job = FileJob(
             kind: .delete(toTrash: false),
             sources: [box.url("tree"), box.url("alone.txt")],
+            target: nil,
             fileSystems: registry
         )
         job.delegate = replies
@@ -177,7 +178,12 @@ internal struct Review2IntegrationFileopsTests {
             try? FileManager.default.createSymbolicLink(at: sub, withDestinationURL: outside)
         }
         let replies = ReportingReplies()
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("victim")], fileSystems: registry)
+        let job = FileJob(
+            kind: .delete(toTrash: false),
+            sources: [box.url("victim")],
+            target: nil,
+            fileSystems: registry
+        )
         // One after the other, so that the swap comes before every removal in the folder.
         job.options.copiesSmallFilesInParallel = false
         job.delegate = replies

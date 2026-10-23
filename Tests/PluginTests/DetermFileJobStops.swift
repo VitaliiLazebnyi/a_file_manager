@@ -29,7 +29,7 @@ internal struct DetermFileJobStops {
         try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: protected.path)
         let answers = CovFileOpsAnswers()
         answers.protections.value = [.cancel]
-        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], fileSystems: fileSystems)
+        let job = FileJob(kind: .delete(toTrash: false), sources: [box.url("d")], target: nil, fileSystems: fileSystems)
         job.delegate = answers
         let outcome = job.run()
         #expect(outcome.cancelled && box.exists("d/a-protected.txt"))
