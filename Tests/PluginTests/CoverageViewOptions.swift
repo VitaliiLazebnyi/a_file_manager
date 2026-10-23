@@ -1,3 +1,4 @@
+import AFMContracts
 import AFMKernel
 import TestSupport
 import Testing
