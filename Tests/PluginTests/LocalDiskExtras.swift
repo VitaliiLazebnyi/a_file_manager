@@ -1,14 +1,18 @@
 import AFMKernel
 import Foundation
-import LocalFileSystemPlugin
 import TestSupport
 import Testing
+
+@testable import LocalFileSystemPlugin
 
 /// What the local file system keeps when it copies, and what it tells about its surroundings.
 @Suite
 internal struct LocalDiskExtras {
+    /// The file system under test.
     internal let local = LocalFileSystem()
 
+    /// A copy has the creation date, the extended attributes and the rights of its source, and an
+    /// existing destination is refused.
     @Test
     internal func aCopyKeepsCreationDateExtendedAttributesAndFlags() throws {
         let box = try Sandbox()
@@ -27,11 +31,12 @@ internal struct LocalDiskExtras {
         )
         var buffer = [UInt8](repeating: 0, count: 16)
         let length = getxattr(box.url("b.txt").path, "com.example.note", &buffer, 16, 0, 0)
-        #expect(length == 5 && String(decoding: buffer[..<5], as: UTF8.self) == "hello")
+        #expect(length == 5 && String(bytes: buffer[..<5], encoding: .utf8) == "hello")
         // An existing destination is refused and stays as it is.
         #expect(throws: (any Error).self) { try local.copy(source, to: box.url("b.txt")) { _ in true } }
     }
 
+    /// A locked file refuses every change but the right to write, which unlocks it.
     @Test
     internal func makingALockedFileWritableUnlocksIt() throws {
         let box = try Sandbox()
@@ -48,6 +53,7 @@ internal struct LocalDiskExtras {
         #expect(!box.exists("locked.txt"))
     }
 
+    /// A location that does not exist yet is answered for the volume of the folder it will be in.
     @Test
     internal func volumesAreFoundAlsoForPlacesThatDoNotExistYet() throws {
         let box = try Sandbox()
@@ -63,6 +69,8 @@ internal struct LocalDiskExtras {
         #expect(local.volume(of: URL(fileURLWithPath: "/"))?.isLocal == true)
     }
 
+    /// The places are home and its usual folders, Applications, iCloud Drive when there is one, and
+    /// the start-up disk once.
     @Test
     internal func placesListTheUsualFoldersAndTheVolumes() {
         let places = local.settledPlaces()
@@ -80,5 +88,33 @@ internal struct LocalDiskExtras {
             )
             .path
         #expect(names.contains("iCloud Drive") == FileManager.default.fileExists(atPath: cloud))
+    }
+
+    /// The folder above a path is found by its text, slashes at the end ignored, as the walk up to
+    /// the nearest existing folder needs it.
+    @Test
+    internal func theFolderAboveAPathIsFoundByItsText() {
+        #expect(LocalFileSystem.parentPath(of: "/a/b") == "/a")
+        #expect(LocalFileSystem.parentPath(of: "/a/b/") == "/a")
+        #expect(LocalFileSystem.parentPath(of: "/a/é/c") == "/a/é")
+        #expect(LocalFileSystem.parentPath(of: "/a") == "/")
+        #expect(LocalFileSystem.parentPath(of: "/") == "/")
+        #expect(LocalFileSystem.parentPath(of: "name").isEmpty)
+    }
+
+    /// A mount table and a table of remote changes besides the program's own read and count
+    /// alike, and go away when nobody holds them.
+    @Test
+    internal func aMountTableAndATableOfRemoteChangesOfTheirOwnWorkLikeTheShared() {
+        weak var table: MountTable?
+        weak var changes: RemoteChanges?
+        do {
+            let ownTable = MountTable()
+            let ownChanges = RemoteChanges()
+            #expect(ownTable.mount(containing: "/").path == "/" && ownTable.isLocal("/"))
+            #expect(ownChanges.strandedCalls(on: "/") == 0)
+            (table, changes) = (ownTable, ownChanges)
+        }
+        #expect(table == nil && changes == nil)
     }
 }

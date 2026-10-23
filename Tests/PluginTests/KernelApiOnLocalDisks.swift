@@ -2,18 +2,20 @@ import AFMKernel
 import Foundation
 import TestSupport
 import Testing
+import os
 
 @testable import LocalFileSystemPlugin
 
 /// The calls the provider interface gained, as the local disks answer them.
 @Suite
 internal struct KernelApiOnLocalDisks {
+    /// The local disks with the system's own probes, as the program uses them.
     internal let local = LocalFileSystem()
 
     private func status(_ url: URL) -> stat {
-        var st = stat()
-        lstat(url.path, &st)
-        return st
+        var info = stat()
+        lstat(url.path, &info)
+        return info
     }
 
     private func attribute(_ name: String, of url: URL) -> Data? {
@@ -37,8 +39,16 @@ internal struct KernelApiOnLocalDisks {
         try url.setResourceValues(values)
     }
 
+    /// The mount point of the volume `info` describes, as a path.
+    private func mountPath(of info: statfs) -> String {
+        withUnsafeBytes(of: info.f_mntonname) { name in
+            String(bytes: name.prefix { $0 != 0 }, encoding: .utf8) ?? ""
+        }
+    }
+
     // MARK: Cancellation
 
+    /// A listing cancelled during a batch stops before the next one, and a flag set before the start reads nothing.
     @Test
     internal func aCancelledListingStopsBeforeTheNextBuffer() throws {
         let box = try Sandbox()
@@ -54,8 +64,8 @@ internal struct KernelApiOnLocalDisks {
             close(descriptor)
         }
         var (pieces, whole) = (0, 0)
-        try local.list(box.root, showHidden: true, cancellation: CancellationFlag()) {
-            whole += $0.count
+        try local.list(box.root, showHidden: true, cancellation: CancellationFlag()) { batch in
+            whole += batch.count
             pieces += 1
             return true
         }
@@ -76,6 +86,7 @@ internal struct KernelApiOnLocalDisks {
 
     // MARK: Continuing a file
 
+    /// A file is cut to a length and continued in place, or continued at its end, and keeps its inode.
     @Test
     internal func aFileIsContinuedInPlace() throws {
         let box = try Sandbox()
@@ -120,6 +131,8 @@ internal struct KernelApiOnLocalDisks {
 
     // MARK: Metadata
 
+    /// Copying the metadata carries a folder's tags, extended attributes, hidden flag and creation date, and a link
+    /// is not followed.
     @Test
     internal func aFoldersTagsHiddenFlagAndCreationDateSurvive() throws {
         let box = try Sandbox()
@@ -164,10 +177,12 @@ internal struct KernelApiOnLocalDisks {
         try local.copyMetadata(from: file, to: other)
         #expect(attribute("user.note", of: other) == Data("file".utf8) && box.read("b.txt") == "other")
         // From elsewhere, or to nothing: an error the caller may pass over.
-        #expect(throws: FileSystemError.self) { try local.copyMetadata(from: URL(string: "mem:///x")!, to: copy) }
+        let elsewhere = try #require(URL(string: "mem:///x"))
+        #expect(throws: FileSystemError.self) { try local.copyMetadata(from: elsewhere, to: copy) }
         #expect(throws: (any Error).self) { try local.copyMetadata(from: source, to: box.url("missing")) }
     }
 
+    /// A lock is copied last, so the folder can be filled first, and the locked copy can still be renamed.
     @Test
     internal func aLockComesLastAndTheCopyCanStillBeTakenAway() throws {
         let box = try Sandbox()
@@ -193,6 +208,7 @@ internal struct KernelApiOnLocalDisks {
 
     // MARK: Quarantine
 
+    /// The quarantine mark is read from a file and set on a file or a folder; a missing item has none.
     @Test
     internal func theQuarantineMarkIsReadAndSet() throws {
         let box = try Sandbox()
@@ -217,6 +233,8 @@ internal struct KernelApiOnLocalDisks {
 
     // MARK: Free space
 
+    /// An old free space figure is answered at once and corrected in the background, which is announced on the main
+    /// thread.
     @Test
     internal func aStaleFreeSpaceFigureIsAnsweredAtOnceAndCorrectedBehind() async throws {
         let box = try Sandbox()
@@ -225,60 +243,54 @@ internal struct KernelApiOnLocalDisks {
         let (plain, spare): (Int64, Int64) = (100 << 30, 7 << 30)
         var probes = LocalProbes()
         probes.freeSpace = { _ in (available: plain, important: plain + spare) }
-        let local = LocalFileSystem(probes: probes)
+        let disks = LocalFileSystem(probes: probes)
         var info = statfs()
         #expect(statfs(box.root.path, &info) == 0)
-        let mountPoint = withUnsafeBytes(of: &info.f_mntonname) {
-            String(cString: $0.bindMemory(to: CChar.self).baseAddress!)
-        }
+        let mountPoint = mountPath(of: info)
         func known() -> Int64? {
-            local.spareLock.lock()
-            defer { local.spareLock.unlock() }
-            return local.spareSpace[mountPoint]?.bytes
+            disks.spareLock.lock()
+            defer { disks.spareLock.unlock() }
+            return disks.spareSpace[mountPoint]?.bytes
         }
         // The first question waits for the figure the Finder shows, and remembers the difference.
-        #expect(local.volume(of: box.root)?.freeBytes == plain + spare)
+        #expect(disks.volume(of: box.root)?.freeBytes == plain + spare)
         #expect(known() == spare)
 
-        final class Heard: @unchecked Sendable {
-            let lock = NSLock()
-            var roots: [URL] = []
-        }
-        let heard = Heard()
+        // The volume roots announced on the main thread.
+        let heard = OSAllocatedUnfairLock<[URL]>(initialState: [])
         let observer = NotificationCenter.default.addObserver(
             forName: FileSystemRegistry.volumeInfoDidChange,
-            object: local,
+            object: disks,
             queue: nil
         ) { note in
             guard Thread.isMainThread, let root = note.userInfo?[FileSystemRegistry.volumeRootKey] as? URL else {
                 return
             }
-            heard.lock.lock()
-            heard.roots.append(root)
-            heard.lock.unlock()
+            heard.withLock { $0.append(root) }
         }
         defer { NotificationCenter.default.removeObserver(observer) }
         func wasHeard() -> Bool {
-            heard.lock.lock()
-            defer { heard.lock.unlock() }
-            return heard.roots.contains { $0.path == mountPoint }
+            heard.withLock { roots in roots.contains { $0.path == mountPoint } }
         }
 
         // A measurement that is old and, by now, a gigabyte and a half off.
         let wrong = spare + 3 << 29
-        local.spareLock.withLock {
-            local.spareSpace[mountPoint] = (
-                wrong, DispatchTime.now().uptimeNanoseconds - 600_000_000_000, false, info.f_fsid
+        disks.spareLock.withLock {
+            disks.spareSpace[mountPoint] = LocalFileSystem.SpareMeasurement(
+                bytes: wrong,
+                measured: DispatchTime.now().uptimeNanoseconds - 600_000_000_000,
+                isMeasuring: false,
+                volume: info.f_fsid
             )
         }
         // Answered from what is known, without waiting for the system…
-        #expect(local.volume(of: box.root)?.freeBytes == plain + wrong)
+        #expect(disks.volume(of: box.root)?.freeBytes == plain + wrong)
         // …and put right behind the scenes, which is announced on the main thread.
         // (Waited for as a condition: the queues are busy while every test runs at once.)
         let patience = Date(timeIntervalSinceNow: Wait.ceiling)
         while !wasHeard(), Date() < patience { try await Task.sleep(nanoseconds: 5_000_000) }
         #expect(wasHeard())
-        #expect(local.volume(of: box.root)?.freeBytes == plain + spare)
+        #expect(disks.volume(of: box.root)?.freeBytes == plain + spare)
         #expect(known() == spare)
     }
 }

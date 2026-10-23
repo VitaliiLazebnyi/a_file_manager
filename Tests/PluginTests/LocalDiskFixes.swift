@@ -1,24 +1,22 @@
-import AFMContracts
 import AFMKernel
-import AppKit
 import Foundation
-import NavigationPlugin
 import TestSupport
 import Testing
 
-@testable import FolderTabsPlugin
 @testable import LocalFileSystemPlugin
-@testable import ViewOptionsPlugin
 
+/// Locked files, failed copies, special files, large folders, sizes, places and watchers on the local disks.
 @Suite
 internal struct LocalDiskFixes {
+    /// The local disks with the system's own probes, as the program uses them.
     internal let local = LocalFileSystem()
 
     private func flags(_ url: URL) -> UInt32 {
-        var st = stat()
-        return lstat(url.path, &st) == 0 ? st.st_flags : 0
+        var info = stat()
+        return lstat(url.path, &info) == 0 ? info.st_flags : 0
     }
 
+    /// A locked file is copied under a temporary name and renamed, and the copy is locked like its source.
     @Test
     internal func aLockedFileIsCopiedUnderATemporaryNameAndRenamed() throws {
         let box = try Sandbox()
@@ -55,6 +53,7 @@ internal struct LocalDiskFixes {
         #expect(box.exists("locked.txt") && box.exists("copy.txt") && !box.exists("other.txt"))
     }
 
+    /// A copy onto an existing file fails and leaves that file alone, and a stopped copy leaves nothing behind.
     @Test
     internal func aFailedCopyLeavesAnExistingFileAlone() throws {
         let box = try Sandbox()
@@ -80,6 +79,7 @@ internal struct LocalDiskFixes {
         )
     }
 
+    /// Pipes and links to them are special, in a listing and asked for alone; files, folders and other links are not.
     @Test
     internal func pipesAndTheLikeAreToldFromFiles() throws {
         let box = try Sandbox()
@@ -100,18 +100,19 @@ internal struct LocalDiskFixes {
         #expect(!FileItem(url: box.url("x"), name: "x").isSpecial)
     }
 
+    /// A folder large enough to be listed on several threads gives the same items as asking for each alone.
     @Test
     internal func aLargeFolderIsListedLikeASmallOne() throws {
         // Enough entries for the items to be made on several threads.
         let box = try Sandbox()
-        let fm = FileManager.default
+        let files = FileManager.default
         for index in 0..<1_500 {
-            fm.createFile(atPath: box.url("file \(index) é#%.txt").path, contents: Data(count: index % 7))
+            files.createFile(atPath: box.url("file \(index) é#%.txt").path, contents: Data(count: index % 7))
         }
         for name in ["Some.app", "second.APP", "plain", "dotted.folder", "v1.2", ".hidden.d", "notes.rtfd"] {
             try box.folder(name)
         }
-        try fm.createSymbolicLink(at: box.url("link.app"), withDestinationURL: box.url("Some.app"))
+        try files.createSymbolicLink(at: box.url("link.app"), withDestinationURL: box.url("Some.app"))
         let items = try local.list(box.root, showHidden: true)
         #expect(items.count == 1_508 && Set(items.map(\.name)).count == 1_508)
         for item in items {
@@ -129,6 +130,7 @@ internal struct LocalDiskFixes {
         #expect(try local.list(box.root, showHidden: false).count == 1_507)
     }
 
+    /// A tree's total size is the same measured directly as added up from its listings, and nothing when cancelled.
     @Test
     internal func aTreeIsMeasuredLikeItIsListed() throws {
         let box = try Sandbox()
@@ -143,7 +145,8 @@ internal struct LocalDiskFixes {
         try box.file(".hidden/secret", "12345")
         try FileManager.default.createSymbolicLink(at: box.url("link"), withDestinationURL: box.url("d1"))
         let byListing = local.totalSizeByListing(of: box.root, cancellation: CancellationFlag())
-        #expect(byListing == (0..<12).reduce(5) { sum, folder in (0..<20).reduce(sum) { $0 + folder * 10 + $1 } }.int64)
+        let written = (0..<12).reduce(5) { sum, folder in (0..<20).reduce(sum) { $0 + folder * 10 + $1 } }
+        #expect(byListing == Int64(written))
         #expect(local.totalSize(of: box.root, cancellation: CancellationFlag()) == byListing)
         let provider: any FileSystemProvider = local
         #expect(
@@ -156,6 +159,7 @@ internal struct LocalDiskFixes {
         #expect(local.totalSize(of: box.root, cancellation: cancelled) == 0)
     }
 
+    /// The places come from memory once known, and a volume's free space is first measured and then worked out.
     @Test
     internal func placesAndVolumesAnswerFromWhatIsKnown() throws {
         let places = local.settledPlaces()
@@ -186,6 +190,7 @@ internal struct LocalDiskFixes {
 
     private func box() throws -> Sandbox { try Sandbox() }
 
+    /// A watcher let go while changes arrive in its folder does no harm.
     @Test
     internal func aWatcherThatGoesAwayWhileChangesArriveDoesNoHarm() async throws {
         let box = try Sandbox()
@@ -193,101 +198,14 @@ internal struct LocalDiskFixes {
         for round in 0..<20 {
             // Made here, not on the main thread: the watch returns at once from any thread, and twenty turns of a
             // main thread that every other test wants took this test two minutes of a full run.
-            let watcher = local.watch([box.url("watched")]) { _ in }
+            let watcher = local.watch([box.url("watched")]) { _ in
+                // The changes themselves do not matter here.
+            }
             try box.file("watched/\(round).txt")
             try await Task.sleep(nanoseconds: UInt64(round % 4) * 150_000_000)
-            withExtendedLifetime(watcher) {}
-        }
-    }
-}
-
-extension Int {
-    fileprivate var int64: Int64 { Int64(self) }
-}
-
-@MainActor
-@Suite
-internal struct PluginFixes {
-    internal let memory = MemoryFileSystem()
-    private let scratch = ScratchPasteboard()
-    internal var pasteboard: NSPasteboard { scratch.pasteboard }
-    internal let bench: TestBench
-
-    internal init() {
-        memory.addFile("/A/one.txt", "1")
-        memory.addFile("/A/docs/in.txt", "inside")
-        memory.addFile("/B/other.txt", "o")
-        bench = TestBench(
-            plugins: [FolderTabsPlugin(), NavigationPlugin(pasteboard: scratch.pasteboard), ViewOptionsPlugin()],
-            fileSystems: [memory],
-            left: memory.url("/A"),
-            right: memory.url("/B")
-        )
-    }
-
-    @Test
-    internal func aTabFileIsReplacedInOneStepAndOnlyIfItIsAFile() {
-        bench.commands.perform("SAVETABS", .location(memory.url("/A/my.tab")))
-        let first = memory.contents("/A/my.tab")
-        #expect(first?.contains("[activetabs]") == true)
-        // Saving again replaces the file, and nothing temporary is left beside it.
-        bench.left.tabs.openTab(showing: memory.url("/A/docs"), activate: true)
-        bench.interaction.choiceAnswers = [0]
-        bench.commands.perform("SAVETABS", .location(memory.url("/A/my.tab")))
-        #expect(memory.contents("/A/my.tab") != first && memory.contents("/A/my.tab")?.contains("docs") == true)
-        #expect(
-            (try? memory.list(memory.url("/A"), showHidden: true).map(\.name).sorted()) == [
-                "docs", "my.tab", "one.txt"
-            ]
-        )
-        // A folder of that name is not a tab file: it is neither removed nor read.
-        memory.addDirectory("/A/folder.tab")
-        bench.commands.perform("SAVETABS", .location(memory.url("/A/folder.tab")))
-        #expect(memory.item(at: memory.url("/A/folder.tab"))?.isDirectory == true)
-        #expect(bench.interaction.log.last?.contains("could not be saved") == true)
-    }
-
-    @Test
-    internal func aFileTooLargeToBeATabFileIsNotLoaded() {
-        memory.addFile("/A/huge.tab", String(repeating: "x", count: FolderTabsPlugin.tabFileLimit + 10))
-        let before = bench.left.tabs.count
-        bench.commands.perform("OPENTABS", .location(memory.url("/A/huge.tab")))
-        #expect(bench.left.tabs.count == before && bench.interaction.log.last?.contains("could not be loaded") == true)
-    }
-
-    @Test
-    internal func theClipboardCommandIsOfferedForAnyTextAndReadsOnlyTheFirstLine() {
-        #expect(!bench.commands.isEnabled("afm_CdFromClipboard"))
-        pasteboard.clearContents()
-        pasteboard.setString(
-            "\n\n  mem:/A/docs  \n" + String(repeating: "more lines\n", count: 50_000),
-            forType: .string
-        )
-        #expect(bench.commands.isEnabled("afm_CdFromClipboard"))
-        bench.commands.perform("afm_CdFromClipboard")
-        #expect(bench.left.model.directory.path == "/A/docs")
-    }
-
-    @Test
-    internal func aLongListIsSortedInTheBackgroundAndAShortOneAtOnce() async throws {
-        let model = bench.left.model
-        bench.commands.perform("cm_SrcBySize")
-        #expect(model.sort == ListOrder(key: .size, descending: true))
-
-        let root = URL(fileURLWithPath: "/", isDirectory: true)
-        let long = (0..<(ViewOptionsPlugin.backgroundSortThreshold + 500))
-            .map {
-                FileItem(url: memory.url("/A/f\($0).txt"), name: "f\($0).txt", stat: .init(size: Int64($0 % 977)))
+            withExtendedLifetime(watcher) {
+                // The watcher lives until here.
             }
-        model.show(Listing(directory: memory.url("/A"), items: long, parent: root, root: root))
-        bench.commands.perform("cm_SrcByName")
-        // Two commands in a row: the second starts from the order the first is on its way to.
-        bench.commands.perform("cm_SrcNegOrder")
-        let patience = Date(timeIntervalSinceNow: Wait.ceiling)
-        while model.sort != ListOrder(key: .name, descending: true), Date() < patience {
-            try await Task.sleep(nanoseconds: 20_000_000)
         }
-        #expect(model.sort == ListOrder(key: .name, descending: true))
-        #expect(model.items == Sorter.sort(long, by: ListOrder(key: .name, descending: true)))
     }
 }

@@ -4,10 +4,15 @@ import LocalFileSystemPlugin
 import TestSupport
 import Testing
 
+/// The local file system on a folder of this Mac: listing, reading, writing, moving, removing,
+/// copying, places and watching.
 @Suite
 internal struct LocalDisk {
+    /// The file system under test.
     internal let local = LocalFileSystem()
 
+    /// A listing shows files, folders and links, leaves hidden entries out unless asked, and fails
+    /// for a folder that is not there.
     @Test
     internal func listsADirectory() throws {
         let box = try Sandbox()
@@ -27,6 +32,7 @@ internal struct LocalDisk {
         #expect(local.displayPath(box.url("docs")) == box.url("docs").path)
     }
 
+    /// Every entry of a bulk listing is the item that looking at the entry alone gives.
     @Test
     internal func theBulkListingAgreesWithLookingAtEachEntry() throws {
         let box = try Sandbox()
@@ -80,6 +86,8 @@ internal struct LocalDisk {
         #expect(try local.list(box.url("folder/inner"), showHidden: true).isEmpty)
     }
 
+    /// A large folder arrives in several batches with every entry once, and stops when the receiver
+    /// says so.
     @Test
     internal func aLargeFolderIsListedInPieces() throws {
         let box = try Sandbox()
@@ -107,6 +115,7 @@ internal struct LocalDisk {
         #expect(received == 1)
     }
 
+    /// Single items are found or not, `/` has no parent, and every location has `/` as its root.
     @Test
     internal func itemsParentsAndRoots() throws {
         let box = try Sandbox()
@@ -118,6 +127,7 @@ internal struct LocalDisk {
         #expect(local.root(of: box.root).path == "/")
     }
 
+    /// A written file gets its contents, date and rights; a reader reads it in pieces and seeks.
     @Test
     internal func readsSeeksAndWrites() throws {
         let box = try Sandbox()
@@ -138,6 +148,7 @@ internal struct LocalDisk {
         reader.close()
     }
 
+    /// Writing to a name that is taken fails and leaves the file there as it was.
     @Test
     internal func writingNeverOverwritesAnExistingFile() throws {
         let box = try Sandbox()
@@ -146,6 +157,7 @@ internal struct LocalDisk {
         #expect(box.read("kept.txt") == "precious")
     }
 
+    /// A move onto a taken name fails unless it replaces, and a move to a free name renames.
     @Test
     internal func movesWithAndWithoutReplacing() throws {
         let box = try Sandbox()
@@ -161,6 +173,7 @@ internal struct LocalDisk {
         #expect(box.read("c.txt") == "a")
     }
 
+    /// A removal takes one file, link or empty folder, and refuses a folder with something in it.
     @Test
     internal func removesOneItemAndNeverATree() throws {
         let box = try Sandbox()
@@ -178,6 +191,7 @@ internal struct LocalDisk {
         #expect(!box.exists("docs"))
     }
 
+    /// A copy to a free name is made, and one to a taken name fails and leaves that file alone.
     @Test
     internal func copyingNeverTouchesAnExistingDestination() throws {
         let box = try Sandbox()
@@ -189,6 +203,7 @@ internal struct LocalDisk {
         #expect(box.read("c.txt") == "precious")
     }
 
+    /// The places begin with home and hold the start-up disk, which has a name and a size.
     @Test
     internal func offersPlacesAndVolumeInformation() {
         let places = local.settledPlaces()
@@ -198,6 +213,7 @@ internal struct LocalDisk {
         #expect(volume?.name.isEmpty == false && (volume?.totalBytes ?? 0) > 0)
     }
 
+    /// A watcher reports a change in the folder it watches, and not those in other folders or below.
     @Test
     internal func reportsChangesInWatchedFoldersOnly() async throws {
         let box = try Sandbox()
@@ -233,7 +249,9 @@ internal struct LocalDisk {
             break
         }
         timeout.cancel()
-        withExtendedLifetime(watcher) {}
+        withExtendedLifetime(watcher) {
+            // Kept watching up to here.
+        }
         #expect(seen == [box.url("watched").path])
     }
 }
