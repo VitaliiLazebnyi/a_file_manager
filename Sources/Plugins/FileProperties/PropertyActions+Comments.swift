@@ -39,15 +39,12 @@ extension PropertyActions {
     /// Asks for the new comment until it fits the comment file; nil when the dialog is cancelled.
     private func askComment(for name: String, startingWith existing: String) -> String? {
         var text = existing
-        while true {
-            guard
-                let answer = interaction.form(
-                    "File comment",
-                    detail: "Edit comment for:\n\(PropertyText.shown(name))",
-                    fields: [.lines("comment", "", text)],
-                    buttons: ["OK"]
-                )
-            else { return nil }
+        while let answer = interaction.form(
+            "File comment",
+            detail: "Edit comment for:\n\(PropertyText.shown(name))",
+            fields: [.lines("comment", "", text)],
+            buttons: ["OK"]
+        ) {
             text = DescriptIon.normalized(answer.text("comment"))
             // A line break counts two characters, as it does in the file.
             let length = text.count + text.filter { $0 == "\n" }.count
@@ -60,6 +57,7 @@ extension PropertyActions {
                 style: .warning
             )
         }
+        return nil
     }
 
     /// Writes the comment in a job and reads both panels again; a failure is reported.

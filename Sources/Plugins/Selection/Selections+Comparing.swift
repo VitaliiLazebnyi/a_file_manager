@@ -13,16 +13,9 @@ extension Selections {
         var marked: [Set<NameBytes>]
     }
 
-    /// Who asks the volumes; stands for the plugin in `BlockingCalls`.
-    private final class VolumeQuestions: Sendable {
-        deinit {
-            // Nothing to release.
-        }
-    }
-
-    /// The owner of the questions to the volumes: a stalled volume holds at most as many
-    /// threads as one owner may have.
-    nonisolated private static let volumeQuestions = VolumeQuestions()
+    /// The owner of the questions to the volumes in `BlockingCalls`, the class object itself (one for the
+    /// whole program, never freed): a stalled volume holds at most as many threads as one owner may have.
+    nonisolated private static var volumeQuestions: AnyObject { Selections.self }
 
     /// Whether both folders are on local volumes that treat `A.txt` and `a.txt` as one name.
     ///

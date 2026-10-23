@@ -4,6 +4,9 @@ import NetFS
 
 /// The real thing: the NetFS framework, which is what Finder's Connect to Server uses.
 public final class SystemVolumeMounter: VolumeMounter {
+    /// An eject: ejects the volume and later calls the block with nil or the error.
+    internal typealias Unmount = @Sendable (_ volume: URL, _ answer: @escaping @Sendable (any Error?) -> Void) -> Void
+
     /// The system's calls, which answer later or never; tests put stand-ins in their place.
     internal struct Calls {
         /// `NetFSMountURLAsync`: asks for the mount without waiting.
@@ -22,11 +25,7 @@ public final class SystemVolumeMounter: VolumeMounter {
         internal var cancel: @Sendable (_ request: AsyncRequestID?) -> Int32 = NetFSMountURLCancel
         /// `FileManager.unmountVolume(at:options:completionHandler:)` without its dialog: ejects `volume` and later
         /// calls `answer` with nil or the error, on a queue of the system's.
-        internal var unmount: @Sendable (_ volume: URL, _ answer: @escaping @Sendable (any Error?) -> Void) -> Void =
-            Self.unmountWithoutDialog
-
-        /// The system's eject of `volume`, which reports to `answer` and shows no dialog of its own.
-        private static func unmountWithoutDialog(_ volume: URL, answer: @escaping @Sendable (any Error?) -> Void) {
+        internal var unmount: Unmount = { volume, answer in
             FileManager.default.unmountVolume(at: volume, options: [.withoutUI], completionHandler: answer)
         }
     }

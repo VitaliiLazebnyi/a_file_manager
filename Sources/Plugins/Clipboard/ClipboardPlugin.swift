@@ -181,7 +181,11 @@ public final class ClipboardPlugin: Plugin {
             return paths.map { path in URL(fileURLWithPath: path, isDirectory: false) }
         }
         let read = pasteboard.readObjects(forClasses: Self.urlClasses, options: [.urlReadingFileURLsOnly: true])
-        return read as? [URL] ?? []
+        // Nothing that can be read and no files at all come to the same: none.
+        if let urls = read as? [URL], !urls.isEmpty {
+            return urls
+        }
+        return []
     }
 
     /// Pastes into the source panel's folder at once, without a dialog.

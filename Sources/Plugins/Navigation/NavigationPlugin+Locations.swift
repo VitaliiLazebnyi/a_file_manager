@@ -36,7 +36,8 @@ extension NavigationPlugin {
         // Only the first line that has anything on it is looked at, however long the text is: the
         // first 8 KB of it (a path is not longer), cut at a byte (rounded down to a whole code point),
         // which only touches the last character.
-        let head = text.utf8.count > 8_192 ? text[..<text.utf8.index(text.utf8.startIndex, offsetBy: 8_192)] : text[...]
+        let head =
+            text.utf8.count > 8_192 ? text[..<text.utf8.index(text.utf8.startIndex, offsetBy: 8_192)] : Substring(text)
         let line = head.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: \.isNewline).first
         let path = String(line ?? "")
             .trimmingCharacters(in: .whitespaces)

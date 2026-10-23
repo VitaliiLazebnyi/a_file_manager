@@ -75,6 +75,13 @@ internal struct CoverageSelectionRules {
         #expect(!folders.matches("é", isFolder: false) && folders.matches("é", isFolder: true))
     }
 
+    /// A regular expression mask matches a name on its own, with nothing to stop it.
+    @Test
+    internal func aRegularExpressionMatchesANameOnItsOwn() {
+        let mask = SelectionMask("<^report-[0-9]+\\.txt$")
+        #expect(mask.matches("Report-12.TXT", isFolder: false) && !mask.matches("report-x.txt", isFolder: false))
+    }
+
     /// A name that is not one piece of UTF-8 (one handed over by Foundation) is still matched.
     @Test
     internal func aBridgedNameIsMatched() {
