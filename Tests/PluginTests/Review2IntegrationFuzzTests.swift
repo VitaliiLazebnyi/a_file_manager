@@ -23,7 +23,12 @@ internal struct Review2IntegrationFuzz {
         memory.addDirectory("/out")
         let item = try #require(registry.item(at: source))
         return (
-            try Decoder.decodeChecked(item, into: memory.url("/out"), run: ToolRun(fileSystems: registry)), memory
+            try Decoder.decodeChecked(
+                item,
+                into: memory.url("/out"),
+                autoRename: false,
+                run: ToolRun(fileSystems: registry)
+            ), memory
         )
     }
 

@@ -43,12 +43,12 @@ internal struct FileToolsFixes {
         try box.folder("out")
         try first.write(to: box.url("in/src1.bin"))
         try second.write(to: box.url("in/src2.bin"))
-        try Encoder.encode(item("in/src1.bin"), into: box.url("in"), method: .mime, run: run)
-        try Encoder.encode(item("in/src2.bin"), into: box.url("in"), method: .mime, run: run)
+        try Encoder.encode(item("in/src1.bin"), into: box.url("in"), options: Encoder.Options(method: .mime), run: run)
+        try Encoder.encode(item("in/src2.bin"), into: box.url("in"), options: Encoder.Options(method: .mime), run: run)
         try FileManager.default.moveItem(at: box.url("in/src1.b64"), to: box.url("in/IMG_0001.b64"))
         try FileManager.default.moveItem(at: box.url("in/src2.b64"), to: box.url("in/IMG_0002.b64"))
 
-        let written = try Decoder.decode(item("in/IMG_0001.b64"), into: box.url("out"), run: run)
+        let written = try Decoder.decode(item("in/IMG_0001.b64"), into: box.url("out"), autoRename: false, run: run)
         #expect(written == [box.url("out/src1.bin")])
         #expect(try Data(contentsOf: box.url("out/src1.bin")) == first)
         #expect(!FileManager.default.fileExists(atPath: box.url("out/src2.bin").path))
@@ -59,10 +59,10 @@ internal struct FileToolsFixes {
         let data = fixPattern(5_000)
         try box.folder("out")
         try data.write(to: box.url("big.bin"))
-        let parts = try Encoder.encode(item("big.bin"), into: box.url("."), method: .mime, linesPerFile: 20, run: run)
+        let parts = try Encoder.encode(item("big.bin"), into: box.url("."), options: Encoder.Options(method: .mime, linesPerFile: 20), run: run)
         #expect(parts.count > 2)
         try FileManager.default.removeItem(at: box.url("big.bin"))
-        let written = try Decoder.decode(fileSystems.item(at: parts[0])!, into: box.url("out"), run: run)
+        let written = try Decoder.decode(fileSystems.item(at: parts[0])!, into: box.url("out"), autoRename: false, run: run)
         #expect(written.count == 1)
         #expect(try Data(contentsOf: written[0]) == data)
     }
@@ -75,7 +75,7 @@ internal struct FileToolsFixes {
             + "MIME-Version: 1.0\r\nContent-Disposition: attachment; filename=\"two.bin\"\r\nContent-Transfer-Encoding: base64\r\n\r\nZWZn\r\n"
         try box.folder("out")
         try Data(text.utf8).write(to: box.url("two.b64"))
-        let written = try Decoder.decode(item("two.b64"), into: box.url("out"), run: run)
+        let written = try Decoder.decode(item("two.b64"), into: box.url("out"), autoRename: false, run: run)
         #expect(written.count == 2)
         #expect(try Data(contentsOf: written[0]) == Data("abcd".utf8))
         #expect(try Data(contentsOf: written[1]) == Data("efg".utf8))
@@ -100,7 +100,7 @@ internal struct FileToolsFixes {
             try Encoder.encode(
                 item("notes.b64"),
                 into: box.url("notes.b64").deletingLastPathComponent(),
-                method: .mime,
+                options: Encoder.Options(method: .mime),
                 run: run
             )
         }
@@ -112,21 +112,21 @@ internal struct FileToolsFixes {
         try box.folder("out")
         let gone = FileItem(url: box.url("missing.bin"), name: "missing.bin", stat: .init(size: 10, modified: Date()))
         #expect(throws: (any Error).self) { try Splitter.split(gone, into: box.url("out"), partSize: 5, run: run) }
-        #expect(throws: (any Error).self) { try Encoder.encode(gone, into: box.url("out"), method: .mime, run: run) }
+        #expect(throws: (any Error).self) { try Encoder.encode(gone, into: box.url("out"), options: Encoder.Options(method: .mime), run: run) }
         #expect(try FileManager.default.contentsOfDirectory(atPath: box.url("out").path).isEmpty)
     }
 
     @Test
     internal func overwriteKeepsTheOldFileUntilTheNewOneIsDone() throws {
         try Data("old".utf8).write(to: box.url("target.txt"))
-        let output = try #require(try run.create(box.url("target.txt")))
+        let output = try #require(try run.create(box.url("target.txt"), autoRename: false, deferred: false))
         try output.write(Data("new".utf8))
         #expect(try Data(contentsOf: box.url("target.txt")) == Data("old".utf8))
         output.abandon()
         #expect(try Data(contentsOf: box.url("target.txt")) == Data("old".utf8))
         #expect(try FileManager.default.contentsOfDirectory(atPath: box.url(".").path) == ["target.txt"])
 
-        let second = try #require(try run.create(box.url("target.txt")))
+        let second = try #require(try run.create(box.url("target.txt"), autoRename: false, deferred: false))
         try second.write(Data("new".utf8))
         try second.finish()
         #expect(try Data(contentsOf: box.url("target.txt")) == Data("new".utf8))
@@ -160,7 +160,7 @@ internal struct FileToolsFixes {
         for length in [32, 48, 64] {
             let fallback = SHA3Hasher(digestLength: length)
             fallback.update(data)
-            let method: ChecksumMethod = length == 32 ? .sha3_256 : length == 48 ? .sha3_384 : .sha3_512
+            let method: ChecksumMethod = length == 32 ? .sha3Bits256 : length == 48 ? .sha3Bits384 : .sha3Bits512
             #expect(fallback.finish().hex == fixDigest(method, data, pieces: 5))
         }
     }
@@ -215,7 +215,7 @@ internal struct FileToolsFixes {
         let data = fixPattern(70_000)
         try data.write(to: box.url("f.bin"))
         let blake = fixDigest(.blake3, data)
-        let sha3 = fixDigest(.sha3_256, data)
+        let sha3 = fixDigest(.sha3Bits256, data)
         let sha2 = fixDigest(.sha256, data)
         let report = try ChecksumRun.verify(
             [
@@ -225,7 +225,7 @@ internal struct FileToolsFixes {
             title: "t",
             run: run
         )
-        #expect(report.sections[0].rows.map(\.result) == [.ok, .ok, .ok, .wrongChecksum])
+        #expect(report.sections[0].rows.map(\.result) == [.correct, .correct, .correct, .wrongChecksum])
     }
 }
 

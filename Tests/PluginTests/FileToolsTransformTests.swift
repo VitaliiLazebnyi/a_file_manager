@@ -237,15 +237,15 @@ internal struct FileToolsTransforms {
         perform(.splitFile, ["target": .text(""), "size": .text("1000")])
         let plan = try Combiner.plan(for: item("A/data.001"), run: run)
         #expect(plan.parts.map(\.name) == ["data.001", "data.002", "data.003"] && plan.info?.size == 3_000)
-        #expect(try Combiner.combine(plan.parts, info: plan.info, into: box.url("B"), run: run).verified == true)
+        #expect(try Combiner.combine(plan.parts, info: plan.info, into: box.url("B"), run: run).check == .matches)
         // A damaged part is found out.
         try Data(repeating: 7, count: 1_000).write(to: box.url("A/data.002"))
         let damaged = try Combiner.combine(plan.parts, info: plan.info, into: box.url("B"), run: run)
-        #expect(damaged.verified == false && damaged.parts == 3)
+        #expect(damaged.check == .damaged && damaged.parts == 3)
         // So is a missing one: the row ends where a name is not there.
         try FileManager.default.removeItem(at: box.url("A/data.003"))
         let short = try Combiner.plan(for: item("A/data.001"), run: run)
-        #expect(try Combiner.combine(short.parts, info: short.info, into: box.url("B"), run: run).verified == false)
+        #expect(try Combiner.combine(short.parts, info: short.info, into: box.url("B"), run: run).check == .damaged)
         // A stored name with a path stays inside the target folder.
         let outside = try Combiner.combine(
             short.parts,
@@ -289,17 +289,17 @@ internal struct FileToolsTransforms {
 
     @Test
     internal func sixBitLines() {
-        #expect(String(decoding: SixBitText.encode(Data("Cat".utf8), xx: false), as: UTF8.self) == "#0V%T\r\n")
-        #expect(String(decoding: SixBitText.encode(Data("Cat".utf8), xx: true), as: UTF8.self) == "1Eq3o\r\n")
-        #expect(SixBitText.decode(Array("#0V%T".utf8)[...], xx: false) == Array("Cat".utf8))
-        #expect(SixBitText.decode(Array("1Eq3o".utf8)[...], xx: true) == Array("Cat".utf8))
+        #expect(String(decoding: SixBitText.encode(Data("Cat".utf8), xxEncode: false), as: UTF8.self) == "#0V%T\r\n")
+        #expect(String(decoding: SixBitText.encode(Data("Cat".utf8), xxEncode: true), as: UTF8.self) == "1Eq3o\r\n")
+        #expect((try? SixBitText.decode(Array("#0V%T".utf8)[...], xxEncode: false)) == Array("Cat".utf8))
+        #expect((try? SixBitText.decode(Array("1Eq3o".utf8)[...], xxEncode: true)) == Array("Cat".utf8))
         // A zero is a backquote in UUEncode, and a line whose spaces were cut off still reads.
-        #expect(String(decoding: SixBitText.encode(Data([0, 0, 0]), xx: false), as: UTF8.self) == "#````\r\n")
-        #expect(SixBitText.decode(Array("#    ".utf8)[...], xx: false) == [0, 0, 0])
-        #expect(SixBitText.decode(Array("#0V%".utf8)[...], xx: false) == [0x43, 0x61, 0x40])
+        #expect(String(decoding: SixBitText.encode(Data([0, 0, 0]), xxEncode: false), as: UTF8.self) == "#````\r\n")
+        #expect((try? SixBitText.decode(Array("#    ".utf8)[...], xxEncode: false)) == [0, 0, 0])
+        #expect((try? SixBitText.decode(Array("#0V%".utf8)[...], xxEncode: false)) == [0x43, 0x61, 0x40])
         #expect(
-            SixBitText.decode(Array("#0V{T".utf8)[...], xx: false) == nil
-                && SixBitText.decode(Array("1Eq#o".utf8)[...], xx: true) == nil
+            (try? SixBitText.decode(Array("#0V{T".utf8)[...], xxEncode: false)) == nil
+                && (try? SixBitText.decode(Array("1Eq#o".utf8)[...], xxEncode: true)) == nil
         )
         #expect(Encoder.outputNames(for: "decoded.txt", method: .uue, parts: 1) == ["decoded.uue"])
         #expect(Encoder.outputNames(for: "a.b.txt", method: .mime, parts: 2) == ["a.b001.b64", "a.b002.b64"])
@@ -352,7 +352,7 @@ internal struct FileToolsTransforms {
     internal func encodeAndDecodeRoundTrip(method: EncodeMethod, count: Int) throws {
         let original = patternData(count)
         try original.write(to: box.url("A/file.bin"))
-        let encoded = try Encoder.encode(item("A/file.bin"), into: memory.url("/out"), method: method, run: run)
+        let encoded = try Encoder.encode(item("A/file.bin"), into: memory.url("/out"), options: Encoder.Options(method: method), run: run)
         #expect(encoded.map(\.lastPathComponent) == ["file." + method.fileExtension])
         let text = memory.contents("/out/file." + method.fileExtension) ?? ""
         #expect(
@@ -362,7 +362,7 @@ internal struct FileToolsTransforms {
         guard let first = memory.item(at: encoded[0]) else {
             return
         }
-        #expect(try Decoder.decode(first, into: box.url("B"), run: run) == [box.url("B/file.bin")])
+        #expect(try Decoder.decode(first, into: box.url("B"), autoRename: false, run: run) == [box.url("B/file.bin")])
         #expect(data("B/file.bin") == original)
     }
 
@@ -374,9 +374,7 @@ internal struct FileToolsTransforms {
         let parts = try Encoder.encode(
             item("A/big.dat"),
             into: box.url("B"),
-            method: method,
-            linesPerFile: 20,
-            bytesPerFile: Int64(10 * method.lineLength),
+            options: Encoder.Options(method: method, linesPerFile: 20, bytesPerFile: Int64(10 * method.lineLength)),
             run: run
         )
         let lines = (5_000 + method.bytesPerLine - 1) / method.bytesPerLine
@@ -485,9 +483,9 @@ internal struct FileToolsTransforms {
     @Test
     internal func decodeNamesTargetsAndClashes() throws {
         #expect(
-            Decoder.safeName("a/b\\c.txt") == "c.txt" && Decoder.safeName("..") == nil && Decoder.safeName(nil) == nil
+            Decoder.safeName("a/b\\c.txt", replacingColon: true) == "c.txt" && Decoder.safeName("..", replacingColon: true) == nil && Decoder.safeName(nil, replacingColon: true) == nil
         )
-        #expect(Decoder.safeName(" x:y\u{7}.txt ") == "x_y_.txt")
+        #expect(Decoder.safeName(" x:y\u{7}.txt ", replacingColon: true) == "x_y_.txt")
         #expect(
             Decoder.fallbackName(for: "photo.jpg.b64") == "photo.jpg"
                 && Decoder.fallbackName(for: "noext") == "noext.decoded"
@@ -532,7 +530,7 @@ internal struct FileToolsTransforms {
             try Splitter.split(item("A/data.bin"), into: box.url("B"), partSize: 100_000, run: stopped)
         }
         #expect(throws: ToolError.cancelled) {
-            try Encoder.encode(item("A/data.bin"), into: box.url("B"), method: .uue, run: stopped)
+            try Encoder.encode(item("A/data.bin"), into: box.url("B"), options: Encoder.Options(method: .uue), run: stopped)
         }
         #expect(throws: ToolError.cancelled) {
             try Combiner.combine([item("A/data.bin")], info: nil, into: box.url("B"), run: stopped)
@@ -545,7 +543,8 @@ internal struct FileToolsTransforms {
             cancellation: flag,
             report: { progress in
                 if progress.bytesDone >= 500_000 { flag.cancel() }
-            }
+            },
+            askExisting: { _ in .overwrite }
         )
         try Data(count: 3 << 20).write(to: box.url("A/large.bin"))
         #expect(throws: ToolError.cancelled) {

@@ -121,7 +121,14 @@ internal struct CoverageFileToolsChecksums {
         #expect(throws: ToolError.cancelled) {
             try ChecksumRun.verify(
                 checksumFiles: [try item("/A/bad.md5")],
-                run: ToolRun(fileSystems: fileSystems, cancellation: flag)
+                run: ToolRun(
+                    fileSystems: fileSystems,
+                    cancellation: flag,
+                    report: { _ in
+                        // Not watched here.
+                    },
+                    askExisting: { _ in .overwrite }
+                )
             )
         }
     }

@@ -53,7 +53,7 @@ internal struct FileToolsHashes {
                 == "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7"
         )
         #expect(digest(.sha512, abc).hasPrefix("ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"))
-        #expect(digest(.sha3_256, abc) == "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")
+        #expect(digest(.sha3Bits256, abc) == "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532")
         #expect(digest(.blake3, abc) == "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85")
     }
 
@@ -100,10 +100,10 @@ internal struct FileToolsHashes {
     internal func sha3(count: Int, sha224: String, sha256: String, sha384: String, sha512: String) {
         let data = patternData(count)
         for pieces in [1, 3, 7] {
-            #expect(digest(.sha3_224, data, pieces: pieces) == sha224)
-            #expect(digest(.sha3_256, data, pieces: pieces) == sha256)
-            #expect(digest(.sha3_384, data, pieces: pieces) == sha384)
-            #expect(digest(.sha3_512, data, pieces: pieces) == sha512)
+            #expect(digest(.sha3Bits224, data, pieces: pieces) == sha224)
+            #expect(digest(.sha3Bits256, data, pieces: pieces) == sha256)
+            #expect(digest(.sha3Bits384, data, pieces: pieces) == sha384)
+            #expect(digest(.sha3Bits512, data, pieces: pieces) == sha512)
         }
     }
 
@@ -159,21 +159,21 @@ internal struct FileToolsHashes {
 
     @Test
     internal func methodsOfTheDialog() {
-        #expect(ChecksumMethod.allCases.map(\.rawValue) == Array(0...11))
+        #expect(ChecksumMethod.allCases.map(\.rawValue).sorted() == Array(0...11))
         #expect(
-            ChecksumMethod(rawValue: 3) == .sha256 && ChecksumMethod(rawValue: 7) == .sha3_256
+            ChecksumMethod(rawValue: 3) == .sha256 && ChecksumMethod(rawValue: 7) == .sha3Bits256
                 && ChecksumMethod(rawValue: 11) == .blake3
         )
         #expect(Set(ChecksumMethod.dialogOrder) == Set(ChecksumMethod.allCases))
         #expect(
-            [ChecksumMethod.crc32, .md5, .sha1, .sha256, .blake3, .sha512, .sha3_256].map(\.fileExtension)
+            [ChecksumMethod.crc32, .md5, .sha1, .sha256, .blake3, .sha512, .sha3Bits256].map(\.fileExtension)
                 == ["sfv", "md5", "sha", "sha256", "bk3", "sha512", "sha3_256"]
         )
         #expect(
             ChecksumMethod.md5.reportName == "MD5" && ChecksumMethod.sha256.reportName == "SHA2_256"
                 && ChecksumMethod.crc32.reportName == "CRC32"
         )
-        #expect(ChecksumMethod.candidates(hexDigits: 64) == [.sha256, .sha3_256, .blake3])
+        #expect(ChecksumMethod.candidates(hexDigits: 64) == [.sha256, .sha3Bits256, .blake3])
         #expect(ChecksumMethod.candidates(hexDigits: 8) == [.crc32] && ChecksumMethod.candidates(hexDigits: 10).isEmpty)
         for method in ChecksumMethod.allCases {
             #expect(digest(method, Data("x".utf8)).count == method.digestLength * 2)
@@ -192,11 +192,13 @@ internal struct FileToolsHashes {
         let lock = NSLock()
         let run = ToolRun(
             fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
             report: { progress in
                 lock.lock()
                 reports.append(progress)
                 lock.unlock()
-            }
+            },
+            askExisting: { _ in .overwrite }
         )
         run.expect(bytes: 300 * 10, items: 300)
         let digests = ChecksumRun.digests(of: files + [(memory.url("/h/missing"), [.md5])], run: run)
@@ -208,7 +210,7 @@ internal struct FileToolsHashes {
             #expect((try? digests[index].get())?.map(\.hex) == expected)
         }
         #expect((try? digests[300].get()) == nil)
-        run.advance(0, force: true)
+        run.advance(0, items: 0, force: true)
         #expect(
             reports.last?.itemsDone == 300
                 && reports.last?.bytesDone == Int64((0..<300).reduce(0) { $0 + "content \($1)".count })

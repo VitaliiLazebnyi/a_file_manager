@@ -35,7 +35,14 @@ internal struct CoverageFileToolsRun {
             asked.modify { $0 += 1 }
             return answer
         }
-        return ToolRun(fileSystems: fileSystems, cancellation: cancellation, askExisting: answering)
+        return ToolRun(
+            fileSystems: fileSystems,
+            cancellation: cancellation,
+            report: { _ in
+                // Not watched here.
+            },
+            askExisting: answering
+        )
     }
 
     /// The item of a memory path.
@@ -58,10 +65,14 @@ internal struct CoverageFileToolsRun {
         let tool = run(cancellation: flag)
         let received = Shared(0)
         #expect(throws: ToolError.cancelled) {
-            try tool.read(memory.url("/A/one.txt")) { block in received.modify { $0 += block.count } }
+            try tool.read(memory.url("/A/one.txt"), counted: true, blockSize: ToolRun.blockSize) { block in
+                received.modify { $0 += block.count }
+            }
         }
         #expect(received.value == 0)
-        #expect(throws: ToolError.cancelled) { try tool.create(memory.url("/A/new.txt")) }
+        #expect(throws: ToolError.cancelled) {
+            try tool.create(memory.url("/A/new.txt"), autoRename: false, deferred: false)
+        }
     }
 
     /// Overwrite all is asked once; files that cannot be written are dropped again.
@@ -69,12 +80,12 @@ internal struct CoverageFileToolsRun {
     internal func overwriteAllIsAskedOnceAndFailedWritesAreDropped() throws {
         let asked = Shared(0)
         let tool = run(.overwriteAll, asked: asked)
-        try tool.write(Data("1".utf8), to: memory.url("/A/one.txt"))
-        try tool.write(Data("2".utf8), to: memory.url("/A/two.txt"))
+        try tool.write(Data("1".utf8), to: memory.url("/A/one.txt"), deferred: false)
+        try tool.write(Data("2".utf8), to: memory.url("/A/two.txt"), deferred: false)
         #expect(asked.value == 1 && memory.contents("/A/one.txt") == "1" && memory.contents("/A/two.txt") == "2")
         files.fails = [.write]
         #expect(throws: CoverageSmallFiles.Failure.self) {
-            try tool.write(Data("3".utf8), to: memory.url("/A/three.txt"))
+            try tool.write(Data("3".utf8), to: memory.url("/A/three.txt"), deferred: false)
         }
         #expect(!memory.exists("/A/three.txt"))
     }
@@ -82,7 +93,7 @@ internal struct CoverageFileToolsRun {
     /// A file the user skips is not written.
     @Test
     internal func aSkippedFileIsNotWritten() throws {
-        #expect(try run(.skip).write(Data("x".utf8), to: memory.url("/A/one.txt")) == nil)
+        #expect(try run(.skip).write(Data("x".utf8), to: memory.url("/A/one.txt"), deferred: false) == nil)
         #expect(memory.contents("/A/one.txt") == "one")
     }
 
@@ -116,23 +127,25 @@ internal struct CoverageFileToolsRun {
     internal func outputsThatFail() throws {
         let flag = CancellationFlag()
         let tool = run(cancellation: flag)
-        let writing = try #require(try tool.create(memory.url("/A/w.txt")))
+        let writing = try #require(try tool.create(memory.url("/A/w.txt"), autoRename: false, deferred: false))
         files.fails = [.write]
         files.onFailure = { _ in flag.cancel() }
         #expect(throws: ToolError.cancelled) { try writing.write(Data("x".utf8)) }
         writing.abandon()
         files.fails = [.close]
         files.onFailure = nil
-        let closing = try #require(try run().create(memory.url("/A/c.txt")))
+        let closing = try #require(try run().create(memory.url("/A/c.txt"), autoRename: false, deferred: false))
         #expect(throws: CoverageSmallFiles.Failure.self) { try closing.finish() }
         try closing.finish()
         #expect(!memory.exists("/A/c.txt"))
         let later = CancellationFlag()
         files.onFailure = { _ in later.cancel() }
-        let cancelled = try #require(try run(cancellation: later).create(memory.url("/A/d.txt")))
+        let cancelled = try #require(
+            try run(cancellation: later).create(memory.url("/A/d.txt"), autoRename: false, deferred: false)
+        )
         #expect(throws: ToolError.cancelled) { try cancelled.finish() }
         files.fails = []
-        let replacing = try #require(try run().create(memory.url("/A/one.txt"), deferred: true))
+        let replacing = try #require(try run().create(memory.url("/A/one.txt"), autoRename: false, deferred: true))
         try replacing.write(Data("new".utf8))
         try replacing.finish()
         files.fails = [.move]
@@ -212,13 +225,18 @@ internal struct CoverageFileToolsRun {
     @Test
     internal func progressFromManyThreadsIsThrottled() {
         let reports = Shared<[Int64]>([])
-        let tool = ToolRun(fileSystems: fileSystems) { progress in reports.modify { $0.append(progress.bytesDone) } }
+        let tool = ToolRun(
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            report: { progress in reports.modify { $0.append(progress.bytesDone) } },
+            askExisting: { _ in .overwrite }
+        )
         let start = Date()
         DispatchQueue.concurrentPerform(iterations: 8) { _ in
-            for _ in 0..<20_000 { tool.advance(1) }
+            for _ in 0..<20_000 { tool.advance(1, items: 0, force: false) }
         }
         let windows = Int(Date().timeIntervalSince(start) / 0.05) + 1
-        tool.advance(0, force: true)
+        tool.advance(0, items: 0, force: true)
         let sent = reports.value
         #expect(sent.count <= windows + 1 && sent.last == 160_000)
         #expect(zip(sent, sent.dropFirst()).allSatisfy { $0 <= $1 })

@@ -80,7 +80,7 @@ internal struct Review2FileTools {
         let files = try ["empty.md5", "junk.sha256", "short.md5"].map(item)
         let report = try ChecksumRun.verify(checksumFiles: files, run: run())
         #expect(report.errors == 1 + 2 + 1)
-        #expect(report.count(.unreadable) == 4 && report.count(.ok) == 0)
+        #expect(report.count(.unreadable) == 4 && report.count(.correct) == 0)
         #expect(report.text(onlyErrors: true).contains("Cannot read any checksum"))
         #expect(report.text(onlyErrors: true).contains("Cannot read line 2!"))
         #expect(report.failedNames.contains("empty.md5"))
@@ -99,12 +99,12 @@ internal struct Review2FileTools {
             }
         let data = ChecksumFile.contents(entries, method: .crc32, unixFormat: true, byteOrderMark: false)
         try data.write(to: box.url("set.sfv"))
-        #expect(try ChecksumRun.verify(checksumFiles: [item("set.sfv")], run: run()).count(.ok) == 3)
+        #expect(try ChecksumRun.verify(checksumFiles: [item("set.sfv")], run: run()).count(.correct) == 3)
         // Damaged, both are caught.
         try "changed".write(to: box.url("#notes.txt"), atomically: true, encoding: .utf8)
         try "changed".write(to: box.url(";x.txt"), atomically: true, encoding: .utf8)
         let report = try ChecksumRun.verify(checksumFiles: [item("set.sfv")], run: run())
-        #expect(report.count(.wrongChecksum) == 2 && report.count(.ok) == 1 && report.errors == 2)
+        #expect(report.count(.wrongChecksum) == 2 && report.count(.correct) == 1 && report.errors == 2)
     }
 
     @Test
@@ -117,7 +117,7 @@ internal struct Review2FileTools {
         #expect(text.hasPrefix("\\") && text.split(separator: "\n").count == 1)
         #expect(ChecksumFile.parse(text, fileName: "x.md5").map(\.name) == [name])
         try data.write(to: box.url("x.md5"))
-        #expect(try ChecksumRun.verify(checksumFiles: [item("x.md5")], run: run()).count(.ok) == 1)
+        #expect(try ChecksumRun.verify(checksumFiles: [item("x.md5")], run: run()).count(.correct) == 1)
         // An SFV file cannot hold such a name, and says so instead of writing a broken file.
         #expect(throws: ToolError.self) {
             try ChecksumRun.create(
@@ -146,7 +146,7 @@ internal struct Review2FileTools {
     internal func decodeFile(_ name: String, _ bytes: [UInt8], into folder: String = "out") throws -> Decoder.Outcome {
         try box.folder(folder)
         try Data(bytes).write(to: box.url(name))
-        return try Decoder.decodeChecked(item(name), into: box.url(folder), run: run())
+        return try Decoder.decodeChecked(item(name), into: box.url(folder), autoRename: false, run: run())
     }
 
     @Test
@@ -169,7 +169,7 @@ internal struct Review2FileTools {
         try box.folder("out")
         try "Zm9vYmFy".write(to: box.url("photo1.b64"), atomically: true, encoding: .utf8)
         try "YmF6cXV4".write(to: box.url("photo2.b64"), atomically: true, encoding: .utf8)
-        let outcome = try Decoder.decodeChecked(item("photo1.b64"), into: box.url("out"), run: run())
+        let outcome = try Decoder.decodeChecked(item("photo1.b64"), into: box.url("out"), autoRename: false, run: run())
         #expect(try Data(contentsOf: outcome.files[0]) == Data("foobar".utf8))
         #expect(names("out") == ["photo1"])
     }
@@ -183,12 +183,11 @@ internal struct Review2FileTools {
         let written = try Encoder.encode(
             item("data.bin"),
             into: box.url("enc"),
-            method: .mime,
-            linesPerFile: 20,
+            options: Encoder.Options(method: .mime, linesPerFile: 20),
             run: run()
         )
         #expect(written.count > 1)
-        let outcome = try Decoder.decodeChecked(registry.item(at: written[0])!, into: box.url("dec"), run: run())
+        let outcome = try Decoder.decodeChecked(registry.item(at: written[0])!, into: box.url("dec"), autoRename: false, run: run())
         #expect(outcome.problems.isEmpty)
         #expect(try Data(contentsOf: outcome.files[0]) == content)
     }
@@ -196,7 +195,7 @@ internal struct Review2FileTools {
     internal func encodeUU(_ content: Data, xx: Bool = false) throws -> String {
         try content.write(to: box.url("src.bin"))
         try box.folder("enc")
-        let written = try Encoder.encode(item("src.bin"), into: box.url("enc"), method: xx ? .xxe : .uue, run: run())
+        let written = try Encoder.encode(item("src.bin"), into: box.url("enc"), options: Encoder.Options(method: xx ? .xxe : .uue), run: run())
         return String(decoding: try Data(contentsOf: written[0]), as: UTF8.self)
     }
 
@@ -265,13 +264,13 @@ internal struct Review2FileTools {
     internal func namesFromEncodedTextStayInsideTheTargetFolder() throws {
         // A slash followed by a combining mark is one character to Swift and a slash to the disk.
         let name = "../\u{301}pwn.txt"
-        #expect(Decoder.safeName(name)?.utf8.contains(0x2F) == false)
-        #expect(Decoder.safeName("a/b\\c/..") == nil)
-        #expect(Decoder.safeName("..\u{301}") == "..\u{301}")
+        #expect(Decoder.safeName(name, replacingColon: true)?.utf8.contains(0x2F) == false)
+        #expect(Decoder.safeName("a/b\\c/..", replacingColon: true) == nil)
+        #expect(Decoder.safeName("..\u{301}", replacingColon: true) == "..\u{301}")
         let uue = "begin 644 \(name)\n#<'=N\n`\nend\n"
         try box.folder("target/inner")
         try Data(uue.utf8).write(to: box.url("evil.uue"))
-        let outcome = try Decoder.decodeChecked(item("evil.uue"), into: box.url("target/inner"), run: run())
+        let outcome = try Decoder.decodeChecked(item("evil.uue"), into: box.url("target/inner"), autoRename: false, run: run())
         #expect(
             outcome.files.count == 1
                 && outcome.files[0].deletingLastPathComponent().path == box.url("target/inner").path
@@ -323,7 +322,7 @@ internal struct Review2FileTools {
             try Encoder.encode(
                 item("data.bin"),
                 into: box.url("out"),
-                method: .mime,
+                options: Encoder.Options(method: .mime),
                 run: run(cancel: cancel, cancelOnAsk: 1)
             )
         }
@@ -351,7 +350,7 @@ internal struct Review2FileTools {
         try Data("begin 644 f\n#86)C\n`\nend\n".utf8).write(to: box.url("f.uue"))
         let cancel = CancellationFlag()
         #expect(throws: ToolError.cancelled) {
-            try Decoder.decode(item("f.uue"), into: box.url("out"), run: run(cancel: cancel, cancelOnAsk: 1))
+            try Decoder.decode(item("f.uue"), into: box.url("out"), autoRename: false, run: run(cancel: cancel, cancelOnAsk: 1))
         }
         #expect(box.read("out/f") == "old" && names("out") == ["f"])
     }
@@ -381,8 +380,7 @@ internal struct Review2FileTools {
         let written = try Encoder.encode(
             item("data.bin"),
             into: box.url("out"),
-            method: .uue,
-            linesPerFile: 999_999_999_999_999_999,
+            options: Encoder.Options(method: .uue, linesPerFile: 999_999_999_999_999_999),
             run: run()
         )
         #expect(written.count == 1)
@@ -396,14 +394,16 @@ internal struct Review2FileTools {
         let reports = ReportCounter()
         let run = ToolRun(
             fileSystems: registry,
+            cancellation: CancellationFlag(),
             report: { _ in
                 if reports.add() == 1 {
                     entered.signal()
                     held.wait()
                 }
-            }
+            },
+            askExisting: { _ in .overwrite }
         )
-        let first = Thread { run.advance(10, force: true) }
+        let first = Thread { run.advance(10, items: 0, force: true) }
         first.start()
         entered.wait()
         let finished = ReportCounter()
@@ -413,7 +413,7 @@ internal struct Review2FileTools {
             // Each one's report is due (forced): a report that is not due does not wait for the turn, and whether
             // one is due by the clock depended on how far apart the system started the threads.
             OtherThread.start {
-                run.advance(1, force: true)
+                run.advance(1, items: 0, force: true)
                 _ = finished.add()
                 group.leave()
             }

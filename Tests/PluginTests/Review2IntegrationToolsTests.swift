@@ -53,7 +53,7 @@ internal struct Review2IntegrationTools {
     @Test
     internal func anEncodedFileAndWhatIsDecodedFromItCarryTheMarkOfTheirSource() throws {
         let source = server.addFile("/in/tool.sh", "#!/bin/sh\necho harmless\n")
-        let encoded = try Encoder.encode(try item(source), into: target.url("/out"), method: .mime, run: run())
+        let encoded = try Encoder.encode(try item(source), into: target.url("/out"), options: Encoder.Options(method: .mime), run: run())
         #expect(encoded.count == 1 && target.quarantineMarks["/out/tool.b64"] == mark)
         // Decoded from a file on the server.
         _ = server.addFile("/in/tool.b64", target.contents("/out/tool.b64") ?? "")
@@ -61,6 +61,7 @@ internal struct Review2IntegrationTools {
         let decoded = try Decoder.decode(
             try item(server.url("/in/tool.b64")),
             into: target.url("/decoded"),
+            autoRename: false,
             run: run()
         )
         #expect(decoded.count == 1 && target.contents("/decoded/tool.sh") == "#!/bin/sh\necho harmless\n")
@@ -87,7 +88,7 @@ internal struct Review2IntegrationTools {
             try Splitter.split(huge, into: target.url("/out"), partSize: 1 << 20, run: run())
         }
         #expect(throws: ToolError.self) {
-            try Encoder.encode(huge, into: target.url("/out"), method: .mime, linesPerFile: 1, run: run())
+            try Encoder.encode(huge, into: target.url("/out"), options: Encoder.Options(method: .mime, linesPerFile: 1), run: run())
         }
     }
 }

@@ -1,27 +1,6 @@
 import AFMKernel
 import Foundation
 
-/// What a file tool reports instead of a result.
-internal enum ToolError: LocalizedError, Equatable {
-    case cancelled
-    case failed(String)
-
-    internal var errorDescription: String? {
-        switch self {
-        case .cancelled:
-            return "The operation was cancelled."
-
-        case .failed(let message):
-            return message
-        }
-    }
-}
-
-/// What to do about a file that is in the way of one a tool wants to write.
-internal enum ExistingFileChoice {
-    case overwrite, overwriteAll, skip, autoRename, cancel
-}
-
 /// The surroundings of one run of a file tool: the file systems it reads and writes
 /// through, its progress and the questions it may ask.
 ///
@@ -35,21 +14,35 @@ internal enum ExistingFileChoice {
 internal final class ToolRun: @unchecked Sendable {
     /// Files are read and written in blocks of this size, never as a whole.
     internal static let blockSize = 1 << 20
+    /// The largest file `contents(of:)` reads as a whole unless told otherwise: 256 MiB.
+    internal static let contentsLimit = 256 << 20
 
+    /// The file systems the tool reads and writes through.
     internal let fileSystems: FileSystemRegistry
+    /// Set when the user cancels; the tool checks it between blocks.
     internal let cancellation: CancellationFlag
+    /// Where the progress goes: the job's window.
     private let report: @Sendable (JobProgress) -> Void
-    private let askExisting: @Sendable (URL) -> ExistingFileChoice
-    private let lock = NSLock()
+    /// Asks the user what to do about a file in the way.
+    internal let askExisting: @Sendable (URL) -> ExistingFileChoice
+    /// Guards the counters, the lines, the time of the last report and the origin.
+    internal let lock = NSLock()
     /// Held while a report is made, so reports reach the window one at a time and in order.
     private let reportLock = NSLock()
+    /// The bytes done so far (under `lock`).
     private var bytesDone: Int64 = 0
+    /// The bytes of the whole run (under `lock`).
     private var bytesTotal: Int64 = 0
+    /// The files done so far (under `lock`).
     private var itemsDone = 0
+    /// The files of the whole run (under `lock`).
     private var itemsTotal = 0
+    /// What the window says about the work at hand (under `lock`).
     private var lines: [String] = []
+    /// When the last report was made (under `lock`).
     private var lastReport = Date.distantPast
-    private var overwritesAll = false
+    /// "Overwrite All" was answered (job thread only).
+    internal var overwritesAll = false
 
     // MARK: Where the data came from
 
@@ -67,10 +60,11 @@ internal final class ToolRun: @unchecked Sendable {
     }
     /// Guarded by `lock`, like `origin`.
     private var carries = false
+    /// The mark of coming from elsewhere of the first source opened that has one (under `lock`).
     private var origin: Data?
 
     /// The mark outputs get, once a source that has one was opened.
-    fileprivate var originMark: Data? {
+    internal var originMark: Data? {
         lock.lock()
         defer { lock.unlock() }
         return origin
@@ -79,20 +73,33 @@ internal final class ToolRun: @unchecked Sendable {
     /// Outputs made with `deferred`, in the order they were created.
     ///
     /// Job thread only.
-    private var journal: [ToolOutput] = []
+    internal var journal: [ToolOutput] = []
 
-    /// Without a job (in tests of the tools themselves) nothing is reported and existing
-    /// files are overwritten.
+    /// A run that reports to `report`, asks `askExisting` about files in the way, and is cancelled by
+    /// `cancellation`.
     internal init(
         fileSystems: FileSystemRegistry,
-        cancellation: CancellationFlag = CancellationFlag(),
-        report: @escaping @Sendable (JobProgress) -> Void = { _ in },
-        askExisting: @escaping @Sendable (URL) -> ExistingFileChoice = { _ in .overwrite }
+        cancellation: CancellationFlag,
+        report: @escaping @Sendable (JobProgress) -> Void,
+        askExisting: @escaping @Sendable (URL) -> ExistingFileChoice
     ) {
         self.fileSystems = fileSystems
         self.cancellation = cancellation
         self.report = report
         self.askExisting = askExisting
+    }
+
+    /// A run without a job (a tool used on its own, as in its tests): nothing is reported and existing files are
+    /// overwritten.
+    internal convenience init(fileSystems: FileSystemRegistry) {
+        self.init(
+            fileSystems: fileSystems,
+            cancellation: CancellationFlag(),
+            report: { _ in
+                // Nobody watches.
+            },
+            askExisting: { _ in .overwrite }
+        )
     }
 
     /// A run inside a job: progress goes to its window, questions through `ask`.
@@ -104,7 +111,7 @@ internal final class ToolRun: @unchecked Sendable {
         self.init(
             fileSystems: fileSystems,
             cancellation: monitor.cancellation,
-            report: { monitor.report($0) },
+            report: { progress in monitor.report(progress) },
             askExisting: { url in monitor.ask { @MainActor @Sendable in askExisting(url) } }
         )
     }
@@ -116,7 +123,9 @@ internal final class ToolRun: @unchecked Sendable {
             url.deletingLastPathComponent().appending(name: "\(base)(\(number))" + (ext.isEmpty ? "" : "." + ext))
         }
         var number = 2
-        while provider.item(at: candidate(number)) != nil { number += 1 }
+        while provider.item(at: candidate(number)) != nil {
+            number += 1
+        }
         return candidate(number)
     }
 
@@ -126,27 +135,34 @@ internal final class ToolRun: @unchecked Sendable {
         first.isSameLocation(as: second) || first.isSameFile(as: second, followingLinks: true)
     }
 
-    private func noteOrigin(of url: URL, in provider: any FileSystemProvider) {
+    /// Keeps the mark of coming from elsewhere of a source, when outputs are to carry it and none was kept yet.
+    internal func noteOrigin(of url: URL, in provider: any FileSystemProvider) {
         guard carriesOrigin, originMark == nil, let mark = provider.quarantine(of: url) else {
             return
         }
         lock.lock()
-        if origin == nil { origin = mark }
+        if origin == nil {
+            origin = mark
+        }
         lock.unlock()
     }
 
+    /// Throws `ToolError.cancelled` once the run is cancelled.
     internal func checkCancelled() throws {
-        if cancellation.isCancelled { throw ToolError.cancelled }
+        if cancellation.isCancelled {
+            throw ToolError.cancelled
+        }
     }
 
     // MARK: Progress
 
+    /// Sets what the whole run is: its bytes and files.
     internal func expect(bytes: Int64, items: Int) {
         lock.lock()
         bytesTotal = bytes
         itemsTotal = items
         lock.unlock()
-        advance(0, force: true)
+        advance(0, items: 0, force: true)
     }
 
     /// Shows what is being worked on.
@@ -156,14 +172,14 @@ internal final class ToolRun: @unchecked Sendable {
         lock.lock()
         self.lines = lines
         lock.unlock()
-        advance(0, force: true)
+        advance(0, items: 0, force: true)
     }
 
     /// Counts bytes (and finished files) and passes the state on, at most twenty times a
-    /// second.
+    /// second; with `force` at once.
     ///
     /// Safe from any thread.
-    internal func advance(_ bytes: Int64, items: Int = 0, force: Bool = false) {
+    internal func advance(_ bytes: Int64, items: Int, force: Bool) {
         // The decision is one step under the lock: a report that is due takes its turn at once
         // (the time of the last report moves on), so no other thread finds it due as well.
         let due = lock.withLock { () -> Bool in
@@ -196,332 +212,7 @@ internal final class ToolRun: @unchecked Sendable {
         report(progress)
     }
 
-    // MARK: Reading and writing
-
-    internal func provider(for url: URL) throws -> any FileSystemProvider { try fileSystems.provider(for: url) }
-
-    /// Hands a file to `body` block by block, counting the bytes as progress.
-    internal func read(
-        _ url: URL,
-        counted: Bool = true,
-        blockSize: Int = ToolRun.blockSize,
-        _ body: (Data) throws -> Void
-    )
-        throws
-    {
-        try read(try openReader(url), counted: counted, blockSize: blockSize, body)
+    deinit {
+        // Nothing to release.
     }
-
-    /// Opens a file for reading; hand it to `read(_:counted:_:)`, which closes it.
-    ///
-    /// Tools open their source before they create anything, so that a source that cannot be read
-    /// costs no output file.
-    internal func openReader(_ url: URL) throws -> any FileReader {
-        do {
-            // What a plugin still holds back for this file (an archive written after a delay) is written first.
-            try fileSystems.flushPendingWrites(to: url, cancellation: cancellation)
-            let provider = try provider(for: url)
-            let reader = try provider.read(url, cancellation: cancellation)
-            noteOrigin(of: url, in: provider)
-            return reader
-        } catch {
-            try checkCancelled()
-            throw error
-        }
-    }
-
-    internal func read(
-        _ reader: any FileReader,
-        counted: Bool = true,
-        blockSize: Int = ToolRun.blockSize,
-        _ body: (Data) throws -> Void
-    ) throws {
-        defer { reader.close() }
-        // A read blocked on a server ends as soon as the run is cancelled.
-        let token = cancellation.interrupting(reader)
-        defer { withExtendedLifetime(token) {} }
-        do {
-            // Every block is read and handled in a pool of its own: a long file would otherwise
-            // keep all its blocks (and what the provider allocated around them) until it ends.
-            while try autoreleasepool(invoking: { () throws -> Bool in
-                guard let block = try reader.read(upToCount: blockSize), !block.isEmpty else {
-                    return false
-                }
-                try checkCancelled()
-                try body(block)
-                if counted { advance(Int64(block.count)) }
-                return true
-            }) {}
-        } catch {
-            // What the interruption made of the read is the cancel itself.
-            try checkCancelled()
-            throw error
-        }
-        try checkCancelled()
-    }
-
-    /// The whole of a small file (a checksum file, a `.crc` file).
-    ///
-    /// A file longer than `limit` is an error, never a silently shortened text.
-    internal func contents(of url: URL, limit: Int = 256 << 20) throws -> Data {
-        var data = Data()
-        let reader = try openReader(url)
-        defer { reader.close() }
-        let token = cancellation.interrupting(reader)
-        defer { withExtendedLifetime(token) {} }
-        do {
-            while try autoreleasepool(invoking: { () throws -> Bool in
-                guard let block = try reader.read(upToCount: Self.blockSize), !block.isEmpty else {
-                    return false
-                }
-                data.append(block)
-                return true
-            }) {
-                if data.count > limit {
-                    throw ToolError.failed("\(url.lastPathComponent) is too large (more than \(limit >> 20) MiB).")
-                }
-            }
-        } catch {
-            try checkCancelled()
-            throw error
-        }
-        return data
-    }
-
-    /// Opens a file for writing.
-    ///
-    /// When one is there already the user decides (or, with `autoRename`, the new file gets the
-    /// name `name(2).ext`); nil means "skip this file".
-    ///
-    /// A file that replaces another is written under a temporary name. With `deferred` the
-    /// replacement happens only when `transaction` ends well, and everything the run created
-    /// is taken back when it does not, so a cancelled or failed run never leaves a mixture of
-    /// old and new files and never touches what was there before.
-    internal func create(_ url: URL, autoRename: Bool = false, deferred: Bool = false) throws -> ToolOutput? {
-        var url = url
-        let provider = try provider(for: url)
-        var output: ToolOutput?
-        if provider.item(at: url, cancellation: cancellation) != nil {
-            var choice = autoRename ? ExistingFileChoice.autoRename : overwritesAll ? .overwrite : askExisting(url)
-            if choice == .overwriteAll {
-                overwritesAll = true
-                choice = .overwrite
-            }
-            switch choice {
-            case .cancel:
-                cancellation.cancel()
-                throw ToolError.cancelled
-
-            case .skip:
-                return nil
-
-            case .autoRename:
-                url = Self.freeName(for: url, provider: provider)
-
-            case .overwrite, .overwriteAll:
-                // The old file stays until the new one is complete: it is written under a
-                // temporary name that replaces the old file when it is finished.
-                let temporary = url.deletingLastPathComponent()
-                    .appending(
-                        name: ".\(url.lastPathComponent).afm-\(UUID().uuidString.prefix(8))"
-                    )
-                output = ToolOutput(
-                    url: url,
-                    writer: try openWriter(temporary, in: provider),
-                    provider: provider,
-                    temporary: temporary,
-                    cancellation: cancellation,
-                    deferred: deferred,
-                    origin: { [weak self] in self?.originMark }
-                )
-            }
-        }
-        let created =
-            try output
-            ?? ToolOutput(
-                url: url,
-                writer: openWriter(url, in: provider),
-                provider: provider,
-                cancellation: cancellation,
-                deferred: deferred,
-                origin: { [weak self] in self?.originMark }
-            )
-        if deferred { journal.append(created) }
-        return created
-    }
-
-    /// Runs `body`.
-    ///
-    /// The outputs it made with `deferred: true` take the place of the files they replace when it
-    /// has finished without an error; if it throws (or is cancelled), they are all removed again
-    /// and the files that were there before are untouched.
-    internal func transaction<Value>(_ body: () throws -> Value) throws -> Value {
-        do {
-            let value = try body()
-            try checkCancelled()
-            let outputs = journal
-            journal = []
-            do {
-                for output in outputs { try output.commit() }
-            } catch {
-                outputs.forEach { $0.undo() }
-                throw error
-            }
-            return value
-        } catch {
-            let outputs = journal
-            journal = []
-            outputs.forEach { $0.undo() }
-            throw error
-        }
-    }
-
-    private func openWriter(_ url: URL, in provider: any FileSystemProvider) throws -> any FileWriter {
-        do {
-            return try provider.write(url, cancellation: cancellation)
-        } catch {
-            try checkCancelled()
-            throw error
-        }
-    }
-
-    /// Writes a small file in one go.
-    @discardableResult
-    internal func write(_ data: Data, to url: URL, deferred: Bool = false) throws -> URL? {
-        guard let output = try create(url, deferred: deferred) else {
-            return nil
-        }
-        do {
-            try output.write(data)
-            try output.finish()
-        } catch {
-            output.abandon()
-            throw error
-        }
-        return output.url
-    }
-}
-
-/// A file being written.
-///
-/// What is not finished is removed again, so a failed or cancelled tool leaves no half-written
-/// files.
-internal final class ToolOutput {
-    private enum State { case open, closed, done, undone }
-
-    internal let url: URL
-    private let writer: any FileWriter
-    private let provider: any FileSystemProvider
-    /// Where the data goes while it replaces an existing file at `url`; nil when it is written to `url` itself.
-    private let temporary: URL?
-    /// Whether the replacement waits for `commit` (see `ToolRun.transaction`).
-    private let deferred: Bool
-    private var state = State.open
-    internal private(set) var bytesWritten: Int64 = 0
-    private let cancellation: CancellationFlag?
-    /// Ties the writer to the run's cancel while the output lives, so a blocked write ends.
-    private let interruption: AnyObject?
-    /// The mark of coming from elsewhere that the finished file gets (see `ToolRun.carriesOrigin`), asked when it is finished.
-    private let origin: () -> Data?
-
-    private var partial: URL { temporary ?? url }
-
-    internal init(
-        url: URL,
-        writer: any FileWriter,
-        provider: any FileSystemProvider,
-        temporary: URL? = nil,
-        cancellation: CancellationFlag? = nil,
-        deferred: Bool = false,
-        origin: @escaping () -> Data?
-    ) {
-        self.origin = origin
-        self.url = url
-        self.writer = writer
-        self.provider = provider
-        self.temporary = temporary
-        self.cancellation = cancellation
-        self.deferred = deferred
-        interruption = cancellation?.interrupting(writer)
-    }
-
-    internal func write(_ data: Data) throws {
-        do {
-            try writer.write(data)
-        } catch {
-            if cancellation?.isCancelled == true { throw ToolError.cancelled }
-            throw error
-        }
-        bytesWritten += Int64(data.count)
-    }
-
-    /// Completes the file.
-    ///
-    /// One that replaces another takes its place now, or, when the output is deferred, at `commit`.
-    internal func finish() throws {
-        guard state == .open else {
-            return
-        }
-        do {
-            try writer.close(attributes: FileAttributes())
-            // Before the file appears under its name. A file system that keeps no such mark does without.
-            if let mark = origin() { try? provider.setQuarantine(mark, of: partial) }
-            if let temporary, !deferred { try provider.move(temporary, to: url, replacing: true) }
-        } catch {
-            state = .undone
-            try? provider.remove(partial)
-            if cancellation?.isCancelled == true { throw ToolError.cancelled }
-            throw error
-        }
-        state = deferred && temporary != nil ? .closed : .done
-    }
-
-    /// Puts a finished, deferred output in the place of the file it replaces.
-    internal func commit() throws {
-        guard state == .closed, let temporary else {
-            return
-        }
-        do {
-            try provider.move(temporary, to: url, replacing: true)
-            state = .done
-        } catch {
-            state = .undone
-            try? provider.remove(temporary)
-            throw error
-        }
-    }
-
-    /// Drops an output that is not finished.
-    internal func abandon() {
-        guard state == .open else {
-            return
-        }
-        state = .undone
-        try? writer.close(attributes: FileAttributes())
-        try? provider.remove(partial)
-    }
-
-    /// Takes back what this output made: the partial or waiting temporary, or a file it created
-    /// anew.
-    ///
-    /// A file it replaced is not touched; that happens only at `commit`.
-    internal func undo() {
-        switch state {
-        case .open:
-            abandon()
-
-        case .closed:
-            state = .undone
-            if let temporary { try? provider.remove(temporary) }
-
-        case .done:
-            state = .undone
-            if temporary == nil { try? provider.remove(url) }
-
-        case .undone:
-            break
-        }
-    }
-
-    deinit { abandon() }
 }

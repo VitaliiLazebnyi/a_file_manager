@@ -794,7 +794,7 @@ internal struct ToolsAdoptFileTools {
         for (index, length) in lengths.enumerated() {
             let data = random(length, seed: UInt64(index + 1))
             for xx in [false, true] {
-                let encoded = SixBitText.encode(data, xx: xx)
+                let encoded = SixBitText.encode(data, xxEncode: xx)
                 #expect(encoded == Reference.encode(data, xx: xx))
                 let bytes = [UInt8](encoded)
                 var start = 0
@@ -802,10 +802,10 @@ internal struct ToolsAdoptFileTools {
                 while start < bytes.count {
                     let end = bytes[start...].firstIndex(of: 13)!
                     let line = bytes[start..<end]
-                    let one = SixBitText.decode(line, xx: xx)
+                    let one = (try? SixBitText.decode(line, xxEncode: xx))
                     #expect(
                         one == Reference.decode(line, xx: xx)
-                            && SixBitText.decode(line, xx: !xx) == Reference.decode(line, xx: !xx)
+                            && (try? SixBitText.decode(line, xxEncode: !xx)) == Reference.decode(line, xx: !xx)
                     )
                     decoded += one ?? []
                     start = end + 2
@@ -824,7 +824,7 @@ internal struct ToolsAdoptFileTools {
                         UInt8(28 + Int(((state >> UInt64(offset % 40)) &+ UInt64(offset) &* 31) % 100))
                     }
             )
-            for xx in [false, true] { #expect(SixBitText.decode(line, xx: xx) == Reference.decode(line, xx: xx)) }
+            for xx in [false, true] { #expect((try? SixBitText.decode(line, xxEncode: xx)) == Reference.decode(line, xx: xx)) }
         }
     }
 
@@ -842,12 +842,15 @@ internal struct ToolsAdoptFileTools {
             return hasher.finish().hex
         }
         // Two other methods of the same length than the first candidate: the second pass hashes both.
-        let candidates: [ChecksumMethod] = [.sha256, .sha3_256, .blake3]
+        let candidates: [ChecksumMethod] = [.sha256, .sha3Bits256, .blake3]
         let wanted = digest(.blake3)
-        let results = ChecksumRun.digests(of: [(box.url("f.bin"), candidates, wanted)], run: run)
+        let results = ChecksumRun.digests(
+            of: [ChecksumRun.HashRequest(url: box.url("f.bin"), methods: candidates, expected: wanted)],
+            run: run
+        )
         let found = try results[0].get()
         #expect(
-            found.count == 3 && found[0].hex == digest(.sha256) && found[1].hex == digest(.sha3_256)
+            found.count == 3 && found[0].hex == digest(.sha256) && found[1].hex == digest(.sha3Bits256)
                 && found[2].hex == wanted
         )
     }
@@ -862,7 +865,14 @@ internal struct ToolsAdoptFileTools {
         memory.stallsReads = true
         defer { memory.releaseStalls() }
         let flag = CancellationFlag()
-        let run = ToolRun(fileSystems: registry, cancellation: flag)
+        let run = ToolRun(
+            fileSystems: registry,
+            cancellation: flag,
+            report: { _ in
+                // Not watched here.
+            },
+            askExisting: { _ in .overwrite }
+        )
         let results = Outcome<[Result<[[UInt8]], any Error>]>()
         let done = background { results.value = ChecksumRun.digests(of: [(memory.url("/h/a"), [.sha1])], run: run) }
         #expect(probe.reading.wait(timeout: .now() + Wait.ceiling) == .success)
@@ -887,7 +897,14 @@ internal struct ToolsAdoptFileTools {
         memory.stallsReads = true
         defer { memory.releaseStalls() }
         let flag = CancellationFlag()
-        let run = ToolRun(fileSystems: registry, cancellation: flag)
+        let run = ToolRun(
+            fileSystems: registry,
+            cancellation: flag,
+            report: { _ in
+                // Not watched here.
+            },
+            askExisting: { _ in .overwrite }
+        )
         let item = memory.item(at: source)!
         let error = Outcome<any Error>()
         let done = background {
@@ -913,11 +930,18 @@ internal struct ToolsAdoptFileTools {
         memory.stallsWrites = true
         defer { memory.releaseStalls() }
         let flag = CancellationFlag()
-        let run = ToolRun(fileSystems: registry, cancellation: flag)
+        let run = ToolRun(
+            fileSystems: registry,
+            cancellation: flag,
+            report: { _ in
+                // Not watched here.
+            },
+            askExisting: { _ in .overwrite }
+        )
         let item = memory.item(at: source)!
         let error = Outcome<any Error>()
         let done = background {
-            do { try Encoder.encode(item, into: memory.url("/out"), method: .uue, run: run) } catch let thrown {
+            do { try Encoder.encode(item, into: memory.url("/out"), options: Encoder.Options(method: .uue), run: run) } catch let thrown {
                 error.value = thrown
             }
         }

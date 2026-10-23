@@ -285,7 +285,7 @@ internal struct FileToolsChecksums {
                 == [
                     Entry(name: "my (1).bin", digest: sha256.lowercased(), method: .sha256),
                     Entry(name: "b.txt", digest: md5, method: .md5),
-                    Entry(name: "c", digest: sha256.lowercased(), method: .sha3_256)
+                    Entry(name: "c", digest: sha256.lowercased(), method: .sha3Bits256)
                 ]
         )
         // The checksum of a stream stands for the file the checksum file is named after.
@@ -303,14 +303,14 @@ internal struct FileToolsChecksums {
         #expect(ChecksumFile.parse("\(md5) *a", fileName: "x.sha256") == [Entry(name: "a", digest: md5, method: nil)])
         #expect(
             ChecksumFile.method(forFileNamed: "A.SHA") == .sha1
-                && ChecksumFile.method(forFileNamed: "a.sha3-512") == .sha3_512
+                && ChecksumFile.method(forFileNamed: "a.sha3-512") == .sha3Bits512
         )
         #expect(
             ChecksumFile.method(forFileNamed: "a.bk3") == .blake3 && ChecksumFile.method(forFileNamed: "a.txt") == nil
         )
         #expect(
-            ChecksumFile.isChecksumFile("x.SFV") && ChecksumFile.isChecksumFile("x.sha512")
-                && !ChecksumFile.isChecksumFile("x.sum")
+            ChecksumFile.isChecksumFile("x.SFV", extraMasks: "") && ChecksumFile.isChecksumFile("x.sha512", extraMasks: "")
+                && !ChecksumFile.isChecksumFile("x.sum", extraMasks: "")
         )
         #expect(ChecksumFile.isChecksumFile("x.sum", extraMasks: "*.sum *.crc32"))
         #expect(
@@ -424,7 +424,7 @@ internal struct FileToolsChecksums {
         )
         #expect(verify(["b b.txt"]).title == "SHA2_256: Errors: 1")
         // SHA-3 and BLAKE3 have the same length; whichever fits is found.
-        let hasher = ChecksumMethod.sha3_256.makeHasher()
+        let hasher = ChecksumMethod.sha3Bits256.makeHasher()
         hasher.update(Data("alpha".utf8))
         pasteboard.clearContents()
         pasteboard.setString(hasher.finish().hex, forType: .string)

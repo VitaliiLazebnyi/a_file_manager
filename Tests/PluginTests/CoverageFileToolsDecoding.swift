@@ -19,7 +19,7 @@ internal struct CoverageFileToolsDecoding {
 
     /// The UUEncode or XXEncode lines of `data`, without their line ends.
     private func sixBit(_ data: Data, xx asXX: Bool = false) -> [String] {
-        let text = String(bytes: SixBitText.encode(data, xx: asXX), encoding: .ascii) ?? ""
+        let text = String(bytes: SixBitText.encode(data, xxEncode: asXX), encoding: .ascii) ?? ""
         return text.split(separator: "\r\n").map(String.init)
     }
 
@@ -173,7 +173,7 @@ internal struct CoverageFileToolsDecoding {
     /// A name longer than a file system takes is cut at a code point.
     @Test
     internal func longNamesAreCut() {
-        let name = Decoder.safeName(String(repeating: "é", count: 200))
+        let name = Decoder.safeName(String(repeating: "é", count: 200), replacingColon: true)
         #expect(name?.utf8.count == 254 && name?.unicodeScalars.count == 127)
     }
 }
