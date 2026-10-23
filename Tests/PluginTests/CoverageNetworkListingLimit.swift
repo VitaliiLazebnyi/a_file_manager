@@ -21,7 +21,7 @@ internal struct CoverageNetworkListingLimit {
         defer { connection.close() }
         var received = 0
         let error = #expect(throws: NetworkError.self) {
-            try connection.list("/", showHidden: false) { entries in
+            try connection.list("/", showHidden: false, cancellation: nil) { entries in
                 received += entries.count
                 return true
             }

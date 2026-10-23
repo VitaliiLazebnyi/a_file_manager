@@ -40,7 +40,7 @@ internal struct CoverageNetworkLinkListings {
         let connection = try server.connected()
         defer { connection.close() }
         var names: [String] = []
-        try connection.list("/", showHidden: false) { entries in
+        try connection.list("/", showHidden: false, cancellation: nil) { entries in
             names += entries.map(\.name)
             return true
         }
@@ -59,10 +59,10 @@ internal struct CoverageNetworkLinkListings {
                 "MLST /docs": "250-Listing\r\n type=dir; /elsewhere\r\n250 End"
             ]
         )
-        let connection = try server.connected { config in config.usesMLSD = false }
+        let connection = try server.connected { config in config.listing = .list }
         defer { connection.close() }
         var entries: [RemoteEntry] = []
-        try connection.list("/", showHidden: false) { more in
+        try connection.list("/", showHidden: false, cancellation: nil) { more in
             entries += more
             return true
         }
@@ -76,7 +76,7 @@ internal struct CoverageNetworkLinkListings {
         let connection = try server.connected()
         defer { connection.close() }
         var calls = 0
-        try connection.list("/", showHidden: true) { _ in
+        try connection.list("/", showHidden: true, cancellation: nil) { _ in
             calls += 1
             return false
         }
@@ -121,7 +121,7 @@ internal struct CoverageNetworkLinkListings {
         let connection = try server.connected { config in config.timeout = 1 }
         defer { connection.close() }
         let error = #expect(throws: NetworkError.self) {
-            try connection.list("/", showHidden: false) { _ in true }
+            try connection.list("/", showHidden: false, cancellation: nil) { _ in true }
         }
         #expect(CoverageNetworkServer.text(of: error) == "reading")
         #expect(connection.isUsable)

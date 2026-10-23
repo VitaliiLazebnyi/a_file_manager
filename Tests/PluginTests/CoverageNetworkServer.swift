@@ -275,7 +275,9 @@ internal final class CoverageNetworkServer: @unchecked Sendable {
     internal func stop() {
         lock.withLock {
             isStopped = true
-            sockets.forEach { _ = shutdown($0, SHUT_RDWR) }
+            for socket in sockets {
+                _ = shutdown(socket, SHUT_RDWR)
+            }
         }
     }
 

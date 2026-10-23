@@ -30,8 +30,8 @@ internal struct CoverageNetworkConnectionCorners {
         let server = try CoverageNetworkServer(replies: ["RMD": "250 Removed"])
         let connection = try server.connected()
         defer { connection.close() }
-        try connection.changeDirectory("/a/b")
-        try connection.removeDirectory("/a")
+        try connection.changeDirectory("/a/b", cancellation: nil)
+        try connection.removeDirectory("/a", cancellation: nil)
         #expect(server.commands.suffix(3) == ["CWD /a/b", "CWD /", "RMD /a"])
     }
 
@@ -43,8 +43,10 @@ internal struct CoverageNetworkConnectionCorners {
         )
         let connection = try server.connected()
         defer { connection.close() }
-        #expect(try connection.modificationTime(of: "/a") == Date(timeIntervalSince1970: 1_704_164_645))
-        #expect(try connection.modificationTime(of: "/b") == nil)
+        #expect(
+            try connection.modificationTime(of: "/a", cancellation: nil) == Date(timeIntervalSince1970: 1_704_164_645)
+        )
+        #expect(try connection.modificationTime(of: "/b", cancellation: nil) == nil)
     }
 
     /// A transfer the server calls failed at the end is an error, and the connection stays usable.
@@ -55,11 +57,11 @@ internal struct CoverageNetworkConnectionCorners {
         )
         let connection = try server.connected()
         defer { connection.close() }
-        let stream = try connection.beginTransfer("RETR a", type: "I")
-        while try stream.read(upToCount: 10, timeout: Wait.ceiling) != nil {
+        let stream = try connection.beginTransfer("RETR a", type: "I", restartAt: 0, cancellation: nil)
+        while try stream.read(upToCount: 10, timeout: Wait.ceiling, cancellation: nil) != nil {
             // Read to the end.
         }
-        let error = #expect(throws: NetworkError.self) { try connection.finishTransfer() }
+        let error = #expect(throws: NetworkError.self) { try connection.finishTransfer(cancellation: nil) }
         #expect(CoverageNetworkServer.code(of: error) == 451)
         #expect(connection.isUsable)
     }
@@ -70,8 +72,10 @@ internal struct CoverageNetworkConnectionCorners {
         let server = try CoverageNetworkServer(replies: ["RETR": Self.heldDownload])
         let connection = try server.connected()
         defer { connection.close() }
-        _ = try connection.beginTransfer("RETR a", type: "I")
-        #expect(throws: NetworkError.self) { try connection.send("NOOP", replyWithin: 0) }
+        _ = try connection.beginTransfer("RETR a", type: "I", restartAt: 0, cancellation: nil)
+        #expect(throws: NetworkError.self) {
+            try connection.send("NOOP", shown: "NOOP", replyWithin: 0, cancellation: nil)
+        }
         connection.abortTransfer()
         #expect(!connection.isUsable)
     }
@@ -90,7 +94,7 @@ internal struct CoverageNetworkConnectionCorners {
         let connection = try server.connected()
         defer { connection.close() }
         var names: [String] = []
-        try connection.list("/", showHidden: false) { entries in
+        try connection.list("/", showHidden: false, cancellation: nil) { entries in
             names += entries.map(\.name)
             return true
         }
@@ -113,7 +117,7 @@ internal struct CoverageNetworkConnectionCorners {
         let connection = try server.connected()
         defer { connection.close() }
         var names: [String] = []
-        try connection.list("/", showHidden: false) { entries in
+        try connection.list("/", showHidden: false, cancellation: nil) { entries in
             names += entries.map(\.name)
             return true
         }

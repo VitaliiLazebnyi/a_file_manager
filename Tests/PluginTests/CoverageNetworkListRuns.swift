@@ -67,6 +67,6 @@ internal struct CoverageNetworkListRuns {
             fileSystems: fixture.bench.kernel.fileSystems
         )
         #expect(plan.items.count == 2 && plan.steps.count == 1)
-        #expect(plan.steps.first?.to == fixture.box.url("other").appending(path: "readme.txt"))
+        #expect(plan.steps.first?.destination == fixture.box.url("other").appending(path: "readme.txt"))
     }
 }

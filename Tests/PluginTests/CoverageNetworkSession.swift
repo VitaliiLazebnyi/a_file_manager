@@ -176,7 +176,7 @@ internal final class CoverageNetworkSession: RemoteSession, @unchecked Sendable 
     }
 
     /// Removes the entry, unless the hook throws.
-    internal func remove(_ path: String, isDirectory _: Bool?, cancellation _: CancellationFlag?) throws {
+    internal func remove(_ path: String, kind _: RemovedKind, cancellation _: CancellationFlag?) throws {
         record("remove \(path)")
         try lock.withLock { removeHook }(path)
         lock.withLock { entries[path] = nil }

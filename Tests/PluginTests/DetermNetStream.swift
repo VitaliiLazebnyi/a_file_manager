@@ -17,10 +17,10 @@ internal struct DetermNetStream {
         defer { close(listener) }
         let accepted = Signal<Int32>()
         OtherThread.start { accepted.set(accept(listener, nil, nil)) }
-        let stream = NetStream(host: "127.0.0.1", port: TestFTPServer.port(of: listener))
+        let stream = NetStream(host: "127.0.0.1", port: TestFTPServer.port(of: listener), security: .plain)
         stream.start()
         defer { stream.close() }
-        try stream.waitUntilReady(timeout: Wait.ceiling)
+        try stream.waitUntilReady(timeout: Wait.ceiling, cancellation: nil)
         let peer = try #require(accepted.wait())
         #expect(CoverageNetworkServer.sendAll(peer, Data("hello".utf8)))
         // Closed with a linger of nothing: the connection is reset, not ended.
@@ -31,7 +31,7 @@ internal struct DetermNetStream {
         var failure: (any Error)?
         while failure == nil {
             do {
-                guard let piece = try stream.read(upToCount: 100, timeout: Wait.ceiling) else {
+                guard let piece = try stream.read(upToCount: 100, timeout: Wait.ceiling, cancellation: nil) else {
                     break
                 }
                 received += piece
