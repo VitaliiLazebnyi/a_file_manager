@@ -682,11 +682,11 @@ internal struct Review2PluginsA2Find {
 
     @Test
     internal func oneShareMountedTwiceIsOnePlace() {
-        let first = DuplicateFinder.Mount(from: "smbfs://me@server/share", on: "/Volumes/share")
-        let second = DuplicateFinder.Mount(from: "smbfs://me@server/share", on: "/Volumes/share-1")
+        let first = DuplicateFinder.Mount(source: "smbfs://me@server/share", mountPoint: "/Volumes/share")
+        let second = DuplicateFinder.Mount(source: "smbfs://me@server/share", mountPoint: "/Volumes/share-1")
         #expect(first.place(of: "/Volumes/share/docs/a.txt") == second.place(of: "/Volumes/share-1/docs/a.txt"))
         #expect(first.place(of: "/Volumes/share/docs/a.txt") != first.place(of: "/Volumes/share/docs/b.txt"))
-        let other = DuplicateFinder.Mount(from: "smbfs://me@server/other", on: "/Volumes/other")
+        let other = DuplicateFinder.Mount(source: "smbfs://me@server/other", mountPoint: "/Volumes/other")
         #expect(other.place(of: "/Volumes/other/docs/a.txt") != first.place(of: "/Volumes/share/docs/a.txt"))
     }
 }

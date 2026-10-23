@@ -1,41 +1,6 @@
 import AFMKernel
 import Foundation
 
-/// Counts the regular expressions that ran out of time, so that a pattern which is too slow
-/// for every name does not cost its time budget again for each of a million files: after a few
-/// timeouts the pattern is taken as unusable and the rest answer at once.
-///
-/// Shared by the threads of one search. All state is guarded by `lock`.
-internal final class RegexTrip: @unchecked Sendable {
-    private let lock = NSLock()
-    private var timeouts = 0
-    private let limit: Int
-
-    /// Whether any regular expression of the search ran out of time.
-    internal var hasTimedOut: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return timeouts > 0
-    }
-
-    /// Whether enough of them did for the pattern to be given up.
-    internal var isTripped: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return timeouts >= limit
-    }
-
-    internal init(limit: Int = 3) {
-        self.limit = limit
-    }
-
-    internal func recordTimeout() {
-        lock.lock()
-        timeouts += 1
-        lock.unlock()
-    }
-}
-
 /// Runs a regular expression the user typed with a bound on its time.
 ///
 /// Such an expression can take time that grows with every character of the text (`(a+)+$`), so it
@@ -43,8 +8,14 @@ internal final class RegexTrip: @unchecked Sendable {
 /// `enumerateMatches` when the budget has passed or the work was cancelled, on whatever thread the
 /// caller is.
 internal enum FindRegex {
+    /// How one bounded match ended.
     internal enum Outcome: Equatable {
-        case matched, unmatched, timedOut
+        /// The text holds a match.
+        case matched
+        /// The budget passed, or the work was cancelled, before the match was decided.
+        case timedOut
+        /// The text holds no match.
+        case unmatched
     }
 
     /// What one match may take.
@@ -56,7 +27,7 @@ internal enum FindRegex {
     internal static func firstMatch(
         _ regex: NSRegularExpression,
         in text: String,
-        budget: TimeInterval = defaultBudget,
+        budget: TimeInterval,
         cancelled: () -> Bool
     ) -> Outcome {
         guard !text.isEmpty else {
@@ -82,26 +53,28 @@ internal enum FindRegex {
         return outcome
     }
 
-    /// `firstMatch` that also counts a timeout in `trip` and gives up at once on a tripped pattern.
+    /// `firstMatch` within `defaultBudget` that also counts a timeout in `trip` and gives up at once on a
+    /// tripped pattern.
     internal static func matches(
         _ regex: NSRegularExpression,
         in text: String,
         trip: RegexTrip?,
-        budget: TimeInterval = defaultBudget,
         cancelled: () -> Bool
     ) -> Bool {
         if trip?.isTripped == true {
             return false
         }
-        switch firstMatch(regex, in: text, budget: budget, cancelled: cancelled) {
+        switch firstMatch(regex, in: text, budget: defaultBudget, cancelled: cancelled) {
         case .matched:
             return true
 
-        case .unmatched:
+        case .timedOut:
+            if !cancelled() {
+                trip?.recordTimeout()
+            }
             return false
 
-        case .timedOut:
-            if !cancelled() { trip?.recordTimeout() }
+        case .unmatched:
             return false
         }
     }

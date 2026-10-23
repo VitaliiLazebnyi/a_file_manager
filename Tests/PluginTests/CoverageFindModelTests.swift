@@ -95,10 +95,10 @@ internal struct CoverageFindModel {
             matchAll: false,
             rules: [FieldRule("tc.name", .contains, "zz"), FieldRule("tc.name", .contains, "a")]
         )
-        .prepared()
+        .prepared(trip: nil)
         let item = FileItem(url: memory.addFile("/any/a.txt"), name: "a.txt")
         let fields = Dictionary(uniqueKeysWithValues: SearchField.builtIn(fileSystems: registry).map { ($0.id, $0) })
-        #expect(rules.matches(item, fields: fields))
+        #expect(rules.matches(item, fields: fields) { false })
     }
 
     @Test
@@ -113,10 +113,10 @@ internal struct CoverageFindModel {
 
     @Test
     internal func cancelledRulesMatchNothing() {
-        let rules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .contains, "a")]).prepared()
+        let rules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .contains, "a")]).prepared(trip: nil)
         let item = FileItem(url: memory.addFile("/a.txt"), name: "a.txt")
         let fields = Dictionary(uniqueKeysWithValues: SearchField.builtIn(fileSystems: registry).map { ($0.id, $0) })
-        #expect(rules.matches(item, fields: fields) && !rules.matches(item, fields: fields, cancelled: { true }))
+        #expect(rules.matches(item, fields: fields) { false } && !rules.matches(item, fields: fields) { true })
     }
 
     // MARK: Regular expressions
@@ -124,15 +124,16 @@ internal struct CoverageFindModel {
     @Test
     internal func anEmptyTextIsMatchedAsIs() throws {
         let empty = try NSRegularExpression(pattern: "^$")
-        #expect(FindRegex.firstMatch(empty, in: "", cancelled: { false }) == .matched)
-        #expect(FindRegex.firstMatch(try NSRegularExpression(pattern: "a"), in: "", cancelled: { false }) == .unmatched)
+        #expect(FindRegex.firstMatch(empty, in: "", budget: FindRegex.defaultBudget) { false } == .matched)
+        let letter = try NSRegularExpression(pattern: "a")
+        #expect(FindRegex.firstMatch(letter, in: "", budget: FindRegex.defaultBudget) { false } == .unmatched)
     }
 
     @Test
     internal func aTrippedExpressionIsNotTriedAgain() throws {
         let trip = RegexTrip(limit: 1)
         trip.recordTimeout()
-        #expect(!FindRegex.matches(try NSRegularExpression(pattern: "a"), in: "a", trip: trip, cancelled: { false }))
+        #expect(!FindRegex.matches(try NSRegularExpression(pattern: "a"), in: "a", trip: trip) { false })
     }
 
     // MARK: Text patterns
@@ -307,13 +308,13 @@ internal struct CoverageFindModel {
 
     @Test
     internal func aShareIsToldByItsSourceAndThePathInIt() throws {
-        let mount = DuplicateFinder.Mount(from: "smbfs://host/share", on: "/Volumes/share")
+        let mount = DuplicateFinder.Mount(source: "smbfs://host/share", mountPoint: "/Volumes/share")
         #expect(mount.place(of: "/Volumes/share/a/b.txt") == "smbfs://host/share/a/b.txt")
         #expect(mount.place(of: "/elsewhere/c.txt") == "smbfs://host/share/elsewhere/c.txt")
-        #expect(DuplicateFinder.Mount(from: "s", on: "/").place(of: "x") == "s/x")
+        #expect(DuplicateFinder.Mount(source: "s", mountPoint: "/").place(of: "x") == "s/x")
         // The home folders of the system are mounted by the automounter, not from a local disk.
         let home = try #require(DuplicateFinder.Mount.of(URL(fileURLWithPath: "/System/Volumes/Data/home")))
-        #expect(home.on == "/System/Volumes/Data/home" && home.from.hasPrefix("autofs:"))
+        #expect(home.mountPoint == "/System/Volumes/Data/home" && home.source.hasPrefix("autofs:"))
         #expect(DuplicateFinder.Mount.of(box.root) == nil)
     }
 
@@ -327,7 +328,7 @@ internal struct CoverageFindModel {
         )
         let items = [local, system].map { FileItem(url: $0, name: $0.lastPathComponent) }
         let kept = DuplicateFinder.distinctFiles(items.map { (key: 0, item: $0) }) { url in
-            DuplicateFinder.Mount(from: "share", on: url.deletingLastPathComponent().path)
+            DuplicateFinder.Mount(source: "share", mountPoint: url.deletingLastPathComponent().path)
         }
         #expect(kept.map(\.item.url) == [local])
     }
@@ -336,7 +337,10 @@ internal struct CoverageFindModel {
     internal func aLocalFileThatIsGoneIsLeftOut() throws {
         let here = try box.file("here.txt", "same")
         let items = [here, box.url("gone.txt")].map { FileItem(url: $0, name: $0.lastPathComponent) }
-        #expect(DuplicateFinder.distinctFiles(items.map { (key: 0, item: $0) }).map(\.item.url) == [here])
+        #expect(
+            DuplicateFinder.distinctFiles(items.map { (key: 0, item: $0) }, mountOf: DuplicateFinder.Mount.of)
+                .map(\.item.url) == [here]
+        )
     }
 
     @Test
@@ -355,7 +359,7 @@ internal struct CoverageFindModel {
     internal func aSearchOfChosenItemsThatIsCancelledFindsNothing() {
         let file = memory.addFile("/c/a.txt")
         var query = SearchQuery(directory: memory.url("/c"))
-        query.onlyItems = [file, memory.url("/c")]
+        query.scope = .only([file, memory.url("/c")])
         let search = FileSearch(query, fileSystems: registry)
         search.cancel()
         var found: [FileItem] = []

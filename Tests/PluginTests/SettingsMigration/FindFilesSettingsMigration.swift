@@ -63,7 +63,7 @@ internal struct FindFilesSettingsMigration {
         #expect(videos.useSpotlight && videos.depth == 2 && !videos.findText && !videos.searchArchives)
         #expect(videos.criteria.dateFrom == Date(timeIntervalSinceReferenceDate: 788_918_400))
         #expect(videos.criteria.dateTo == nil && videos.criteria.olderThan == nil)
-        #expect(videos.criteria.notOlderThan == Age(6, .months) && videos.criteria.directory == .no)
+        #expect(videos.criteria.notOlderThan == Age(6, .months) && videos.criteria.directory == .unset)
         #expect(videos.criteria.size == SizeRule(.greater, 500, .megabytes))
         #expect(!videos.fieldRules.isActive && !videos.duplicates.isActive)
         let notes = try #require(store["invoices"]).settings

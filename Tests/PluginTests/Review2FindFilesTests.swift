@@ -187,7 +187,7 @@ internal struct Review2FindFiles {
         )
         var query = SearchQuery(directory: memory.url("/wide"))
         query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
-        let search = FileSearch(query, fileSystems: fileSystems, columns: columns, tuning: .init(budget: 30))
+        let search = FileSearch(query, fileSystems: fileSystems, columns: columns, now: Date(), tuning: .init(budget: 30))
         // Written by the other thread before it signals, read here after the wait.
         nonisolated(unsafe) var count = 0
         let done = DispatchSemaphore(value: 0)
@@ -253,7 +253,7 @@ internal struct Review2FindFiles {
         }
         // Used by the work on its own thread only while the test waits for it to finish.
         nonisolated(unsafe) var query = SearchQuery(directory: memory.url("/found"), names: "n1.txt")
-        query.onlyItems = items
+        query.scope = .only(items)
         // Used by the work on its own thread only while the test waits for it to finish.
         nonisolated(unsafe) var hits: [String] = []
         #expect(finishes { hits = names(of: query) })
@@ -295,7 +295,7 @@ internal struct Review2FindFiles {
         try FileManager.default.linkItem(at: box.url("dir/one.txt"), to: box.url("dir/two.txt"))
         var query = SearchQuery(directory: box.url("dir"))
         query.moreDirectories = [box.url("dir"), box.url("dir/one.txt")]
-        query.onlyItems = [box.url("dir/one.txt"), box.url("dir/two.txt"), box.url("dir/one.txt")]
+        query.scope = .only([box.url("dir/one.txt"), box.url("dir/two.txt"), box.url("dir/one.txt")])
         let found = names(of: query)
         #expect(found.sorted() == ["one.txt", "two.txt"])
     }

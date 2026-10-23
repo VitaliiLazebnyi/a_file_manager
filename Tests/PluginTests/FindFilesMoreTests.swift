@@ -242,8 +242,8 @@ internal struct SearchCriteriaRules {
     internal func attributesAreTriState() {
         var criteria = FileCriteria()
         #expect(!criteria.hasAttributes)
-        criteria.hidden = .yes
-        criteria.directory = .no
+        criteria.hidden = .set
+        criteria.directory = .unset
         #expect(criteria.hasAttributes)
         #expect(criteria.matches(file(hidden: true), now: Date()))
         #expect(
@@ -251,15 +251,15 @@ internal struct SearchCriteriaRules {
                 && !criteria.matches(file(directory: true, hidden: true), now: Date())
         )
         criteria = FileCriteria()
-        criteria.readOnly = .yes
-        criteria.executable = .no
+        criteria.readOnly = .set
+        criteria.executable = .unset
         #expect(criteria.matches(file(permissions: 0o444), now: Date()))
         #expect(
             !criteria.matches(file(permissions: 0o644), now: Date())
                 && !criteria.matches(file(permissions: 0o555), now: Date())
         )
         criteria = FileCriteria()
-        (criteria.symbolicLink, criteria.package) = (.yes, .no)
+        (criteria.symbolicLink, criteria.package) = (.set, .unset)
         #expect(
             criteria.matches(file(symlink: true), now: Date())
                 && !criteria.matches(file(symlink: true, package: true), now: Date())
@@ -404,9 +404,9 @@ internal struct ExtendedSearching {
     @Test
     internal func onlyChosenItemsAreSearched() {
         var chosen = query(names: "*.txt *.bak *.md")
-        chosen.onlyItems = [
+        chosen.scope = .only([
             memory.url("/work/notes.txt"), memory.url("/work/old"), memory.url("/other/photo.jpg"), memory.url("/gone")
-        ]
+        ])
         // Files are tested themselves, folders searched inside.
         #expect(find(chosen) == ["/work/notes.txt", "/work/old/budget.bak", "/work/old/deep/readme.md"])
         chosen.maxDepth = 1
@@ -428,7 +428,7 @@ internal struct ExtendedSearching {
         dated.criteria.dateFrom = Date(timeIntervalSince1970: 2_500_000)
         #expect(find(dated) == ["/work/Budget 2026.xls"])
         var folders = query()
-        folders.criteria.directory = .yes
+        folders.criteria.directory = .set
         #expect(find(folders) == ["/work/old", "/work/old/deep"])
     }
 
@@ -589,10 +589,14 @@ internal struct Duplicates {
                 == [["/d/A/copy.txt", "/d/B/copy.txt"]]
         )
         #expect(
-            DuplicateFinder.digest(of: memory.url("/d/A/copy.txt"), fileSystems: fileSystems)
-                == DuplicateFinder.digest(of: memory.url("/d/B/copy.txt"), fileSystems: fileSystems)
+            DuplicateFinder.digest(of: memory.url("/d/A/copy.txt"), fileSystems: fileSystems, cancellation: CancellationFlag())
+                == DuplicateFinder.digest(
+                    of: memory.url("/d/B/copy.txt"),
+                    fileSystems: fileSystems,
+                    cancellation: CancellationFlag()
+                )
         )
-        #expect(DuplicateFinder.digest(of: memory.url("/d/gone"), fileSystems: fileSystems) == nil)
+        #expect(DuplicateFinder.digest(of: memory.url("/d/gone"), fileSystems: fileSystems, cancellation: CancellationFlag()) == nil)
     }
 
     @Test
@@ -697,7 +701,7 @@ internal struct SavedSearches {
         )
         all.criteria.olderThan = Age(1, .days)
         all.criteria.size = SizeRule(.less, 5)
-        all.criteria.hidden = .yes
+        all.criteria.hidden = .set
         all.duplicates = DuplicateOptions(isEnabled: true)
         all.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("tc.name", .contains, "a")])
         #expect(all.summary == "*.txt, regex, text \"x\", date, zip, size, attr, 2x, D<=3, plugins, Spotlight")
@@ -726,7 +730,7 @@ internal struct SavedSearches {
                 && query.maxDepth == 1
         )
         // Nothing marked in the panel: the option has nothing to work on.
-        #expect(query.onlyItems == nil)
+        #expect(query.scope == .startDirectories)
         form.findText = true
         form.searchIn = ""
         query = form.query(
@@ -735,7 +739,7 @@ internal struct SavedSearches {
             includeHidden: false,
             selected: [memory.url("/base/a")]
         )
-        #expect(query.directories == [base] && query.text == "ignored" && query.onlyItems == [memory.url("/base/a")])
+        #expect(query.directories == [base] && query.text == "ignored" && query.scope == .only([memory.url("/base/a")]))
     }
 }
 
@@ -809,7 +813,7 @@ internal struct SpotlightQueries {
         remote.moreDirectories = [URL(string: "mem:///x")!]
         #expect(!SpotlightQuery.isAvailable(for: remote))
         var chosen = query()
-        chosen.onlyItems = []
+        chosen.scope = .only([])
         #expect(!SpotlightQuery.isAvailable(for: chosen))
     }
 
@@ -931,7 +935,7 @@ internal final class FindFilesWindow {
             olderThan: Age(2, .hours),
             size: SizeRule(.greater, 1.5, .megabytes)
         )
-        (settings.criteria.hidden, settings.criteria.directory, settings.criteria.executable) = (.yes, .no, .yes)
+        (settings.criteria.hidden, settings.criteria.directory, settings.criteria.executable) = (.set, .unset, .set)
         settings.duplicates = DuplicateOptions(isEnabled: true, sameName: false, sameSize: true, sameContents: true)
         settings.fieldRules = FieldRules(
             isEnabled: true,
