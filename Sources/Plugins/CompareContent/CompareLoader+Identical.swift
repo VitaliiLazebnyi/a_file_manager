@@ -15,9 +15,7 @@ extension CompareLoader {
         cancellation: CancellationFlag = CancellationFlag(),
         stretch: Int = Self.stretch
     ) throws -> Bool {
-        if cancellation.isCancelled {
-            throw CancellationError()
-        }
+        try throwIfCancelled(cancellation)
         try fileSystems.flushPendingWrites(to: first, cancellation: cancellation)
         try fileSystems.flushPendingWrites(to: second, cancellation: cancellation)
         let files = [
@@ -77,17 +75,22 @@ extension CompareLoader {
             readers.append(reader)
             tokens.append(cancellation.interrupting(reader))
         }
-        while !cancellation.isCancelled {
+        var (same, ended) = (true, false)
+        while same, !ended {
+            try throwIfCancelled(cancellation)
             let blocks = try autoreleasepool {
                 [try exactly(1 << 20, from: readers[0]), try exactly(1 << 20, from: readers[1])]
             }
-            if blocks[0] != blocks[1] {
-                return false
-            }
-            if blocks[0].isEmpty {
-                return true
-            }
+            same = blocks[0] == blocks[1]
+            ended = blocks[0].isEmpty
         }
-        throw CancellationError()
+        return same
+    }
+
+    /// Throws `CancellationError` once `cancellation` is set.
+    private static func throwIfCancelled(_ cancellation: CancellationFlag) throws {
+        if cancellation.isCancelled {
+            throw CancellationError()
+        }
     }
 }
