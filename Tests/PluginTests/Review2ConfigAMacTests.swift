@@ -15,17 +15,25 @@ import Testing
 /// keeps short lines.
 @MainActor
 @Suite
-internal struct Review2ConfigAMac {
+internal struct Review2ConfigAMacTests {
+    /// The folder on disk: `A` with `count` empty files, `S` with a name that has a line break, and an empty `B`.
     internal let box: Sandbox
     private let scratch = ScratchPasteboard()
+    /// The pasteboard the plugin copies to, the test's own.
     internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    /// The plugin, which starts nothing and records what it would have opened.
     internal let mac: MacIntegrationPlugin
+    /// The kernel with navigation, selection and the plugin; `A` on the left, `B` on the right.
     internal let bench: TestBench
+    /// How many files `A` has: a few more than are picked out in the background.
     internal let count: Int
 
+    /// The kernel's commands.
     internal var commands: CommandRegistry { bench.commands }
-    internal var ui: ScriptedInteraction { bench.interaction }
+    /// The scripted answers to the plugin's questions, and the log of them.
+    internal var interaction: ScriptedInteraction { bench.interaction }
 
+    /// Makes the folders and starts the kernel; every file opens with one application.
     internal init() throws {
         box = try Sandbox()
         count = MacIntegrationPlugin.backgroundListThreshold + 10
@@ -46,11 +54,14 @@ internal struct Review2ConfigAMac {
         )
     }
 
+    /// Lets the main thread run until `done` holds, or the ceiling of waits has passed.
     internal func wait(until done: () -> Bool) async {
         let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !done(), Date() < deadline { try? await Task.sleep(nanoseconds: 20_000_000) }
     }
 
+    /// Thousands of marked items are picked out in the background, in list order; Finder is shown a
+    /// bounded number of them and too many are not shared.
     @Test
     internal func theMarkedItemsOfALongListArePickedOutInTheBackground() async {
         commands.perform(.selectAll)
@@ -70,29 +81,30 @@ internal struct Review2ConfigAMac {
         commands.perform(MacIntegrationPlugin.quickLook)
         commands.perform(.revealInFinder)
         commands.perform(MacIntegrationPlugin.share)
-        await wait { ui.log.contains { $0.hasPrefix("inform:") } && mac.log.count == 2 }
+        await wait { interaction.log.contains { $0.hasPrefix("inform:") } && mac.log.count == 2 }
         // The log says how many, Finder is shown a bounded number, and too many are not shared.
         #expect(mac.log.sorted() == ["quicklook \(count) items", "reveal \(MacIntegrationPlugin.revealLimit) items"])
-        #expect(ui.log == ["inform: Too many items to share"])
+        #expect(interaction.log == ["inform: Too many items to share"])
     }
 
+    /// Two marked items of a long list are both copied and shared.
     @Test
     internal func aFewMarkedItemsOfALongListAreStillAllOfThem() async {
         bench.left.model.setSelected(true, names: ["f7.txt", "f3.txt"])
         commands.perform(MacIntegrationPlugin.copyAsPathname)
         await wait { pasteboard.string(forType: .string) != nil }
         let names = (pasteboard.string(forType: .string) ?? "").split(separator: "\n")
-            .map {
-                URL(fileURLWithPath: String($0)).lastPathComponent
-            }
+            .map { line in URL(fileURLWithPath: String(line)).lastPathComponent }
         #expect(Set(names) == ["f3.txt", "f7.txt"] && names.count == 2)
         commands.perform(MacIntegrationPlugin.share)
         await wait { mac.log.count == 1 }
         #expect(
-            mac.log.first?.hasPrefix("share ") == true && mac.log.first?.contains("f3.txt") == true && ui.log.isEmpty
+            mac.log.first?.hasPrefix("share ") == true && mac.log.first?.contains("f3.txt") == true
+                && interaction.log.isEmpty
         )
     }
 
+    /// Without marked items the file under the cursor is acted on at once.
     @Test
     internal func withoutMarksNothingWaits() {
         bench.left.moveCursor(toName: "f1.txt")
@@ -102,17 +114,18 @@ internal struct Review2ConfigAMac {
         #expect(mac.log == ["quicklook " + bench.left.model.directory.path + "/f1.txt"])
     }
 
+    /// A name with a line break makes one log line, and one line in the question of Open With.
     @Test
     internal func aNameWithALineBreakMakesOneLogLine() {
         bench.left.show(box.url("S"))
         bench.left.moveCursor(toName: "line\nbreak.txt")
         commands.perform(.edit)
         commands.perform(MacIntegrationPlugin.openWithDefault)
-        ui.formAnswers = [.accept]
+        interaction.formAnswers = [.accept]
         commands.perform(MacIntegrationPlugin.openWith)
         #expect(mac.log.count == 3 && mac.log.allSatisfy { !$0.contains("\n") && $0.hasSuffix("line\\nbreak.txt") })
         #expect(mac.log[2].hasPrefix("open-with First ") && mac.opened.count == 3)
         // The question names the file on one line too.
-        #expect(ui.log == ["form: Open “line\\nbreak.txt” with"])
+        #expect(interaction.log == ["form: Open “line\\nbreak.txt” with"])
     }
 }
