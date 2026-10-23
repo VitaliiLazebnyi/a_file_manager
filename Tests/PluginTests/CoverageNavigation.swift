@@ -78,6 +78,36 @@ internal struct CoverageNavigation {
         #expect(left.model.directory.path == "/A/docs")
     }
 
+    /// A clipboard whose text has no path yet is asked again: a program may put the text there
+    /// after the change count was changed, and the path is followed once it is there.
+    @Test
+    internal func aPathPutOnTheClipboardAfterItsCountChangedIsFollowed() {
+        scratch.pasteboard.clearContents()
+        scratch.pasteboard.setString("  ", forType: .string)
+        let count = scratch.pasteboard.changeCount
+        commands.perform("afm_CdFromClipboard")
+        #expect(left.model.directory.path == "/A")
+        scratch.pasteboard.setString("docs", forType: .string)
+        #expect(scratch.pasteboard.changeCount == count)
+        commands.perform("afm_CdFromClipboard")
+        #expect(left.model.directory.path == "/A/docs")
+    }
+
+    /// The Mac's standard places, Home and Exchange Directories come with the symbols a toolbar
+    /// button for them shows.
+    @Test
+    internal func theStandardPlacesHaveTheirToolbarSymbols() {
+        let toolbar = bench.kernel.toolbar
+        let symbols: [CommandID: String] = [
+            "afm_GoDesktop": "menubar.dock.rectangle", "afm_GoDocuments": "doc", "afm_GoDownloads": "arrow.down.circle",
+            "afm_GoApplications": "square.grid.2x2", "afm_GoVolumes": "externaldrive", "afm_GoTrash": "trash",
+            .goHome: "house", .exchangePanels: "arrow.left.arrow.right"
+        ]
+        for (command, symbol) in symbols {
+            #expect(toolbar.symbol(for: command) == symbol, "\(command)")
+        }
+    }
+
     /// With one volume, and the panel on it, there is no next volume: the command is refused.
     @Test
     internal func theNextVolumeIsRefusedWhenThereIsNoOther() {

@@ -105,19 +105,35 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   passed (391 / 3,452 / 337, 54 UI tests); lines 99.98%, functions 99.96%, regions 99.98%; 5 files below 100%:
   `FileGridView+Drop`, `AppleScript`, `MultiRenameWindowController:785`, `NetStream`, and `ZipFormat:175–176` (lost
   counts of the non-atomic counters).
-- **100% reached (2026-10-21):** `UITests/run.sh` (55 UI tests and the two desktop checks of AFM UI Mouse: the drag
-  from the thumbnails, Finder Info), then `Scripts/check.sh test`: every test ran and passed (394 / 3,454 / 337);
-  lines 94,639 / 94,639, functions 15,244 / 15,244, regions 40,997 / 40,997. The owner's four decisions taken:
-  atomic counters in the gate's coverage run, documented `!` in `NetStream` and the rename list, Finder automation
-  for the program and Accessibility for the helper (both signed by `UITests/identity.sh`). Found on the way: Finder
-  on macOS 27 resolves no file path it is handed (Finder Info now walks Finder's own references); a grid in no
-  window trapped on its visible rows; XCUITest's drags do not arrive in the VM (see the hand-over, UI tests). A
-  posted key event that only carries a modifier's flag leaves that modifier held for the whole system (a unit test
-  of drop operations then saw Cmd held): the helper presses and releases modifier keys itself.
-- Next: lint step 6 (the touched files are clean, the rest of the repository is not), the mutation runs, gates
-  repo-wide at zero, benchmarks re-recorded, CI and pre-commit.
-- **Waiting for the owner** (before 2026-10-21; decided since, kept for the record): atomic counters for the coverage run;
-  a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
+- **100% reached (2026-10-21):** `UITests/run.sh` (55 UI tests and the two desktop checks of AFM UI Mouse: the drag from
+  the thumbnails, Finder Info), then `Scripts/check.sh test`: every test ran and passed (394 / 3,454 / 337); lines
+  94,639 / 94,639, functions 15,244 / 15,244, regions 40,997 / 40,997. The owner's four decisions taken: atomic counters
+  in the gate's coverage run, documented `!` in `NetStream` and the rename list, Finder automation for the program and
+  Accessibility for the helper (both signed by `UITests/identity.sh`). Found on the way: Finder on macOS 27 resolves no
+  file path it is handed (Finder Info now walks Finder's own references); a grid in no window trapped on its visible
+  rows; XCUITest's drags do not arrive in the VM (see the hand-over, UI tests). A posted key event that only carries a
+  modifier's flag leaves that modifier held for the whole system (a unit test of drop operations then saw Cmd held): the
+  helper presses and releases modifier keys itself.
+- Next: lint step 6 (the touched files are clean, the rest of the repository is not), the mutation runs, gates repo-wide
+  at zero, benchmarks re-recorded, CI and pre-commit.
+- **Mutation, `Sources/Plugins/Navigation` (2026-10-23, branch of the Navigation agent): gate passed.** 31 mutants (17
+  relational, 6 logical, 5 ternary, 3 removed calls), all killed, none equivalent. First run: 30 killed, 1 survived
+  (`ClipboardText.path` kept an empty answer: no test put text on the clipboard after its change count moved). Second
+  run: the removed `toolbar.setSymbol` of the standard places survived; the first run had counted it killed only because
+  `PanelReadAheadProgramTests.theFolderUnderTheCursorIsReadAheadAfterAMoment` (ShellTests) failed by timing in that run.
+  Two tests in `CoverageNavigation` kill both; every other kill was checked to come from a Navigation test. Time: 718 s
+  and 700 s for the first runs (23 s per mutant), 366 s for the passing run (12 s per mutant, all killed by the selected
+  PluginTests), plus about 10 minutes for the map and builds each run. Found on the way: `mutation.sh` nested a run's
+  logs inside the last run's (`report/logs/logs`), fixed; tests that failed when run alone for the map, differently each
+  run (`StallFTPLinks/theResolverPutsItsLinksBackWhileACommandHoldsTheConnection`,
+  `CoverageFindSpotlight/aQuestionStartedTwiceAnswersOnce`,
+  `AppFileWorkTests/changesMadeByOtherProgramsAppearByThemselves`,
+  `PanelRememberedVisitTests/aFreshListingThatComesFirstIsShownInstead`): flaky under load, they make the map incomplete
+  and can kill a mutant that no real test notices, so a kill by an unrelated test needs a look. Full suite after it
+  (`swift test --parallel --enable-code-coverage -j 3`): 394 / 3,456 / 337, all passed; Navigation 100% lines,
+  functions, regions.
+- **Waiting for the owner** (before 2026-10-21; decided since, kept for the record): atomic counters for the coverage
+  run; a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
   prompt); the drop on the thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`,
   `SystemPreviewPanel:20`, `SystemDialogs:31` (millisecond windows: accept, or restructure). Then: lint step 6 and the
   mutation runs.
