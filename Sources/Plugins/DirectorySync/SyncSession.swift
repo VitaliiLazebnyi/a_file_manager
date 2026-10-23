@@ -315,4 +315,8 @@ internal final class SyncSession {
             )
         }
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

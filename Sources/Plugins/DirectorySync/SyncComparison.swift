@@ -291,4 +291,8 @@ public final class SyncComparison: @unchecked Sendable {
             )
         }
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

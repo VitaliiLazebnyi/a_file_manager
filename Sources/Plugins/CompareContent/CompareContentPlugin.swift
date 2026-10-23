@@ -184,4 +184,8 @@ public final class CompareContentPlugin: Plugin {
             window.close()
         }
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

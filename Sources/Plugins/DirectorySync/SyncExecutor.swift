@@ -202,4 +202,8 @@ public final class SyncExecutor: @unchecked Sendable {
         }
         return false
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

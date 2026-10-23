@@ -121,4 +121,8 @@ public final class DirectorySyncPlugin: Plugin {
         session?.cancelComparison()
         window?.close()
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

@@ -330,4 +330,8 @@ internal final class DecodeMachine {
         }
         return rest.split { character in character == ";" || character == " " }.first.map(String.init)
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }

@@ -350,4 +350,8 @@ internal final class CompareSession {
                     + "\(Format.bytes(Int64(diff.differingBytes))) bytes differ    binary"
         }
     }
+
+    deinit {
+        // Nothing to release.
+    }
 }
