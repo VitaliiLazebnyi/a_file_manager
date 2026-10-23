@@ -101,7 +101,7 @@ internal struct CovViewPaneKeyboardTests {
         window.contentView = content
         defer { window.contentView = nil }
         let flag = CancellationFlag()
-        pane.activity = ("Working", nil, flag)
+        pane.activity = ViewerPane.Activity(text: "Working", progress: nil, cancel: flag)
         #expect(window.makeFirstResponder(nil) && !pane.hasKeyboard)
         let escape = try Self.key("\u{1B}", 53, in: window)
         #expect(pane.monitored(escape) === escape && !flag.isCancelled)

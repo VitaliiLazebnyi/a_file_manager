@@ -47,7 +47,7 @@ internal enum DetectTarget {
         for candidate in [encoding, guess] {
             let whole = checkWhole(data, candidate)
             checkPieces(data, candidate, cutA: cutA, cutB: cutB, whole: whole)
-            if let back = candidate.encode(String(decoding: whole.units.prefix(64), as: UTF16.self)) {
+            if let back = try? candidate.encode(String(decoding: whole.units.prefix(64), as: UTF16.self)) {
                 _ = back.count
             }
         }
@@ -65,8 +65,8 @@ internal enum DetectTarget {
             "detect-bom-length",
             "\(guess.bomLength) of \(data.count)"
         )
-        _ = ViewerDetection.content(name: fzText(data.prefix(40)), sample: sample)
-        _ = ViewerDetection.content(name: "a.txt", sample: sample)
+        _ = ViewerDetection.content(name: fzText(data.prefix(40)), sample: sample, additionalMedia: [], vetoed: [])
+        _ = ViewerDetection.content(name: "a.txt", sample: sample, additionalMedia: [], vetoed: [])
         _ = ViewerDetection.htmlCharset(sample)
         _ = ViewerDetection.extensions(in: fzText(data.prefix(100)))
         _ = HexFormat.hexString(sample.prefix(64))

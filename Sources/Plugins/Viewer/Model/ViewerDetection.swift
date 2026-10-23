@@ -6,7 +6,9 @@ import Foundation
 /// The specification leaves the heuristics open ("a clone must choose its own"); these are the
 /// viewer's. Pure functions on a sample of the file.
 internal enum ViewerDetection {
+    /// How the start of a file reads as text.
     internal struct TextGuess: Equatable {
+        /// The encoding the text is most likely in.
         internal var encoding: ViewerEncoding
         /// The length of a byte-order mark at the start; it is not part of the text.
         internal var bomLength = 0
@@ -14,26 +16,46 @@ internal enum ViewerDetection {
         internal var isBinary = false
     }
 
+    /// How a sample reads as UTF-8.
     internal enum UTF8Validity {
-        case ascii, multiByte, invalid
+        /// Only ASCII bytes: the same text in every code page.
+        case ascii
+        /// Not UTF-8 (a broken sequence, or a decoded U+FFFD that the bytes do not hold).
+        case invalid
+        /// Valid UTF-8 with at least one character of more than one byte.
+        case multiByte
     }
 
     /// What a file is, beyond text and binary, by its name and its first bytes.
     internal enum Content: Equatable {
-        case image, media, pdf, html, rtf, other
+        /// A web page, shown as text without its tags.
+        case html
+        /// A picture.
+        case image
+        /// Sound or video.
+        case media
+        /// None of the others: text or binary, as the bytes say.
+        case other
+        /// A PDF document.
+        case pdf
+        /// A document in Rich Text Format.
+        case rtf
     }
 
     /// How many bytes from the start of a file are looked at.
     internal static let sampleSize = 64 * 1_024
 
+    /// The extensions of pictures, shown as such whatever their first bytes are.
     internal static let imageExtensions: Set<String> = [
         "png", "jpg", "jpeg", "jpe", "jfif", "gif", "bmp", "dib", "tif", "tiff", "heic", "heif", "webp",
         "icns", "ico", "cur", "psd", "tga", "jp2", "j2k", "avif", "dng", "cr2", "nef", "arw", "raf", "orf"
     ]
+    /// The extensions of sound and video files.
     internal static let mediaExtensions: Set<String> = [
         "mp3", "m4a", "aac", "wav", "aif", "aiff", "aifc", "caf", "flac", "mp4", "m4v", "mov", "mpg",
         "mpeg", "avi", "3gp", "m4b", "mp2", "au", "snd", "ac3", "amr"
     ]
+    /// The extensions of web pages.
     internal static let htmlExtensions: Set<String> = ["html", "htm", "xhtml", "shtml"]
 
     /// A byte-order mark names the encoding outright.
@@ -118,6 +140,8 @@ internal enum ViewerDetection {
         return controls * 20 > bytes.count
     }
 
+    /// How `bytes` read as UTF-8; with `mayBeCutOff`, a sequence at the very end that only lacks
+    /// its last bytes does not count against them.
     internal static func utf8Validity(_ bytes: [UInt8], mayBeCutOff: Bool) -> UTF8Validity {
         var text = DecodedText()
         let used = ViewerEncoding.utf8.decode(bytes, final: false, into: &text)
@@ -164,17 +188,20 @@ internal enum ViewerDetection {
         return dos > windows
     }
 
+    /// What the file `name` is, by its extension and the first bytes in `sample`.
+    ///
     /// `additionalMedia` and `vetoed` are lists of extensions from the configuration
     /// (spec 10 › Type lists and vetoes).
     internal static func content(
         name: String,
         sample: Data,
-        additionalMedia: Set<String> = [],
-        vetoed: Set<String> = []
+        additionalMedia: Set<String>,
+        vetoed: Set<String>
     )
         -> Content
     {
-        let ext = (name as NSString).pathExtension.lowercased()
+        // Rooted, so that an empty name does not stand for the working folder.
+        let ext = URL(fileURLWithPath: "/" + name).pathExtension.lowercased()
         let head = [UInt8](sample.prefix(16))
         func starts(_ signature: [UInt8], at offset: Int = 0) -> Bool {
             head.count >= offset + signature.count && Array(head[offset..<offset + signature.count]) == signature
@@ -200,10 +227,9 @@ internal enum ViewerDetection {
         if htmlExtensions.contains(ext) {
             return .html
         }
-        let start = String(decoding: sample.prefix(256), as: UTF8.self).lowercased()
-            .drop {
-                $0.isWhitespace || $0 == "\u{FEFF}"
-            }
+        let start = ViewerEncoding.utf8.string(from: sample.prefix(256))
+            .lowercased()
+            .drop { character in character.isWhitespace || character == "\u{FEFF}" }
         if start.hasPrefix("<!doctype html") || start.hasPrefix("<html") {
             return .html
         }
@@ -212,26 +238,20 @@ internal enum ViewerDetection {
 
     /// The extensions in a list such as `*.mkv *.wmv` or `mkv, wmv`.
     internal static func extensions(in list: String) -> Set<String> {
-        Set(
-            list.lowercased().split(whereSeparator: { " ,;|".contains($0) })
-                .map {
-                    String($0.drop { "*.".contains($0) })
-                }
-                .filter { !$0.isEmpty }
-        )
+        let words = list.lowercased().split { character in " ,;|".contains(character) }
+        return Set(words.map { word in String(word.drop { "*.".contains($0) }) }.filter { !$0.isEmpty })
     }
 
     /// The character set an HTML file names in its head (`<meta charset=…>`, or the
     /// `http-equiv` form), if any (spec 10 › HTML text).
     internal static func htmlCharset(_ sample: Data) -> ViewerEncoding? {
-        let head = String(decoding: sample.prefix(4_096), as: UTF8.self).lowercased()
+        let head = ViewerEncoding.utf8.string(from: sample.prefix(4_096)).lowercased()
         guard let range = head.range(of: "charset=") else {
             return nil
         }
-        let name = head[range.upperBound...].drop { "\"' ".contains($0) }
-            .prefix {
-                $0.isLetter || $0.isNumber || "-_".contains($0)
-            }
+        let name = head[range.upperBound...]
+            .drop { "\"' ".contains($0) }
+            .prefix { character in character.isLetter || character.isNumber || "-_".contains(character) }
         switch name {
         case "utf-8", "utf8":
             return .utf8

@@ -9,7 +9,7 @@ import TestSupport
 @MainActor
 internal final class CoverageViewerPagerBench {
     /// Wrapped at 40 columns.
-    internal static let wrapped = ViewerLayout.text(TextLayoutOptions(columns: 40, wordWrap: true))
+    internal static let wrapped = ViewerLayout.text(TextLayoutOptions(columns: 40, wordWrap: true, tabWidth: 8))
 
     /// The window; close it with `close()`.
     internal let window: NSWindow
@@ -56,7 +56,13 @@ internal final class CoverageViewerPagerBench {
 
     /// A document of `text` in `layout`.
     internal func document(_ text: String, _ layout: ViewerLayout) -> TextDocument {
-        TextDocument(source: DataByteSource(Data(text.utf8)), encoding: .utf8, layout: layout)
+        TextDocument(
+            source: DataByteSource(Data(text.utf8)),
+            encoding: .utf8,
+            bomLength: 0,
+            layout: layout,
+            reusing: nil
+        )
     }
 
     /// Shows `document` and waits until its first rows are there.

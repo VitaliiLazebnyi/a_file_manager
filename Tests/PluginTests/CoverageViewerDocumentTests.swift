@@ -8,18 +8,27 @@ import Testing
 /// changed after they were indexed.
 @Suite
 internal struct CoverageViewerDocumentTests {
-    private static let wrapped = ViewerLayout.text(TextLayoutOptions(columns: 80, wordWrap: true))
+    private static let wrapped = ViewerLayout.text(TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 8))
 
     // MARK: Documents
 
     /// The byte layouts have every row a line, need no index and find rows by arithmetic.
     @Test
     internal func theByteLayoutsCountRowsByArithmetic() throws {
-        let document = TextDocument(source: DataByteSource(Data(count: 100)), encoding: .utf8, layout: .hex)
+        let document = TextDocument(
+            source: DataByteSource(Data(count: 100)),
+            encoding: .utf8,
+            bomLength: 0,
+            layout: .hex,
+            reusing: nil
+        )
         #expect(document.rowCount == 7 && document.lineCount == 7 && document.isIndexComplete)
         #expect(document.segmentsReused == 0 && document.checkpointCount == 0 && document.indexedThrough == 100)
-        #expect(try document.row(containing: 40) == 2)
-        #expect(try document.row(ofLine: 3) == 2 && document.row(ofLine: 0) == nil && document.row(ofLine: 8) == nil)
+        #expect(try document.row(containing: 40, cancellation: nil) == 2)
+        #expect(
+            try document.row(ofLine: 3, cancellation: nil) == 2 && document.row(ofLine: 0, cancellation: nil) == nil
+                && document.row(ofLine: 8, cancellation: nil) == nil
+        )
         #expect(document.characterBoundaries == nil)
     }
 
@@ -27,7 +36,13 @@ internal struct CoverageViewerDocumentTests {
     @Test
     internal func aDoubleByteTextKeepsItsBoundaries() throws {
         let encoding = try #require(ViewerEncoding.codePage(936))
-        let document = TextDocument(source: DataByteSource(Data("abc".utf8)), encoding: encoding, layout: Self.wrapped)
+        let document = TextDocument(
+            source: DataByteSource(Data("abc".utf8)),
+            encoding: encoding,
+            bomLength: 0,
+            layout: Self.wrapped,
+            reusing: nil
+        )
         let first = try #require(document.characterBoundaries)
         #expect(document.characterBoundaries === first)
     }
@@ -35,11 +50,23 @@ internal struct CoverageViewerDocumentTests {
     /// Stopping the index, or the document, ends the index's flag.
     @Test
     internal func theIndexFlagEndsWithTheDocument() {
-        let document = TextDocument(source: DataByteSource(Data("a".utf8)), encoding: .utf8, layout: Self.wrapped)
+        let document = TextDocument(
+            source: DataByteSource(Data("a".utf8)),
+            encoding: .utf8,
+            bomLength: 0,
+            layout: Self.wrapped,
+            reusing: nil
+        )
         #expect(!document.indexCancellation.isCancelled)
         document.stopIndexing()
         #expect(document.indexCancellation.isCancelled && !document.cancellation.isCancelled)
-        let other = TextDocument(source: DataByteSource(Data("a".utf8)), encoding: .utf8, layout: Self.wrapped)
+        let other = TextDocument(
+            source: DataByteSource(Data("a".utf8)),
+            encoding: .utf8,
+            bomLength: 0,
+            layout: Self.wrapped,
+            reusing: nil
+        )
         other.cancellation.cancel()
         #expect(other.indexCancellation.isCancelled)
     }
@@ -50,18 +77,34 @@ internal struct CoverageViewerDocumentTests {
     internal func longLinesAreReadInSeveralPieces() throws {
         let long = String(repeating: "a", count: 100_000)
         let data = Data((long + "\nb").utf8)
-        let layout = ViewerLayout.text(TextLayoutOptions(columns: 200_000, wordWrap: false))
-        let document = TextDocument(source: DataByteSource(data), encoding: .utf8, layout: layout)
-        document.buildIndex(parallel: false)
-        let rows = try document.rows(from: 0, count: 2)
+        let layout = ViewerLayout.text(TextLayoutOptions(columns: 200_000, wordWrap: false, tabWidth: 8))
+        let document = TextDocument(
+            source: DataByteSource(data),
+            encoding: .utf8,
+            bomLength: 0,
+            layout: layout,
+            reusing: nil
+        )
+        document.buildIndex(parallel: false, scanning: .standard) {
+            // Not watched here.
+        }
+        let rows = try document.rows(from: 0, count: 2, cancellation: nil)
         #expect(rows.count == 2)
         #expect(rows[0].range == 0..<100_001 && rows[0].text.count == 100_000)
         #expect(rows[1].range == 100_001..<100_002 && rows[1].text == "b")
         // A line that ends exactly where a piece of reading ends.
         let exact = Data((String(repeating: "c", count: 32 * 1_024 - 1) + "\nd\n").utf8)
-        let second = TextDocument(source: DataByteSource(exact), encoding: .utf8, layout: layout)
-        second.buildIndex(parallel: false)
-        #expect(try second.rows(from: 1, count: 1).first?.text == "d")
+        let second = TextDocument(
+            source: DataByteSource(exact),
+            encoding: .utf8,
+            bomLength: 0,
+            layout: layout,
+            reusing: nil
+        )
+        second.buildIndex(parallel: false, scanning: .standard) {
+            // Not watched here.
+        }
+        #expect(try second.rows(from: 1, count: 1, cancellation: nil).first?.text == "d")
     }
 
     /// The line end of a row shows no text: a selection of it alone marks nothing.
@@ -70,10 +113,14 @@ internal struct CoverageViewerDocumentTests {
         let document = TextDocument(
             source: DataByteSource(Data("ab\r\ncd".utf8)),
             encoding: .utf8,
-            layout: Self.wrapped
+            bomLength: 0,
+            layout: Self.wrapped,
+            reusing: nil
         )
-        document.buildIndex(parallel: false)
-        let row = try #require(try document.rows(from: 0, count: 1).first)
+        document.buildIndex(parallel: false, scanning: .standard) {
+            // Not watched here.
+        }
+        let row = try #require(try document.rows(from: 0, count: 1, cancellation: nil).first)
         #expect(document.textRanges(in: row, for: 2..<4).isEmpty)
         #expect(document.textRanges(in: row, for: 1..<4) == [1..<2])
     }
@@ -83,11 +130,13 @@ internal struct CoverageViewerDocumentTests {
     @Test
     internal func rowsOfBytesThatAreGoneAreNotMadeUp() throws {
         let source = CoverageViewerChangingSource(Data("one\ntwo\nthree\n".utf8))
-        let document = TextDocument(source: source, encoding: .utf8, layout: Self.wrapped)
-        document.buildIndex(parallel: false)
+        let document = TextDocument(source: source, encoding: .utf8, bomLength: 0, layout: Self.wrapped, reusing: nil)
+        document.buildIndex(parallel: false, scanning: .standard) {
+            // Not watched here.
+        }
         #expect(document.rowCount == 3)
         source.replace(with: Data())
-        #expect(try document.rows(from: 1, count: 2).isEmpty)
+        #expect(try document.rows(from: 1, count: 2, cancellation: nil).isEmpty)
         #expect(document.readError as? ViewerError == .fileChanged)
     }
 
@@ -97,9 +146,13 @@ internal struct CoverageViewerDocumentTests {
         let document = TextDocument(
             source: CoverageViewerShortSource(length: 100, available: 0),
             encoding: .utf8,
-            layout: Self.wrapped
+            bomLength: 0,
+            layout: Self.wrapped,
+            reusing: nil
         )
-        document.buildIndex(parallel: false)
+        document.buildIndex(parallel: false, scanning: .standard) {
+            // Not watched here.
+        }
         #expect(document.isIndexComplete && document.rowCount == 0)
         #expect(document.readError as? ViewerError == .fileChanged)
     }
@@ -113,36 +166,52 @@ internal struct CoverageViewerDocumentTests {
         let source = CoverageViewerChangingSource(text)
         // The second segment (bytes 1000 to 2000) cannot be read while the index is built.
         source.fail(1_100..<2_000)
-        let document = TextDocument(source: source, encoding: .utf8, layout: Self.wrapped)
-        document.buildIndex(parallel: false, segmentSize: 1_000, chunkSize: 100)
+        let document = TextDocument(source: source, encoding: .utf8, bomLength: 0, layout: Self.wrapped, reusing: nil)
+        document.buildIndex(
+            parallel: false,
+            scanning: TextRowIndex.ScanOptions(segmentSize: 1_000, chunkSize: 100, rawScan: true)
+        ) {
+            // Not watched here.
+        }
         source.fail(nil)
         #expect(document.isIndexComplete && document.readError != nil)
         // An offset in the gap belongs to the last row before it.
-        #expect(try document.row(containing: 1_500) == 100)
+        #expect(try document.row(containing: 1_500, cancellation: nil) == 100)
         // With other bytes, the lines are not found in the rows before the gap.
         source.replace(with: Data(repeating: 0x78, count: text.count))
-        #expect(try document.row(ofLine: 100) == nil)
+        #expect(try document.row(ofLine: 100, cancellation: nil) == nil)
     }
 
     /// An empty text has its one place in row 0.
     @Test
     internal func anEmptyTextIsRowZero() throws {
-        let document = TextDocument(source: DataByteSource(Data()), encoding: .utf8, layout: Self.wrapped)
-        document.buildIndex(parallel: false)
-        #expect(try document.row(containing: 0) == 0)
+        let document = TextDocument(
+            source: DataByteSource(Data()),
+            encoding: .utf8,
+            bomLength: 0,
+            layout: Self.wrapped,
+            reusing: nil
+        )
+        document.buildIndex(parallel: false, scanning: .standard) {
+            // Not watched here.
+        }
+        #expect(try document.row(containing: 0, cancellation: nil) == 0)
     }
 
     /// The index knows no place for a row it has not found.
     @Test
     internal func anUnknownRowHasNoPlace() {
-        let index = TextRowIndex()
-        let options = TextLayoutOptions(columns: 80, wordWrap: true)
+        let index = TextRowIndex(start: 0, reusing: nil)
+        let options = TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 8)
         index.build(
-            source: DataByteSource(Data("a\nb\n".utf8)),
-            content: 0..<4,
-            encoding: .utf8,
-            options: options,
+            TextRowIndex.Input(
+                source: DataByteSource(Data("a\nb\n".utf8)),
+                content: 0..<4,
+                encoding: .utf8,
+                options: options
+            ),
             parallel: false,
+            scanning: .standard,
             cancellation: CancellationFlag()
         ) {
             // No progress to show.
@@ -157,11 +226,16 @@ internal struct CoverageViewerDocumentTests {
         let line = Data("abcdefghi\n".utf8)
         let source = CoverageViewerChangingSource(Data((0..<300).flatMap { _ in line }))
         source.fail(0..<1_000)
-        let document = TextDocument(source: source, encoding: .utf8, layout: Self.wrapped)
-        document.buildIndex(parallel: true, segmentSize: 1_000, chunkSize: 100)
+        let document = TextDocument(source: source, encoding: .utf8, bomLength: 0, layout: Self.wrapped, reusing: nil)
+        document.buildIndex(
+            parallel: true,
+            scanning: TextRowIndex.ScanOptions(segmentSize: 1_000, chunkSize: 100, rawScan: true)
+        ) {
+            // Not watched here.
+        }
         source.fail(nil)
         #expect(document.isIndexComplete && document.rowCount > 0)
-        #expect(try document.row(containing: 500) == nil)
+        #expect(try document.row(containing: 500, cancellation: nil) == nil)
     }
 
     // MARK: Rows
@@ -169,7 +243,7 @@ internal struct CoverageViewerDocumentTests {
     /// A CR at the end of a piece waits for the next: a LF may follow.
     @Test
     internal func aCarriageReturnAtTheEndOfAPieceWaits() {
-        var splitter = RowSplitter(TextLayoutOptions(columns: 80, wordWrap: true))
+        var splitter = RowSplitter(TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 8))
         let units = Array("ab\r".utf16)
         var rows: [Range<Int>] = []
         let used = units.withUnsafeBufferPointer { buffer in
@@ -187,7 +261,7 @@ internal struct CoverageViewerDocumentTests {
         }
         #expect(last == 3 && rows == [0..<3])
         // The same for text cut from its bytes.
-        var byteSplitter = RowSplitter(TextLayoutOptions(columns: 80, wordWrap: true))
+        var byteSplitter = RowSplitter(TextLayoutOptions(columns: 80, wordWrap: true, tabWidth: 8))
         let bytes = Array("ab\r".utf8)
         var measured: [Int] = []
         let usedBytes = bytes.withUnsafeBufferPointer { buffer in

@@ -53,7 +53,7 @@ internal enum BoundariesTarget {
             // First far in, where the block's boundary has to be found without the ones before.
             let offset =
                 turn == 0 ? content.upperBound - 1 : content.lowerBound + Int64(Int(probe.u16()) % Int(content.count))
-            guard let got = try? boundaries.characterStart(atOrBefore: offset) else {
+            guard let got = try? boundaries.characterStart(atOrBefore: offset, cancellation: nil) else {
                 fzFail("boundaries-threw", what)
             }
             fzCheck(
@@ -63,8 +63,8 @@ internal enum BoundariesTarget {
                     + describe(data)
             )
         }
-        _ = try? boundaries.characterStart(atOrBefore: -3)
-        _ = try? boundaries.characterStart(atOrBefore: Int64.max)
+        _ = try? boundaries.characterStart(atOrBefore: -3, cancellation: nil)
+        _ = try? boundaries.characterStart(atOrBefore: Int64.max, cancellation: nil)
         _ = boundaries.blockCount
     }
 

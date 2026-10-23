@@ -61,7 +61,7 @@ internal struct CoverageViewerSourceTests {
                 return CoverageViewerReader(try Data(contentsOf: url))
             }
         )
-        let source = try ProviderByteSource.open(file, fileSystems: provider.registry)
+        let source = try ProviderByteSource.open(file, fileSystems: provider.registry, cancellation: CancellationFlag())
         #expect(source is ProviderByteSource && source.length == 4_000)
         #expect(reads.value == 0)
         #expect(try source.read(at: 3_990, count: 100) == Data(repeating: 0x61, count: 10))
@@ -84,12 +84,20 @@ internal struct CoverageViewerSourceTests {
             }
         )
         #expect(throws: ViewerError.notAFile("pipe")) {
-            try ProviderByteSource.open(fifo, fileSystems: provider.registry)
+            try ProviderByteSource.open(fifo, fileSystems: provider.registry, cancellation: CancellationFlag())
         }
         #expect(throws: CocoaError.self) {
-            try ProviderByteSource.open(directory.appendingPathComponent("missing"), fileSystems: provider.registry)
+            try ProviderByteSource.open(
+                directory.appendingPathComponent("missing"),
+                fileSystems: provider.registry,
+                cancellation: CancellationFlag()
+            )
         }
-        let folder = try ProviderByteSource.open(directory, fileSystems: provider.registry)
+        let folder = try ProviderByteSource.open(
+            directory,
+            fileSystems: provider.registry,
+            cancellation: CancellationFlag()
+        )
         #expect(folder is DataByteSource && folder.length == 7)
     }
 
@@ -108,13 +116,15 @@ internal struct CoverageViewerSourceTests {
         )
         let first = try ProviderByteSource.open(
             try #require(URL(string: "count:///small")),
-            fileSystems: provider.registry
+            fileSystems: provider.registry,
+            cancellation: CancellationFlag()
         )
         #expect(first is DataByteSource && first.length == Int64(small.count))
         #expect(try first.read(at: 0, count: 5) == Data("short".utf8))
         let second = try ProviderByteSource.open(
             try #require(URL(string: "count:///big")),
-            fileSystems: provider.registry
+            fileSystems: provider.registry,
+            cancellation: CancellationFlag()
         )
         #expect(second is ProviderByteSource && second.length == Int64(big.count))
         #expect(try second.read(at: Int64(big.count) - 3, count: 10) == Data(repeating: 0x62, count: 3))
@@ -132,7 +142,7 @@ internal struct CoverageViewerSourceTests {
         )
         let url = try #require(URL(string: "stream:///random"))
         #expect(throws: ViewerError.endless("random")) {
-            try ProviderByteSource.open(url, fileSystems: provider.registry)
+            try ProviderByteSource.open(url, fileSystems: provider.registry, cancellation: CancellationFlag())
         }
     }
 
@@ -161,7 +171,11 @@ internal struct CoverageViewerSourceTests {
                 )
             }
         )
-        let source = try ProviderByteSource.open(try #require(URL(string: "flag:///a")), fileSystems: provider.registry)
+        let source = try ProviderByteSource.open(
+            try #require(URL(string: "flag:///a")),
+            fileSystems: provider.registry,
+            cancellation: CancellationFlag()
+        )
         #expect(try source.read(at: 90, count: 50, cancellation: flag) == Data(repeating: 0x63, count: 10))
         #expect(closed.value == 1)
         #expect(try source.read(at: 0, count: 10) == Data(repeating: 0x63, count: 10))
@@ -187,7 +201,8 @@ internal struct CoverageViewerSourceTests {
         )
         let source = try ProviderByteSource.open(
             try #require(URL(string: "epoch:///a")),
-            fileSystems: provider.registry
+            fileSystems: provider.registry,
+            cancellation: CancellationFlag()
         )
         holder.value = source
         #expect(try source.read(at: 0, count: 10).count == 10)
@@ -211,12 +226,18 @@ internal struct CoverageViewerSourceTests {
             spacing: 16
         )
         for block in 1..<limit {
-            #expect(try boundaries.characterStart(atOrBefore: Int64(block * 16 + 3)) == Int64(block * 16 + 3))
+            #expect(
+                try boundaries.characterStart(atOrBefore: Int64(block * 16 + 3), cancellation: nil)
+                    == Int64(block * 16 + 3)
+            )
         }
         #expect(boundaries.blockCount == limit)
-        #expect(try boundaries.characterStart(atOrBefore: Int64(limit * 16)) == Int64(limit * 16))
+        #expect(try boundaries.characterStart(atOrBefore: Int64(limit * 16), cancellation: nil) == Int64(limit * 16))
         #expect(boundaries.blockCount == 2)
-        #expect(try boundaries.characterStart(atOrBefore: Int64(limit * 16 + 20)) == Int64(limit * 16 + 20))
+        #expect(
+            try boundaries.characterStart(atOrBefore: Int64(limit * 16 + 20), cancellation: nil)
+                == Int64(limit * 16 + 20)
+        )
     }
 
     // MARK: Saving
@@ -232,7 +253,9 @@ internal struct CoverageViewerSourceTests {
         #expect(chmod(directory.path, 0o500) == 0)
         let target = directory.appendingPathComponent("copy.txt")
         let error = #expect(throws: CocoaError.self) {
-            try ViewerSave.save(DataByteSource(Data("text".utf8)), to: target, cancellation: CancellationFlag())
+            try ViewerSave.save(DataByteSource(Data("text".utf8)), to: target, cancellation: CancellationFlag()) { _ in
+                // Not watched here.
+            }
         }
         #expect(error?.code == .fileWriteNoPermission)
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
@@ -248,29 +271,36 @@ internal struct CoverageViewerSourceTests {
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
         try Data().write(to: target.appendingPathComponent("inside"))
         #expect(throws: CocoaError.self) {
-            try ViewerSave.save(DataByteSource(Data("text".utf8)), to: target, cancellation: CancellationFlag())
+            try ViewerSave.save(DataByteSource(Data("text".utf8)), to: target, cancellation: CancellationFlag()) { _ in
+                // Not watched here.
+            }
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["taken"])
     }
 
     // MARK: Work gate
 
-    /// A job refused by a gate that is stuck, without anything to call instead, simply does not run.
+    /// A job refused by a gate that is stuck does not run; only its refusal is called.
     @Test
-    internal func aRefusedJobWithoutAHandlerIsDropped() {
+    internal func aRefusedJobIsDropped() {
         let gate = ViewerWorkGate(live: 1, stuck: 1)
         let release = DispatchSemaphore(value: 0)
         let started = DispatchSemaphore(value: 0)
         let flag = CancellationFlag()
-        gate.submit(cancellation: flag) {
-            started.signal()
-            _ = release.wait(timeout: .now() + Wait.ceiling)
-        }
+        gate.submit(
+            cancellation: flag,
+            refused: { Issue.record("The first job was refused") },
+            {
+                started.signal()
+                _ = release.wait(timeout: .now() + Wait.ceiling)
+            }
+        )
         #expect(started.wait(timeout: .now() + Wait.ceiling) == .success)
         flag.cancel()
         let ran = ViewerAdoptBox(false)
-        gate.submit(cancellation: CancellationFlag()) { ran.value = true }
-        #expect(gate.waitingCount == 0 && gate.threadsInUse == 1)
+        let refused = ViewerAdoptBox(false)
+        gate.submit(cancellation: CancellationFlag(), refused: { refused.value = true }, { ran.value = true })
+        #expect(gate.waitingCount == 0 && gate.threadsInUse == 1 && refused.value)
         release.signal()
         #expect(Wait.until { gate.threadsInUse == 0 })
         #expect(!ran.value)

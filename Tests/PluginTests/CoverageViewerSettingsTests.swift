@@ -26,7 +26,7 @@ internal struct CoverageViewerSettingsTests {
     internal func imageAndPlayerOptionsAreKept() {
         let store = MemorySettings()
         let settings = ListerSettings(store)
-        #expect(settings.imageFit == .none && !settings.centersImages && settings.playerVolume == 1)
+        #expect(settings.imageFit == .actualSize && !settings.centersImages && settings.playerVolume == 1)
         settings.imageFit = .largerOnly
         settings.centersImages = true
         settings.playerVolume = 1.5
@@ -34,7 +34,7 @@ internal struct CoverageViewerSettingsTests {
         settings.playerVolume = 0.25
         #expect(ListerSettings(store).playerVolume == 0.25)
         store.set(7, forKey: "viewer.fitImages")
-        #expect(settings.imageFit == .none)
+        #expect(settings.imageFit == .actualSize)
     }
 
     /// A font is a name and a size; the size is kept within 6…96, and an empty name or a size

@@ -15,13 +15,13 @@ internal struct CoverageViewerSearchTests {
     ) throws -> Range<Int64>? {
         let pattern = try SearchPattern(text, options: options, encoding: encoding)
         return try ViewerSearch.find(
-            pattern,
-            in: source,
-            content: 0..<source.length,
-            from: 0,
-            backwards: options.backwards,
-            encoding: encoding
-        )
+            ViewerSearch.Request(pattern: pattern, start: 0, backwards: options.backwards),
+            in: ViewerSearch.Subject(source: source, content: 0..<source.length, encoding: encoding, boundaries: nil),
+            tuning: .standard,
+            cancellation: CancellationFlag()
+        ) { _ in
+            // No progress to show.
+        }
     }
 
     private static func utf16(_ text: String) -> Data {

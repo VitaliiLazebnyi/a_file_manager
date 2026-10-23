@@ -17,7 +17,7 @@ extension RowsTarget {
         let content = document.content
         let span = input.data.count - Int(content.lowerBound) + 1
         let offset = content.isEmpty ? content.lowerBound : content.lowerBound + Int64(Int(probe.u16()) % span)
-        let found = try? document.row(containing: offset)
+        let found = try? document.row(containing: offset, cancellation: nil)
         if rows.isEmpty {
             fzCheck(found == .some(0), "rows-lookup-empty", "\(what): \(String(describing: found))")
             return
@@ -35,14 +35,14 @@ extension RowsTarget {
         )
         let wantLine = 1 + (Int(probe.byte()) % max(1, lines))
         let first = rows.firstIndex { $0.startsLine && $0.line == wantLine }
-        let got = try? document.row(ofLine: wantLine)
+        let got = try? document.row(ofLine: wantLine, cancellation: nil)
         fzCheck(
             got == first,
             "rows-line-lookup",
             "\(what): line \(wantLine) gives \(String(describing: got)), expected \(String(describing: first))\n"
                 + describe(input.data)
         )
-        if let shown = (try? document.rows(from: row, count: 1))?.first {
+        if let shown = (try? document.rows(from: row, count: 1, cancellation: nil))?.first {
             checkGeometry(document, shown, offset: offset, what: what, probe: &probe)
         }
     }
@@ -74,14 +74,25 @@ extension RowsTarget {
             layout: .text(input.otherOptions),
             reusing: document
         )
-        again.buildIndex(parallel: input.parallel, segmentSize: input.segment, chunkSize: input.chunk)
+        again.buildIndex(
+            parallel: input.parallel,
+            scanning: TextRowIndex.ScanOptions(segmentSize: input.segment, chunkSize: input.chunk, rawScan: true)
+        ) {
+            // No progress is wanted.
+        }
         let fresh = TextDocument(
             source: input.source,
             encoding: input.encoding,
             bomLength: input.bom,
-            layout: .text(input.otherOptions)
+            layout: .text(input.otherOptions),
+            reusing: nil
         )
-        fresh.buildIndex(parallel: false, segmentSize: 1 << 22, chunkSize: 1 << 20, rawScan: false)
+        fresh.buildIndex(
+            parallel: false,
+            scanning: TextRowIndex.ScanOptions(segmentSize: 1 << 22, chunkSize: 1 << 20, rawScan: false)
+        ) {
+            // No progress is wanted.
+        }
         compare(allRows(again, input.what), allRows(fresh, input.what), "rows-reused-index-differs", input)
     }
 
@@ -90,13 +101,21 @@ extension RowsTarget {
     internal static func checkByteLayouts(_ input: RowsInput, probe: inout Choices) {
         let widths = [Int(probe.byte()), 0, -1, 16]
         for layout in [ViewerLayout.hex, .binary(width: widths[0]), .binary(width: widths[1 + probe.int(3)])] {
-            let fixed = TextDocument(source: input.source, encoding: input.encoding, layout: layout)
-            fixed.buildIndex(parallel: input.parallel)
+            let fixed = TextDocument(
+                source: input.source,
+                encoding: input.encoding,
+                bomLength: 0,
+                layout: layout,
+                reusing: nil
+            )
+            fixed.buildIndex(parallel: input.parallel, scanning: .standard) {
+                // No progress is wanted.
+            }
             let count = fixed.rowCount
             var covered: Int64 = 0
             var first = 0
             while first < count {
-                let part = (try? fixed.rows(from: first, count: 500)) ?? []
+                let part = (try? fixed.rows(from: first, count: 500, cancellation: nil)) ?? []
                 fzCheck(!part.isEmpty, "fixed-rows-missing", "\(layout) \(first) of \(count)")
                 for row in part {
                     fzCheck(row.range.lowerBound == covered, "fixed-rows-gap", "\(layout)")
@@ -110,8 +129,8 @@ extension RowsTarget {
                 "fixed-rows-do-not-reach-end",
                 "\(layout): \(covered) of \(input.data.count)"
             )
-            _ = try? fixed.row(containing: Int64(probe.u16()))
-            _ = try? fixed.row(ofLine: Int(probe.byte()))
+            _ = try? fixed.row(containing: Int64(probe.u16()), cancellation: nil)
+            _ = try? fixed.row(ofLine: Int(probe.byte()), cancellation: nil)
         }
     }
 

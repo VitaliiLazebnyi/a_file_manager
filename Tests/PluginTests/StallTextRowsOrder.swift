@@ -66,12 +66,14 @@ internal struct StallTextRowsOrder {
             for signal in done { _ = signal.wait() }
         }
         index.build(
-            source: source,
-            content: 0..<Int64(data.count),
-            encoding: .utf8,
-            options: TextLayoutOptions(columns: 200, wordWrap: false),
+            TextRowIndex.Input(
+                source: source,
+                content: 0..<Int64(data.count),
+                encoding: .utf8,
+                options: TextLayoutOptions(columns: 200, wordWrap: false, tabWidth: 8)
+            ),
             parallel: true,
-            segmentSize: segment,
+            scanning: TextRowIndex.ScanOptions(segmentSize: segment, chunkSize: 1 << 20, rawScan: true),
             cancellation: CancellationFlag()
         ) { progress.add() }
         #expect(source.progressAtRelease == 0)

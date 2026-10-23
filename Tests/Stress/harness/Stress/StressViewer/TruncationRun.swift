@@ -39,7 +39,9 @@ internal enum TruncationRun {
         let document = TextDocument(
             source: source,
             encoding: .utf8,
-            layout: .text(TextLayoutOptions(columns: columns, wordWrap: round % 3 != 2))
+            bomLength: 0,
+            layout: .text(TextLayoutOptions(columns: columns, wordWrap: round % 3 != 2, tabWidth: 8)),
+            reusing: nil
         )
         pager.show(document, parallel: true)
         let hammer = Hammer(document, columns: columns, label: "truncated")

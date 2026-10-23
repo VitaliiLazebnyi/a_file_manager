@@ -9,88 +9,10 @@ import UniformTypeIdentifiers
 
 @testable import ViewerPlugin
 
-/// A file system of a few made-up files, for what the memory file system cannot do: readers that
-/// are slow to close, and files that do not end.
-///
-/// Unchecked: what it records is guarded by `lock`; its switches are set by the test before use.
-internal final class Review2HookProvider: FileSystemProvider, @unchecked Sendable {
-    /// Unchecked: used by one thread at a time, as the protocol allows.
-    private final class Reader: FileReader, @unchecked Sendable {
-        let owner: Review2HookProvider
-        let data: Data?
-        var position = 0
-        init(_ owner: Review2HookProvider, data: Data?) {
-            self.owner = owner
-            self.data = data
-        }
-
-        func read(upToCount count: Int) -> Data? {
-            guard let data else {
-                return Data(repeating: 0x41, count: count)
-            }
-            guard position < data.count else {
-                return nil
-            }
-            let block = data.subdata(in: position..<min(data.count, position + count))
-            position += block.count
-            return block
-        }
-
-        func seek(to offset: UInt64) { position = Int(offset) }
-
-        func close() {
-            owner.onClose()
-            owner.lock.lock()
-            owner.closed += 1
-            owner.lock.unlock()
-        }
-    }
-
-    internal let scheme = "hook"
-    internal let capabilities: FileSystemCapabilities = []
-    internal var sizes: [String: Int64] = [:]
-    internal var special: Set<String> = []
-    internal var contents: [String: Data] = [:]
-    internal var endless: Set<String> = []
-    private let lock = NSLock()
-    private var closed = 0
-    /// Called by `close()` of every reader.
-    internal var onClose: () -> Void = {}
-    internal var closeCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return closed
-    }
-
-    internal func list(_: URL, showHidden _: Bool) -> [FileItem] { [] }
-    internal func parent(of directory: URL) -> URL? { directory.deletingLastPathComponent() }
-    internal func createDirectory(at _: URL) throws { throw FileSystemError.notSupported("x") }
-    internal func write(_: URL) throws -> any FileWriter { throw FileSystemError.notSupported("x") }
-    internal func remove(_: URL) {}
-    internal func move(_: URL, to _: URL, replacing _: Bool) {}
-    internal func copy(_: URL, to _: URL, progress _: (Int64) -> Bool) {}
-
-    internal func item(at url: URL) -> FileItem? {
-        FileItem(
-            url: url,
-            name: url.lastPathComponent,
-            kind: .init(isSpecial: special.contains(url.path)),
-            stat: .init(size: sizes[url.path] ?? Int64(contents[url.path]?.count ?? 0))
-        )
-    }
-
-    internal func read(_ url: URL) -> any FileReader {
-        Reader(
-            self,
-            data: endless.contains(url.path) ? nil : contents[url.path] ?? Data(count: Int(sizes[url.path] ?? 0))
-        )
-    }
-}
-
 /// Review round 2, the sources of bytes: opening links and special files, closing readers off the
 /// calling thread, saving, the copies for the players, and the rules for links in a viewed file.
 @Suite
-internal struct Review2ViewerSource {
+internal struct Review2ViewerSourceTests {
     private func folder() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(
             "afm-r2viewer-\(UUID().uuidString)",
@@ -108,6 +30,7 @@ internal struct Review2ViewerSource {
 
     // MARK: Opening
 
+    /// A symbolic link to a file is opened with the size of its target, an empty one as empty.
     @Test
     internal func aLinkToAFileIsOpenedWithTheSizeOfItsTarget() throws {
         let directory = try folder()
@@ -116,7 +39,7 @@ internal struct Review2ViewerSource {
         try Data(repeating: UInt8(ascii: "x"), count: 5_000).write(to: target)
         let link = directory.appendingPathComponent("current.log")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
-        let source = try ProviderByteSource.open(link, fileSystems: local())
+        let source = try ProviderByteSource.open(link, fileSystems: local(), cancellation: CancellationFlag())
         #expect(source is ProviderByteSource && source.length == 5_000)
         #expect(try source.read(at: 4_990, count: 100).count == 10)
         // An empty file is empty, through a link too.
@@ -124,35 +47,47 @@ internal struct Review2ViewerSource {
         try Data().write(to: empty)
         let emptyLink = directory.appendingPathComponent("empty-link")
         try FileManager.default.createSymbolicLink(at: emptyLink, withDestinationURL: empty)
-        #expect(try ProviderByteSource.open(emptyLink, fileSystems: local()).length == 0)
-        #expect(try ProviderByteSource.open(empty, fileSystems: local()).length == 0)
+        #expect(
+            try ProviderByteSource.open(emptyLink, fileSystems: local(), cancellation: CancellationFlag()).length == 0
+        )
+        #expect(try ProviderByteSource.open(empty, fileSystems: local(), cancellation: CancellationFlag()).length == 0)
     }
 
+    /// Devices, links to them and pipes are refused without being read; a pipe does not block the open.
     @Test
     internal func devicesAndPipesAreRefusedWithoutBeingRead() throws {
         let directory = try folder()
         defer { try? FileManager.default.removeItem(at: directory) }
         for path in ["/dev/zero", "/dev/null"] {
             #expect(throws: ViewerError.self) {
-                try ProviderByteSource.open(URL(fileURLWithPath: path), fileSystems: local())
+                try ProviderByteSource.open(
+                    URL(fileURLWithPath: path),
+                    fileSystems: local(),
+                    cancellation: CancellationFlag()
+                )
             }
         }
         let zero = directory.appendingPathComponent("zero-link")
         try FileManager.default.createSymbolicLink(at: zero, withDestinationURL: URL(fileURLWithPath: "/dev/zero"))
-        #expect(throws: ViewerError.self) { try ProviderByteSource.open(zero, fileSystems: local()) }
+        #expect(throws: ViewerError.self) {
+            try ProviderByteSource.open(zero, fileSystems: local(), cancellation: CancellationFlag())
+        }
         // A FIFO would block on open() forever.
         let fifo = directory.appendingPathComponent("pipe")
         #expect(mkfifo(fifo.path, 0o600) == 0)
         let outcome = ViewerAdoptBox<Bool>(false)
         let worker = ViewerAdoptWorker {
-            outcome.value = (try? ProviderByteSource.open(fifo, fileSystems: local())) == nil
+            outcome.value =
+                (try? ProviderByteSource.open(fifo, fileSystems: local(), cancellation: CancellationFlag())) == nil
         }
         worker.start()
         #expect(worker.waitUntilFinished() && outcome.value)
     }
 
+    /// Measuring a file that never ends stops when its cancellation flag is set.
     @Test
-    internal func measuringAFileOfUnknownSizeStopsWithItsFlag() {
+    internal func measuringAFileOfUnknownSizeStopsWithItsFlag() throws {
+        let stream = try #require(URL(string: "hook:///stream"))
         let provider = Review2HookProvider()
         provider.endless = ["/stream"]
         let registry = FileSystemRegistry()
@@ -161,7 +96,7 @@ internal struct Review2ViewerSource {
         let outcome = ViewerAdoptBox<Result<any ByteSource, any Error>?>(nil)
         let worker = ViewerAdoptWorker {
             outcome.value = Result {
-                try ProviderByteSource.open(URL(string: "hook:///stream")!, fileSystems: registry, cancellation: flag)
+                try ProviderByteSource.open(stream, fileSystems: registry, cancellation: flag)
             }
         }
         worker.start()
@@ -171,29 +106,33 @@ internal struct Review2ViewerSource {
         if case .success? = outcome.value { Issue.record("The stream was opened") }
     }
 
+    /// An entry its file system calls special is refused, whatever file system it is on.
     @Test
     internal func specialEntriesAreRefusedWhateverTheFileSystem() throws {
+        let stream = try #require(URL(string: "hook:///stream"))
         let provider = Review2HookProvider()
         provider.endless = ["/stream"]
         provider.special = ["/stream"]
         let registry = FileSystemRegistry()
         registry.register(provider)
         #expect(throws: ViewerError.self) {
-            try ProviderByteSource.open(URL(string: "hook:///stream")!, fileSystems: registry)
+            try ProviderByteSource.open(stream, fileSystems: registry, cancellation: CancellationFlag())
         }
     }
 
     // MARK: Closing
 
+    /// Closing a source returns while its readers' closes are still blocked, and they are closed later.
     @Test
     internal func closingTheSourceDoesNotWaitForTheReaders() throws {
+        let file = try #require(URL(string: "hook:///a"))
         let provider = Review2HookProvider()
         provider.contents["/a"] = Data(repeating: 0x42, count: 100_000)
         let registry = FileSystemRegistry()
         registry.register(provider)
         let gate = DispatchSemaphore(value: 0)
         provider.onClose = { _ = gate.wait(timeout: .now() + Wait.ceiling) }
-        let source = try ProviderByteSource.open(URL(string: "hook:///a")!, fileSystems: registry)
+        let source = try ProviderByteSource.open(file, fileSystems: registry, cancellation: CancellationFlag())
         _ = try source.read(at: 0, count: 10)
         // The close of the reader blocks (a server that does not answer): `close` returns anyway.
         let started = Date()
@@ -205,13 +144,16 @@ internal struct Review2ViewerSource {
         #expect(provider.closeCount == 1)
     }
 
+    /// A reader that was in use when the source closed is closed when it comes back; letting go of a
+    /// source closes its readers.
     @Test
     internal func aReaderInUseWhenTheSourceIsClosedIsClosedWhenItComesBack() throws {
+        let file = try #require(URL(string: "hook:///a"))
         let provider = Review2HookProvider()
         provider.contents["/a"] = Data(repeating: 0x42, count: 100_000)
         let registry = FileSystemRegistry()
         registry.register(provider)
-        let source = try ProviderByteSource.open(URL(string: "hook:///a")!, fileSystems: registry)
+        let source = try ProviderByteSource.open(file, fileSystems: registry, cancellation: CancellationFlag())
         // Two readers: one idle, one that was out when `close` came.
         _ = try source.read(at: 0, count: 10)
         source.close()
@@ -223,7 +165,8 @@ internal struct Review2ViewerSource {
         #expect(provider.closeCount == 2)
         // Letting go of the source closes what it holds, off the thread that lets go.
         var again: ProviderByteSource? = try #require(
-            try ProviderByteSource.open(URL(string: "hook:///a")!, fileSystems: registry) as? ProviderByteSource
+            try ProviderByteSource.open(file, fileSystems: registry, cancellation: CancellationFlag())
+                as? ProviderByteSource
         )
         _ = try again?.read(at: 0, count: 10)
         again = nil
@@ -233,19 +176,34 @@ internal struct Review2ViewerSource {
 
     // MARK: The block cache
 
+    /// A block that was read short is not kept: the next read asks for it again.
     @Test
     internal func aShortBlockIsNotKeptInMemory() throws {
-        /// Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
+        // Unchecked: its switches are set by the test before use, and it is used from one thread at a time.
         final class Flaky: ByteSource, @unchecked Sendable {
             let length: Int64 = 40_000
             var short = true
+
             func read(at offset: Int64, count: Int) -> Data {
                 let wanted = min(count, 40_000 - Int(offset))
                 return Data(repeating: 0x61, count: short ? wanted / 2 : wanted)
             }
+
+            deinit {
+                // Nothing to release.
+            }
         }
         let base = Flaky()
-        let cached = CachedByteSource(base, blockSize: 4_096, capacity: 8)
+        let cached = CachedByteSource(
+            base,
+            policy: CachedByteSource.Policy(
+                blockSize: 4_096,
+                capacity: 8,
+                wholeFileLimit: 0,
+                spillsToDisk: false,
+                diskLimit: 1 << 30
+            )
+        )
         // A read that came back short ...
         #expect(try cached.read(at: 0, count: 100).count == 100)
         base.short = false
@@ -254,10 +212,20 @@ internal struct Review2ViewerSource {
         #expect(try cached.read(at: 0, count: 4_096).count == 4_096)
     }
 
+    /// A read of four blocks or more passes the block cache, and later reads still work.
     @Test
     internal func aLongReadOfFourBlocksGoesPastTheMemoryCache() throws {
         let data = Data((0..<(1 << 20)).map { UInt8(truncatingIfNeeded: $0) })
-        let cached = CachedByteSource(DataByteSource(data), blockSize: 256 << 10, capacity: 4)
+        let cached = CachedByteSource(
+            DataByteSource(data),
+            policy: CachedByteSource.Policy(
+                blockSize: 256 << 10,
+                capacity: 4,
+                wholeFileLimit: 0,
+                spillsToDisk: false,
+                diskLimit: 1 << 30
+            )
+        )
         _ = try cached.read(at: 0, count: 1 << 20)
         // Four blocks of 256 KB are a scan: nothing was kept, a read of one block still works.
         #expect(try cached.read(at: 300_000, count: 100) == data.subdata(in: 300_000..<300_100))
@@ -265,6 +233,7 @@ internal struct Review2ViewerSource {
 
     // MARK: Save as
 
+    /// The viewed file is recognised as the target of a save through links, hard links and other spellings.
     @Test
     internal func savingOntoTheViewedFileIsRecognisedAndRefused() throws {
         let directory = try folder()
@@ -287,6 +256,7 @@ internal struct Review2ViewerSource {
         #expect(ViewerSave.isSameFile(directory.appendingPathComponent("x/../a.txt"), file))
     }
 
+    /// A save writes a temporary file, reports its progress, and leaves only the target behind.
     @Test
     internal func aSaveWritesATemporaryFileAndMovesItIntoPlace() throws {
         let directory = try folder()
@@ -300,12 +270,18 @@ internal struct Review2ViewerSource {
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["copy.bin"])
     }
 
+    /// A save of a file that became shorter, or a cancelled one, fails and leaves the target as it was.
     @Test
     internal func aSaveOfAFileThatBecameShorterFailsAndLeavesTheTargetAlone() throws {
         final class Short: ByteSource {
             let length: Int64 = 2_000_000
+
             func read(at offset: Int64, count: Int) -> Data {
                 offset >= 1_500_000 ? Data() : Data(repeating: 0x42, count: min(count, 1_500_000 - Int(offset)))
+            }
+
+            deinit {
+                // Nothing to release.
             }
         }
         let directory = try folder()
@@ -313,7 +289,9 @@ internal struct Review2ViewerSource {
         let target = directory.appendingPathComponent("copy.bin")
         try Data("old".utf8).write(to: target)
         #expect(throws: ViewerError.fileChanged) {
-            try ViewerSave.save(Short(), to: target, cancellation: CancellationFlag())
+            try ViewerSave.save(Short(), to: target, cancellation: CancellationFlag()) { _ in
+                // Not watched here.
+            }
         }
         #expect(try Data(contentsOf: target) == Data("old".utf8))
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["copy.bin"])
@@ -321,207 +299,11 @@ internal struct Review2ViewerSource {
         let flag = CancellationFlag()
         flag.cancel()
         #expect(throws: (any Error).self) {
-            try ViewerSave.save(DataByteSource(Data(count: 100)), to: target, cancellation: flag)
+            try ViewerSave.save(DataByteSource(Data(count: 100)), to: target, cancellation: flag) { _ in
+                // Not watched here.
+            }
         }
         #expect(try Data(contentsOf: target) == Data("old".utf8))
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["copy.bin"])
-    }
-
-    // MARK: Temporary copies
-
-    @Test
-    internal func theNameOfACopyIsOneSafeComponent() {
-        for name in [
-            "..", ".", "", "../../x", "a/b", "a\\b", "x:y", "..%2F..%2Fx", "\u{0}evil",
-            String(repeating: "n", count: 400) + ".mov"
-        ] {
-            let safe = TemporaryCopies.safeName(name)
-            #expect(
-                !safe.isEmpty && safe != "." && safe != ".." && !safe.contains("/") && !safe.contains(":")
-                    && !safe.contains("\u{0}"),
-                "\(name.debugDescription) -> \(safe.debugDescription)"
-            )
-            #expect(safe.utf8.count <= 255)
-        }
-        #expect(TemporaryCopies.safeName("../../x") == "_.._.._x")
-        #expect(TemporaryCopies.safeName("movie.mp4") == "movie.mp4")
-        #expect(TemporaryCopies.safeName(String(repeating: "n", count: 400) + ".mov").hasSuffix(".mov"))
-    }
-
-    @Test
-    internal func aNameWithEncodedSeparatorsStaysInsideItsFolder() throws {
-        let provider = Review2HookProvider()
-        // As a server sends it: the last component is "../../escape.mp4" once decoded.
-        let url = URL(string: "hook:///a/..%2F..%2Fescape.mp4")!
-        #expect(url.lastPathComponent == "../../escape.mp4")
-        provider.contents[url.path] = Data("payload".utf8)
-        let registry = FileSystemRegistry()
-        registry.register(provider)
-        let copies = TemporaryCopies()
-        defer { copies.removeAll() }
-        let copy = try #require(copies.localURL(for: url, fileSystems: registry, cancellation: CancellationFlag()))
-        let folder = copy.deletingLastPathComponent().standardizedFileURL
-        #expect(copy.standardizedFileURL.deletingLastPathComponent() == folder && !copy.lastPathComponent.contains("/"))
-        #expect(try String(contentsOf: copy, encoding: .utf8) == "payload")
-        let root = folder.deletingLastPathComponent().deletingLastPathComponent()
-        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("escape.mp4").path))
-    }
-
-    @Test
-    internal func aFileTooBigToCopyIsRefusedBeforeAByteIsRead() {
-        let registry = FileSystemRegistry()
-        let provider = Review2HookProvider()
-        provider.sizes["/huge.mov"] = 50 << 30
-        registry.register(provider)
-        let copies = TemporaryCopies()
-        defer { copies.removeAll() }
-        let result = copies.localCopy(
-            for: URL(string: "hook:///huge.mov")!,
-            fileSystems: registry,
-            cancellation: CancellationFlag()
-        )
-        if case .failure(let refusal) = result {
-            #expect(refusal == .tooLarge(50 << 30, limit: 1 << 30) && refusal.message.contains("too large"))
-        } else {
-            Issue.record("copied")
-        }
-        #expect(provider.closeCount == 0)
-    }
-
-    @Test
-    internal func aCopyIsNotRegisteredForAPaneThatLetGoMeanwhileOrAfterRemoveAll() throws {
-        let memory = MemoryFileSystem()
-        let registry = FileSystemRegistry()
-        registry.register(memory)
-        let url = memory.addFile("/a/clip.mp4", String(repeating: "c", count: 1_000))
-        let copies = TemporaryCopies()
-        defer { copies.removeAll() }
-        let owner = ObjectIdentifier(copies)
-        let first = try #require(
-            copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag())
-        )
-        copies.removeAll()
-        copies.waitForCleanup()
-        // The folder is gone with its entry: copying again makes a new one.
-        #expect(!FileManager.default.fileExists(atPath: first.path))
-        let second = try #require(
-            copies.localURL(for: url, fileSystems: registry, owner: owner, cancellation: CancellationFlag())
-        )
-        #expect(FileManager.default.fileExists(atPath: second.path))
-    }
-
-    // MARK: Links
-
-    @Test
-    internal func onlyWebAndMailLinksOpenInTheBrowser() {
-        #expect(
-            LinkPolicy.opensInBrowser(URL(string: "https://example.com/a")!)
-                && LinkPolicy.opensInBrowser(URL(string: "http://example.com")!)
-        )
-        #expect(LinkPolicy.opensInBrowser(URL(string: "mailto:a@example.com")!))
-        for text in [
-            "file:///Applications/Calculator.app", "smb://evil/share", "sftp://evil/x", "ftp://evil/x",
-            "x-evil-scheme://run", "javascript:alert(1)", "tel:123", "relative.html"
-        ] {
-            #expect(!LinkPolicy.opensInBrowser(URL(string: text)!), "\(text)")
-        }
-    }
-
-    @Test
-    internal func aPageCanOnlyLeadToFilesBesideTheOneShown() {
-        let base = URL(fileURLWithPath: "/Users/me/pages/index.html")
-        func target(_ text: String) -> String? { LinkPolicy.target(of: URL(string: text)!, relativeTo: base)?.path }
-        #expect(target("other.html") == "/Users/me/pages/other.html")
-        #expect(target("sub/page.html#part") == "/Users/me/pages/sub/page.html")
-        for text in [
-            "../secret.html", "../../etc/passwd", "file:///etc/passwd", "file:///Users/me/other/x.html",
-            "sftp://evil/x", "ftp://evil/x", "smb://evil/x",
-            "http://evil/x", "..%2F..%2Fx", "sub/..%2F..%2Fx", "/etc/passwd", "//evil/x"
-        ] {
-            #expect(target(text) == nil, "\(text) -> \(target(text) ?? "nil")")
-        }
-        // The same file system and host only.
-        let remote = URL(string: "sftp://host/pub/doc/index.html")!
-        func remoteTarget(_ text: String) -> String? {
-            LinkPolicy.target(of: URL(string: text)!, relativeTo: remote)?.absoluteString
-        }
-        #expect(remoteTarget("next.html") == "sftp://host/pub/doc/next.html")
-        #expect(
-            remoteTarget("sftp://other/pub/doc/next.html") == nil && remoteTarget("ftp://host/pub/doc/next.html") == nil
-                && remoteTarget("../up.html") == nil
-        )
-    }
-
-    @Test
-    internal func aPageShownFromAStringNavigatesOnceAndThenNowhere() {
-        let blank = URL(string: "about:blank")
-        typealias Page = WebContentView
-        // The load of the page itself, once.
-        #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: blank, expectsPage: true) == .allow)
-        // A meta refresh, a redirect, a script-less load of the web or of a file, a frame: refused.
-        for text in ["https://evil.example/x", "http://127.0.0.1:18473/refresh", "file:///etc/passwd", "ftp://evil/x"] {
-            #expect(
-                Page.decide(isMainFrame: true, isLinkClick: false, url: URL(string: text), expectsPage: false)
-                    == .cancel,
-                "\(text)"
-            )
-            #expect(
-                Page.decide(isMainFrame: true, isLinkClick: false, url: URL(string: text), expectsPage: true)
-                    == .cancel,
-                "\(text)"
-            )
-        }
-        #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: nil, expectsPage: true) == .allow)
-        #expect(Page.decide(isMainFrame: true, isLinkClick: false, url: blank, expectsPage: false) == .cancel)
-        #expect(Page.decide(isMainFrame: false, isLinkClick: false, url: blank, expectsPage: true) == .cancel)
-        // A click is handed on, and a jump inside the page stays.
-        #expect(
-            Page.decide(
-                isMainFrame: true,
-                isLinkClick: true,
-                url: URL(string: "https://example.com"),
-                expectsPage: false
-            )
-                == .followLink
-        )
-        #expect(
-            Page.decide(isMainFrame: true, isLinkClick: true, url: URL(string: "about:blank#part"), expectsPage: false)
-                == .allow
-        )
-    }
-
-    // MARK: Encodings
-
-    @Test
-    internal func codePagesThatCannotBeDecodedAreNotOffered() {
-        // EUC-JP and GB 18030 were taken out in the first pass and are back (second pass), decoded by their layout; other
-        // code pages of many bytes (ISO-2022, EUC-KR, HZ ...) are still not offered.
-        #expect(ViewerEncoding.codePage(51_932) != nil && ViewerEncoding.codePage(54_936) != nil)
-        for page in [50_220, 50_221, 50_222, 51_949, 52_936] {
-            #expect(ViewerEncoding.codePage(page) == nil, "\(page)")
-        }
-        for page in [1_252, 437, 866, 932, 936, 949, 950, 28_591, 20_866, 65_001] {
-            #expect(ViewerEncoding.codePage(page) != nil, "\(page)")
-        }
-        #expect(ViewerEncoding.codePages.contains(.ansi) && ViewerEncoding.codePages.contains { $0.codePage == 932 })
-    }
-
-    // MARK: Folders
-
-    @Test
-    internal func countingAFolderOnAServerStopsAtItsLimit() {
-        let memory = MemoryFileSystem()
-        for folder in 0..<5 {
-            for file in 0..<20 { memory.addFile("/tree/d\(folder)/f\(file).txt", String(repeating: "a", count: 10)) }
-        }
-        let all = FolderSummary.measure(memory.url("/tree"), provider: memory, cancellation: CancellationFlag())
-        #expect(all.files == 100 && all.folders == 5 && !all.isPartial)
-        let limited = FolderSummary.measure(
-            memory.url("/tree"),
-            provider: memory,
-            cancellation: CancellationFlag(),
-            limit: 30
-        )
-        #expect(limited.isPartial && limited.files < 100 && limited.text.hasPrefix("At least "))
     }
 }

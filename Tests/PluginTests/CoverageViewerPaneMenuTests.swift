@@ -54,7 +54,8 @@ internal struct CoverageViewerPaneMenuTests {
         let other = try bench.file("other.txt", text: "Other file\n")
         bench.setup.plugin.open(
             [ViewerItem(source: .file(notes), title: "notes"), ViewerItem(source: .file(other), title: "other")],
-            internalOnly: false
+            internalOnly: false,
+            followsCursor: false
         )
         let controller = try #require(bench.setup.plugin.windows.last)
         let pane = controller.pane
@@ -77,10 +78,10 @@ internal struct CoverageViewerPaneMenuTests {
         #expect(await bench.wait { pane.loadGeneration > generation && pane.loaded != nil })
         // Page setup keeps the margins the user confirmed.
         #expect(CoverageViewerMenus.run("Page Setup", in: "File", of: pane))
-        #expect(bench.settings.printMargins == nil)
+        #expect(bench.settings.printMargins.isEmpty)
         bench.dialogs.layoutAnswer = true
         #expect(CoverageViewerMenus.run("Page Setup", in: "File", of: pane))
-        #expect(bench.settings.printMargins?.count == 4)
+        #expect(bench.settings.printMargins.count == 4)
         // Print runs an operation with the window.
         #expect(await bench.textShown(pane))
         #expect(CoverageViewerMenus.run("Print", in: "File", of: pane))
@@ -192,7 +193,7 @@ internal struct CoverageViewerPaneMenuTests {
         #expect(CoverageViewerMenus.run("Fit only larger", in: "Options", of: pane))
         #expect(image.fit == .largerOnly)
         #expect(CoverageViewerMenus.run("Fit only larger", in: "Options", of: pane))
-        #expect(image.fit == .none)
+        #expect(image.fit == .actualSize)
         #expect(CoverageViewerMenus.run("Center images", in: "Options", of: pane))
         #expect(image.centered)
         #expect(CoverageViewerMenus.run("Rotate right", in: "Options", of: pane))

@@ -155,7 +155,8 @@ internal struct CoverageViewerCopiesTests {
         let registry = Self.registry(Data("abc".utf8), size: 3)
         let flag = CancellationFlag()
         #expect(
-            TemporaryCopies(directory: readOnly).localCopy(for: Self.url, fileSystems: registry, cancellation: flag)
+            TemporaryCopies(directory: readOnly, disk: .system)
+                .localCopy(for: Self.url, fileSystems: registry, cancellation: flag)
                 == .failure(.unreadable)
         )
         let full = TemporaryCopies(directory: FileManager.default.temporaryDirectory, disk: Self.disk(freeSpace: 0))
@@ -227,7 +228,7 @@ internal struct CoverageViewerCopiesTests {
         let holder = ViewerAdoptBox<TemporaryCopies?>(nil)
         let registry = Self.registry(Data("abc".utf8), size: 3) { block in
             if !block.isEmpty {
-                holder.value?.removeAll(waiting: false)
+                holder.value?.removeAll(waiting: false, then: nil)
             }
         }
         let copies = TemporaryCopies()

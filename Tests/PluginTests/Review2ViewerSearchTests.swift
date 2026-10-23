@@ -9,18 +9,24 @@ import Testing
 /// result does not depend on the size of the chunks or on whether the bytes are compared raw or
 /// decoded, and a file that became shorter does not trap a double-byte search.
 @Suite
-internal struct Review2ViewerSearch {
+internal struct Review2ViewerSearchTests {
     // MARK: Double-byte text in a file that became shorter
 
     private final class Shrunk: ByteSource {
         let length: Int64 = 200_000
+
         func read(at offset: Int64, count: Int) -> Data {
             guard offset < 50_000 else {
                 return Data()
             }
             return Data(
-                (0..<min(count, 50_000 - Int(offset))).map { ($0 + Int(offset)) % 2 == 0 ? UInt8(0x81) : UInt8(0x41) }
+                (0..<min(count, 50_000 - Int(offset)))
+                    .map { ($0 + Int(offset)).isMultiple(of: 2) ? UInt8(0x81) : UInt8(0x41) }
             )
+        }
+
+        deinit {
+            // Nothing to release.
         }
     }
 
@@ -35,17 +41,25 @@ internal struct Review2ViewerSearch {
     ) throws -> Range<Int64>? {
         let pattern = try SearchPattern(text, options: options, encoding: encoding)
         return try ViewerSearch.find(
-            pattern,
-            in: DataByteSource(data),
-            content: 0..<Int64(data.count),
-            from: start,
-            backwards: options.backwards,
-            encoding: encoding,
-            chunkSize: chunkSize,
-            rawBytes: rawBytes
-        )
+            ViewerSearch.Request(pattern: pattern, start: start, backwards: options.backwards),
+            in: ViewerSearch.Subject(
+                source: DataByteSource(data),
+                content: 0..<Int64(data.count),
+                encoding: encoding,
+                boundaries: nil
+            ),
+            tuning: ViewerSearch.Tuning(
+                chunkSize: chunkSize,
+                parallelism: ProcessInfo.processInfo.activeProcessorCount,
+                rawBytes: rawBytes
+            ),
+            cancellation: CancellationFlag()
+        ) { _ in
+            // Not watched here.
+        }
     }
 
+    /// A backwards search does not return the match that begins at its start, whatever the chunk size.
     @Test
     internal func aBackwardsSearchDoesNotReturnTheMatchThatBeginsAtItsStart() throws {
         // "ss" is the single character ß (bytes 4 and 5): a match that begins at the start itself.
@@ -63,6 +77,7 @@ internal struct Review2ViewerSearch {
         }
     }
 
+    /// Finding the previous hit again and again walks back through every hit: the forward hits in reverse.
     @Test
     internal func findingThePreviousHitRepeatedlyWalksBackThroughAllOfThem() throws {
         let data = Data("Straße, STRASSE, strasse, Straße".utf8)
@@ -83,6 +98,7 @@ internal struct Review2ViewerSearch {
         #expect(found.count == 4 && found.reversed() == forwards)
     }
 
+    /// From the middle of a character, a backwards search finds only matches that begin before it.
     @Test
     internal func aStartInTheMiddleOfACharacterReturnsOnlyMatchesThatBeginBeforeIt() throws {
         // "ä" is two bytes; a search backwards from its second byte finds what begins before it.
@@ -97,6 +113,7 @@ internal struct Review2ViewerSearch {
         #expect(try find("ä", in: data, backwards, from: 3) == nil)
     }
 
+    /// Control characters are compared like any other, on the raw and on the decoded path.
     @Test
     internal func controlCharactersAreNotSkippedOverInTheText() throws {
         // The needle has an escape in front of the 9; the text has a 9 only (second byte invalid).
@@ -111,12 +128,16 @@ internal struct Review2ViewerSearch {
             #expect(try find("0\u{03}", in: Data(text.utf8), chunkSize: chunk) == nil, "chunk \(chunk)")
         }
         let with = String(repeating: "é", count: 29) + "0\u{03}" + String(repeating: "é", count: 5)
-        let at = Int64(29 * 2)
+        let matchStart = Int64(29 * 2)
         for chunk in [8, 16, 33, 1 << 20] {
-            #expect(try find("0\u{03}", in: Data(with.utf8), chunkSize: chunk) == at..<at + 2, "chunk \(chunk)")
+            #expect(
+                try find("0\u{03}", in: Data(with.utf8), chunkSize: chunk) == matchStart..<matchStart + 2,
+                "chunk \(chunk)"
+            )
         }
     }
 
+    /// Random texts and needles give the same match with every chunk size, raw or decoded.
     @Test
     internal func theAnswerDoesNotDependOnTheChunkSizeOrThePath() throws {
         var state: UInt64 = 20_260_101
@@ -142,14 +163,16 @@ internal struct Review2ViewerSearch {
                 let start = backwards ? Int64(data.count) : 0
                 let reference = try find(needle, in: data, options, from: start, chunkSize: 1 << 20, rawBytes: false)
                 for chunk in [1, 2, 3, 7, 16, 100] {
+                    let label =
+                        "\(text.debugDescription) \(needle.debugDescription) backwards \(backwards) chunk \(chunk)"
                     #expect(
                         try find(needle, in: data, options, from: start, chunkSize: chunk, rawBytes: false)
                             == reference,
-                        "decoded \(text.debugDescription) \(needle.debugDescription) backwards \(backwards) chunk \(chunk)"
+                        "decoded \(label)"
                     )
                     #expect(
                         try find(needle, in: data, options, from: start, chunkSize: chunk, rawBytes: true) == reference,
-                        "raw \(text.debugDescription) \(needle.debugDescription) backwards \(backwards) chunk \(chunk)"
+                        "raw \(label)"
                     )
                 }
                 compared += 1
@@ -158,6 +181,7 @@ internal struct Review2ViewerSearch {
         #expect(compared == 300)
     }
 
+    /// Every match a backwards search finds begins before its start.
     @Test
     internal func everyBackwardsMatchBeginsBeforeTheStart() throws {
         let data = Data("ßssSSßx ßss".utf8)
@@ -172,31 +196,47 @@ internal struct Review2ViewerSearch {
         }
     }
 
+    /// A double-byte file that became shorter makes its boundaries, and a search over it, throw instead of trap.
     @Test
     internal func aFileThatBecameShorterDoesNotTrapTheBoundariesOfADoubleByteText() throws {
         let sjis = try #require(ViewerEncoding.codePage(932))
-        let boundaries = CharacterBoundaries(source: Shrunk(), content: 0..<200_000, encoding: sjis)
-        #expect(throws: ViewerError.fileChanged) { try boundaries.characterStart(atOrBefore: 150_000) }
+        let boundaries = CharacterBoundaries(
+            source: Shrunk(),
+            content: 0..<200_000,
+            encoding: sjis,
+            spacing: CharacterBoundaries.standardSpacing
+        )
+        #expect(throws: ViewerError.fileChanged) {
+            try boundaries.characterStart(atOrBefore: 150_000, cancellation: nil)
+        }
         let pattern = try SearchPattern("zzzz", options: SearchOptions(), encoding: sjis)
         // Reached through a search, which goes by chunks.
         #expect(throws: (any Error).self) {
             _ = try ViewerSearch.find(
-                pattern,
-                in: Shrunk(),
-                content: 0..<200_000,
-                from: 0,
-                backwards: false,
-                encoding: sjis,
-                chunkSize: 40_000,
-                parallelism: 1
-            )
+                ViewerSearch.Request(pattern: pattern, start: 0, backwards: false),
+                in: ViewerSearch.Subject(
+                    source: Shrunk(),
+                    content: 0..<200_000,
+                    encoding: sjis,
+                    boundaries: nil
+                ),
+                tuning: ViewerSearch.Tuning(
+                    chunkSize: 40_000,
+                    parallelism: 1,
+                    rawBytes: true
+                ),
+                cancellation: CancellationFlag()
+            ) { _ in
+                // Not watched here.
+            }
         }
     }
 
+    /// The boundaries of a long double-byte text keep no more than a fixed number of blocks.
     @Test
     internal func theBoundariesKeepAtMostAFixedNumberOfBlocks() throws {
         let sjis = try #require(ViewerEncoding.codePage(932))
-        let data = Data((0..<(1 << 20)).map { $0 % 2 == 0 ? UInt8(0x81) : UInt8(0x41) })
+        let data = Data((0..<(1 << 20)).map { $0.isMultiple(of: 2) ? UInt8(0x81) : UInt8(0x41) })
         let boundaries = CharacterBoundaries(
             source: DataByteSource(data),
             content: 0..<Int64(data.count),
@@ -204,7 +244,7 @@ internal struct Review2ViewerSearch {
             spacing: 16
         )
         for offset in stride(from: 0, to: data.count, by: 16) {
-            _ = try boundaries.characterStart(atOrBefore: Int64(offset))
+            _ = try boundaries.characterStart(atOrBefore: Int64(offset), cancellation: nil)
         }
         #expect(boundaries.blockCount <= CharacterBoundaries.keptLimit)
     }

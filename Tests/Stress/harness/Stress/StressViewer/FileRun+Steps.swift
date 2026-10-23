@@ -23,7 +23,7 @@ extension FileRun {
             }
             checkRoundTrip(document, row: row, count: count, name: name)
         }
-        if let last = try? document.rows(from: max(0, count - 1), count: 1).first,
+        if let last = try? document.rows(from: max(0, count - 1), count: 1, cancellation: nil).first,
             last.range.upperBound != document.content.upperBound
         {
             fail(
@@ -35,19 +35,21 @@ extension FileRun {
 
     /// From `row` to its offset and back, and to its line and back.
     nonisolated private static func checkRoundTrip(_ document: TextDocument, row: Int, count: Int, name: String) {
-        guard let got = try? document.rows(from: row, count: 2), let first = got.first else {
+        guard let got = try? document.rows(from: row, count: 2, cancellation: nil), let first = got.first else {
             if count > 0 {
                 fail("\(name): round trip: no row", "row \(row) of \(count)")
             }
             return
         }
-        if let back = try? document.row(containing: first.range.lowerBound), back != row, !first.range.isEmpty {
+        if let back = try? document.row(containing: first.range.lowerBound, cancellation: nil), back != row,
+            !first.range.isEmpty
+        {
             fail(
                 "\(name): row(containing:) disagrees with rows(from:)",
                 "row \(row) begins at \(first.range.lowerBound), which is said to be in row \(String(describing: back))"
             )
         }
-        if let lineRow = try? document.row(ofLine: first.line) {
+        if let lineRow = try? document.row(ofLine: first.line, cancellation: nil) {
             if lineRow > row {
                 fail(
                     "\(name): row(ofLine:) behind the row of that line",

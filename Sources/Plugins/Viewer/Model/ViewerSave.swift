@@ -28,7 +28,7 @@ internal enum ViewerSave {
         _ source: any ByteSource,
         to target: URL,
         cancellation: CancellationFlag,
-        progress: (Int64) -> Void = { _ in }
+        progress: (Int64) -> Void
     ) throws {
         let folder = target.deletingLastPathComponent()
         let temporary = folder.appendingPathComponent(

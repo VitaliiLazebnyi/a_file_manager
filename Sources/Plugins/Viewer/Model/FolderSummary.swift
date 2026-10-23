@@ -33,20 +33,30 @@ internal struct FolderSummary: Equatable {
             left -= count
             return true
         }
+
+        deinit {
+            // Nothing to release.
+        }
     }
 
+    /// The files below the folder, at every depth (links count as files).
     internal var files = 0
+    /// The folders below the folder, at every depth, the folder itself not counted.
     internal var folders = 0
+    /// The sizes of all the files added up, at most `Int64.max`.
     internal var bytes: Int64 = 0
     /// Counting stopped at its limit: the numbers are a part of the whole.
     internal var isPartial = false
 
+    /// The line the quick-view pane shows: files, folders and bytes, "At least" before a partial count.
     internal var text: String {
         (isPartial ? "At least " : "")
-            + "\(Format.bytes(Int64(files))) file\(files == 1 ? "" : "s"), \(Format.bytes(Int64(folders))) folder\(folders == 1 ? "" : "s"), "
+            + "\(Format.bytes(Int64(files))) file\(files == 1 ? "" : "s"), "
+            + "\(Format.bytes(Int64(folders))) folder\(folders == 1 ? "" : "s"), "
             + "\(Format.bytes(bytes)) bytes (\(Format.shortSize(bytes)))"
     }
 
+    /// The counts of two parts of a tree together; partial when either part is.
     internal static func + (left: Self, right: Self) -> Self {
         Self(
             files: left.files + right.files,
@@ -62,12 +72,13 @@ internal struct FolderSummary: Equatable {
     /// Returns what was counted up to then when `cancellation` is set (the listings are
     /// cancellable, so a server that does not answer does not keep the threads). Links are counted,
     /// not followed. With `limit`, counting stops after that many entries, as it does for a tree on
-    /// a server, where every folder is a trip; `isPartial` is then set.
+    /// a server, where every folder is a trip; `isPartial` is then set. Without it (nil) everything
+    /// is counted.
     internal static func measure(
         _ directory: URL,
         provider: any FileSystemProvider,
         cancellation: CancellationFlag,
-        limit: Int? = nil
+        limit: Int?
     ) -> Self {
         let budget = limit.map { Budget($0) }
         var result = measure(directory, provider: provider, cancellation: cancellation, budget: budget)
@@ -97,8 +108,8 @@ internal struct FolderSummary: Equatable {
                 summary.bytes = summary.bytes.addingSaturated(item.size)
             }
         }
-        let below = Parallel.map(items.filter(\.isRealDirectory)) {
-            measure($0.url, provider: provider, cancellation: cancellation, budget: budget)
+        let below = Parallel.map(items.filter(\.isRealDirectory)) { folder in
+            measure(folder.url, provider: provider, cancellation: cancellation, budget: budget)
         }
         return below.reduce(summary, +)
     }
