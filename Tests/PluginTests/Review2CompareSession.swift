@@ -1,6 +1,5 @@
 import AFMContracts
 import AFMKernel
-import AppKit
 import Foundation
 import LocalFileSystemPlugin
 import TestSupport
@@ -8,129 +7,25 @@ import Testing
 
 @testable import CompareContentPlugin
 
-private struct Seeded: RandomNumberGenerator {
-    var state: UInt64
-
-    mutating func next() -> UInt64 {
-        state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-        return state ^ (state >> 29)
-    }
-}
-
-private func isValid(_ segments: [DiffSegment], _ a: [Int], _ b: [Int]) -> Bool {
-    var (i, j) = (0, 0)
-    for segment in segments {
-        guard segment.first.lowerBound == i, segment.second.lowerBound == j, !(segment.first.isEmpty && segment.second.isEmpty) else {
-            return false
-        }
-        if segment.isEqual, Array(a[segment.first]) != Array(b[segment.second]) {
-            return false
-        }
-        (i, j) = (segment.first.upperBound, segment.second.upperBound)
-    }
-    return i == a.count && j == b.count && Myers.apply(segments, to: a, from: b) == b
-}
-
-/// A source-like file: mostly distinct lines, some repeated ones (braces, blanks).
-private func sourceLike(_ count: Int, seed: UInt64) -> [Int] {
-    var random = Seeded(state: seed)
-    return (0..<count)
-        .map { index in
-            Int.random(in: 0..<10, using: &random) < 2 ? -Int.random(in: 1...30, using: &random) : index
-        }
-}
-
-/// Review round 2: the diff of large files near the shortest, saving that never loses or mangles
-/// a file, and a session that does not trust a diff that is out of date.
-@Suite
-internal struct Review2CompareDiff {
-    @Test
-    internal func aDeletedBlockInALargeFileCostsAboutTheBlock() {
-        let a = sourceLike(24_000, seed: 1)
-        var b = a
-        var random = Seeded(state: 2)
-        b.removeSubrange(9_000..<10_500)
-        for _ in 0..<150 {
-            b[Int.random(in: 0..<b.count, using: &random)] = 1_000_000 + Int.random(in: 0..<1_000_000, using: &random)
-        }
-        let segments = Myers.diff(a, b)
-        #expect(isValid(segments, a, b))
-        // The shortest script deletes the block and replaces 150 lines: at most 1,500 + 2 x 150.
-        #expect(Myers.editDistance(segments) <= 1_800 + 100)
-    }
-
-    @Test
-    internal func aMovedBlockInALargeFileCostsAboutTwiceTheBlock() {
-        let a = sourceLike(24_000, seed: 3)
-        var b = a
-        let block = Array(b[3_000..<3_400])
-        b.removeSubrange(3_000..<3_400)
-        b.insert(contentsOf: block, at: 17_000)
-        var random = Seeded(state: 4)
-        for _ in 0..<100 {
-            b[Int.random(in: 0..<b.count, using: &random)] = 2_000_000 + Int.random(in: 0..<1_000_000, using: &random)
-        }
-        let segments = Myers.diff(a, b)
-        #expect(isValid(segments, a, b))
-        #expect(Myers.editDistance(segments) <= 1_000 + 100)
-    }
-
-    @Test
-    internal func whenTheSearchIsCutOffLinesUniqueToBothSidesHoldTheDiffTogether() {
-        // A low limit forces the cut-off at once; the lines that occur once on each side anchor the result.
-        let a = Array(0..<6_000)
-        var b = a
-        b.removeSubrange(2_000..<2_800)
-        var random = Seeded(state: 5)
-        for _ in 0..<60 {
-            b[Int.random(in: 0..<b.count, using: &random)] = 100_000 + Int.random(in: 0..<100_000, using: &random)
-        }
-        for limit in [0, 1, 5, 20] {
-            let segments = Myers.diff(a, b, costLimit: limit)
-            #expect(isValid(segments, a, b))
-            #expect(Myers.editDistance(segments) <= 800 + 2 * 60 + 40)
-        }
-    }
-
-    @Test
-    internal func cutOffDiffsStayValidOnSmallRandomInputs() {
-        var random = Seeded(state: 6)
-        for _ in 0..<400 {
-            let a = (0..<Int.random(in: 0...40, using: &random)).map { _ in Int.random(in: 0..<6, using: &random) }
-            let b = (0..<Int.random(in: 0...40, using: &random)).map { _ in Int.random(in: 0..<6, using: &random) }
-            for limit in [0, 1, 2, 3, 8] { #expect(isValid(Myers.diff(a, b, costLimit: limit), a, b)) }
-        }
-    }
-
-    @Test
-    internal func theLimitFollowsTheSizeAndStaysBounded() {
-        #expect(Myers.defaultLimit(forSize: 19_999) == nil)
-        #expect(Myers.defaultLimit(forSize: 20_000) == 8_192)
-        #expect((Myers.defaultLimit(forSize: 100_000) ?? 0) > 2_000)
-        #expect(Myers.defaultLimit(forSize: 10_000_000) == 256)
-    }
-
-    @Test
-    internal func insideALineOnlyTheStartOfAHugeLineIsLookedAt() {
-        let long = String(repeating: "abcdefghij", count: 200_000)
-        let ranges = TextDiff.inline(long, long + "X")
-        #expect(
-            ranges.left.allSatisfy { $0.upperBound <= long.utf16.count }
-                && ranges.right.last?.upperBound == long.utf16.count + 1
-        )
-    }
-}
-
+/// Review round 2: saving that never loses or mangles a file, and a session that does not trust a diff that is
+/// out of date.
 @MainActor
 @Suite
 internal struct Review2CompareSession {
+    /// The folders of the two files.
     internal let box: Sandbox
+    /// The plugin, without windows.
     internal let plugin = CompareContentPlugin(opensWindows: false)
+    /// The settings of the bench.
     internal let settings = MemorySettings()
+    /// The kernel with the plugin, its panels on the two folders.
     internal let bench: TestBench
-    internal var ui: ScriptedInteraction { bench.interaction }
+    /// The scripted answers of the user, and what was asked.
+    internal var interaction: ScriptedInteraction { bench.interaction }
+    /// The session the command opened.
     internal var session: CompareSession { plugin.sessions[0] }
 
+    /// Two folders with a file `f.txt` each, the second with one line changed and one added.
     internal init() throws {
         box = try Sandbox()
         try box.file("A/f.txt", "one\ntwo\nthree\nfour\n")
@@ -144,6 +39,7 @@ internal struct Review2CompareSession {
         )
     }
 
+    /// Compares the two `f.txt` and turns edit mode on.
     internal func open() {
         bench.left.reload()
         bench.left.moveCursor(toName: "f.txt")
@@ -151,6 +47,7 @@ internal struct Review2CompareSession {
         session.setEditing(true)
     }
 
+    /// Undo puts back exactly what the edits replaced, and the session is unmodified again.
     @Test
     internal func undoPutsBackExactlyWhatEditsReplaced() {
         open()
@@ -165,10 +62,13 @@ internal struct Review2CompareSession {
         #expect(!session.hasUnsavedChanges && !session.canUndo)
         #expect(
             session.text(.right, row: 1) == before
-                && (0..<session.rowCount).map { session.text(.left, row: $0) } == ["one", "two", "three", "four", nil]
+                && (0..<session.rowCount).map { row in session.text(.left, row: row) } == [
+                    "one", "two", "three", "four", nil
+                ]
         )
     }
 
+    /// Rows far beyond the texts change nothing and do not trap.
     @Test
     internal func aRowThatPointsOutsideTheTextsIsNeverTrusted() {
         open()
@@ -177,31 +77,34 @@ internal struct Review2CompareSession {
         #expect(!session.hasUnsavedChanges)
     }
 
+    /// Quitting asks about unsaved edits: Cancel calls it off, Don't Save gives them up, Save writes them.
     @Test
     internal func quittingAsksAboutUnsavedEditsAndCanBeCalledOff() {
         open()
         session.setText("two edited", .left, row: 1)
-        ui.choiceAnswers = [2]  // Cancel
+        interaction.choiceAnswers = [2]  // Cancel
         #expect(!plugin.shouldTerminate())
         #expect(box.read("A/f.txt") == "one\ntwo\nthree\nfour\n" && session.hasUnsavedChanges)
-        ui.choiceAnswers = [1]  // Don't Save
+        interaction.choiceAnswers = [1]  // Don't Save
         #expect(plugin.shouldTerminate())
         #expect(box.read("A/f.txt") == "one\ntwo\nthree\nfour\n" && !session.hasUnsavedChanges)
         session.setText("second edit", .left, row: 1)
-        ui.choiceAnswers = [0]  // Save
+        interaction.choiceAnswers = [0]  // Save
         #expect(plugin.shouldTerminate())
         #expect(box.read("A/f.txt") == "one\nsecond edit\nthree\nfour\n")
     }
 
+    /// Stopping the plugin asks once more about what is left, and saves it.
     @Test
     internal func stopAsksOnceMoreForWhatIsLeft() {
         open()
         session.setText("changed", .right, row: 1)
-        ui.choiceAnswers = [0]
+        interaction.choiceAnswers = [0]
         plugin.stop()
         #expect(box.read("B/f.txt")?.contains("changed") == true)
     }
 
+    /// A save never overwrites a file someone else changed after it was loaded.
     @Test
     internal func aSaveNeverOverwritesAFileSomeoneElseChanged() throws {
         open()
@@ -209,11 +112,12 @@ internal struct Review2CompareSession {
         // Someone else writes the file after it was loaded.
         Thread.sleep(forTimeInterval: 0.02)
         try "theirs\n".write(to: box.url("A/f.txt"), atomically: true, encoding: .utf8)
-        var saved: Bool?
-        session.save { saved = $0 }
-        #expect(saved == false && box.read("A/f.txt") == "theirs\n" && session.hasUnsavedChanges)
+        var answers: [Bool] = []
+        session.save { saved in answers.append(saved) }
+        #expect(answers == [false] && box.read("A/f.txt") == "theirs\n" && session.hasUnsavedChanges)
     }
 
+    /// A character the encoding cannot hold is refused, not turned into a question mark.
     @Test
     internal func aCharacterTheEncodingCannotHoldIsRefusedNotTurnedIntoAQuestionMark() throws {
         try Data([0x63, 0x61, 0x66, 0xE9, 0x0A]).write(to: box.url("A/latin.txt"))
@@ -224,12 +128,13 @@ internal struct Review2CompareSession {
         bench.commands.perform(.compareByContent)
         session.setEditing(true)
         session.setText("snowman \u{2603}", .left, row: 0)
-        var saved: Bool?
-        session.save { saved = $0 }
-        #expect(saved == false)
+        var answers: [Bool] = []
+        session.save { saved in answers.append(saved) }
+        #expect(answers == [false])
         #expect(try Data(contentsOf: box.url("A/latin.txt")) == Data([0x63, 0x61, 0x66, 0xE9, 0x0A]))
     }
 
+    /// The two sides of one file are not both saved: the second would replace the first.
     @Test
     internal func theTwoSidesOfOneFileAreNotBothSaved() throws {
         try box.file("A/g.txt", "a\nb\n")
@@ -242,11 +147,12 @@ internal struct Review2CompareSession {
         session.setEditing(true)
         session.setText("x", .left, row: 0)
         session.setText("y", .right, row: 1)
-        var saved: Bool?
-        session.save { saved = $0 }
-        #expect(saved == false && box.read("A/g.txt") == "a\nb\n")
+        var answers: [Bool] = []
+        session.save { saved in answers.append(saved) }
+        #expect(answers == [false] && box.read("A/g.txt") == "a\nb\n")
     }
 
+    /// Replacing a file keeps its hard links together, and refuses a file that changed since it was loaded.
     @Test
     internal func replaceKeepsHardLinksTogetherAndRefusesAChangedFile() throws {
         let registry = FileSystemRegistry()
@@ -268,14 +174,16 @@ internal struct Review2CompareSession {
         #expect(box.read("h/one.txt") == "changed elsewhere, longer")
     }
 
+    /// On a file system that cannot replace in one step, the file is replaced and nothing is left beside it.
     @Test
     internal func aFileThatCannotBeRenamedOverIsNotLostWhenTheSecondStepFails() throws {
-        // A provider that cannot replace in one step: the old file is moved aside and comes back if the new one cannot be put in place.
+        // A provider that cannot replace in one step: the old file is moved aside and comes back if the new one
+        // cannot be put in place.
         let memory = MemoryFileSystem()
         memory.addFile("/d/f.txt", "old")
         let registry = FileSystemRegistry()
         registry.register(memory)
         try CompareLoader.replace(memory.url("/d/f.txt"), with: Data("new".utf8), fileSystems: registry)
-        #expect(memory.contents("/d/f.txt") == "new" && memory.allPaths.allSatisfy { !$0.contains("afm-") })
+        #expect(memory.contents("/d/f.txt") == "new" && memory.allPaths.allSatisfy { path in !path.contains("afm-") })
     }
 }

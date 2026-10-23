@@ -76,7 +76,11 @@ internal struct DirectorySyncSettingsMigration {
         SettingsJSON.store(Fixture.options, forKey: "directorySync.options", in: settings)
         SettingsJSON.store(Fixture.show, forKey: "directorySync.show", in: settings)
         let (bench, session) = try Self.session(on: settings, in: try Sandbox())
-        defer { withExtendedLifetime(bench) {} }
+        defer {
+            withExtendedLifetime(bench) {
+                // The bench owns the kernel the session uses, up to here.
+            }
+        }
         let options = session.options
         #expect(options.subdirectories && options.byContent && !options.ignoreDate && options.asymmetric)
         #expect(!options.emptyDirectories && options.mask == "*.swift *.md" && options.toleranceSeconds == 2)
@@ -91,7 +95,11 @@ internal struct DirectorySyncSettingsMigration {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.showNothing, forKey: "directorySync.show", in: settings)
         let (bench, session) = try Self.session(on: settings, in: try Sandbox())
-        defer { withExtendedLifetime(bench) {} }
+        defer {
+            withExtendedLifetime(bench) {
+                // The bench owns the kernel the session uses, up to here.
+            }
+        }
         #expect(session.show == .all)
     }
 
@@ -101,7 +109,11 @@ internal struct DirectorySyncSettingsMigration {
         let settings = MemorySettings()
         SettingsJSON.store(Fixture.sets, forKey: "directorySync.sets", in: settings)
         let (bench, session) = try Self.session(on: settings, in: try Sandbox())
-        defer { withExtendedLifetime(bench) {} }
+        defer {
+            withExtendedLifetime(bench) {
+                // The bench owns the kernel the session uses, up to here.
+            }
+        }
         #expect(session.savedSets.map(\.name) == ["Backup"])
         #expect(session.loadSet(named: "Backup"))
         #expect(session.leftPath == "/Users/me/Documents" && session.rightPath == "/Volumes/Backup/Documents")
@@ -119,7 +131,11 @@ internal struct DirectorySyncSettingsMigration {
         SettingsJSON.store(Fixture.sets, forKey: "directorySync.sets", in: settings)
         let box = try Sandbox()
         let (bench, session) = try Self.session(on: settings, in: box)
-        defer { withExtendedLifetime(bench) {} }
+        defer {
+            withExtendedLifetime(bench) {
+                // The bench owns the kernel the session uses, up to here.
+            }
+        }
         session.leftPath = box.url("A").path
         session.rightPath = box.url("B").path
         session.compare()
