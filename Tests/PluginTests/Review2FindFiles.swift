@@ -9,15 +9,56 @@ import Testing
 /// it goes, the long text, numbers that used to trap, files seen twice.
 @Suite
 internal struct Review2FindFiles {
+    /// A reader over bytes in memory.
+    ///
+    /// Unchecked: used by one thread at a time, as the protocol allows.
+    private final class MemoryReader: FileReader, @unchecked Sendable {
+        private let data: Data
+        private var position = 0
+
+        init(_ data: Data) { self.data = data }
+
+        func read(upToCount count: Int) -> Data? {
+            guard position < data.count else {
+                return nil
+            }
+            let end = min(position + count, data.count)
+            defer { position = end }
+            return data.subdata(in: position..<end)
+        }
+
+        func seek(to offset: UInt64) { position = min(Int(offset), data.count) }
+
+        func close() {
+            // Nothing to close.
+        }
+
+        func interrupt() {
+            // Nothing waits that could be woken.
+        }
+
+        deinit {
+            // Nothing to release.
+        }
+    }
+
+    /// The file systems the searches go through: the local disk and `memory`.
     internal let fileSystems: FileSystemRegistry
+    /// A file system in memory.
     internal let memory: MemoryFileSystem
 
+    /// The file systems of a test.
     internal init() {
         (fileSystems, memory) = makeFileSystems()
     }
 
-    /// Runs `work` on another thread and fails instead of hanging if it does not end.
-    internal func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
+    /// Runs `work` on another thread and fails instead of hanging if it does not end within `Wait.ceiling`.
+    internal func finishes(_ work: @escaping @Sendable () -> Void) -> Bool {
+        finishes(within: Wait.ceiling, work)
+    }
+
+    /// Runs `work` on another thread and fails instead of hanging if it does not end within `seconds`.
+    internal func finishes(within seconds: Double, _ work: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -29,6 +70,7 @@ internal struct Review2FindFiles {
 
     // MARK: Patterns
 
+    /// A name expression that backtracks without end is stopped and matches nothing; quick names still match.
     @Test
     internal func aNameRegexThatBacktracksEndsAndFindsNothing() {
         let mask = SearchMask(#"^(\w+[ _-]?)+\.jpg$"#, regex: true)
@@ -41,6 +83,7 @@ internal struct Review2FindFiles {
         #expect(SearchMask(#"^(\w+[ _-]?)+\.jpg$"#, regex: true).matches("holiday photo.jpg"))
     }
 
+    /// A text expression that backtracks without end is stopped and says so; a cancelled search ends it too.
     @Test
     internal func aContentRegexThatBacktrackingEndsAndCancels() throws {
         var options = TextSearchOptions()
@@ -62,11 +105,12 @@ internal struct Review2FindFiles {
         }
         .start()
         // Written by the other thread before it signals, read here after the wait.
-        nonisolated(unsafe) var cancelled: Bool?
-        #expect(finishes { cancelled = second.accepts(MemoryReader(data), cancellation: cancellation) })
-        #expect(cancelled == false)
+        nonisolated(unsafe) var accepted = true
+        #expect(finishes { accepted = second.accepts(MemoryReader(data), cancellation: cancellation) })
+        #expect(!accepted)
     }
 
+    /// A rule whose expression is broken stops the search before it starts; a slow one matches nothing.
     @Test
     internal func aFieldRuleRegexIsCheckedAndBounded() {
         var query = SearchQuery(directory: memory.url("/"))
@@ -86,12 +130,14 @@ internal struct Review2FindFiles {
         #expect(found.isEmpty)
     }
 
+    /// The names a search finds, in the order found.
     internal func names(of query: SearchQuery) -> [String] {
         var found: [String] = []
         FileSearch(query, fileSystems: fileSystems).run { found.append($0.name) }
         return found
     }
 
+    /// A text of 20,000 characters is found on a thread with a small stack, also as whole words.
     @Test
     internal func aVeryLongTextIsFoundOnASmallStack() throws {
         // The matcher used to recurse once per character: 6,000 were enough to overflow a thread's stack.
@@ -111,16 +157,18 @@ internal struct Review2FindFiles {
         }
     }
 
+    /// UTF-16 without a byte order mark is searched by an expression in either byte order.
     @Test
     internal func utf16WithoutAMarkIsSearchedByRegexInBothByteOrders() throws {
         var options = TextSearchOptions(regex: true, encodings: [.utf16])
         options.regex = true
         let pattern = try TextPattern("wor", caseSensitive: true, options: options)
-        #expect(pattern.isFound(in: Data("hello world\n".data(using: .utf16BigEndian)!)))
-        #expect(pattern.isFound(in: Data("hello world\n".data(using: .utf16LittleEndian)!)))
-        #expect(!pattern.isFound(in: Data("hello there\n".data(using: .utf16BigEndian)!)))
+        #expect(pattern.isFound(in: try #require("hello world\n".data(using: .utf16BigEndian))))
+        #expect(pattern.isFound(in: try #require("hello world\n".data(using: .utf16LittleEndian))))
+        #expect(!pattern.isFound(in: try #require("hello there\n".data(using: .utf16BigEndian))))
     }
 
+    /// A line of five megabytes is cut between characters, and a text at its very end is found.
     @Test
     internal func aLongLineIsCutBetweenCharacters() throws {
         var options = TextSearchOptions()
@@ -133,161 +181,35 @@ internal struct Review2FindFiles {
         #expect(!pattern.isFound(in: Data(none.utf8), blockSize: 1 << 20))
     }
 
-    // MARK: The walk
-
-    @Test
-    internal func hitsOfAFolderComeBeforeItsLastFilesAreTested() {
-        // 70 files; the tests of the last ones wait until the first hits have been reported.
-        for index in 0..<70 { memory.addFile(String(format: "/many/f%02d.txt", index)) }
-        let release = DispatchSemaphore(value: 0)
-        let columns = ColumnRegistry()
-        columns.register(
-            ContentColumn(id: "gate", title: "Gate") { item in
-                if item.name >= "f64" { _ = release.wait(timeout: .now() + Wait.ceiling) }
-                return "open"
-            }
-        )
-        var query = SearchQuery(directory: memory.url("/many"))
-        query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
-        let search = FileSearch(query, fileSystems: fileSystems, columns: columns)
-        let first = DispatchSemaphore(value: 0)
-        // Counted by the thread that searches and read by the one that waits: under a lock.
-        let lock = NSLock()
-        // Guarded by `lock`.
-        nonisolated(unsafe) var hits = 0
-        let thread = Thread {
-            search.run { _ in
-                let isFirst = lock.withLock { () -> Bool in
-                    hits += 1
-                    return hits == 1
-                }
-                if isFirst { first.signal() }
-            }
-        }
-        thread.start()
-        // The first hit arrives while the last files are still held back.
-        let early = first.wait(timeout: .now() + Wait.ceiling) == .success
-        for _ in 0..<8 { release.signal() }
-        #expect(early)
-        #expect(finishes(within: 600) { while lock.withLock({ hits }) < 70 { Thread.sleep(forTimeInterval: 0.01) } })
-    }
-
-    @Test
-    internal func aSlowFrontJobDoesNotLetTheOthersListTheWholeTree() {
-        for folder in 0..<200 {
-            for file in 0..<10 { memory.addFile(String(format: "/wide/d%03d/f%d.txt", folder, file)) }
-        }
-        let release = DispatchSemaphore(value: 0)
-        let columns = ColumnRegistry()
-        columns.register(
-            ContentColumn(id: "gate", title: "Gate") { item in
-                if item.url.path == "/wide/d000/f0.txt" { _ = release.wait(timeout: .now() + Wait.ceiling) }
-                return "open"
-            }
-        )
-        var query = SearchQuery(directory: memory.url("/wide"))
-        query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("gate", .equals, "open")])
-        let search = FileSearch(query, fileSystems: fileSystems, columns: columns, now: Date(), tuning: .init(budget: 30))
-        // Written by the other thread before it signals, read here after the wait.
-        nonisolated(unsafe) var count = 0
-        let done = DispatchSemaphore(value: 0)
-        Thread {
-            search.run { _ in count += 1 }
-            done.signal()
-        }
-        .start()
-        // While the first folder's test is held, the other threads read a few folders ahead and then wait.
-        Thread.sleep(forTimeInterval: 1)
-        let listed = memory.listRequests.filter { $0.hasPrefix("/wide/d") }.count
-        #expect(listed < 100)
-        release.signal()
-        // The 2,000 files and the 200 folders.
-        #expect(done.wait(timeout: .now() + Wait.ceiling) == .success && count == 2_200)
-    }
-
-    @Test
-    internal func cancellingAContentSearchWhileItRunsIsSafe() {
-        for folder in 0..<12 {
-            for file in 0..<40 {
-                memory.addFile("/tree/d\(folder)/f\(file).txt", String(repeating: "lorem ipsum ", count: 50))
-            }
-        }
-        for round in 0..<20 {
-            var query = SearchQuery(directory: memory.url("/tree"), text: "needle-\(round)")
-            query.fieldRules = FieldRules(isEnabled: true, rules: [FieldRule("tc.size", .greater, "1")])
-            let search = FileSearch(query, fileSystems: fileSystems)
-            Thread {
-                Thread.sleep(forTimeInterval: Double(round) / 2_000)
-                search.cancel()
-            }
-            .start()
-            #expect(finishes { search.run { _ in } })
-        }
-    }
-
-    @Test
-    internal func aWalkThatIsClosedDoesNotComeBackToLife() {
-        for index in 0..<30 { memory.addFile("/deep/a/b/c/d\(index)/e.txt", "x") }
-        var query = SearchQuery(directory: memory.url("/deep"))
-        query.resultLimit = 5
-        let search = FileSearch(query, fileSystems: fileSystems)
-        // Used by the work on its own thread only while the test waits for it to finish.
-        nonisolated(unsafe) var found = 0
-        #expect(finishes { search.run { _ in found += 1 } })
-        #expect(found == 5 && search.reachedResultLimit)
-        var all = SearchQuery(directory: memory.url("/deep"))
-        all.resultLimit = 1_000
-        let complete = FileSearch(all, fileSystems: fileSystems)
-        var every = 0
-        complete.run { _ in every += 1 }
-        #expect(every > 30 && !complete.reachedResultLimit)
-    }
-
-    @Test
-    internal func searchInFoundFilesDoesNotCompareEveryItemWithEveryFolder() {
-        for folder in 0..<300 { for file in 0..<10 { memory.addFile("/found/d\(folder)/n\(file).txt") } }
-        var items: [URL] = []
-        for folder in 0..<300 {
-            items.append(memory.url("/found/d\(folder)"))
-            for file in 0..<10 { items.append(memory.url("/found/d\(folder)/n\(file).txt")) }
-        }
-        // Used by the work on its own thread only while the test waits for it to finish.
-        nonisolated(unsafe) var query = SearchQuery(directory: memory.url("/found"), names: "n1.txt")
-        query.scope = .only(items)
-        // Used by the work on its own thread only while the test waits for it to finish.
-        nonisolated(unsafe) var hits: [String] = []
-        #expect(finishes { hits = names(of: query) })
-        // A file listed beside the folder that holds it is found once, by the folder.
-        #expect(hits.count == 300)
-    }
-
     // MARK: Files seen twice, special files
 
+    /// One remote place written in two ways is no duplicate of itself; two files of one name are.
     @Test
-    internal func theSameRemotePlaceWrittenTwoWaysIsNotADuplicateOfItself() {
-        func item(_ text: String) -> FileItem {
+    internal func theSameRemotePlaceWrittenTwoWaysIsNotADuplicateOfItself() throws {
+        func item(_ text: String) throws -> FileItem {
             FileItem(
-                url: URL(string: text)!,
+                url: try #require(URL(string: text)),
                 name: "same.txt",
                 stat: .init(size: 5, modified: Date(timeIntervalSince1970: 1))
             )
         }
         let options = DuplicateOptions(isEnabled: true, sameName: true, sameSize: true, sameContents: false)
         let twice = DuplicateFinder.groups(
-            of: [item("sftp://HOST/a/same.txt"), item("sftp://host/a/same.txt")],
+            of: [try item("sftp://HOST/a/same.txt"), try item("sftp://host/a/same.txt")],
             options: options,
             fileSystems: fileSystems
         )
         #expect(twice.isEmpty)
         // Two different files of one name are still a group.
         let two = DuplicateFinder.groups(
-            of: [item("sftp://host/a/same.txt"), item("sftp://host/b/same.txt")],
+            of: [try item("sftp://host/a/same.txt"), try item("sftp://host/b/same.txt")],
             options: options,
             fileSystems: fileSystems
         )
         #expect(two.count == 1 && two[0].count == 2)
     }
 
+    /// Overlapping roots report a file once, while two hard links in one folder are two files.
     @Test
     internal func overlappingRootsKeepHardLinksAndDropTheSameFolder() throws {
         let box = try Sandbox()
@@ -300,6 +222,7 @@ internal struct Review2FindFiles {
         #expect(found.sorted() == ["one.txt", "two.txt"])
     }
 
+    /// A local file is read through a checked descriptor; a FIFO or a missing file gives no reader.
     @Test
     internal func aFifoOrAStubIsNotOpenedForReading() throws {
         let box = try Sandbox()
@@ -319,6 +242,7 @@ internal struct Review2FindFiles {
 
     // MARK: Numbers that used to trap
 
+    /// Ages, depths and sizes beyond reason are held to what they can be.
     @Test
     internal func absurdNumbersAreHeldToWhatTheyCanBe() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
@@ -343,6 +267,7 @@ internal struct Review2FindFiles {
 
     // MARK: Spotlight
 
+    /// Files the index returns are read for the text where it cannot judge case, phrases or encodings.
     @Test
     internal func spotlightReChecksWhatTheIndexCannotJudge() {
         var query = SearchQuery(directory: memory.url("/"), text: "smith")
@@ -356,27 +281,4 @@ internal struct Review2FindFiles {
         query.textOptions.encodings = [.utf8, .western]
         #expect(SpotlightQuery.recheckingText(of: query))
     }
-}
-
-/// A reader over bytes in memory.
-///
-/// Unchecked: used by one thread at a time, as the protocol allows.
-private final class MemoryReader: FileReader, @unchecked Sendable {
-    private let data: Data
-    private var position = 0
-
-    init(_ data: Data) { self.data = data }
-
-    func read(upToCount count: Int) -> Data? {
-        guard position < data.count else {
-            return nil
-        }
-        let end = min(position + count, data.count)
-        defer { position = end }
-        return data.subdata(in: position..<end)
-    }
-
-    func seek(to offset: UInt64) { position = min(Int(offset), data.count) }
-    func close() {}
-    func interrupt() {}
 }

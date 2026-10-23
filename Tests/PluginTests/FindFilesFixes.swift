@@ -9,20 +9,24 @@ import Testing
 /// that used to trap.
 @Suite
 internal struct FindFilesFixes {
+    /// The file systems the searches go through.
     internal let fileSystems: FileSystemRegistry
 
+    /// The file systems of a test.
     internal init() {
         (fileSystems, _) = makeFileSystems()
     }
 
+    /// The paths a search finds, in the order found.
     internal func find(_ query: SearchQuery) -> [String] {
         var found: [String] = []
         FileSearch(query, fileSystems: fileSystems).run { found.append($0.url.path) }
         return found
     }
 
-    /// Runs `work` on another thread and fails instead of hanging if it does not end.
-    internal func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
+    /// Runs `work` on another thread and fails instead of hanging if it does not end within `Wait.ceiling`.
+    internal func finishes(_ work: @escaping @Sendable () -> Void) -> Bool {
+        let seconds = Wait.ceiling
         let done = DispatchSemaphore(value: 0)
         Thread {
             work()
@@ -32,6 +36,7 @@ internal struct FindFilesFixes {
         return done.wait(timeout: .now() + seconds) == .success
     }
 
+    /// Masks match character by character: `[` is a bracket, composed and decomposed letters are one.
     @Test
     internal func masksUseCharactersNotBytesOrBrackets() {
         #expect(SearchMask("file[1].txt").matches("file[1].txt"))
@@ -46,12 +51,14 @@ internal struct FindFilesFixes {
         #expect(SearchMask("*.txt | draft*").matches("final.txt") && !SearchMask("*.txt | draft*").matches("draft.txt"))
     }
 
+    /// A mask of many stars against a long name ends at once.
     @Test
     internal func aLongWildcardIsNotSlow() {
         let mask = SearchMask(String(repeating: "a*", count: 40) + "b")
         #expect(finishes { _ = mask.matches(String(repeating: "a", count: 5_000)) })
     }
 
+    /// A text search does not open a FIFO or a device, which would never end.
     @Test
     internal func textSearchSkipsPipesAndDevices() throws {
         let box = try Sandbox()
@@ -61,8 +68,8 @@ internal struct FindFilesFixes {
         nonisolated(unsafe) var found: [String] = []
         let ended = finishes {
             FileSearch(SearchQuery(directory: box.root, text: "needle"), fileSystems: fileSystems)
-                .run {
-                    found.append($0.name)
+                .run { item in
+                    found.append(item.name)
                 }
         }
         #expect(ended && found == ["real.txt"])
@@ -72,6 +79,7 @@ internal struct FindFilesFixes {
         )
     }
 
+    /// Duplicates leave out FIFOs, a hard link to a file already found, and roots given twice.
     @Test
     internal func duplicatesIgnorePipesHardLinksAndRepeatedRoots() throws {
         let box = try Sandbox()
@@ -99,6 +107,7 @@ internal struct FindFilesFixes {
         #expect(FileSearch(onlyLinks, fileSystems: fileSystems).runForDuplicates().isEmpty)
     }
 
+    /// Start directories that lie in each other are searched once, unless a depth limit needs them.
     @Test
     internal func overlappingStartDirectoriesAreSearchedOnce() throws {
         let box = try Sandbox()
@@ -117,6 +126,7 @@ internal struct FindFilesFixes {
         #expect(find(twice).count == 2)
     }
 
+    /// A folder reached a second time through a link is not searched again.
     @Test
     internal func aFolderReachedBySymlinkedParentIsNotSearchedTwice() throws {
         let box = try Sandbox()
@@ -127,6 +137,7 @@ internal struct FindFilesFixes {
         #expect(find(query).count == 1)
     }
 
+    /// The hits and folders of many folders come in path order, each folder once.
     @Test
     internal func manyFoldersAreReportedInPathOrder() throws {
         let box = try Sandbox()
@@ -134,8 +145,10 @@ internal struct FindFilesFixes {
         for folder in 0..<40 {
             for file in 0..<6 {
                 let path = String(format: "d%02d/f%d.txt", folder, file)
-                try box.file(path, file % 2 == 0 ? "has needle" : "nothing")
-                if file % 2 == 0 { expected.append(box.url(path).path) }
+                try box.file(path, file.isMultiple(of: 2) ? "has needle" : "nothing")
+                if file.isMultiple(of: 2) {
+                    expected.append(box.url(path).path)
+                }
             }
         }
         // Used by the work on its own thread only while the test waits for it to finish.
@@ -154,6 +167,7 @@ internal struct FindFilesFixes {
         #expect(folders.count == 41 && folders.first == box.root.lastPathComponent)
     }
 
+    /// A cancelled search ends without a hit.
     @Test
     internal func cancelledSearchEndsEarly() throws {
         let box = try Sandbox()
@@ -166,6 +180,7 @@ internal struct FindFilesFixes {
         #expect(count == 0)
     }
 
+    /// The name mask and the size criterion must both hold.
     @Test
     internal func nameIsTestedBeforeTheCriteria() throws {
         let box = try Sandbox()
@@ -176,6 +191,7 @@ internal struct FindFilesFixes {
         #expect(find(query) == [box.url("keep.log").path])
     }
 
+    /// Sizes that are too big, negative or not a number are held to what a size can be, not trapped on.
     @Test
     internal func absurdNumbersDoNotTrap() {
         for value in [1e20, -1e20, Double.nan, Double.infinity, 1e300] {
@@ -189,15 +205,16 @@ internal struct FindFilesFixes {
         #expect(
             SpotlightQuery.string(
                 for: {
-                    var q = SearchQuery(directory: URL(fileURLWithPath: "/"))
-                    q.criteria.size = SizeRule(.equal, .nan, .gigabytes)
-                    return q
+                    var query = SearchQuery(directory: URL(fileURLWithPath: "/"))
+                    query.criteria.size = SizeRule(.equal, .nan, .gigabytes)
+                    return query
                 }()
             )
             .contains("kMDItemFSSize")
         )
     }
 
+    /// Prepared criteria decide as the criteria do; empty criteria need no preparing.
     @Test
     internal func preparedCriteriaAgreeWithTheDirectOnes() {
         let now = Date()
@@ -220,15 +237,16 @@ internal struct FindFilesFixes {
         #expect(FileCriteria().prepared(now: now) == nil)
     }
 
+    /// A regular expression with `^` and `$` finds a line across small blocks, and only where it is.
     @Test
     internal func regexTextSearchReadsLinesInBlocks() {
         let pattern = try? TextPattern(
             "^beta$",
             caseSensitive: true,
             options: {
-                var o = TextSearchOptions()
-                o.regex = true
-                return o
+                var options = TextSearchOptions()
+                options.regex = true
+                return options
             }()
         )
         var lines = (0..<20_000).map { "line \($0)" }

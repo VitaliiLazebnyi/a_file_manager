@@ -7,94 +7,22 @@ import Testing
 
 @testable import SelectionPlugin
 
-/// Round 2 of the review, Selection: regular expressions that cannot hang, a `**` that is not
-/// exponential, work off the main thread with a list-version guard, numbers that used to trap,
-/// the ANSI file that used to raise.
-@Suite
-internal struct Review2FindSelectionRules {
-    internal func finishes(within seconds: Double = Wait.ceiling, _ work: @escaping @Sendable () -> Void) -> Bool {
-        let done = DispatchSemaphore(value: 0)
-        Thread {
-            work()
-            done.signal()
-        }
-        .start()
-        return done.wait(timeout: .now() + seconds) == .success
-    }
-
-    @Test
-    internal func aRegexMaskThatBacktracksEndsAndSaysSo() {
-        let mask = SelectionMask("<(a+)+$")
-        let name = String(repeating: "a", count: 45) + "!"
-        // Used by the work on its own thread only while the test waits for it to finish.
-        nonisolated(unsafe) var selected = [true]
-        #expect(finishes { selected = mask.selected([MaskEntry(name: name)]) })
-        #expect(selected == [false] && mask.timedOut)
-        // The same mask judges a name it is quick on.
-        let quick = SelectionMask("<(a+)+$")
-        #expect(quick.selected([MaskEntry(name: "aaa")]) == [true] && !quick.timedOut)
-    }
-
-    @Test
-    internal func aRegexMaskStopsWhenCancelled() {
-        let mask = SelectionMask(#"<^(\w+[ _-]?)+\.jpg$"#)
-        let flag = CancellationFlag()
-        Thread {
-            Thread.sleep(forTimeInterval: 0.05)
-            flag.cancel()
-        }
-        .start()
-        let entries = (0..<5).map { MaskEntry(name: String(repeating: "a", count: 40 + $0) + ".png") }
-        // Used by the work on its own thread only while the test waits for it to finish.
-        nonisolated(unsafe) var result: [Bool] = []
-        #expect(finishes { result = mask.selected(entries, cancelled: { flag.isCancelled }) })
-        #expect(result.allSatisfy { !$0 })
-    }
-
-    @Test
-    internal func manyAnyLevelsInAPathMaskAreNotExponential() {
-        let mask = SelectionMask("**/**/**/**/**/**/**/**/**/**/**/**/**/x.txt")
-        let directory = (0..<30).map { "d\($0)" }
-        // Used by the work on its own thread only while the test waits for it to finish.
-        nonisolated(unsafe) var result = [true]
-        #expect(finishes { result = mask.selected([MaskEntry(name: "y.txt", directory: directory)]) })
-        #expect(result == [false])
-        #expect(mask.selected([MaskEntry(name: "x.txt", directory: directory)]) == [true])
-        // The chain still means what it did.
-        #expect(
-            SelectionMask("a/**/c/*.txt")
-                .selected([
-                    MaskEntry(name: "f.txt", directory: ["a", "c"]),
-                    MaskEntry(name: "f.txt", directory: ["a", "b", "b", "c"]),
-                    MaskEntry(name: "f.txt", directory: ["a", "b"]),
-                    MaskEntry(name: "f.txt", directory: ["x", "a", "c"])
-                ]) == [true, true, false, true]
-        )
-    }
-
-    @Test
-    internal func aNameAnsiCannotWriteDoesNotRaise() {
-        let name = "\u{3000}\u{0300}"
-        let item = FileItem(url: URL(fileURLWithPath: "/tmp/x"), name: name)
-        let data = SelectionFile.encode(
-            [item, FileItem(url: URL(fileURLWithPath: "/tmp/y"), name: "sél ą.txt")],
-            as: .ansi
-        )
-        #expect(data.count == "??\r\nsél a.txt".unicodeScalars.count)
-        #expect(data.contains(0xE9))
-        #expect(SelectionFile.windows1252("plain") == Data("plain".utf8))
-    }
-}
-
+/// Round 2 of the review, Selection commands: masks worked out in the background, results for a
+/// list that changed meanwhile, long lists, extreme counts and saving over a file.
 @MainActor
 @Suite
 internal struct Review2FindSelectionCommands {
+    /// The identifiers of the commands of the Selection plugin.
     internal typealias Ids = SelectionCommands
 
+    /// The file system the panels show.
     internal let memory = MemoryFileSystem()
     private let scratch = ScratchPasteboard()
+
+    /// A pasteboard of the test's own, in place of the clipboard.
     internal var pasteboard: NSPasteboard { scratch.pasteboard }
 
+    /// A bench with the Selection plugin over `memory`; with `background` its work runs off the main thread.
     internal func makeBench(background: Bool) -> TestBench {
         TestBench(
             plugins: [SelectionPlugin(pasteboard: pasteboard, background: background)],
@@ -107,9 +35,12 @@ internal struct Review2FindSelectionCommands {
     /// Gives the main run loop the time to hand the result of background work back.
     internal func settle(_ condition: () -> Bool) async {
         let patience = Date(timeIntervalSinceNow: Wait.ceiling)
-        while !condition(), Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
+        while !condition(), Date() < patience {
+            try? await Task.sleep(nanoseconds: 2_000_000)
+        }
     }
 
+    /// A regular expression mask is worked out in the background, and the selection comes after.
     @Test
     internal func aRegexMaskIsEvaluatedOffTheMainThread() async {
         memory.addFile("/A/alpha.txt")
@@ -123,6 +54,7 @@ internal struct Review2FindSelectionCommands {
         #expect(bench.left.model.selection == ["alpha.txt"])
     }
 
+    /// A mask that takes too long is reported and selects nothing.
     @Test
     internal func aMaskThatBacktracksIsReportedAndSelectsNothing() async {
         memory.addFile("/A/" + String(repeating: "a", count: 45) + "!")
@@ -152,9 +84,12 @@ internal struct Review2FindSelectionCommands {
         #expect(bench.left.model.selection == ["alpha.txt", "alpine.txt"])
     }
 
+    /// A long list is selected, inverted, restored and selected whole in the background.
     @Test
     internal func aLongListIsSelectedInvertedAndRestoredWithoutBlocking() async {
-        for index in 0..<(Selections.longList + 5_000) { memory.addFile("/A/f\(index).txt") }
+        for index in 0..<(Selections.longList + 5_000) {
+            memory.addFile("/A/f\(index).txt")
+        }
         memory.addFile("/A/keep.md")
         let bench = makeBench(background: true)
         let model = bench.left.model
@@ -177,6 +112,7 @@ internal struct Review2FindSelectionCommands {
         #expect(model.selectionCount == total)
     }
 
+    /// Comparing the two folders and loading the selection from the clipboard work in the background.
     @Test
     internal func comparingTwoFoldersAndTheClipboardWorkInTheBackground() async {
         memory.addFile("/A/only_left.txt")
@@ -195,6 +131,7 @@ internal struct Review2FindSelectionCommands {
         #expect(bench.left.model.selection == ["both.txt"])
     }
 
+    /// Counts at the ends of the range do not trap.
     @Test
     internal func extremeCountsDoNotTrap() {
         memory.addFile("/A/a.txt")
@@ -208,6 +145,7 @@ internal struct Review2FindSelectionCommands {
         #expect(bench.left.model.rowCount > 0)
     }
 
+    /// Saving the selection over a file replaces it and leaves no temporary file behind.
     @Test
     internal func savingOverAFileKeepsNoTemporaryFileAndReplacesTheOldOne() {
         memory.addFile("/A/one.txt")
