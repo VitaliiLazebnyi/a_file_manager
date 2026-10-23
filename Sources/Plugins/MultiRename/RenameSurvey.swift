@@ -5,6 +5,9 @@ import Foundation
 ///
 /// Blocks; not for the main thread.
 internal struct RenameSurvey {
+    /// How a volume that does (`true`) or does not tell letter case apart treats names.
+    private static let foldings: [Bool: CaseFolding] = [true: .distinct, false: .folded]
+
     /// The file systems the items are on.
     internal let fileSystems: FileSystemRegistry
     /// What was found out about the same folders before, if the caller keeps any.
@@ -23,7 +26,7 @@ internal struct RenameSurvey {
             current.deleteLastPathComponent()
         }
         let values = try? current.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
-        return values?.volumeSupportsCaseSensitiveNames.map { $0 ? .distinct : .folded }
+        return values?.volumeSupportsCaseSensitiveNames.flatMap { Self.foldings[$0] }
     }
 
     /// The keys of every entry of the given folders (by `locationKey`).
