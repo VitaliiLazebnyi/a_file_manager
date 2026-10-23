@@ -151,6 +151,25 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   found. The ViewOptions sources still have SwiftLint findings (lint step 6); the test file is clean. Full suite after
   it (clean build, `swift test --parallel --enable-code-coverage -j 3`): 394 / 3,458 / 337, all passed; ViewOptions 100%
   lines, functions, regions. The final mutation run was made at the branch tip, after this note.
+- **Mutation, `Sources/AFMKernel/Commands` (2026-10-23, branch `mutation-commands`): gate passed, no test needed.** 25
+  mutants in 4 of the 13 files (`Shortcut.swift` 7, `MenuRegistry.swift` 7, `CommandRegistry.swift` 6,
+  `KeyBindings.swift` 5; the other nine files hold only declarations, a `switch` of literals and initialisers, where
+  Muter's operators find nothing): 12 relational, 4 logical, 9 removed calls; all 25 killed, none equivalent, none
+  survived. Every kill was checked in the per-mutant logs: each comes from the kernel's own command, menu, key-binding
+  and shortcut tests (`CommandTests`, `MenuTests`, `KeyTests`, `CoreLogTests`, `CoreKernelCoverageTests`,
+  `CoreRegistryBehaviourTests`, `KernelAndPluginTests`); the fault of a command registered twice is killed by the test
+  that reads it back from the log store. One kill is a hang: with `rest.removeFirst(...)` removed from
+  `Shortcut.init(notation:)` the modifier loop never ends, and the run stops at its time limit (a hang counts as a
+  kill). Time: 610 s for Muter (24 s per mutant), 976 s with the map and builds, `-j 3` with other agents' builds
+  beside. The first attempt was lost: the agent's worktree was removed under the running script (the harness cleans up
+  worktrees it thinks unchanged); the work moved to a worktree of its own (`.claude/worktrees/mutation-commands`).
+  Failed alone for the map: `PanelRememberedVisitTests/aFreshListingThatComesFirstIsShownInstead` (ShellTests; killed
+  nothing here). No bug found, no source touched. Full suite (clean build,
+  `swift test --parallel --enable-code-coverage -j 3`): the first run failed one unrelated test,
+  `CovSmallArchiveTestTests/aDamagedMiddleIsFound(copied: false)` (`problems.count == 1 && ...` false after 49 s under
+  load; it passes alone, and its comment says the damage's effect depends on the times in the TAR headers: a flaky test
+  for the Archives owner); the second run: 394 / 3,458 / 337, all passed; Commands 100% lines, functions, regions. The
+  final mutation run was made at the branch tip, after this note.
 - **Waiting for the owner** (before 2026-10-21; decided since, kept for the record): atomic counters for the coverage
   run; a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
   prompt); the drop on the thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`,
