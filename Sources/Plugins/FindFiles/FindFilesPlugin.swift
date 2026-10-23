@@ -81,7 +81,9 @@ public final class FindFilesPlugin: Plugin {
 
     /// The three commands that open Find Files: the main window, a separate one, and the main window in the
     /// folder under the cursor.
-    private func registerCommands(in kernel: Kernel) {
+    private func registerCommands(in owner: Kernel) {
+        // The kernel keeps the commands; they must not keep it in turn.
+        unowned let kernel = owner
         let source = { kernel.panels.source.model }
         kernel.commands.register(
             Command(.searchFor, "Find Files…", [.f(7, .option), .cmd("f")], runsDuringJobs: true)
