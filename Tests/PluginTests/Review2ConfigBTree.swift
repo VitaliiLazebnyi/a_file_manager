@@ -85,7 +85,7 @@ internal struct Review2ConfigBTree {
         while case .pending(let node, let left) = missing {
             missing = tree.search("zzz", from: node, includingStart: true, remaining: left, timeBudget: 0)
         }
-        guard case .none = missing else {
+        guard case .notFound = missing else {
             Issue.record("expected no match")
             return
         }

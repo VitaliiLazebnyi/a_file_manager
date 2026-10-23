@@ -17,8 +17,12 @@ internal struct DetermSelectionPaths {
     internal func anEntryFromOutsideTheListsFolderKeepsItsWholePath() {
         let base = URL(string: "mem:///work") ?? URL(fileURLWithPath: "/")
         let items = [item("/work/a.txt", name: "a.txt"), item("/other/deep/b.txt", name: "other/deep/b.txt")]
-        #expect(SelectionRule(mask: "/*.txt").names(among: items, base: base) == ["a.txt"])
-        #expect(SelectionRule(mask: "/other/deep/*.txt").names(among: items, base: base) == ["other/deep/b.txt"])
-        #expect(SelectionRule(mask: "/deep/*.txt").names(among: items, base: base).isEmpty)
+        #expect(SelectionRule(mask: "/*.txt").names(among: items, base: base, now: Date()) == ["a.txt"])
+        #expect(
+            SelectionRule(mask: "/other/deep/*.txt").names(among: items, base: base, now: Date()) == [
+                "other/deep/b.txt"
+            ]
+        )
+        #expect(SelectionRule(mask: "/deep/*.txt").names(among: items, base: base, now: Date()).isEmpty)
     }
 }

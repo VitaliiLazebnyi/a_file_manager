@@ -67,7 +67,7 @@ internal struct Review2ConfigBPlaces {
         // The newest store wins, and what is left is no temporary file.
         for round in 0..<20 { cache.store((0...round).map { "f\($0)" }, for: root) }
         cache.flush()
-        #expect(TreeCache(directory: box.url("cache")).paths(for: root)?.count == 20)
+        #expect(TreeCache(directory: box.url("cache")).entry(for: root)?.paths.count == 20)
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: box.url("cache").path)
             .filter { $0.contains(".tmp") }
         #expect(leftovers.isEmpty)

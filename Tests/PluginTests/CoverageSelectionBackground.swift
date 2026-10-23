@@ -95,7 +95,7 @@ internal struct CoverageSelectionBackground {
             rounds += 1
             memory.addFile("/A/more\(rounds).txt")
             holding.left.reload()
-            work.forEach { $0() }
+            for block in work { block() }
             #expect(await RunLoopWait.until { !held.value.isEmpty || rejected > 0 })
         }
         #expect(rejected == 1 && rounds == Selections.attempts && held.value.isEmpty)

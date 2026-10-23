@@ -1,39 +1,11 @@
 import AFMKernel
 import Foundation
 
-/// Counts what a lenient decode had to leave out, so whoever loads can tell the user.
-///
-/// Made for one decode and used only by the thread that runs it.
-internal final class DecodeReport: @unchecked Sendable {
-    internal static let key = CodingUserInfoKey(rawValue: "afm.places.decodeReport")!
-    internal var skipped = 0
-}
-
-/// An array read element by element: an element that cannot be decoded is counted in the
-/// decoder's `DecodeReport` and skipped, the rest is kept.
-internal struct LenientElements<Element: Decodable>: Decodable {
-    private struct Ignored: Decodable { init(from _: any Decoder) {} }
-
-    internal var elements: [Element] = []
-
-    internal init(from decoder: any Decoder) throws {
-        var container = try decoder.unkeyedContainer()
-        let report = decoder.userInfo[DecodeReport.key] as? DecodeReport
-        while !container.isAtEnd {
-            if let element = try? container.decode(Element.self) {
-                elements.append(element)
-            } else {
-                report?.skipped += 1
-                _ = try container.decode(Ignored.self)
-            }
-        }
-    }
-}
-
 /// Reading stored values without losing them: when what is stored cannot be read in full, a
 /// copy is kept under `<key>.unreadable` before anything else is saved over it.
 internal enum StoredSettings {
     /// The value under `key`; nil when nothing is stored or none of it can be read.
+    ///
     /// `problem` is called with a message when the data was damaged or partly left out.
     internal static func load<Value: Decodable>(
         _ type: Value.Type,
@@ -45,14 +17,16 @@ internal enum StoredSettings {
             return nil
         }
         let report = DecodeReport()
-        let decoder = JSONDecoder()
-        decoder.userInfo[DecodeReport.key] = report
-        let value = try? decoder.decode(type, from: data)
+        let value = DecodeReport.$current.withValue(report) {
+            try? JSONDecoder().decode(type, from: data)
+        }
         guard value == nil || report.skipped > 0 else {
             return value
         }
         let backup = key + ".unreadable"
-        if settings.data(forKey: backup) == nil { settings.set(data as Data?, forKey: backup) }
+        if settings.data(forKey: backup) == nil {
+            settings.set(data as Data?, forKey: backup)
+        }
         problem(
             value == nil
                 ? "The stored data of “\(key)” could not be read."
@@ -62,11 +36,23 @@ internal enum StoredSettings {
     }
 }
 
-// Stored data is read leniently: a missing key takes its default and an unknown key is ignored,
-// so a field another version added or removed never makes the list unreadable.
+/// Reading a stored entry leniently.
+///
+/// A missing key takes its default and an unknown key is ignored, so a field another version added or removed never
+/// makes the list unreadable.
 extension HotlistEntry {
-    private enum Keys: String, CodingKey { case kind, title, command, target, children }
+    /// The stored field names.
+    private enum Keys: String, CodingKey {
+        case kind = "kind"
+        case title = "title"
+        case command = "command"
+        case target = "target"
+        case children = "children"
+    }
 
+    /// Reads a stored entry; a missing field takes its default, a submenu keeps the children it can read.
+    ///
+    /// Throws only when the stored value is not an object or a field holds the wrong type.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: Keys.self)
         kind = try container.decodeIfPresent(Kind.self, forKey: .kind) ?? .item
@@ -77,9 +63,19 @@ extension HotlistEntry {
     }
 }
 
+/// Reading a stored hotlist leniently, as `HotlistEntry` does.
 extension Hotlist {
-    private enum Keys: String, CodingKey { case entries, hideCharacter, hidesMarked }
+    /// The stored field names.
+    private enum Keys: String, CodingKey {
+        case entries = "entries"
+        case hideCharacter = "hideCharacter"
+        case hidesMarked = "hidesMarked"
+    }
 
+    /// Reads a stored hotlist, keeping the entries it can read and at most `limit` of them.
+    ///
+    /// What is left out or cut off is counted in the running `DecodeReport`. Throws only when the stored value is
+    /// not an object or a field holds the wrong type.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: Keys.self)
         entries = try container.decodeIfPresent(LenientElements<HotlistEntry>.self, forKey: .entries)?.elements ?? []
@@ -89,6 +85,6 @@ extension Hotlist {
         // edited by hand or imported); what is cut off is counted, so the user is told.
         var room = Self.limit
         let cut = Self.trimmed(&entries, room: &room)
-        (decoder.userInfo[DecodeReport.key] as? DecodeReport)?.skipped += cut
+        DecodeReport.current?.skipped += cut
     }
 }
