@@ -7,15 +7,15 @@ public enum Controls {
     /// The key codes of the named keys the tests press.
     public enum Code {
         /// F2.
-        public static let f2: UInt16 = 120
+        public static let functionKey2: UInt16 = 120
         /// F3.
-        public static let f3: UInt16 = 99
+        public static let functionKey3: UInt16 = 99
         /// F4.
-        public static let f4: UInt16 = 118
+        public static let functionKey4: UInt16 = 118
         /// F5.
-        public static let f5: UInt16 = 96
+        public static let functionKey5: UInt16 = 96
         /// F10.
-        public static let f10: UInt16 = 109
+        public static let functionKey10: UInt16 = 109
         /// Return.
         public static let returnKey: UInt16 = 36
         /// Space.
@@ -29,9 +29,9 @@ public enum Controls {
         /// Page down.
         public static let pageDown: UInt16 = 121
         /// Arrow up.
-        public static let up: UInt16 = 126
+        public static let upArrow: UInt16 = 126
         /// Arrow down.
-        public static let down: UInt16 = 125
+        public static let downArrow: UInt16 = 125
         /// A key that types a character (its code is not a named key's).
         public static let character: UInt16 = 0
     }

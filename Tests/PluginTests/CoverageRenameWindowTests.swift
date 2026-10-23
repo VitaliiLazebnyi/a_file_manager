@@ -308,9 +308,9 @@ internal final class CoverageRenameWindow {
         let table = try #require(table)
         table.selectRowIndexes([1], byExtendingSelection: false)
         let second = session.rows[1].entry.name
-        table.keyDown(with: Controls.key(Controls.Code.up, "", .shift))
+        table.keyDown(with: Controls.key(Controls.Code.upArrow, "", .shift))
         #expect(session.rows[0].entry.name == second && table.selectedRowIndexes == [0])
-        table.keyDown(with: Controls.key(Controls.Code.down, "", .shift))
+        table.keyDown(with: Controls.key(Controls.Code.downArrow, "", .shift))
         #expect(session.rows[1].entry.name == second)
         table.keyDown(with: Controls.key(Controls.Code.character, "1"))
         #expect(session.settings.firstOnly)
@@ -324,7 +324,7 @@ internal final class CoverageRenameWindow {
         table.keyDown(with: Controls.key(Controls.Code.backspace))
         #expect(session.rowCount == count - 1)
         // Other keys go to the list as usual.
-        table.keyDown(with: Controls.key(Controls.Code.down))
+        table.keyDown(with: Controls.key(Controls.Code.downArrow))
         #expect(session.rowCount == count - 1 && session.settings.firstOnly)
         // The last row taken out leaves nothing selected.
         session.remove(IndexSet(0..<(session.rowCount - 1)))
@@ -336,12 +336,12 @@ internal final class CoverageRenameWindow {
     @Test
     internal func functionKeysOfTheWindow() {
         session.settings.nameMask = "[N]2"
-        window.sendEvent(Controls.key(Controls.Code.f5))
+        window.sendEvent(Controls.key(Controls.Code.functionKey5))
         #expect(session.rows.first?.entry.name == "a2.txt" && session.settings == .unchanged)
         var clicked: [String?] = []
         controller.clickPopUp = { clicked.append($0.itemTitles.first) }
-        window.sendEvent(Controls.key(Controls.Code.f2))
-        window.sendEvent(Controls.key(Controls.Code.f10))
+        window.sendEvent(Controls.key(Controls.Code.functionKey2))
+        window.sendEvent(Controls.key(Controls.Code.functionKey10))
         #expect(clicked == ["F2 Load/save settings", "F10 Names"])
         // Any other key goes its usual way: here, into the field being edited.
         session.settings.nameMask = ""

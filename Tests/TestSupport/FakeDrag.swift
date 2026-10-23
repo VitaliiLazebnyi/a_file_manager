@@ -46,10 +46,10 @@ public final class FakeDrag: NSObject, NSDraggingInfo {
 
     /// Not used by a data source.
     public func enumerateDraggingItems(
-        options _: NSDraggingItemEnumerationOptions = [],
+        options _: NSDraggingItemEnumerationOptions,
         for _: NSView?,
         classes _: [AnyClass],
-        searchOptions _: [NSPasteboard.ReadingOptionKey: Any] = [:],
+        searchOptions _: [NSPasteboard.ReadingOptionKey: Any],
         using _: (NSDraggingItem, Int, UnsafeMutablePointer<ObjCBool>) -> Void
     ) {
         // Nothing is dragged as items.

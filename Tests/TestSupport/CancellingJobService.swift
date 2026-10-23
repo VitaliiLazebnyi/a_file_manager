@@ -108,9 +108,11 @@ public final class CancellingJobService: JobService, ShellServices {
 
     /// Runs the jobs that were held, in order.
     public func runHeld() {
-        let jobs = heldJobs
+        let waiting = heldJobs
         heldJobs = []
-        jobs.forEach { $0() }
+        for job in waiting {
+            job()
+        }
     }
 
     deinit {
