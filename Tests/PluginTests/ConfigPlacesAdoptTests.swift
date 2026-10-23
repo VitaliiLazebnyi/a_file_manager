@@ -129,15 +129,15 @@ internal struct VirtualFoldersAdoption {
         let branch = virtual.branch(of: memory.url("/F"))
         let flag = CancellationFlag()
 
-        let reader = try virtual.read(VirtualLocation.branch(of: memory.url("/F/one.txt")).url, cancellation: flag)
+        let reader = try virtual.read(VirtualLocation.branch(real: memory.url("/F/one.txt")).url, cancellation: flag)
         #expect(try reader.read(upToCount: 10) == Data("hello".utf8))
         reader.close()
-        let writer = try virtual.write(VirtualLocation.branch(of: memory.url("/F/new.txt")).url, cancellation: flag)
+        let writer = try virtual.write(VirtualLocation.branch(real: memory.url("/F/new.txt")).url, cancellation: flag)
         try writer.write(Data("abc".utf8))
         try writer.close(attributes: FileAttributes())
         #expect(memory.contents("/F/new.txt") == "abc")
         let appender = try virtual.append(
-            to: VirtualLocation.branch(of: memory.url("/F/new.txt")).url,
+            to: VirtualLocation.branch(real: memory.url("/F/new.txt")).url,
             at: 1,
             cancellation: flag
         )
@@ -148,26 +148,26 @@ internal struct VirtualFoldersAdoption {
         try virtual.commit(branch, cancellation: flag)
         #expect(memory.commits == ["/F"])
         #expect(virtual.quarantine(of: branch) == memory.quarantineValue)
-        try virtual.setQuarantine(Data("q".utf8), of: VirtualLocation.branch(of: memory.url("/F/dir")).url)
+        try virtual.setQuarantine(Data("q".utf8), of: VirtualLocation.branch(real: memory.url("/F/dir")).url)
         #expect(memory.quarantineMarks["/F/dir"] == Data("q".utf8))
 
         // Both ends are translated; the real file system gets real locations.
         try virtual.copyMetadata(
-            from: VirtualLocation.branch(of: memory.url("/F/dir")).url,
-            to: VirtualLocation.branch(of: memory.url("/G/copy")).url
+            from: VirtualLocation.branch(real: memory.url("/F/dir")).url,
+            to: VirtualLocation.branch(real: memory.url("/G/copy")).url
         )
         #expect(memory.metadataCopies.map(\.to) == ["/G/copy"] && memory.metadataCopies.first?.from.scheme == "mem")
         let list = virtual.register(files: [memory.url("/F/one.txt")], title: "Found", origin: nil)
         #expect(throws: FileSystemError.self) {
-            try virtual.copyMetadata(from: list, to: VirtualLocation.branch(of: memory.url("/G/copy")).url)
+            try virtual.copyMetadata(from: list, to: VirtualLocation.branch(real: memory.url("/G/copy")).url)
         }
 
         #expect(
-            virtual.item(at: VirtualLocation.branch(of: memory.url("/F/one.txt")).url, cancellation: flag)?.name
+            virtual.item(at: VirtualLocation.branch(real: memory.url("/F/one.txt")).url, cancellation: flag)?.name
                 == "one.txt"
         )
         flag.cancel()
-        #expect(virtual.item(at: VirtualLocation.branch(of: memory.url("/F/one.txt")).url, cancellation: flag) == nil)
+        #expect(virtual.item(at: VirtualLocation.branch(real: memory.url("/F/one.txt")).url, cancellation: flag) == nil)
         #expect(virtual.totalSize(of: branch, cancellation: CancellationFlag()) == 7)
     }
 
@@ -222,9 +222,9 @@ internal struct VirtualFoldersAdoption {
         memory.addFile("/N/" + decomposed)
         let urls = [memory.url("/N/" + composed), memory.url("/N/" + decomposed), memory.url("/N/" + composed)]
         let list = virtual.register(files: urls, title: "Twins", origin: nil)
-        #expect(virtual.entries(of: list)?.count == 2)
+        #expect(virtual.entries(of: list).count == 2)
         let picked = virtual.registerPicked(urls, in: memory.url("/N"))
-        #expect(virtual.entries(of: picked)?.count == 2)
+        #expect(virtual.entries(of: picked).count == 2)
         let shown = try virtual.list(picked, showHidden: true)
         #expect(Set(shown.map { Array($0.name.utf8) }).count == 2)
     }

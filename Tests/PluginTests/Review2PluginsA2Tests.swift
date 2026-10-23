@@ -621,8 +621,8 @@ internal struct Review2PluginsA2Lists {
         let files = [memory.url("/a"), memory.url("/b"), memory.url("/a")]
         let plain = virtual.register(files: files, title: "t", origin: nil)
         let unique = virtual.register(files: files, title: "t", origin: nil, isUnique: true)
-        #expect(virtual.entries(of: plain)?.count == 2)
-        #expect(virtual.entries(of: unique)?.count == 3)
+        #expect(virtual.entries(of: plain).count == 2)
+        #expect(virtual.entries(of: unique).count == 3)
     }
 }
 

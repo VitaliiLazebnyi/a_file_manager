@@ -34,7 +34,7 @@ internal struct CoverageVirtualWatching {
     /// be watched give no token.
     @Test
     internal func whatIsWatched() {
-        let branch = VirtualLocation.branch(of: memory.url("/A")).url
+        let branch = VirtualLocation.branch(real: memory.url("/A")).url
         let picked = virtual.registerPicked([memory.url("/A/one.txt")], in: memory.url("/A"))
         let token = virtual.watch([branch, picked, memory.url("/A")]) { _ in
             // Nothing is reported here.
@@ -82,7 +82,12 @@ internal struct CoverageVirtualWatching {
         registry.register(files)
         var shortLived: VirtualFileSystem? = VirtualFileSystem(fileSystems: registry)
         let list = shortLived?.register(files: [memory.url("/A/one.txt")], title: "Found", origin: nil)
-        var token = list.flatMap { url in shortLived?.watch([url]) { _ in /* nothing */ } }
+        var token = list.flatMap { url in
+            shortLived?
+                .watch([url]) { _ in
+                    // Only the watching itself counts here.
+                }
+        }
         weak let gone = shortLived
         shortLived = nil
         #expect(gone == nil && token != nil)
@@ -113,6 +118,6 @@ internal struct CoverageVirtualWatching {
         }
         #expect(token != nil)
         release.signal()
-        #expect(virtual.entries(of: list)?.count == urls.count)
+        #expect(virtual.entries(of: list).count == urls.count)
     }
 }
