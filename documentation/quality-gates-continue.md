@@ -154,7 +154,7 @@ merge what is finished, and restart the rest with the same section of `wave-100.
 - **Mutation, `Sources/AFMKernel/Commands` (2026-10-23, branch `mutation-commands`): gate passed, no test needed.** 25
   mutants in 4 of the 13 files (`Shortcut.swift` 7, `MenuRegistry.swift` 7, `CommandRegistry.swift` 6,
   `KeyBindings.swift` 5; the other nine files hold only declarations, a `switch` of literals and initialisers, where
-  Muter's operators find nothing): 12 relational, 4 logical, 9 removed calls; all 25 killed, none equivalent, none
+  Muter's operators find nothing): 12 relational, 3 logical, 10 removed calls; all 25 killed, none equivalent, none
   survived. Every kill was checked in the per-mutant logs: each comes from the kernel's own command, menu, key-binding
   and shortcut tests (`CommandTests`, `MenuTests`, `KeyTests`, `CoreLogTests`, `CoreKernelCoverageTests`,
   `CoreRegistryBehaviourTests`, `KernelAndPluginTests`); the fault of a command registered twice is killed by the test
@@ -169,7 +169,8 @@ merge what is finished, and restart the rest with the same section of `wave-100.
   `CovSmallArchiveTestTests/aDamagedMiddleIsFound(copied: false)` (`problems.count == 1 && ...` false after 49 s under
   load; it passes alone, and its comment says the damage's effect depends on the times in the TAR headers: a flaky test
   for the Archives owner); the second run: 394 / 3,458 / 337, all passed; Commands 100% lines, functions, regions. The
-  final mutation run was made at the branch tip, after this note.
+  final mutation run (at `4ab732a`, the commit of this note) killed the same 25 with the same tests in 444 s (18 s per
+  mutant).
 - **Waiting for the owner** (before 2026-10-21; decided since, kept for the record): atomic counters for the coverage
   run; a documented `!` for `NetStream:242/444`, `MultiRenameWindowController:785`; `AppleScript.run` (Finder automation
   prompt); the drop on the thumbnail grid (Accessibility for the UI test runner); `SystemDesktop:45`,
