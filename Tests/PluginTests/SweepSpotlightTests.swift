@@ -17,6 +17,7 @@ internal struct SweepSpotlightTests {
         let search = SpotlightSearch(
             "kMDItemFSName == \"Calculator.app\"",
             scopes: [URL(fileURLWithPath: "/System/Applications")],
+            limit: SpotlightSearch.resultLimit,
             queue: queue
         )
         var answers = 0

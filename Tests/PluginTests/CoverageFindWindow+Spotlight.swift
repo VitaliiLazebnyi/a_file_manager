@@ -122,8 +122,8 @@ extension CoverageFindWindow {
     @Test
     internal func f2TurnsTheSearchInFoundFilesOnAndOff() async {
         await search { settings in settings.searchFor = "*.txt" }
-        _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.f2))
-        _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.f2))
+        _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.functionKey2))
+        _ = window.performKeyEquivalent(with: Controls.key(Controls.Code.functionKey2))
         #expect(button("F2 Search in found files/folders")?.state == .off)
         var closed = 0
         controller.onClose = { _ in closed += 1 }

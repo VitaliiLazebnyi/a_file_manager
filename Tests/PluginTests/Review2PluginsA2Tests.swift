@@ -682,11 +682,11 @@ internal struct Review2PluginsA2Find {
 
     @Test
     internal func oneShareMountedTwiceIsOnePlace() {
-        let first = DuplicateFinder.Mount(from: "smbfs://me@server/share", on: "/Volumes/share")
-        let second = DuplicateFinder.Mount(from: "smbfs://me@server/share", on: "/Volumes/share-1")
+        let first = DuplicateFinder.Mount(source: "smbfs://me@server/share", mountPoint: "/Volumes/share")
+        let second = DuplicateFinder.Mount(source: "smbfs://me@server/share", mountPoint: "/Volumes/share-1")
         #expect(first.place(of: "/Volumes/share/docs/a.txt") == second.place(of: "/Volumes/share-1/docs/a.txt"))
         #expect(first.place(of: "/Volumes/share/docs/a.txt") != first.place(of: "/Volumes/share/docs/b.txt"))
-        let other = DuplicateFinder.Mount(from: "smbfs://me@server/other", on: "/Volumes/other")
+        let other = DuplicateFinder.Mount(source: "smbfs://me@server/other", mountPoint: "/Volumes/other")
         #expect(other.place(of: "/Volumes/other/docs/a.txt") != first.place(of: "/Volumes/share/docs/a.txt"))
     }
 }
@@ -700,17 +700,14 @@ internal struct Review2PluginsA2Rename {
         let sources = (0..<40_000).map { URL(fileURLWithPath: "/x/f\($0).txt") }
         let targets: [URL?] = (0..<40_000).map { URL(fileURLWithPath: "/x/g\($0).txt") }
         let planner = RenamePlanner()
-        #expect(planner.steps(sources: sources, targets: targets).count == 40_000)
-        #expect(planner.steps(sources: sources, targets: targets, cancelled: { true }).isEmpty)
+        let all = planner.steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { false }
+        #expect(all.count == 40_000)
+        #expect(planner.steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { true }.isEmpty)
         var calls = 0
-        let part = planner.steps(
-            sources: sources,
-            targets: targets,
-            cancelled: {
-                calls += 1
-                return calls > 2
-            }
-        )
+        let part = planner.steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) {
+            calls += 1
+            return calls > 2
+        }
         #expect(part.count < 40_000)
     }
 
@@ -718,7 +715,8 @@ internal struct Review2PluginsA2Rename {
     internal func aRingOfRenamesIsStillOpenedWithATemporaryName() {
         let sources = ["1", "2", "3"].map { URL(fileURLWithPath: "/x/\($0).txt") }
         let targets: [URL?] = ["2", "3", "1"].map { URL(fileURLWithPath: "/x/\($0).txt") }
-        let steps = RenamePlanner().steps(sources: sources, targets: targets)
+        let steps = RenamePlanner()
+            .steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { false }
         #expect(
             steps.count == 4 && steps.filter { $0.kind == .park }.count == 1
                 && steps.filter { $0.kind == .unpark }.count == 1
@@ -752,7 +750,9 @@ internal struct Review2PluginsA2Rename {
                 isFolder: false,
                 size: 1,
                 modified: Date(timeIntervalSince1970: 0),
-                directoryPath: "/d"
+                directoryPath: "/d",
+                folders: ["d"],
+                url: nil
             )
             let engine = RenameEngine(settings, context: context)
             let done = DispatchSemaphore(value: 0)
@@ -770,9 +770,9 @@ internal struct Review2PluginsA2Rename {
         let box = try Sandbox()
         let one = try box.file("one.txt")
         let other = try box.file("other.txt")
-        #expect(RenameRunner.isSameFileOnDisk(one, one) == true)
-        #expect(RenameRunner.isSameFileOnDisk(one, other) == false)
-        #expect(RenameRunner.isSameFileOnDisk(one, box.url("missing")) == nil)
+        #expect(RenameRunner.sameness(one, one) == .same)
+        #expect(RenameRunner.sameness(one, other) == .different)
+        #expect(RenameRunner.sameness(one, box.url("missing")) == .unknown)
         // A file with two names may be two files to the listing: it is left to it.
         let link = box.url("link.txt")
         #expect(
@@ -780,6 +780,6 @@ internal struct Review2PluginsA2Rename {
                 one.withUnsafeFileSystemRepresentation { source in Darwin.link(source!, target!) }
             } == 0
         )
-        #expect(RenameRunner.isSameFileOnDisk(one, link) == nil)
+        #expect(RenameRunner.sameness(one, link) == .unknown)
     }
 }

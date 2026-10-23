@@ -33,9 +33,9 @@ internal struct ToolsAdoptFindFiles {
     @Test
     internal func aFileListedBesideItsFolderIsFoundOnce() {
         var query = SearchQuery(directory: memory.url("/D"), names: "*.txt")
-        query.onlyItems = [
+        query.scope = .only([
             memory.url("/D"), memory.url("/D/top.txt"), memory.url("/D/sub/s.txt"), memory.url("/D/sub/deep/x.txt")
-        ]
+        ])
         #expect(find(query).sorted() == ["/D/sub/deep/x.txt", "/D/sub/s.txt", "/D/top.txt"])
         // With a limit a deeper file may or may not be reached from the folder; either way once.
         for depth in 0...3 {
@@ -73,7 +73,7 @@ internal struct ToolsAdoptFindFiles {
         let box = try Sandbox()
         try box.file("one/a.txt", "a")
         var query = SearchQuery(directory: box.url("one"), names: "*.txt")
-        query.onlyItems = [box.url("one"), box.url("one/a.txt")]
+        query.scope = .only([box.url("one"), box.url("one/a.txt")])
         #expect(find(query).count == 1)
     }
 
