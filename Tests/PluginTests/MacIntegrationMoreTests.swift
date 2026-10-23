@@ -15,17 +15,25 @@ import Testing
 /// Nothing is started and no system panel is shown.
 @MainActor
 @Suite
-internal struct MacIntegrationMore {
+internal struct MacIntegrationMoreTests {
+    /// The folder on disk: `A` with `notes.txt`, `photo.png` and `sub`, and an empty `B`.
     internal let box: Sandbox
     private let scratch = ScratchPasteboard()
+    /// The pasteboard the plugin copies to, the test's own.
     internal var pasteboard: NSPasteboard { scratch.pasteboard }
+    /// The plugin, which starts nothing and records what it would have opened.
     internal let mac: MacIntegrationPlugin
+    /// A file system that is not local, with `/M/remote.txt`.
     internal let memory = MemoryFileSystem()
+    /// The kernel with navigation, selection and the plugin; `A` on the left, `B` on the right.
     internal let bench: TestBench
 
+    /// The kernel's commands.
     internal var commands: CommandRegistry { bench.commands }
-    internal var ui: ScriptedInteraction { bench.interaction }
+    /// The scripted answers to the plugin's questions, and the log of them.
+    internal var interaction: ScriptedInteraction { bench.interaction }
 
+    /// Makes the folders and starts the kernel; text files open with two applications, others with none.
     internal init() throws {
         box = try Sandbox()
         try box.file("A/notes.txt", "hello")
@@ -36,8 +44,8 @@ internal struct MacIntegrationMore {
         let apps = [
             URL(fileURLWithPath: "/Applications/First Editor.app"), URL(fileURLWithPath: "/Applications/Second.app")
         ]
-        mac = MacIntegrationPlugin(launchesApplications: false, pasteboard: scratch.pasteboard) {
-            $0.pathExtension == "txt" ? apps : []
+        mac = MacIntegrationPlugin(launchesApplications: false, pasteboard: scratch.pasteboard) { file in
+            file.pathExtension == "txt" ? apps : []
         }
         bench = TestBench(
             plugins: [NavigationPlugin(), SelectionPlugin(), mac],
@@ -47,8 +55,11 @@ internal struct MacIntegrationMore {
         )
     }
 
+    /// The path of an item of `A`.
     internal func path(_ name: String) -> String { box.url("A/" + name).path }
 
+    /// F4 opens the file under the cursor with the editor the preference names; folders and
+    /// files that are not local are not edited.
     @Test
     internal func f4UsesTheEditorOfThePreferences() {
         let page = bench.kernel.preferences.pages.first { $0.title == "Edit (F4)" }
@@ -79,6 +90,7 @@ internal struct MacIntegrationMore {
         )
     }
 
+    /// The editor preference is a name, a path or a bundle identifier; what cannot be found is TextEdit.
     @Test
     internal func theEditorPreferenceNamesAnApplication() {
         let textEdit = "/System/Applications/TextEdit.app"
@@ -92,15 +104,30 @@ internal struct MacIntegrationMore {
         #expect(MacIntegrationPlugin.editorApplication(named: "").path == textEdit)
         #expect(MacIntegrationPlugin.editorApplication(named: "/nowhere/Missing.app").path == textEdit)
         #expect(MacIntegrationPlugin.editorApplication(named: "No Such Editor 12345").path == textEdit)
+        #expect(MacIntegrationPlugin.editorApplication(named: "~/No Such Folder 12345/Missing.app").path == textEdit)
     }
 
+    /// A leading `~` stands for the user's home folder and `~name` for that user's, as in the
+    /// shell; a user who does not exist leaves the path as it is.
+    @Test
+    internal func aTildeIsAHomeFolder() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        #expect(MacIntegrationPlugin.expandingTilde(in: "~/Editors/A.app") == home + "/Editors/A.app")
+        #expect(MacIntegrationPlugin.expandingTilde(in: "~") == home)
+        #expect(MacIntegrationPlugin.expandingTilde(in: "~root/A.app") == "/var/root/A.app")
+        #expect(MacIntegrationPlugin.expandingTilde(in: "~nosuchuser12345/A.app") == "~nosuchuser12345/A.app")
+        #expect(MacIntegrationPlugin.expandingTilde(in: "/Applications/A.app") == "/Applications/A.app")
+    }
+
+    /// Open With lists the applications that open the file, the default first, and opens the
+    /// one picked; Enter and Open with Default Application go to the default one.
     @Test
     internal func openWithOffersTheApplicationsForTheFile() {
         bench.left.moveCursor(toName: "notes.txt")
-        ui.formAnswers = [.values(["row": .index(1)]), .cancel, .values(["row": .index(2)])]
+        interaction.formAnswers = [.values(["row": .index(1)]), .cancel, .values(["row": .index(2)])]
         commands.perform(MacIntegrationPlugin.openWith)
-        #expect(ui.forms.count == 1)
-        if case .list(let rows, let selected)? = ui.forms.first?.first?.kind {
+        #expect(interaction.forms.count == 1)
+        if case .list(let rows, let selected)? = interaction.forms.first?.first?.kind {
             #expect(rows == ["First Editor (default)", "Second", "Other…"] && selected == 0)
         } else {
             Issue.record("Open With shows no list")
@@ -120,6 +147,8 @@ internal struct MacIntegrationMore {
         )
     }
 
+    /// Quick Look, Share and Copy as Pathname act on the marked items, or the one under the cursor,
+    /// and Copy as Pathname on the folder itself without either.
     @Test
     internal func quickLookShareAndPathnameTakeTheOperands() {
         bench.left.moveCursor(toName: "photo.png")
@@ -147,11 +176,13 @@ internal struct MacIntegrationMore {
         #expect(
             pasteboard.string(forType: .string) == box.url("B").path && !commands.isEnabled(MacIntegrationPlugin.share)
         )
-        let context = bench.kernel.menus.contextMenu(onItem: true).compactMap { $0 }
+        let context = bench.kernel.menus.contextMenu(onItem: true).compactMap(\.self)
         #expect(context.contains(MacIntegrationPlugin.openWith) && context.contains(MacIntegrationPlugin.editTags))
         #expect(!bench.kernel.menus.contextMenu(onItem: false).contains(MacIntegrationPlugin.share))
     }
 
+    /// Finder tags are typed separated by commas; the dialog proposes the file's tags, Cancel
+    /// keeps them and an empty line removes them.
     @Test
     internal func finderTagsAreReadEditedAndWritten() {
         #expect(
@@ -159,24 +190,24 @@ internal struct MacIntegrationMore {
                 && MacIntegrationPlugin.tags(from: " ").isEmpty
         )
         bench.left.moveCursor(toName: "notes.txt")
-        ui.promptAnswers = [.text("Work, Red"), .cancel, .text("")]
+        interaction.promptAnswers = [.text("Work, Red"), .cancel, .text("")]
         commands.perform(MacIntegrationPlugin.editTags)
         #expect(MacIntegrationPlugin.tags(of: box.url("A/notes.txt")) == ["Work", "Red"])
         #expect(
-            ui.log == ["prompt: Finder tags of “notes.txt”: []"]
+            interaction.log == ["prompt: Finder tags of “notes.txt”: []"]
                 && mac.log == ["tags " + path("notes.txt") + ": Work, Red"]
         )
         #expect(bench.jobService.titles == ["Reading tags", "Setting tags"])
         // The dialog proposes the tags the file has; Cancel keeps them, an empty line removes them.
         commands.perform(MacIntegrationPlugin.editTags)
         #expect(
-            ui.log.last == "prompt: Finder tags of “notes.txt”: [Work, Red]"
+            interaction.log.last == "prompt: Finder tags of “notes.txt”: [Work, Red]"
                 && MacIntegrationPlugin.tags(of: box.url("A/notes.txt")).count == 2
         )
         commands.perform(.selectAll)
         commands.perform(MacIntegrationPlugin.editTags)
         #expect(
-            ui.log.last == "prompt: Finder tags of 3 items: []"
+            interaction.log.last == "prompt: Finder tags of 3 items: []"
                 && MacIntegrationPlugin.tags(of: box.url("A/notes.txt")).isEmpty
         )
     }

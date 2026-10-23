@@ -12,6 +12,7 @@ import AppKit
 /// load of the item before when the cursor moves on.
 @MainActor
 internal final class QuickViewPanel {
+    /// The embedded Lister pane below the bar.
     internal let pane: ViewerPane
     /// The panel whose list is covered.
     internal private(set) weak var covered: any PanelHandle?
@@ -28,6 +29,10 @@ internal final class QuickViewPanel {
     /// The item that is shown, as the followed panel lists it.
     internal private(set) var shownItem: FileItem?
 
+    /// Puts the panel over the list of `covered` and shows what the cursor of `followed` is on,
+    /// `delay` seconds after it moved; `onDismiss` runs when the quick view should end.
+    ///
+    /// `internalOnly` shows every file as text (`cm_ListInternalOnly`).
     internal init(
         kernel: Kernel,
         settings: ListerSettings,
@@ -54,9 +59,12 @@ internal final class QuickViewPanel {
             }
             headerText = title
         }
-        follower = CursorFollower(kernel: kernel, delay: delay, panel: { [weak self] in self?.followed }) {
-            [weak self] in self?.show($0)
-        }
+        follower = CursorFollower(
+            kernel: kernel,
+            delay: delay,
+            panel: { [weak self] in self?.followed },
+            show: { [weak self] item in self?.show(item) }
+        )
         subscription = kernel.panelEvents.subscribe { [weak self] event, panel in
             guard let self, panel === self.covered else {
                 return
@@ -115,5 +123,9 @@ internal final class QuickViewPanel {
         // The keyboard goes back to the list that was followed.
         if pane.hasKeyboard { followed?.focus() }
         if host?.overlay === container { host?.overlay = nil }
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

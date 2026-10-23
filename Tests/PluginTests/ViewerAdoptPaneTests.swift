@@ -11,11 +11,15 @@ import Testing
 /// out again.
 @MainActor
 @Suite(.serialized)
-internal struct ViewerAdoptPane {
+internal struct ViewerAdoptPaneTests {
+    /// The file system the files are read from; it can stall reads or pass for a remote one.
     internal let memory = MemoryFileSystem()
+    /// The viewer, with a short quick view delay and no windows put on the screen.
     internal let plugin: ViewerPlugin
+    /// The program around the viewer, its two panels on the memory file system.
     internal let bench: TestBench
 
+    /// Sets up the viewer over the memory file system, with one small text file in the left folder.
     internal init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
@@ -24,9 +28,12 @@ internal struct ViewerAdoptPane {
         memory.addFile("/A/small.txt", "small file\nsecond line")
     }
 
+    /// Waits until the condition holds or the tests' ceiling has passed, sleeping in between.
+    ///
+    /// Returns whether the condition holds at the end.
     @discardableResult
-    internal func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
-        let deadline = Date().addingTimeInterval(seconds)
+    private func wait(until condition: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(Wait.ceiling)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
         }
@@ -43,6 +50,7 @@ internal struct ViewerAdoptPane {
         return await wait { done.value }
     }
 
+    /// Closing the pane interrupts a read that waits for a stalled server, and nothing is shown.
     @Test
     internal func closingThePaneEndsAReadThatWaitsForTheServer() async throws {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
@@ -58,6 +66,7 @@ internal struct ViewerAdoptPane {
         #expect(pane.loaded == nil)
     }
 
+    /// In the quick view, the next file (or none) drops the one still being read, and its work ends.
     @Test
     internal func switchingFilesInTheQuickViewDropsTheFileThatIsStillBeingRead() async {
         memory.addFile("/A/slow.txt", String(repeating: "a slow line\n", count: 20_000))
@@ -84,6 +93,8 @@ internal struct ViewerAdoptPane {
         pane.stopWork()
     }
 
+    /// A big text of a remote file system is cached on disk, a new layout reuses its segments, and
+    /// closing the pane frees the cache.
     @Test
     internal func aBigTextOfASlowFileSystemIsKeptOnDiskForTheNextLayout() async throws {
         // Above what is kept in memory (the pane's blocks are made small for the test, 1 MB in

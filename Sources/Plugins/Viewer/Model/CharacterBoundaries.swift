@@ -22,6 +22,9 @@ internal final class CharacterBoundaries: @unchecked Sendable {
     /// is kept.
     internal static let keptLimit = 1 << 16
 
+    /// The spacing of the kept boundaries the viewer uses: one per 16 KB.
+    internal static let standardSpacing = 16 << 10
+
     private let source: any ByteSource
     private let content: Range<Int64>
     private let table: CodeTable
@@ -38,7 +41,9 @@ internal final class CharacterBoundaries: @unchecked Sendable {
         return known.count
     }
 
-    internal init(source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, spacing: Int = 16 << 10) {
+    /// Boundaries of the text in `content` of `source`, in `encoding`, one kept per `spacing` bytes
+    /// (at least 16); nothing is read before the first question.
+    internal init(source: any ByteSource, content: Range<Int64>, encoding: ViewerEncoding, spacing: Int) {
         self.source = source
         self.content = content
         table = CodeTable.table(for: encoding)
@@ -77,20 +82,20 @@ internal final class CharacterBoundaries: @unchecked Sendable {
     /// character begins there.
     ///
     /// Reads at most one block, plus what finding the block's boundary needs the first time.
-    internal func characterStart(atOrBefore offset: Int64, cancellation: CancellationFlag? = nil) throws -> Int64 {
-        let offset = min(max(offset, content.lowerBound), content.upperBound)
-        let block = (offset - content.lowerBound) / spacing
+    internal func characterStart(atOrBefore offset: Int64, cancellation: CancellationFlag?) throws -> Int64 {
+        let inside = min(max(offset, content.lowerBound), content.upperBound)
+        let block = (inside - content.lowerBound) / spacing
         let from = try boundary(ofBlock: block, cancellation)
-        guard offset > from else {
+        guard inside > from else {
             return from
         }
         let data = try read(
             at: from,
-            count: Int(offset - from) + table.longestCharacter,
-            needed: Int(offset - from),
+            count: Int(inside - from) + table.longestCharacter,
+            needed: Int(inside - from),
             cancellation
         )
-        return from + Int64(walk(data, from: 0, whileAtOrBefore: Int(offset - from)))
+        return from + Int64(walk(data, from: 0, whileAtOrBefore: Int(inside - from)))
     }
 
     /// Counts characters off from index `from` of `data` (a boundary) and returns the index of
@@ -102,13 +107,13 @@ internal final class CharacterBoundaries: @unchecked Sendable {
     private func walk(_ data: Data, from: Int, whileAtOrBefore limit: Int) -> Int {
         var index = from
         // Never past the bytes there are, whatever was asked for.
-        let limit = min(limit, data.count)
+        let end = min(limit, data.count)
         data.withUnsafeBytes { raw in
             let bytes = raw.bindMemory(to: UInt8.self)
-            while index < limit {
+            while index < end {
                 // Too few bytes to tell (the end of the file): the first byte is a stray one.
                 let next = index + max(1, table.characterLength(bytes, at: index))
-                if next > limit { break }
+                if next > end { break }
                 index = next
             }
         }
@@ -182,5 +187,9 @@ internal final class CharacterBoundaries: @unchecked Sendable {
             cancellation
         )
         return from + Int64(walk(data, from: 0, whileAtOrBefore: Int(target - from)))
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

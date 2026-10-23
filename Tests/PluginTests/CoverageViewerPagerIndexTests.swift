@@ -15,7 +15,13 @@ internal struct CoverageViewerPagerIndexTests {
     private static let rowLength = Int64(Self.lines.utf8.count / 60)
 
     private static func document(_ source: any ByteSource, reusing previous: TextDocument?) -> TextDocument {
-        TextDocument(source: source, encoding: .utf8, layout: CoverageViewerPagerBench.wrapped, reusing: previous)
+        TextDocument(
+            source: source,
+            encoding: .utf8,
+            bomLength: 0,
+            layout: CoverageViewerPagerBench.wrapped,
+            reusing: previous
+        )
     }
 
     /// Holds the calling thread until `semaphore` is signalled.
@@ -33,10 +39,14 @@ internal struct CoverageViewerPagerIndexTests {
         let release = DispatchSemaphore(value: 0)
         let started = DispatchSemaphore(value: 0)
         let flag = CancellationFlag()
-        gate.submit(cancellation: flag) {
-            started.signal()
-            _ = release.wait(timeout: .now() + Wait.ceiling)
-        }
+        gate.submit(
+            cancellation: flag,
+            refused: { Issue.record("The job was refused") },
+            {
+                started.signal()
+                _ = release.wait(timeout: .now() + Wait.ceiling)
+            }
+        )
         Self.block(until: started)
         flag.cancel()
         bench.pager.indexGate = gate
@@ -66,14 +76,14 @@ internal struct CoverageViewerPagerIndexTests {
         #expect(await bench.wait { pager.position?.offset == 1 })
         // The cursor is found again in the new layout.
         let second = Self.document(source, reusing: first)
-        pager.show(second, at: pager.topOffset, keepingSelection: true, parallel: false)
+        pager.show(second, at: pager.topOffset, select: nil, keepingSelection: true, parallel: false)
         #expect(await bench.wait { pager.document === second && pager.position?.offset == 1 })
         // A place the view is on its way to is carried over; the old look-up comes back too late.
         source.hold()
         pager.reveal(offset: 30 * Self.rowLength)
         #expect(await bench.wait { source.waitingReads == 1 })
         let third = Self.document(source, reusing: second)
-        pager.show(third, at: pager.topOffset, keepingSelection: true, parallel: false)
+        pager.show(third, at: pager.topOffset, select: nil, keepingSelection: true, parallel: false)
         #expect(await bench.wait { pager.document === third })
         source.release()
         #expect(await bench.wait { pager.position?.offset == 30 * Self.rowLength })
@@ -81,12 +91,12 @@ internal struct CoverageViewerPagerIndexTests {
         pager.scroll(toLine: 40)
         #expect(await bench.wait { pager.position?.line == 40 })
         let fourth = Self.document(source, reusing: third)
-        pager.show(fourth, at: pager.topOffset, keepingSelection: true, parallel: false)
+        pager.show(fourth, at: pager.topOffset, select: nil, keepingSelection: true, parallel: false)
         #expect(await bench.wait { pager.document === fourth && pager.position?.line == 40 })
         // A found text is shown selected, a few rows below the top.
         let fifth = Self.document(source, reusing: fourth)
         let found = 50 * Self.rowLength..<50 * Self.rowLength + 4
-        pager.show(fifth, at: found.lowerBound, select: found, parallel: false)
+        pager.show(fifth, at: found.lowerBound, select: found, keepingSelection: false, parallel: false)
         #expect(await bench.wait { pager.document === fifth && pager.selection == found })
     }
 
@@ -105,13 +115,13 @@ internal struct CoverageViewerPagerIndexTests {
         #expect(await bench.wait { pager.position?.offset == 29 * Self.rowLength + 1 })
         source.fail(true)
         let second = Self.document(source, reusing: first)
-        pager.show(second, at: pager.topOffset, keepingSelection: true, parallel: false)
+        pager.show(second, at: pager.topOffset, select: nil, keepingSelection: true, parallel: false)
         #expect(await bench.wait { pager.document === second && second.readError != nil })
         source.fail(false)
         // The text is dropped while the cursor is looked for.
         source.hold()
         let third = Self.document(source, reusing: first)
-        pager.show(third, at: 0, keepingSelection: true, parallel: false)
+        pager.show(third, at: 0, select: nil, keepingSelection: true, parallel: false)
         #expect(await bench.wait { pager.document === third })
         pager.clear()
         source.release()

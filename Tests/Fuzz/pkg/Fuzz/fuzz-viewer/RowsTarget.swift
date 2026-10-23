@@ -68,16 +68,16 @@ internal enum RowsTarget {
         for _ in 0..<min(24, input.probes) {
             checkLookup(document, rows, lines: lines, input, probe: &probe)
         }
-        _ = try? document.row(containing: -5)
-        _ = try? document.row(containing: Int64.max)
-        _ = try? document.row(ofLine: 0)
-        _ = try? document.row(ofLine: Int.max)
-        _ = try? document.rows(from: rows.count, count: 3)
-        _ = try? document.rows(from: max(0, rows.count - 1), count: Int.max)
+        _ = try? document.row(containing: -5, cancellation: nil)
+        _ = try? document.row(containing: Int64.max, cancellation: nil)
+        _ = try? document.row(ofLine: 0, cancellation: nil)
+        _ = try? document.row(ofLine: Int.max, cancellation: nil)
+        _ = try? document.rows(from: rows.count, count: 3, cancellation: nil)
+        _ = try? document.rows(from: max(0, rows.count - 1), count: Int.max, cancellation: nil)
         checkReuse(document, input)
         checkByteLayouts(input, probe: &probe)
         if input.data.count > 2 {
-            _ = try? document.text(in: 1..<Int64(input.data.count - 1))
+            _ = try? document.text(in: 1..<Int64(input.data.count - 1), cancellation: nil)
         }
     }
 
@@ -88,7 +88,7 @@ internal enum RowsTarget {
         let count = document.rowCount
         var first = 0
         while first < count {
-            let rows = (try? document.rows(from: first, count: 97)) ?? []
+            let rows = (try? document.rows(from: first, count: 97, cancellation: nil)) ?? []
             fzCheck(!rows.isEmpty, "rows-missing", "\(what): no rows from \(first) of \(count)")
             for (index, row) in rows.enumerated() {
                 fzCheck(row.index == first + index, "rows-index", "\(what): \(row.index) at \(first + index)")
@@ -112,9 +112,15 @@ internal enum RowsTarget {
             source: input.source,
             encoding: input.encoding,
             bomLength: input.bom,
-            layout: .text(input.options)
+            layout: .text(input.options),
+            reusing: nil
         )
-        document.buildIndex(parallel: parallel, segmentSize: segment, chunkSize: chunk, rawScan: raw)
+        document.buildIndex(
+            parallel: parallel,
+            scanning: TextRowIndex.ScanOptions(segmentSize: segment, chunkSize: chunk, rawScan: raw)
+        ) {
+            // No progress is wanted.
+        }
         fzCheck(document.isIndexComplete, "rows-index-incomplete", input.what)
         fzCheck(document.readError == nil, "rows-read-error", input.what)
         return (document, allRows(document, input.what))

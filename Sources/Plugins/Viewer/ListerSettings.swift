@@ -1,57 +1,6 @@
 import AFMKernel
 import Foundation
 
-/// The display modes of the Options menu, numbered as their keys (spec 10 › Mode list).
-internal enum ViewMode: Int, CaseIterable {
-    case text = 1
-    case binary, hex, media, html, unicode, utf8, preview
-
-    internal var title: String {
-        switch self {
-        case .text:
-            return "Text only"
-
-        case .binary:
-            return "Binary (fixed line length)"
-
-        case .hex:
-            return "Hex"
-
-        case .media:
-            return "Image/Multimedia"
-
-        case .html:
-            return "HTML text (strip tags)"
-
-        case .unicode:
-            return "Unicode"
-
-        case .utf8:
-            return "UTF-8"
-
-        // The Mac's counterpart of the Explorer preview and of Lister plugins.
-        case .preview:
-            return "Quick Look Preview"
-        }
-    }
-
-    /// The modes that show rows of text in the pager.
-    internal var isTextual: Bool { self != .media && self != .preview }
-}
-
-/// The three fonts of the Options menu (spec 10 › Font slots): each stands for a font and,
-/// unless the Encoding menu says otherwise, a character set.
-internal enum FontSlot: Int {
-    case ansi, ascii, variable
-
-    internal var encoding: ViewerEncoding { self == .ascii ? .dos : .ansi }
-}
-
-/// How an image is fitted to the window (the specification's `ShrinkBitmap`).
-internal enum ImageFit: Int {
-    case none, window, largerOnly
-}
-
 /// The Lister's options: those of Configure Lister (spec 10 › Configure Lister) and those the
 /// viewer remembers by itself (wrap, text cursor, fonts, window size).
 ///
@@ -74,6 +23,7 @@ internal final class ListerSettings {
         static let margins = "viewer.printMargins"
     }
 
+    /// The extensions Quick Look shows at startup until the user changes the list: office, iWork, e-book and 3D files.
     internal static let defaultQuickLookTypes =
         "doc docx xls xlsx ppt pptx pages numbers key odt ods odp epub svg eps ai usdz stl obj dae gltf"
 
@@ -136,49 +86,66 @@ internal final class ListerSettings {
     internal var startupFont: Int { store.index(Key.startupFont, default: 0) }
     /// Characters per row of wrapped text; 0 wraps at the edge of the window.
     internal var textWidth: Int { number(Key.textWidth, default: 0, in: 0...16_384) }
+    /// Characters per row in Binary mode, 8 to 1024 (75 unless set).
     internal var binaryWidth: Int { number(Key.binaryWidth, default: 75, in: 8...1_024) }
+    /// The columns between tab stops, 1 to 64 (8 unless set).
     internal var tabWidth: Int { number(Key.tabWidth, default: 8, in: 1...64) }
     /// Where a row is cut when text is not wrapped.
     internal var unwrapWidth: Int { number(Key.unwrapWidth, default: 1_024, in: 80...16_384) }
+    /// How many rows above a search result stay in view when the viewer scrolls to it, 0 to 50.
     internal var searchGoBack: Int { number(Key.searchGoBack, default: 3, in: 0...50) }
+    /// Whether images and PDF open as graphics rather than as text.
     internal var loadsGraphics: Bool { store.flag(Key.graphics, default: true) }
+    /// Whether audio and video open in the player rather than as text.
     internal var playsMultimedia: Bool { store.flag(Key.multimedia, default: true) }
+    /// Whether RTF files are shown formatted rather than as their source.
     internal var showsRTF: Bool { store.flag(Key.rtf, default: true) }
+    /// Whether HTML opens as text with links rather than as a web page.
     internal var showsHTMLAsText: Bool { store.flag(Key.htmlAsText, default: true) }
+    /// Whether the links of HTML shown as text are put in `{ }`.
     internal var linkBraces: Bool { store.flag(Key.linkBraces, default: true) }
+    /// Whether the viewer offers Quick Look previews at all.
     internal var usesQuickLook: Bool { store.flag(Key.quickLook, default: true) }
+    /// The extensions (lowercase, without the dot) that open in the Quick Look preview.
     internal var quickLookTypes: Set<String> {
         ViewerDetection.extensions(in: store.text(Key.quickLookTypes, default: Self.defaultQuickLookTypes))
     }
+    /// Further extensions that open in the media view, besides those the system knows as audio or video.
     internal var additionalMediaTypes: Set<String> {
         ViewerDetection.extensions(in: store.text(Key.mediaTypes, default: ""))
     }
+    /// Extensions that never open as image or multimedia, whatever their content.
     internal var noMediaTypes: Set<String> { ViewerDetection.extensions(in: store.text(Key.noMediaTypes, default: "")) }
+    /// The shortest delay between the frames of an animated GIF, in seconds (0.01 to 5).
     internal var gifMinimumDelay: Double { Double(number(Key.gifDelay, default: 80, in: 10...5_000)) / 1_000 }
 
     // MARK: Remembered by the viewer
 
+    /// Whether long lines of text wrap at the window's edge (or the text width).
     internal var wrap: Bool {
         get { store.flag(Key.wrap, default: true) }
         set { store.set(newValue, forKey: Key.wrap) }
     }
 
+    /// Whether the text cursor is shown and moved by the arrow keys.
     internal var caret: Bool {
         get { store.flag(Key.caret, default: true) }
         set { store.set(newValue, forKey: Key.caret) }
     }
 
+    /// How images are fitted to the window; an unknown stored value reads as actual size.
     internal var imageFit: ImageFit {
-        get { ImageFit(rawValue: store.index(Key.fit, default: 0)) ?? .none }
+        get { ImageFit(rawValue: store.index(Key.fit, default: 0)) ?? .actualSize }
         set { store.set(newValue.rawValue, forKey: Key.fit) }
     }
 
+    /// Whether an image is centred in the window rather than drawn from its top left corner.
     internal var centersImages: Bool {
         get { store.flag(Key.center, default: false) }
         set { store.set(newValue, forKey: Key.center) }
     }
 
-    /// 0…1.
+    /// The volume of the media player, 0…1.
     internal var playerVolume: Float {
         get { min(1, max(0, store.value(Float.self, forKey: Key.volume) ?? 1)) }
         set { store.set(min(1, max(0, newValue)), forKey: Key.volume) }
@@ -190,6 +157,7 @@ internal final class ListerSettings {
         set { store.set(Array(newValue.prefix(20)), forKey: Key.searchHistory) }
     }
 
+    /// The options of the last search (whole words, case, direction, hex, regular expression), offered by the next one.
     internal var searchOptions: SearchOptions {
         get { store.value(SearchOptions.self, forKey: Key.searchOptions) ?? SearchOptions() }
         set { store.set(newValue, forKey: Key.searchOptions) }
@@ -201,12 +169,13 @@ internal final class ListerSettings {
         set { store.set(newValue, forKey: Key.userEncodings) }
     }
 
-    /// Left, right, top and bottom print margins in points; nil until Page Setup stored some.
-    internal var printMargins: [Double]? {
-        get { store.value([Double].self, forKey: Key.margins) }
+    /// Left, right, top and bottom print margins in points; empty until Page Setup stored some.
+    internal var printMargins: [Double] {
+        get { store.value([Double].self, forKey: Key.margins) ?? [] }
         set { store.set(newValue, forKey: Key.margins) }
     }
 
+    /// Reads and writes the options in `store`.
     internal init(_ store: any SettingsStore) {
         self.store = store
     }
@@ -214,6 +183,27 @@ internal final class ListerSettings {
     /// The page of the configuration dialog; `onChange` runs after the user changed something.
     internal static func preferencePage(onChange: @escaping @MainActor @Sendable () -> Void) -> PreferencePage {
         PreferencePage(title: "Lister", preferences: preferences, onChange: onChange)
+    }
+
+    /// The options of Configure Lister as the fields of its dialog, each with its value in `store`.
+    internal static func formFields(in store: any SettingsStore) -> [FormField] {
+        preferences.map { preference -> FormField in
+            switch preference.kind {
+            case .flag(let value):
+                return .checkbox(preference.key, preference.label, store.flag(preference.key, default: value))
+
+            case .choice(let options, let value):
+                return .choice(
+                    preference.key,
+                    preference.label,
+                    options,
+                    selected: store.index(preference.key, default: value)
+                )
+
+            case .text(let value):
+                return .text(preference.key, preference.label, store.text(preference.key, default: value))
+            }
+        }
     }
 
     private func number(_ key: String, default value: Int, in range: ClosedRange<Int>) -> Int {
@@ -239,7 +229,13 @@ internal final class ListerSettings {
     internal func windowFrame(quick: Bool) -> String? {
         store.value(String.self, forKey: quick ? Key.quickFrame : Key.frame)
     }
+
+    /// Stores the frame of the Lister window (`quick`: of the separate quick view), as `windowFrame(quick:)` reads it.
     internal func setWindowFrame(_ frame: String, quick: Bool) {
         store.set(frame, forKey: quick ? Key.quickFrame : Key.frame)
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

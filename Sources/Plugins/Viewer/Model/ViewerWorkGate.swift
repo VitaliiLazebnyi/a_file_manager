@@ -31,7 +31,9 @@ internal final class ViewerWorkGate: @unchecked Sendable {
         stuck: 8
     )
 
+    /// How many jobs that nobody has cancelled may run at once (at least 1).
     internal let live: Int
+    /// How many threads cancelled jobs may hold before new jobs are refused (at least 1).
     internal let stuck: Int
     private let lock = NSLock()
     private var waiting: [Waiting] = []
@@ -52,6 +54,7 @@ internal final class ViewerWorkGate: @unchecked Sendable {
         return waiting.filter { !$0.flag.isCancelled }.count
     }
 
+    /// A gate with the given limits; a limit below 1 counts as 1.
     internal init(live: Int, stuck: Int) {
         self.live = max(1, live)
         self.stuck = max(1, stuck)
@@ -64,7 +67,7 @@ internal final class ViewerWorkGate: @unchecked Sendable {
     /// Any thread.
     internal func submit(
         cancellation flag: CancellationFlag,
-        refused: @Sendable () -> Void = {},
+        refused: @Sendable () -> Void,
         _ work: @escaping @Sendable () -> Void
     ) {
         lock.lock()
@@ -120,7 +123,9 @@ internal final class ViewerWorkGate: @unchecked Sendable {
         let token = running.removeValue(forKey: id)?.token
         let ready = takeReady()
         lock.unlock()
-        withExtendedLifetime(token) {}
+        withExtendedLifetime(token) {
+            // The cancel registration is let go only here, after the lock is released.
+        }
         start(ready)
     }
 
@@ -129,5 +134,9 @@ internal final class ViewerWorkGate: @unchecked Sendable {
         let ready = takeReady()
         lock.unlock()
         start(ready)
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

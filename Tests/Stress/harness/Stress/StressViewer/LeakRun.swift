@@ -28,9 +28,13 @@ internal final class LeakRun {
         document = TextDocument(
             source: source,
             encoding: .utf8,
-            layout: .text(TextLayoutOptions(columns: 131, wordWrap: true))
+            bomLength: 0,
+            layout: .text(TextLayoutOptions(columns: 131, wordWrap: true, tabWidth: 8)),
+            reusing: nil
         )
-        document.buildIndex(parallel: true)
+        document.buildIndex(parallel: true, scanning: .standard) {
+            // No progress is wanted.
+        }
         do {
             pattern = try SearchPattern("zzz_not_there", options: SearchOptions(), encoding: .utf8)
         } catch {
@@ -73,7 +77,7 @@ internal final class LeakRun {
     /// rows(from:count:) with and without a flag, and with one set before or during the call.
     private func measureRows() {
         measure("rows(from:count:100), no flag", count: 20_000) { random in
-            _ = try? document.rows(from: Int(random.next() % UInt64(rows)), count: 100)
+            _ = try? document.rows(from: Int(random.next() % UInt64(rows)), count: 100, cancellation: nil)
         }
         measure("rows(from:count:100), flag never set", count: 20_000) { random in
             _ = try? document.rows(
@@ -100,7 +104,7 @@ internal final class LeakRun {
     /// row(containing:), row(ofLine:) and reads of the source.
     private func measureLookups() {
         measure("row(containing:), no flag", count: 20_000) { random in
-            _ = try? document.row(containing: Int64(random.next() % UInt64(length)))
+            _ = try? document.row(containing: Int64(random.next() % UInt64(length)), cancellation: nil)
         }
         measure("row(containing:), flag never set", count: 20_000) { random in
             _ = try? document.row(containing: Int64(random.next() % UInt64(length)), cancellation: CancellationFlag())
@@ -125,14 +129,13 @@ internal final class LeakRun {
         // With one chunk at a time everything runs on the calling thread, inside this loop's autorelease pool.
         measure("ViewerSearch.find over the whole file, parallelism 1 (calling thread only)", count: 100) { _ in
             _ = try? ViewerSearch.find(
-                pattern,
-                in: source,
-                content: document.content,
-                from: 0,
-                backwards: false,
-                encoding: .utf8,
-                parallelism: 1
-            )
+                ViewerSearch.Request(pattern: pattern, start: 0, backwards: false),
+                in: ViewerSearch.Subject(source: source, content: document.content, encoding: .utf8, boundaries: nil),
+                tuning: ViewerSearch.Tuning(chunkSize: 1 << 20, parallelism: 1, rawBytes: true),
+                cancellation: CancellationFlag()
+            ) { _ in
+                // No progress is wanted.
+            }
         }
         measure("ViewerSearch.find over the whole file, flag never set", count: 100) { _ in
             searchWholeFile()
@@ -141,9 +144,13 @@ internal final class LeakRun {
             let other = TextDocument(
                 source: source,
                 encoding: .utf8,
-                layout: .text(TextLayoutOptions(columns: 40 + Int(random.next() % 100), wordWrap: true))
+                bomLength: 0,
+                layout: .text(TextLayoutOptions(columns: 40 + Int(random.next() % 100), wordWrap: true, tabWidth: 8)),
+                reusing: nil
             )
-            other.buildIndex(parallel: true)
+            other.buildIndex(parallel: true, scanning: .standard) {
+                // No progress is wanted.
+            }
         }
     }
 
@@ -166,13 +173,13 @@ internal final class LeakRun {
     /// One search for the absent text through the whole file, with every core.
     private func searchWholeFile() {
         _ = try? ViewerSearch.find(
-            pattern,
-            in: source,
-            content: document.content,
-            from: 0,
-            backwards: false,
-            encoding: .utf8
-        )
+            ViewerSearch.Request(pattern: pattern, start: 0, backwards: false),
+            in: ViewerSearch.Subject(source: source, content: document.content, encoding: .utf8, boundaries: nil),
+            tuning: .standard,
+            cancellation: CancellationFlag()
+        ) { _ in
+            // No progress is wanted.
+        }
     }
 
     /// The footprint, the heap and the threads now.

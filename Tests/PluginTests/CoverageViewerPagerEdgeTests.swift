@@ -37,7 +37,9 @@ internal struct CoverageViewerPagerEdgeTests {
         let gone = TextDocument(
             source: CoverageViewerShortSource(length: 100, available: 0),
             encoding: .utf8,
-            layout: CoverageViewerPagerBench.wrapped
+            bomLength: 0,
+            layout: CoverageViewerPagerBench.wrapped,
+            reusing: nil
         )
         pager.show(gone, parallel: false)
         #expect(await bench.wait { pager.document === gone && !pager.isIndexing })
@@ -51,7 +53,7 @@ internal struct CoverageViewerPagerEdgeTests {
         defer { bench.close() }
         let pager = bench.pager
         let long = String(repeating: "wide ", count: 100) + "\n" + Self.lines
-        let unwrapped = ViewerLayout.text(TextLayoutOptions(columns: 1_000, wordWrap: false))
+        let unwrapped = ViewerLayout.text(TextLayoutOptions(columns: 1_000, wordWrap: false, tabWidth: 8))
         #expect(await bench.show(bench.document(long, unwrapped)))
         let scrollers = try #require(Self.scrollers(pager))
         scrollers.vertical.doubleValue = 1
@@ -97,12 +99,19 @@ internal struct CoverageViewerPagerEdgeTests {
         defer { bench.close() }
         let pager = bench.pager
         let source = CoverageViewerHeldSource(Self.lines)
-        let first = TextDocument(source: source, encoding: .utf8, layout: CoverageViewerPagerBench.wrapped)
+        let first = TextDocument(
+            source: source,
+            encoding: .utf8,
+            bomLength: 0,
+            layout: CoverageViewerPagerBench.wrapped,
+            reusing: nil
+        )
         #expect(await bench.show(first))
         source.hold()
         let second = TextDocument(
             source: source,
             encoding: .utf8,
+            bomLength: 0,
             layout: CoverageViewerPagerBench.wrapped,
             reusing: first
         )
@@ -125,12 +134,19 @@ internal struct CoverageViewerPagerEdgeTests {
         defer { bench.close() }
         let pager = bench.pager
         let source = CoverageViewerHeldSource(Self.lines)
-        let first = TextDocument(source: source, encoding: .utf8, layout: CoverageViewerPagerBench.wrapped)
+        let first = TextDocument(
+            source: source,
+            encoding: .utf8,
+            bomLength: 0,
+            layout: CoverageViewerPagerBench.wrapped,
+            reusing: nil
+        )
         #expect(await bench.show(first))
         source.hold()
         let second = TextDocument(
             source: source,
             encoding: .utf8,
+            bomLength: 0,
             layout: CoverageViewerPagerBench.wrapped,
             reusing: first
         )
@@ -152,7 +168,7 @@ internal struct CoverageViewerPagerEdgeTests {
         defer { bench.close() }
         let pager = bench.pager
         #expect(await bench.show(bench.document(String(repeating: "x", count: 100), CoverageViewerPagerBench.wrapped)))
-        pager.perform(.down)
+        pager.perform(.rowDown)
         pager.perform(.rowStart)
         #expect(await bench.wait { pager.position?.offset == 40 })
         pager.perform(.left)
@@ -187,7 +203,13 @@ internal struct CoverageViewerPagerEdgeTests {
         weak var gone: TextPagerView?
         do {
             let bench = CoverageViewerPagerBench(width: 400, height: 200)
-            let first = TextDocument(source: source, encoding: .utf8, layout: CoverageViewerPagerBench.wrapped)
+            let first = TextDocument(
+                source: source,
+                encoding: .utf8,
+                bomLength: 0,
+                layout: CoverageViewerPagerBench.wrapped,
+                reusing: nil
+            )
             #expect(await bench.show(first))
             bench.pager.perform(.right)
             #expect(await bench.wait { bench.pager.position?.offset == 1 })
@@ -195,10 +217,11 @@ internal struct CoverageViewerPagerEdgeTests {
             let second = TextDocument(
                 source: source,
                 encoding: .utf8,
+                bomLength: 0,
                 layout: CoverageViewerPagerBench.wrapped,
                 reusing: first
             )
-            bench.pager.show(second, at: 0, keepingSelection: true, parallel: false)
+            bench.pager.show(second, at: 0, select: nil, keepingSelection: true, parallel: false)
             #expect(await bench.wait { source.waitingReads >= 1 })
             gone = bench.pager
             bench.window.contentView = nil

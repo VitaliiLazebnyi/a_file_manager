@@ -31,7 +31,13 @@ internal struct CovViewPagerRevealTests {
         defer { bench.close() }
         let pager = bench.pager
         let source = Self.heldText()
-        let document = TextDocument(source: source, encoding: .utf8, layout: CoverageViewerPagerBench.wrapped)
+        let document = TextDocument(
+            source: source,
+            encoding: .utf8,
+            bomLength: 0,
+            layout: CoverageViewerPagerBench.wrapped,
+            reusing: nil
+        )
         pager.show(document, parallel: false)
         #expect(await bench.wait { pager.document === document && pager.position != nil })
         #expect(!document.isIndexComplete)

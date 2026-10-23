@@ -334,7 +334,11 @@ internal struct ViewerThroughVirtualFolders {
         memory.addFile("/far/big.txt", String(repeating: "line of text\n", count: 8_000))
         let gate = DispatchSemaphore(value: 0)
         probe.onRead = { gate.signal() }
-        let source = try ProviderByteSource.open(virtual.branch(of: memory.url("/far/big.txt")), fileSystems: registry)
+        let source = try ProviderByteSource.open(
+            virtual.branch(of: memory.url("/far/big.txt")),
+            fileSystems: registry,
+            cancellation: CancellationFlag()
+        )
         memory.stallsReads = true
         let flag = CancellationFlag()
         let outcome = SharedBox<Result<Data, any Error>?>(nil)

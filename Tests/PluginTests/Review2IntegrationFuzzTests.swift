@@ -65,10 +65,20 @@ internal struct Review2IntegrationFuzz {
         let document = TextDocument(
             source: DataByteSource(data),
             encoding: .utf8,
-            layout: .text(TextLayoutOptions(columns: columns, wordWrap: false))
+            bomLength: 0,
+            layout: .text(TextLayoutOptions(columns: columns, wordWrap: false, tabWidth: 8)),
+            reusing: nil
         )
-        document.buildIndex(parallel: parallel, segmentSize: segment, chunkSize: chunk, rawScan: raw)
-        return (try document.rows(from: 0, count: max(1, document.rowCount)).map(\.range), document.lineCount)
+        document.buildIndex(
+            parallel: parallel,
+            scanning: TextRowIndex.ScanOptions(segmentSize: segment, chunkSize: chunk, rawScan: raw)
+        ) {
+            // Not watched here.
+        }
+        return (
+            try document.rows(from: 0, count: max(1, document.rowCount), cancellation: nil).map(\.range),
+            document.lineCount
+        )
     }
 
     @Test

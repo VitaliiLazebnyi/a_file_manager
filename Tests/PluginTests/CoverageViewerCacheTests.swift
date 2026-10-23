@@ -93,7 +93,7 @@ internal struct CoverageViewerCacheTests {
     /// Without a disk cache there are no bytes on disk.
     @Test
     internal func aSourceThatDoesNotSpillHasNothingOnDisk() {
-        let cached = CachedByteSource(DataByteSource(Data(count: 10)))
+        let cached = CachedByteSource(DataByteSource(Data(count: 10)), policy: .standard)
         #expect(cached.diskBytes == 0 && !cached.diskCacheIsOpen)
     }
 
@@ -102,7 +102,16 @@ internal struct CoverageViewerCacheTests {
     @Test
     internal func aWholeFileThatBecameShorterKeepsOnlyWholeBlocks() throws {
         let base = CoverageViewerShortSource(length: 1_000, available: 250)
-        let cached = CachedByteSource(base, blockSize: 100, capacity: 20, wholeFileLimit: 10_000)
+        let cached = CachedByteSource(
+            base,
+            policy: CachedByteSource.Policy(
+                blockSize: 100,
+                capacity: 20,
+                wholeFileLimit: 10_000,
+                spillsToDisk: false,
+                diskLimit: 1 << 30
+            )
+        )
         let all = try cached.read(at: 0, count: 1_000)
         #expect(all == base.read(at: 0, count: 1_000) && all.count == 250)
         // Blocks 0 and 1 are kept: read again they come from memory.
@@ -117,7 +126,16 @@ internal struct CoverageViewerCacheTests {
     @Test
     internal func aLongReadThroughTheDiskEndsWhereTheFileEnds() throws {
         let base = CoverageViewerShortSource(length: 10_000, available: 2_500)
-        let cached = CachedByteSource(base, blockSize: 1_000, capacity: 2, spillsToDisk: true)
+        let cached = CachedByteSource(
+            base,
+            policy: CachedByteSource.Policy(
+                blockSize: 1_000,
+                capacity: 2,
+                wholeFileLimit: 0,
+                spillsToDisk: true,
+                diskLimit: 1 << 30
+            )
+        )
         defer { cached.close() }
         let data = try cached.read(at: 0, count: 8_000)
         #expect(data == base.read(at: 0, count: 2_500))

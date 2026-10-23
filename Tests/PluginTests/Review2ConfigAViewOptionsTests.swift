@@ -13,37 +13,56 @@ import Testing
 /// The test says when the background work and its return happen.
 @MainActor
 @Suite
-internal struct Review2ConfigAViewOptions {
+internal struct Review2ConfigAViewOptionsTests {
     /// Holds what the plugin hands to the background and back, until the test runs it.
     ///
     /// Unchecked: used on the main thread only; the plugin hands its steps over there and the test
     /// runs them there.
     internal final class Steps: @unchecked Sendable {
+        /// The work handed to the background, not run yet.
         internal var background: [@Sendable () -> Void] = []
+        /// The results handed back to the main thread, not run yet.
         internal var main: [@MainActor @Sendable () -> Void] = []
 
+        /// Runs the background work handed over so far (what it hands over meanwhile waits).
         internal func runBackground() {
             let work = background
             background = []
-            work.forEach { $0() }
+            for step in work {
+                step()
+            }
         }
 
+        /// Runs the results handed back so far, on the main thread.
         @MainActor
         internal func runMain() {
             let work = main
             main = []
-            work.forEach { $0() }
+            for step in work {
+                step()
+            }
+        }
+
+        deinit {
+            // Nothing to release.
         }
     }
 
+    /// `/Big`, a folder as long as the background sort threshold plus one program, and an empty `/B`.
     internal let memory = MemoryFileSystem()
+    /// The plugin, with the test's steps for its background and main-thread work.
     internal let plugin = ViewOptionsPlugin()
+    /// What the plugin handed over and the test has not run yet.
     internal let steps = Steps()
+    /// The kernel with the plugin, `/Big` on the left (the source).
     internal let bench: TestBench
 
+    /// The bench's commands.
     internal var commands: CommandRegistry { bench.commands }
+    /// The model of the left panel, which lists `/Big`.
     internal var model: PanelModel { bench.left.model }
 
+    /// Builds the long folder and the bench, and takes over the plugin's background and main-thread work.
     internal init() {
         for number in 0..<ViewOptionsPlugin.backgroundSortThreshold {
             memory.addFile("/Big/f\(number).txt", String(repeating: "x", count: number % 7))
@@ -55,6 +74,9 @@ internal struct Review2ConfigAViewOptions {
         plugin.onMain = { [steps] in steps.main.append($0) }
     }
 
+    /// A long list that the folder changed under while it was sorted comes in the order asked for,
+    /// and nothing is sorted twice.
+    ///
     /// (Before the model kept the wish, `PanelModel.requestSort`, the stale result sent the
     /// new list to the background a second time; now the reading brings the order with it.)
     @Test
@@ -75,6 +97,7 @@ internal struct Review2ConfigAViewOptions {
         #expect(commands.isChecked(.sortBySize))
     }
 
+    /// An order set another way while a long list was sorted is kept, and the next command starts from it.
     @Test
     internal func anOrderSetByAnotherRouteMeanwhileIsNotOverwritten() {
         commands.perform(.sortBySize)
@@ -90,6 +113,7 @@ internal struct Review2ConfigAViewOptions {
         #expect(model.sort == ListOrder(key: .ext, descending: true))
     }
 
+    /// Of two sort commands in a row, the later one's order is the one the list gets.
     @Test
     internal func aLaterSortCommandTakesOver() {
         commands.perform(.sortBySize)
@@ -100,6 +124,7 @@ internal struct Review2ConfigAViewOptions {
         #expect(model.sort.key == .date && steps.background.isEmpty)
     }
 
+    /// A long list is filtered in the background, again when it changed meanwhile, and a later filter wins.
     @Test
     internal func aLongListIsFilteredInTheBackground() {
         let all = model.items.count
@@ -124,6 +149,7 @@ internal struct Review2ConfigAViewOptions {
         #expect(model.filter == nil && model.items.count == all + 1)
     }
 
+    /// Only Selected Files is offered when files are marked; Last Custom Filter when a mask is stored.
     @Test
     internal func onlySelectedIsOfferedByTheNumberOfMarks() {
         #expect(!commands.isEnabled(ViewOptionsPlugin.onlySelected))

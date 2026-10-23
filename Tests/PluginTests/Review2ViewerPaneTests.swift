@@ -13,12 +13,17 @@ import UniformTypeIdentifiers
 /// leads nowhere, a text that is no longer read keeps what it shows, images are made once.
 @MainActor
 @Suite(.serialized)
-internal struct Review2ViewerPane {
-    internal let memory = MemoryFileSystem()
-    internal let hook = Review2HookProvider()
-    internal let plugin: ViewerPlugin
-    internal let bench: TestBench
+internal struct Review2ViewerPaneTests {
+    /// The file system the panels show, with a small text and two pages that link to each other.
+    private let memory = MemoryFileSystem()
+    /// A file system whose files the test gives and whose readers can be made to wait when they close.
+    private let hook = Review2HookProvider()
+    /// The Lister, with a player that plays nothing and no windows on the screen.
+    private let plugin: ViewerPlugin
+    /// The kernel and panels the Lister runs in.
+    private let bench: TestBench
 
+    /// Sets up the Lister over both file systems, the panels on `/A` and `/B`.
     internal init() {
         _ = NSApplication.shared
         plugin = ViewerPlugin(overlayHost: { _ in nil }, quickViewDelay: 0.01, showsWindows: false)
@@ -34,8 +39,9 @@ internal struct Review2ViewerPane {
         memory.addFile("/A/next.html", "<html><body>next page</body></html>")
     }
 
+    /// Waits until `condition` holds or `seconds` have gone by; returns whether it holds.
     @discardableResult
-    internal func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
+    private func wait(upTo seconds: TimeInterval = Wait.ceiling, until condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(seconds)
         while !condition(), Date() < deadline {
             try? await Task.sleep(nanoseconds: 3_000_000)
@@ -54,13 +60,14 @@ internal struct Review2ViewerPane {
 
     // MARK: Nothing waits for the server
 
+    /// Stopping the pane does not wait on the main thread for the readers of a server to close.
     @Test
-    internal func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async {
+    internal func stoppingThePaneDoesNotWaitForTheReadersOfAServerToClose() async throws {
         hook.contents["/slow.txt"] = Data(String(repeating: "a line of text\n", count: 2_000).utf8)
         let gate = DispatchSemaphore(value: 0)
         hook.onClose = { _ = gate.wait(timeout: .now() + Wait.ceiling) }
         let pane = pane()
-        pane.load(ViewerItem(source: .file(URL(string: "hook:///slow.txt")!), title: "slow"))
+        pane.load(ViewerItem(source: .file(try #require(URL(string: "hook:///slow.txt"))), title: "slow"))
         #expect(await wait { pane.loaded != nil && pane.pager.document?.isIndexComplete == true })
         let started = Date()
         pane.stopWork()
@@ -76,6 +83,7 @@ internal struct Review2ViewerPane {
 
     // MARK: The text that is no longer read
 
+    /// A text whose reading was stopped keeps the rows it shows when it is scrolled.
     @Test
     internal func aTextThatIsNoLongerReadKeepsWhatItShowsWhenScrolled() async {
         let pane = pane()
@@ -94,8 +102,9 @@ internal struct Review2ViewerPane {
 
     // MARK: Links in the page
 
+    /// A link in a page is followed only to a file beside the page, never to another server or folder.
     @Test
-    internal func aLinkInAPageLeadsOnlyToFilesBesideIt() async {
+    internal func aLinkInAPageLeadsOnlyToFilesBesideIt() async throws {
         let pane = pane()
         pane.load(ViewerItem(source: .file(memory.url("/A/index.html")), title: "index"))
         #expect(await wait { pane.loaded != nil })
@@ -103,16 +112,17 @@ internal struct Review2ViewerPane {
         for text in [
             "sftp://evil/x", "ftp://evil/x", "smb://evil/share", "file:///etc/passwd", "../outside.html", "..%2F..%2Fx"
         ] {
-            pane.followLink(URL(string: text)!)
+            pane.followLink(try #require(URL(string: text)))
             #expect(pane.item?.url == shown, "\(text)")
         }
-        pane.followLink(URL(string: "next.html")!)
+        pane.followLink(try #require(URL(string: "next.html")))
         #expect(await wait { pane.item?.url?.lastPathComponent == "next.html" })
         pane.stopWork()
     }
 
     // MARK: Big documents
 
+    /// An HTML file over the page limit is not laid out as a page; the text modes show it.
     @Test
     internal func aHugeHTMLFileIsNotLaidOutAsAPageOnTheMainThread() async throws {
         let pane = pane()
@@ -130,6 +140,7 @@ internal struct Review2ViewerPane {
         pane.stopWork()
     }
 
+    /// An RTF file over the limit is not formatted as rich text.
     @Test
     internal func aHugeRTFFileIsNotFormattedOnTheMainThread() async throws {
         let pane = pane()
@@ -154,6 +165,7 @@ internal struct Review2ViewerPane {
     // MARK: Images
 
     private func picture(_ width: Int, _ height: Int) throws -> CGImage {
+        let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try #require(
             CGContext(
                 data: nil,
@@ -161,7 +173,7 @@ internal struct Review2ViewerPane {
                 height: height,
                 bitsPerComponent: 8,
                 bytesPerRow: 0,
-                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                space: space,
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             )
         )
@@ -170,6 +182,7 @@ internal struct Review2ViewerPane {
         return try #require(context.makeImage())
     }
 
+    /// A zoom through many sizes makes one bitmap, of the last size asked for.
     @Test
     internal func aZoomThatPassesThroughManySizesMakesOneBitmap() async throws {
         let frame = try picture(2_000, 1_000)
@@ -204,13 +217,15 @@ internal struct Review2ViewerPane {
         return data as Data
     }
 
+    /// The images of a multi-page TIFF are not played as an animation: the largest one is shown still.
     @Test
     internal func theImagesOfAnIconOrAMultiPageTIFFAreNotPlayedAsAnAnimation() throws {
         let tiff = try encoded([try picture(64, 64), try picture(300, 200), try picture(128, 128)], type: .tiff)
-        let still = try #require(ImageDecoder.decode(tiff))
+        let still = try #require(ImageDecoder().decode(tiff))
         #expect(still.frames.count == 1 && still.frames[0].image.width == 300 && still.frames[0].image.height == 200)
     }
 
+    /// A GIF with several frames is decoded as an animation of all of them.
     @Test
     internal func aGIFWithSeveralFramesIsStillAnAnimation() throws {
         let gif = try encoded(
@@ -219,21 +234,23 @@ internal struct Review2ViewerPane {
             properties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]],
             frameProperties: [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.2]]
         )
-        let animation = try #require(ImageDecoder.decode(gif, minimumDelay: 0.05))
+        let animation = try #require(ImageDecoder(minimumDelay: 0.05).decode(gif))
         #expect(animation.frames.count == 3)
     }
 
     // MARK: Row text
 
+    /// A lone `<` in HTML is text, and quotes in attributes do not hide or fake a link's `href`.
     @Test
     internal func linksAndTextOfHTMLThatHasLoneAngleBrackets() {
-        let result = HTMLText.plainText(from: "<p>if a < b then c</p><p>done</p>")
+        let result = HTMLText.plainText(from: "<p>if a < b then c</p><p>done</p>", linkBraces: true)
         #expect(result.text == "if a < b then c\ndone\n", "\(result.text.debugDescription)")
         // A lone `<` at the very end does not drop the rest of the document before it.
-        #expect(HTMLText.plainText(from: "kept text <").text == "kept text <\n")
+        #expect(HTMLText.plainText(from: "kept text <", linkBraces: true).text == "kept text <\n")
         let links = HTMLText.plainText(
-            from:
-                "<a data-href=\"decoy\" href=\"real\">x</a> <a title=\"a>b\" href=\"two\">y</a> <a title='href=\"nope\"' href=three>z</a>"
+            from: "<a data-href=\"decoy\" href=\"real\">x</a> <a title=\"a>b\" href=\"two\">y</a> "
+                + "<a title='href=\"nope\"' href=three>z</a>",
+            linkBraces: true
         )
         #expect(links.links == ["real", "two", "three"], "\(links.links)")
     }
