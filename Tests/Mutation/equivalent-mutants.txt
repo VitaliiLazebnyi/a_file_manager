@@ -188,3 +188,15 @@ before: prepared.forget()
 after: (statement removed)
 reason: The prepared lists are the model's own lists here; forgetting them only spares the
   prepared change a release in the background when it goes. The model is the same either way.
+
+file: Sources/Plugins/ViewOptions/ViewOptionsPlugin.swift
+operator: ChangeLogicalConnector
+in: private func sortInBackground(_ model: PanelModel, to order: ListOrder)
+before: if model.apply(prepared) != .stale || model.sort == order {
+after: if model.apply(prepared) != .stale && model.sort == order {
+reason: An apply of a sort that is not stale has made `order` the model's sort (takeSort and
+  takeSortName adopt it), so both forms take the branch then. A stale one with `sort == order`
+  falls through to `guard model.requestedSort == order` in the mutant, and that guard fails and
+  does what the branch does (forget the pending order, return): PanelModel never holds a
+  requested sort equal to its sort (requestSort stores nil for it, setSort and the snapshot
+  restore clear it, adoptSort clears it when it adopts that order). The two forms do the same.
