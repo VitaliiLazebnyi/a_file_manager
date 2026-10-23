@@ -47,7 +47,8 @@ internal struct CoverageRenameRun {
         onProgress: ((RenameStep, Int) -> Void)? = nil
     ) -> RenameRunResult {
         let sources = renames.map { url($0.0) }
-        let steps = RenamePlanner().steps(sources: sources, targets: renames.map { url($0.1) })
+        let steps = RenamePlanner()
+            .steps(sources: sources, targets: renames.map { url($0.1) }, isFolder: [], temporaryName: nil) { false }
         let runner = RenameRunner(fileSystems: registry, cancellation: cancellation)
         runner.onProgress = onProgress
         return runner.run(steps, sources: sources)
@@ -139,9 +140,9 @@ internal struct CoverageRenameRun {
         fileSystem.refusedTargets = ["/d/" + precomposed]
         let source = url("/d/" + decomposed)
         let target = url("/d/").appending(path: precomposed)
-        let runner = RenameRunner(fileSystems: registry)
+        let runner = RenameRunner(fileSystems: registry, cancellation: CancellationFlag())
         let result = runner.run(
-            [RenameStep(item: 0, from: source, to: target, kind: .direct, ontoItself: false)],
+            [RenameStep(item: 0, from: source, destination: target, kind: .direct, ontoItself: false)],
             sources: [source]
         )
         #expect(result.failures.count == 1 && result.renamed.isEmpty)
@@ -160,7 +161,7 @@ internal struct CoverageRenameRun {
         let matcher = WildcardMatcher("a*a*a*a*b", caseSensitive: true)
         let guardian = RenameRegexGuard()
         for _ in 0..<3 {
-            #expect(matcher.matches(in: long, firstOnly: false, guardian: guardian, cancelled: { false }) == nil)
+            #expect(matcher.matches(in: long, firstOnly: false, guardian: guardian) { false } == .gaveUp)
         }
         #expect(guardian.isTripped)
         var settings = RenameSettings()
@@ -176,8 +177,8 @@ internal struct CoverageRenameRun {
         let guardian = RenameRegexGuard()
         let asked = Asked()
         let found = WildcardMatcher("a*a*b", caseSensitive: true)
-            .matches(in: long, firstOnly: false, guardian: guardian, cancelled: { asked.next() > 1 })
-        #expect(found == nil && !guardian.hasTimedOut)
+            .matches(in: long, firstOnly: false, guardian: guardian) { asked.next() > 1 }
+        #expect(found == .gaveUp && !guardian.hasTimedOut)
     }
 
     @Test
@@ -238,10 +239,10 @@ internal struct CoverageRenameRun {
 
     @Test
     internal func theVolumeAnswersForFoldersAwayFromTheList() {
-        #expect(RenameSurvey.volumeFoldsCase(url("/x")) == nil)
+        #expect(RenameSurvey.volumeCaseFolding(url("/x")) == nil)
         let missing = box.url("not/there/yet")
-        #expect(RenameSurvey.volumeFoldsCase(missing) == RenameSurvey.volumeFoldsCase(box.root))
-        #expect(RenameSurvey.volumeFoldsCase(box.root) != nil)
+        #expect(RenameSurvey.volumeCaseFolding(missing) == RenameSurvey.volumeCaseFolding(box.root))
+        #expect(RenameSurvey.volumeCaseFolding(box.root) != nil)
     }
 
     @Test
@@ -265,11 +266,11 @@ internal struct CoverageRenameRun {
         var settings = RenameSettings()
         settings.nameMask = "X[N]"
         let preview = RenameComputation.preview(
-            entries,
-            settings: settings,
-            context: RenameContext(),
-            fileSystems: registry
-        )
+            RenameRequest(entries: entries, settings: settings, context: RenameContext()),
+            fileSystems: registry,
+            cache: RenameCache(),
+            cancellation: nil
+        ) { false }
         #expect(preview.planner.key(box.url("A.TXT")) == preview.planner.key(box.url("a.txt")))
         #expect(preview.planner.key(url("/r/B.TXT")) != preview.planner.key(url("/r/b.txt")))
     }
@@ -283,12 +284,16 @@ internal struct CoverageRenameRun {
         let target = RenameComputation.target(of: entry, named: box.url("b/two.txt").path)
         #expect(target.path == box.url("b/two.txt").path)
         let preview = RenameComputation.preview(
-            [entry],
-            settings: RenameSettings(),
-            context: RenameContext(),
-            given: [box.url("b/two.txt").path],
-            fileSystems: registry
-        )
+            RenameRequest(
+                entries: [entry],
+                settings: RenameSettings(),
+                context: RenameContext(),
+                given: [box.url("b/two.txt").path]
+            ),
+            fileSystems: registry,
+            cache: RenameCache(),
+            cancellation: nil
+        ) { false }
         #expect(preview.statuses == [.ready] && preview.targets.first??.lastPathComponent == "two.txt")
         let remote = RenameEntry(try #require(registry.item(at: fileSystem.base.addFile("/r/s/x.txt"))))
         #expect(RenameComputation.target(of: remote, named: "/t/y.txt") == url("/t/y.txt"))
@@ -313,12 +318,11 @@ internal struct CoverageRenameRun {
         settings.nameMask = "b"
         let asked = Asked()
         let preview = RenameComputation.preview(
-            entries,
-            settings: settings,
-            context: RenameContext(),
+            RenameRequest(entries: entries, settings: settings, context: RenameContext()),
             fileSystems: registry,
-            isCancelled: { asked.next() >= 3 }
-        )
+            cache: RenameCache(),
+            cancellation: nil
+        ) { asked.next() >= 3 }
         // Not compared with b.txt, which is there: the conflict is not found.
         #expect(preview.statuses == [.ready] && preview.existing.isEmpty)
     }
@@ -425,13 +429,13 @@ internal struct CoverageRenameRun {
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path) }
         let log = folder.appending(path: RenameLog.fileName)
-        RenameLog.write([RenamedItem(from: url("/a"), to: url("/b"))], to: log, fileSystems: registry)
+        RenameLog.write([RenamedItem(from: url("/a"), destination: url("/b"))], to: log, fileSystems: registry)
         #expect(!FileManager.default.fileExists(atPath: log.path))
     }
 
     @Test
     internal func aFileMovedElsewhereIsLoggedWithItsWholePath() {
-        let text = RenameLog.text([RenamedItem(from: url("/a/x.txt"), to: url("/b/y.txt"))], fileSystems: registry)
+        let text = RenameLog.text([RenamedItem(from: url("/a/x.txt"), destination: url("/b/y.txt"))], fileSystems: registry)
         #expect(
             text == "\"\(registry.displayPath(url("/a/x.txt")))\" -> \"\(registry.displayPath(url("/b/y.txt")))\"\n"
         )

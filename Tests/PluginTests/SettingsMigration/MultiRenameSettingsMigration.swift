@@ -77,9 +77,9 @@ internal struct MultiRenameSettingsMigration {
         #expect(store.undoCount == 2)
         let runs = store.undoHistory
         try #require(runs.count == 2)
-        #expect(runs[0].map(\.to.lastPathComponent) == ["IMG_0100.jpg"])
+        #expect(runs[0].map(\.destination.lastPathComponent) == ["IMG_0100.jpg"])
         #expect(runs[1].map(\.from.path) == ["/Users/me/Documents/x y.txt", "/Users/me/Documents/b.txt"])
-        #expect(store.lastUndo?.map(\.to.lastPathComponent) == ["x-y.txt", "B.txt"])
+        #expect(store.lastUndo.map(\.destination.lastPathComponent) == ["x-y.txt", "B.txt"])
     }
 
     /// Runs saved before their count was kept: there is something to undo until they are

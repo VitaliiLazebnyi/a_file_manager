@@ -39,7 +39,7 @@ internal struct CoverageRenameEngine {
         return context
     }()
 
-    internal let file = RenameSubject(name: "photo.jpg", modified: Self.afternoon, directoryPath: "/Users/ada")
+    internal let file = RenameSubject(name: "photo.jpg", isFolder: false, size: 0, modified: Self.afternoon, directoryPath: "/Users/ada", folders: RenameSubject.folders(in: "/Users/ada"), url: nil)
 
     /// The name the masks give, without Search & Replace.
     internal func name(
@@ -80,13 +80,13 @@ internal struct CoverageRenameEngine {
 
     @Test
     internal func theFullPathOfAnItemAtTheTop() {
-        #expect(name("[1-]", RenameSubject(name: "a.txt", directoryPath: "/")) == "/a.txt")
+        #expect(name("[1-]", RenameSubject(name: "a.txt", isFolder: false, size: 0, modified: Date(timeIntervalSince1970: 0), directoryPath: "/", folders: RenameSubject.folders(in: "/"), url: nil)) == "/a.txt")
         #expect(name("[1-]") == "/Users/ada/photo.jpg")
     }
 
     @Test
     internal func folderDotsCanBeSwitchedOffAgain() {
-        let folder = RenameSubject(name: "v1.2", isFolder: true)
+        let folder = RenameSubject(name: "v1.2", isFolder: true, size: 0, modified: Date(timeIntervalSince1970: 0), directoryPath: "", folders: [], url: nil)
         #expect(name("[I1][N]", folder) == "v1.2")
         #expect(name("[I1][I0][N]", folder) == "v1")
     }
@@ -229,7 +229,7 @@ internal struct CoverageRenameEngine {
         let long = String(repeating: "a", count: 9_000) + "b"
         #expect(WildcardMatcher("*ab", caseSensitive: true).matches(in: long, firstOnly: true).first?.length == 9_001)
         let matcher = WildcardMatcher("a*b", caseSensitive: true)
-        #expect(matcher.matches(in: long, firstOnly: true, guardian: RenameRegexGuard(), cancelled: { true }) == nil)
+        #expect(matcher.matches(in: long, firstOnly: true, guardian: RenameRegexGuard()) { true } == .gaveUp)
     }
 
     // MARK: The planner
@@ -263,8 +263,9 @@ internal struct CoverageRenameEngine {
         let steps = planner.steps(
             sources: [url("/d/folder"), url("/e/file")],
             targets: [url("/d/folder2"), url("/e/file2")],
-            isFolder: [true, false]
-        )
+            isFolder: [true, false],
+            temporaryName: nil
+        ) { false }
         #expect(steps.map(\.item) == [0, 1])
     }
 
@@ -276,8 +277,8 @@ internal struct CoverageRenameEngine {
             sources: [url("/d/folder"), url("/d/folder/file")],
             targets: [url("/d/other"), url("/d/folder/file2")],
             isFolder: [true, false],
-            cancelled: { asked.next() > 1 }
-        )
+            temporaryName: nil
+        ) { asked.next() > 1 }
         #expect(steps.isEmpty && asked.value >= 2)
     }
 }

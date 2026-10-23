@@ -67,7 +67,9 @@ internal final class CoverageRenameWindow {
             store: RenameStore(settings: bench.kernel.settings),
             settings: .unchanged,
             logDirectory: box.url("log"),
-            previewsInBackground: false
+            previewsInBackground: false,
+            clipboard: { nil },
+            clipboardChangeCount: nil
         )
         controller = MultiRenameWindowController(kernel: bench.kernel, session: session)
         window = try #require(controller.window)
@@ -489,7 +491,7 @@ internal final class CoverageRenameWindow {
         #expect(session.givenNames == ["x", "y"])
         #expect(popup("F10 Names")?.item(withTitle: "Use the rename masks again")?.isEnabled == true)
         choose("Use the rename masks again", in: "F10 Names")
-        #expect(session.givenNames == nil)
+        #expect(session.givenNames.isEmpty)
         choose("F10 Names", in: "F10 Names")
         // A list loaded from a file: the open panel is answered in the user's place.
         memory.addFile("/lists/names.txt", "x1\nx2")
@@ -502,7 +504,7 @@ internal final class CoverageRenameWindow {
             done(response, urls)
         }
         choose("Load names from file…", in: "F10 Names")
-        #expect(shown.count == 1 && session.givenNames == nil)
+        #expect(shown.count == 1 && session.givenNames.isEmpty)
         answers = [(.OK, [memory.url("/lists/names.txt")])]
         choose("Load names from file…", in: "F10 Names")
         #expect(session.givenNames == ["x1", "x2"])

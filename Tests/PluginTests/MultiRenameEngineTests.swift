@@ -24,9 +24,12 @@ internal struct MultiRenameEngine {
 
     internal let photo = RenameSubject(
         name: "IMG_1001.jpg",
+        isFolder: false,
         size: 4_711,
         modified: Self.date,
-        directoryPath: "/Users/ada/work/photos"
+        directoryPath: "/Users/ada/work/photos",
+        folders: RenameSubject.folders(in: "/Users/ada/work/photos"),
+        url: nil
     )
 
     internal func name(
@@ -116,7 +119,7 @@ internal struct MultiRenameEngine {
 
     @Test
     internal func foldersAndTheFolderDotSwitch() {
-        let folder = RenameSubject(name: "release.v2", isFolder: true)
+        let folder = RenameSubject(name: "release.v2", isFolder: true, size: 0, modified: Date(timeIntervalSince1970: 0), directoryPath: "", folders: [], url: nil)
         #expect(name("[N]", ext: "[E]", folder) == "release.v2")
         #expect(name("[N]_x", ext: "[E]", folder) == "release_x.v2")
         #expect(name("[I][N]_x", ext: "[E]", folder) == "release.v2_x")
@@ -169,9 +172,9 @@ internal struct MultiRenameEngine {
         #expect(part("[y][H][i][i1]") == "2510ama")
         #expect(part("[d]") == "12-1-25")
         #expect(part("[t]") == "10.05.09 AM")
-        let evening = RenameSubject(name: "a", modified: Self.date.addingTimeInterval(3 * 3_600))
+        let evening = RenameSubject(name: "a", isFolder: false, size: 0, modified: Self.date.addingTimeInterval(3 * 3_600), directoryPath: "", folders: [], url: nil)
         #expect(part("[h]-[H]-[i]", evening) == "13-01-pm")
-        #expect(part("[H]", RenameSubject(name: "a", modified: Date(timeIntervalSince1970: 0))) == "12")
+        #expect(part("[H]", RenameSubject(name: "a")) == "12")
     }
 
     @Test
@@ -389,12 +392,10 @@ internal struct MultiRenameEngine {
         settings.nameMask = "[N]-[C:5]"
         let names =
             RenameComputation.names(
-                entries,
-                settings: settings,
-                context: context,
-                given: nil,
-                fileSystems: registry
-            )
+                RenameRequest(entries: entries, settings: settings, context: context),
+                fileSystems: registry,
+                subjects: []
+            ) { false }
             .names
         #expect(names.count == 5_000 && names[0] == "f0-00001.txt" && names[4_999] == "f4999-05000.txt")
         #expect(
@@ -415,7 +416,7 @@ internal struct MultiRenamePlanning {
         func fold(_ name: String) -> String { foldsCase ? name.lowercased() : name }
         var present = names
         for step in steps {
-            let (from, to) = (step.from.lastPathComponent, step.to.lastPathComponent)
+            let (from, to) = (step.from.lastPathComponent, step.destination.lastPathComponent)
             guard let index = present.firstIndex(of: from) else {
                 Issue.record("\(from) is not there")
                 continue
@@ -433,7 +434,9 @@ internal struct MultiRenamePlanning {
             .steps(
                 sources: renames.map { url($0.0) },
                 targets: urls(renames.map(\.1)),
-                temporaryName: { "tmp\($0)" }
+                isFolder: [],
+                temporaryName: { "tmp\($0)" },
+                cancelled: { false }
             )
     }
 
@@ -458,7 +461,7 @@ internal struct MultiRenamePlanning {
     internal func swapsAndRingsGoThroughATemporaryName() {
         let swap = plan([("1.txt", "2.txt"), ("2.txt", "1.txt")])
         #expect(swap.map(\.kind) == [.park, .direct, .unpark])
-        #expect(swap.map(\.item) == [0, 1, 0] && swap[0].to.lastPathComponent == "tmp0")
+        #expect(swap.map(\.item) == [0, 1, 0] && swap[0].destination.lastPathComponent == "tmp0")
         #expect(simulate(["1.txt", "2.txt"], swap) == ["2.txt", "1.txt"])
 
         let ring = plan([("a", "b"), ("b", "c"), ("c", "a"), ("x", "y")])

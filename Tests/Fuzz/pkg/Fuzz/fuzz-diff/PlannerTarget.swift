@@ -38,11 +38,17 @@ internal func checkSteps(_ planner: RenamePlanner, _ plan: RenamePlanCase, _ det
     let (sources, targets) = (plan.sources, plan.targets)
     var names = plan.existing
     var place = sources.map(planner.key)
-    let steps = planner.steps(sources: sources, targets: targets) { ".tmp-\($0)" }
+    let steps = planner.steps(
+        sources: sources,
+        targets: targets,
+        isFolder: [],
+        temporaryName: { ".tmp-\($0)" },
+        cancelled: { false }
+    )
     let stepsDetail =
-        detail + " plan \(planText(targets)) steps \(steps.map { "\($0.item):\($0.from.path)>\($0.to.path)" })"
+        detail + " plan \(planText(targets)) steps \(steps.map { "\($0.item):\($0.from.path)>\($0.destination.path)" })"
     for step in steps {
-        let (from, onto) = (planner.key(step.from), planner.key(step.to))
+        let (from, onto) = (planner.key(step.from), planner.key(step.destination))
         fzCheck(place[step.item] == from && names.contains(from), "planner-step-source-missing", stepsDetail)
         fzCheck(step.ontoItself == (from == onto), "planner-onto-itself-flag", stepsDetail)
         fzCheck(from == onto || !names.contains(onto), "planner-step-onto-existing", stepsDetail)

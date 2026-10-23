@@ -115,12 +115,10 @@ internal struct Review2FindRename {
         #expect(
             finishes {
                 (names, problem) = RenameComputation.names(
-                    subjects,
-                    settings: settings,
-                    context: context,
-                    given: nil,
-                    fileSystems: FileSystemRegistry()
-                )
+                    RenameRequest(entries: subjects, settings: settings, context: context),
+                    fileSystems: FileSystemRegistry(),
+                    subjects: []
+                ) { false }
             }
         )
         #expect(names.allSatisfy { $0 == nil } && problem as? SearchReplace.Problem == .tooSlow("(a*)*b"))
@@ -162,11 +160,11 @@ internal struct Review2FindRename {
         settings.search = "a"
         settings.replacement = "b"
         let preview = RenameComputation.preview(
-            [RenameEntry(item)],
-            settings: settings,
-            context: context,
-            fileSystems: FileSystemRegistry()
-        )
+            RenameRequest(entries: [RenameEntry(item)], settings: settings, context: context),
+            fileSystems: FileSystemRegistry(),
+            cache: RenameCache(),
+            cancellation: nil
+        ) { false }
         #expect(preview.targets.first??.path == "/root/sub/b.txt" && preview.statuses == [.ready])
     }
 
@@ -180,16 +178,21 @@ internal struct Review2FindRename {
         var settings = RenameSettings()
         settings.nameMask = "[u][N]"
         let preview = RenameComputation.preview(
-            [RenameEntry(item)],
-            settings: settings,
-            context: context,
-            fileSystems: FileSystemRegistry()
-        )
+            RenameRequest(entries: [RenameEntry(item)], settings: settings, context: context),
+            fileSystems: FileSystemRegistry(),
+            cache: RenameCache(),
+            cancellation: nil
+        ) { false }
         #expect(preview.statuses == [.ready])
         #expect(preview.names.first??.unicodeScalars.map(\.value) == [0xE9, 0x2E, 0x74, 0x78, 0x74])
         let url = URL(string: "mem:///d/a")!
         let planner = RenamePlanner()
-        let moved = planner.steps(sources: [url], targets: [URL(string: "mem:///d/e%CC%81")!])
+        let moved = planner.steps(
+            sources: [url],
+            targets: [URL(string: "mem:///d/e%CC%81")!],
+            isFolder: [],
+            temporaryName: nil
+        ) { false }
         #expect(moved.count == 1)
     }
 
@@ -219,8 +222,9 @@ internal struct Review2FindRename {
             .steps(
                 sources: sources,
                 targets: targets,
-                isFolder: [true, false, false, true, false]
-            )
+                isFolder: [true, false, false, true, false],
+                temporaryName: nil
+            ) { false }
         let order = steps.map(\.item)
         #expect(Set(order) == [0, 1, 2, 3, 4])
         // Every item comes before the folders that hold it.
@@ -229,7 +233,8 @@ internal struct Review2FindRename {
         )
         #expect(order.firstIndex(of: 1)! < order.firstIndex(of: 0)!)
         // Without folders the order is the list's.
-        #expect(RenamePlanner().steps(sources: sources, targets: targets).map(\.item) == [0, 1, 2, 3, 4])
+        let plain = RenamePlanner().steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { false }
+        #expect(plain.map(\.item) == [0, 1, 2, 3, 4])
     }
 
     @Test
@@ -240,8 +245,8 @@ internal struct Review2FindRename {
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
         // The planner was wrong about the volume, and the target is not there: an ordinary rename.
-        let step = RenameStep(item: 0, from: box.url("a.txt"), to: box.url("b.txt"), kind: .direct, ontoItself: true)
-        let result = RenameRunner(fileSystems: registry).run([step], sources: [box.url("a.txt")])
+        let step = RenameStep(item: 0, from: box.url("a.txt"), destination: box.url("b.txt"), kind: .direct, ontoItself: true)
+        let result = RenameRunner(fileSystems: registry, cancellation: CancellationFlag()).run([step], sources: [box.url("a.txt")])
         #expect(result.failures.isEmpty && box.read("b.txt") == "first" && !box.exists("a.txt"))
     }
 
@@ -253,7 +258,7 @@ internal struct Review2FindRename {
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
         let log = box.url("Logs/Test").appendingPathComponent(RenameLog.fileName)
-        RenameLog.write([RenamedItem(from: box.url("a"), to: box.url("b"))], to: log, fileSystems: registry)
+        RenameLog.write([RenamedItem(from: box.url("a"), destination: box.url("b"))], to: log, fileSystems: registry)
         let attributes = try FileManager.default.attributesOfItem(atPath: log.path)
         let folder = try FileManager.default.attributesOfItem(atPath: log.deletingLastPathComponent().path)
         #expect((attributes[.posixPermissions] as? Int) == 0o600 && (folder[.posixPermissions] as? Int) == 0o700)
@@ -397,7 +402,7 @@ internal struct Review2FindRenameSessions {
         let session = session(clipboard: { nil }, changes: nil)
         session.settings.nameMask = "n_[N]"
         #expect(session.counts.changing == 3)
-        session.start()
+        session.start(completion: nil)
         #expect(session.rowCount == 0 && !session.isBusy && memory.exists("/d/n_a.txt"))
     }
 
@@ -421,7 +426,9 @@ internal struct Review2FindRenameSessions {
             store: RenameStore(settings: settings),
             settings: request,
             logDirectory: box.url("log"),
-            previewsInBackground: false
+            previewsInBackground: false,
+            clipboard: { nil },
+            clipboardChangeCount: nil
         )
         #expect(session.rows.map(\.status) == [.ready])
         var result: RenameRunResult?
@@ -433,7 +440,7 @@ internal struct Review2FindRenameSessions {
         #expect(result?.failures.isEmpty == true && names == [[0xE9, 0x2E, 0x74, 0x78, 0x74]])
         // And Undo writes the accent the way it was.
         local.interaction.choiceAnswers = [0]
-        session.undo()
+        session.undo(completion: nil)
         let back = (try FileManager.default.contentsOfDirectory(atPath: box.url("p").path))
             .map {
                 Array($0.unicodeScalars.map(\.value))
@@ -444,7 +451,7 @@ internal struct Review2FindRenameSessions {
     @Test
     internal func theUndoHistoryNeedsNoDecodingToBeCounted() async {
         let store = RenameStore(settings: settings)
-        store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/d/a"), to: URL(fileURLWithPath: "/d/b"))])
+        store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/d/a"), destination: URL(fileURLWithPath: "/d/b"))])
         store.flush()
         // Another store over the same settings, as at the next start of the program.
         let next = RenameStore(settings: MemorySettingsCopy.copy(of: settings))
@@ -453,17 +460,17 @@ internal struct Review2FindRenameSessions {
         next.loadUndo { loaded = true }
         let patience = Date(timeIntervalSinceNow: Wait.ceiling)
         while !loaded, Date() < patience { try? await Task.sleep(nanoseconds: 2_000_000) }
-        #expect(loaded && next.lastUndo?.count == 1)
+        #expect(loaded && next.lastUndo.count == 1)
     }
 
     @Test
     internal func aRunLargerThanTheLimitIsKeptOnlyForThisSession() {
         let big = (0..<(RenameStore.persistedItemLimit + 5))
             .map {
-                RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))
+                RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), destination: URL(fileURLWithPath: "/d/n\($0)"))
             }
         let store = RenameStore(settings: settings)
-        store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/d/a"), to: URL(fileURLWithPath: "/d/b"))])
+        store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/d/a"), destination: URL(fileURLWithPath: "/d/b"))])
         store.appendUndo(big)
         store.flush()
         #expect(store.undoCount == 2)

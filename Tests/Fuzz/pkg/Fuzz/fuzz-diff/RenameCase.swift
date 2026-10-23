@@ -47,7 +47,9 @@ internal struct RenameCase {
             isFolder: more & 128 != 0,
             size: size,
             modified: Date(timeIntervalSince1970: date),
-            directoryPath: directory
+            directoryPath: directory,
+            folders: RenameSubject.folders(in: directory),
+            url: nil
         )
         self.settings = readSettings
         self.context = readContext

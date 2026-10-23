@@ -129,8 +129,10 @@ internal struct MultiRenameFixes {
         #expect(planner.key(url("Name.TXT", in: "/linux")) != planner.key(url("name.txt", in: "/linux")))
         let steps = planner.steps(
             sources: [url("A", in: "/mac"), url("B", in: "/linux")],
-            targets: [url("a", in: "/mac"), url("b", in: "/linux")]
-        )
+            targets: [url("a", in: "/mac"), url("b", in: "/linux")],
+            isFolder: [],
+            temporaryName: nil
+        ) { false }
         #expect(steps.map(\.ontoItself) == [true, false])
     }
 
@@ -142,8 +144,8 @@ internal struct MultiRenameFixes {
         let registry = FileSystemRegistry()
         registry.register(LocalFileSystem())
         // A planner that wrongly took the volume for case-insensitive: a.txt "onto itself" b.txt.
-        let step = RenameStep(item: 0, from: box.url("a.txt"), to: box.url("b.txt"), kind: .direct, ontoItself: true)
-        let result = RenameRunner(fileSystems: registry).run([step], sources: [box.url("a.txt")])
+        let step = RenameStep(item: 0, from: box.url("a.txt"), destination: box.url("b.txt"), kind: .direct, ontoItself: true)
+        let result = RenameRunner(fileSystems: registry, cancellation: CancellationFlag()).run([step], sources: [box.url("a.txt")])
         #expect(result.renamed.isEmpty && result.failures.count == 1)
         #expect(box.read("a.txt") == "first" && box.read("b.txt") == "second")
         #expect(
@@ -183,12 +185,14 @@ internal struct MultiRenameFixes {
             store: RenameStore(settings: MemorySettings()),
             settings: settings,
             logDirectory: box.url("log"),
-            previewsInBackground: false
+            previewsInBackground: false,
+            clipboard: { nil },
+            clipboardChangeCount: nil
         )
         #expect(
             session.rows.map(\.status) == [.ready, .ready] && session.rows.map(\.newName) == ["a_x.txt", "b_x.txt"]
         )
-        session.start()
+        session.start(completion: nil)
         #expect(box.exists("sub/a_x.txt") && box.exists("sub/deep/b_x.txt"))
         #expect(!box.exists("sub/sub") && !box.exists("sub/a.txt"))
         // A list that is not changed by the masks stays unchanged.
@@ -198,7 +202,9 @@ internal struct MultiRenameFixes {
             store: RenameStore(settings: MemorySettings()),
             settings: .unchanged,
             logDirectory: box.url("log"),
-            previewsInBackground: false
+            previewsInBackground: false,
+            clipboard: { nil },
+            clipboardChangeCount: nil
         )
         #expect(again.rows.map(\.status) == [.unchanged])
     }
@@ -219,34 +225,35 @@ internal struct MultiRenameFixes {
         settings.nameMask = "b"
         let cache = RenameCache()
         let first = RenameComputation.preview(
-            entries,
-            settings: settings,
-            context: context,
+            RenameRequest(entries: entries, settings: settings, context: context),
             fileSystems: registry,
-            cache: cache
-        )
+            cache: cache,
+            cancellation: nil
+        ) { false }
         // The folder changes behind the cache's back: only a fresh look sees it.
         try box.file("d.txt")
         settings.nameMask = "d"
         let second = RenameComputation.preview(
-            entries,
-            settings: settings,
-            context: context,
+            RenameRequest(entries: entries, settings: settings, context: context),
             fileSystems: registry,
-            cache: cache
-        )
-        let fresh = RenameComputation.preview(entries, settings: settings, context: context, fileSystems: registry)
+            cache: cache,
+            cancellation: nil
+        ) { false }
+        let fresh = RenameComputation.preview(
+            RenameRequest(entries: entries, settings: settings, context: context),
+            fileSystems: registry,
+            cache: RenameCache(),
+            cancellation: nil
+        ) { false }
         #expect(first.statuses == [.duplicate, .unchanged, .duplicate] || first.statuses.contains(.duplicate))
         #expect(second.statuses.allSatisfy { $0 == .duplicate })
         #expect(fresh.statuses.allSatisfy { $0 == .duplicate })
         let cancelled = RenameComputation.preview(
-            entries,
-            settings: settings,
-            context: context,
+            RenameRequest(entries: entries, settings: settings, context: context),
             fileSystems: registry,
             cache: cache,
-            isCancelled: { true }
-        )
+            cancellation: nil
+        ) { true }
         #expect(cancelled.names.count == 3)
     }
 
@@ -259,11 +266,11 @@ internal struct MultiRenameFixes {
         let store = RenameStore(settings: settings)
         let run = (0..<5_000)
             .map {
-                RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))
+                RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), destination: URL(fileURLWithPath: "/d/n\($0)"))
             }
         store.appendUndo(run)
         store.appendUndo([run[0]])
-        #expect(store.undoCount == 2 && store.lastUndo?.count == 1)
+        #expect(store.undoCount == 2 && store.lastUndo.count == 1)
         // Another store on the same settings sees it at once, and so does a fresh decode of the saved copy.
         #expect(RenameStore(settings: settings).undoCount == 2)
         store.flush()
@@ -284,7 +291,7 @@ internal struct MultiRenameFixes {
         let store = await MainActor.run { RenameStore(settings: settings) }
         let big = (0..<(RenameStore.persistedItemLimit - 10))
             .map {
-                RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), to: URL(fileURLWithPath: "/d/n\($0)"))
+                RenamedItem(from: URL(fileURLWithPath: "/d/\($0)"), destination: URL(fileURLWithPath: "/d/n\($0)"))
             }
         await MainActor.run {
             store.appendUndo(big)
@@ -342,10 +349,10 @@ internal struct MultiRenameFixSessions {
     internal func aRunThatCanNeverBeUndoneDoesNotBlockEarlierOnes() {
         var session = open("a.*")
         session.settings.nameMask = "first[C]"
-        session.start()
+        session.start(completion: nil)
         session = open("c.txt")
         session.settings.nameMask = "second"
-        session.start()
+        session.start(completion: nil)
         #expect(RenameStore(settings: settings).undoCount == 2)
         // The file of the newer run is deleted by somebody else: that run cannot be taken back.
         try? memory.remove(memory.url("/d/second.txt"))
@@ -355,7 +362,7 @@ internal struct MultiRenameFixSessions {
         session.undo { left = $0 }
         #expect(left?.count == 1 && session.canUndo)
         #expect(RenameStore(settings: settings).undoCount == 1)
-        session.undo()
+        session.undo(completion: nil)
         #expect(!session.canUndo && memory.exists("/d/a.jpg") && memory.exists("/d/a.txt"))
     }
 }

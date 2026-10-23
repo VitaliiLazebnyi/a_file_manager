@@ -66,7 +66,9 @@ internal struct CoverageRenameSession {
                 store: store,
                 settings: .unchanged,
                 logDirectory: log,
-                previewsInBackground: inBackground
+                previewsInBackground: inBackground,
+                clipboard: { nil },
+                clipboardChangeCount: nil
             )
         }
         return MultiRenameSession(
@@ -76,7 +78,8 @@ internal struct CoverageRenameSession {
             settings: .unchanged,
             logDirectory: log,
             previewsInBackground: inBackground,
-            clipboard: clipboard
+            clipboard: clipboard,
+            clipboardChangeCount: nil
         )
     }
 
@@ -98,7 +101,7 @@ internal struct CoverageRenameSession {
         attachJobs(.held)
         let session = session()
         session.settings.nameMask = "x[N]"
-        session.start()
+        session.start(completion: nil)
         #expect(session.isBusy && jobs.heldCount == 1 && !session.canUndo)
         let before = session.rows.map(\.entry.name)
         session.sort(by: .name, ascending: false)
@@ -107,12 +110,12 @@ internal struct CoverageRenameSession {
         session.remove([0])
         session.nextStep()
         session.loadNames(fromText: "z")
-        session.loadNames(from: memory.url("/f/a.txt"))
+        session.loadNames(from: memory.url("/f/a.txt"), completion: nil)
         session.editNames()
         session.clearGivenNames()
-        session.start()
-        session.undo()
-        #expect(session.rows.map(\.entry.name) == before && session.givenNames == nil && jobs.heldCount == 1)
+        session.start(completion: nil)
+        session.undo(completion: nil)
+        #expect(session.rows.map(\.entry.name) == before && session.givenNames.isEmpty && jobs.heldCount == 1)
         #expect(!ui.log.contains { $0.hasPrefix("form:") })
         jobs.runHeld()
         #expect(!session.isBusy && names == ["xa.txt", "xb.txt", "xc.txt"])
@@ -147,18 +150,18 @@ internal struct CoverageRenameSession {
     internal func anUndoCancelledAtOnceKeepsTheRun() {
         let session = session()
         session.settings.nameMask = "x[N]"
-        session.start()
+        session.start(completion: nil)
         attachJobs(.atStart)
         ui.choiceAnswers = [0]
         var attempted: [RenamedItem]?
         session.undo { attempted = $0 }
         #expect(names == ["xa.txt", "xb.txt", "xc.txt"] && attempted?.count == 3)
-        #expect(session.canUndo && session.store.lastUndo?.count == 3)
+        #expect(session.canUndo && session.store.lastUndo.count == 3)
         #expect(!ui.log.contains { $0.hasPrefix("inform:") })
         // Asked again, it puts the files back.
         attachJobs(.never)
         ui.choiceAnswers = [0]
-        session.undo()
+        session.undo(completion: nil)
         #expect(names == ["a.txt", "b.txt", "c.txt"] && !session.canUndo)
     }
 
@@ -227,14 +230,14 @@ internal struct CoverageRenameSession {
         session.loadNames(fromText: "x")
         #expect(session.givenNames == ["x"])
         session.loadNames(fromText: "\n\n")
-        #expect(session.givenNames == nil)
+        #expect(session.givenNames.isEmpty)
     }
 
     @Test
     internal func anUndoInTheBackgroundDecodesTheRunsFirst() async {
         let session = session(inBackground: true)
         session.settings.nameMask = "x[N]"
-        session.start()
+        session.start(completion: nil)
         #expect(names == ["xa.txt", "xb.txt", "xc.txt"])
         ui.choiceAnswers = [0]
         var attempted: [RenamedItem]?
@@ -266,7 +269,7 @@ internal struct CoverageRenameSession {
         let session = session()
         session.loadNames(fromText: "x.txt\ny.txt\nz.txt")
         session.nextStep()
-        #expect(session.givenNames == nil && session.rows.map(\.entry.name) == ["x.txt", "y.txt", "z.txt"])
+        #expect(session.givenNames.isEmpty && session.rows.map(\.entry.name) == ["x.txt", "y.txt", "z.txt"])
         #expect(session.rows.allSatisfy { $0.status == .ready })
     }
 
@@ -336,7 +339,7 @@ internal struct CoverageRenameSession {
         let items = many(10)
         let session = session(items)
         session.loadNames(fromText: (0..<10).map { "sub/n\($0).txt" }.joined(separator: "\n"))
-        session.start()
+        session.start(completion: nil)
         let question = ui.log.first { $0.hasPrefix("choose: 10 of the names given move") }
         #expect(question?.contains("sub/n7.txt\n…") == true)
         #expect(memory.allPaths.filter { $0.hasPrefix("/many/f") }.count == 10)
@@ -347,7 +350,7 @@ internal struct CoverageRenameSession {
         let session = session()
         session.loadNames(fromText: "x/y.txt\nb.txt\n")
         ui.choiceAnswers = [0]
-        session.start()
+        session.start(completion: nil)
         #expect(ui.log.contains { $0.hasPrefix("choose: 1 of the names given move") })
         #expect(memory.allPaths.contains("/f/x/y.txt"))
     }
@@ -356,7 +359,7 @@ internal struct CoverageRenameSession {
     internal func manyConflictsAreShownInPart() {
         let session = session(many(13))
         session.settings.nameMask = "same"
-        session.start()
+        session.start(completion: nil)
         let question = ui.log.first { $0.hasPrefix("choose: Name conflict: 13 file(s)") }
         #expect(question?.contains("same.txt\n…") == true)
     }
@@ -386,7 +389,7 @@ internal struct CoverageRenameSession {
         let session = session(items)
         session.loadNames(fromText: names.map { "blocker/" + $0 }.joined(separator: "\n"))
         ui.choiceAnswers = [0]
-        session.start()
+        session.start(completion: nil)
         #expect(ui.log.contains("inform: 16 file(s) could not be renamed!"))
     }
 
@@ -394,7 +397,7 @@ internal struct CoverageRenameSession {
     internal func namesThatCannotBeUsedAreToldAfterTheRun() {
         let session = session()
         session.loadNames(fromText: "x.txt\n..\n")
-        session.start()
+        session.start(completion: nil)
         #expect(names.contains("x.txt") && ui.log.contains { $0.contains("1 file(s) were left out") })
     }
 
@@ -403,7 +406,7 @@ internal struct CoverageRenameSession {
     @Test
     internal func undoNeedsSomethingToUndo() {
         let session = session()
-        session.undo()
+        session.undo(completion: nil)
         #expect(ui.log.isEmpty && !session.isBusy)
     }
 
@@ -412,7 +415,7 @@ internal struct CoverageRenameSession {
         settings.set(1, forKey: "multirename.undoCount")
         let session = session()
         #expect(session.canUndo)
-        session.undo()
+        session.undo(completion: nil)
         #expect(ui.log.isEmpty && !session.isBusy)
     }
 
@@ -420,8 +423,8 @@ internal struct CoverageRenameSession {
     internal func aLongRunIsShownInPartWhenUndone() {
         let session = session(many(21))
         session.settings.nameMask = "u[C]"
-        session.start()
-        session.undo()
+        session.start(completion: nil)
+        session.undo(completion: nil)
         #expect(ui.log.last?.hasSuffix("… (21 files)") == true)
     }
 
@@ -435,7 +438,7 @@ internal struct CoverageRenameSession {
     internal func theResultListGoesToTheViewerOrTheViewCommand() {
         let session = session()
         session.settings.nameMask = "x[N]"
-        session.start()
+        session.start(completion: nil)
         var viewed: [CommandArgument] = []
         bench.kernel.commands.register(Command(.view, "View"), parameterized: { viewed.append($0) })
         session.showResultList()

@@ -57,7 +57,7 @@ internal struct CoverageRenameStore {
     @Test
     internal func loadingTheUndoHistoryTwiceAnswersAtOnce() {
         let store = RenameStore(settings: MemorySettings())
-        store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/a"), to: URL(fileURLWithPath: "/b"))])
+        store.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/a"), destination: URL(fileURLWithPath: "/b"))])
         var answered = false
         store.loadUndo { answered = true }
         #expect(answered && store.undoCount == 1)
@@ -69,7 +69,7 @@ internal struct CoverageRenameStore {
     internal func theUndoHistoryIsDecodedInTheBackground() async {
         let settings = MemorySettings()
         let writer = RenameStore(settings: settings)
-        writer.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/a"), to: URL(fileURLWithPath: "/b"))])
+        writer.appendUndo([RenamedItem(from: URL(fileURLWithPath: "/a"), destination: URL(fileURLWithPath: "/b"))])
         writer.flush()
         let copy = MemorySettings()
         for key in ["multirename.undo", "multirename.undoCount"] { copy.set(settings.data(forKey: key), forKey: key) }
@@ -77,7 +77,7 @@ internal struct CoverageRenameStore {
         var answered = false
         reader.loadUndo { answered = true }
         #expect(await RunLoopWait.until { answered })
-        #expect(reader.lastUndo?.first?.to.path == "/b")
+        #expect(reader.lastUndo.first?.destination.path == "/b")
     }
 
     /// Writing the history now is nothing to do while it was never read.

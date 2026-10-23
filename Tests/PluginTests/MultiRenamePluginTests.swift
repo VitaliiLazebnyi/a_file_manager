@@ -137,7 +137,10 @@ internal struct MultiRenameRuns {
             items: items,
             store: RenameStore(settings: self.settings),
             settings: settings,
-            logDirectory: box.url("log")
+            logDirectory: box.url("log"),
+            previewsInBackground: true,
+            clipboard: { nil },
+            clipboardChangeCount: nil
         )
         var changes = 0
         session.onChange = { changes += 1 }
@@ -179,7 +182,7 @@ internal struct MultiRenameRuns {
         let session = open()
         session.settings.search = "IMG_"
         session.settings.replacement = "pic"
-        session.start()
+        session.start(completion: nil)
         #expect(photos == ["notes.txt", "pic1001.jpg", "pic1002.jpg", "pic1003.jpg"])
         #expect(session.rows.map(\.entry.name) == ["notes.txt"])
     }
@@ -188,7 +191,7 @@ internal struct MultiRenameRuns {
     internal func resultLog() throws {
         let session = open(["IMG_1001.jpg", "IMG_1002.jpg"])
         session.settings.nameMask = "[C]/pic"
-        session.start()
+        session.start(completion: nil)
         let log = try String(contentsOf: box.url("log/renlog.txt"), encoding: .utf8)
         #expect(log == "\"mem:/photos/IMG_1001.jpg\" -> \"1/pic.jpg\"\n\"mem:/photos/IMG_1002.jpg\" -> \"2/pic.jpg\"\n")
         #expect(session.logURL == box.url("log/renlog.txt"))
@@ -202,13 +205,13 @@ internal struct MultiRenameRuns {
     internal func slashesMoveIntoFoldersThatAreCreated() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "[C+1/2]/[N]"
-        session.start()
+        session.start(completion: nil)
         #expect(
             memory.allPaths.filter { $0.hasPrefix("/photos/") && $0.hasSuffix(".jpg") }
                 == ["/photos/1/IMG_1001.jpg", "/photos/1/IMG_1002.jpg", "/photos/2/IMG_1003.jpg"]
         )
         ui.choiceAnswers = [0]
-        session.undo()
+        session.undo(completion: nil)
         // Undo puts the files back and leaves the folders.
         #expect(photos == ["1", "2", "IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg", "notes.txt"])
     }
@@ -217,8 +220,8 @@ internal struct MultiRenameRuns {
     internal func swapsAndShiftsThroughGivenNames() {
         let session = open(["IMG_*"])
         session.loadNames(fromText: "IMG_1002.jpg\r\nIMG_1003.jpg\r\nIMG_1001.jpg\r\n")
-        #expect(session.givenNames?.count == 3 && session.rows.allSatisfy { $0.status == .ready })
-        session.start()
+        #expect(session.givenNames.count == 3 && session.rows.allSatisfy { $0.status == .ready })
+        session.start(completion: nil)
         #expect(photos == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg", "notes.txt"])
         #expect(
             ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"].map { memory.contents("/photos/" + $0) } == [
@@ -227,7 +230,7 @@ internal struct MultiRenameRuns {
         )
         #expect(!memory.allPaths.contains { $0.contains("afm-rename") })
         ui.choiceAnswers = [0]
-        session.undo()
+        session.undo(completion: nil)
         #expect(
             ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg"].map { memory.contents("/photos/" + $0) } == [
                 "p0", "p1", "p2"
@@ -245,11 +248,11 @@ internal struct MultiRenameRuns {
         #expect(
             names(session) == ["2.txt", "3.txt", "4.txt", "5.txt"] && session.rows.allSatisfy { $0.status == .ready }
         )
-        session.start()
+        session.start(completion: nil)
         #expect(namesOnDisk(box.url("A")) == ["2.txt", "3.txt", "4.txt", "5.txt"])
         #expect((2...5).map { box.read("A/\($0).txt") } == ["content 1", "content 2", "content 3", "content 4"])
         ui.choiceAnswers = [0]
-        session.undo()
+        session.undo(completion: nil)
         #expect(namesOnDisk(box.url("A")) == ["1.txt", "2.txt", "3.txt", "4.txt"])
         #expect(box.read("A/1.txt") == "content 1" && box.read("A/4.txt") == "content 4")
     }
@@ -264,11 +267,11 @@ internal struct MultiRenameRuns {
         #expect(session.rows.map(\.entry.name) == ["one.txt", "readme.md", "two.txt"])
         session.loadNames(fromText: "two.txt\nREADME.md\none.txt")
         #expect(session.rows.allSatisfy { $0.status == .ready })
-        session.start()
+        session.start(completion: nil)
         #expect(namesOnDisk(box.url("A")) == ["README.md", "one.txt", "two.txt"])
         #expect(box.read("A/one.txt") == "2" && box.read("A/two.txt") == "1" && box.read("A/README.md") == "r")
         ui.choiceAnswers = [0]
-        session.undo()
+        session.undo(completion: nil)
         #expect(namesOnDisk(box.url("A")) == ["one.txt", "readme.md", "two.txt"])
         #expect(box.read("A/one.txt") == "1" && box.read("A/two.txt") == "2")
     }
@@ -281,7 +284,7 @@ internal struct MultiRenameRuns {
         let session = open()
         session.settings.letterCase = .upper
         #expect(session.rows.allSatisfy { $0.status == .ready })
-        session.start()
+        session.start(completion: nil)
         #expect(namesOnDisk(box.url("A")) == ["A.TXT", "B.TXT"] && box.read("A/A.TXT") == "a")
     }
 
@@ -293,7 +296,7 @@ internal struct MultiRenameRuns {
         session.settings.nameMask = "notes"
         session.settings.extensionMask = "txt"
         ui.choiceAnswers = [0]
-        session.start()
+        session.start(completion: nil)
         #expect(photos == ["notes (2).txt", "notes (3).txt", "notes (4).txt", "notes.txt"])
         #expect(memory.contents("/photos/notes.txt") == "n" && memory.contents("/photos/notes (2).txt") == "p0")
         #expect(ui.log.contains { $0.hasPrefix("choose: Name conflict: 3 file(s)") })
@@ -305,10 +308,10 @@ internal struct MultiRenameRuns {
         session.settings.search = "IMG_1001.jpg|IMG_1002"
         session.settings.replacement = "notes.txt|pic"
         // Cancel: nothing happens.
-        session.start()
+        session.start(completion: nil)
         #expect(photos == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg", "notes.txt"] && !session.canUndo)
         ui.choiceAnswers = [1]
-        session.start()
+        session.start(completion: nil)
         #expect(photos == ["IMG_1001.jpg", "IMG_1003.jpg", "notes.txt", "pic.jpg"])
         #expect(session.rows.map(\.entry.name) == ["IMG_1001.jpg", "IMG_1003.jpg", "notes.txt"])
     }
@@ -320,7 +323,7 @@ internal struct MultiRenameRuns {
         // After the preview, behind the tool's back; the run finds it and asks.
         memory.addFile("/photos/new2.jpg", "other")
         ui.choiceAnswers = [1]
-        session.start()
+        session.start(completion: nil)
         #expect(memory.contents("/photos/new2.jpg") == "other" && memory.contents("/photos/new1.jpg") == "p0")
         #expect(memory.exists("/photos/IMG_1002.jpg"))
     }
@@ -350,9 +353,9 @@ internal struct MultiRenameRuns {
     internal func undoAsksAndRestoresInReverseOrder() {
         let session = open(["IMG_*"])
         session.settings.nameMask = "Photo_[C]"
-        session.start()
+        session.start(completion: nil)
         // No: nothing happens.
-        session.undo()
+        session.undo(completion: nil)
         #expect(photos.contains("Photo_1.jpg") && session.canUndo)
         #expect(
             ui.log.last
@@ -370,21 +373,21 @@ internal struct MultiRenameRuns {
     internal func undoWorksAfterTheToolWasClosedAndKeepsWhatFailed() {
         var session = open(["IMG_*"])
         session.settings.nameMask = "a[C]"
-        session.start()
+        session.start(completion: nil)
         session = open(["notes.txt"])
         session.settings.nameMask = "b"
-        session.start()
+        session.start(completion: nil)
         #expect(RenameStore(settings: settings).undoHistory.map(\.count) == [3, 1])
         // Another program takes one of the old names.
         memory.addFile("/photos/IMG_1002.jpg", "taken")
         // A new session, as after reopening the tool: the runs are undone one by one.
         session = open(["b.txt"])
         ui.choiceAnswers = [0, 0]
-        session.undo()
+        session.undo(completion: nil)
         #expect(memory.exists("/photos/notes.txt") && session.canUndo)
         var left: [RenamedItem]?
         session.undo { left = $0 }
-        #expect(left?.map(\.to.lastPathComponent) == ["a2.jpg"])
+        #expect(left?.map(\.destination.lastPathComponent) == ["a2.jpg"])
         #expect(photos == ["IMG_1001.jpg", "IMG_1002.jpg", "IMG_1003.jpg", "a2.jpg", "notes.txt"])
         #expect(memory.contents("/photos/IMG_1002.jpg") == "taken")
         #expect(RenameStore(settings: settings).undoHistory.map(\.count) == [1])
@@ -397,13 +400,13 @@ internal struct MultiRenameRuns {
         for round in 1...3 {
             let session = open(["notes*"])
             session.settings.nameMask = "notes\(round)"
-            session.start()
+            session.start(completion: nil)
         }
         #expect(RenameStore(settings: settings).undoHistory.count == 2)
         settings.set("0", forKey: RenameStore.undoLimitKey)
         let session = open(["notes*"])
         session.settings.nameMask = "final"
-        session.start()
+        session.start(completion: nil)
         #expect(photos.contains("final.txt") && !session.canUndo)
     }
 
@@ -438,7 +441,7 @@ internal struct MultiRenameRuns {
         #expect(
             session.rows.map(\.entry.name) == ["IMG_1003.jpg", "IMG_1001.jpg"] && names(session) == ["1.jpg", "2.jpg"]
         )
-        session.start()
+        session.start(completion: nil)
         #expect(
             memory.contents("/photos/1.jpg") == "p2" && memory.contents("/photos/2.jpg") == "p0"
                 && memory.exists("/photos/IMG_1002.jpg")
@@ -456,7 +459,7 @@ internal struct MultiRenameRuns {
         #expect(session.rows.map(\.entry.name) == ["holiday 1001.jpg", "holiday 1002.jpg", "holiday 1003.jpg"])
         #expect(session.rows.allSatisfy { $0.status == .ready })
         session.settings.nameMask = "[F][N1-7]-[N-1]"
-        session.start()
+        session.start(completion: nil)
         #expect(photos == ["Holiday-1.jpg", "Holiday-2.jpg", "Holiday-3.jpg", "notes.txt"])
     }
 
@@ -478,19 +481,19 @@ internal struct MultiRenameRuns {
         #expect(names(session).first == "IMG_1001X.JPG")
         ui.formAnswers = [.cancel]
         session.editNames()
-        #expect(session.givenNames == nil)
+        #expect(session.givenNames.isEmpty)
 
         session.settings = .unchanged
         let list = try box.file("names.txt", "a.jpg\nb.jpg\nc.jpg\n")
         var loaded = false
         session.loadNames(from: list) { loaded = true }
         #expect(loaded && names(session) == ["a.jpg", "b.jpg", "c.jpg"])
-        session.loadNames(from: memory.addFile("/lists/utf16.txt", "ignored"))
-        session.loadNames(from: box.url("missing.txt"))
+        session.loadNames(from: memory.addFile("/lists/utf16.txt", "ignored"), completion: nil)
+        session.loadNames(from: box.url("missing.txt"), completion: nil)
         #expect(ui.log.last == "inform: The names cannot be loaded!")
         // Sorting ends the pairing of names and places.
         session.sort(by: .name, ascending: false)
-        #expect(session.givenNames == nil)
+        #expect(session.givenNames.isEmpty)
     }
 
     // MARK: Settings
@@ -566,7 +569,9 @@ internal struct MultiRenameWindow {
             store: RenameStore(settings: bench.kernel.settings),
             settings: .unchanged,
             logDirectory: box.url("log"),
-            previewsInBackground: false
+            previewsInBackground: false,
+            clipboard: { nil },
+            clipboardChangeCount: nil
         )
         let controller = MultiRenameWindowController(kernel: bench.kernel, session: session)
         let window = try #require(controller.window)
