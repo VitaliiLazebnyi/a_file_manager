@@ -700,19 +700,14 @@ internal struct Review2PluginsA2Rename {
         let sources = (0..<40_000).map { URL(fileURLWithPath: "/x/f\($0).txt") }
         let targets: [URL?] = (0..<40_000).map { URL(fileURLWithPath: "/x/g\($0).txt") }
         let planner = RenamePlanner()
-        #expect(planner.steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { false }.count == 40_000)
+        let all = planner.steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { false }
+        #expect(all.count == 40_000)
         #expect(planner.steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { true }.isEmpty)
         var calls = 0
-        let part = planner.steps(
-            sources: sources,
-            targets: targets,
-            isFolder: [],
-            temporaryName: nil,
-            cancelled: {
-                calls += 1
-                return calls > 2
-            }
-        )
+        let part = planner.steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) {
+            calls += 1
+            return calls > 2
+        }
         #expect(part.count < 40_000)
     }
 
@@ -720,7 +715,8 @@ internal struct Review2PluginsA2Rename {
     internal func aRingOfRenamesIsStillOpenedWithATemporaryName() {
         let sources = ["1", "2", "3"].map { URL(fileURLWithPath: "/x/\($0).txt") }
         let targets: [URL?] = ["2", "3", "1"].map { URL(fileURLWithPath: "/x/\($0).txt") }
-        let steps = RenamePlanner().steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { false }
+        let steps = RenamePlanner()
+            .steps(sources: sources, targets: targets, isFolder: [], temporaryName: nil) { false }
         #expect(
             steps.count == 4 && steps.filter { $0.kind == .park }.count == 1
                 && steps.filter { $0.kind == .unpark }.count == 1

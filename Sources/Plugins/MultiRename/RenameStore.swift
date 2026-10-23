@@ -72,8 +72,6 @@ internal final class RenameStore {
     private let own: any SettingsStore
     private let memory: Memory
 
-    // MARK: Preferences
-
     /// How many runs can be undone; 0 turns Undo off (`MultiRenameUndoHistoryLen`).
     internal var undoLimit: Int {
         max(0, Int(all.text(Self.undoLimitKey, default: "20").trimmingCharacters(in: .whitespaces)) ?? 20)
@@ -86,8 +84,6 @@ internal final class RenameStore {
     internal var titleRule: TitleCaseRule {
         TitleCaseRule(setting: all.text(Self.lowercaseWordsKey, default: TitleCaseRule.defaultSetting))
     }
-
-    // MARK: Saved settings
 
     /// Settings that cannot be read are left out; the others stay.
     internal var saved: [String: RenameSettings] {
@@ -113,8 +109,6 @@ internal final class RenameStore {
     /// Changes whenever a history or the saved settings change; a window that shows them
     /// need not rebuild them while it stays the same.
     internal var revision: Int { memory.revision }
-
-    // MARK: Undo
 
     /// The runs that can be undone, the latest last.
     ///
@@ -170,8 +164,6 @@ internal final class RenameStore {
         memories[ObjectIdentifier(settings)] = created
         return created
     }
-
-    // MARK: Histories
 
     /// What was typed into a field before, newest first.
     internal func history(_ history: History) -> [String] {
